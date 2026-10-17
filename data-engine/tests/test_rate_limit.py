@@ -146,9 +146,23 @@ def test_production_store_unavailable_returns_honest_503(monkeypatch):
             research_auth_secret=SECRET,
             minio_secret_key="production-minio-secret-not-a-default",
             minio_access_key="production-minio-access-not-a-default",
+            database_url="postgresql://cavaai:Sup3rStrong-Unique-Pass@db:5432/cavaai",
         ),
     )
     client = TestClient(_app(_principal("user-a")))
     response = client.post("/api/chat")
     assert response.status_code == 503
     assert response.json() == {"detail": "Rate limit backend unavailable"}
+
+
+def test_redis_clients_set_socket_timeout():
+    # Sin socket_timeout un Redis colgado (conexion abierta, sin respuesta)
+    # bloquea el request indefinidamente aunque connect_timeout sea corto.
+    from pathlib import Path
+
+    import app.core.rate_limit as rl
+    import app.core.replay as rp
+
+    for module in (rl, rp):
+        source = Path(module.__file__).read_text()
+        assert "socket_timeout=0.5" in source, module.__name__

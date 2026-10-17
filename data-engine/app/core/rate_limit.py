@@ -117,7 +117,7 @@ async def _record_hit(
 
             from app.core.redis_retry import no_retry_async
 
-            client = redis.from_url(redis_url, socket_connect_timeout=0.25, retry=no_retry_async())
+            client = redis.from_url(redis_url, socket_connect_timeout=0.25, socket_timeout=0.5, retry=no_retry_async())
             member = f"{now:.6f}:{uuid.uuid4().hex}"
             try:
                 async with client.pipeline(transaction=True) as pipe:

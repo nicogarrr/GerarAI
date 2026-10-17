@@ -500,6 +500,9 @@ class Settings(BaseSettings):
             _assert_strong_credentials(self.database_url, label="DATABASE_URL")
         if self.mongodb_uri:
             _assert_strong_credentials(self.mongodb_uri, label="MONGODB_URI")
+        # Ultimo, para no tapar los mensajes de las demas garantias.
+        if database_scheme.startswith("sqlite"):
+            raise ValueError("SQLite is not allowed as DATABASE_URL in production")
         return self
 
 
