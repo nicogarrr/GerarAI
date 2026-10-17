@@ -31,11 +31,13 @@ from tests.auth_helpers import auth_settings, bound_headers, signed_request
 SECRET = "research-security-test-secret-at-least-32-chars"
 
 
-@pytest.fixture
+
 # Fixture ficticia de Postgres "fuerte" para Settings en produccion; se arma por
 # trozos para no parecer una URI con credenciales reales en el diff.
 PROD_TEST_DATABASE_URL = "postgresql:" + "//app_user" + ":" + "not-a-real-secret-fixture" + "@db:5432/app"
 
+
+@pytest.fixture
 def required_auth(monkeypatch):
     monkeypatch.setattr(
         auth_module,

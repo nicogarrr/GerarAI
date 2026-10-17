@@ -13,9 +13,8 @@ from app.api.routes.health import router as health_router
 from app.core.auth import get_research_principal
 from app.core.config import get_settings
 from app.core.database import SessionLocal, init_db
-from app.core.rate_limit import enforce_rate_limit
+from app.core.rate_limit import AuthFailureLimitMiddleware, enforce_rate_limit
 from app.core.raw_body import RawBodyMiddleware
-from app.core.rate_limit import AuthFailureLimitMiddleware
 from app.llm.factory import validate_llm_configuration
 from app.llm.model_aliases import configure_model_aliases
 from app.metrics.latency import LatencyMetricsMiddleware
