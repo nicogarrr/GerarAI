@@ -41,7 +41,7 @@ El script levanta **solo la infraestructura** con Docker (PostgreSQL, MongoDB,
 Redis, Qdrant, MinIO), libera los puertos 8000/3000 de procesos huérfanos de
 sesiones anteriores, aplica las migraciones de Alembic (se detiene si fallan)
 y arranca backend (uvicorn :8000) y frontend (next :3000) en local, abriendo
-REDACTED_BY_AUDIT en el navegador.
+http://localhost:3000 en el navegador.
 
 **Opción A — stack completo con Docker:**
 
@@ -51,7 +51,7 @@ cp docker.env.example .env
 docker compose up --build
 ```
 
-Abre REDACTED_BY_AUDIT. Servicios: PostgreSQL, MongoDB (auth), Qdrant (vectores), MinIO (documentos), Redis.
+Abre http://localhost:3000. Servicios: PostgreSQL, MongoDB (auth), Qdrant (vectores), MinIO (documentos), Redis.
 
 | Servicio | Puerto host |
 |---|---|

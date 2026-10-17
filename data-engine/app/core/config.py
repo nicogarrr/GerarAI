@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     app_name: str = "CavaAI Research Engine"
     api_prefix: str = "/api"
     cors_origins: list[str] = Field(
-        default_factory=lambda: ["REDACTED_BY_AUDIT", "http://127.0.0.1:3000"]
+        default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )
 
     # Research OS is private by default. Tests that intentionally exercise the

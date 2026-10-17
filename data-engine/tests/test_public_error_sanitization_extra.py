@@ -104,7 +104,7 @@ def test_no_infrastructure_detail_reaches_the_client():
 
 def test_redact_secrets_strips_provider_keys():
     for template in (
-        "REDACTED_BY_AUDIT/quote?symbol=AAPL&token=SECRETVALUE",
+        "https://finnhub.io/api/v1/quote?symbol=AAPL&token=SECRETVALUE",
         "https://financialmodelingprep.com/api/v3/x?apikey=SECRETVALUE",
         "url=redis://user:pass@cache:6379&api_key=SECRETVALUE",
     ):

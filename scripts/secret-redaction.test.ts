@@ -22,7 +22,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 
 const SECRET = 'VERYSECRET123';
-const RAW_URL = `REDACTED_BY_AUDIT/quote?symbol=AAPL&token=${SECRET}`;
+const RAW_URL = `https://finnhub.io/api/v1/quote?symbol=AAPL&token=${SECRET}`;
 
 describe('redactUrl', () => {
     it('redacta la credencial de la query', () => {

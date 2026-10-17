@@ -27,7 +27,7 @@ const envSchema = z.object({
 
   // Finnhub - Opcional (hay fallback)
   FINNHUB_API_KEY: z.string().optional(),
-  FINNHUB_BASE_URL: z.string().url().default('REDACTED_BY_AUDIT'),
+  FINNHUB_BASE_URL: z.string().url().default('https://finnhub.io/api/v1'),
 
   // FMP - Financial Modeling Prep
   FMP_API_KEY: z.string().optional(),

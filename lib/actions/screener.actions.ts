@@ -5,7 +5,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { jsonBody, researchRequest } from '@/lib/research/client';
 import { formatNumber } from '@/lib/format';
 
-const FINNHUB_BASE_URL = 'REDACTED_BY_AUDIT';
+const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
 export type ScreenerFilters = {

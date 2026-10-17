@@ -327,13 +327,13 @@ services:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - RESEARCH_AUTH_REQUIRED=true
       - RESEARCH_AUTH_SECRET=${RESEARCH_AUTH_SECRET:?Set RESEARCH_AUTH_SECRET in .env}
-      - NEXT_PUBLIC_APP_URL=REDACTED_BY_AUDIT
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
     healthcheck:
       # node:alpine sin curl: fetch nativo de Node 22.
       test:
         - CMD-SHELL
         - >-
-          node -e "fetch('REDACTED_BY_AUDIT/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+          node -e "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 15s
       timeout: 10s
       retries: 5

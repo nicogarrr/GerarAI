@@ -26,7 +26,7 @@ try {
     const auth = betterAuth({
         database: mongodbAdapter(mongoose.connection),
         secret: 'ci-only-secret-that-is-long-enough-for-builds',
-        baseURL: 'REDACTED_BY_AUDIT',
+        baseURL: 'http://localhost:3000',
         emailAndPassword: {
             enabled: true,
             disableSignUp: false,
