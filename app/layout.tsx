@@ -32,9 +32,10 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
-  alternates: {
-    canonical: '/',
-  },
+  // Sin `alternates.canonical` aqui: un canonico en el layout raiz lo heredan
+  // TODAS las rutas, y /metodologia y /help (indexables) pasaban a declarar
+  // canonico '/' - se fusionaban con la landing en el indice. Cada pagina
+  // publica declara el suyo (la landing ya tenia '/').
 };
 
 export const viewport: Viewport = {
