@@ -115,6 +115,15 @@ export function isAppError(error: unknown): error is AppError {
 }
 
 /**
+ * 401/403: sesión caducada o acceso denegado. NUNCA es «sin datos»: una
+ * página que lo traduce a su estado vacío le dice al usuario «no tienes
+ * nada» cuando en realidad no se le dejó entrar. Se propaga o se redirige.
+ */
+export function isAuthError(error: unknown): boolean {
+  return isAppError(error) && (error.statusCode === 401 || error.statusCode === 403);
+}
+
+/**
  * Type guard para verificar si un error es un Error estándar
  */
 export function isError(error: unknown): error is Error {
