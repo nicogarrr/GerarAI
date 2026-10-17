@@ -117,7 +117,7 @@ python -m venv .venv && ./.venv/Scripts/pip install -r requirements.txt
 
 # Frontend (raíz)
 npm install
-npm run dev            # REDACTED_BY_AUDIT (FMP_BACKEND_URL=http://localhost:8000)
+npm run dev            # http://localhost:3000 (FMP_BACKEND_URL=http://localhost:8000)
 
 # Tests del backend
 ./.venv/Scripts/python -m pytest tests/ -q

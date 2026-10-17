@@ -85,14 +85,14 @@ describe('los errores no filtran credenciales al cliente', () => {
         const { redactUrl } = await import('../lib/upstream/redact.ts');
         // La key de Finnhub viaja en ?token=; el mensaje de error de la
         // accion la devolvia entera al navegador.
-        const redacted = redactUrl('REDACTED_BY_AUDIT/quote?symbol=AAPL&token=SUPERSECRET');
+        const redacted = redactUrl('https://finnhub.io/api/v1/quote?symbol=AAPL&token=SUPERSECRET');
         assert.ok(!redacted.includes('SUPERSECRET'), redacted);
         assert.ok(redacted.includes('REDACTED'), redacted);
         assert.ok(redacted.includes('symbol=AAPL'), redacted);
         // Una URL sin credenciales se devuelve intacta.
         assert.equal(
-            redactUrl('REDACTED_BY_AUDIT/quote?symbol=AAPL'),
-            'REDACTED_BY_AUDIT/quote?symbol=AAPL',
+            redactUrl('https://finnhub.io/api/v1/quote?symbol=AAPL'),
+            'https://finnhub.io/api/v1/quote?symbol=AAPL',
         );
     });
 });

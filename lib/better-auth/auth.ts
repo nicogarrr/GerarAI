@@ -24,7 +24,7 @@ if (!signUpDisabled && requireEmailVerification) {
 const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => betterAuth({
     ...(database ? { database } : {}),
     secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.BETTER_AUTH_URL || env.VERCEL_URL || 'REDACTED_BY_AUDIT',
+    baseURL: env.BETTER_AUTH_URL || env.VERCEL_URL || 'http://localhost:3000',
     emailAndPassword: {
         enabled: true,
         // P0: en producción el signup queda cerrado por defecto para evitar

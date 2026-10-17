@@ -141,7 +141,7 @@ async function revisionOverlay(symbol: string, cutoffDay: string): Promise<Signa
     try {
         const token = process.env.FINNHUB_API_KEY;
         if (!token) return null;
-        const url = `REDACTED_BY_AUDIT/stock/earnings?symbol=${encodeURIComponent(symbol)}&token=${token}`;
+        const url = `https://finnhub.io/api/v1/stock/earnings?symbol=${encodeURIComponent(symbol)}&token=${token}`;
         const rows = await fetchJson<FinnhubEarningsRow[]>(url, `ov:rev:${symbol}:${cutoffDay}`);
         if (!Array.isArray(rows) || rows.length === 0) return null;
 

@@ -206,7 +206,7 @@ _REAL_UNIVERSE: list[tuple[str, str, str]] = [
 
 _ETF_SYMBOLS = {"SPY", "QQQ", "IWM", "DIA", "VOO", "VTI", "GLD"}
 
-_FINNHUB_BASE = "REDACTED_BY_AUDIT"
+_FINNHUB_BASE = "https://finnhub.io/api/v1"
 _PROFILE_TTL = 6 * 3600.0  # 6h: nombre/market cap/sector cambian lento
 _QUOTE_TTL = 60.0  # precio real del día, refrescado cada minuto (como market.py)
 # El universo tiene 35 símbolos: un burst de seis workers está por debajo del

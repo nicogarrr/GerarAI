@@ -21,7 +21,7 @@ class FinnhubClient:
     corrida se perdian sin reintento.
     """
 
-    base_url = "REDACTED_BY_AUDIT"
+    base_url = "https://finnhub.io/api/v1"
 
     def __init__(self) -> None:
         self.settings = get_settings()

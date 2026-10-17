@@ -11,7 +11,7 @@ import { NewsSource } from '@/lib/types/vendorSources';
 
 export type { NewsSource };
 
-const FINNHUB_BASE_URL = 'REDACTED_BY_AUDIT';
+const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 
 /**
  * Fetch news from Finnhub

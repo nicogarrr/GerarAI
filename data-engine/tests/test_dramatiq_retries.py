@@ -222,10 +222,10 @@ def test_sec_attribution_via_cause_chain():
 def test_other_provider_error_mentioning_sec_url_is_not_sec():
     """Un 429 de otro proveedor cuya request NO es sec.gov no alimenta el
     breaker aunque el texto mencione una URL de la SEC."""
-    request = httpx.Request("GET", "REDACTED_BY_AUDIT/quote")
+    request = httpx.Request("GET", "https://finnhub.io/api/v1/quote")
     response = httpx.Response(429, request=request)
     exc = httpx.HTTPStatusError(
-        "Client error '429 Too Many Requests' for url 'REDACTED_BY_AUDIT/quote'; "
+        "Client error '429 Too Many Requests' for url 'https://finnhub.io/api/v1/quote'; "
         "see https://www.sec.gov/Archives for reference",
         request=request,
         response=response,

@@ -10,7 +10,7 @@ import { AuthorizationError, ValidationError } from '@/lib/types/errors';
 import { sumCashByCurrency } from '@/lib/portfolio-cash';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
 
-const FINNHUB_BASE_URL = 'REDACTED_BY_AUDIT';
+const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
 async function resolveUserId(requestedUserId?: string): Promise<string> {

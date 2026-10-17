@@ -526,7 +526,7 @@ def test_safe_detail_never_returns_exception_text(caplog):
 def test_safe_detail_redacts_vendor_keys_in_server_log(caplog):
     # httpx mete la URL completa (con la key del servidor) en el texto de la
     # excepcion: el log tampoco puede guardarla.
-    exc = RuntimeError("GET REDACTED_BY_AUDIT/quote?symbol=AAPL&token=secrettoken123 failed")
+    exc = RuntimeError("GET https://finnhub.io/api/v1/quote?symbol=AAPL&token=secrettoken123 failed")
     with caplog.at_level(logging.ERROR, logger="cavaai.request_errors"):
         detail = safe_detail(exc, 500)
     assert "secrettoken123" not in detail
@@ -541,7 +541,7 @@ def test_rag_status_error_redacts_vendor_keys(monkeypatch):
 
     class _Boom:
         def get_collections(self):
-            raise RuntimeError("GET REDACTED_BY_AUDIT/quote?token=secrettoken123 failed")
+            raise RuntimeError("GET https://finnhub.io/api/v1/quote?token=secrettoken123 failed")
 
     monkeypatch.setattr(RAGIndex, "client", lambda self: _Boom())
     out = RAGIndex().status()

@@ -108,7 +108,7 @@ class CompanyEnrichmentService:
             return None
         try:
             resp = self._client.get(
-                "REDACTED_BY_AUDIT/stock/profile2",
+                "https://finnhub.io/api/v1/stock/profile2",
                 params={"symbol": ticker, "token": key},
             )
             if resp.status_code == 200:
@@ -127,7 +127,7 @@ class CompanyEnrichmentService:
             return None
         try:
             resp = self._client.get(
-                "REDACTED_BY_AUDIT/search",
+                "https://finnhub.io/api/v1/search",
                 params={"q": ticker, "token": key},
             )
             if resp.status_code != 200:

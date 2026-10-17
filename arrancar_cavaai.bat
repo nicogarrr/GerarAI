@@ -97,12 +97,12 @@ start "CavaAI frontend (prod)" node_modules\.bin\next start -p 3000
 echo Esperando al frontend prod (arranca en ~2 s tras el build)...
 :wait_web
 for /L %%i in (1,1,30) do (
-  curl -sf REDACTED_BY_AUDIT/ >nul 2>&1 && goto web_ok
+  curl -sf http://localhost:3000/ >nul 2>&1 && goto web_ok
   timeout /t 4 /nobreak >nul
 )
 :web_ok
-start REDACTED_BY_AUDIT/
-echo Listo (%FRONT_MODE%): REDACTED_BY_AUDIT/
+start http://localhost:3000/
+echo Listo (%FRONT_MODE%): http://localhost:3000/
 pause
 goto :eof
 

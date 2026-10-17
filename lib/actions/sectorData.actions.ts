@@ -4,7 +4,7 @@ import { cache } from 'react';
 import { fetchJSON } from '@/lib/upstream/finnhub';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 
-const FINNHUB_BASE_URL = 'REDACTED_BY_AUDIT';
+const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 
 /**
  * Obtiene promedios del sector desde Finnhub (si está disponible)
