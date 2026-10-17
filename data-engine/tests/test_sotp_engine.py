@@ -51,8 +51,8 @@ def test_sotp_requires_sourced_segment_metrics_multiples_and_discount():
                     metric=metric,
                     value=Decimal(str(value)),
                     unit="decimal",
-                    period="FY2025",
-                    fiscal_year=2025,
+                    period=f"FY{(fiscal_years or {}).get(metric, 2025)}",
+                    fiscal_year=(fiscal_years or {}).get(metric, 2025),
                     fiscal_quarter="FY",
                     source_type="sotp_engine_test",
                     confidence=Decimal("0.91"),
@@ -91,7 +91,9 @@ BASE_FACTS = {
 }
 
 
-def _sotp_result(facts_overrides: dict, *, tags=None, price=None) -> dict:
+def _sotp_result(
+    facts_overrides: dict, *, tags=None, price=None, fiscal_years: dict | None = None
+) -> dict:
     """Valida SOTPE con `facts_overrides` aplicando encima de BASE_FACTS.
 
     `None` como valor borra el fact: es la forma de expresar "no existe".
@@ -234,3 +236,16 @@ def test_shared_adr_helper_only_admits_positive_finite_unambiguous_ratios():
         assert adr_ratio(company) is None
         assert is_adr_without_ratio(company)
     assert adr_ratio(SimpleNamespace(factor_tags=["adr:8", "adr:8.0"])) == 8
+
+
+def test_sotp_blocks_segments_from_different_periods():
+    result = _sotp_result({}, fiscal_years={"segment_assets_operating_metric": 2022})
+    assert result["status"] != "ok"
+    assert result["publishable"] is False
+    assert "consistent_segment_periods" in result["missing_inputs"]
+
+
+def test_sotp_same_period_segments_still_value():
+    result = _sotp_result({})
+    assert result["status"] == "ok"
+    assert "consistent_segment_periods" not in result["missing_inputs"]

@@ -94,6 +94,7 @@ class SOTPEngine(ValuationEngine):
         net_debt = float(net_debt_fact.value) if net_debt_fact is not None else None
 
         segments: list[dict] = []
+        segment_period_keys: list = []
         missing_segments: list[str] = []
         segment_sources: list[FinancialFact] = []
         suffix = "_valuation_multiple"
@@ -121,6 +122,11 @@ class SOTPEngine(ValuationEngine):
                 }
             )
             segment_sources.extend([operating_fact, multiple_fact])
+            segment_period_keys.append(
+                operating_fact.fiscal_year
+                if operating_fact.fiscal_year is not None
+                else operating_fact.period
+            )
 
         discount_fact = latest_by_metric.get("holding_company_discount")
 
@@ -131,6 +137,12 @@ class SOTPEngine(ValuationEngine):
             missing.append("net_debt")
         if discount_fact is None or not 0 <= float(discount_fact.value) < 1:
             missing.append("holding_company_discount")
+        # Cada segmento toma "su ultimo" hecho por separado: sin esta comprobacion
+        # un NAV podia sumar un segmento de FY2024 con otro de FY2022 y publicarlo
+        # como un unico periodo.
+        segment_periods = set(segment_period_keys)
+        if len(segment_periods) > 1:
+            missing.append("consistent_segment_periods")
         if not segments:
             missing.extend(
                 missing_segments
