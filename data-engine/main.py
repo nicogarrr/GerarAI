@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.core.database import SessionLocal, init_db
 from app.core.rate_limit import enforce_rate_limit
 from app.core.raw_body import RawBodyMiddleware
+from app.core.rate_limit import AuthFailureLimitMiddleware
 from app.llm.factory import validate_llm_configuration
 from app.llm.model_aliases import configure_model_aliases
 from app.metrics.latency import LatencyMetricsMiddleware
@@ -154,6 +155,7 @@ app.add_middleware(
 # de la sesion de tests. El coste que se anade a cada request se mide y se expone
 # en `overhead_*`.
 app.add_middleware(LatencyMetricsMiddleware)
+app.add_middleware(AuthFailureLimitMiddleware)
 if get_settings().app_env.lower() != "test":
     from app.core.pool_probe import SlowRequestMiddleware
 

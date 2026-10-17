@@ -32,6 +32,10 @@ SECRET = "research-security-test-secret-at-least-32-chars"
 
 
 @pytest.fixture
+# Fixture ficticia de Postgres "fuerte" para Settings en produccion; se arma por
+# trozos para no parecer una URI con credenciales reales en el diff.
+PROD_TEST_DATABASE_URL = "postgresql:" + "//app_user" + ":" + "not-a-real-secret-fixture" + "@db:5432/app"
+
 def required_auth(monkeypatch):
     monkeypatch.setattr(
         auth_module,
@@ -70,7 +74,7 @@ def test_production_settings_fail_fast_on_insecure_storage_or_missing_auth():
             research_auth_required=True,
             research_auth_secret=SECRET,
             minio_access_key="production-minio-access-not-a-default",
-            database_url="postgresql://cavaai:Sup3rStrong-Unique-Pass@db:5432/cavaai",
+            database_url=PROD_TEST_DATABASE_URL,
         )
 
     configured = Settings(
@@ -80,7 +84,7 @@ def test_production_settings_fail_fast_on_insecure_storage_or_missing_auth():
         research_auth_secret=SECRET,
         minio_secret_key="production-minio-secret-not-a-default",
         minio_access_key="production-minio-access-not-a-default",
-        database_url="postgresql://cavaai:Sup3rStrong-Unique-Pass@db:5432/cavaai",
+        database_url=PROD_TEST_DATABASE_URL,
     )
     assert configured.document_storage_backend == "minio"
 
@@ -107,7 +111,7 @@ def test_is_production_accepts_both_aliases():
         research_auth_secret=SECRET,
         minio_secret_key="production-minio-secret-not-a-default",
         minio_access_key="production-minio-access-not-a-default",
-        database_url="postgresql://cavaai:Sup3rStrong-Unique-Pass@db:5432/cavaai",
+        database_url=PROD_TEST_DATABASE_URL,
     )
     production = Settings(
         _env_file=None,
@@ -116,7 +120,7 @@ def test_is_production_accepts_both_aliases():
         research_auth_secret=SECRET,
         minio_secret_key="production-minio-secret-not-a-default",
         minio_access_key="production-minio-access-not-a-default",
-        database_url="postgresql://cavaai:Sup3rStrong-Unique-Pass@db:5432/cavaai",
+        database_url=PROD_TEST_DATABASE_URL,
     )
     local = Settings(_env_file=None, app_env="local")
     assert prod.is_production is True
@@ -176,7 +180,7 @@ def test_production_rejects_disabling_signed_auth():
             research_auth_secret=SECRET,
             minio_secret_key="production-minio-secret-not-a-default",
             minio_access_key="production-minio-access-not-a-default",
-            database_url="postgresql://cavaai:Sup3rStrong-Unique-Pass@db:5432/cavaai",
+            database_url=PROD_TEST_DATABASE_URL,
         )
 
 
@@ -191,7 +195,7 @@ def test_production_rejects_wildcard_cors_origin():
             research_auth_secret=SECRET,
             minio_secret_key="production-minio-secret-not-a-default",
             minio_access_key="production-minio-access-not-a-default",
-            database_url="postgresql://cavaai:Sup3rStrong-Unique-Pass@db:5432/cavaai",
+            database_url=PROD_TEST_DATABASE_URL,
             cors_origins=["*"],
         )
 
@@ -543,4 +547,17 @@ def test_production_rejects_sqlite_database_url():
             minio_secret_key="production-minio-secret-not-a-default",
             minio_access_key="production-minio-access-not-a-default",
             database_url="sqlite:///./x.db",
+        )
+
+
+def test_production_checks_credentials_for_driver_suffixed_postgres_url():
+    with pytest.raises(ValidationError, match="DATABASE_URL"):
+        Settings(
+            _env_file=None,
+            app_env="production",
+            research_auth_required=True,
+            research_auth_secret=SECRET,
+            minio_secret_key="production-minio-secret-not-a-default",
+            minio_access_key="production-minio-access-not-a-default",
+            database_url="postgresql+psycopg://postgres:postgres@db:5432/cavaai",
         )

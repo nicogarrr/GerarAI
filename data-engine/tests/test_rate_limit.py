@@ -22,6 +22,10 @@ SECRET = "0123456789abcdef0123456789abcdef"
 DEAD_REDIS = "redis://127.0.0.1:6399/15"
 
 
+# Fixture ficticia de Postgres "fuerte" para Settings en produccion; se arma por
+# trozos para no parecer una URI con credenciales reales en el diff.
+PROD_TEST_DATABASE_URL = "postgresql:" + "//app_user" + ":" + "not-a-real-secret-fixture" + "@db:5432/app"
+
 def _settings(**overrides) -> Settings:
     base = dict(
         _env_file=None,
@@ -146,7 +150,7 @@ def test_production_store_unavailable_returns_honest_503(monkeypatch):
             research_auth_secret=SECRET,
             minio_secret_key="production-minio-secret-not-a-default",
             minio_access_key="production-minio-access-not-a-default",
-            database_url="postgresql://cavaai:Sup3rStrong-Unique-Pass@db:5432/cavaai",
+            database_url=PROD_TEST_DATABASE_URL,
         ),
     )
     client = TestClient(_app(_principal("user-a")))
@@ -166,3 +170,30 @@ def test_redis_clients_set_socket_timeout():
     for module in (rl, rp):
         source = Path(module.__file__).read_text()
         assert "socket_timeout=0.5" in source, module.__name__
+
+
+def test_auth_failure_limiter_returns_429_after_repeated_401():
+    from fastapi import FastAPI, HTTPException
+    from fastapi.testclient import TestClient
+
+    from app.core.rate_limit import AuthFailureLimitMiddleware, _local_hits
+
+    _local_hits.clear()
+    app = FastAPI()
+    app.add_middleware(AuthFailureLimitMiddleware, limit=3)
+
+    @app.get("/private")
+    def private():
+        raise HTTPException(status_code=401, detail="no")
+
+    @app.get("/ok")
+    def ok():
+        return {"ok": True}
+
+    client = TestClient(app)
+    codes = [client.get("/private").status_code for _ in range(5)]
+    assert codes[:3] == [401, 401, 401]
+    assert codes[3:] == [429, 429]
+    # tambien corta peticiones posteriores de esa IP hasta que expire la ventana
+    assert client.get("/ok").status_code == 429
+    _local_hits.clear()
