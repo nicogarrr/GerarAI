@@ -19,7 +19,9 @@ class RawBodyMiddleware:
         app,
         max_body_bytes: int = 10 * 1024 * 1024,
         max_body_bytes_by_prefix: dict[str, int] | None = None,
+        max_unsigned_body_bytes: int | None = None,
     ):
+        self.max_unsigned_body_bytes = max_unsigned_body_bytes
         self.app = app
         self.max_body_bytes = max_body_bytes
         # Limites por prefijo de ruta: la subida de documentos admite 15MB
@@ -40,6 +42,15 @@ class RawBodyMiddleware:
             return
 
         limit = self._limit_for(str(scope.get("path") or ""))
+        # Un request sin firma no puede llegar a ninguna ruta firmada: no hay
+        # motivo para bufferizar 10-16MB de un cliente anonimo antes de que
+        # la auth lo rechace. Se le aplica un tope pequeno.
+        has_signature = any(
+            name.lower() == b"x-cavaai-signature" and value
+            for name, value in scope.get("headers") or []
+        )
+        if not has_signature and self.max_unsigned_body_bytes is not None:
+            limit = min(limit, self.max_unsigned_body_bytes)
         chunks: list[bytes] = []
         total = 0
         message: dict[str, Any] = await receive()

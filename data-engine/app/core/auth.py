@@ -199,8 +199,11 @@ async def get_research_principal(
         nonce_key = "cavaai:nonce:" + hashlib.sha256(
             f"{x_cavaai_tenant}:{x_cavaai_user}:{x_cavaai_nonce}".encode()
         ).hexdigest()
-        app_env = getattr(settings, "app_env", "local").lower()
-        local_only = app_env in {"local", "test"}
+        # Mismo criterio que el rate limiter (is_local_environment); antes
+        # 'dev'/'ci' usaban Redis aqui y local alli.
+        local_only = getattr(settings, "is_local_environment", None)
+        if local_only is None:
+            local_only = getattr(settings, "app_env", "local").lower() in {"local", "test"}
         try:
             fresh = await consume_nonce(
                 nonce_key,
