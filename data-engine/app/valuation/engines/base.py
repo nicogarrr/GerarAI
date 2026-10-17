@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import date, datetime, time, timezone
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
@@ -23,7 +24,13 @@ from app.valuation.moat_framework import empty_moat_framework
 MODEL_VERSION = "valuation-engines-v2"
 
 
-def traceable_wacc(db: Session, company: Company) -> float | None:
+def _cutoff_end_of_day(as_of: date) -> datetime:
+    return datetime.combine(as_of, time.max, tzinfo=timezone.utc)
+
+
+def traceable_wacc(
+    db: Session, company: Company, *, as_of: date | None = None
+) -> float | None:
     """Return the persisted, traceable WACC for this company, if any.
 
     ``metric_calculation_service`` / ``WaccInputService`` already compute a
@@ -32,14 +39,18 @@ def traceable_wacc(db: Session, company: Company) -> float | None:
     the same company is not discounted at 10% and 6.2% depending on which
     module answers.
     """
+    conditions = [
+        CalculatedMetric.company_id == company.id,
+        CalculatedMetric.metric == "wacc",
+        CalculatedMetric.status == "ok",
+        CalculatedMetric.value.is_not(None),
+    ]
+    if as_of is not None:
+        # Con cutoff, un WACC calculado DESPUES de esa fecha es lookahead.
+        conditions.append(CalculatedMetric.created_at <= _cutoff_end_of_day(as_of))
     metric = db.scalar(
         select(CalculatedMetric)
-        .where(
-            CalculatedMetric.company_id == company.id,
-            CalculatedMetric.metric == "wacc",
-            CalculatedMetric.status == "ok",
-            CalculatedMetric.value.is_not(None),
-        )
+        .where(*conditions)
         .order_by(
             CalculatedMetric.fiscal_year.desc().nullslast(),
             desc(CalculatedMetric.created_at),
@@ -120,6 +131,9 @@ class ValuationContext:
     snapshot: FinancialSnapshot
     current_price: float | None
     engine_key: str
+    # Cutoff point-in-time (None = vigente). Los inputs con marca de tiempo
+    # (WACC trazable) solo cuentan si existian a esa fecha.
+    as_of: date | None = None
 
 
 def insufficient_result(
@@ -191,6 +205,7 @@ class ValuationEngine(ABC):
         db: Session,
         company: Company,
         current_price: float | None,
+        as_of: date | None = None,
     ) -> ValuationContext:
         snapshot = FinancialSnapshotBuilder().build(db, company)
         return ValuationContext(
@@ -199,6 +214,7 @@ class ValuationEngine(ABC):
             snapshot=snapshot,
             current_price=current_price,
             engine_key=self.key,
+            as_of=as_of,
         )
 
 
@@ -294,7 +310,7 @@ def apply_publication_blockers(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def resolve_rates(db, company) -> tuple[float, str, float, str, list[str]]:
+def resolve_rates(db, company, *, as_of: date | None = None) -> tuple[float, str, float, str, list[str]]:
     """(wacc, wacc_source, terminal, terminal_source, inferidos_descartados).
 
     Prioridad: CalculatedMetric trazable > InferredInput (base + URLs) > tags.
@@ -306,7 +322,7 @@ def resolve_rates(db, company) -> tuple[float, str, float, str, list[str]]:
     if db is None:
         return wacc_default, "tag_default", terminal_default, "tag_default", []
     service = InferredInputService()
-    traceable = traceable_wacc(db, company)
+    traceable = traceable_wacc(db, company, as_of=as_of)
     inferred_w = service.latest_valid(db, company.id, "wacc") if traceable is None else None
     inferred_g = service.latest_valid(db, company.id, "terminal_growth")
     if traceable is not None:

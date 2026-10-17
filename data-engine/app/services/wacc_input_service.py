@@ -26,9 +26,17 @@ class WaccInputService:
         sources: list[int] = []
 
         fred = FREDClient()
+        # DGS10 es el bono del Tesoro de EE.UU.: solo es la tasa libre de
+        # riesgo coherente para companias cuyos flujos estan en USD. Para otra
+        # divisa no se inventa un proxy: no se genera el hecho y el motor WACC
+        # lo reporta como input ausente (missing_inputs / publication_blockers).
+        company_currency = (company.currency or "USD").upper()
+        risk_free_supported = company_currency == "USD"
         # Sin clave FRED se usa fredgraph.csv (publico, fuente declarada):
         # el dato es el mismo, la via queda en el documento fuente.
-        if fred.configured():
+        if not risk_free_supported:
+            payload = {"observations": []}
+        elif fred.configured():
             payload = await fred.series(
                 getattr(settings, "wacc_risk_free_series", "DGS10"),
                 limit=10,
@@ -64,7 +72,8 @@ class WaccInputService:
                             settings, "wacc_risk_free_series", "DGS10"
                         ),
                         "date": risk_free_date,
-                        "currency": company.currency,
+                        # Divisa de la SERIE (USD), no la de la compania.
+                        "currency": "USD",
                         "via": "api_key" if fred.configured() else "fredgraph_csv",
                     },
                 )
@@ -175,6 +184,9 @@ class WaccInputService:
             "ticker": company.ticker,
             "as_of": as_of,
             "currency": company.currency,
+            "risk_free_unavailable_for_currency": (
+                None if risk_free_supported else company_currency
+            ),
             "fact_ids": [fact.id for fact in facts],
             "source_document_ids": sorted(set(sources)),
             "missing": [

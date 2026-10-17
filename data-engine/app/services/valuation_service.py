@@ -101,39 +101,49 @@ def _assert_no_lookahead_guard(valuation: dict, *, as_of: date | None = None) ->
     }
 
 
-def _position_price(db: Session, company_id: int) -> float | None:
+def _position_price(
+    db: Session, company_id: int, as_of: date | None = None
+) -> float | None:
     """Return a real market price or None. Never invent a placeholder price."""
-    position = db.scalar(select(Position).where(Position.company_id == company_id).limit(1))
+    # Con cutoff, el mark de la posicion es el precio de HOY (sin fecha): no se
+    # usa, y el cierre se acota a date <= as_of.
+    position = (
+        None
+        if as_of is not None
+        else db.scalar(select(Position).where(Position.company_id == company_id).limit(1))
+    )
     if position and position.market_price and float(position.market_price) > 0:
         return float(position.market_price)
-    market_price = db.scalar(
-        select(MarketPrice)
-        .where(MarketPrice.company_id == company_id)
-        .order_by(desc(MarketPrice.date))
-        .limit(1)
-    )
+    price_query = select(MarketPrice).where(MarketPrice.company_id == company_id)
+    if as_of is not None:
+        price_query = price_query.where(MarketPrice.date <= as_of)
+    market_price = db.scalar(price_query.order_by(desc(MarketPrice.date)).limit(1))
     if market_price and market_price.close and float(market_price.close) > 0:
         return float(market_price.close)
     return None
 
 
-def _position_price_as_of(db: Session, company_id: int) -> str | None:
+def _position_price_as_of(
+    db: Session, company_id: int, as_of: date | None = None
+) -> str | None:
     """Fecha (ISO) del precio que ``_position_price`` resuelve, con la misma
     precedencia (posicion primero, ultimo cierre despues). None si no hay
     precio o la fuente no declara fecha. La ficha lo usa para rotular el
     precio del modelo con su fecha, nunca como precio actual."""
-    position = db.scalar(select(Position).where(Position.company_id == company_id).limit(1))
+    position = (
+        None
+        if as_of is not None
+        else db.scalar(select(Position).where(Position.company_id == company_id).limit(1))
+    )
     if position and position.market_price and float(position.market_price) > 0:
         # Sin procedencia real del mark: updated_at es la ultima modificacion
         # de la fila (una reconstruccion mueve la fecha SIN refrescar el
         # precio), nunca la fecha del precio. None honesto.
         return None
-    market_price = db.scalar(
-        select(MarketPrice)
-        .where(MarketPrice.company_id == company_id)
-        .order_by(desc(MarketPrice.date))
-        .limit(1)
-    )
+    price_query = select(MarketPrice).where(MarketPrice.company_id == company_id)
+    if as_of is not None:
+        price_query = price_query.where(MarketPrice.date <= as_of)
+    market_price = db.scalar(price_query.order_by(desc(MarketPrice.date)).limit(1))
     if market_price and market_price.close and float(market_price.close) > 0:
         return market_price.date.isoformat()
     return None
@@ -143,9 +153,9 @@ class ValuationService:
     def value_company(
         self, db: Session, company: Company, *, as_of: date | None = None
     ) -> dict:
-        current_price = _position_price(db, company.id)
+        current_price = _position_price(db, company.id, as_of)
         engine = resolve(company)
-        context = engine.build_context(db, company, current_price)
+        context = engine.build_context(db, company, current_price, as_of)
         # Blocker enforcement lives here as well as in the engines: this is the
         # function every consumer goes through (thesis, red team, snapshot,
         # persistence), and a result that carries publication blockers must
@@ -198,7 +208,7 @@ class ValuationService:
         # DB), no la cotizacion en vivo: la ficha lo rotula con esta fecha.
         # La fecha es best-effort: sin ella, None honesto (el precio ya esta).
         try:
-            result["trace"]["price_as_of"] = _position_price_as_of(db, company.id)
+            result["trace"]["price_as_of"] = _position_price_as_of(db, company.id, as_of)
         except Exception:  # noqa: BLE001 - la fecha nunca rompe la valoracion
             result["trace"]["price_as_of"] = None
 
