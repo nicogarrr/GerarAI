@@ -25,5 +25,9 @@ const FINANCE_PATTERN = new RegExp(
 
 export function isFinanciallyRelevant(article: { headline?: string; summary?: string; related?: string | null }): boolean {
     if (article.related?.trim()) return true;
+    const headline = article.headline ?? '';
+    // Lifestyle advice can mention money or a CEO without being market news.
+    if (/\b(parenting|parenting coach|raise (?:kids|children)|raising (?:kids|children)|toddler|crianza)\b/i.test(headline)
+        && !/\b(earnings|stocks?|share price|inflation|revenue|bolsa|acciones|resultados)\b/i.test(headline)) return false;
     return FINANCE_PATTERN.test(`${article.headline ?? ''} ${article.summary ?? ''}`);
 }
