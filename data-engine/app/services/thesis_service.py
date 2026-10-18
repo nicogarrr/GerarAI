@@ -741,7 +741,7 @@ class ThesisService:
         catalysts: list[dict] = []
         if earnings.get("status") == "ok" and earnings.get("next_date"):
             item: dict = {
-                "label": "Proximos resultados",
+                "label": "Próximos resultados",
                 "date": earnings.get("next_date"),
                 "source": "earnings_calendar",
             }
@@ -877,8 +877,8 @@ class ThesisService:
         if valuation.get("status") == "insufficient_data":
             missing = ", ".join(valuation.get("missing_inputs") or []) or "datos financieros basicos"
             base = (
-                f"Tesis de {company.ticker} no publicable todavia: faltan {missing}. "
-                "Ningun valor justo debe considerarse fiable hasta completar las fuentes."
+                f"Tesis de {company.ticker} no publicable todavía: faltan {missing}. "
+                "Ningún valor justo debe considerarse fiable hasta completar las fuentes."
             )
         elif valuation.get("status") == "partial":
             missing = ", ".join(valuation.get("missing_inputs") or []) or "algunos inputs"
@@ -1079,11 +1079,11 @@ class ThesisService:
     def _facts_markdown(self, facts: dict[str, FinancialFact]) -> str:
         if not facts:
             return (
-                "No coherent financial snapshot is available. "
-                "Ingest SEC/FMP facts before any publishable valuation."
+                "No hay un snapshot financiero coherente disponible. "
+                "Ingiere hechos SEC/FMP antes de cualquier valoración publicable."
             )
         rows = [
-            "| Metric | Value | Unit | Period | Source |",
+            "| Métrica | Valor | Unidad | Periodo | Fuente |",
             "| --- | ---: | --- | --- | --- |",
         ]
         for metric, fact in facts.items():
@@ -1097,10 +1097,10 @@ class ThesisService:
         if valuation.get("status") == "insufficient_data":
             missing = "\n".join(f"- {item}" for item in (valuation.get("missing_inputs") or []))
             return (
-                "**NO VALUATION — insufficient data**\n\n"
-                f"Engine: `{(valuation.get('trace') or {}).get('engine', 'unknown')}`\n\n"
-                f"Missing:\n{missing or '- required inputs'}\n\n"
-                "GerarAI will not publish a fair value from bootstrap assumptions."
+                "**SIN VALORACIÓN — datos insuficientes**\n\n"
+                f"Motor: `{(valuation.get('trace') or {}).get('engine', 'unknown')}`\n\n"
+                f"Faltan:\n{missing or '- inputs requeridos'}\n\n"
+                "GerarAI no publica un valor justo a partir de supuestos de arranque."
             )
 
         if valuation.get("status") == "partial":
@@ -1108,50 +1108,50 @@ class ThesisService:
             assumed = trace.get("assumed") or {}
             missing = "\n".join(f"- {item}" for item in (valuation.get("missing_inputs") or []))
             supuestos = (
-                f"FCF margin base {assumed.get('fcf_margin_base')} "
-                f"(band {assumed.get('fcf_margin_band')})"
-                + ("; $1 revenue floor (no coherent revenue)" if assumed.get("revenue_floor_used") else "")
-                + f"; revenue growth {assumed.get('revenue_growth')}"
+                f"margen FCF base {assumed.get('fcf_margin_base')} "
+                f"(banda {assumed.get('fcf_margin_band')})"
+                + ("; suelo de ingresos de 1 $ (sin ingresos coherentes)" if assumed.get("revenue_floor_used") else "")
+                + f"; crecimiento de ingresos {assumed.get('revenue_growth')}"
                 + f"; WACC {assumed.get('wacc')}"
                 + f"; terminal {assumed.get('terminal_growth')}"
             )
             return (
-                "**PARTIAL-INDICATIVE RANGE — not a final fair value**\n\n"
-                f"Engine: `{trace.get('engine', 'unknown')}` "
-                f"(basis: `{trace.get('valuation_basis', 'indicative_assumptions')}`).\n\n"
+                "**RANGO INDICATIVO PARCIAL — no es un valor justo final**\n\n"
+                f"Motor: `{trace.get('engine', 'unknown')}` "
+                f"(base: `{trace.get('valuation_basis', 'indicative_assumptions')}`).\n\n"
                 f"{self._range_lines(valuation)}\n\n"
-                f"Documented assumptions (NOT reported facts): {supuestos}.\n\n"
-                f"Reverse DCF vs market price: see section 14.\n\n"
-                f"Still missing before publishing:\n{missing or '- none listed'}\n\n"
+                f"Supuestos documentados (NO son datos reportados): {supuestos}.\n\n"
+                f"DCF inverso frente a precio de mercado: ver sección 14.\n\n"
+                f"Aún falta antes de publicar:\n{missing or '- nada listado'}\n\n"
                 f"{trace.get('notice', '')}"
             )
 
         return "\n".join(
             [
-                f"- Status: `{valuation.get('status')}` publishable={valuation.get('publishable')}",
+                f"- Estado: `{valuation.get('status')}` publicable={valuation.get('publishable')}",
                 *self._range_lines(valuation).split("\n"),
-                f"- Input source: {(valuation.get('trace') or {}).get('input_source', 'unknown')}",
-                f"- Engine: {(valuation.get('trace') or {}).get('engine', 'unknown')}",
+                f"- Fuente de inputs: {(valuation.get('trace') or {}).get('input_source', 'unknown')}",
+                f"- Motor: {(valuation.get('trace') or {}).get('engine', 'unknown')}",
             ]
         )
 
     def _range_lines(self, valuation: dict) -> str:
         price = valuation.get("current_price")
         mos = valuation.get("margin_of_safety")
-        price_txt = f"{price:.2f}" if price is not None else "N/A (no market price)"
-        mos_txt = f"{mos:.1%}" if mos is not None else "N/A (requires market price)"
+        price_txt = f"{price:.2f}" if price is not None else "N/D (sin precio de mercado)"
+        mos_txt = f"{mos:.1%}" if mos is not None else "N/D (requiere precio de mercado)"
 
         def fmt(v):
-            return f"{v:.2f}" if v is not None else "N/A"
+            return f"{v:.2f}" if v is not None else "N/D"
 
         return "\n".join(
             [
-                f"- Current price: {price_txt}",
-                f"- Bear value: {fmt(valuation.get('bear_value'))}",
-                f"- Base value: {fmt(valuation.get('base_value'))}",
-                f"- Bull value: {fmt(valuation.get('bull_value'))}",
-                f"- Expected value: {fmt(valuation.get('expected_value'))}",
-                f"- Margin of safety: {mos_txt}",
+                f"- Precio actual: {price_txt}",
+                f"- Valor bear: {fmt(valuation.get('bear_value'))}",
+                f"- Valor base: {fmt(valuation.get('base_value'))}",
+                f"- Valor bull: {fmt(valuation.get('bull_value'))}",
+                f"- Valor esperado: {fmt(valuation.get('expected_value'))}",
+                f"- Margen de seguridad: {mos_txt}",
             ]
         )
 
@@ -1160,9 +1160,9 @@ class ThesisService:
             company.company_type, company.factor_tags or [], company.special_risks or []
         )
         lines = [
-            moat.get("note", "Requires sourced evidence before final qualitative claims."),
+            moat.get("note", "Se requiere evidencia con fuente antes de afirmaciones cualitativas finales."),
             "",
-            "| Type | Strength | Trend | Confidence | Status |",
+            "| Tipo | Fuerza | Tendencia | Confianza | Estado |",
             "| --- | ---: | --- | ---: | --- |",
         ]
         for item in moat.get("moats") or []:
@@ -1176,61 +1176,61 @@ class ThesisService:
         earnings = sources.get("earnings") or {}
         transcript = sources.get("transcript") or {}
         lines = [
-            "Call claims are stored separately and later verified against reported outcomes."
+            "Las afirmaciones de las calls se guardan aparte y se verifican después contra lo reportado."
         ]
         if earnings.get("status") == "ok":
             extra = f" {earnings['time']}" if earnings.get("time") else ""
             eps = earnings.get("eps_forecast")
-            eps_txt = f", EPS forecast {eps}" if eps is not None else ""
-            lines.append(f"Next earnings: {earnings.get('next_date')}{extra}{eps_txt}.")
+            eps_txt = f", EPS estimado {eps}" if eps is not None else ""
+            lines.append(f"Próximos resultados: {earnings.get('next_date')}{extra}{eps_txt}.")
         else:
             lines.append(
-                f"Next earnings: pendiente ({earnings.get('detail', 'sin fecha de earnings')})."
+                f"Próximos resultados: pendiente ({earnings.get('detail', 'sin fecha de resultados')})."
             )
             if earnings.get("action"):
-                lines.append(f"Accion: {earnings['action']}")
+                lines.append(f"Acción: {earnings['action']}")
         if transcript.get("status") == "ok":
             lines.append(
-                f"Latest transcript: {transcript.get('title')} ({transcript.get('period')})."
+                f"Última transcripción: {transcript.get('title')} ({transcript.get('period')})."
             )
         else:
             lines.append(
-                f"Transcripcion: {transcript.get('detail', 'pendiente transcripcion')}."
+                f"Transcripción: {transcript.get('detail', 'pendiente transcripción')}."
             )
             if transcript.get("action"):
-                lines.append(f"Accion: {transcript['action']}")
+                lines.append(f"Acción: {transcript['action']}")
         return "\n".join(lines)
 
     def _news_markdown(self, sources: dict) -> str:
         news = sources.get("news") or {}
         base = (
-            "Material news updates require source audit and human approval "
-            "before thesis versioning."
+            "Las noticias materiales requieren auditoría de fuentes y aprobación "
+            "humana antes de versionar la tesis."
         )
         items = news.get("items") or []
         if not items:
             pending = news.get("detail", "sin noticias ingeridas")
-            action = f" Accion: {news['action']}" if news.get("action") else ""
-            return f"{base}\nLatest material news: pendiente ({pending}).{action}"
-        rows = [base, "", "Latest material news:"]
+            action = f" Acción: {news['action']}" if news.get("action") else ""
+            return f"{base}\nÚltimas noticias materiales: pendiente ({pending}).{action}"
+        rows = [base, "", "Últimas noticias materiales:"]
         for item in items:
             rows.append(
                 f"- {item.get('date', '?')} [{item.get('source', '?')}] "
-                f"{item.get('title', '')} (materiality {item.get('materiality', '?')})"
+                f"{item.get('title', '')} (materialidad {item.get('materiality', '?')})"
             )
         return "\n".join(rows)
 
     def _sources_markdown(self, sources: dict) -> str:
-        ok: list[str] = ["- Company master seed"]
+        ok: list[str] = ["- Semilla maestra de la empresa"]
         pending: list[str] = []
         labels = {
-            "fundamentals": "Fundamentals",
-            "market": "Market price/profile",
+            "fundamentals": "Fundamentales",
+            "market": "Precio/perfil de mercado",
             "filings": "Filings 10-K/10-Q/8-K",
-            "news": "News",
-            "earnings": "Earnings date",
-            "transcript": "Transcript",
-            "ir": "Investor-relations",
+            "news": "Noticias",
+            "earnings": "Fecha de resultados",
+            "transcript": "Transcripción",
+            "ir": "Relación con inversores",
             "external_theses": "Tesis externas",
         }
         for key, label in labels.items():
@@ -1240,7 +1240,7 @@ class ThesisService:
                 ok.append(f"- {label}: conseguido ({detail})")
             else:
                 reason = block.get("detail", "pendiente") if block else "no intentado"
-                action = f" | Accion: {block['action']}" if block.get("action") else ""
+                action = f" | Acción: {block['action']}" if block.get("action") else ""
                 pending.append(f"- {label}: pendiente ({reason}){action}")
         lines = ["Conseguido:"] + ok
         if pending:
@@ -1250,15 +1250,15 @@ class ThesisService:
     def _source_ok_detail(self, key: str, block: dict) -> str:
         if key == "fundamentals":
             metrics = ", ".join(block.get("metrics") or [])
-            return f"{block.get('source')}, {block.get('facts_imported')} facts: {metrics}"
+            return f"{block.get('source')}, {block.get('facts_imported')} hechos: {metrics}"
         if key == "market":
             parts = []
             if block.get("price") is not None:
-                parts.append(f"price {block['price']}")
+                parts.append(f"precio {block['price']}")
             if block.get("market_cap") is not None:
-                parts.append(f"market cap {block['market_cap']:.0f}")
+                parts.append(f"capitalización {block['market_cap']:.0f}")
             if block.get("name"):
-                parts.append(f"name '{block['name']}'")
+                parts.append(f"nombre '{block['name']}'")
             return f"{block.get('source')}" + (f": {', '.join(parts)}" if parts else "")
         if key == "filings":
             forms = ", ".join(
@@ -1268,14 +1268,14 @@ class ThesisService:
         if key == "news":
             return f"{len(block.get('items') or [])} eventos materiales"
         if key == "earnings":
-            return f"next {block.get('next_date')}"
+            return f"próximos {block.get('next_date')}"
         if key == "transcript":
             return f"{block.get('title')} ({block.get('period')})"
         if key == "ir":
             titles = "; ".join(
                 str(i.get("title") or "") for i in (block.get("items") or [])[:3]
             )
-            return f"{block.get('source')}: {len(block.get('items') or [])} releases ({titles})"
+            return f"{block.get('source')}: {len(block.get('items') or [])} comunicados ({titles})"
         if key == "external_theses":
             return f"{len(block.get('items') or [])} tesis pegadas"
         return str(block.get("source") or "ok")
@@ -1283,13 +1283,13 @@ class ThesisService:
     @staticmethod
     def _provenance_markdown(items: list[dict]) -> str:
         if not items:
-            return "Sin inputs etiquetables: el modelo no tiene aun datos con procedencia."
+            return "Sin inputs etiquetables: el modelo no tiene aún datos con procedencia."
         lines = [
-            "Cada input del modelo lleva su etiqueta: **dato** (linea reportada "
-            "con cita), **derivado** (formula documentada + inputs), "
-            "**estimacion_llm** (metodo + confianza) o **supuesto** (rationale).",
+            "Cada input del modelo lleva su etiqueta: **dato** (línea reportada "
+            "con cita), **derivado** (fórmula documentada + inputs), "
+            "**estimacion_llm** (método + confianza) o **supuesto** (justificación).",
             "",
-            "| input | etiqueta | valor | metodo | cita |",
+            "| input | etiqueta | valor | método | cita |",
             "|---|---|---|---|---|",
         ]
         for item in items:
@@ -1307,12 +1307,12 @@ class ThesisService:
     # hay; lo que falta se declara pendiente y se pide, nunca se inventa.
     _PENDING_INPUT_HINTS = {
         "revenue_history_two_periods": (
-            "faltan al menos dos periodos de ingresos reportados; llegan con el "
-            "10-K/10-Q mas reciente (SEC) o la presentacion de resultados."
+            "faltan al menos dos períodos de ingresos reportados; llegan con el "
+            "10-K/10-Q más reciente (SEC) o la presentación de resultados."
         ),
         "normalized_fcf_margin": (
             "falta el margen FCF normalizado; se deriva de cash-flows reportados "
-            "o se aporta como supuesto etiquetado (metodo + fecha)."
+            "o se aporta como supuesto etiquetado (método + fecha)."
         ),
         "normalized_fcf_or_fcf_margin": (
             "falta un FCF o margen FCF reportado; si hay un margen INFERIDO "
@@ -1320,15 +1320,15 @@ class ThesisService:
         ),
         "net_debt": (
             "falta la deuda neta; se deriva de deuda total menos efectivo (mismo "
-            "periodo) cuando ambos constan en un filing."
+            "período) cuando ambos constan en un filing."
         ),
         "shares_diluted": (
-            "faltan las acciones diluidas; constan en el ultimo 10-K/10-Q o en "
-            "la presentacion de resultados."
+            "faltan las acciones diluidas; constan en el último 10-K/10-Q o en "
+            "la presentación de resultados."
         ),
         "traceable_wacc": (
-            "el WACC no es trazable a una metrica calculada; se aporta como "
-            "supuesto documentado (metodo + fecha + inputs)."
+            "el WACC no es trazable a una métrica calculada; se aporta como "
+            "supuesto documentado (método + fecha + inputs)."
         ),
         "fiscal_year": (
             "falta el ejercicio fiscal de anclaje; llega con los filings anuales."
@@ -1366,7 +1366,7 @@ class ThesisService:
                 "inventan:"
             )
             for key in missing:
-                lines.append(f"- **{key}**: {self._pending_input_hint(key)}")
+                lines.append(f"- `{key}`: {self._pending_input_hint(key)}")
         # Politica del producto: un supuesto sin base documentada no se muestra como
         # INFERIDO; se declara N/D (sin datos), igual que cualquier input pendiente.
         nd_keys = sorted(
@@ -1383,7 +1383,7 @@ class ThesisService:
                 "Supuestos sin base documentada (N/D, no se muestran como inferidos):"
             )
             for key in nd_keys:
-                lines.append(f"- **{key}**: N/D - falta base (dado X, inferimos Y) con fuente https.")
+                lines.append(f"- `{key}`: N/D (supuesto sin base documentada).")
         pending_sources = [
             (name, block.get("source"), block.get("detail"))
             for name, block in sorted((sources or {}).items())
@@ -1419,9 +1419,9 @@ class ThesisService:
         reverse = valuation.get("reverse_dcf") or {}
         required_growth = reverse.get("required_revenue_growth")
         reverse_line = (
-            f"Required revenue growth: {required_growth:.1%}"
+            f"Crecimiento de ingresos requerido: {required_growth:.1%}"
             if required_growth is not None
-            else "Reverse DCF unavailable (missing market price or valuation inputs)."
+            else "DCF inverso no disponible (falta el precio de mercado o inputs de valoración)."
         )
         scenario_style = (valuation.get("trace") or {}).get("scenario_style", "n/a")
         framework = long_term_model.get("framework") or {}
@@ -1442,10 +1442,10 @@ class ThesisService:
             else self._scenario_probabilities(long_term_model)
         )
         probabilities_line = (
-            "Probabilities (model): "
+            "Probabilidades (modelo): "
             + " · ".join(f"{name} {prob:.0%}" for name, prob in scenario_probabilities.items())
             if scenario_probabilities
-            else "Probabilities: pendiente (el modelo no las ha persistido)."
+            else "Probabilidades: pendiente (el modelo no las ha persistido)."
         )
         pendings_section = self._pendings_markdown(
             valuation, long_term_model, sources, fact_sources
@@ -1461,85 +1461,85 @@ class ThesisService:
         ) or "- Sin catalizadores con fecha conocida; pendiente del calendario de resultados."
         invalidation_lines = "\n".join(f"- {criterion}" for criterion in invalidation_criteria)
 
-        return f"""# {company.ticker} Thesis v{version}
+        return f"""# Tesis de {company.ticker} — v{version}
 
-## 1. Executive Summary
-{company.name} is tracked as `{company.company_type}` with model `{company.valuation_model}`.
-Valuation input source: `{(valuation.get("trace") or {}).get("input_source", "unknown")}`.
-Engine: `{(valuation.get("trace") or {}).get("engine", "unknown")}`.
+## 1. Resumen ejecutivo
+{company.name} se sigue como `{company.company_type}` con el modelo `{company.valuation_model}`.
+Fuente de los inputs de valoración: `{(valuation.get("trace") or {}).get("input_source", "unknown")}`.
+Motor: `{(valuation.get("trace") or {}).get("engine", "unknown")}`.
 
-## 2. Hypothesis
+## 2. Hipótesis
 {hypothesis}
-The investable question is whether the evidence supports the assumptions behind the selected model, not whether a model output looks attractive in isolation.
+La pregunta invertible es si la evidencia respalda los supuestos detrás del modelo elegido, no si la salida de un modelo parece atractiva de forma aislada.
 
-## 3. Business Model
-Sector: {company.sector}. Industry: {company.industry}.
-Company-specific framework: `{framework.get("key", "unknown")}`. Primary question: {framework.get("primary_question", "unknown")}.
-Mandatory drivers missing: {", ".join(mandatory_missing) if mandatory_missing else "none"}.
+## 3. Modelo de negocio
+Sector: {company.sector}. Industria: {company.industry}.
+Marco específico de la empresa: `{framework.get("key", "unknown")}`. Pregunta primaria: {framework.get("primary_question", "unknown")}.
+Drivers obligatorios ausentes: {", ".join(mandatory_missing) if mandatory_missing else "ninguno"}.
 
-## 4. Latest Results
+## 4. Últimos resultados
 {self._facts_markdown(facts)}
 
-## 5. Historical Financials
-Stored in `financial_facts` and `financial_statements` once ingested. Snapshot builder enforces period coherence.
+## 5. Histórico financiero
+Se guarda en `financial_facts` y `financial_statements` una vez ingerido. El constructor de snapshots exige coherencia de periodo.
 
-## 6. Free Cash Flow
-Derived only from coherent snapshot facts (same fiscal anchor). Bootstrap FCF margins are disabled.
+## 6. Flujo de caja libre
+Se deriva solo de hechos coherentes del snapshot (mismo ancla fiscal). Los márgenes FCF de arranque están desactivados.
 
-## 7. Balance Sheet
-Net debt / cash / shares must align with the income-statement anchor period (or a compatible instant).
+## 7. Balance
+Deuda neta, caja y acciones deben alinear con el periodo ancla de la cuenta de resultados (o un instante compatible).
 
-## 8. Capital Allocation
-Tracked through filings, calls, buybacks, dilution and dividends. Funding-gap dilution replaces fixed $100 capital raises when cash/capex facts exist.
+## 8. Asignación de capital
+Seguimiento mediante filings, calls, recompras, dilución y dividendos. La dilución por gap de financiación sustituye a las ampliaciones fijas de 100 $ cuando hay datos de caja/capex.
 
-## 9. Management And Calls
+## 9. Equipo directivo y calls
 {self._earnings_markdown(sources)}
 
-## 10. News And Catalysts
+## 10. Noticias y catalizadores
 {catalysts_lines}
 {self._news_markdown(sources)}
 
-## 11. Risks
+## 11. Riesgos
 {", ".join(company.special_risks)}
 
-## 12. Competition And Moat
+## 12. Competencia y foso
 {self._moat_markdown(company, valuation)}
 
-## 13. Valuation
+## 13. Valoración
 {self._valuation_markdown(valuation)}
 
-### Long-Term Fundamental Modeling Engine
-Persisted model version: `{(long_term_model.get("persistence") or {}).get("version")}`.
-Model status: `{long_term_model.get("status")}`. Market-opportunity verdict: `{(market_opportunity.get("verdict") or {}).get("label", "unknown")}`.
+### Motor fundamental de largo plazo
+Versión persistida del modelo: `{(long_term_model.get("persistence") or {}).get("version")}`.
+Estado del modelo: `{long_term_model.get("status")}`. Veredicto de oportunidad de mercado: `{(market_opportunity.get("verdict") or {}).get("label", "unknown")}`.
 
-## 14. Reverse DCF
+## 14. DCF inverso
 {reverse_line}
 
 ## 15. Bear / Base / Bull
-Scenario style: `{scenario_style}`. {probabilities_line}
+Estilo de escenarios: `{scenario_style}`. {probabilities_line}
 
-## 16. Red Team
-Primary red-team question: what assumption would break first if the next filing contradicts the current model?
+## 16. Red team
+Pregunta primaria del red team: ¿qué supuesto se rompería primero si el próximo filing contradice el modelo actual?
 
-## 17. What Would Invalidate The Thesis
+## 17. Qué invalidaría la tesis
 {invalidation_lines}
-Structural invalidators: unsupported claims, missing calculation traces, adverse primary filings, incoherent snapshots, or material assumption drift.
+Invalidadores estructurales: afirmaciones sin respaldo, trazas de cálculo ausentes, filings primarios adversos, snapshots incoherentes o deriva material de supuestos.
 
-## 18. What To Watch
+## 18. Qué vigilar
 {", ".join(company.special_sources)}
 
-## 19. Source Audit
-Passed: {audit["passed"]}
-Coverage score: {audit["source_coverage_score"]}
-Unsupported claims: {audit["unsupported_claims"]}
+## 19. Auditoría de fuentes
+Superada: {"sí" if audit["passed"] else "no"}
+Cobertura de fuentes: {audit["source_coverage_score"]}
+Afirmaciones sin respaldo: {audit["unsupported_claims"]}
 
-## 20. Sources
+## 20. Fuentes
 {self._sources_markdown(sources)}
 
-## 21. Datos Pendientes
+## 21. Datos pendientes
 {pendings_section}
 
-## 22. Procedencia de los Inputs
+## 22. Procedencia de los inputs
 {provenance_section}
-Fingerprint: evidence-set hash drives versioning.
+Fingerprint: el hash del conjunto de evidencia gobierna el versionado.
 """

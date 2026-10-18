@@ -296,13 +296,13 @@ def test_generate_with_mocked_sources_persists_facts_and_blocks_range_on_cash_bu
     assert "normalized_fcf_or_fcf_margin" in thesis["executive_summary"]
 
     markdown = thesis["thesis_markdown"]
-    assert "NO VALUATION — insufficient data" in markdown
-    assert "PARTIAL-INDICATIVE RANGE" not in markdown
+    assert "SIN VALORACIÓN — datos insuficientes" in markdown
+    assert "RANGO INDICATIVO PARCIAL" not in markdown
     # Fuentes: conseguido con detalle, sin datos inventados.
-    assert "Fundamentals: conseguido" in markdown
+    assert "Fundamentales: conseguido" in markdown
     assert "revenue" in markdown and "shares_diluted" in markdown
-    assert "Next earnings:" in markdown
-    assert "Latest transcript: Q4 2024 earnings call transcript" in markdown
+    assert "Próximos resultados:" in markdown
+    assert "Última transcripción: Q4 2024 earnings call transcript" in markdown
     assert "ASTS firma acuerdo comercial" in markdown
     assert "Investor Day 2025 Presentation" in markdown
     assert "Tesis externas: conseguido" in markdown or "tesis pegadas" in markdown
@@ -352,9 +352,9 @@ def test_generate_without_network_degrades_to_honest_skeleton(monkeypatch):
     assert thesis["expected_value"] is None
     assert "no publicable" in thesis["executive_summary"]
     markdown = thesis["thesis_markdown"]
-    assert "NO VALUATION — insufficient data" in markdown
+    assert "SIN VALORACIÓN — datos insuficientes" in markdown
     assert "Pendiente:" in markdown
-    assert "Pendiente transcripcion" in markdown
+    assert "Pendiente transcripción" in markdown
 
 
 def test_clean_audit_blocked_downstream_is_not_failed():

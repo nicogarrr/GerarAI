@@ -757,7 +757,7 @@ class LongTermModelService:
                             unit="USD",
                             source_fact_ids=_unique_ids(ocf, capex),
                             calculation="operating_cash_flow + capital_expenditure",
-                            basis="derived because reported free_cash_flow is missing",
+                            basis="derivado porque falta el flujo de caja libre reportado",
                         )
                         continue
                 metrics[metric] = _fact_line(fact)
@@ -782,7 +782,7 @@ class LongTermModelService:
                     unit="decimal",
                     source_fact_ids=ids,
                     calculation=f"{numerator} / revenue",
-                    basis="same fiscal year",
+                    basis="mismo ejercicio fiscal",
                 )
             rows.append({"period": period, "fiscal_year": year, "metrics": metrics})
         return rows
@@ -880,7 +880,7 @@ class LongTermModelService:
                 value=median(values[-5:]) if values else None,
                 unit="decimal",
                 source_type="financial_facts" if values else "missing",
-                basis=f"median of latest {min(5, len(values))} annual {metric} observations",
+                basis=f"mediana de las últimas {min(5, len(values))} observaciones anuales de {metric}",
                 source_fact_ids=_unique_ids(ids=ids),
                 confidence=self._confidence(fact_cache, ids),
             )
@@ -899,9 +899,8 @@ class LongTermModelService:
                 unit="decimal",
                 source_type=tax_rate.source_type,
                 basis=(
-                    f"clamped from {raw_tax} (negative effective tax rates come from "
-                    "non-operating charges and would otherwise inflate NOPAT, which "
-                    "maximises it)"
+                    f"tipo efectivo {raw_tax:.2%} acotado al rango [0 %, 60 %]: los tipos "
+                    "negativos proceden de cargas no operativas e inflarían el NOPAT"
                     if clamped_tax != raw_tax
                     else tax_rate.basis
                 ),
@@ -913,7 +912,7 @@ class LongTermModelService:
                 value=0.25,
                 unit="decimal",
                 source_type="model_policy",
-                basis="fallback statutory tax rate; replace with reported tax data",
+                basis="tipo impositivo legal de reserva; sustituir con datos fiscales reportados",
                 source_fact_ids=[],
                 confidence=0.35,
             )
@@ -978,7 +977,7 @@ class LongTermModelService:
                 value=default_wacc(company),
                 unit="decimal",
                 source_type="model_policy",
-                basis="preview-only company policy; a traceable CalculatedMetric(wacc) is required for publication",
+                basis="política de empresa solo de vista previa; se requiere una CalculatedMetric(wacc) trazable para publicar",
                 source_fact_ids=[],
                 confidence=0.20,
             )
@@ -1003,7 +1002,7 @@ class LongTermModelService:
                 value=default_terminal_growth(company),
                 unit="decimal",
                 source_type="model_policy",
-                basis="terminal growth policy from company framework",
+                basis="política de crecimiento terminal del marco de la empresa",
                 source_fact_ids=[],
                 confidence=0.40,
             )
@@ -1021,7 +1020,7 @@ class LongTermModelService:
                     value=default_terminal_growth(company),
                     unit="decimal",
                     source_type="model_policy",
-                    basis="terminal growth policy from company framework",
+                    basis="política de crecimiento terminal del marco de la empresa",
                     source_fact_ids=[],
                     confidence=0.40,
                 )
@@ -1034,7 +1033,7 @@ class LongTermModelService:
                     value=default_wacc(company),
                     unit="decimal",
                     source_type="model_policy",
-                    basis="preview-only company policy; a traceable CalculatedMetric(wacc) is required for publication",
+                    basis="política de empresa solo de vista previa; se requiere una CalculatedMetric(wacc) trazable para publicar",
                     source_fact_ids=[],
                     confidence=0.20,
                 )
@@ -1053,7 +1052,7 @@ class LongTermModelService:
                 value=abs(capex_intensity.value),
                 unit="decimal",
                 source_type=capex_intensity.source_type,
-                basis="median absolute capital expenditure / revenue",
+                basis="mediana de capex absoluto / ingresos",
                 source_fact_ids=capex_intensity.source_fact_ids,
                 confidence=capex_intensity.confidence,
             )

@@ -612,7 +612,7 @@ class ThesisEvidenceService:
         if row is None:
             return _pending(
                 "transcripts",
-                "Pendiente transcripcion: sin fuente gratuita disponible.",
+                "Pendiente transcripción: sin fuente gratuita disponible.",
                 action="Puede añadirse manualmente desde Fuentes.",
             )
         return {

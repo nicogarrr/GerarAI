@@ -37,4 +37,4 @@ def test_positive_ocf_keeps_partial_indicative_range(monkeypatch):
     assert thesis["status"] == "draft"
     assert thesis["base_value"] is not None
     assert "parcial-indicativa" in thesis["executive_summary"]
-    assert "PARTIAL-INDICATIVE RANGE" in thesis["thesis_markdown"]
+    assert "RANGO INDICATIVO PARCIAL" in thesis["thesis_markdown"]
