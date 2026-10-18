@@ -138,3 +138,41 @@ def test_refresh_skips_without_run():
     with _db() as db:
         result = refresh_propicks_prices(db, fetcher=_fake_fetcher)
         assert result["status"] == "skipped"
+
+
+def test_refresh_cubre_todas_las_aprobadas_no_solo_el_top():
+    """Las joyas viven fuera del top rankeado: sin precio fresco de todas las
+    aprobadas, find_gems nunca las ve (regresion: pestana de joyas vacia)."""
+    with _db() as db:
+        from datetime import UTC, datetime
+
+        run = ProPickRun(
+            as_of=datetime.now(UTC), status="completed", funnel_version="test",
+            universe_size=3, passed_count=3, top_n=1, duration_ms=1, params={},
+        )
+        db.add(run)
+        companies = [_company("RANK1"), _company("GEM1"), _company("GEM2")]
+        for company in companies:
+            db.add(company)
+        db.flush()
+        db.add_all(
+            [
+                ProPickCandidate(run_id=run.id, company_id=companies[0].id, passed=True,
+                                 rank=1, score=95.0, failed_gates=[], metrics={}, coverage={}),
+                ProPickCandidate(run_id=run.id, company_id=companies[1].id, passed=True,
+                                 rank=None, score=70.0, failed_gates=[], metrics={}, coverage={}),
+                ProPickCandidate(run_id=run.id, company_id=companies[2].id, passed=True,
+                                 rank=None, score=60.0, failed_gates=[], metrics={}, coverage={}),
+            ]
+        )
+        db.commit()
+
+        result = refresh_propicks_prices(
+            db, top_n=1, fetcher=_fake_fetcher, as_of=date(2026, 9, 25)
+        )
+        assert result["status"] == "ok"
+        assert result["companies"] == 3
+        assert result["covered"] == 3
+        assert result["bars_written"] == 3 * 301
+        metrics = db.scalars(select(CalculatedMetric)).all()
+        assert {m.company_id for m in metrics} == {c.id for c in companies}

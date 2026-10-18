@@ -36,6 +36,7 @@ from app.workers.dramatiq_app import (
     refresh_ticker_news,
     review_theses,
     run_daily_research,
+    run_propicks_funnel,
     scan_contradictions,
     scan_insider_watchlist,
     sync_ibkr_flex,
@@ -372,15 +373,25 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
               "cron", job_id="splits_tracked_weekly", day_of_week="sun", hour=5, minute=10, jitter=600)
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="universe"),
               "cron", job_id="splits_universe_weekly", day_of_week="sun", hour=5, minute=50, jitter=600)
-    # F2 ProPicks: precios diarios + momentum del top-40 del ultimo run.
-    # Tras el cierre de mercado US (21:45 UTC ~ cierre + margen).
+    # F1 ProPicks: run diario del embudo completo tras el cierre US. Sin el,
+    # la Seleccion IA dependia de un POST manual y quedaba congelada semanas.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, run_propicks_funnel),
+        "cron",
+        job_id="propicks_funnel_daily",
+        hour=21,
+        minute=30,
+    )
+    # F2 ProPicks: precios diarios + momentum de TODAS las aprobadas del
+    # ultimo run (tras el run de las 21:30). Tras el cierre de mercado US.
     _register(
         scheduler,
         partial(enqueue_for_all_tenants, refresh_propicks_prices),
         "cron",
         job_id="propicks_prices_daily",
-        hour=21,
-        minute=45,
+        hour=22,
+        minute=0,
     )
     # Snapshot mensual congelado del embudo (dia 1, tras los precios del cierre).
     _register(

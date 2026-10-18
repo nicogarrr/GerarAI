@@ -1683,6 +1683,36 @@ def refresh_propicks_prices(
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000)
+def run_propicks_funnel(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Run diario del embudo completo (F1): seleccion vigente cada dia.
+
+    Antes solo existia el POST manual /api/propicks/runs: la pantalla de
+    Seleccion IA mostraba el ultimo run manual (podia tener semanas) y el
+    refresco de precios heredaba un top-N viejo. Persiste ranks hasta 100
+    para que el refresco de precios cubra tambien la banda de las joyas.
+    """
+    from app.services.propicks_funnel_service import execute_run
+
+    db = _session(tenant_id, user_id)
+    try:
+        run = execute_run(db, top_n=100)
+        return {
+            "actor": "run_propicks_funnel",
+            "run_id": run.id,
+            "passed_count": run.passed_count,
+            "top_n": run.top_n,
+        }
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("run_propicks_funnel", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000)
 def freeze_propicks_snapshot(
     tenant_id: int | None = None,
     user_id: str | None = None,
