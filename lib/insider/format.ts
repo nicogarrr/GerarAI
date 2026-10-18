@@ -37,3 +37,32 @@ export function insiderRole(role: string | null | undefined, officerTitle: strin
 export function sideLabel(side: string | null | undefined): string {
     return side === 'compra' ? 'Compra' : side === 'venta' ? 'Venta' : '—';
 }
+
+/** Codigos de transaccion Form 4 (SEC) en español. P/S tienen su propio
+ *  tratamiento (compra/venta); el resto se traduce para no mostrar
+ *  «Codigo M» a pelo. Codigo desconocido: se devuelve el codigo tal cual. */
+const CODE_LABELS: Record<string, string> = {
+    A: 'Concesión',
+    C: 'Conversión de derivado',
+    D: 'Disposición al emisor',
+    E: 'Expiración de derivado',
+    F: 'Retención fiscal',
+    G: 'Donación',
+    H: 'Expiración de derivado',
+    I: 'Transacción discrecional',
+    J: 'Otra operación',
+    K: 'Swap de equity',
+    M: 'Ejercicio de opción',
+    O: 'Ejercicio de opción',
+    U: 'Disposición por OPA',
+    W: 'Herencia',
+    X: 'Ejercicio de opción',
+};
+
+export function insiderCodeLabel(code: string | null | undefined): string {
+    const clean = (code ?? '').trim().toUpperCase();
+    if (!clean) return '—';
+    if (clean === 'P') return sideLabel('compra');
+    if (clean === 'S') return sideLabel('venta');
+    return CODE_LABELS[clean] ?? `Código ${clean}`;
+}

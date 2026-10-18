@@ -114,6 +114,7 @@ def insider_filings(
                             "role": tx.role,
                             "officer_title": tx.officer_title,
                             "code": tx.code,
+                            "is_derivative": bool(tx.is_derivative),
                             "shares": tx.shares,
                             "price": tx.price,
                             "value": tx.value,

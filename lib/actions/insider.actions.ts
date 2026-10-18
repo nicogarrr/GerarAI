@@ -49,6 +49,8 @@ export interface InsiderFilingTransaction {
     role?: string | null;
     officer_title?: string | null;
     code?: string | null;
+    /** Derivado (opciones) vs acciones; explica tramos M duplicados. */
+    is_derivative?: boolean | null;
     shares?: number | null;
     price?: number | null;
     value?: number | null;
