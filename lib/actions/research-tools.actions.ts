@@ -407,6 +407,24 @@ export async function getKnowledgeDocuments() {
   return requestJson<KnowledgeDocument[]>('/api/knowledge/documents?limit=500');
 }
 
+/** Cartas listas: filtrar antes de paginar para no ocultarlas tras otros documentos. */
+export async function getKnowledgeLetters() {
+  const letters: KnowledgeDocument[] = [];
+  const seen = new Set<number>();
+  const limit = 500;
+  for (let offset = 0; ; offset += limit) {
+    const page = await requestJson<KnowledgeDocument[]>(
+      `/api/knowledge/documents?document_type=fund_letter&status=ready&limit=${limit}&offset=${offset}`,
+    );
+    if (page.some(doc => seen.has(doc.id))) {
+      throw new Error('No se pudo completar el listado de cartas: páginas repetidas.');
+    }
+    for (const doc of page) seen.add(doc.id);
+    letters.push(...page);
+    if (page.length < limit) return letters;
+  }
+}
+
 export type KnowledgeDocumentDetail = KnowledgeDocument & { chunk_count: number };
 
 /** Un documento por id. `null` si no existe (404); cualquier otro error se propaga. */

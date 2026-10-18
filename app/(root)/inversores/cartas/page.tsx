@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import BackendOffline from '@/components/system/BackendOffline';
-import { getKnowledgeDocuments } from '@/lib/actions/research-tools.actions';
+import { getKnowledgeLetters } from '@/lib/actions/research-tools.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 
 import { IngestLettersButton } from '../_components/IngestLettersButton';
@@ -27,9 +27,9 @@ type PageProps = {
 
 export default async function LettersPage({ searchParams }: PageProps) {
     const { autor, pagina } = await searchParams;
-    let documents: Awaited<ReturnType<typeof getKnowledgeDocuments>>;
+    let documents: Awaited<ReturnType<typeof getKnowledgeLetters>>;
     try {
-        documents = await getKnowledgeDocuments();
+        documents = await getKnowledgeLetters();
     } catch (error) {
         if (isBackendUnavailableError(error)) {
             return <BackendOffline feature="Cartas de inversores" retryHref="/inversores/cartas" />;

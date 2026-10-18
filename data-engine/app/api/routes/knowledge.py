@@ -238,9 +238,15 @@ async def _read_upload_limited(file: UploadFile) -> bytes:
 def list_documents(
     collection_id: int | None = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    document_type: str | None = None,
+    status: str | None = None,
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    return KnowledgeLibraryService.list_documents(db, collection_id=collection_id, limit=limit)
+    return KnowledgeLibraryService.list_documents(
+        db, collection_id=collection_id, limit=limit, offset=offset,
+        document_type=document_type, status=status,
+    )
 
 
 @router.get("/documents/{document_id}")
