@@ -70,6 +70,122 @@ const COMPONENTS_EXCEPTIONS: Record<string, string> = {
  */
 const APP_EXCEPTIONS: Record<string, string> = {};
 
+/**
+ * Allowlist por ruta de las directivas 'use client' justificadas.
+ *
+ * Antes habia un contador total: dos PRs paralelas que anadiesen un fichero
+ * cliente chocaban siempre en el numero, y el que mergeaba segundo dejaba
+ * main en rojo. La lista por ruta mantiene el mismo rigor (un fichero
+ * cliente nuevo NO listado falla; una entrada obsoleta falla) y las PRs
+ * paralelas solo anaden lineas distintas.
+ *
+ * Alta de un fichero cliente nuevo: anade su ruta ordenada alfabeticamente
+ * con el motivo (la senal de cliente que lo exige). El motivo se lee en la
+ * revision; el guard exige que el fichero exista, siga teniendo la
+ * directiva y el detector la siga justificando.
+ */
+const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'app/(auth)/sign-in/page.tsx': 'useRouter, useState, jsx-onSubmit, jsx-onClick, libreria cliente: react-hook-form, libreria cliente: sonner',
+  'app/(root)/error.tsx': 'useEffect, jsx-onClick',
+  'app/(root)/inversores/_components/HubNav.tsx': 'usePathname',
+  'app/(root)/inversores/_components/IngestLettersButton.tsx': 'useState, jsx-onClick',
+  'app/(root)/inversores/_components/LibraryChat.tsx': 'usePathname, useState, browser:navigator, jsx-onSubmit, jsx-onChange, jsx-onKeyDown, jsx-onClick',
+  'app/(root)/inversores/_components/SyncPortfoliosButton.tsx': 'useState, jsx-onClick',
+  'app/(root)/ownership/SyncButton.tsx': 'useTransition, useState, jsx-onClick',
+  'app/global-error.tsx': 'jsx-onClick',
+  'components/alerts/AlertsManager.tsx': 'useSearchParams, useState, useEffect, browser:window, jsx-onOpenChange, jsx-onChange, jsx-onValueChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/select.tsx, importa cliente: components/ui/label.tsx',
+  'components/brain/GlobalBrain.tsx': 'usePathname, useState, useEffect, browser:window, useRef, browser:navigator, browser:document, jsx-onClick, jsx-spread, jsx-onSubmit, jsx-onChange, libreria cliente: react-markdown',
+  'components/corporate-actions/CorporateActionsView.tsx': 'useState, jsx-onClick, libreria cliente: sonner, importa cliente: components/data/RecordViews.tsx',
+  'components/data/RecordViews.tsx': 'useState, jsx-onClick, useEffect',
+  'components/ErrorBoundary.tsx': 'jsx-onClick, browser:window, jsx-spread',
+  'components/export/ExportView.tsx': 'useState, useEffect, browser:document, jsx-onValueChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/label.tsx, importa cliente: components/ui/select.tsx',
+  'components/export/ObsidianVaultCard.tsx': 'jsx-onClick, browser:window',
+  'components/forms/AccessRequestForm.tsx': 'useState, jsx-onSubmit',
+  'components/forms/CountrySelectField.tsx': 'useState, jsx-onOpenChange, jsx-onSelect, jsx-onChange, libreria cliente: react-hook-form, libreria cliente: react-select-country-list, importa cliente: components/ui/popover.tsx, importa cliente: components/ui/command.tsx, importa cliente: components/ui/label.tsx',
+  'components/forms/FileUploadInput.tsx': 'useRef, useState, useEffect, jsx-spread, jsx-onChange, libreria cliente: sonner',
+  'components/forms/MutationForm.tsx': 'useRef, useState, jsx-spread, libreria cliente: sonner',
+  'components/forms/SignUpForm.tsx': 'useRouter, jsx-onSubmit, libreria cliente: react-hook-form, libreria cliente: sonner, importa cliente: components/forms/CountrySelectField.tsx, importa cliente: components/forms/AccessRequestForm.tsx',
+  'components/GlossaryTerm.tsx': 'importa cliente: components/ui/tooltip.tsx',
+  'components/help/HelpTabs.tsx': 'importa cliente: components/ui/tabs.tsx',
+  'components/historical-stress/HistoricalStressView.tsx': 'useState, jsx-onClick',
+  'components/insider/InsiderSignalsView.tsx': 'useRouter, useState, jsx-onSubmit, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/data/RecordViews.tsx',
+  'components/knowledge-graph/KnowledgeGraphCanvas.tsx': 'browser:document, useRouter, usePathname, useSearchParams, useState, useRef, browser:window, useEffect, browser:navigator, browser:ResizeObserver, browser:new ResizeObserver, jsx-onClick, jsx-onKeyDown, jsx-onPointerCancel, jsx-onPointerDown, jsx-onPointerLeave, jsx-onPointerMove, jsx-onPointerUp, jsx-onPointerEnter, jsx-onChange',
+  'components/knowledge/DeleteDocumentButton.tsx': 'useState, browser:window, jsx-onClick',
+  'components/knowledge/ExtractionRefresh.tsx': 'useRouter, useEffect, browser:window, browser:document',
+  'components/layout/BottomNav.tsx': 'usePathname, jsx-onClick, browser:window',
+  'components/layout/Breadcrumbs.tsx': 'usePathname',
+  'components/layout/SectionNav.tsx': 'usePathname',
+  'components/layout/Sidebar.tsx': 'usePathname, useState, browser:document, jsx-onClick',
+  'components/media/YouTubeEmbed.tsx': 'useState, jsx-onClick',
+  'components/MobileNav.tsx': 'useState, useRef, useEffect, browser:HTMLElement, browser:document, browser:window, jsx-onClick, importa cliente: components/NavItems.tsx, importa cliente: components/SearchCommand.tsx',
+  'components/NavItems.tsx': 'usePathname',
+  'components/OnlineBanner.tsx': 'jsx-spread, importa cliente: hooks/useOnlineStatus.ts',
+  'components/PersonalizedOverview.tsx': 'jsx-onClick, useState, useEffect, jsx-onRetry',
+  'components/plan/PlanSetupDialog.tsx': 'useRouter, useState, browser:document, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx',
+  'components/plan/PlanView.tsx': 'importa cliente: components/data/RecordViews.tsx, importa cliente: components/plan/PlanSetupDialog.tsx',
+  'components/portfolio/AddTransactionButton.tsx': 'useRouter, useState, useRef, useEffect, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onClick, jsx-onValueChange, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx, importa cliente: components/ui/select.tsx',
+  'components/portfolio/EditTransactionDialog.tsx': 'useRouter, useState, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onValueChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx, importa cliente: components/ui/select.tsx',
+  'components/portfolio/ImportIBKRButton.tsx': 'useState, useRef, useRouter, jsx-onChange, jsx-onClick, libreria cliente: sonner',
+  'components/portfolio/PortfolioAllocation.tsx': 'dynamic-ssr-false, importa cliente: components/portfolio/PortfolioAllocationChart.tsx',
+  'components/portfolio/PortfolioAllocationChart.tsx': 'libreria cliente: recharts',
+  'components/portfolio/PortfolioHoldings.tsx': 'useRouter, useState, useEffect, jsx-onClick, libreria cliente: sonner',
+  'components/portfolio/PortfolioNavChart.tsx': 'libreria cliente: recharts',
+  'components/portfolio/PortfolioTabs.tsx': 'dynamic-ssr-false, useSearchParams, useRouter, usePathname, useState, useEffect, jsx-onValueChange, jsx-onClick, importa cliente: components/ui/tabs.tsx, importa cliente: components/portfolio/PortfolioSummary.tsx, importa cliente: components/portfolio/PortfolioHoldings.tsx, importa cliente: components/portfolio/PortfolioTransactions.tsx, importa cliente: components/portfolio/PortfolioAllocation.tsx, importa cliente: components/portfolio/PortfolioNavChart.tsx, importa cliente: components/portfolio/PortfolioScores.tsx, importa cliente: components/portfolio/PortfolioTearsheet.tsx, importa cliente: components/portfolio/AddTransactionButton.tsx, importa cliente: components/portfolio/RefreshPortfolioButton.tsx, importa cliente: components/portfolio/ImportIBKRButton.tsx',
+  'components/portfolio/PortfolioTransactions.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner, importa cliente: components/portfolio/EditTransactionDialog.tsx, importa cliente: components/portfolio/ImportIBKRButton.tsx',
+  'components/portfolio/RefreshPortfolioButton.tsx': 'useState, useRouter, jsx-onClick, libreria cliente: sonner',
+  'components/proPicks/EnhancedProPicksContent.tsx': 'useState, useRef, jsx-onFiltersChange, jsx-onApply, jsx-onClick, libreria cliente: sonner, importa cliente: components/proPicks/EnhancedProPicksFilters.tsx',
+  'components/proPicks/EnhancedProPicksFilters.tsx': 'jsx-onClick, jsx-onValueChange, importa cliente: components/ui/label.tsx, importa cliente: components/ui/select.tsx',
+  'components/proPicks/MonthlyRebalanceView.tsx': 'useState, useRef, browser:document, jsx-onChange, jsx-onClick',
+  'components/proPicks/ProPicksTabs.tsx': 'useState, useEffect, jsx-onValueChange, jsx-onStrategyChange, jsx-onClick, importa cliente: components/ui/tabs.tsx, importa cliente: components/proPicks/EnhancedProPicksContent.tsx, importa cliente: components/proPicks/MonthlyRebalanceView.tsx, importa cliente: components/proPicks/StrategyFactsheet.tsx, importa cliente: components/proPicks/StrategySelector.tsx, importa cliente: components/proPicks/WalkForwardResults.tsx',
+  'components/proPicks/StrategySelector.tsx': 'useRouter, jsx-onValueChange, importa cliente: components/ui/select.tsx',
+  'components/PublicMobileNav.tsx': 'useState, useRef, useEffect, browser:HTMLElement, browser:document, browser:window, jsx-onClick',
+  'components/pwa/InstallApp.tsx': 'browser:window, useState, useEffect, jsx-onClick',
+  'components/research/ChangesSinceVisit.tsx': 'useState, useEffect, browser:window',
+  'components/research/CompanyHeaderQuote.tsx': 'useState, useEffect, browser:document, browser:window, importa cliente: components/research/CompanyTechnicalWorkspace.tsx',
+  'components/research/CompanyMarketChart.tsx': 'browser:window, browser:getComputedStyle, browser:document, useRef, useState, jsx-onHover, jsx-onState, useEffect',
+  'components/research/CompanyMarketPanel.tsx': 'dynamic-ssr-false, importa cliente: components/research/CompanyMarketChart.tsx',
+  'components/research/CompanyTechnicalChart.tsx': 'useState, useEffect, jsx-onClick, useRef, browser:window',
+  'components/research/CompanyTechnicalWorkspace.tsx': 'dynamic-ssr-false, importa cliente: components/research/CompanyTechnicalChart.tsx',
+  'components/research/NewsHeadline.tsx': 'useState, useRef, useEffect, browser:new IntersectionObserver, browser:IntersectionObserver',
+  'components/research/NewsSecondOrder.tsx': 'useState, jsx-onToggle',
+  'components/research/NextStepLink.tsx': 'jsx-onClick, browser:window',
+  'components/research/QuickAlertButton.tsx': 'useSyncExternalStore, useState, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/select.tsx',
+  'components/research/ResearchAssistant.tsx': 'useState, useEffect, jsx-onSubmit, jsx-onChange, importa cliente: components/ui/panel.tsx',
+  'components/research/ScrollToOnMount.tsx': 'useEffect, browser:document',
+  'components/research/ShareCapitalPanel.tsx': 'jsx-onClick, useState, jsx-onChange, libreria cliente: recharts, importa cliente: components/ui/panel.tsx',
+  'components/research/ThesisApproveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
+  'components/research/ThesisAudioPlayer.tsx': 'browser:window, useSyncExternalStore, useState, useRef, useEffect, jsx-onClick',
+  'components/research/ThesisDebatePanel.tsx': 'useState, jsx-onClick',
+  'components/research/ThesisExportMenu.tsx': 'importa cliente: components/ui/dropdown-menu.tsx',
+  'components/research/ThesisGenerateButton.tsx': 'useRouter, useState, useRef, useEffect, browser:document, browser:window, jsx-onClick',
+  'components/research/ThesisHumanInputForm.tsx': 'useState, jsx-onSubmit',
+  'components/risk/RiskDashboardView.tsx': 'useState, useEffect, importa cliente: components/data/RecordViews.tsx',
+  'components/screener/FollowButton.tsx': 'useState, jsx-onClick, libreria cliente: sonner',
+  'components/screeners/FilterFields.tsx': 'useState, jsx-onChange',
+  'components/screeners/SubmitButton.tsx': 'useFormStatus',
+  'components/SearchCommand.tsx': 'useRouter, useState, useRef, browser:HTMLElement, browser:document, useEffect, browser:window, jsx-onClick, jsx-onOpenChange, jsx-onCloseAutoFocus, jsx-onValueChange, jsx-onSelect, jsx-onMouseEnter, jsx-onFocus, importa cliente: components/ui/command.tsx',
+  'components/security/TwoFactorSettings.tsx': 'useState, browser:navigator, jsx-onSubmit, jsx-onClick, libreria cliente: sonner, libreria cliente: react-hook-form',
+  'components/settings/TaxDeclarantForm.tsx': 'useState, jsx-onSubmit, jsx-onChange, libreria cliente: sonner',
+  'components/taxes/FilingSections.tsx': 'browser:document, jsx-onPreview, jsx-onReset, useState, jsx-onClick, importa cliente: components/data/RecordViews.tsx, importa cliente: components/taxes/TmePreviewForm.tsx',
+  'components/taxes/TaxesView.tsx': 'browser:document, useRouter, useState, useEffect, jsx-onChange, jsx-onClick, jsx-onPreview, jsx-onReset, libreria cliente: sonner, importa cliente: components/data/RecordViews.tsx, importa cliente: components/taxes/FilingSections.tsx',
+  'components/taxes/TmePreviewForm.tsx': 'useState, jsx-onSubmit, jsx-onChange, jsx-onClick',
+  'components/ui/avatar.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-avatar',
+  'components/ui/command.tsx': 'jsx-spread, jsx-onCloseAutoFocus, libreria cliente: cmdk, importa cliente: components/ui/dialog.tsx',
+  'components/ui/dialog.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-dialog',
+  'components/ui/dropdown-menu.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-dropdown-menu',
+  'components/ui/label.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-label',
+  'components/ui/panel.tsx': 'browser:HTMLElement, browser:window, jsx-spread, jsx-onClick',
+  'components/ui/popover.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-popover',
+  'components/ui/select.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-select',
+  'components/ui/sonner.tsx': 'jsx-spread, libreria cliente: sonner',
+  'components/ui/tabs.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-tabs',
+  'components/ui/tooltip.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-tooltip',
+  'components/UserDropdown.tsx': 'useRouter, jsx-onClick, importa cliente: components/ui/dropdown-menu.tsx, importa cliente: components/ui/avatar.tsx',
+  'components/watchlist/WatchlistRemoveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
+  'components/work-products/WorkProductButton.tsx': 'useState, jsx-onOpenChange, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/label.tsx, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/select.tsx',
+  'hooks/useOnlineStatus.ts': 'useSyncExternalStore, browser:window, browser:navigator',
+};
+
 const audit = auditRepo(root, ['components', 'app', 'hooks', 'lib']);
 const byRel = new Map(audit.map((r) => [r.rel, r]));
 
@@ -315,32 +431,52 @@ describe('el escaner y el guard cuentan lo mismo', () => {
     );
   });
 
-  it('el numero de directivas client del repo no crece sin explicacion', () => {
-    // 102 = ExtractionRefresh: useEffect + useRouter para refrescar la lista mientras una extraccion esta pendiente (#1438 lo anadio sin subir este contador; lo subo aqui).
-    // 101 = DeleteDocumentButton: useState del borrado y window.confirm antes de llamar a la server action (biblioteca de conocimiento).
-    // 100 = SyncPortfoliosButton: useState del estado de sincronizacion y onClick que llama a la server action (inversores/carteras en cuenta nueva).
-    // 99 = IngestLettersButton: useState del estado de descarga y onClick que llama a la server action (inversores/cartas con biblioteca vacia).
-    // 98 = NewsSecondOrder (useState y onToggle del <details> que carga el segundo orden bajo demanda) + TaxDeclarantForm (useState de los campos fiscales y envío del formulario en /settings): ambas justificadas por hooks y eventos, no heredadas.
-    // 96 = ThesisAudioPlayer: useState/useRef/useSyncExternalStore y handlers de play/pausa/detener sobre window.speechSynthesis (la lectura en voz alta solo existe en el navegador).
-    // 95 = PublicMobileNav: useState del drawer, listeners de teclado (Escape/Tab), matchMedia para cerrar al cruzar md y bloqueo de scroll del body en el header publico.
-    // 94 = AccessRequestForm: useState (envio, error y confirmacion) y onSubmit del formulario de solicitud de acceso con el registro cerrado.
-    // 93 = HistoricalStressView: useState (paginacion de la tabla de ventanas) en la pagina /portfolio/stress.
-    // 92 = ShareCapitalPanel: useState (pestanas saldos/flujos y paginacion) y recharts, que solo funciona en cliente.
-    // 91 = ChangesSinceVisit: localStorage/sessionStorage + fetch en cliente (la ultima visita solo existe en el navegador).
-    // 90 = InstallApp: beforeinstallprompt, useState/useEffect y click para instalar la PWA (seccion Instalar GerarAI en /security).
-    // 89 = ThesisExportMenu: DropdownMenu Radix interactivo (trigger, items, teclado) que agrupa las 4 exportaciones de la tesis.
-    // 88 = CompanyHeaderQuote: useEffect/useState, refresco 60s y visibilitychange para cotización extendida.
-    // 87 = NextStepLink: onClick para llevar la pantalla al inicio al cambiar de vista de la ficha (en movil el enlace esta al final de una pagina larga); 86 = TmePreviewForm: useState para el campo TME, validacion y envio del formulario; 85 = HubNav: usePathname para la sección activa de la biblioteca. 84 = LibraryChat: useState para pregunta/autor/respuesta/busy/error y eventos onSubmit/onChange;
-    // requiere interactividad real, no es excepción heredada. 83 = NewsHeadline adds visible-only async translation state/IntersectionObserver; 82 = 77 justificadas (SectionNav: usePathname para contexto de rutas) y antes 81 = 76 justificadas (CompanyTechnicalChart: hooks/canvas/rangos; CompanyTechnicalWorkspace: dynamic ssr:false) + 5 heredadas. Antes: 79 = 74 justificadas (A, incluye KnowledgeGraphCanvas: eventos de puntero, pan/zoom y BottomNav: usePathname; YouTubeEmbed: useState para cargar tras clic) + 5 heredadas del padre (C). Si sube, alguien
-    // ha anadido un modulo cliente: que lo justifique en la revision.
-    const total = audit.filter((r) => r.hasUseClient).length;
-    const justified = audit.filter((r) => r.hasUseClient && r.justified).length;
-    const inherited = audit.filter((r) => r.hasUseClient && !r.justified).length;
-    assert.equal(inherited, 5, 'cambian las excepciones: revisa COMPONENTS_EXCEPTIONS y su motivo');
-    assert.equal(
-      total,
-      102,
-      `han aparecido directivas 'use client' sin revisar (total ${total}, justificadas ${justified}, heredadas ${inherited})`,
+  it('cada directiva client del repo esta en la allowlist, ni una mas ni una menos', () => {
+    const actual = audit
+      .filter((r) => r.hasUseClient && r.justified)
+      .map((r) => r.rel)
+      .sort();
+    const faltan = actual.filter((rel) => !(rel in JUSTIFIED_USE_CLIENT));
+    const sobran = Object.keys(JUSTIFIED_USE_CLIENT).filter((rel) => !actual.includes(rel));
+    assert.deepEqual(
+      faltan,
+      [],
+      "directivas 'use client' nuevas sin listar: anade cada ruta a JUSTIFIED_USE_CLIENT con su motivo",
+    );
+    assert.deepEqual(
+      sobran,
+      [],
+      'entradas obsoletas en JUSTIFIED_USE_CLIENT (la directiva ya no existe o ya no se justifica): borralas',
+    );
+  });
+
+  it('cada entrada de la allowlist existe, conserva la directiva y el detector la sigue justificando', () => {
+    for (const [rel, reason] of Object.entries(JUSTIFIED_USE_CLIENT)) {
+      assert.ok(typeof reason === 'string' && reason.trim().length > 0, `${rel}: motivo vacio`);
+      assert.ok(existsSync(join(root, rel)), `${rel}: la entrada apunta a un fichero que no existe. Borrala.`);
+      const row = byRel.get(rel);
+      assert.ok(row, `${rel}: el auditor no encuentra el fichero. Borra la entrada.`);
+      assert.equal(row.hasUseClient, true, `${rel}: ya no tiene 'use client'. Borra la entrada.`);
+      assert.equal(
+        row.justified,
+        true,
+        `${rel}: el detector ya no justifica la directiva: quita la directiva o borra la entrada.`,
+      );
+    }
+  });
+
+  it('las unicas directivas sin justificar son las excepciones listadas, ni una mas', () => {
+    // Sin numero total: el conjunto de directivas muertas tiene que ser
+    // exactamente el de las excepciones declaradas, ruta a ruta.
+    const dead = audit
+      .filter((r) => r.hasUseClient && !r.justified)
+      .map((r) => r.rel)
+      .sort();
+    const exceptions = [...Object.keys(COMPONENTS_EXCEPTIONS), ...Object.keys(APP_EXCEPTIONS)].sort();
+    assert.deepEqual(
+      dead,
+      exceptions,
+      'una directiva muerta nueva necesita su excepcion con motivo (o quitar la directiva); una excepcion obsoleta se borra',
     );
   });
 });
