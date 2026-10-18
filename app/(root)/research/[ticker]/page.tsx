@@ -50,6 +50,7 @@ import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Panel } from '@/components/ui/panel';
 import { Stat } from '@/components/ui/stat';
+import { getCompanyPer } from '@/lib/actions/company-per.actions';
 import { Textarea } from '@/components/ui/textarea';
 import {
   askResearchCompanyChat,
@@ -90,7 +91,7 @@ import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import CitationsList from '@/components/chat/CitationsList';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
-import { formatCompact, formatDate, formatMarketDate, formatUserDateTime, formatMoney, formatPercent, NA } from '@/lib/format';
+import { formatCompact, formatDate, formatMarketDate, formatNumber, formatUserDateTime, formatMoney, formatPercent, NA } from '@/lib/format';
 import { glossary, moatGlossaryKey } from '@/lib/glossary';
 import {
   RESEARCH_RENDER_BUDGET_MS,
@@ -811,13 +812,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           .slice(0, 5)
           .sort((a, b) => b.date.localeCompare(a.date))
       : [];
+    const per = await getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: 'No se pudo consultar el PER' }));
     content = (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <Stat label="Cobertura" value={healthText(snapshot.research_health.score, listingStatus(company.exchange, headerMarket?.quote?.priceAsOf ?? null, new Date()))} />
           <Stat label="Hechos" value={snapshot.counts.facts} />
           <Stat label="Afirmaciones" value={snapshot.counts.claims} />
           <Stat label="Documentos" value={snapshot.counts.documents} />
+          <Stat label="PER (TTM)" value={per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA} hint={per.note} />
         </div>
         <p className="text-xs leading-5 text-gray-500">
           Cobertura = 20 por capa (documentos, hechos, tesis, modelo) +10 métricas
