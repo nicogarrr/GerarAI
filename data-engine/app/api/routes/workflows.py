@@ -128,18 +128,34 @@ async def run_workflow(
         envelope_check = db.scalar(select(Company).where(Company.ticker == ticker))
         if not envelope_check:
             raise HTTPException(status_code=404, detail=f"Company {ticker} not found")
+        tenant_id = db.info.get("tenant_id")
+        if tenant_id is None:
+            # Mismo guard que ThesisApprovalWorkflow: el thread del grafo va
+            # namespacetado por tenant (thesis:{tenant}:{company}:...) y sin
+            # tenant no hay namespace honesto. Antes todo corria bajo el
+            # tenant fijo "shadow", identico para todos los workspaces; con
+            # un checkpointer durable esos threads colisionarian entre
+            # tenants (el in-memory actual no persiste, pero el namespace
+            # sin tenant ya era la trampa).
+            raise HTTPException(status_code=403, detail="Tenant context required")
         result = ThesisShadowService().run(
             db,
             ticker=ticker,
+            tenant_external_id=str(tenant_id),
             idempotency_key=key,
         )
         if result.get("idempotent_replay"):
-            run_id = db.scalar(
-                select(WorkflowRun.id).where(
-                    WorkflowRun.workflow_name == name,
-                    WorkflowRun.idempotency_key == key,
+            # El run_id viaja en el payload grabado por el servicio. Runs
+            # grabados antes de este cambio no lo llevan: se re-consulta por
+            # clave de idempotencia (scoped por tenant), nunca "el ultimo".
+            run_id = result.get("run_id")
+            if run_id is None:
+                run_id = db.scalar(
+                    select(WorkflowRun.id).where(
+                        WorkflowRun.workflow_name == name,
+                        WorkflowRun.idempotency_key == key,
+                    )
                 )
-            )
             return {
                 **result,
                 "run_id": run_id,
@@ -147,16 +163,11 @@ async def run_workflow(
                 "steps": workflow["steps"],
                 "estimated_minutes": 0,
             }
-        run_id = db.scalar(
-            select(WorkflowRun.id).where(
-                WorkflowRun.workflow_name == name,
-            ).order_by(WorkflowRun.id.desc()).limit(1)
-        )
         return {
             "status": "completed",
             "workflow": name,
             "ticker": ticker,
-            "run_id": run_id,
+            "run_id": result.get("run_id"),
             "result": result,
             "steps": workflow["steps"],
             "estimated_minutes": 0,
