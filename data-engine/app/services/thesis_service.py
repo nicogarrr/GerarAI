@@ -428,8 +428,15 @@ class ThesisService:
         }
         valuation["long_term_model"] = long_term_model
         news_items = ((evidence.get("sources") or {}).get("news") or {}).get("items") or []
+        # Una tesis insufficient_data no usa el precio (no hay valoracion): el
+        # precio no puede distinguir versiones, asi que queda fuera de la huella.
         fingerprint = self._input_fingerprint(
-            db, company, valuation, long_term_model, news_items
+            db,
+            company,
+            valuation,
+            long_term_model,
+            news_items,
+            include_price=valuation.get("status") != "insufficient_data",
         )
 
         existing = self.latest(db, ticker)
