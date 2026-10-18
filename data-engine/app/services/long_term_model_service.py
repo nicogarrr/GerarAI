@@ -646,7 +646,10 @@ class LongTermModelService:
         drivers: list[dict[str, Any]] = []
         for key in ordered_keys:
             facts = fact_cache.get(key) or []
-            fact = facts[-1] if facts else None
+            # Match the annual model anchor, not whichever quarterly/undated
+            # row happened to be ingested last.
+            annual = self._annual_by_year(facts)
+            fact = annual[max(annual)] if annual else (facts[-1] if facts else None)
             drivers.append(
                 {
                     "key": key,
@@ -709,14 +712,20 @@ class LongTermModelService:
         return constrained
 
     def _facts(self, db: Session, company: Company, metric: str) -> list[FinancialFact]:
-        return list(
-            db.scalars(
-                select(FinancialFact)
-                .where(FinancialFact.company_id == company.id, FinancialFact.metric == metric)
-                .order_by(FinancialFact.fiscal_year.asc().nullslast(), FinancialFact.created_at.asc())
-                .limit(200)
-            ).all()
-        )
+        # Bound the newest facts, not the oldest 200. SEC histories can exceed
+        # that cap and include undated legacy quarters. Keep the consumer's
+        # oldest-to-newest contract after selecting the current window.
+        newest = list(db.scalars(
+            select(FinancialFact)
+            .where(FinancialFact.company_id == company.id, FinancialFact.metric == metric)
+            .order_by(
+                FinancialFact.fiscal_year.desc().nullslast(),
+                FinancialFact.created_at.desc(),
+                FinancialFact.id.desc(),
+            )
+            .limit(200)
+        ).all())
+        return list(reversed(newest))
 
     def _annual_by_year(self, facts: list[FinancialFact]) -> dict[int, FinancialFact]:
         result: dict[int, FinancialFact] = {}
