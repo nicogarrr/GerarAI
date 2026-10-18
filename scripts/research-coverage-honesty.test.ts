@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 // @ts-expect-error Node strip-types requires the explicit TS extension.
-import { researchValuability, modelConditionState } from '../lib/research/coverage-state.ts';
+import { researchValuability, modelConditionState, visibleThesisRating } from '../lib/research/coverage-state.ts';
 const complete = { latest_thesis: { status: 'ok' }, model_summary: { status: 'ok', publishable: true }, valuation_summary: { status: 'ok' } };
 test('coverage never makes insufficient thesis or blocked model valueable', () => {
   assert.equal(researchValuability({ ...complete, latest_thesis: { status: 'insufficient_data' } }), 'No valorable / falta evidencia');
@@ -26,4 +26,12 @@ test('index and overview use coverage and a separate evidence state', () => {
   const panel = readFileSync('components/research/FundamentalModelPanels.tsx', 'utf8');
   assert.doesNotMatch(panel, /CheckCircle2/);
   assert.match(panel, /modelConditionState\(item/);
+});
+
+test('un veredicto de valoración no contradice el estado no valorable (caso ADBE)', () => {
+  const blocked = { ...complete, model_summary: { status: 'blocked', publishable: false } };
+  assert.equal(visibleThesisRating('attractive', blocked), null);
+  assert.equal(visibleThesisRating('expensive', blocked), null);
+  assert.equal(visibleThesisRating('attractive', complete), 'attractive');
+  assert.equal(visibleThesisRating('insufficient_data', blocked), 'insufficient_data');
 });

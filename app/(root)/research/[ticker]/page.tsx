@@ -4,7 +4,7 @@ import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
 import { factDisplayAudit } from '@/lib/research/fact-display-audit';
 import { groupClaimsByVersion } from '@/lib/research/claim-groups';
 import { GROUPS, MODULES, asView, moduleHref, type View } from '@/lib/research/research-views';
-import { researchValuability } from '@/lib/research/coverage-state';
+import { researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getProfile } from '@/lib/actions/finnhub.actions';
@@ -855,9 +855,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             {snapshot.latest_thesis ? (
               <>
                 <div className="flex flex-wrap gap-2">
-                  <Badge>{label(snapshot.latest_thesis.rating)}</Badge>
+                  {visibleThesisRating(snapshot.latest_thesis.rating, snapshot) ? <Badge>{label(snapshot.latest_thesis.rating)}</Badge> : null}
                   <Badge variant="outline">v{snapshot.latest_thesis.version}</Badge>
-                  <Badge variant="outline">{label(snapshot.latest_thesis.status)}</Badge>
+                  {label(snapshot.latest_thesis.status) !== label(snapshot.latest_thesis.rating) ? (
+                    <Badge variant="outline">{label(snapshot.latest_thesis.status)}</Badge>
+                  ) : null}
                 </div>
                 <p className="mt-3 text-sm leading-6 text-gray-300">{snapshot.latest_thesis.executive_summary}</p>
                 <div className="mt-4 flex flex-wrap items-center gap-3">

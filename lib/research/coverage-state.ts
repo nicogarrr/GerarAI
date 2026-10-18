@@ -30,3 +30,18 @@ export function modelConditionState(item: {
   }
   return 'Pendiente de contrastar';
 }
+
+/** Ratings del motor de tesis que son un veredicto de valoración. */
+const VALUATION_VERDICTS = new Set(['attractive', 'expensive', 'fair', 'cheap', 'incomplete_price']);
+
+/** Un veredicto de valoración (atractiva/cara) no puede convivir con un estado
+ *  «no valorable»: si la valoración no es válida, el veredicto se omite
+ *  (null). Los demás ratings (compra, mantener, datos insuficientes...) pasan. */
+export function visibleThesisRating(
+  rating: string | null | undefined,
+  snapshot: Parameters<typeof researchValuability>[0],
+): string | null {
+  if (!rating) return null;
+  if (VALUATION_VERDICTS.has(rating) && researchValuability(snapshot) === 'No valorable / falta evidencia') return null;
+  return rating;
+}

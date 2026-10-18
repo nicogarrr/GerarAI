@@ -1,4 +1,4 @@
-import { researchValuability } from '@/lib/research/coverage-state';
+import { researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FileSearch } from 'lucide-react';
@@ -139,7 +139,7 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                     )}
                     {thesis ? (
                         <>
-                            <Badge>{ratingLabel(thesis.rating)}</Badge>
+                            {snapshot && visibleThesisRating(thesis.rating, snapshot) ? <Badge>{ratingLabel(thesis.rating)}</Badge> : null}
                             <span className="text-xs text-gray-500">
                                 v{formatNumber(thesis.version)} · {formatDate(thesis.created_at)}
                             </span>
