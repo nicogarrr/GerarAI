@@ -42,3 +42,13 @@ test('source and detail controls exist on both surfaces', () => {
     assert.match(view, /item.sourceUrl/);
   }
 });
+
+test('tracked news card shows the source headline from the alert title', () => {
+  const card = alertCardCopy({ ...base, alert_type: 'tracked_news', title: 'Noticia sobre ASML: ASML supera las previsiones de pedidos del trimestre', eventForm: null });
+  assert.equal(card.summary, 'ASML supera las previsiones de pedidos del trimestre');
+});
+
+test('tracked news card without headline keeps the generic summary (no invented content)', () => {
+  const card = alertCardCopy({ ...base, alert_type: 'tracked_news', title: 'Noticia sobre ASML', eventForm: null });
+  assert.equal(card.summary, 'Noticia sobre Visa.');
+});

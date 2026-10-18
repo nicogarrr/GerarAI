@@ -28,11 +28,20 @@ export function alertCardCopy(alert: TriggeredAlertDelivery): { heading: string;
   const summary = form
     ? `Documento ${form} asociado a ${company}.`
     : alert.alert_type === 'tracked_news'
-      ? `Noticia sobre ${company}.`
+      ? trackedNewsSummary(alert, company)
       : alert.alert_type.includes('news')
         ? `Noticia marcada para revisión de la tesis de ${company}; el impacto aún debe verificarse.`
         : alertOwnText(alert, company);
   return { heading: `${company} · ${kind}${suffix}`, summary, technical: `${alert.title}\n${alert.message}` };
+}
+
+/** El titular de la noticia viaja en el título de la alerta ("Noticia sobre TICKER: titular",
+ *  tracked_news_alerts.py): se muestra tal cual viene de la fuente. Si la alerta es antigua y
+ *  no trae titular, se mantiene la frase genérica (nunca se inventa contenido). */
+function trackedNewsSummary(alert: TriggeredAlertDelivery, company: string): string {
+  const title = alert.title.trim();
+  const headline = title.replace(/^Noticia sobre [^:]+:\s*/i, '').trim();
+  return headline && headline !== title ? headline : `Noticia sobre ${company}.`;
 }
 
 /** Texto propio de la alerta (regla, posiciones cortas, cribado) en vez de una frase genérica. */
