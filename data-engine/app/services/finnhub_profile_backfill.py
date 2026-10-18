@@ -127,6 +127,13 @@ class FinnhubProfileBackfill:
             if profile.get("name"):
                 fields.extend(k for k in ("exchange", "currency", "country", "finnhubIndustry") if profile.get(k))
 
+            # Objecion de revision: con exchange placeholder, Finnhub
+            # resuelve el ticker pelado al ADR americano (SAN -> NYSE/USD/US)
+            # y promover exchange/currency/country/market_cap escribiria la
+            # identidad de OTRO instrumento. En ese caso solo se promueve el
+            # nombre; el resto queda como candidato declarado en metadata.
+            unknown_exchange = company.exchange in _PLACEHOLDER_EXCHANGES
+            adr_candidates: dict[str, str] = {}
             changed = False
             name = (profile.get("name") or "").strip()
             if name and (
@@ -137,29 +144,34 @@ class FinnhubProfileBackfill:
                 company.name = name
                 changed = True
             exchange = (profile.get("exchange") or "").strip()
-            if exchange and company.exchange in _PLACEHOLDER_EXCHANGES:
-                company.exchange = exchange
-                changed = True
             currency = (profile.get("currency") or "").strip()
-            if currency and not (company.currency or "").strip():
-                company.currency = currency
-                changed = True
-            industry = (profile.get("finnhubIndustry") or "").strip()
-            if industry and industry.upper() not in {"N/A", "UNKNOWN"} and not (company.industry or "").strip():
-                company.industry = industry
-                changed = True
-                sector = sector_for_industry(industry)
-                if sector and not (company.sector or "").strip():
-                    company.sector = sector
             country = (profile.get("country") or "").strip().upper()
-            if country and not (company.domicile_country or "").strip():
-                company.domicile_country = country
-                changed = True
+            industry = (profile.get("finnhubIndustry") or "").strip()
+            if unknown_exchange:
+                for key, value in (("exchange", exchange), ("currency", currency), ("country", country)):
+                    if value:
+                        adr_candidates[key] = value
+            else:
+                # exchange conocido y no placeholder: se respeta tal cual.
+                if currency and not (company.currency or "").strip():
+                    company.currency = currency
+                    changed = True
+                if industry and industry.upper() not in {"N/A", "UNKNOWN"} and not (company.industry or "").strip():
+                    company.industry = industry
+                    changed = True
+                    sector = sector_for_industry(industry)
+                    if sector and not (company.sector or "").strip():
+                        company.sector = sector
+                if country and not (company.domicile_country or "").strip():
+                    company.domicile_country = country
+                    changed = True
 
             quote_date = _quote_session_date(quote or {}, today)
             cap = _decimal(profile.get("marketCapitalization"))
             cap_written = False
-            if cap is not None and cap > 0 and quote_date is not None:
+            if unknown_exchange and cap is not None and cap > 0:
+                adr_candidates["market_cap_usd_millions"] = str(cap)
+            if not unknown_exchange and cap is not None and cap > 0 and quote_date is not None:
                 period = quote_date.isoformat()
                 already = db.scalar(
                     select(func.count(FinancialFact.id)).where(
@@ -200,6 +212,9 @@ class FinnhubProfileBackfill:
                         "company_updated": changed,
                         "market_cap_written": cap_written,
                         "empty": not profile,
+                        # Candidatos NO promovidos por identidad dudosa (ADR):
+                        # visibles para revision, nunca aplicados a Company.
+                        "adr_candidates": adr_candidates,
                     },
                 )
             )

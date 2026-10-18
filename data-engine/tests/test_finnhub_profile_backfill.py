@@ -77,7 +77,7 @@ def _company(db: Session, ticker: str, **overrides) -> Company:
 
 
 def test_backfill_fills_profile_and_quote_dated_market_cap(db):
-    company = _company(db, "XYZ")
+    company = _company(db, "XYZ", exchange="NASDAQ")
     client = _Client(
         quotes={"XYZ": {"c": 25.5, "t": int(datetime(2026, 10, 16, 20, 0, tzinfo=UTC).timestamp())}},
         profiles={"XYZ": {
@@ -93,7 +93,8 @@ def test_backfill_fills_profile_and_quote_dated_market_cap(db):
     assert result["procesadas"] == 1
     assert result["market_cap"] == 1
     assert company.name == "Xylem Robotics Inc"
-    assert company.exchange == "NASDAQ NMS - GLOBAL MARKET"
+    # exchange conocido no se pisa con el valor del perfil (regla anti-ADR).
+    assert company.exchange == "NASDAQ"
     assert company.domicile_country == "US"
     cap = db.scalar(
         select(FinancialFact).where(
@@ -123,6 +124,39 @@ def test_backfill_never_overwrites_good_fields(db):
     assert company.name == "Real Name"
     assert company.exchange == "NASDAQ"
     assert company.domicile_country == "GB"
+
+
+def test_placeholder_exchange_promotes_only_name_adr_stays_candidate(db):
+    """Objecion de revision: SAN con exchange placeholder -> Finnhub resuelve
+    el ADR (NYSE/USD/US); promover identidad o market_cap escribiria OTRO
+    instrumento. Solo el nombre se promueve; el resto queda declarado como
+    candidato en metadata del Document."""
+    company = _company(db, "SAN")  # exchange UNKNOWN por defecto
+    client = _Client(
+        quotes={"SAN": {"c": 4.9, "t": int(datetime(2026, 10, 16, 20, 0, tzinfo=UTC).timestamp())}},
+        profiles={"SAN": {
+            "name": "Banco Santander SA", "exchange": "NYSE",
+            "currency": "USD", "country": "US",
+            "marketCapitalization": 80000.0,
+        }},
+    )
+    service = FinnhubProfileBackfill(settings=_Settings(), client=client)
+    result = service.backfill(db, sleep_between_calls=0, today=date(2026, 10, 17))
+
+    assert company.name == "Banco Santander SA"
+    assert company.exchange == "UNKNOWN"  # nunca el NYSE del ADR
+    assert company.currency == "USD"  # ya era USD; no promovido desde perfil
+    assert company.domicile_country in (None, "")
+    assert result["market_cap"] == 0
+    assert db.scalar(
+        select(FinancialFact).where(FinancialFact.company_id == company.id)
+    ) is None
+    doc = db.scalar(select(Document).where(Document.company_id == company.id))
+    candidates = doc.metadata_["adr_candidates"]
+    assert candidates["exchange"] == "NYSE"
+    assert candidates["country"] == "US"
+    assert candidates["market_cap_usd_millions"] == "80000.0"
+    assert doc.metadata_["market_cap_written"] is False
 
 
 def test_backfill_skips_companies_checked_recently(db):
