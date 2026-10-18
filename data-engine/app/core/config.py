@@ -495,11 +495,16 @@ class Settings(BaseSettings):
             raise ValueError("MINIO_SECRET_KEY must not use a development default in production")
         if self.minio_access_key.lower() in _WEAK_MINIO_ACCESS_KEYS:
             raise ValueError("MINIO_ACCESS_KEY must not use a development default in production")
-        database_scheme = (self.database_url.split(":", 1) or [""])[0].lower()
+        # "postgresql+psycopg" (la URL real de la VM) tambien es postgres: antes
+        # el sufijo del driver hacia saltarse la comprobacion de credenciales.
+        database_scheme = (self.database_url.split(":", 1) or [""])[0].lower().split("+", 1)[0]
         if database_scheme in {"postgres", "postgresql"}:
             _assert_strong_credentials(self.database_url, label="DATABASE_URL")
         if self.mongodb_uri:
             _assert_strong_credentials(self.mongodb_uri, label="MONGODB_URI")
+        # Ultimo, para no tapar los mensajes de las demas garantias.
+        if database_scheme.startswith("sqlite"):
+            raise ValueError("SQLite is not allowed as DATABASE_URL in production")
         return self
 
 

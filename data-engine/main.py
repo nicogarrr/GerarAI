@@ -13,7 +13,7 @@ from app.api.routes.health import router as health_router
 from app.core.auth import get_research_principal
 from app.core.config import get_settings
 from app.core.database import SessionLocal, init_db
-from app.core.rate_limit import enforce_rate_limit
+from app.core.rate_limit import AuthFailureLimitMiddleware, enforce_rate_limit
 from app.core.raw_body import RawBodyMiddleware
 from app.llm.factory import validate_llm_configuration
 from app.llm.model_aliases import configure_model_aliases
@@ -59,6 +59,13 @@ def _start_embedder_warmup(settings) -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings = get_settings()
+    if "app_env" not in settings.model_fields_set:
+        # app_env tiene default "local": sin APP_ENV explicito la API arrancaba
+        # con auth firmada/rate limit/nonce en modo local (fail-open). El API
+        # exige declararlo; los workers no pasan por aqui.
+        raise RuntimeError(
+            "APP_ENV is not set: refusing to start the API with the implicit 'local' default"
+        )
     if settings.app_env.lower() != "test":
         from app.core.database import engine as _engine
         from app.core.pool_probe import install as _install_pool_probe
@@ -120,6 +127,9 @@ app = FastAPI(
 
 app.add_middleware(
     RawBodyMiddleware,
+    # Sin cabecera de firma el request no puede pasar la auth: tope de 1MB
+    # en vez de bufferizar 10-16MB antes de rechazarlo.
+    max_unsigned_body_bytes=1024 * 1024,
     max_body_bytes_by_prefix={
         # La ruta de subida valida contra MAX_DOCUMENT_BYTES (15MB); el
         # middleware le deja pasar hasta 16MB para que sea ella quien
@@ -144,6 +154,7 @@ app.add_middleware(
 # de la sesion de tests. El coste que se anade a cada request se mide y se expone
 # en `overhead_*`.
 app.add_middleware(LatencyMetricsMiddleware)
+app.add_middleware(AuthFailureLimitMiddleware)
 if get_settings().app_env.lower() != "test":
     from app.core.pool_probe import SlowRequestMiddleware
 

@@ -117,7 +117,7 @@ async def _record_hit(
 
             from app.core.redis_retry import no_retry_async
 
-            client = redis.from_url(redis_url, socket_connect_timeout=0.25, retry=no_retry_async())
+            client = redis.from_url(redis_url, socket_connect_timeout=0.25, socket_timeout=0.5, retry=no_retry_async())
             member = f"{now:.6f}:{uuid.uuid4().hex}"
             try:
                 async with client.pipeline(transaction=True) as pipe:
@@ -194,3 +194,88 @@ async def enforce_rate_limit(
         )
     response.headers["X-RateLimit-Limit"] = str(limit)
     response.headers["X-RateLimit-Remaining"] = str(max(0, limit - count))
+
+
+# --- Limite previo a la auth: peticiones que acaban en 401 -----------------
+# enforce_rate_limit depende de get_research_principal, asi que un 401 se
+# lanza ANTES de contar nada: un cliente sin credenciales podia martillear la
+# API sin limite. Este middleware cuenta por IP solo las respuestas 401 y
+# corta con 429 cuando una IP supera AUTH_FAILURE_LIMIT en la ventana.
+
+AUTH_FAILURE_LIMIT = 30
+
+
+async def _count_hits(key: str, *, use_redis: bool, redis_url: str) -> int:
+    now = _now()
+    if use_redis:
+        import redis.asyncio as redis
+
+        from app.core.redis_retry import no_retry_async
+
+        client = redis.from_url(
+            redis_url, socket_connect_timeout=0.25, socket_timeout=0.5, retry=no_retry_async()
+        )
+        try:
+            return int(await client.zcount(key, now - WINDOW_SECONDS, "+inf"))
+        finally:
+            await client.aclose()
+    async with _local_lock:
+        hits = _local_hits.get(key)
+        if not hits:
+            return 0
+        cutoff = now - WINDOW_SECONDS
+        return sum(1 for h in hits if h > cutoff)
+
+
+class AuthFailureLimitMiddleware:
+    def __init__(self, app, limit: int = AUTH_FAILURE_LIMIT):
+        self.app = app
+        self.limit = limit
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        settings = get_settings()
+        path = str(scope.get("path") or "")
+        if not settings.rate_limit_enabled or is_exempt_path(path) or scope.get("method") == "OPTIONS":
+            await self.app(scope, receive, send)
+            return
+        client = scope.get("client")
+        ip = client[0] if client else "unknown"
+        key = "cavaai:authfail:" + hashlib.sha256(ip.encode()).hexdigest()
+        use_redis = not settings.is_local_environment
+        try:
+            failures = await _count_hits(key, use_redis=use_redis, redis_url=settings.redis_url)
+        except Exception:  # noqa: BLE001 - el limite principal ya falla cerrado en prod
+            failures = 0
+        if failures >= self.limit:
+            from starlette.responses import JSONResponse
+
+            response = JSONResponse(
+                {"detail": "Too many failed authentication attempts"},
+                status_code=429,
+                headers={"Retry-After": str(WINDOW_SECONDS)},
+            )
+            await response(scope, receive, send)
+            return
+
+        status_holder: dict[str, int] = {}
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                status_holder["status"] = message["status"]
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+        if status_holder.get("status") == 401:
+            try:
+                await _record_hit(
+                    key,
+                    window_seconds=WINDOW_SECONDS,
+                    use_redis=use_redis,
+                    redis_url=settings.redis_url,
+                    degrade_to_local=True,
+                )
+            except Exception:  # noqa: BLE001
+                pass

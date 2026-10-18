@@ -135,3 +135,29 @@ def test_per_prefix_limit_still_rejects_above_its_cap():
     payload = b"x" * (17 * 1024 * 1024)
     response = client.post("/api/knowledge/documents/upload", content=payload)
     assert response.status_code == 413
+
+
+def _unsigned_cap_app() -> FastAPI:
+    app = FastAPI()
+    app.add_middleware(RawBodyMiddleware, max_unsigned_body_bytes=1024)
+
+    @app.post("/echo")
+    async def echo(request: Request):
+        return JSONResponse({"len": len(await request.body())})
+
+    return app
+
+
+def test_unsigned_body_over_small_cap_rejected():
+    client = TestClient(_unsigned_cap_app())
+    assert client.post("/echo", content=b"x" * 2048).status_code == 413
+    assert client.post("/echo", content=b"x" * 512).status_code == 200
+
+
+def test_signed_body_over_small_cap_accepted():
+    client = TestClient(_unsigned_cap_app())
+    response = client.post(
+        "/echo", content=b"x" * 2048, headers={"x-cavaai-signature": "abc"}
+    )
+    assert response.status_code == 200
+    assert response.json() == {"len": 2048}
