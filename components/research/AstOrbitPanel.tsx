@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import type { AstOrbitObject, AstOrbitOverview } from '@/lib/actions/asts-orbits.actions';
+import type { AstOrbitObject, AstOrbitOverview, AstsAnalysis } from '@/lib/actions/asts-orbits.actions';
 import { formatNumber, formatUserDateTime } from '@/lib/format';
 import { Panel } from '@/components/ui/panel';
 import { AstSmaChart } from '@/components/research/AstSmaChart';
@@ -19,13 +19,39 @@ function SourceObjects({ objects }: { objects: AstOrbitObject[] }) {
   </ul>;
 }
 
-export function AstOrbitPanel({ data }: { data: AstOrbitOverview | null }) {
+function CatalogReading({ analysis }: { analysis: AstsAnalysis | null }) {
+  const reading = analysis?.status === 'disponible' ? analysis.analysis : null;
+  if (!analysis || !reading) {
+    return <Panel title="Lectura del catálogo"><p className="text-sm text-gray-400">Sin datos frescos del catálogo.</p></Panel>;
+  }
+  const interpretation = reading.llm_interpretation;
+  return <Panel title="Lectura del catálogo">
+    <p className="text-sm leading-6 text-gray-300">{reading.summary}</p>
+    <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-gray-300">
+      {reading.observations.map((item) => <li key={item.text}>{item.text}</li>)}
+    </ul>
+    {interpretation ? <div className="mt-4 rounded-md border border-gray-800 p-3">
+      <h3 className="text-sm font-semibold text-gray-100">Interpretación generativa, no verificada</h3>
+      <p className="mt-2 text-sm leading-6 text-gray-300">{interpretation.summary}</p>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-300">
+        {interpretation.observations.map((item) => <li key={item.text}>{item.text}</li>)}
+      </ul>
+    </div> : null}
+    <p className="mt-3 text-xs text-gray-500">
+      Fuente: <a className="text-teal-300 hover:underline" href={analysis.source.url} rel="noopener noreferrer" target="_blank">{analysis.source.name}</a>
+      {analysis.source.fetched_at ? ` · descarga ${formatUserDateTime(analysis.source.fetched_at)}` : ''}
+    </p>
+  </Panel>;
+}
+
+export function AstOrbitPanel({ data, analysis }: { data: AstOrbitOverview | null; analysis: AstsAnalysis | null }) {
   const supgp = data?.supgp;
   return <div className="space-y-5">
     <Panel title="Órbitas de la constelación AST" description="Semieje mayor estimado a partir de elementos orbitales públicos, no telemetría del satélite.">
       <p className="text-sm leading-6 text-gray-300">{data?.usage_note ?? 'La lectura orbital no está disponible ahora. No inferimos órbitas ni despliegues sin elementos vigentes.'}</p>
       <p className="mt-3 text-xs text-gray-500">Cadencia máxima de descarga: cada {data?.cadence_hours ?? 2} h. La época orbital de cada objeto se muestra aparte. GP y SupGP no se mezclan.</p>
     </Panel>
+    <CatalogReading analysis={analysis} />
     <section className="space-y-3" aria-label="Historial GP">
       <h2 className="text-lg font-semibold text-gray-100">Catálogo GP · CelesTrak</h2>
       <p className="text-xs text-gray-400">Última descarga GP: {data?.fetched_at ? formatUserDateTime(data.fetched_at) : 'sin datos'}.</p>

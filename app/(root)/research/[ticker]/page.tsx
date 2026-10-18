@@ -35,7 +35,7 @@ import { missingLayerAction, missingLayerLabel } from '@/lib/research/missing-la
 import { metricLabel } from '@/lib/research/metric-labels';
 import { MoatPanel } from '@/components/research/MoatPanel';
 import { AstOrbitPanel } from '@/components/research/AstOrbitPanel';
-import { getAstOrbitOverview } from '@/lib/actions/asts-orbits.actions';
+import { getAstOrbitOverview, getAstsAnalysis } from '@/lib/actions/asts-orbits.actions';
 import {
   DecisionAndRealityPanel,
   LongTermModelPanel,
@@ -541,7 +541,7 @@ type ViewWorkspaces = {
   model: Awaited<ReturnType<typeof getResearchLongTermModel>>;
   'market-opportunity': Awaited<ReturnType<typeof getResearchLongTermModel>>;
   moat: Awaited<ReturnType<typeof getResearchMoatWorkspace>>;
-  satellites: Awaited<ReturnType<typeof getAstOrbitOverview>> | null;
+  satellites: { orbits: Awaited<ReturnType<typeof getAstOrbitOverview>>; analysis: Awaited<ReturnType<typeof getAstsAnalysis>> } | null;
   peers: Awaited<ReturnType<typeof getResearchPeersWorkspace>>;
   valuation: Awaited<ReturnType<typeof getResearchValuationWorkspace>>;
   documents: Awaited<ReturnType<typeof getResearchDocumentsWorkspace>>;
@@ -617,7 +617,7 @@ function launchViewData(
       // Solo ASTS tiene orbitales: pedirlo para cualquier otro ticker sería una
       // llamada segura de quedar sin usar.
       return ticker === 'ASTS'
-        ? { key: 'satellites', promise: withResearchTelemetry('ast-orbits', () => getAstOrbitOverview()) }
+        ? { key: 'satellites', promise: withResearchTelemetry('ast-orbits', async () => { const [orbits, analysis] = await Promise.all([getAstOrbitOverview(), getAstsAnalysis()]); return { orbits, analysis }; }) }
         : undefined;
     case 'peers':
       return { key: 'peers', promise: withResearchTelemetry('peers-workspace', () => getResearchPeersWorkspace(ticker)) };
@@ -1211,8 +1211,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   } else if (activeView === 'satellites') {
     // El panel ya degrada solo cuando no hay datos; aquí la lectura llega del
     // lote en paralelo (null si degradó, igual que antes).
-    const orbits = ticker === 'ASTS' ? await viewData('satellites') : null;
-    content = ticker === 'ASTS' ? <AstOrbitPanel data={orbits} /> : <EmptyState title="Esta vista orbital solo está disponible para ASTS." />;
+    const satellites = ticker === 'ASTS' ? await viewData('satellites') : null;
+    content = ticker === 'ASTS' ? <AstOrbitPanel data={satellites?.orbits ?? null} analysis={satellites?.analysis ?? null} /> : <EmptyState title="Esta vista orbital solo está disponible para ASTS." />;
   } else if (activeView === 'peers') {
     const peers = await viewData('peers');
     content = (
