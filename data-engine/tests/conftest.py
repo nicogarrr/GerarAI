@@ -132,3 +132,11 @@ def _reset_sec_client_state():
     reset_sec_client_state()
     yield
     reset_sec_client_state()
+
+
+@pytest.fixture(autouse=True)
+def _no_live_benchmark(monkeypatch):
+    """Los tests nunca llaman a Yahoo para el SPY de la comparativa."""
+    from app.services import portfolio_intelligence_service as svc
+
+    monkeypatch.setattr(svc, "_live_benchmark_prices", lambda cutoff: None)

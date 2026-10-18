@@ -92,3 +92,20 @@ def test_alpha_and_information_ratio_math(db):
     # Constant active return => zero tracking error => information ratio null, not crash.
     assert result["tracking_error"] == pytest.approx(0.0, abs=1e-6)
     assert result["information_ratio"] is None
+
+
+def test_live_spy_series_is_used_without_master_row(db, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.services import portfolio_intelligence_service as svc
+
+    start = date(2026, 1, 1)
+    live = [SimpleNamespace(date=start + timedelta(days=i), adj_close=Decimal(str(100 * 1.001 ** i)))
+            for i in range(61)]
+    monkeypatch.setattr(svc, "_live_benchmark_prices", lambda cutoff: live)
+    portfolio = {start + timedelta(days=i): 0.002 for i in range(1, 61)}
+    result = PortfolioIntelligenceService()._benchmark_comparison(db, portfolio, date(2025, 1, 1))
+    assert result["status"] == "calculated"
+    assert result["observations"] == 60
+    assert result["alpha_annualized"] is not None
+    assert db.scalar(__import__("sqlalchemy").select(Company).where(Company.ticker == "SPY")) is None
