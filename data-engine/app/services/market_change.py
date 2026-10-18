@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import Company, MarketPrice
 
-
 # Unica fuente que cuenta como cierre oficial: barras diarias reales (job
 # market_close_sync). Finnhub/FMP/yahoo intradia son fotos spot de un momento
 # cualquiera: comparar dos fotos daba variaciones distintas de las oficiales.
