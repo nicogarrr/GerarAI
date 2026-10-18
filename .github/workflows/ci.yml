@@ -188,9 +188,15 @@ jobs:
       # xdist -n 2: la suite son ~11 min single-process y el runner tiene 2
       # vCPU. Los tests que necesitan Qdrant VIVO (marker `services`, solo
       # test_rag_activation.py) van aparte y sin xdist, en el paso de RAG
-      # activation de abajo, que sigue siendo fail-closed contra el service.
+      # activation, que sigue siendo fail-closed contra el service.
       # El resto de tests que importan qdrant_client usan fakes en memoria.
-      - run: uv run --frozen python -m pytest -n 2 -m "not services"
+      # ORDEN IMPORTANTE: la activation va ANTES de la suite porque es quien
+      # descarga los modelos de embeddings (cache HF en ~/.cache/huggingface y
+      # ONNX de fastembed en /tmp/fastembed_cache). El runner de RAG evals que
+      # corre dentro de la suite (test_rag_evals_contracts) es hermetico: con
+      # la cache fria abstiene y falla. Antes lo calentaba el propio
+      # test_rag_activation al correr dentro del `pytest` unico; al sacarlo
+      # con `-m "not services"` hay que ejecutarlo primero a proposito.
       - name: Wait for Qdrant
         run: for i in $(seq 1 30); do curl -fs http://localhost:6333/collections && break || sleep 2; done
       - name: RAG activation against real Qdrant (must not skip)
@@ -210,6 +216,7 @@ jobs:
             echo "RAG activation tests skipped: Qdrant service not reachable" >&2
             exit 1
           fi
+      - run: uv run --frozen python -m pytest -n 2 -m "not services"
       - run: uv run --frozen python scripts/run_financial_evals.py
 
   evals:
