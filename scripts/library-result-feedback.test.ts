@@ -20,7 +20,7 @@ test('empty principios state explains a silent extraction outcome', () => {
   assert.match(noPrinciplesText([job('queued')]), /Aún no hay principios/);
   assert.match(noPrinciplesText([job('completed', {principle_ids: []})]), /sin encontrar principios/);
   assert.match(noPrinciplesText([job('partial', {principle_ids: []})]), /a medias/);
-  assert.match(noPrinciplesText([job('failed', {}, 'boom')]), /falló: boom/);
+  assert.match(noPrinciplesText([job('failed', {}, 'boom')]), /No se pudo completar la extracción/);
   // Una extracción con principios ya creados no es un estado vacío real.
   assert.match(noPrinciplesText([job('completed', {principle_ids: [1, 2]})]), /Aún no hay principios/);
 });
