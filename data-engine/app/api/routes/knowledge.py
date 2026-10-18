@@ -172,6 +172,23 @@ def _job(job: ProcessingJob) -> dict:
     }
 
 
+@router.post("/corpus/ingest-async", status_code=202)
+def ingest_corpus_async(db: Session = Depends(get_db)) -> dict:
+    """Encola la primera descarga del corpus libre de cartas para este tenant.
+
+    Responde de inmediato (202): el actor `ingest_letters_corpus` descarga e
+    ingiere los PDFs publicos (Numantia, Buffett, Azvalor, Magallanes) con el
+    contexto de tenant del solicitante. Idempotente por dedupe SHA-256.
+    """
+    from app.workers.dramatiq_app import ingest_letters_corpus
+
+    message = ingest_letters_corpus.send(
+        tenant_id=db.info.get("tenant_id"),
+        user_id=db.info.get("user_id"),
+    )
+    return {"status": "queued", "broker_message_id": str(message.message_id)}
+
+
 @router.post("/collections/defaults")
 def install_default_collections(db: Session = Depends(get_db)) -> list[dict]:
     return [

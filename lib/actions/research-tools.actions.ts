@@ -390,6 +390,19 @@ export async function getKnowledgeLibrary() {
   return { collections, documents, principles, jobs };
 }
 
+export type CorpusIngestResult = { success: true } | { success: false; message: string };
+
+/** Encola la primera descarga del corpus libre de cartas (202; el actor trabaja en segundo plano). */
+export async function ingestLettersCorpusNow(): Promise<CorpusIngestResult> {
+  try {
+    await requestJson('/api/knowledge/corpus/ingest-async', { method: 'POST' });
+    return { success: true };
+  } catch (error) {
+    console.error('ingestLettersCorpusNow error:', error);
+    return { success: false, message: error instanceof Error ? error.message : 'No se pudo encolar la descarga.' };
+  }
+}
+
 export async function getKnowledgeDocuments() {
   return requestJson<KnowledgeDocument[]>('/api/knowledge/documents?limit=500');
 }
