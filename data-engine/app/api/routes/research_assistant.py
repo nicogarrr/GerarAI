@@ -7,6 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.schemas import ChatPageContext
@@ -90,11 +91,13 @@ async def research_assistant(payload: AssistantRequest, db: Session = Depends(ge
     # Contexto de página explícito: en modo explore el ticker de la página
     # (resuelto en catálogo; contenido privado acotado al tenant) completa la pregunta sin
     # ticker. El modo guía sigue exigiendo ticker explícito.
-    page_context = resolve_page_context(db, payload.page)
+    # resolve_page_context y answer son sqlalchemy sincrono: hilo del pool.
+    # synthesize (LLM) es async real y se queda awaitado.
+    page_context = await run_in_threadpool(resolve_page_context, db, payload.page)
     if payload.mode == "explore" and not payload.ticker and page_context and page_context.company:
         payload = payload.model_copy(update={"ticker": page_context.company.ticker})
     try:
-        baseline = answer(db, payload)
+        baseline = await run_in_threadpool(answer, db, payload)
         response = AssistantResponse.model_validate(await synthesize(db, payload, baseline))
         response.context = page_context.echo() if page_context else None
         return response
