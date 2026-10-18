@@ -113,7 +113,7 @@ export function NewsEventsFlow({
               <li className="rounded-lg border border-gray-800 bg-black/20 p-3" key={`card-${event.id}`}>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
                   {event.ticker ? (
-                    <Link className="font-semibold text-teal-300 hover:text-teal-200" href={`/research/${event.ticker}`}>
+                    <Link className="inline-flex min-h-11 items-center font-semibold text-teal-300 hover:text-teal-200" href={`/research/${event.ticker}`}>
                       {event.ticker}
                     </Link>
                   ) : null}
@@ -175,7 +175,7 @@ export function NewsEventsFlow({
                     <th className="py-3 text-left text-sm font-semibold" scope="row">
                       {event.ticker ? (
                         <Link
-                          className="text-teal-300 hover:text-teal-200"
+                          className="inline-flex min-h-11 items-center text-teal-300 hover:text-teal-200"
                           href={`/research/${event.ticker}`}
                         >
                           {event.ticker}

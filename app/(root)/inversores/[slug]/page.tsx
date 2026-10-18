@@ -36,7 +36,12 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  return { title: `Inversores · ${slug}` };
+  try {
+    const investor = await getInvestor(slug);
+    return { title: investor ? `Inversores · ${investor.name}` : 'Inversor no encontrado' };
+  } catch {
+    return { title: 'Inversores' };
+  }
 }
 
 export default async function InvestorPage({

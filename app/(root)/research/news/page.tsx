@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,8 @@ async function submitIngestFeed(formData: FormData): Promise<void> {
 }
 
 type PageProps = { searchParams: Promise<{ lane?: string; pagina?: string }> };
+
+export const metadata: Metadata = { title: 'Noticias' };
 
 export default async function ResearchNewsPage({ searchParams }: PageProps) {
   const query = await searchParams;
