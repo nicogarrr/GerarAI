@@ -37,3 +37,9 @@ test('versiones y rango corresponden a datos cargados, no a la ventana solicitad
   assert.equal(loadedFinancialRange([{ series: [{ period: 'unknown', value: null }] }]), null);
   assert.equal(loadedFinancialRange([{ series: [{ period: '2023-09-27:FY', value: 12 }, { period: 'FY2025', value: 20 }] }]), '2023–2025');
 });
+
+test('financial definitions and dated facts do not expose raw provider captions', () => {
+  assert.equal(financialDefinition('Gross Margin'), 'Margen bruto');
+  assert.equal(financialDefinition('Cash And Equivalents'), 'Efectivo y equivalentes');
+  assert.equal(financialPeriod('2026-01-25:FY'), 'Ejercicio al 25/01/2026');
+});

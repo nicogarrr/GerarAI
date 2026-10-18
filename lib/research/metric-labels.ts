@@ -8,6 +8,12 @@
  * la humaniza (guiones bajos -> espacios) en vez de ocultarla.
  */
 export const METRIC_LABELS: Record<string, string> = {
+    market_cap: 'Capitalización bursátil',
+    roce: 'Rentabilidad del capital empleado (ROCE)',
+    incremental_roic: 'ROIC incremental',
+    stock_based_compensation: 'Remuneración en acciones',
+    owner_earnings: 'Beneficio del propietario',
+
     // Hechos canónicos (financial_ingestion_service.py)
     revenue: 'Ingresos',
     gross_profit: 'Beneficio bruto',
