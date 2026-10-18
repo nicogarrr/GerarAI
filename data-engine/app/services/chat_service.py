@@ -795,8 +795,19 @@ class ChatService:
                 llm_trace={"path": "small_talk"},
                 context=context_echo,
             )
-        from app.services.brain_data_tools import answer_data_question
+        from app.services.brain_data_tools import (
+            answer_data_question,
+            dividend_ticker_without_records,
+        )
 
+        missing_dividends = dividend_ticker_without_records(db, question)
+        if missing_dividends is not None:
+            from app.services.dividend_ingestion_service import DividendIngestionService
+
+            try:
+                await DividendIngestionService().sync_company(db, ticker=missing_dividends)
+            except Exception:  # noqa: BLE001 - sin proveedor se responde con lo guardado
+                db.rollback()
         data_answer = answer_data_question(db, question)
         if data_answer is not None:
             # A quote question may also request a concrete metric. Do not let
