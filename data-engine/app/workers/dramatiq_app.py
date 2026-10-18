@@ -1329,6 +1329,44 @@ def backfill_finnhub_profiles(
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("backfill_finnhub_profiles", exc, tenant_id=tenant_id)
+@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=600_000)
+def seed_company_fundamentals(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+    ticker: str = "",
+) -> dict[str, Any]:
+    """Siembra los fundamentales de una empresa en el tenant que la acaba de
+    anadir a cartera o watchlist (los FinancialFact son por tenant: sin este
+    carril el tenant nuevo veia «sin hechos persistidos» hasta pulsar
+    «Refrescar SEC»). Misma fuente primaria que el boton (SEC companyfacts /
+    snapshot ESEF local) y mismos contratos de veracidad; si el tenant ya
+    tiene hechos no hace nada; un fallo del proveedor queda contado, nunca
+    inventado.
+    """
+    from sqlalchemy import select as _select
+
+    from app.models import Company
+    from app.services.fundamentals_seed_service import seed_company_fundamentals as _seed
+
+    db = _session(tenant_id, user_id)
+    try:
+        ticker = (ticker or "").strip().upper()
+        company = db.scalar(_select(Company).where(Company.ticker == ticker))
+        if company is None and "." in ticker:
+            company = db.scalar(
+                _select(Company).where(Company.ticker == ticker.split(".")[0])
+            )
+        if company is None:
+            return {"actor": "seed_company_fundamentals", "status": "sin_company",
+                    "ticker": ticker}
+        try:
+            result = _seed(db, company)
+        except Exception as exc:
+            _rollback(db)
+            logger.exception("seed fundamentals failed for %s", ticker)
+            return {"actor": "seed_company_fundamentals", "status": "error",
+                    "ticker": ticker, "detail": str(exc)[:200]}
+        return {"actor": "seed_company_fundamentals", **result}
     finally:
         db.close()
 

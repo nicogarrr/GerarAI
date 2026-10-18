@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models import Company, FinancialFact, MarketPrice, ThesisVersion, WatchItem
 from app.services.connectors.earnings_calendar import fetch_earnings_range
+from app.services.fundamentals_seed_service import enqueue_fundamentals_seed
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
 
 router = APIRouter()
@@ -60,6 +61,9 @@ def upsert_watch_item(
             enqueue_tracked_analysis(db, symbol)
         except Exception:
             db.rollback()  # Following succeeds even if the analysis outbox fails.
+        # Los hechos son por tenant: siembra automatica para que la ficha no
+        # salga vacia hasta pulsar «Refrescar SEC» (hallazgo del tester).
+        enqueue_fundamentals_seed(db, symbol)
     return _payload(item)
 
 
