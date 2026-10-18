@@ -275,8 +275,12 @@ export type PortfolioIntelligence = {
   concentration: { top_1: number; top_5: number; herfindahl: number; weights: Record<string, number> };
   exposures: Record<'sectors' | 'countries' | 'currencies' | 'factors', Record<string, number>>;
   attribution: {
-    portfolio_components: Record<string, number>;
-    positions: Array<{ ticker: string; weight: number; total_return: number | null; components: Record<string, number | null> }>;
+    basis?: 'adjusted_price_return';
+    period_start?: string | null;
+    period_end?: string | null;
+    portfolio_components: Record<string, number | null>;
+    incomplete_components?: string[];
+    positions: Array<{ ticker: string; weight: number; total_return: number | null; period_start?: string | null; period_end?: string | null; components: Record<string, number | null> }>;
   };
   ledger_contribution: {
     positions: Array<{

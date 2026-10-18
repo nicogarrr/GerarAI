@@ -1056,6 +1056,7 @@ class PortfolioIntelligenceService:
                 all_facts[fact.company_id][fact.metric].append(fact)
         all_dividends: dict[int, float] = defaultdict(float)
         ambiguous_dividends: set[int] = set()
+        companies_with_dividend_rows: set[int] = set()
         if company_ids:
             for dividend in db.scalars(
                 select(Transaction).where(
@@ -1073,6 +1074,7 @@ class PortfolioIntelligenceService:
                     ambiguous_dividends.add(dividend.company_id)
                     continue
                 all_dividends[dividend.company_id] += float(cash_amount(dividend))
+                companies_with_dividend_rows.add(dividend.company_id)
         for position, company in rows:
             prices = price_series.get(company.id, [])
             # El ratio exige AMBOS extremos ajustados: con historica ajustada
@@ -1097,16 +1099,23 @@ class PortfolioIntelligenceService:
             # eps_diluted is the ingested key; eps is a legacy alias (F376).
             fundamental_growth = self._series_change(by_metric.get("eps_diluted") or by_metric.get("eps", []))
             share_change = self._series_change(by_metric.get("shares_diluted", []))
-            dilution = max(share_change or 0, 0)
-            buybacks = max(-(share_change or 0), 0)
-            dividends_known = company.id not in ambiguous_dividends
+            # Sin cifras de acciones en el horizonte no hay recompras ni
+            # dilucion que medir: N/D, no un 0,0 % que parece medido.
+            dilution = max(share_change, 0) if share_change is not None else None
+            buybacks = max(-share_change, 0) if share_change is not None else None
+            # Sin ningun dividendo en el registro no se distingue "no paga"
+            # de "no esta registrado": N/D en vez de 0,0 %.
+            dividends_known = (
+                company.id not in ambiguous_dividends
+                and company.id in companies_with_dividend_rows
+            )
             dividends = all_dividends.get(company.id, 0.0)
             dividend_return = (
-                (dividends / float(position.cost_basis_native))
+                dividends / float(position.cost_basis_native)
                 if dividends_known
                 and position.cost_basis_native
                 and position.cost_basis_native > 0
-                else (0.0 if dividends_known else None)
+                else None
             )
             period_start = prices[0].date if prices else cutoff
             period_end = prices[-1].date if prices else cutoff
@@ -1120,8 +1129,8 @@ class PortfolioIntelligenceService:
                 total_return
                 - (fundamental_growth or 0)
                 - dividend_return
-                - buybacks
-                + dilution
+                - (buybacks or 0)
+                + (dilution or 0)
                 - fx_component
                 if total_return is not None
                 and fx_component is not None
@@ -1133,7 +1142,7 @@ class PortfolioIntelligenceService:
                 "multiple": multiple,
                 "dividends": dividend_return,
                 "buybacks": buybacks,
-                "dilution": -dilution,
+                "dilution": -dilution if dilution is not None else None,
                 "fx": fx_component,
                 "sizing": (
                     total_return * weights.get(company.id, 0)
@@ -1153,12 +1162,19 @@ class PortfolioIntelligenceService:
                     "ticker": company.ticker,
                     "weight": weights.get(company.id, 0),
                     "total_return": total_return,
+                    "period_start": period_start.isoformat() if prices else None,
+                    "period_end": period_end.isoformat() if prices else None,
                     "fx_known": fx_component is not None,
                     "dividends_known": dividends_known,
                     "components": components,
                 }
             )
+        starts = [p["period_start"] for p in positions if p["period_start"]]
+        ends = [p["period_end"] for p in positions if p["period_end"]]
         return {
+            "basis": "adjusted_price_return",
+            "period_start": min(starts) if starts else None,
+            "period_end": max(ends) if ends else None,
             "portfolio_components": dict(totals),
             "incomplete_components": sorted(
                 key for key, value in totals.items() if value is None
