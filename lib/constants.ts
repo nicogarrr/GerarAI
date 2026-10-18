@@ -24,7 +24,6 @@ import {
   Sparkles,
   Star,
   Target,
-  TrendingUp,
   Landmark,
     Users,
     UsersRound,
@@ -174,7 +173,7 @@ export const ROUTE_CATALOG: NavSection[] = [
         icon: Filter,
         hub: '/discover',
         description: 'Busca con métricas y filtros guardados.',
-        children: [{ href: '/screener', label: 'Mercado', icon: LineChart, hub: '/discover', description: 'Explora empresas por sector y tamaño.' }],
+        children: [{ href: '/screener', label: 'Mercado', icon: LineChart, hub: '/discover', description: 'Explora empresas por sector y mira subidas, bajadas y más activas.' }],
       },
       {
         href: '/knowledge',
@@ -190,7 +189,6 @@ export const ROUTE_CATALOG: NavSection[] = [
     title: 'Señales',
     items: [
       { href: '/watchlist', label: 'Watchlist', icon: Star, hub: '/watchlist' },
-      { href: '/movers', label: 'Movers', icon: TrendingUp, hub: '/discover', description: 'Subidas, bajadas y actividad por sesión.' },
       { href: '/insider', label: 'Insider', icon: Users, hub: '/discover', description: 'Compras declaradas por directivos en Form 4.' },
       { href: '/ownership', label: '13F', icon: Landmark, hub: '/discover', description: 'Posiciones declaradas por los grandes fondos en el Form 13F.' },
       {

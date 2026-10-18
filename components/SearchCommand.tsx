@@ -369,7 +369,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                                     {flattenNavItems([section]).filter(item => !isSearchMode || item.label.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase())).map((item) => (
                                         <CommandItem
                                             key={item.href}
-                                            value={`ir ${item.label}`}
+                                            value={`ir ${item.label} ${item.description ?? ''}`.trim()}
                                             keywords={[section.title]}
                                             onSelect={() => go(item.href)}
                                             className="flex min-h-11 items-center gap-2 px-4"

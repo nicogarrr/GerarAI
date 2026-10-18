@@ -109,7 +109,7 @@ const TABLE_ROUTES = [
   { path: "/corporate-actions", heading: undefined },
   { path: "/ownership", heading: undefined },
   { path: "/screeners", heading: undefined },
-  { path: "/movers", heading: "Movers" },
+  { path: "/screener?vista=subidas", heading: "Screener" },
   { path: "/screener", heading: "Screener" },
   { path: "/research/news", heading: "Eventos de noticias" },
   { path: "/research/sources", heading: "Fuentes" },

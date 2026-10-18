@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const page = readFileSync('app/(root)/movers/page.tsx', 'utf8');
+const page = (readFileSync('components/market/MoversTable.tsx', 'utf8') + readFileSync('app/(root)/screener/page.tsx', 'utf8'));
 const market = readFileSync('data-engine/app/services/market_change.py', 'utf8');
 const actions = readFileSync('lib/actions/market.actions.ts', 'utf8');
 

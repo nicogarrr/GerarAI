@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const panel = readFileSync(join(root, 'components/research/CompanyMarketPanel.tsx'), 'utf8');
-const movers = readFileSync(join(root, 'app/(root)/movers/page.tsx'), 'utf8');
+const movers = readFileSync(join(root, 'components/market/MoversTable.tsx'), 'utf8');
 
 describe('panel de mercado: divisa', () => {
     it('no asume USD', () => {

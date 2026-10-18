@@ -1,6 +1,9 @@
 import { quoteObserved } from '@/lib/market/quote-observed';
 import type { Metadata } from 'next';
-import { getMarketIndicesResult } from '@/lib/actions/market.actions';
+import { getMarketIndicesResult, getMarketMovers } from '@/lib/actions/market.actions';
+import { getTickerContext } from '@/lib/actions/ticker-context.actions';
+import { MoversTable } from '@/components/market/MoversTable';
+import BackendOffline from '@/components/system/BackendOffline';
 import { getSavedScreenerEngines, getScreenerStocksReal } from '@/lib/actions/screener.actions';
 import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
@@ -55,8 +58,76 @@ function screenerPrice(price: number, currency: string | null | undefined): stri
     : formatNumber(price, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default async function ScreenerPage({ searchParams }: { searchParams?: Promise<{ sector?: string }> }) {
-  const sector = sectorEn((await searchParams)?.sector ?? 'Information Technology');
+const VISTAS = [
+  { id: 'empresas', label: 'Empresas', href: '/screener' },
+  { id: 'subidas', label: 'Subidas', href: '/screener?vista=subidas' },
+  { id: 'bajadas', label: 'Bajadas', href: '/screener?vista=bajadas' },
+  { id: 'activas', label: 'Activas', href: '/screener?vista=activas' },
+] as const;
+
+type Vista = (typeof VISTAS)[number]['id'];
+
+const vistaDe = (value: string | undefined): Vista =>
+  VISTAS.some((v) => v.id === value) ? (value as Vista) : 'empresas';
+
+function VistaTabs({ vista }: { vista: Vista }) {
+  return (
+    <nav aria-label="Vista de mercado" className="flex flex-wrap gap-2">
+      {VISTAS.map((v) => (
+        <Button key={v.id} asChild variant={vista === v.id ? 'default' : 'outline'} size="sm" className="min-h-[44px] min-w-[44px] rounded-md px-4">
+          <Link aria-current={vista === v.id ? 'page' : undefined} href={v.href}>{v.label}</Link>
+        </Button>
+      ))}
+    </nav>
+  );
+}
+
+async function MoversVista({ vista }: { vista: Exclude<Vista, 'empresas'> }) {
+  let movers, tickerContext;
+  try {
+    [movers, tickerContext] = await Promise.all([getMarketMovers(25), getTickerContext()]);
+  } catch (error) {
+    if (isBackendUnavailableError(error)) {
+      return <BackendOffline feature="Mercado" retryHref={`/screener?vista=${vista}`} />;
+    }
+    throw error;
+  }
+  const tickerSets = {
+    portfolioTickers: new Set(tickerContext.portfolioTickers),
+    watchlistTickers: new Set(tickerContext.watchlistTickers),
+  };
+  const rows = vista === 'subidas' ? movers.gainers : vista === 'bajadas' ? movers.losers : movers.most_active;
+  const caption = vista === 'subidas' ? 'Mayores subidas' : vista === 'bajadas' ? 'Mayores bajadas' : 'Mayor volumen';
+  return (
+    <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip p-4 sm:p-6">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold break-words text-gray-100">{t('nav.screener')}</h1>
+        {movers.session_date ? (
+          <p className="mt-1 text-sm text-gray-400">
+            {`Sesión del ${formatMarketDate(movers.session_date)} frente a la anterior.`}
+            {movers.excluded_not_comparable
+              ? ` ${movers.excluded_not_comparable} ${movers.excluded_not_comparable === 1 ? 'valor queda' : 'valores quedan'} fuera por no tener cierre en esa sesión.`
+              : ''}
+          </p>
+        ) : null}
+      </div>
+      <VistaTabs vista={vista} />
+      {movers.universe === 0 ? (
+        <p className="text-sm text-gray-500">Sin movimientos todavía.</p>
+      ) : (
+        <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-3 sm:p-5">
+          <MoversTable rows={rows} caption={caption} tickerSets={tickerSets} showVolume={vista === 'activas'} />
+        </section>
+      )}
+    </main>
+  );
+}
+
+export default async function ScreenerPage({ searchParams }: { searchParams?: Promise<{ sector?: string; vista?: string }> }) {
+  const params = await searchParams;
+  const vista = vistaDe(params?.vista);
+  if (vista !== 'empresas') return <MoversVista vista={vista} />;
+  const sector = sectorEn(params?.sector ?? 'Information Technology');
   // Screener (backend) e índices (backend) son independientes: en paralelo
   // en vez de en serie. El flag distingue "backend caído" (reintentar) de
   // "filtro sin resultados" (cambiar de sector).
@@ -101,6 +172,8 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
         <h1 className="text-2xl font-semibold break-words text-gray-100">{t('nav.screener')}</h1>
         <p className="mt-1 text-sm text-gray-400">Large caps líquidos con precio y market cap reales.</p>
       </div>
+
+      <VistaTabs vista={vista} />
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por sector">
         {SECTORES.map((s) => (

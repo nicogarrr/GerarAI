@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const page = readFileSync('app/(root)/movers/page.tsx', 'utf8');
+const page = (readFileSync('components/market/MoversTable.tsx', 'utf8') + readFileSync('app/(root)/screener/page.tsx', 'utf8'));
 
 test('F331: la tabla de movers cabe en la tarjeta del grid de 3 columnas', () => {
     // A 1366-1920 la tarjeta queda en ~331px y VOLUMEN salía recortado:
