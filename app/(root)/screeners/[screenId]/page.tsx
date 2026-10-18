@@ -3,7 +3,8 @@ import { ArrowLeft } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { runSavedScreen } from '@/lib/actions/research-tools.actions';
+import { ScreenBreadcrumbName } from '@/components/screeners/ScreenBreadcrumbName';
+import { getScreenerWorkspace, runSavedScreen } from '@/lib/actions/research-tools.actions';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { formatScreenRank } from '@/lib/screener-results';
@@ -13,10 +14,13 @@ export const revalidate = 0;
 
 export default async function SavedScreenResultsPage({ params }: { params: Promise<{ screenId: string }> }) {
   const { screenId } = await params;
+  const workspace = await getScreenerWorkspace();
+  const name = workspace.screens.find(screen => screen.id === Number(screenId))?.name ?? 'Filtro guardado';
   const result = await runSavedScreen(Number(screenId));
   const newMatches = new Set(result.new_match_company_ids ?? []);
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
+      <ScreenBreadcrumbName name={name} />
       <header className="border-b border-gray-800 pb-5">
         <Button asChild className="mb-4" size="sm" variant="ghost">
           <Link href="/screeners">
@@ -24,7 +28,7 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
           </Link>
         </Button>
         <p className="text-sm font-semibold uppercase text-teal-300">Filtro guardado</p>
-        <h1 className="mt-1 text-3xl font-bold text-gray-100">Resultados</h1>
+        <h1 className="mt-1 text-3xl font-bold text-gray-100">{name}</h1>
         <p className="mt-2 text-sm text-gray-400">
           {formatNumber(result.match_count, { maximumFractionDigits: 0 })}{' '}
           {result.match_count === 1 ? 'coincidencia' : 'coincidencias'} en{' '}

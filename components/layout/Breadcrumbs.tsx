@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import { flattenNavItems, ROUTE_CATALOG, type NavItem } from '@/lib/constants';
@@ -100,7 +101,14 @@ function buildCrumbs(pathname: string): Crumb[] {
 
 export default function Breadcrumbs() {
   const pathname = usePathname();
+  const [override, setOverride] = useState<{ path: string; name: string } | null>(null);
+  useEffect(() => {
+    const listener = (event: Event) => setOverride((event as CustomEvent).detail);
+    window.addEventListener('page-breadcrumb-name', listener);
+    return () => window.removeEventListener('page-breadcrumb-name', listener);
+  }, []);
   const crumbs = buildCrumbs(pathname);
+  if (override?.path === pathname && crumbs.length) crumbs[crumbs.length - 1].label = override.name;
   if (crumbs.length < 2) return null;
 
   return (
