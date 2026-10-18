@@ -41,6 +41,12 @@ export type MarketMovers = {
   session_date?: string | null;
   /** Empresas del universo sin cierre en esa sesion: fuera de los rankings. */
   excluded_not_comparable?: number;
+  /** Con cambio medible pero bajo el suelo de liquidez: fuera de los rankings. */
+  excluded_illiquid?: number;
+  /** Suelo de liquidez aplicado (documentado en docs/features/MOVERS_LIQUIDITY_FILTER.md). */
+  liquidity_floor?: { min_price: number; min_turnover: number } | null;
+  /** ISO tz-aware: el registro mas reciente entre las filas del universo. */
+  last_registered_at?: string | null;
   gainers: MarketMover[];
   losers: MarketMover[];
   most_active: MarketMover[];

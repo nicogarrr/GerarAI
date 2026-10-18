@@ -370,6 +370,29 @@ def market_indices() -> dict:
 _common_sessions = market_change.common_sessions
 
 
+# Suelo de liquidez de los rankings de Movers (justificación completa en
+# docs/features/MOVERS_LIQUIDITY_FILTER.md):
+# - Cierre >= 5 en la divisa del valor: el umbral clásico de "penny stock"
+#   (la SEC fija $5). Por debajo, unos céntimos de ruido producen un +30 %
+#   que no es una oportunidad operable, y las microcaps copaban Subidas.
+# - Negociación de la sesión (cierre × volumen) >= 1 000 000 en la divisa
+#   del valor: por debajo, una orden pequeña ya mueve el precio.
+# Volumen ausente = negociación no medible: el valor queda fuera de los
+# rankings (nunca entra con un dato supuesto) y se cuenta en
+# `excluded_illiquid`. El universo no se filtra, y /api/market/changes
+# (watchlist) tampoco: la cartera del usuario necesita su variación aunque
+# el valor sea ilíquido.
+MIN_MOVERS_PRICE = 5.0
+MIN_MOVERS_TURNOVER = 1_000_000.0
+
+
+def _is_liquid_for_movers(mover: dict) -> bool:
+    if mover["price"] < MIN_MOVERS_PRICE:
+        return False
+    volume = mover["volume"]
+    return volume is not None and mover["price"] * volume >= MIN_MOVERS_TURNOVER
+
+
 @router.get("/movers")
 def market_movers(
     db: Session = Depends(get_db),
@@ -379,28 +402,48 @@ def market_movers(
 
     Sin filas devuelve universo vacío, nunca KeyError ni 500. El cambio sale de
     `market_change.compute_session_changes`, la misma función que usan Mercado
-    y watchlist."""
+    y watchlist. Los rankings solo admiten valores que superan el suelo de
+    liquidez documentado arriba; el universo y sus exclusiones se declaran."""
     movers, stale_excluded, session_day = market_change.compute_session_changes(db)
     if not movers:
         return {
             "as_of": None,
             "universe": 0,
+            "session_date": None,
+            "excluded_not_comparable": 0,
+            "excluded_illiquid": 0,
+            "liquidity_floor": {"min_price": MIN_MOVERS_PRICE, "min_turnover": MIN_MOVERS_TURNOVER},
+            "last_registered_at": None,
             "gainers": [],
             "losers": [],
             "most_active": [],
         }
     as_of = max((m["date"] for m in movers if m["date"]), default=None)
+    # Hora del último dato: el registro más reciente entre las filas del
+    # universo (updated_at, ISO tz-aware; el max lexicográfico es seguro con
+    # un formato ISO homogéneo de la misma columna).
+    last_registered_at = max(
+        (m["registered_at"] for m in movers if m["registered_at"]), default=None
+    )
     with_change = [m for m in movers if m["change_pct"] is not None]
-    gainers = sorted(with_change, key=lambda m: m["change_pct"], reverse=True)[:limit]
-    losers = sorted(with_change, key=lambda m: m["change_pct"])[:limit]
-    # "Mas activas" ordena por volumen REAL: sin dato de volumen no hay ranking.
-    with_volume = [m for m in movers if m["volume"] is not None and m["current"]]
+    liquid = [m for m in with_change if _is_liquid_for_movers(m)]
+    excluded_illiquid = len(with_change) - len(liquid)
+    gainers = sorted(liquid, key=lambda m: m["change_pct"], reverse=True)[:limit]
+    losers = sorted(liquid, key=lambda m: m["change_pct"])[:limit]
+    # "Mas activas" ordena por volumen REAL: sin dato de volumen no hay ranking,
+    # y el mismo suelo de liquidez que en subidas/bajadas.
+    with_volume = [
+        m for m in movers if m["volume"] is not None and m["current"] and _is_liquid_for_movers(m)
+    ]
     most_active = sorted(with_volume, key=lambda m: m["volume"], reverse=True)[:limit]
     return {
         "as_of": as_of,
         "universe": len(movers),
         "session_date": session_day.isoformat() if session_day else None,
         "excluded_not_comparable": stale_excluded,
+        "excluded_illiquid": excluded_illiquid,
+        "liquidity_floor": {"min_price": MIN_MOVERS_PRICE, "min_turnover": MIN_MOVERS_TURNOVER},
+        "last_registered_at": last_registered_at,
         "gainers": gainers,
         "losers": losers,
         "most_active": most_active,
