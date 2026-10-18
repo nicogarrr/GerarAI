@@ -67,6 +67,9 @@ const nextConfig: NextConfig = {
     // los estilos inline de React/Tailwind.
 
     // Headers for better caching and security
+    async redirects() {
+        return [{ source: '/research/settings', destination: '/settings', permanent: true }];
+    },
     async headers() {
         return [
             {
