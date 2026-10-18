@@ -157,7 +157,7 @@ export default async function TemasPage({ searchParams }: PageProps) {
           ? `${data.source} · ${data.intraday ? 'intradía' : 'cierre'} del ${formatMarketDate(data.as_of)} · ${data.method}`
           : `${data.source} · sin fecha de datos disponible · ${data.method}`}
         {data.status === 'parcial' ? ' · datos parciales' : ''}
-        {data.stale ? ' · actualizando' : ''}
+        {data.stale ? ' · recalculando: se muestra la última versión calculada' : ''}
       </footer>
     </main>
   );

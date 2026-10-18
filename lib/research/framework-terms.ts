@@ -8,6 +8,11 @@ export const FRAMEWORK_TERMS: Record<string, string> = {
     // siglas
     arpu: 'ARPU', arr: 'ARR', aum: 'AUM', nav: 'NAV', noi: 'NOI', rpo: 'RPO', sbc: 'compensación en acciones (SBC)',
     tpv: 'volumen total de pagos (TPV)', 'r&d': 'I+D', cet1_ratio: 'ratio CET1', rote: 'ROTE', affo_per_share: 'AFFO por acción',
+    // tipos de modelo de valoración (claves de company_framework.py)
+    space_network: 'red espacial / conectividad', space_defense: 'plataforma espacial y de defensa', platform: 'plataforma / marketplace',
+    subscriber: 'suscriptores / ingresos recurrentes', software_ai: 'software / plataforma de IA', capacity_infrastructure: 'capacidad / infraestructura',
+    holding_asset_manager: 'holding / gestora de activos', bank: 'banco / negocio de depósitos', insurer: 'aseguradora', reit: 'SOCIMI / propietario de inmuebles',
+    commodity: 'materias primas / royalties / recursos', biotech_pre_fcf: 'biotecnología / IA-biología pre-FCF', generic_fcf: 'compounder de flujo de caja libre',
     // métricas y drivers
     collaboration_revenue: 'ingresos por colaboraciones', product_revenue: 'ingresos por producto', milestones: 'hitos de colaboración',
     pipeline_stage: 'fase del pipeline', cash_and_investments: 'caja e inversiones', partner_dependence: 'dependencia de socios',

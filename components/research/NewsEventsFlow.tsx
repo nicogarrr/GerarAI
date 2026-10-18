@@ -4,7 +4,7 @@ import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { TickerContextBadges } from '@/components/common/TickerContextBadges';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import type { NewsLane } from '@/lib/news-paging';
-import { formatPercent, NA } from '@/lib/format';
+import { formatPercent, formatUserDateTime, NA } from '@/lib/format';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
 import { NewsSecondOrder } from '@/components/research/NewsSecondOrder';
 import { etiquetaDireccionImpacto, etiquetaTemaMacro, etiquetaTierFuente, etiquetaTipoEvento } from "@/lib/labels";
@@ -50,6 +50,15 @@ function NewsPager({label,lane,page,hasMore}:{label:string;lane:NewsLane;page:nu
  * enlaces Anterior/Siguiente la cambian. El carril se filtra en la API (no
  * sobre una ventana fija), así que "Macro" y "Empresas" recorren todo el histórico.
  */
+/** Fecha del evento; con hora solo si la fuente trae una hora real (no medianoche UTC por defecto). */
+function eventDateText(value: string): string {
+  const day = value.split('T')[0];
+  const match = /T(\d{2}:\d{2})/.exec(value);
+  if (!match || match[1] === '00:00') return day;
+  const formatted = formatUserDateTime(value);
+  return formatted === NA ? day : formatted;
+}
+
 export function NewsEventsFlow({
   events,
   hasMore,
@@ -130,7 +139,7 @@ export function NewsEventsFlow({
                       macro{event.macro_theme ? ` · ${etiquetaTemaMacro(event.macro_theme)}` : ''}
                     </span>
                   ) : null}
-                  <span>{event.date.split('T')[0]}</span>
+                  <span>{eventDateText(event.date)}</span>
                   {event.date_source === 'gdelt_first_seen' ? (
                     <span className="rounded-full bg-gray-900 px-2 py-0.5 text-gray-400" title="Fecha de primera detección en GDELT, no de publicación">vía GDELT</span>
                   ) : null}
@@ -201,7 +210,7 @@ export function NewsEventsFlow({
                       ) : null}
                     </th>
                     <td className="min-w-[150px] px-3 py-3 text-gray-400">
-                      <div>{event.date.split('T')[0]}</div>
+                      <div>{eventDateText(event.date)}</div>
                       {event.date_source === 'ingested_at_fallback' ? (
                         <div className="mt-1 text-xs text-gray-500">fecha de ingesta · la fuente no da fecha</div>
                       ) : null}

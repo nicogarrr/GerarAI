@@ -207,7 +207,7 @@ export const ROUTE_CATALOG: NavSection[] = [
       { href: '/alerts', label: 'Alertas', icon: Bell, hub: '/watchlist' },
       { href: '/propicks', label: 'ProPicks', icon: Lightbulb, hub: '/discover', description: 'Ranking, reglas de selección y backtest.' },
       { href: '/temas', label: 'Temas', icon: LineChart, hub: '/discover', description: 'Rentabilidad YTD y 1M de temas de mercado.' },
-      { href: '/cuellos', label: 'Cuellos', icon: Gauge, hub: '/discover', description: 'Escasez detectada en las fuentes y candidatos inferidos.' },
+      { href: '/cuellos', label: 'Cuellos de botella', icon: Gauge, hub: '/discover', description: 'Escasez detectada en las fuentes y candidatos inferidos.' },
       { href: '/macro-calendar', label: 'Calendario macro', icon: CalendarDays, hub: '/discover', description: 'FOMC, IPC y empleo, y resúmenes de tus 8-K.' },
     ],
   },
