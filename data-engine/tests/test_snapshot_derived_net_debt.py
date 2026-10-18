@@ -119,3 +119,45 @@ def test_derived_net_debt_carries_shared_source_or_none(db):
     db.commit()
     snap2 = FinancialSnapshotBuilder().build(db, c)
     assert snap2.facts["net_debt"].source_id is None
+
+
+def _dated(db, c, metric, value, period, year=2025, quarter="FY", unit="USD"):
+    f = FinancialFact(company_id=c.id, metric=metric, value=Decimal(str(value)), unit=unit,
+                      period=period, fiscal_year=year, fiscal_quarter=quarter, source_type="SEC")
+    db.add(f)
+    db.commit()
+    return f
+
+
+def test_same_closing_date_with_different_period_labels_pairs(db):
+    c = _company(db)
+    _dated(db, c, "revenue", 1_000, "2025-12-31:FY")
+    _dated(db, c, "shares_diluted", 10, "2025-12-31:FY")
+    debt = _dated(db, c, "total_debt", 300, "2025-12-31:ANNUAL")
+    cash = _dated(db, c, "cash_and_equivalents", 100, "2025-12-31")
+    snap = FinancialSnapshotBuilder().build(db, c)
+    assert snap.value("net_debt") == 200.0
+    assert snap.derived["net_debt"] == [debt.id, cash.id]
+
+
+def test_newest_common_instant_is_used_when_latest_debt_has_no_matching_cash(db):
+    c = _company(db)
+    _dated(db, c, "revenue", 1_000, "2025-12-31:FY")
+    _dated(db, c, "shares_diluted", 10, "2025-12-31:FY")
+    _dated(db, c, "total_debt", 900, "2026-03-31:Q1", year=2026, quarter="Q1")
+    debt = _dated(db, c, "total_debt", 300, "2025-12-31:FY")
+    cash = _dated(db, c, "cash_and_equivalents", 100, "2025-12-31:FY")
+    snap = FinancialSnapshotBuilder().build(db, c)
+    assert snap.value("net_debt") == 200.0
+    assert snap.derived["net_debt"] == [debt.id, cash.id]
+
+
+def test_different_closing_dates_never_pair(db):
+    c = _company(db)
+    _dated(db, c, "revenue", 1_000, "2025-12-31:FY")
+    _dated(db, c, "shares_diluted", 10, "2025-12-31:FY")
+    _dated(db, c, "total_debt", 300, "2025-12-31:FY")
+    _dated(db, c, "cash_and_equivalents", 100, "2025-09-30:FY")
+    snap = FinancialSnapshotBuilder().build(db, c)
+    assert snap.value("net_debt") is None
+    assert "net_debt" in snap.missing_inputs

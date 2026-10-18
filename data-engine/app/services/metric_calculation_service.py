@@ -984,6 +984,11 @@ class MetricCalculationService:
                         missing.append("valid_interest_expense_over_debt")
                 else:
                     missing.append("cost_of_debt_or_interest_expense")
+            elif "total_debt" in facts and Decimal(facts["total_debt"].value) == 0:
+                # Deuda financiera reportada = 0: su peso en el WACC es 0 y el
+                # coste de la deuda no entra. No se inventa un coste; se declara.
+                cost_of_debt = Decimal("0")
+                cost_of_debt_source = "no_reported_debt"
             else:
                 missing.append("cost_of_debt_or_interest_expense")
 
