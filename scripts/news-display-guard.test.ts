@@ -33,7 +33,7 @@ test('límite de palabra: prefijo de ticker, no subcadena', () => {
 });
 
 test('la tabla de /research/news usa el helper con el flag del payload', () => {
-    assert.match(page, /newsDisplayTitle\(event\.title, event\.ticker, event\.headline_from_source\)/);
+    assert.match(page, /newsDisplayTitle\(event\.title, event\.ticker, event\.headline_from_source, event\.original_headline\)/);
 });
 
 test('F19: titulares tokenizados por la fuente se pintan con la puntuación pegada', () => {
@@ -53,4 +53,12 @@ test('noticias repetidas se deduplican por título normalizado o URL', () => {
     { title: 'Distinta', url: null },
   ]);
   assert.deepEqual(out.map((e) => e.title), ['Launch Delays Could Change The Case For AST SpaceMobile Stock', 'Distinta']);
+});
+
+test('titular de la fuente con ticker añadido por la ingesta: se pinta el original', () => {
+    assert.equal(newsDisplayTitle('NVDA TSMC Is Spending Billions', 'NVDA', true, 'TSMC Is Spending Billions'), 'TSMC Is Spending Billions');
+    // Titular que de origen empieza por el ticker: intacto.
+    assert.equal(newsDisplayTitle('NVDA stock jumps', 'NVDA', true, 'NVDA stock jumps'), 'NVDA stock jumps');
+    // Sin original persistido: intacto.
+    assert.equal(newsDisplayTitle('NVDA TSMC Is Spending Billions', 'NVDA', true, null), 'NVDA TSMC Is Spending Billions');
 });

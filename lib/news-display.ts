@@ -17,8 +17,35 @@ export function newsDisplayTitle(
     title: string,
     ticker: string | null | undefined,
     headlineFromSource: boolean | null | undefined,
+    originalHeadline?: string | null,
 ): string {
-    return stripTickerPrefix(untokenizeHeadline(title), ticker, headlineFromSource);
+    return stripTickerPrefix(
+        untokenizeHeadline(sourceHeadlineWithoutAddedTicker(title, ticker, headlineFromSource, originalHeadline)),
+        ticker,
+        headlineFromSource,
+    );
+}
+
+/**
+ * La ingesta antepone el ticker al texto guardado (F175). Si el titular
+ * original de la fuente ya está persistido y el título guardado es exactamente
+ * «TICKER » + ese original, se pinta el original: es el verbatim de la fuente y
+ * evita repetir el ticker (ya visible en su columna). Un titular que de origen
+ * empieza por el ticker no cumple la condición y se respeta.
+ */
+function sourceHeadlineWithoutAddedTicker(
+    title: string,
+    ticker: string | null | undefined,
+    headlineFromSource: boolean | null | undefined,
+    originalHeadline: string | null | undefined,
+): string {
+    const original = originalHeadline?.trim();
+    const normalizedTicker = ticker?.trim().toUpperCase();
+    if (headlineFromSource === false || !original || !normalizedTicker) return title;
+    const trimmed = title.trimStart();
+    if (!trimmed.toUpperCase().startsWith(`${normalizedTicker} `)) return title;
+    const rest = trimmed.slice(normalizedTicker.length + 1);
+    return rest.toLowerCase().startsWith(original.toLowerCase()) ? original : title;
 }
 
 /**
