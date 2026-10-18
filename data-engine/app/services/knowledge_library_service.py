@@ -14,7 +14,8 @@ from typing import Any
 from sqlalchemy import delete, desc, func, select, update
 from sqlalchemy.orm import Session
 
-from app.llm import LLMProvider, LLMRequest, Message, ResponseFormat, create_llm_provider
+from app.llm import LLMProvider, LLMRequest, Message, ResponseFormat
+from app.llm.chat_provider import create_background_llm_provider
 from app.llm.json import parse_json_response
 from app.models import (
     Company,
@@ -80,9 +81,23 @@ def _compact(value: str) -> str:
 logger = logging.getLogger("cavaai.knowledge_library")
 
 
+def extraction_error_message(exc: Exception) -> str:
+    """Error de extracción legible para la UI: los fallos del modelo (timeout,
+    caída, cuota) se explican en español natural en vez del `ProviderTransportError: ...`
+    técnico en inglés. El detalle técnico queda en el log del actor."""
+    from app.llm.errors import LLMError
+
+    if isinstance(exc, LLMError):
+        return (
+            "El modelo de lenguaje no respondió o no está disponible ahora mismo. "
+            "Vuelve a intentarlo en unos minutos."
+        )
+    return f"{type(exc).__name__}: {exc}"
+
+
 class KnowledgeLibraryService:
     def __init__(self, provider: LLMProvider | None = None) -> None:
-        self.provider = provider or create_llm_provider()
+        self.provider = provider or create_background_llm_provider()
         self.parser = DocumentIngestionService()
 
     def ensure_default_collections(self, db: Session) -> list[KnowledgeCollection]:

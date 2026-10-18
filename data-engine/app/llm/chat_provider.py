@@ -1,7 +1,13 @@
-"""Opt-in independent free fallback, scoped to chat, not background LLM jobs."""
+"""Cadena gratuita de respaldo verificada (OpenCode -> Groq -> Gemini).
+
+Chat: carrera acotada (ChatFallbackProvider). Trabajos en segundo plano
+(extracción de principios): secuencial con UN reintento transitorio
+(SequentialFallbackProvider), sin carreras que dupliquen llamadas.
+"""
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -15,6 +21,8 @@ from app.llm.contracts import LLMRequest, LLMResponse, Message
 from app.llm.errors import ProviderRequestError, ProviderResponseError, ProviderTransportError
 from app.llm.factory import create_llm_provider
 from app.llm.model_aliases import VERIFIED_FREE_MODELS
+
+logger = logging.getLogger(__name__)
 
 GROQ_MODEL = "openai/gpt-oss-120b"
 GEMINI_MODEL = "gemini-3.5-flash-lite"
@@ -156,16 +164,71 @@ class ChatFallbackProvider(LLMProvider):
             await asyncio.gather(*tasks, return_exceptions=True)
 
 
-def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
-    settings = settings or get_settings()
-    primary = create_llm_provider(settings, client=client)
-    if not settings.groq_chat_fallback_enabled or primary.name == "disabled":
-        return primary
-    if primary.name != "opencode-go":
-        raise ValueError("Groq chat fallback requires the verified OpenCode primary")
+_TRANSIENT_TRANSPORT_REASONS = frozenset({"read_timeout", "connect_timeout", "write_timeout", "pool_timeout", "timeout"})
+_EMPTY_REPLY_MARKERS = ("returned no assistant message", "returned an empty assistant message")
+
+
+def _is_transient(exc: Exception) -> bool:
+    """Timeout del transporte o respuesta vacía: reintentable una vez. Nada de salidas inválidas."""
+    if isinstance(exc, ProviderTransportError):
+        return exc.reason in _TRANSIENT_TRANSPORT_REASONS
+    if isinstance(exc, ProviderResponseError):
+        return any(marker in str(exc) for marker in _EMPTY_REPLY_MARKERS)
+    return False
+
+
+class SequentialFallbackProvider(LLMProvider):
+    """Respaldo para trabajos en segundo plano (extracción de principios).
+
+    Secuencial, nunca en carrera: un documento son hasta ~40 lotes y una
+    carrera como la del chat duplicaría las llamadas. El primario tiene UN
+    reintento solo ante error transitorio (timeout o respuesta vacía); si
+    vuelve a fallar, o ante cualquier otro error de proveedor (caída, cuota,
+    respuesta ilegible), se prueba la cadena gratuita verificada Groq ->
+    Gemini con el modelo pineado. `ProviderRequestError` (fallo nuestro, una
+    petición mal construida) se propaga sin probar más miembros.
+    """
+
+    name = "background-sequential-fallback"
+
+    def __init__(self, primary: LLMProvider, backup: LLMProvider | None = None, backup2: LLMProvider | None = None, *, retry_pause: float = 2.0) -> None:
+        self.primary, self.backup, self.backup2 = primary, backup, backup2
+        self.retry_pause = retry_pause
+        members = tuple(p for p in (primary, backup, backup2) if p is not None)
+        self.supported_capabilities = frozenset.intersection(*(m.supported_capabilities for m in members))
+        # Ruta compuesta honesta: nunca se anuncia como el modelo gratuito del primario.
+        super().__init__(model_router=CascadeModelRouter(members), max_retries=0)
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        try:
+            return await self.primary.complete(request)
+        except _FALL_THROUGH as exc:
+            last: Exception = exc
+        if _is_transient(last):
+            logger.warning("background LLM: %s transitorio (%s); un reintento", self.primary.name, type(last).__name__)
+            await asyncio.sleep(self.retry_pause)
+            try:
+                return await self.primary.complete(request)
+            except _FALL_THROUGH as exc:
+                last = exc
+        for provider, models in ((self.backup, (GROQ_MODEL,)), (self.backup2, GEMINI_MODELS)):
+            if provider is None:
+                continue
+            for model in models:
+                try:
+                    return await provider.complete(replace(request, model=model))
+                except _FALL_THROUGH as exc:
+                    last = exc
+                    logger.warning("background LLM: %s falló (%s); siguiente proveedor", provider.name, type(exc).__name__)
+        raise last
+
+
+def _groq_backup(settings: Settings, client: httpx.AsyncClient | None) -> OpenAICompatibleProvider | None:
+    if not settings.groq_chat_fallback_enabled:
+        return None
     if not (settings.groq_api_key and settings.groq_free_plan_confirmed and settings.groq_zdr_confirmed):
         raise ValueError("Groq chat requires a verified free plan, ZDR and API key")
-    backup = OpenAICompatibleProvider(
+    return OpenAICompatibleProvider(
         api_key=settings.groq_api_key,
         base_url="https://api.groq.com/openai/v1",
         default_model=GROQ_MODEL,
@@ -178,20 +241,62 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
         max_output_tokens=2400,
         client=client,
     )
-    backup2 = None
-    if settings.gemini_chat_fallback_enabled:
-        if not (settings.gemini_api_key and settings.gemini_free_plan_confirmed):
-            raise ValueError("Gemini chat requires a verified free plan (no billing) and API key")
-        backup2 = OpenAICompatibleProvider(
-            api_key=settings.gemini_api_key,
-            base_url=GEMINI_BASE_URL,
-            default_model=GEMINI_MODEL,
-            provider_name="gemini",
-            reasoning_effort="low",
-            timeout_seconds=15,
-            total_timeout_seconds=18,
-            max_retries=0,
-            max_output_tokens=8000,
-            client=client,
-        )
+
+
+def _gemini_backup(settings: Settings, client: httpx.AsyncClient | None) -> OpenAICompatibleProvider | None:
+    if not settings.gemini_chat_fallback_enabled:
+        return None
+    if not (settings.gemini_api_key and settings.gemini_free_plan_confirmed):
+        raise ValueError("Gemini chat requires a verified free plan (no billing) and API key")
+    return OpenAICompatibleProvider(
+        api_key=settings.gemini_api_key,
+        base_url=GEMINI_BASE_URL,
+        default_model=GEMINI_MODEL,
+        provider_name="gemini",
+        reasoning_effort="low",
+        timeout_seconds=15,
+        total_timeout_seconds=18,
+        max_retries=0,
+        max_output_tokens=8000,
+        client=client,
+    )
+
+
+def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
+    settings = settings or get_settings()
+    primary = create_llm_provider(settings, client=client)
+    if not settings.groq_chat_fallback_enabled or primary.name == "disabled":
+        return primary
+    if primary.name != "opencode-go":
+        raise ValueError("Groq chat fallback requires the verified OpenCode primary")
+    backup = _groq_backup(settings, client)
+    assert backup is not None  # el flag de arriba lo garantiza
+    backup2 = _gemini_backup(settings, client)
     return ChatFallbackProvider(primary, backup, total=settings.llm_total_timeout_seconds, backup2=backup2)
+
+
+def create_background_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
+    """Proveedor para trabajos en segundo plano: primario con reintento
+    transitorio y la cadena gratuita Groq/Gemini en secuencia.
+
+    Reutiliza las mismas claves y flags verificados del chat. Un respaldo mal
+    configurado se salta con un aviso en el log en vez de romper el trabajo:
+    el primario solo ya es el comportamiento anterior.
+    """
+    settings = settings or get_settings()
+    primary = create_llm_provider(settings, client=client)
+    if primary.name == "disabled":
+        return primary
+    try:
+        backup = _groq_backup(settings, client)
+    except ValueError:
+        logger.warning("background LLM fallback: Groq mal configurado; se omite el respaldo")
+        backup = None
+    try:
+        backup2 = _gemini_backup(settings, client)
+    except ValueError:
+        logger.warning("background LLM fallback: Gemini mal configurado; se omite el respaldo")
+        backup2 = None
+    if backup is None and backup2 is None:
+        return primary
+    return SequentialFallbackProvider(primary, backup, backup2)
