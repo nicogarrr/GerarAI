@@ -603,32 +603,6 @@ class ChatResponse(BaseModel):
     context: dict | None = None
 
 
-class EvidenceSuggestionOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    company_id: int | None
-    document_id: int | None
-    document_chunk_id: int | None
-    suggested_claim_id: int | None
-    suggestion_type: str
-    statement: str
-    relation: str
-    rationale: str
-    quote: str | None
-    confidence: Decimal
-    status: str
-    model: str | None
-    prompt_version: str
-    metadata_: dict
-    created_at: datetime
-
-
-class EvidenceSuggestionAction(BaseModel):
-    action: Literal["accept", "reject"]
-    claim_id: int | None = None
-
-
 class ContradictionScanRequest(BaseModel):
     ticker: str
     document_id: int | None = None
