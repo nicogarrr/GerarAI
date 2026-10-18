@@ -15,6 +15,28 @@ _YAHOO_SUFFIX_BY_EXCHANGE = {
     "BOLSA DE MADRID": ".MC",
 }
 
+# Country risk premium por pais de la compania, tabla publicada y gratuita de
+# Damodaran (NYU Stern), «Country Default Spreads and Risk Premiums»,
+# actualizada el 5 de enero de 2026 (vintage declarado en el documento
+# fuente). Solo paises verificados en esa tabla; el resto cae al ajuste
+# estatico settings.wacc_country_risk_premium. US se excluye a proposito: la
+# prima de mercado madura de Damodaran ya incorpora el spread soberano USA,
+# sumar su CRP (0,23%) lo contaria dos veces.
+_DAMODARAN_CRP_SOURCE_URL = (
+    "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/ctryprem.html"
+)
+_DAMODARAN_CRP_VINTAGE = "2026-01-05"
+_DAMODARAN_CRP_BY_COUNTRY: dict[str, Decimal] = {
+    "DE": Decimal("0.0"),
+    "ES": Decimal("0.0155"),
+    "FR": Decimal("0.0078"),
+    "GB": Decimal("0.0078"),
+    "IT": Decimal("0.0246"),
+    "MX": Decimal("0.0246"),
+    "NL": Decimal("0.0"),
+    "PT": Decimal("0.0155"),
+}
+
 
 class WaccInputService:
     """Refresh dated, sourced market assumptions used by WACC_STANDARD_V1."""
@@ -91,19 +113,28 @@ class WaccInputService:
                     )
                 )
 
+        country = self._company_country(company)
+        crp_table_value = _DAMODARAN_CRP_BY_COUNTRY.get(country or "")
+        crp_source = "damodaran_ctryprem" if crp_table_value is not None else "settings_default"
+        policy_metadata = {
+            "methodology": "WACC_POLICY_V1",
+            "date": as_of,
+            "currency": company.currency,
+            "country": country
+            or getattr(settings, "wacc_default_country", "US"),
+            "country_risk_premium_source": crp_source,
+        }
+        if crp_table_value is not None:
+            policy_metadata["country_risk_premium_reference"] = {
+                "source_url": _DAMODARAN_CRP_SOURCE_URL,
+                "vintage": _DAMODARAN_CRP_VINTAGE,
+            }
         policy_document = self._source_document(
             db,
             company,
             source_type="wacc_policy",
             title=f"WACC policy assumptions {as_of}",
-            metadata={
-                "methodology": "WACC_POLICY_V1",
-                "date": as_of,
-                "currency": company.currency,
-                "country": getattr(
-                    settings, "wacc_default_country", "US"
-                ),
-            },
+            metadata=policy_metadata,
         )
         sources.append(policy_document.id)
         for metric, value in [
@@ -121,7 +152,9 @@ class WaccInputService:
             ),
             (
                 "country_risk_premium",
-                Decimal(
+                crp_table_value
+                if crp_table_value is not None
+                else Decimal(
                     str(
                         getattr(
                             settings,
@@ -273,6 +306,18 @@ class WaccInputService:
             fact.source_id = source.id
             fact.confidence = confidence
         return fact
+
+    @staticmethod
+    def _company_country(company: Company) -> str | None:
+        """Pais de la compania como codigo ISO-2: domicile_country y, si
+        falta, el prefijo del ISIN (dos letras del pais emisor)."""
+        country = (getattr(company, "domicile_country", None) or "").strip().upper()
+        if country:
+            return country
+        isin = (getattr(company, "isin", None) or "").strip().upper()
+        if len(isin) >= 2 and isin[:2].isalpha():
+            return isin[:2]
+        return None
 
     @staticmethod
     def _yahoo_symbol(company: Company) -> str:

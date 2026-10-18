@@ -127,6 +127,76 @@ def test_refresh_stores_sourced_risk_free_and_policy_facts(db, monkeypatch):
     assert sorted(result["source_document_ids"]) == result["source_document_ids"]
 
 
+def _crp_fact(db, company):
+    return db.scalar(
+        select(FinancialFact).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == "country_risk_premium",
+        )
+    )
+
+
+def _policy_doc(db, company):
+    return db.scalar(
+        select(Document).where(
+            Document.company_id == company.id,
+            Document.source_type == "wacc_policy",
+        )
+    )
+
+
+def test_crp_comes_from_damodaran_table_for_spanish_company(db, monkeypatch):
+    _patch_no_yfinance(monkeypatch)
+    _patch_fred(monkeypatch, _StubFred(configured=True))
+    company = _company(db)
+    company.domicile_country = "ES"
+    db.commit()
+    _run(WaccInputService().refresh(db, company))
+
+    crp = _crp_fact(db, company)
+    assert crp is not None
+    assert crp.value == Decimal("0.0155")
+    assert crp.source_type == "wacc_policy"
+    doc = _policy_doc(db, company)
+    assert doc.metadata_["country"] == "ES"
+    assert doc.metadata_["country_risk_premium_source"] == "damodaran_ctryprem"
+    reference = doc.metadata_["country_risk_premium_reference"]
+    assert reference["vintage"] == "2026-01-05"
+    assert reference["source_url"].startswith("https://pages.stern.nyu.edu/")
+
+
+def test_crp_resolves_country_from_isin_prefix(db, monkeypatch):
+    _patch_no_yfinance(monkeypatch)
+    _patch_fred(monkeypatch, _StubFred(configured=True))
+    asml = _company(db)
+    asml.ticker = "ASML"
+    asml.exchange = "EURONEXT AMSTERDAM"
+    asml.currency = "EUR"
+    asml.isin = "NL0010273215"
+    db.commit()
+    _run(WaccInputService().refresh(db, asml))
+
+    crp = _crp_fact(db, asml)
+    assert crp is not None
+    assert crp.value == Decimal("0.0")
+    doc = _policy_doc(db, asml)
+    assert doc.metadata_["country"] == "NL"
+    assert doc.metadata_["country_risk_premium_source"] == "damodaran_ctryprem"
+
+
+def test_crp_falls_back_to_settings_default_without_country(db, monkeypatch):
+    _patch_no_yfinance(monkeypatch)
+    _patch_fred(monkeypatch, _StubFred(configured=True))
+    company = _company(db)
+    _run(WaccInputService().refresh(db, company))
+
+    crp = _crp_fact(db, company)
+    assert crp is not None
+    doc = _policy_doc(db, company)
+    assert doc.metadata_["country_risk_premium_source"] == "settings_default"
+    assert "country_risk_premium_reference" not in doc.metadata_
+
+
 def test_refresh_without_fred_key_and_empty_csv_keeps_honest_missing_state(db, monkeypatch):
     _patch_no_yfinance(monkeypatch)
     _patch_fred(monkeypatch, _StubFred(configured=False))
