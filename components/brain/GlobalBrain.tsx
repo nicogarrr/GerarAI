@@ -38,10 +38,12 @@ type ContextEcho = {
  * "Viendo X"); el eco que devuelve el servidor (IDs resueltos y permisos
  * aplicados allí) manda sobre la etiqueta local. Solo lectura.
  */
-/** Selector de controles que el FAB no puede tapar en reposo: lo que el
- *  usuario podria querer pulsar justo debajo de la burbuja. */
+/** Selector de lo que el FAB no puede tapar en reposo: controles que el
+ *  usuario podria querer pulsar y contenido marcado con
+ *  [data-fab-keep-clear] que no debe quedar ilegible bajo la burbuja
+ *  (QA 11: la columna Cambio de /movers y el grafico de precio). */
 const FAB_INTERACTIVE_SELECTOR =
-    'a[href], button, input, select, textarea, summary, [role="button"], [role="link"], [contenteditable="true"]';
+    'a[href], button, input, select, textarea, summary, [role="button"], [role="link"], [contenteditable="true"], [data-fab-keep-clear]';
 
 /** ¿El FAB tapa un control interactivo en reposo? Se mira que hay justo
  *  debajo de su zona (centro y esquinas interiores) con elementsFromPoint,

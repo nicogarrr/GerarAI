@@ -23,6 +23,16 @@ test('el propio FAB y su icono no cuentan como obstaculo', () => {
     assert.match(source, /a\[href\], button, input, select, textarea/);
 });
 
+test('QA 11: el FAB tampoco tapa contenido marcado data-fab-keep-clear', () => {
+    // La columna Cambio de /movers y el lienzo del grafico de precio (con las
+    // fechas del eje) se marcan: al cruzar su zona la burbuja se auto-oculta.
+    assert.match(source, /\[data-fab-keep-clear\]/);
+    const movers = readFileSync('app/(root)/movers/page.tsx', 'utf8');
+    assert.match(movers, /text-red-400'\}`} data-fab-keep-clear>/);
+    const chart = readFileSync('components/research/CompanyTechnicalChart.tsx', 'utf8');
+    assert.match(chart, /data-testid="technical-price-canvas" data-fab-keep-clear/);
+});
+
 test('el bloqueo por controles se evalua con o sin leyenda y se limpia', () => {
     assert.match(source, /setFabControlsBlocked\(fab \? fabCoversInteractive\(fab\) : false\)/);
     assert.match(source, /fabScrollHidden \|\| fabLegendBlocked \|\| fabControlsBlocked/);

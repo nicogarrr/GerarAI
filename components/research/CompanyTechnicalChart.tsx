@@ -158,7 +158,7 @@ function PriceCanvas({ bars, levels, currency, hourly = false }: { bars: Company
         current.chart.timeScale().fitContent();
     }, [ready, bars, levels, hourly]);
     return <div className="relative">
-        <div ref={container} className="h-[280px] w-full sm:h-[360px]" role="img" aria-label={`Evolución del precio${bars.length ? ` del ${formatMarketDate(bars[0].date)} al ${formatMarketDate(bars.at(-1)!.date)}` : ': sin datos'}`} data-testid="technical-price-canvas" />
+        <div ref={container} className="h-[280px] w-full sm:h-[360px]" role="img" aria-label={`Evolución del precio${bars.length ? ` del ${formatMarketDate(bars[0].date)} al ${formatMarketDate(bars.at(-1)!.date)}` : ': sin datos'}`} data-testid="technical-price-canvas" data-fab-keep-clear />
         {error || bars.length < 2 ? <p role="status" className="absolute inset-0 grid place-items-center bg-surface-1 text-sm text-gray-500">{error ? 'No se pudo cargar el gráfico' : 'Sin datos suficientes para este rango'}</p> : !ready ? <p role="status" className="absolute inset-0 grid animate-pulse place-items-center text-xs text-gray-500">Cargando gráfico</p> : null}
     </div>;
 }
