@@ -4,6 +4,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 from collections import Counter
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -296,9 +297,18 @@ def _tag_name(element: ElementTree.Element) -> str:
     return element.tag.rsplit("}", 1)[-1]
 
 
+_MACHINE_DECIMAL = re.compile(r"^[+-]?\d+(?:\.\d+)?$")
+
+
 def _decimal(value: str | None, default: str = "0") -> Decimal:
     if value in (None, ""):
         return Decimal(default)
+    # Los atributos del Flex XML son numeros de maquina: el punto es SIEMPRE el
+    # decimal. parse_localized_number lee "32.725" como 32725 (agrupacion es-ES):
+    # vendia ZETA a 32.725 US$ en vez de 32,725.
+    plain = str(value).strip()
+    if _MACHINE_DECIMAL.match(plain):
+        return Decimal(plain)
     parsed = parse_localized_number(value)
     if parsed is None:
         # An unparseable amount must not become a silent 0: a zero cash flow is

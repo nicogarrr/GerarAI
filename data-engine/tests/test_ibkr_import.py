@@ -166,3 +166,19 @@ def test_external_id_dedupe_is_one_query_for_many_trades():
         per_row = [s for s in statements if "external_id = ?" in s]
         assert len(batched) == 1
         assert per_row == []
+
+
+def test_flex_decimal_dot_is_always_the_decimal_separator():
+    from decimal import Decimal
+
+    from app.services.ibkr_import_service import _decimal
+
+    # Regresion: "32.725" (precio real de ZETA) se leia como 32725 (agrupacion es-ES).
+    assert _decimal("32.725") == Decimal("32.725")
+    assert _decimal("42.935") == Decimal("42.935")
+    assert _decimal("-0.362219321") == Decimal("-0.362219321")
+    assert _decimal("1250") == Decimal("1250")
+    # Con coma o con dos puntos siguen valiendo las notaciones localizadas.
+    assert _decimal("1,234.56") == Decimal("1234.56")
+    assert _decimal("1.234,56") == Decimal("1234.56")
+    assert _decimal("1.234.567") == Decimal("1234567")
