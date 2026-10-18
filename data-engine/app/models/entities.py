@@ -1284,6 +1284,21 @@ class ModelRun(TenantOwnedMixin, Base, TimestampMixin):
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
 
 
+class ChatTelemetryEvent(TenantOwnedMixin, Base, TimestampMixin):
+    """Telemetría propia de /api/chat (€0, sin Langfuse): pregunta, ruta
+    (LLM/determinista), latencia y error, por tenant."""
+
+    __tablename__ = "chat_telemetry_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    question: Mapped[str] = mapped_column(String(500))
+    route: Mapped[str] = mapped_column(String(60), index=True)
+    used_llm: Mapped[bool] = mapped_column(Boolean, default=False)
+    model: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
 class BudgetUsage(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "budget_usage"
 
