@@ -3,7 +3,14 @@ name: Ingest precision evals
 on:
   push:
     branches: [main]
+  # Mismo criterio que coverage.yml: los evals de ingest solo miden codigo de
+  # data-engine (run_ingest_evals.py + sus fixtures y contratos). Un PR que
+  # no toca data-engine no puede mover la precision y antes gastaba un runner
+  # de todas formas. En push a main y workflow_dispatch corre siempre.
   pull_request:
+    paths:
+      - "data-engine/**"
+      - ".github/workflows/ingest-evals.yml"
   workflow_dispatch:
 
 permissions:
