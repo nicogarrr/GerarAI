@@ -1100,13 +1100,23 @@ export async function importResearchSource(formData: FormData) {
   if (!title) throw new ValidationError('El título es obligatorio', 'title');
   if (text.length < 20) throw new ValidationError('El documento debe tener al menos 20 caracteres', 'text');
 
-  await postJson('/api/sources/transcripts/import-text', null, {
-    ticker,
-    title,
-    text,
-    source_url: sourceUrl || null,
-    period,
-  });
+  const sourceType = String(formData.get('source_type') ?? 'manual_upload');
+  if (!['manual_upload', 'manual_transcript', 'company_ir'].includes(sourceType)) {
+    throw new ValidationError('Selecciona un tipo de fuente válido', 'source_type');
+  }
+  if (sourceType === 'manual_transcript') {
+    await postJson('/api/sources/transcripts/import-text', null, {
+      ticker, title, text, source_url: sourceUrl || null, period,
+    });
+  } else {
+    const payload = new FormData();
+    payload.set('ticker', ticker);
+    payload.set('title', title);
+    payload.set('source_type', sourceType);
+    if (sourceUrl) payload.set('source_url', sourceUrl);
+    payload.set('file', new File([text], 'manual-source.txt', { type: 'text/plain' }));
+    await postForm('/api/sources/documents/ingest-file', null, payload);
+  }
 
   revalidatePath('/research/sources');
 }
@@ -1120,9 +1130,11 @@ export async function importResearchDocumentFile(formData: FormData) {
   if (!title) throw new ValidationError('El título es obligatorio', 'title');
   if (!(file instanceof File) || file.size === 0) throw new ValidationError('Selecciona un archivo no vacío', 'file');
 
-  await postForm('/api/sources/documents/ingest-file', null, formData);
+  const result = await postForm<{ document_id: number; ticker: string; status: string } | null>('/api/sources/documents/ingest-file', null, formData);
   revalidatePath('/research/sources');
   revalidatePath(`/research/${ticker}`);
+  if (!result) throw new ExternalAPIError('No se pudo confirmar el documento importado', 'research-api');
+  return { message: `${result.status === 'duplicate' ? 'Documento ya existente' : 'Documento importado'}: ${result.ticker} · #${result.document_id}.` };
 }
 
 export async function importResearchDocumentUrl(formData: FormData) {
