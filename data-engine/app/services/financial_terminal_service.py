@@ -10,7 +10,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import CalculatedMetric, Company, Document, FinancialFact
-from app.services.financial_ingestion_service import SOURCE_PRIORITY
+from app.services.financial_ingestion_service import SOURCE_PRIORITY, _is_bank_like
 from app.services.metric_calculation_service import METRIC_DEFINITIONS
 
 DEFAULT_TERMINAL_METRICS = (
@@ -195,6 +195,23 @@ class FinancialTerminalService:
                     "calculation_trace": metric.calculation_trace,
                 }
             )
+        # El motivo «FCF sin capex» necesita saber si hay CFO AUNQUE no se
+        # haya pedido esa serie: consulta minima, solo cuando falta el FCF.
+        ocf_available = False
+        if "free_cash_flow" in requested and not series.get("free_cash_flow"):
+            ocf_available = bool(
+                db.scalar(
+                    select(FinancialFact.id)
+                    .where(
+                        FinancialFact.company_id == company.id,
+                        FinancialFact.metric == "operating_cash_flow",
+                    )
+                    .limit(1)
+                )
+            )
+        available_metrics = {
+            metric for metric in requested if series.get(metric)
+        }
         metric_payloads = []
         for metric in requested:
             points = sorted(
@@ -215,6 +232,13 @@ class FinancialTerminalService:
                     "canonical_formula": formula_spec[1] if formula_spec else None,
                     "definition_version": formula_spec[0] if formula_spec else None,
                     "status": "available" if points else "missing",
+                    "missing_reason": self._missing_reason(
+                        metric,
+                        available=bool(points),
+                        available_metrics=available_metrics,
+                        ocf_available=ocf_available,
+                        bank_like=_is_bank_like(company),
+                    ),
                     "periods": len(points),
                     "segments": sorted({row["segment"] for row in points}),
                     "series": points,
@@ -242,6 +266,31 @@ class FinancialTerminalService:
                 ],
             },
         }
+
+    @staticmethod
+    def _missing_reason(
+        metric: str,
+        *,
+        available: bool,
+        available_metrics: set[str],
+        ocf_available: bool,
+        bank_like: bool,
+    ) -> str | None:
+        """Por que falta una metrica, cuando se sabe decir sin inventar.
+
+        QA datos (hallazgo 7): GOOGL/AMZN/JPM sin capex ni FCF aunque hay
+        CFO. Dos casos distinguibles: FCF sin capex (no se deriva, no se
+        sustituye por cero) y bancos sin capex desglosado en XBRL (JPM no
+        lleva ningun tag de capex en companyfacts). Lo demas queda en la
+        explicacion generica de «sin observaciones».
+        """
+        if available:
+            return None
+        if metric == "free_cash_flow" and ocf_available:
+            return "Sin capex reportado: el FCF no se deriva sin capex (no se sustituye por cero)."
+        if metric == "capital_expenditure" and bank_like:
+            return "Los bancos no reportan capex desglosado en XBRL."
+        return None
 
     @staticmethod
     def _frequency(quarter: str | None, period: str) -> str:
