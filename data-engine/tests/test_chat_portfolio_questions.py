@@ -70,7 +70,7 @@ def test_patrimonio_neto_con_caja_y_margen(db):
     assert "caja 7.933,60 EUR" in resp.answer
     assert "deuda de margen 17.541,34 EUR" in resp.answer
     assert "patrimonio neto 6.630,17 EUR" in resp.answer
-    assert "no una recomendación" in resp.answer
+    assert "recomendación" not in resp.answer
 
 
 def test_peso_de_ticker_responde_con_la_posicion(db):

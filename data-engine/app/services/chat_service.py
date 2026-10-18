@@ -23,7 +23,7 @@ from app.models import (
     ThesisSection,
     ThesisVersion,
 )
-from app.schemas import ChatPageContext, ChatResponse
+from app.schemas import ChatPageContext, ChatResponse, ChatTurn
 from app.services.brain_service import SMALL_TALK_RE, resolve_page_context, small_talk_answer
 from app.services.chat_synthesis_service import ChatSynthesisService
 from app.services.claim_scope import live_claims
@@ -414,6 +414,36 @@ _POSITION_QUERY_RE = re.compile(
     r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+)?(?:tengo|vale|valen|tienen)\b"
 )
 # Cuando la misma frase pide ademas caja o patrimonio se adjunta ese bloque.
+_RANK_HIGH_RE = re.compile(r"(?i)\b(?:m[aá]s\s+(?:alto|caro|grande)|mayor|m[aá]xim[oa])\b")
+_RANK_LOW_RE = re.compile(r"(?i)\b(?:m[aá]s\s+(?:bajo|barato|peque[nñ]o)|menor|m[ií]nim[oa])\b")
+_RANK_COST_RE = re.compile(r"(?i)\bcoste\s+medio\b|\bprecio\s+medio\b")
+_RANK_VALUE_RE = re.compile(r"(?i)\b(?:valor|peso)\b")
+
+
+def _ranking_metric(question: str) -> tuple[str, str, bool] | None:
+    """(métrica, etiqueta, ¿el más alto?) si es una pregunta de ranking; si no, None."""
+    high = bool(_RANK_HIGH_RE.search(question))
+    low = bool(_RANK_LOW_RE.search(question))
+    if high == low:
+        return None
+    if _RANK_COST_RE.search(question):
+        return ("cost", "coste medio", high)
+    if _RANK_VALUE_RE.search(question):
+        return ("value", "valor", high)
+    return None
+
+
+def _history_is_portfolio(history: list[ChatTurn] | None) -> bool:
+    """¿Va la conversación de la cartera? Mira los últimos turnos."""
+    for turn in (history or [])[-4:]:
+        text = turn.content or ""
+        if turn.role == "assistant" and "posiciones abiertas" in text:
+            return True
+        if turn.role == "user" and (_PORTFOLIO_SELF_RE.search(text) or _PORTFOLIO_QUERY_RE.search(text)):
+            return True
+    return False
+
+
 _NET_WORTH_CUE_RE = re.compile(r"(?i)\b(?:patrimonio|caja|margen|neto)\b")
 
 
@@ -640,6 +670,7 @@ class ChatService:
         enable_debate: bool | None = None,
         use_jev: bool = True,
         page: ChatPageContext | None = None,
+        history: list[ChatTurn] | None = None,
     ) -> ChatResponse:
         # Contexto de página explícito ("Viendo X"): el ticker de la página se
         # resuelve en servidor en el catálogo global; el contenido privado
@@ -709,6 +740,19 @@ class ChatService:
             if portfolio_answer is not None:
                 portfolio_answer.context = context_echo
                 return portfolio_answer
+        # Seguimiento de cartera ("¿cuál tiene el coste medio más alto?"): sin
+        # empresa ni orden y con la cartera ya en la conversación, se responde
+        # con las posiciones guardadas en lugar de perder el hilo.
+        if (
+            company is None
+            and not ticker
+            and _history_is_portfolio(history)
+            and not _ORDER_VERB_RE.search(question or "")
+        ):
+            followup = self._portfolio_ranking(db, question or "")
+            if followup is not None:
+                followup.context = context_echo
+                return followup
         if company is not None and not ticker:
             ticker = company.ticker
         # La abstencion financiera vive en el clasificador unificado de
@@ -766,6 +810,7 @@ class ChatService:
                 question=question,
                 baseline=baseline,
                 db=db,
+                history=history,
             )
         response.context = context_echo
         return response
@@ -823,8 +868,7 @@ class ChatService:
             f"con datos a {_fmt_date_es(as_of.isoformat())}:\n"
             + "\n".join(lines)
             + extra
-            + "\n\nSon los datos guardados en la app, no una recomendación. "
-            "Pregunta por un ticker para ver su ficha y fuentes."
+            + "\n\nPregunta por un ticker para ver su ficha y fuentes."
         )
         cash_line = self._cash_line(
             db, tenant_id, base if not mixed else None,
@@ -839,6 +883,73 @@ class ChatService:
             prompt_version="portfolio-overview-v1",
             confidence=0.9,
             llm_trace={"path": "portfolio_overview", "generated": False, "provider_calls": 0},
+        )
+
+    def _portfolio_ranking(self, db: Session, question: str) -> ChatResponse | None:
+        """Mayor/menor posición por coste medio, valor o peso, de lo guardado."""
+        metric = _ranking_metric(question)
+        if metric is None:
+            return None
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return None
+        rows = list(
+            db.execute(
+                select(Position, Company)
+                .join(Company, Company.id == Position.company_id)
+                .where(Position.quantity > 0, Position.tenant_id == tenant_id)
+            ).all()
+        )
+        if not rows:
+            return None
+        key_name, label, highest = metric
+
+        def _value(pos: Position) -> float:
+            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
+            return float(raw or 0)
+
+        if key_name == "cost":
+            rows = [row for row in rows if row[0].average_cost is not None and float(row[0].average_cost) > 0]
+            if not rows:
+                return None
+            keyfn = lambda row: float(row[0].average_cost)  # noqa: E731
+            currency_of = lambda row: row[0].currency or "EUR"  # noqa: E731
+        else:
+            keyfn = lambda row: _value(row[0])  # noqa: E731
+            currency_of = (  # noqa: E731
+                lambda row: (row[0].base_currency or "EUR")
+                if row[0].market_value_base is not None
+                else (row[0].currency or "EUR")
+            )
+        currencies = sorted({currency_of(row) for row in rows})
+        if len(currencies) > 1:
+            return ChatResponse(
+                answer=(
+                    f"No puedo ordenarlas por {label}: tus posiciones están en monedas distintas "
+                    f"({', '.join(currencies)}) y no se pueden comparar sin convertirlas."
+                ),
+                sources=[],
+                model="deterministic",
+                prompt_version="portfolio-ranking-v1",
+                confidence=0.9,
+                llm_trace={"path": "portfolio_ranking", "generated": False, "provider_calls": 0, "mixed_currency": True},
+            )
+        rows.sort(key=keyfn, reverse=highest)
+        pos, comp = rows[0]
+        cur = currencies[0]
+        amount = _fmt_number_es(keyfn(rows[0]), 2)
+        word = "más alto" if highest else "más bajo"
+        answer = f"La posición con el {label} {word} es {comp.ticker}: {amount} {cur}."
+        if len(rows) > 1:
+            nxt_pos, nxt = rows[1]
+            answer += f" Le sigue {nxt.ticker} con {_fmt_number_es(keyfn(rows[1]), 2)} {cur}."
+        return ChatResponse(
+            answer=answer,
+            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of))],
+            model="deterministic",
+            prompt_version="portfolio-ranking-v1",
+            confidence=0.9,
+            llm_trace={"path": "portfolio_ranking", "generated": False, "provider_calls": 0},
         )
 
     def _cash_line(
@@ -948,8 +1059,7 @@ class ChatService:
         if not found:
             answer = (
                 f"No tienes ninguna posición guardada en {company.ticker}; "
-                f"tu cartera guardada tiene {len(rows)} posiciones abiertas en otros tickers. "
-                "Son los datos guardados en la app, no una recomendación."
+                f"tu cartera guardada tiene {len(rows)} posiciones abiertas en otros tickers."
             )
             return ChatResponse(
                 answer=answer,
@@ -980,7 +1090,6 @@ class ChatService:
             )
             if cash_line:
                 answer += "\n\n" + cash_line
-        answer += "\n\nSon los datos guardados en la app, no una recomendación."
         return ChatResponse(
             answer=answer,
             sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of))],

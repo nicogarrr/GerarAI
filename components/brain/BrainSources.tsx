@@ -14,7 +14,9 @@ export function BrainSources({ citations }: { citations?: PortfolioChatCitation[
                             </a>
                         ) : <span className="text-slate-200">{citation.document}</span>}
                         {citation.page !== null && <span className="text-slate-400"> · Página {citation.page}</span>}
-                        <span className="mt-0.5 block text-slate-400">{citationKindLabel(citation.locator)}</span>
+                        {citationKindLabel(citation.locator) && (
+                            <span className="mt-0.5 block text-slate-400">{citationKindLabel(citation.locator)}</span>
+                        )}
                     </li>
                 ))}
             </ul>

@@ -14,7 +14,8 @@ describe('citationKindLabel', () => {
     assert.equal(citationKindLabel('financial_fact:99'), 'Dato financiero');
     assert.equal(citationKindLabel('claim:7'), 'Afirmación');
     assert.equal(citationKindLabel('rag_chunk:0f1e-uuid'), 'Documento');
-    assert.equal(citationKindLabel('desconocido:1'), 'Fuente');
+    assert.equal(citationKindLabel('desconocido:1'), null);
+    assert.equal(citationKindLabel('position:3'), 'Posición');
   });
   it('ningún componente pinta el localizador crudo', () => {
     for (const file of ['components/brain/BrainSources.tsx', 'components/portfolio/PortfolioChatSources.tsx', 'components/chat/CitationsList.tsx']) {

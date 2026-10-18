@@ -4851,6 +4851,8 @@ export interface components {
         ChatRequest: {
             /** Enable Debate */
             enable_debate?: boolean | null;
+            /** History */
+            history?: components["schemas"]["ChatTurn"][];
             page?: components["schemas"]["ChatPageContext"] | null;
             /** Question */
             question: string;
@@ -4905,6 +4907,19 @@ export interface components {
             sources: {
                 [key: string]: unknown;
             }[];
+        };
+        /**
+         * ChatTurn
+         * @description Turno previo de la conversación del cerebro (solo texto, acotado).
+         */
+        ChatTurn: {
+            /** Content */
+            content: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
         };
         /** ClaimCreate */
         ClaimCreate: {

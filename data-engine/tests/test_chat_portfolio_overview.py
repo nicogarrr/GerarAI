@@ -39,7 +39,7 @@ def test_mi_cartera_lists_stored_positions_without_llm(db):
     assert "2 posiciones" in resp.answer
     assert resp.answer.index("AAA") < resp.answer.index("BBB")
     assert "75 %" in resp.answer
-    assert "no una recomendación" in resp.answer
+    assert "recomendación" not in resp.answer
     assert {s["type"] for s in resp.sources} == {"position"}
 
 
@@ -74,3 +74,52 @@ def test_mixed_base_currencies_show_no_total_or_weights(db):
     db.commit()
     resp = asyncio.run(ChatService().answer(db, "mis posiciones", "portfolio", None))
     assert "sin total" in resp.answer and "%" not in resp.answer
+
+
+def test_followup_uses_history_to_rank_positions(db):
+    from app.schemas import ChatTurn
+
+    a = _company(db, "AAA", "Alpha")
+    b = _company(db, "BBB", "Beta")
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), market_value=Decimal("300")))
+    db.add(Position(tenant_id=1, company_id=b.id, quantity=Decimal("2"), average_cost=Decimal("50"), market_value=Decimal("100")))
+    db.commit()
+    history = [
+        ChatTurn(role="user", content="¿Qué tengo en mi cartera?"),
+        ChatTurn(role="assistant", content="Tu cartera guardada tiene 2 posiciones abiertas"),
+    ]
+    resp = asyncio.run(
+        ChatService().answer(db, "¿cuál tiene el coste medio más alto?", "portfolio", None, history=history)
+    )
+    assert resp.prompt_version == "portfolio-ranking-v1"
+    assert "BBB" in resp.answer and "50" in resp.answer
+    assert resp.llm_trace["provider_calls"] == 0
+    low = asyncio.run(
+        ChatService().answer(db, "¿y el de menor valor?", "portfolio", None, history=history)
+    )
+    assert "BBB" in low.answer
+
+
+def test_ranking_without_portfolio_history_is_not_hijacked(db):
+    a = _company(db, "AAA", "Alpha")
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), market_value=Decimal("300")))
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿cuál tiene el coste medio más alto?", "portfolio", None))
+    assert resp.prompt_version != "portfolio-ranking-v1"
+
+
+def test_ranking_refuses_to_compare_mixed_currencies(db):
+    from app.schemas import ChatTurn
+
+    a = _company(db, "AAA", "Alpha")
+    b = _company(db, "BBB", "Beta")
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), currency="EUR", base_currency="EUR", market_value=Decimal("300"), market_value_base=Decimal("300")))
+    db.add(Position(tenant_id=1, company_id=b.id, quantity=Decimal("2"), average_cost=Decimal("50"), currency="USD", base_currency="USD", market_value=Decimal("100"), market_value_base=Decimal("100")))
+    db.commit()
+    history = [ChatTurn(role="assistant", content="Tu cartera guardada tiene 2 posiciones abiertas")]
+    for question in ("¿cuál tiene el coste medio más alto?", "¿cuál tiene el mayor valor?"):
+        resp = asyncio.run(ChatService().answer(db, question, "portfolio", None, history=history))
+        assert resp.prompt_version == "portfolio-ranking-v1"
+        assert "monedas distintas" in resp.answer
+        assert "EUR" in resp.answer and "USD" in resp.answer
+        assert resp.llm_trace["mixed_currency"] is True

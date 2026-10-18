@@ -556,12 +556,20 @@ class ChatPageContext(BaseModel):
     ticker: str | None = Field(default=None, max_length=20)
 
 
+class ChatTurn(BaseModel):
+    """Turno previo de la conversación del cerebro (solo texto, acotado)."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=1500)
+
+
 class ChatRequest(BaseModel):
     question: str = Field(min_length=3)
     scope: str = "portfolio"
     ticker: str | None = None
     enable_debate: bool | None = None
     page: ChatPageContext | None = None
+    history: list[ChatTurn] = Field(default_factory=list, max_length=8)
 
 
 class SynthesisSection(BaseModel):

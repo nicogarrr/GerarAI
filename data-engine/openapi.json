@@ -878,6 +878,14 @@
             ],
             "title": "Enable Debate"
           },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ChatTurn"
+            },
+            "maxItems": 8,
+            "title": "History",
+            "type": "array"
+          },
           "page": {
             "anyOf": [
               {
@@ -1014,6 +1022,30 @@
           "sources"
         ],
         "title": "ChatResponse",
+        "type": "object"
+      },
+      "ChatTurn": {
+        "description": "Turno previo de la conversaci\u00f3n del cerebro (solo texto, acotado).",
+        "properties": {
+          "content": {
+            "maxLength": 1500,
+            "title": "Content",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ChatTurn",
         "type": "object"
       },
       "ClaimCreate": {
