@@ -67,9 +67,9 @@ def test_patrimonio_neto_con_caja_y_margen(db):
     db.commit()
     resp = asyncio.run(ChatService().answer(db, "¿Cuánto vale mi patrimonio neto?", "portfolio", None))
     assert resp.llm_trace["provider_calls"] == 0
-    assert "caja 7.933,60 EUR" in resp.answer
-    assert "deuda de margen 17.541,34 EUR" in resp.answer
-    assert "patrimonio neto 6.630,17 EUR" in resp.answer
+    assert "caja 7.933,60 €" in resp.answer
+    assert "deuda de margen 17.541,34 €" in resp.answer
+    assert "patrimonio neto 6.630,17 €" in resp.answer
     assert "recomendación" not in resp.answer
 
 
@@ -97,7 +97,7 @@ def test_peso_y_patrimonio_en_la_misma_pregunta(db):
     ))
     assert resp.llm_trace["path"] == "portfolio_position"
     assert "100 %" in resp.answer
-    assert "patrimonio neto 5.066,00 EUR" in resp.answer
+    assert "patrimonio neto 5.066,00 €" in resp.answer
 
 
 def test_ticker_sin_posicion_lo_dice_sin_inventar(db):

@@ -108,6 +108,10 @@ def _fmt_money_es(number: float, digits: int = 2) -> str:
     return text.replace(",", " ").replace(".", ",").replace(" ", ".")
 
 
+def _currency_display(currency: str) -> str:
+    return "€" if currency == "EUR" else currency
+
+
 def _fmt_value_es(value: float | None, unit: str | None) -> str:
     """Cifra legible: -71,5 millones USD / 1,14 mil millones USD / 300 acciones."""
     if value is None:
@@ -888,22 +892,21 @@ class ChatService:
             )
             lines.append(
                 f"- {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
-                f"coste medio {_fmt_number_es(float(pos.average_cost), 2)} {pos.currency}, "
-                f"valor {_fmt_number_es(_value(pos), 2)} {pos.base_currency or 'EUR'}{weight}"
+                f"coste medio {_fmt_number_es(float(pos.average_cost), 2)} {_currency_display(pos.currency)}, "
+                f"valor {_fmt_number_es(_value(pos), 2)} {_currency_display(pos.base_currency or 'EUR')}{weight}"
             )
             sources.append(self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of)))
         extra = f"\n(Se muestran las {limit} mayores de {len(rows)}.)" if len(rows) > limit else ""
         total_text = (
             "monedas base distintas, sin total"
             if mixed
-            else f"valor total {_fmt_money_es(total)} {base}"
+            else f"valor total {_fmt_money_es(total)} {_currency_display(base)}"
         )
         answer = (
             f"Tu cartera guardada tiene {len(rows)} posiciones abiertas, {total_text}, "
             f"con datos a {_fmt_date_es(as_of.isoformat())}:\n"
             + "\n".join(lines)
             + extra
-            + "\n\nPregunta por un ticker para ver su ficha y fuentes."
         )
         cash_line = self._cash_line(
             db, tenant_id, base if not mixed else None,
@@ -974,10 +977,10 @@ class ChatService:
         cur = currencies[0]
         amount = _fmt_number_es(keyfn(rows[0]), 2)
         word = "más alto" if highest else "más bajo"
-        answer = f"La posición con el {label} {word} es {comp.ticker}: {amount} {cur}."
+        answer = f"La posición con el {label} {word} es {comp.ticker}: {amount} {_currency_display(cur)}."
         if len(rows) > 1:
             nxt_pos, nxt = rows[1]
-            answer += f" Le sigue {nxt.ticker} con {_fmt_number_es(keyfn(rows[1]), 2)} {cur}."
+            answer += f" Le sigue {nxt.ticker} con {_fmt_number_es(keyfn(rows[1]), 2)} {_currency_display(cur)}."
         return ChatResponse(
             answer=answer,
             sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))],
@@ -1015,7 +1018,7 @@ class ChatService:
             native[row.currency] = native.get(row.currency, 0.0) + float(row.balance)
         if base is None:
             parts = [
-                f"{_fmt_money_es(amount)} {currency}"
+                f"{_fmt_money_es(amount)} {_currency_display(currency)}"
                 for currency, amount in sorted(native.items())
             ]
             return (
@@ -1050,17 +1053,17 @@ class ChatService:
         line = ""
         pieces: list[str] = []
         if assets:
-            pieces.append(f"caja {_fmt_money_es(assets)} {base}")
+            pieces.append(f"caja {_fmt_money_es(assets)} {_currency_display(base)}")
         if debt:
-            pieces.append(f"deuda de margen {_fmt_money_es(debt)} {base}")
+            pieces.append(f"deuda de margen {_fmt_money_es(debt)} {_currency_display(base)}")
         if pieces:
             line = "Además: " + " y ".join(pieces)
             if positions_total is not None:
                 net = positions_total + assets - debt
-                line += f"; patrimonio neto {_fmt_money_es(net)} {base}"
+                line += f"; patrimonio neto {_fmt_money_es(net)} {_currency_display(base)}"
             line += "."
         if missing:
-            detalle = ", ".join(f"{_fmt_money_es(native[c])} {c}" for c in missing)
+            detalle = ", ".join(f"{_fmt_money_es(native[c])} {_currency_display(c)}" for c in missing)
             line += (
                 f" Sin tipo de cambio guardado para {', '.join(missing)}"
                 f" ({detalle}): esa caja no entra en la suma."
@@ -1114,8 +1117,8 @@ class ChatService:
             weight_text = " (sin peso: monedas base distintas)"
         answer = (
             f"Tu posición guardada en {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
-            f"coste medio {_fmt_money_es(float(pos.average_cost))} {pos.currency}, "
-            f"valor {_fmt_money_es(_value(pos))} {pos.base_currency or 'EUR'}{weight_text}, "
+            f"coste medio {_fmt_money_es(float(pos.average_cost))} {_currency_display(pos.currency)}, "
+            f"valor {_fmt_money_es(_value(pos))} {_currency_display(pos.base_currency or 'EUR')}{weight_text}, "
             f"con datos a {_fmt_date_es(pos.as_of.isoformat())}."
         )
         if _NET_WORTH_CUE_RE.search(question):

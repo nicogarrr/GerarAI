@@ -121,5 +121,5 @@ def test_ranking_refuses_to_compare_mixed_currencies(db):
         resp = asyncio.run(ChatService().answer(db, question, "portfolio", None, history=history))
         assert resp.prompt_version == "portfolio-ranking-v1"
         assert "monedas distintas" in resp.answer
-        assert "EUR" in resp.answer and "USD" in resp.answer
+        assert "€" in resp.answer and "USD" in resp.answer
         assert resp.llm_trace["mixed_currency"] is True
