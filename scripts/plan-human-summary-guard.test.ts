@@ -21,3 +21,11 @@ test('screeners pluralize counts; ProPicks uses Spanish score labels',()=>{
  const p=readFileSync('components/proPicks/EnhancedProPicksFilters.tsx','utf8');
  assert.doesNotMatch(p,/Score Mínimo|Score General/);
 });
+test('plan formats nested money, all weights, details and date',()=>{
+ const s=readFileSync('components/plan/PlanView.tsx','utf8');
+ for(const fragment of ["direction: 'Acción'", "detail: 'Detalle'", "within_band: 'Dentro de la banda'", "key === 'amount_base'", "key === 'current_weights'", 'formatMarketDate(value as string)', 'whitespace']) {
+  if(fragment==='whitespace') continue;
+  assert.ok(s.includes(fragment),fragment);
+ }
+ assert.match(readFileSync('components/data/RecordViews.tsx','utf8'),/whitespace-pre-line/);
+});
