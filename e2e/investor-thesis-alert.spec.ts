@@ -9,6 +9,8 @@ test.describe("investor thesis alert flow", () => {
     await page.goto("/research/MSFT");
 
     await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
+    // El formulario de alerta vive en un popover tras el botón campana.
+    await page.getByRole("button", { name: "Alerta de precio" }).click();
     await expect(page.getByPlaceholder("Precio objetivo $")).toBeVisible();
     await expect(page.getByRole("button", { name: "+ Alerta" })).toBeVisible();
 
@@ -21,6 +23,7 @@ test.describe("investor thesis alert flow", () => {
     await page.goto("/research/MSFT");
 
     await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "Alerta de precio" }).click();
     await page.getByRole("button", { name: "+ Alerta" }).click();
     await expect(page.getByText("Introduce un precio objetivo válido")).toBeVisible();
   });
