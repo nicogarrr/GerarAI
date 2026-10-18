@@ -690,6 +690,14 @@ function launchViewData(
   }
 }
 
+/** El motor puede citar instantes ISO crudos ("2026-10-18T09:00:00+00:00"): se muestran como fecha y hora de Madrid. */
+function humanizeChatAnswer(answer: string): string {
+  return answer.replace(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/g, (iso) => {
+    const formatted = formatUserDateTime(iso);
+    return formatted === NA ? iso : formatted;
+  });
+}
+
 export default async function ResearchCompanyPage({ params, searchParams }: PageProps) {
   const [{ ticker: rawTicker }, query] = await Promise.all([params, searchParams]);
   assertTickerShape(rawTicker);
@@ -1354,8 +1362,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </Panel>
         {response ? (
           <Panel title="Respuesta">
-            <div className="whitespace-pre-wrap text-sm leading-7 text-gray-300">{response.answer}</div>
-            <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline">modelo {response.model ?? 'determinista'}</Badge><Badge variant="outline">{response.sources.length} fuentes</Badge><Badge variant="outline">{response.blocked ? 'datos insuficientes' : 'con evidencia'}</Badge></div>
+            <div className="whitespace-pre-wrap text-sm leading-7 text-gray-300">{humanizeChatAnswer(response.answer)}</div>
+            <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline">modelo {response.model && response.model !== 'deterministic' ? response.model : 'determinista'}</Badge><Badge variant="outline">{response.sources.length} fuentes</Badge><Badge variant="outline">{response.blocked ? 'datos insuficientes' : 'con evidencia'}</Badge></div>
             <CitationsList citations={[]} sources={response.sources} />
           </Panel>
         ) : chatFailed ? (
