@@ -68,7 +68,14 @@ export interface PortfolioChatCitation extends ChatCitation {
 
 /** Keep backend sources visible without inventing links for internal records. */
 export function toPortfolioChatCitations(sources: ChatSource[] | undefined | null): PortfolioChatCitation[] {
-    return (sources ?? []).map((source) => {
+    const seen = new Set<string>();
+    const unique = (sources ?? []).filter((source) => {
+        const key = `${source.type}:${String(source.id)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+    return unique.map((source) => {
         const existing = toChatCitations([source])[0];
         let url: string | null = null;
         if (typeof source.url === 'string' && (source.url === '/portfolio' || /^\/research\/[A-Za-z0-9.%_-]+(?:\?view=(?:financials|thesis|news))?$/.test(source.url))) {
@@ -111,4 +118,11 @@ const CITATION_KIND_LABELS: Record<string, string> = {
 export function citationKindLabel(locator: string): string | null {
     const kind = locator.split(':', 1)[0] ?? '';
     return CITATION_KIND_LABELS[kind] ?? null;
+}
+
+/** Etiqueta del tipo solo si aporta algo: "Posición GOOGL" ya dice "Posición". */
+export function citationKindLabelFor(citation: { locator: string; document: string }): string | null {
+    const label = citationKindLabel(citation.locator);
+    if (!label) return null;
+    return citation.document.trim().toLowerCase().startsWith(label.toLowerCase()) ? null : label;
 }

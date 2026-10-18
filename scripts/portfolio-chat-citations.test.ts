@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error Node strip-types requires explicit extension.
-import { toPortfolioChatCitations } from '../lib/chat/citations.ts';
+import { citationKindLabelFor, toPortfolioChatCitations } from '../lib/chat/citations.ts';
 test('preserves backend URL, page and locator; internal source has no invented URL', () => {
     const result = toPortfolioChatCitations([
         { type: 'document_chunk', id: 8, title: 'Informe anual de prueba', page_number: 12, url: 'https://example.org/report.pdf' },
@@ -48,4 +48,14 @@ test('panel Cerebro bloquea y restaura el scroll de fondo', async () => {
     const ui = readFileSync('components/brain/GlobalBrain.tsx', 'utf8');
     assert.ok(ui.includes("document.body.style.overflow = 'hidden'"));
     assert.ok(ui.includes('document.body.style.overflow = previousOverflow'));
+});
+
+test('Cerebro no repite la misma fuente ni la etiqueta de tipo si el título ya la dice', () => {
+    const result = toPortfolioChatCitations([
+        { type: 'position', id: 7, title: 'Posición GOOGL', url: '/portfolio' },
+        { type: 'position', id: 7, title: 'Posición GOOGL', url: '/portfolio' },
+    ] as never);
+    assert.equal(result.length, 1);
+    assert.equal(citationKindLabelFor(result[0]), null);
+    assert.equal(citationKindLabelFor({ locator: 'position:9', document: 'GOOGL' }), 'Posición');
 });
