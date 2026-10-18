@@ -7,7 +7,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import desc, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
@@ -323,7 +323,13 @@ def list_financial_facts(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    query = select(FinancialFact).where(FinancialFact.company_id == company.id)
+    query = (
+        select(FinancialFact)
+        .where(FinancialFact.company_id == company.id)
+        # El frontend enlaza cada cifra a su fuente: una sola query extra para
+        # todos los documentos en vez de un lazy load por hecho.
+        .options(selectinload(FinancialFact.source))
+    )
     if metric:
         query = query.where(FinancialFact.metric == metric)
     query = query.order_by(

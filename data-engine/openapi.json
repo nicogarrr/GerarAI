@@ -3457,9 +3457,43 @@
             ],
             "title": "Source Id"
           },
+          "source_published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Published At"
+          },
+          "source_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Title"
+          },
           "source_type": {
             "title": "Source Type",
             "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
           },
           "unit": {
             "title": "Unit",
@@ -31583,6 +31617,181 @@
         ]
       }
     },
+    "/api/market/changes": {
+      "get": {
+        "description": "Variaci\u00f3n diaria de tickers concretos con la misma f\u00f3rmula que Movers.\n\nUn ticker sin cierres comparables devuelve change_pct null (la UI muestra\nN/D), nunca un valor de otra fuente.",
+        "operationId": "market_changes_api_market_changes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tickers",
+            "required": true,
+            "schema": {
+              "maxLength": 2000,
+              "minLength": 1,
+              "title": "Tickers",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Market Changes Api Market Changes Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Market Changes",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/api/market/indices": {
       "get": {
         "operationId": "market_indices_api_market_indices_get",
@@ -31748,7 +31957,7 @@
     },
     "/api/market/movers": {
       "get": {
-        "description": "Gainers/losers/m\u00e1s activas calculados desde market_prices local.\n\nDise\u00f1o fr\u00edo-seguro: sin filas no hay KeyError ni 500 \u2014 se devuelve\nuniverso vac\u00edo y la UI lo muestra como estado honesto. El cambio se\ncalcula entre los dos \u00faltimos cierres de cada compa\u00f1\u00eda (nunca se asume\ncach\u00e9 caliente ni fechas globales).",
+        "description": "Gainers/losers/m\u00e1s activas desde market_prices (cierres datados).\n\nSin filas devuelve universo vac\u00edo, nunca KeyError ni 500. El cambio sale de\n`market_change.compute_session_changes`, la misma funci\u00f3n que usan Mercado\ny watchlist.",
         "operationId": "market_movers_api_market_movers_get",
         "parameters": [
           {

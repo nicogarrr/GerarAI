@@ -80,6 +80,12 @@ export type ResearchFact = {
   is_adjusted: boolean;
   confidence: string;
   created_at: string;
+  // Procedencia enlazable (documento de origen del dato, p. ej. filing SEC).
+  // Nulos cuando el hecho no tiene documento: se muestra la fuente como
+  // texto plano, nunca un enlace inventado.
+  source_url?: string | null;
+  source_title?: string | null;
+  source_published_at?: string | null;
 };
 
 export type ResearchCalculatedMetric = {

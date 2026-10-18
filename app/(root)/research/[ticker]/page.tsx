@@ -281,20 +281,54 @@ function metricValue(value: number | string | null | undefined, unit: string) {
   return formatResearchMetric(parsed, unit);
 }
 
+/** Fuente de una cifra: enlace real al documento de origen (filing SEC/ESEF o pagina del proveedor) con su fecha, o texto plano cuando no hay documento. Nunca un enlace inventado. */
+function FactSource({ fact }: { fact: ResearchFact }) {
+  const text = label(fact.source_type);
+  if (!fact.source_url) return <>{text}</>;
+  const date = fact.source_published_at ? formatUserDate(fact.source_published_at) : null;
+  return (
+    <a
+      className="text-teal-300 underline-offset-2 transition hover:text-teal-200 hover:underline"
+      href={fact.source_url}
+      rel="noopener noreferrer"
+      target="_blank"
+      title={fact.source_title ?? fact.source_url}
+    >
+      {text}{date ? ` · ${date}` : ''}
+    </a>
+  );
+}
+
+/** La cifra enlaza a su fuente cuando el backend trae URL real del documento. */
+function FactValueLink({ fact, children }: { fact: ResearchFact; children: React.ReactNode }) {
+  if (!fact.source_url) return <>{children}</>;
+  return (
+    <a
+      className="underline-offset-2 transition hover:text-teal-200 hover:underline"
+      href={fact.source_url}
+      rel="noopener noreferrer"
+      target="_blank"
+      title={fact.source_title ?? 'Fuente del dato'}
+    >
+      {children}
+    </a>
+  );
+}
+
 function FactCard({ fact, ticker, staleness }: { fact: ResearchFact; ticker: string; staleness: string | null }) {
   const audit = factDisplayAudit(ticker, fact);
   return (
     <div className="rounded-lg border border-gray-800 p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium text-gray-200">{metricLabel(fact.metric)}</span>
-        <span className={`text-sm font-semibold ${audit ? 'text-gray-400' : 'text-teal-300'}`}>{audit ? 'N/D' : metricValue(fact.value, fact.unit)}</span>
+        <span className={`text-sm font-semibold ${audit ? 'text-gray-400' : 'text-teal-300'}`}>{audit ? 'N/D' : <FactValueLink fact={fact}>{metricValue(fact.value, fact.unit)}</FactValueLink>}</span>
       </div>
       {audit ? <p className="mt-2 text-xs text-amber-300">{audit}</p> : null}
       {!audit && staleness ? <p className="mt-2 text-xs text-amber-300">{staleness}</p> : null}
       <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-gray-500">
         <span>{financialPeriod(fact.period)}</span>
         <span>·</span>
-        <span>{label(fact.source_type)}</span>
+        <span><FactSource fact={fact} /></span>
       </div>
     </div>
   );
@@ -358,8 +392,8 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
             <tr key={fact.id} className="text-gray-300">
               <th className="border-b border-gray-900 py-2 text-left text-sm font-medium" scope="row">{metricLabel(fact.metric)}</th>
               <td className="border-b border-gray-900 py-2">{financialPeriod(fact.period)}</td>
-              <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact) ? <span className="text-gray-400">N/D<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact)}</span></span> : <>{metricValue(fact.value, fact.unit)}{stalenessOf(fact) ? <span className="mt-1 block text-xs text-amber-300">{stalenessOf(fact)}</span> : null}</>}</td>
-              <td className="border-b border-gray-900 py-2 text-right text-xs text-gray-500">{label(fact.source_type)}</td>
+              <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact) ? <span className="text-gray-400">N/D<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact)}</span></span> : <><FactValueLink fact={fact}>{metricValue(fact.value, fact.unit)}</FactValueLink>{stalenessOf(fact) ? <span className="mt-1 block text-xs text-amber-300">{stalenessOf(fact)}</span> : null}</>}</td>
+              <td className="border-b border-gray-900 py-2 text-right text-xs text-gray-500"><FactSource fact={fact} /></td>
             </tr>
           ))}
         </tbody>

@@ -513,6 +513,24 @@ class FinancialFact(TenantOwnedMixin, Base, TimestampMixin):
     is_adjusted: Mapped[bool] = mapped_column(Boolean, default=False)
     confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), default=Decimal("0.80"))
 
+    # Procedencia del dato: el documento (filing SEC/ESEF, pagina del proveedor)
+    # del que salio la cifra. La carga eager se pide SOLO en el endpoint de
+    # facts (selectinload alli); el resto de consultas masivas (screener,
+    # valuation) no arrastra el join.
+    source: Mapped["Document | None"] = relationship(foreign_keys=[source_id])
+
+    @property
+    def source_url(self) -> str | None:
+        return self.source.source_url if self.source is not None else None
+
+    @property
+    def source_title(self) -> str | None:
+        return self.source.title if self.source is not None else None
+
+    @property
+    def source_published_at(self) -> datetime | None:
+        return self.source.published_at if self.source is not None else None
+
 
 class CompanyKPI(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "company_kpis"
