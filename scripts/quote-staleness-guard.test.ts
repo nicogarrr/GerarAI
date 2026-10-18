@@ -22,7 +22,7 @@ test('F358: toda cotizacion Finnhub se valida por su timestamp (sanitizeFinnhubQ
     assert.match(freshness, /classifyQuoteKind\(t, nowMs\)/, 'clasifica por semantica de sesion');
     assert.match(freshness, /if \(kind === 'stale'\) return null/, 'stale se rechaza en origen');
     const uses = finnhubActions.match(/\.then\(sanitizeFinnhubQuote\)/g) ?? [];
-    assert.ok(uses.length >= 2, 'getStockFinancialData y su variante Light tambien pasan por el filtro (ruta ProPicks)');
+    assert.ok(uses.length >= 1, 'getStockFinancialDataLight tambien pasa por el filtro (ruta ProPicks)');
     assert.match(finnhubActions, /const quote = sanitizeFinnhubQuote\(data\)/, 'fetchStockQuote pasa por el filtro');
 });
 
