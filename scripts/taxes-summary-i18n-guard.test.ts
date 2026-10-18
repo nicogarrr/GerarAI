@@ -11,7 +11,7 @@ test('F330: las claves de sin-atribuir y el metodo tienen etiqueta y formato en 
     assert.match(view, /unattributed_tickers: 'Tickers sin atribuir'/);
     assert.match(view, /unattributed_dividends_base: 'Dividendos sin atribuir'/);
     assert.match(view, /'unattributed_dividends_base',\s*\n\s*\]\);/);
-    assert.match(view, /'unattributed_tickers'\]\)/);
+    assert.match(view, /'unattributed_tickers', 'ambiguous_cash'\]\)/);
     assert.match(view, /fifo: 'FIFO'/);
     assert.match(view, /key === 'method'/);
 });
