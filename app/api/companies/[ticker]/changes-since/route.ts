@@ -1,7 +1,8 @@
+import { withAuthErrors } from '@/lib/auth/route-auth';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
 
-export async function GET(request: Request, { params }: { params: Promise<{ ticker: string }> }) {
+async function getHandler(request: Request, { params }: { params: Promise<{ ticker: string }> }) {
     await requireAuthenticatedUser();
     const { ticker } = await params;
     if (!/^[A-Za-z0-9.^=-]{1,32}$/.test(ticker)) return Response.json({ status: 'unavailable' }, { status: 400 });
@@ -19,3 +20,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ tick
         return Response.json({ status: 'unavailable' }, { status: 502, headers: { 'Cache-Control': 'no-store' } });
     }
 }
+
+export const GET = withAuthErrors(getHandler);

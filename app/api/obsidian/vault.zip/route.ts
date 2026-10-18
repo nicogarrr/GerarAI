@@ -1,3 +1,4 @@
+import { withAuthErrors } from '@/lib/auth/route-auth';
 import { NextResponse } from 'next/server';
 import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -5,7 +6,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 
 /** Proxy privado: la firma Research OS nunca llega al navegador. */
-export async function GET() {
+async function getHandler() {
   await requireAuthenticatedUser();
   const path = '/api/obsidian/vault.zip';
   let upstream: Response;
@@ -29,3 +30,5 @@ export async function GET() {
     },
   });
 }
+
+export const GET = withAuthErrors(getHandler);

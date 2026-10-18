@@ -1,3 +1,4 @@
+import { withAuthErrors } from '@/lib/auth/route-auth';
 import { NextResponse } from 'next/server';
 import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -6,7 +7,7 @@ const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 type RouteContext = { params: Promise<{ ticker: string }> };
 
 /** Proxy privado: la firma Research OS nunca llega al navegador. */
-export async function GET(_request: Request, { params }: RouteContext) {
+async function getHandler(_request: Request, { params }: RouteContext) {
   await requireAuthenticatedUser();
   const clean = (await params).ticker.trim().toUpperCase();
   if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(clean)) {
@@ -37,3 +38,5 @@ export async function GET(_request: Request, { params }: RouteContext) {
     },
   });
 }
+
+export const GET = withAuthErrors(getHandler);

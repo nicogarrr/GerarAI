@@ -1,3 +1,4 @@
+import { withAuthErrors } from '@/lib/auth/route-auth';
 import { NextResponse } from 'next/server';
 import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -11,7 +12,7 @@ type RouteContext = { params: Promise<{ ticker: string }> };
  * El navegador no puede firmar la identidad Research OS, así que esta
  * route la firma en servidor y retransmite el binario del data-engine.
  */
-export async function GET(_request: Request, { params }: RouteContext) {
+async function getHandler(_request: Request, { params }: RouteContext) {
   await requireAuthenticatedUser();
   const { ticker } = await params;
   const clean = ticker.trim().toUpperCase();
@@ -53,3 +54,5 @@ export async function GET(_request: Request, { params }: RouteContext) {
     },
   });
 }
+
+export const GET = withAuthErrors(getHandler);
