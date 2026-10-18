@@ -11,6 +11,8 @@ const SECTIONS = [
   ["/inversores/conceptos", "Conceptos"],
   ["/inversores/mas-compradas", "Más compradas"],
   ["/inversores/solape", "Solape"],
+  ["/ownership", "13F"],
+  ["/insider", "Insiders"],
   ["/inversores/canales", "Canales"],
 ] as const;
 
