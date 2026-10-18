@@ -50,7 +50,7 @@ test("news -> materiality -> thesis change", async ({ request }) => {
     ticker: "MSFT",
     title: `MSFT cuts guidance after earnings miss ${marker}`,
     text:
-      "The company disclosed an SEC fraud investigation, a share offering with dilution, " +
+      "Microsoft disclosed an SEC fraud investigation, a share offering with dilution, " +
       "and lower revenue and FCF margin guidance.",
     url,
     source: "sec_filing",
