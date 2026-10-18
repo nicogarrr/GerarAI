@@ -257,3 +257,19 @@ def test_ticker_feed_hides_rows_that_only_carry_the_ticker_label():
         second = client.get("/api/news?limit=1&offset=1").json()
         assert [row["title"] for row in second] == [visible[1]]
     engine.dispose()
+
+
+def test_aena_requires_full_name_not_the_bare_word():
+    from types import SimpleNamespace
+
+    from app.services.ticker_news_lane import fails_strict_name
+
+    aena = SimpleNamespace(ticker="AENA", name="Aena SME SA")
+    assert fails_strict_name(aena, "AENA Rio de Janeiro News Today")
+    assert fails_strict_name(aena, "AENA Adani Airports wins bid")
+    assert fails_strict_name(aena, "AENA Aguas fecales en Ibiza")
+    assert not fails_strict_name(aena, "Aena S.M.E., S.A. eleva su dividendo")
+    assert not fails_strict_name(aena, "AENA Aeropuertos Españoles y Navegación Aérea sube tarifas")
+    assert not fails_strict_name(aena, "Los aeropuertos de Aena baten récord")
+    # Otras empresas no se ven afectadas.
+    assert not fails_strict_name(SimpleNamespace(ticker="NVDA", name="NVIDIA Corp"), "NVDA rises")

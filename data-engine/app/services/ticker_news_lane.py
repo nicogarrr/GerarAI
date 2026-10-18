@@ -45,6 +45,29 @@ VERIFIED_ALIASES: dict[str, tuple[str, ...]] = {
     "AAPL": ("iPhone", "iPad", "App Store"),
     "ADBE": ("Photoshop", "Acrobat"),
 }
+# Siglas que coinciden con una palabra o lugar corriente (AENA en titulares de
+# Rio de Janeiro, Adani o aguas fecales de Ibiza): el ticker o «Aena» sueltos no
+# vinculan; hace falta el nombre completo, una forma verificada o el cashtag.
+STRICT_NAME_PATTERNS: dict[str, tuple[str, ...]] = {
+    "AENA": (
+        r"Aena\s+S\.?\s?M\.?\s?E\.?",
+        r"Aena\s+Aeropuertos",
+        r"Aeropuertos\s+Espa(?:ñ|n)oles\s+y\s+Navegaci(?:ó|o)n\s+A(?:é|e)rea",
+        r"aeropuertos\s+de\s+Aena",
+        r"\$AENA\b",
+        r"\b(?:BME|BME\s*Growth|MCE)\s*:\s*AENA\b",
+    ),
+}
+
+
+def fails_strict_name(company, text: str) -> bool:
+    """True si la empresa exige nombre completo y el texto no lo trae."""
+    patterns = STRICT_NAME_PATTERNS.get((getattr(company, "ticker", "") or "").upper())
+    if not patterns:
+        return False
+    return not any(re.search(pattern, text or "", flags=re.IGNORECASE) for pattern in patterns)
+
+
 # Competidores que el feed de Yahoo etiqueta con nuestro ticker aunque el
 # titular trate de ellos (ASTS recibia titulares de Rocket Lab). Solo se descarta
 # si el texto nombra al competidor Y no cita a la empresa; nada de terminos de
