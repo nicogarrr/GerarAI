@@ -31,6 +31,6 @@ test('F323: los mapas cubren el catalogo del backend', () => {
     for (const key of BACKEND_TIERS) {
         assert.match(page, new RegExp(`${key}: '`), `falta tier ${key}`);
     }
-    assert.match(page, /SOURCE_TYPE_LABELS\[value\] \?\? humanizeId\(value\)/);
-    assert.match(page, /SOURCE_TIER_LABELS\[value\] \?\? humanizeId\(value\)/);
+    assert.match(page, /SOURCE_TYPE_LABELS\[value\] \?\? sourceDisplay\(value\)/);
+    assert.match(page, /SOURCE_TIER_LABELS\[value\] \?\? sourceDisplay\(value\)/);
 });
