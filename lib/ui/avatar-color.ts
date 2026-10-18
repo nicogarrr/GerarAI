@@ -28,6 +28,11 @@ export function avatarTone(name: string): string {
     return AVATAR_TONES[hashName(name) % AVATAR_TONES.length];
 }
 
+/** Primera letra o cifra de la palabra: en «(Oakmark)» el "(" no es inicial. */
+function firstAlphanumeric(word: string): string | undefined {
+    return Array.from(word).find((char) => /[\p{L}\p{N}]/u.test(char));
+}
+
 /** Hasta dos iniciales (primera y ultima palabra). Sin nombre: "?" . */
 export function avatarInitials(name: string): string {
     const words = name
@@ -35,7 +40,7 @@ export function avatarInitials(name: string): string {
         .split(/\s+/)
         .filter((word) => /[\p{L}\p{N}]/u.test(word));
     if (words.length === 0) return "?";
-    const first = Array.from(words[0])[0] ?? "?";
-    const last = words.length > 1 ? (Array.from(words[words.length - 1])[0] ?? "") : "";
+    const first = firstAlphanumeric(words[0]) ?? "?";
+    const last = words.length > 1 ? (firstAlphanumeric(words[words.length - 1]) ?? "") : "";
     return (first + last).toUpperCase();
 }
