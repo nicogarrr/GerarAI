@@ -61,3 +61,34 @@ def test_failure_never_leaks_or_fabricates_refresh_date(db,monkeypatch):
     result=asyncio.run(svc.refresh_free_financials(db,c))
     assert result['status']=='error' and result['last_refreshed_at'] is None
     assert 'private-url' not in str(result)
+
+
+@pytest.mark.parametrize(('ticker', 'exchange'), [
+    ('HD', 'NEW YORK STOCK EXCHANGE, INC.'),
+    ('AMD', 'NASDAQ NMS - GLOBAL MARKET'),
+])
+def test_us_long_exchange_names_refresh_without_stored_cik(db, monkeypatch, ticker, exchange):
+    c = company(db)
+    c.ticker = ticker
+    c.exchange = exchange
+    c.cik = None
+    db.commit()
+    called = []
+    async def refresh(self, **kwargs):
+        called.append(kwargs['company'].ticker)
+        db.add(FinancialFact(company_id=c.id, metric='revenue', period='2025:FY', value=Decimal('100'), unit='USD', source_type='SEC'))
+        db.commit()
+        return {'facts_imported': 1}
+    monkeypatch.setattr(svc.FinancialIngestionService, 'refresh_from_sec', refresh)
+    result = asyncio.run(svc.refresh_free_financials(db, c))
+    assert called == [ticker]
+    assert result['status'] == 'ok'
+    assert result['facts_imported'] == 1
+
+
+@pytest.mark.parametrize('exchange', ['BME', 'LONDON STOCK EXCHANGE', 'NOTNASDAQ', 'EURONEXT PARIS'])
+def test_non_us_exchange_still_skipped_even_when_currency_usd(db, exchange):
+    c = company(db)
+    c.exchange = exchange
+    db.commit()
+    assert asyncio.run(svc.refresh_free_financials(db, c))['reason'] == 'emisor_no_sec'
