@@ -97,12 +97,12 @@ import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
 import { SourceAuditDetail } from '@/components/research/SourceAuditDetail';
-import { dedupeNewsEvents } from '@/lib/news-display';
+import { dedupeNewsEvents, newsDisplayTitle } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import CitationsList from '@/components/chat/CitationsList';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
-import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDateTime, formatMoney, NA } from '@/lib/format';
+import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, NA } from '@/lib/format';
 import { glossary, moatGlossaryKey } from '@/lib/glossary';
 import {
   RESEARCH_RENDER_BUDGET_MS,
@@ -136,7 +136,8 @@ type PageProps = {
 /** Fecha de la noticia con su provenance: nunca afirmar fecha de publicacion
  *  cuando es el fallback de ingesta o no hay metadato. */
 function newsDateLabel(event: { date: string; date_source?: string | null }): string {
-  const day = event.date.slice(0, 10);
+  // es-ES («16 oct 2026»), no ISO crudo: el resto de la app ya pinta así.
+  const day = formatUserDate(event.date);
   // Mismo criterio que NewsEventsFlow y ResearchAssistant: solo 'source' es
   // fecha de publicacion verificada; el resto se etiqueta, nunca se afirma.
   if (event.date_source === 'source') return day;
@@ -896,7 +897,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       ? dedupeNewsEvents(
           newsEntry.value
             .slice()
-            .sort((a, b) => (b.materiality_score ?? 0) - (a.materiality_score ?? 0)),
+            .sort((a, b) => (b.materiality_score ?? 0) - (a.materiality_score ?? 0))
+            // Dedupe por el titular que se PINTA: dos ingestas del mismo
+            // titular (sufijo de fuente o prefijo de ticker distinto en el
+            // texto guardado) normalizan a claves distintas y salían
+            // duplicadas seguidas (QA ASTS «Launch Delays…» x2).
+            .map((event) => ({
+              ...event,
+              title: newsDisplayTitle(event.title, event.ticker, event.headline_from_source, event.original_headline),
+            })),
         )
           .slice(0, 5)
           .sort((a, b) => b.date.localeCompare(a.date))

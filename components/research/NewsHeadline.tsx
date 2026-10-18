@@ -21,7 +21,6 @@ function translate(id: number): Promise<string | null> {
 export function NewsHeadline({ event }: { event: ResearchNewsEvent }) {
   const original = event.original_headline ?? event.title;
   const [translated, setTranslated] = useState<string | null>(event.headline_translation?.text ?? null);
-  const [attempted, setAttempted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const needsTranslation = event.headline_from_source !== false && (nonLatin.test(original) || /\b(the|with|says|shares|stocks|earnings|reports|raises|falls|after|amid|outlook|growth|investors|market|billion|million|revenue|warns|cuts|for|and|as|to|in)\b/i.test(original));
   useEffect(() => {
@@ -30,7 +29,7 @@ export function NewsHeadline({ event }: { event: ResearchNewsEvent }) {
     const observer = new IntersectionObserver(entries => {
       if (!entries.some(entry => entry.isIntersecting)) return;
       observer.disconnect();
-      translate(event.id).then(text => {if (active) {setTranslated(text);setAttempted(true);}});
+      translate(event.id).then(text => {if (active && text) {setTranslated(text);}});
     });
     observer.observe(ref.current);
     return () => {active=false;observer.disconnect();};
@@ -38,6 +37,6 @@ export function NewsHeadline({ event }: { event: ResearchNewsEvent }) {
   const title = translated ?? newsDisplayTitle(event.title, event.ticker, event.headline_from_source, event.original_headline);
   return <div ref={ref} className="break-words">
     {event.url ? <a className="hover:text-teal-200" href={event.url} rel="noreferrer" target="_blank">{title}</a> : title}
-    {translated ? <><span className="mt-1 block text-xs text-gray-500">Traducción automática · español</span><details className="mt-1 text-xs text-gray-400"><summary className="cursor-pointer">Ver titular original</summary><p className="mt-1 break-words">{original}</p></details></> : needsTranslation && attempted ? <span className="mt-1 block text-xs text-gray-500">Titular original · traducción no disponible</span> : null}
+    {translated ? <><span className="mt-1 block text-xs text-gray-500">Traducción automática · español</span><details className="mt-1 text-xs text-gray-400"><summary className="cursor-pointer">Ver titular original</summary><p className="mt-1 break-words">{original}</p></details></> : null}
   </div>;
 }
