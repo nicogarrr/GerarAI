@@ -158,3 +158,17 @@ def test_general_clock_calls_model_with_real_clock_not_a_refusal():
     assert provider.requests
     assert response.answer.startswith("En Tokio son las")
     assert response.model == "stub"
+
+
+def test_mixed_quote_and_fcf_margin_answers_both_without_provider(db):
+    a = company(db, "AAPL")
+    db.add(MarketPrice(company_id=a.id, date=date.today(), close=Decimal("200"), source="yahoo"))
+    for metric, value in [("revenue", "100"), ("free_cash_flow", "25")]:
+        db.add(FinancialFact(tenant_id=1, company_id=a.id, metric=metric, value=Decimal(value), unit="USD", period="2025:FY", fiscal_year=2025, source_type="SEC", is_reported=True))
+    db.commit()
+    response = asyncio.run(ChatService().answer(db, "¿Cuál es el margen FCF de AAPL y cuál es su precio actual?", "portfolio", None))
+    assert "200,00 USD" in response.answer
+    assert "25,00 %" in response.answer
+    assert response.llm_trace["provider_calls"] == 0
+    assert len(response.sources) == 3
+    assert all(source["url"] for source in response.sources)
