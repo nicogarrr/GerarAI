@@ -93,6 +93,7 @@ function listRoutes(dir: string, base: string): string[] {
 const CATALOG_EXCEPTIONS: Record<string, string> = {
     '/security': 'menú del avatar (UserDropdown), no es destino de sección',
     '/settings': 'menú del avatar (UserDropdown), no es destino de sección',
+    '/research/data-health': 'diagnóstico fuera de navegación por decisión UX; ruta conservada, research-data-health-nav-guard lo exige',
     '/search': 'página-herramienta del buscador global, se abre desde el header',
     // Subpáginas del módulo Inversores: las cubre su HubNav propio
     // (app/(root)/inversores/layout.tsx) y las migas las nombran vía
