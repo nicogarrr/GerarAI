@@ -132,8 +132,15 @@ def test_latest_restatement_wins_and_dates_deduplicate(setup):
 def test_sec_map_contains_exact_capital_concepts():
     from app.services.financial_ingestion_service import SEC_METRIC_MAP
     mapping = {metric: (concepts, unit) for metric, concepts, unit in SEC_METRIC_MAP}
-    assert mapping["common_stock_repurchased"] == (["PaymentsForRepurchaseOfCommonStock"], "USD")
-    assert mapping["common_stock_issued"] == (["ProceedsFromIssuanceOfCommonStock"], "USD")
+    # Alias documentados: el valor de recompras/emision tambien sale del
+    # disclosure de la memoria (StockRepurchasedDuringPeriodValue /
+    # StockIssuedDuringPeriodValueNewIssues); _collapse_aliases deja un
+    # ganador por periodo (filed mas reciente). 4.171 y 10.821 CIKs mas
+    # cubiertos, medido sobre el parquet DenyTranDFW/edgar_xbrl_companyfacts.
+    assert mapping["common_stock_repurchased"] == (
+        ["PaymentsForRepurchaseOfCommonStock", "StockRepurchasedDuringPeriodValue"], "USD")
+    assert mapping["common_stock_issued"] == (
+        ["ProceedsFromIssuanceOfCommonStock", "StockIssuedDuringPeriodValueNewIssues"], "USD")
     assert mapping["shares_repurchased"] == (["StockRepurchasedDuringPeriodShares"], "shares")
 
 
