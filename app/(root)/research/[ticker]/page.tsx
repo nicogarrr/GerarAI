@@ -110,6 +110,8 @@ import CitationsList from '@/components/chat/CitationsList';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
 import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, NA } from '@/lib/format';
+import { getInsiderFilings } from '@/lib/actions/insider.actions';
+import { insiderName, insiderRole } from '@/lib/insider/format';
 import { glossary, moatGlossaryKey } from '@/lib/glossary';
 import {
   RESEARCH_RENDER_BUDGET_MS,
@@ -1317,6 +1319,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     );
   } else if (activeView === 'holders') {
     const holders = await viewData('holders');
+    // Propietarios = 13F (gestores) + insiders (Form 4, SEC EDGAR, gratis).
+    // Los Form 4 persistidos se leen del backend; sin red ni proveedor de
+    // pago. Best-effort: cualquier fallo degrada a panel vacio honesto.
+    const insiderFilings = await getInsiderFilings(ticker, 8).catch(() => null);
     content = (
       <div className="space-y-6">
         {holders === null ? (
@@ -1357,6 +1363,36 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             </p>
           </Panel>
         )}
+        <Panel title="Insiders (Form 4 · SEC EDGAR)">
+          {insiderFilings === null || insiderFilings.status !== 'ok' || insiderFilings.filings.length === 0 ? (
+            <EmptyState title="Sin operaciones insider persistidas para este ticker." />
+          ) : (
+            <ul className="space-y-3">
+              {insiderFilings.filings.map((filing) => (
+                <li className="rounded-lg border border-gray-800 p-3 text-sm" key={filing.accession_number}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-gray-300">
+                      {filing.form}{filing.is_amendment ? ' (enmienda)' : ''} · {filing.filing_date ? formatDate(filing.filing_date) : 'fecha desconocida'}
+                    </span>
+                    {safeHttpUrl(filing.source_url) ? (
+                      <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(filing.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">Form 4 original</a>
+                    ) : null}
+                  </div>
+                  <ul className="mt-2 space-y-1 text-xs text-gray-400">
+                    {filing.transactions.slice(0, 6).map((tx, index) => (
+                      <li key={`${filing.accession_number}-${index}`}>
+                        {insiderName(tx.insider)} · {insiderRole(tx.role, tx.officer_title)} · {tx.code === 'P' ? 'Compra' : tx.code === 'S' ? 'Venta' : tx.code ?? '—'}
+                        {typeof tx.shares === 'number' ? ` · ${formatNumber(tx.shares)} acciones` : ''}
+                        {typeof tx.value === 'number' && Number.isFinite(tx.value) ? ` · ${formatMoney(tx.value, 'USD', { maximumFractionDigits: 0 })}` : ''}
+                        {tx.tx_date ? ` · ${formatDate(tx.tx_date)}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
       </div>
     );
   } else if (activeView === 'financials') {
