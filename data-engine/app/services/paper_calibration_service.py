@@ -51,7 +51,7 @@ def calibration(rows: list[PaperTrade], now: datetime | None = None) -> dict:
         "muestra_insuficiente": n < MIN_CLOSED,
         "minimo_cerradas": MIN_CLOSED,
         "aviso": (
-            f"muestra insuficiente ({n} cerradas, minimo {MIN_CLOSED}): la calibracion es orientativa"
+            f"Muestra insuficiente ({n} cerradas, mínimo {MIN_CLOSED}): la calibración es orientativa"
             if n < MIN_CLOSED
             else None
         ),
