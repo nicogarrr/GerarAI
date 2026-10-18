@@ -17,9 +17,6 @@ export default async function ExportPage() {
                 <div>
                     <p className="text-sm font-semibold uppercase text-teal-300">Diario</p>
                     <h1 className="mt-1 text-3xl font-bold text-gray-100">Exportación</h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                        Descarga el journal de decisiones de inversión de un año completo en CSV o JSON, o tus tesis de cartera y watchlist en un vault de Obsidian (.zip).
-                    </p>
                 </div>
             </header>
 

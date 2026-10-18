@@ -78,7 +78,7 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
         <div>
           <p className="text-sm font-semibold uppercase text-teal-300">Recuperación de research</p>
           <h1 className="mt-1 text-3xl font-bold text-gray-100">Búsqueda universal</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">Busca evidencia de empresas, hechos, afirmaciones, secciones de tesis, decisiones, lecciones y la biblioteca de inversión en un único conjunto de resultados ordenado.</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">Evidencia de empresas, tesis, decisiones y biblioteca en un único resultado.</p>
         </div>
         <Button asChild className="h-11 w-full sm:w-auto" variant="outline"><Link href="/knowledge"><BookOpen aria-hidden="true" className="h-4 w-4" />{t('knowledge.library')}</Link></Button>
       </header>

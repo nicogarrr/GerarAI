@@ -132,7 +132,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
           <p className="text-sm font-semibold uppercase text-teal-300">Conocimiento de inversión</p>
           <h1 className="mt-1 text-3xl font-bold text-gray-100">{t('knowledge.library')}</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
-            Libros, cartas y casos de estudio separados de la evidencia de empresas, con principios aprobados por humanos y trazables.
+            Libros, cartas y casos de estudio, con principios aprobados a mano y trazables.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
@@ -203,7 +203,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
 
         <div className="rounded-xl border border-gray-800 bg-surface-1 p-5">
           <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Colecciones por defecto</h2></div>
-          <p className="mb-4 text-sm text-gray-400">Instala las colecciones base (calidad compounders, operaciones, macro) para tener dónde ingerir sin crear nada a mano.</p>
+          <p className="mb-4 text-sm text-gray-400">Instala las colecciones base (calidad compounders, operaciones, macro) para no empezar de cero.</p>
           <MutationForm action={installKnowledgeDefaults} successMessage="Colecciones por defecto listas">
             <Button className="h-11 w-full sm:w-fit" type="submit"><Library aria-hidden="true" className="h-4 w-4" />Instalar por defecto</Button>
           </MutationForm>
