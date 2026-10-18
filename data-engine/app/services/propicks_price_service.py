@@ -254,6 +254,35 @@ def compute_momentum_metrics(
     return stats
 
 
+def latest_run_passed_companies(db: Session, *, limit: int = 500) -> list[Company]:
+    """Todas las aprobadas del ultimo run completado (rank primero, luego score).
+
+    Las joyas ocultas viven fuera del top-N: el top del embudo de calidad son
+    mega-caps, y las gemas (cap 300M-10.000M) estan mas abajo del ranking. Si
+    solo se refrescan precios del top-N, ninguna aprobada pequena tiene precio
+    fresco y `find_gems` devuelve una lista vacia.
+    """
+    run = db.scalar(
+        select(ProPickRun)
+        .where(ProPickRun.status == "completed")
+        .order_by(desc(ProPickRun.id))
+        .limit(1)
+    )
+    if run is None:
+        return []
+    rows = db.execute(
+        select(Company)
+        .join(ProPickCandidate, ProPickCandidate.company_id == Company.id)
+        .where(ProPickCandidate.run_id == run.id, ProPickCandidate.passed.is_(True))
+        .order_by(
+            ProPickCandidate.rank.asc().nulls_last(),
+            ProPickCandidate.score.desc(),
+        )
+        .limit(limit)
+    ).scalars().all()
+    return list(rows)
+
+
 def latest_run_top_companies(db: Session, *, top_n: int = 40) -> list[Company]:
     """Top-N aprobadas del ultimo run completado del embudo."""
     run = db.scalar(
@@ -278,13 +307,23 @@ def refresh_propicks_prices(
     db: Session,
     *,
     top_n: int = 40,
+    max_companies: int = 500,
     period: str = "1y",
     fetcher: Callable[..., dict[str, list[PriceBar]]] = fetch_history_yfinance,
     as_of: date | None = None,
 ) -> dict[str, Any]:
-    """Job F2: precios diarios + momentum para el top-N del ultimo run."""
+    """Job F2: precios diarios + momentum del embudo.
+
+    Cobertura de precios: TODAS las aprobadas del ultimo run (hasta
+    ``max_companies``), no solo el top-N rankeado. Con cobertura solo top-N,
+    ninguna empresa pequena llegaba a tener precio fresco y la pantalla de
+    joyas salia sistematicamente vacia (top de calidad = mega-caps, fuera de
+    la banda 300M-10.000M). El momentum se calcula para toda empresa con
+    serie suficiente; ``top_n`` queda como parametro legacy aceptado por
+    compatibilidad de llamadas existentes.
+    """
     as_of = as_of or date.today()
-    companies = latest_run_top_companies(db, top_n=top_n)
+    companies = latest_run_passed_companies(db, limit=max_companies)
     if not companies:
         return {"status": "skipped", "reason": "no completed propick run", "companies": 0}
     symbols = {s: c for c in companies if (s := yahoo_symbol(c)) is not None}
