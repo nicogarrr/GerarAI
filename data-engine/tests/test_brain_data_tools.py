@@ -172,3 +172,58 @@ def test_mixed_quote_and_fcf_margin_answers_both_without_provider(db):
     assert response.llm_trace["provider_calls"] == 0
     assert len(response.sources) == 3
     assert all(source["url"] for source in response.sources)
+
+
+def _dividend(db, comp, ex, amount, pay=None, tenant=1):
+    from app.models import DividendRecord
+    db.add(DividendRecord(tenant_id=tenant, company_id=comp.id, ex_date=ex, pay_date=pay, amount=Decimal(amount), currency="USD", source="fmp"))
+
+
+def test_company_dividend_by_name_next_and_last_declared(db):
+    ko = Company(ticker="KO", name="Coca-Cola Co", currency="USD", exchange="NYSE", company_type="operating", valuation_model="unassigned")
+    db.add(ko)
+    db.flush()
+    _dividend(db, ko, date.today() + timedelta(days=20), "0.53", date.today() + timedelta(days=45))
+    _dividend(db, ko, date.today() - timedelta(days=70), "0.51")
+    db.commit()
+    db.info.pop("tenant_id", None)
+    _dividend(db, ko, date.today() + timedelta(days=20), "9.99", tenant=2)
+    db.commit()
+    db.info["tenant_id"] = 1
+    response = asyncio.run(ChatService().answer(db, "¿Qué dividendo paga Coca-Cola y cuándo es el próximo?", "portfolio", None))
+    assert "Próximo declarado" in response.answer and "0,53 USD" in response.answer
+    assert "0,51 USD" in response.answer and "9,99" not in response.answer
+    assert response.llm_trace["provider_calls"] == 0
+    assert response.sources and all(s["url"].startswith("/research/KO") for s in response.sources)
+
+
+def test_company_without_dividends_says_unavailable(db):
+    ko = Company(ticker="KO", name="Coca-Cola Co", currency="USD", exchange="NYSE", company_type="operating", valuation_model="unassigned")
+    db.add(ko)
+    db.commit()
+    response = asyncio.run(ChatService().answer(db, "¿Qué dividendo paga Coca-Cola y cuándo es el próximo?", "portfolio", None))
+    assert "No tengo dividendos guardados de KO" in response.answer
+    assert response.sources == []
+
+
+def test_portfolio_dividends_this_year_only_own_open_positions(db):
+    a = company(db, "AAA")
+    b = company(db, "BBB")
+    c = company(db, "CCC")
+    today = date.today()
+    for comp, qty in ((a, "10"), (b, "5")):
+        db.add(Position(tenant_id=1, company_id=comp.id, quantity=Decimal(qty), average_cost=Decimal("10"), currency="USD", as_of=today, market_value=Decimal("100")))
+    _dividend(db, a, date(today.year, 1, 15), "1.00")
+    _dividend(db, a, date(today.year, 7, 15), "1.50")
+    _dividend(db, c, date(today.year, 3, 1), "5.00")
+    db.commit()
+    response = asyncio.run(ChatService().answer(db, "¿Qué dividendos cobrará mi cartera este año?", "portfolio", None))
+    assert "AAA: 2 pago(s)" in response.answer and "25,00 USD" in response.answer
+    assert "Sin dividendos guardados: BBB" in response.answer
+    assert "CCC" not in response.answer
+    assert response.sources and response.llm_trace["provider_calls"] == 0
+
+
+def test_dividend_question_without_company_or_portfolio_is_not_hijacked(db):
+    from app.services.brain_data_tools import answer_data_question
+    assert answer_data_question(db, "¿Qué es un dividendo?") is None
