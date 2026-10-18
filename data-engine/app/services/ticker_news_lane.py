@@ -176,6 +176,30 @@ def _only_ticker_prefix_mention(company, title: str, summary: str) -> bool:
     )
 
 
+def _cites_company(company, title: str, summary: str) -> bool:
+    """True si titular o resumen citan a la empresa (sin contar el ticker pegado delante).
+
+    Terminos: el ticker, los alias verificados y las palabras distintivas (4+
+    letras) del nombre, en palabra completa. El feed de Yahoo por ticker trae
+    articulos «relacionados» que no tratan de la empresa (Novo Nordisk y Ken
+    Griffin bajo NVDA, Verizon bajo GOOGL); como la ingesta liga la noticia al
+    ticker del feed, sin esta comprobacion quedaban atribuidas a ella.
+    """
+    ticker = (getattr(company, "ticker", "") or "").upper()
+    if not ticker:
+        return True
+    prefix = re.compile(rf"^\s*{re.escape(ticker)}\s+")
+    rest = f"{prefix.sub('', title or '', count=1)} {prefix.sub('', summary or '', count=1)}"
+    terms = [ticker, *VERIFIED_ALIASES.get(ticker, ())]
+    terms += [
+        w for w in re.split(r"\W+", getattr(company, "name", "") or "")
+        if len(w) >= 4 and w.lower() not in _NAME_NOISE
+    ]
+    return any(
+        re.search(rf"(?<![\w]){re.escape(term)}(?![\w])", rest, flags=re.IGNORECASE) for term in terms
+    )
+
+
 def label_yahoo(result: ConnectorResult, company=None, evidence_level=None) -> ConnectorResult:
     """Fuente legible y estable: el titulo del feed es 'Yahoo! Finance: X News'."""
     result.items = [
@@ -183,6 +207,7 @@ def label_yahoo(result: ConnectorResult, company=None, evidence_level=None) -> C
         for item in result.items
         if not is_data_page_headline(item.title)
         and not is_law_firm_solicitation(item.title, item.summary)
+        and (company is None or _cites_company(company, item.title, item.summary or ""))
         and not (company is not None and _only_ticker_prefix_mention(company, item.title, item.summary or ""))
         and not (
             company is not None

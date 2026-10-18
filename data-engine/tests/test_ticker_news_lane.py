@@ -194,9 +194,9 @@ def test_yahoo_drops_competitor_only_headlines_but_keeps_company_mentions():
         _item("Analyst raises price target", "No names here."),
     ]
     out = label_yahoo(ConnectorResult(source="rss", items=items), ASTS, _ticker_evidence_level)
+    # Sin citar a la empresa (ni ticker, ni nombre, ni alias) tampoco se liga al ticker del feed.
     assert [i.title for i in out.items] == [
         "Rocket Lab vs AST SpaceMobile: which space stock wins?",
-        "Analyst raises price target",
     ]
     # Sin empresa (compatibilidad) no se filtra por competidor.
     assert len(label_yahoo(ConnectorResult(source="rss", items=list(items))).items) == 3
@@ -217,7 +217,7 @@ def test_yahoo_drops_headline_whose_only_company_mention_is_a_ticker_prefix():
     out = label_yahoo(
         ConnectorResult(source="rss", items=[fastenal, real, plain, other_ticker_news]), _Co, _ticker_evidence_level
     )
-    assert [i.title for i in out.items] == [real.title, plain.title, other_ticker_news.title]
+    assert [i.title for i in out.items] == [real.title, plain.title]
 
 
 def test_law_firm_solicitation_is_detected_but_real_news_is_not():
@@ -243,3 +243,35 @@ def test_impact_direction_whole_words_and_valuation_phrases():
     assert direction("analysts praise the execution plan") == "neutral"
     assert direction("record revenue but valuation concern grows") == "mixed"
     assert direction("beats estimates, record quarter") == "positive"
+
+
+def test_yahoo_ticker_feed_only_keeps_items_that_cite_the_company():
+    """QA: Novo Nordisk / Ken Griffin bajo NVDA y Verizon bajo GOOGL se ligaban por el ticker del feed."""
+
+    class _Nvda:
+        ticker = "NVDA"
+        name = "NVIDIA Corporation"
+
+    class _Googl:
+        ticker = "GOOGL"
+        name = "Alphabet Inc"
+
+    nvda = [
+        _item("Novo Trades at Less Than 12 Times Earnings", "Novo Nordisk valuation."),
+        _item("Ken Griffin Just Bought a Dividend King", "Citadel's latest 13F."),
+        _item("My Top Dividend Growth Stock", "Why I own it."),
+        _item("Nvidia unveils new Blackwell chip", "Nvidia said on Monday."),
+    ]
+    out = label_yahoo(ConnectorResult(source="rss", items=nvda), _Nvda, _ticker_evidence_level)
+    assert [i.title for i in out.items] == ["Nvidia unveils new Blackwell chip"]
+
+    googl = [
+        _item("Verizon launches generous customer perks", "Verizon says new perks."),
+        _item("Alphabet's Google expands cloud region", "Alphabet said."),
+        _item("YouTube adds new creator tools", "The video platform."),
+    ]
+    out = label_yahoo(ConnectorResult(source="rss", items=googl), _Googl, _ticker_evidence_level)
+    assert [i.title for i in out.items] == [
+        "Alphabet's Google expands cloud region",
+        "YouTube adds new creator tools",
+    ]
