@@ -39,8 +39,9 @@ describe('hashIp / clientIp', () => {
     assert.equal(h.length, 32);
   });
 
-  it('toma la primera IP de x-forwarded-for y cae a x-real-ip o unknown', () => {
-    assert.equal(clientIp('1.1.1.1, 2.2.2.2'), '1.1.1.1');
+  it('prefiere x-real-ip, luego la ultima IP de x-forwarded-for, o unknown', () => {
+    assert.equal(clientIp('1.1.1.1, 2.2.2.2'), '2.2.2.2');
+    assert.equal(clientIp('9.9.9.9, 2.2.2.2', '4.4.4.4'), '4.4.4.4');
     assert.equal(clientIp('', '3.3.3.3'), '3.3.3.3');
     assert.equal(clientIp(null, null), 'unknown');
   });
