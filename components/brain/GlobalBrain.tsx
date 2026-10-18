@@ -37,6 +37,43 @@ type ContextEcho = {
  * "Viendo X"); el eco que devuelve el servidor (IDs resueltos y permisos
  * aplicados allí) manda sobre la etiqueta local. Solo lectura.
  */
+/** Selector de controles que el FAB no puede tapar en reposo: lo que el
+ *  usuario podria querer pulsar justo debajo de la burbuja. */
+const FAB_INTERACTIVE_SELECTOR =
+    'a[href], button, input, select, textarea, summary, [role="button"], [role="link"], [contenteditable="true"]';
+
+/** ¿El FAB tapa un control interactivo en reposo? Se mira que hay justo
+ *  debajo de su zona (centro y esquinas interiores) con elementsFromPoint,
+ *  descartando el propio FAB y su icono. La zona se mide desde el computed
+ *  style (bottom/right resuelven env(safe-area-inset-*) a px), igual que el
+ *  chequeo de la leyenda: con el translate-y-24 del estado oculto el rect
+ *  saldria de la zona y el estado oscilaria. */
+function fabCoversInteractive(fab: HTMLElement): boolean {
+    const styles = getComputedStyle(fab);
+    const bottom = parseFloat(styles.bottom) || 0;
+    const right = parseFloat(styles.right) || 0;
+    const width = parseFloat(styles.width) || 0;
+    const height = parseFloat(styles.height) || 0;
+    if (!width || !height) return false;
+    const zoneLeft = window.innerWidth - right - width;
+    const zoneTop = window.innerHeight - bottom - height;
+    const inset = 6;
+    const points: [number, number][] = [
+        [zoneLeft + width / 2, zoneTop + height / 2],
+        [zoneLeft + inset, zoneTop + inset],
+        [zoneLeft + width - inset, zoneTop + inset],
+        [zoneLeft + inset, zoneTop + height - inset],
+        [zoneLeft + width - inset, zoneTop + height - inset],
+    ];
+    return points.some(([x, y]) =>
+        document.elementsFromPoint(x, y).some((el) => {
+            if (el === fab || fab.contains(el)) return false;
+            const control = el.closest(FAB_INTERACTIVE_SELECTOR);
+            return control !== null && control !== fab && !fab.contains(control);
+        }),
+    );
+}
+
 export function GlobalBrain({ userId }: GlobalBrainProps) {
     const pathname = usePathname();
     const page = brainPageContext(pathname);
@@ -104,12 +141,18 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
      */
     const [fabScrollHidden, setFabScrollHidden] = useState(false);
     const [fabLegendBlocked, setFabLegendBlocked] = useState(false);
+    const [fabControlsBlocked, setFabControlsBlocked] = useState(false);
     const fabRef = useRef<HTMLButtonElement>(null);
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | undefined;
         const checkLegendOverlap = () => {
             const legend = document.getElementById('portfolio-allocation-legend');
             const fab = fabRef.current;
+            // FAB-390: en reposo el FAB tampoco puede tapar CONTROLES del borde
+            // derecho en móvil (un botón o enlace bajo la burbuja no se puede
+            // pulsar). Con o sin leyenda: se oculta hasta que dejan de cruzar
+            // su zona. En md+ las clases md:* lo mantienen siempre visible.
+            setFabControlsBlocked(fab ? fabCoversInteractive(fab) : false);
             if (!legend || !fab) {
                 setFabLegendBlocked(false);
                 return;
@@ -148,7 +191,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
             if (timer !== undefined) clearTimeout(timer);
         };
     }, []);
-    const fabHidden = fabScrollHidden || fabLegendBlocked;
+    const fabHidden = fabScrollHidden || fabLegendBlocked || fabControlsBlocked;
 
     async function handleSend() {
         if (!input.trim() || loading) return;
