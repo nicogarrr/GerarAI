@@ -24,13 +24,13 @@ import asyncio
 import json
 from pathlib import Path
 
-from app.services.cnmv_mapping import resolve_issuer
 from app.services.connectors.esef import (
     EsefClient,
     EsefError,
     EsefFiling,
     normalize_xbrl_json,
 )
+from app.services.esef_issuer_mapping import resolve_ticker_for_country
 
 SOURCE = "filings.xbrl.org (XBRL International ESEF filing index), xBRL-JSON render"
 
@@ -99,20 +99,31 @@ def merge_facts(normalized_docs: list[dict]) -> dict:
     return merged
 
 
-async def build(out: Path, country: str, fetched_at: str, client: EsefClient, max_filings: int = 5) -> dict:
-    filings = await client.list_all_filings(country)
-    selected = filings_per_lei(filings, max_filings)
+async def build(out: Path, countries: str | list[str], fetched_at: str, client: EsefClient, max_filings: int = 5) -> dict:
+    """Snapshots ESEF para uno o varios paises (p.ej. ["ES", "NL"]) en un
+    unico manifest: correr paises por separado sobrescribia el manifest y
+    dejaba solo el ultimo pais. Cada pais resuelve contra SU tabla
+    reviewed (CNMV para ES, AFM/ESEF para NL)."""
+    if isinstance(countries, str):
+        countries = [countries]
+    selected: dict[str, list[EsefFiling]] = {}
+    for country in countries:
+        filings = await client.list_all_filings(country)
+        for lei, issuer_filings in filings_per_lei(filings, max_filings).items():
+            selected.setdefault(lei, []).extend(issuer_filings)
     (out / "snapshots").mkdir(parents=True, exist_ok=True)
 
     issuers: dict[str, dict] = {}
     unresolved: dict[str, str] = {}
     for lei, issuer_filings in sorted(selected.items()):
+        issuer_filings.sort(key=lambda f: f.period_end or "", reverse=True)
+        country = issuer_filings[0].country
         try:
             name = await client.get_entity_name(lei)
         except EsefError:
             name = ""
-        issuer = resolve_issuer(name) if name else None
-        if issuer is None:
+        ticker = resolve_ticker_for_country(country, name) if name else None
+        if ticker is None:
             unresolved[lei] = name or "<entity lookup failed>"
             continue
         normalized_docs = []
@@ -124,7 +135,7 @@ async def build(out: Path, country: str, fetched_at: str, client: EsefClient, ma
         periods = [f.period_end for f in issuer_filings]
         payload = {
             "lei": lei,
-            "ticker": issuer.ticker,
+            "ticker": ticker,
             "entity_name": name,
             "period_end": latest.period_end,
             "periods": periods,
@@ -136,7 +147,7 @@ async def build(out: Path, country: str, fetched_at: str, client: EsefClient, ma
         path = out / "snapshots" / f"{lei}.json"
         path.write_text(json.dumps(payload))
         issuers[lei] = {
-            "ticker": issuer.ticker,
+            "ticker": ticker,
             "entity_name": name,
             "period_end": latest.period_end,
             "periods": periods,
@@ -144,11 +155,12 @@ async def build(out: Path, country: str, fetched_at: str, client: EsefClient, ma
             "sha256": latest.sha256,
         }
         n = sum(len(u) for c in facts.values() for u in c.values())
-        print(f"{issuer.ticker} ({name}): {len(facts)} conceptos, {n} entradas, {len(periods)} filings, period {latest.period_end} -> {path}")
+        print(f"{ticker} ({name}): {len(facts)} conceptos, {n} entradas, {len(periods)} filings, period {latest.period_end} -> {path}")
 
     manifest = {
         "issuers": dict(sorted(issuers.items())),
         "unresolved": dict(sorted(unresolved.items())),
+        "countries": countries,
         "fetched_at": fetched_at,
         "source": SOURCE,
     }
@@ -160,12 +172,13 @@ async def build(out: Path, country: str, fetched_at: str, client: EsefClient, ma
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True)
-    parser.add_argument("--country", default="ES")
+    parser.add_argument("--country", action="append", default=None,
+                        help="Pais ESEF a construir (repetible; por defecto ES).")
     parser.add_argument("--fetched-at", required=True, help="Fecha de captura (provenance).")
     parser.add_argument("--max-filings", type=int, default=5,
                         help="Filings mas recientes por emisor (historia ~5 ejercicios).")
     args = parser.parse_args()
-    asyncio.run(build(Path(args.out), args.country, args.fetched_at, EsefClient(), args.max_filings))
+    asyncio.run(build(Path(args.out), args.country or ["ES"], args.fetched_at, EsefClient(), args.max_filings))
     return 0
 
 

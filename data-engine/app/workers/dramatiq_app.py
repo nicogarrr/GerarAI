@@ -1345,7 +1345,9 @@ def refresh_esef_fundamentals(
             from app.services.connectors.esef import EsefClient
 
             manifest = run_from_any_context(
-                build_esef(_Path(base), "ES", _date.today().isoformat(), EsefClient())
+                # ES + NL en un unico manifest (ASML reviewed; cada pais
+                # resuelve contra su tabla: CNMV / AFM-ESEF).
+                build_esef(_Path(base), ["ES", "NL"], _date.today().isoformat(), EsefClient())
             )
             refresh_esef_fundamentals.send(
                 tenant_id, user_id, phase="ingest", cursor=0
@@ -1358,12 +1360,12 @@ def refresh_esef_fundamentals(
                 "unresolved": len(manifest.get("unresolved", {})),
             }
 
-        from app.services.cnmv_mapping import REVIEWED_ISSUERS
+        from app.services.esef_issuer_mapping import reviewed_tickers
         from app.services.financial_ingestion_service import (
             FinancialIngestionService,
         )
 
-        tickers = sorted({issuer.ticker for issuer in REVIEWED_ISSUERS})
+        tickers = reviewed_tickers()
         chunk = tickers[cursor:cursor + ESEF_REINGEST_CHUNK]
         service = FinancialIngestionService()
         results: dict[str, str] = {}
