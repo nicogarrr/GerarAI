@@ -61,7 +61,7 @@ const sources = [
   {
     icon: Database,
     title: 'Otras fuentes públicas',
-    text: 'FRED (series macroeconómicas), CelesTrak (elementos orbitales), GDELT (noticias), CNMV (posiciones cortas en España) y FINRA (interés corto en EE. UU.).',
+    text: 'FRED (series macroeconómicas, cuando está configurada), CelesTrak (elementos orbitales), GDELT (noticias), CNMV (posiciones cortas en España) y FINRA (interés corto en EE. UU.).',
     href: '/research',
     cta: 'Ver research',
   },
@@ -151,12 +151,12 @@ const costs = [
   {
     icon: Wallet,
     title: 'Datos: 0 EUR/mes',
-    text: 'Todas las fuentes de datos listadas arriba se usan en su capa gratuita o de acceso público.',
+    text: 'Finnhub (capa gratuita con clave), Yahoo Finance (sin clave), SEC EDGAR (acceso público) y el resto de fuentes listadas arriba se usan sin cuota de pago.',
   },
   {
     icon: FlaskConical,
     title: 'Modelos LLM: por uso',
-    text: 'Los modelos se consumen a través de Groq y Gemini. El coste se registra por modelo: si no se conoce, se dice «desconocido» en lugar de poner un 0.',
+    text: 'Los modelos de lenguaje se consumen a través de los proveedores configurados (Groq y Gemini). El coste se registra por modelo: si no se conoce, se dice «desconocido» en lugar de poner un 0.',
   },
   {
     icon: BookOpen,
@@ -199,6 +199,23 @@ export default function MetodologiaPage() {
         </div>
       </header>
 
+      {/* La página es pública, pero los módulos que enlaza viven dentro de la
+          app: se dice aquí, en vez de dejar que un visitante sin cuenta
+          descubra el muro de sesión al pulsarlos. */}
+      <p className="rounded-xl border border-gray-700/50 bg-surface-overlay p-4 text-sm leading-6 text-gray-300">
+        Esta página es pública. Los botones y las fichas que enlazan (research, índices, señales de
+        insiders, Biblioteca, búsqueda de evidencia y ProPicks) forman parte del espacio de trabajo:
+        requieren una cuenta, así que al pulsarlos se te pedirá iniciar sesión.{' '}
+        <Link href="/sign-up" className="public-footer-link">
+          Crear cuenta
+        </Link>{' '}
+        o{' '}
+        <Link href="/sign-in" className="public-footer-link">
+          iniciar sesión
+        </Link>
+        .
+      </p>
+
       <section className="min-w-0">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Database className="h-5 w-5 text-teal-300" />
@@ -236,14 +253,19 @@ export default function MetodologiaPage() {
       </section>
 
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
-        <h2 className="text-lg font-semibold text-gray-100">Señal orbital de AST SpaceMobile</h2>
-        <p className="mt-2 text-sm leading-6 text-gray-400">
-          Con los elementos orbitales de CelesTrak se calcula la altura orbital de cada satélite del grupo AST y se
-          compara en una ventana de 24 a 72 horas con al menos tres épocas. Una caída de 2 km o más invita a revisar
-          fuentes: no prueba un despliegue, una maniobra ni su causa, porque la resistencia atmosférica y los
-          ajustes de los elementos también cambian el valor. Es una señal exploratoria. Si pasan 30 horas sin una
-          descarga válida, la señal y su historial se ocultan.
-        </p>
+        <h2 className="text-lg font-semibold text-gray-100">Señal orbital AST: semieje mayor</h2>
+        <p className="mt-2 text-sm leading-6 text-gray-400">Para cada objeto del grupo AST de CelesTrak calculamos el semieje mayor con
+          a = (μ / (2πn / 86.400)²)^(1/3), con μ terrestre = 398.600,4418 km³/s² y n en revoluciones al día.
+          Conservamos hasta 32 épocas distintas por ID NORAD. Comparamos solo una ventana de 24 a 72 horas
+          con al menos tres épocas separadas por dos horas. Una caída de 2 km o más invita a revisar fuentes,
+          no prueba despliegue, maniobra ni causa: la resistencia atmosférica, ajustes orbitales y revisiones
+          de elementos también pueden producir cambios. BSTAR y las derivadas del movimiento medio son
+          parámetros de ajuste, no telemetría independiente. La señal es exploratoria y no sustituye
+          una confirmación primaria. El grupo AST se consulta cada dos horas como máximo. GP (catálogo general) y SupGP (elementos
+          suplementarios AST-E) se guardan y representan en series independientes: no se comparan entre sí.
+          Una fuente puede faltar sin invalidar la otra. Nunca se consulta CelesTrak al abrir la vista;
+          después de 30 horas sin descarga válida se ocultan señal e historial caducados de cada fuente.
+          La época orbital y la fecha de descarga son distintas.</p>
       </section>
 
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
@@ -368,7 +390,7 @@ export default function MetodologiaPage() {
           Estos ocho criterios describen calidad financiera histórica, no demuestran por sí solos
           un foso competitivo. Solo se puntúan en el perfil operativo general y con datos
           suficientes. Para empresas en etapa temprana o de crecimiento, financieras y cíclicas
-          el resultado es «no evaluable con estos umbrales», no un 0/8. La evaluación del foso exige evidencia
+          el resultado es «no evaluable con estos umbrales», no un 0/8. El perfil se basa en tipo, sector y etiquetas registrados, no en el ticker ni en pérdidas de un año. La evaluación del foso exige evidencia
           verificable por separado; su ausencia no equivale a cero.
         </p>
         <ul className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
