@@ -6,15 +6,26 @@ siempre (visto en prod: AAPL "Unknown . Unknown"). El ensure ahora enriquece
 best-effort desde Finnhub; si la API no tiene datos, el stub se crea igual.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 import main
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, init_db
 from app.models import Company
 from app.services.company_enrichment_service import CompanyEnrichmentService
 
 TICKER = "ZZQAENSURE"
+
+
+@pytest.fixture(autouse=True)
+def _schema():
+    # Mismo patron que test_materiality_service / test_valuation_integrity:
+    # las tablas las crea init_db, no el orden de la suite. Con xdist cada
+    # worker es un proceso nuevo con su propia sqlite, y este fichero puede
+    # caer el primero en su worker sin que ningun TestClient haya arrancado
+    # la app (y su lifespan -> init_db) antes en ese proceso.
+    init_db()
 
 
 def _clean() -> None:
