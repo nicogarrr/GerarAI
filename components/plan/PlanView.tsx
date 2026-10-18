@@ -103,7 +103,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 maxKeys={20}
                 emptyMessage={t('plan.empty')}
                 emptyAction={<PlanSetupDialog />}
-                actions={<PlanSetupDialog triggerLabel="Editar plan" initial={initialPlan} />}
+                actions={initialPlan?.plan_exists === true ? <PlanSetupDialog triggerLabel="Editar plan" initial={initialPlan} /> : undefined}
             />
 
             <Card className="rounded-lg border border-gray-700 bg-gray-800/50">

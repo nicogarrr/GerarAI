@@ -210,7 +210,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                     <Card className="p-8 rounded-lg border border-gray-700 bg-gray-800/50 text-center">
                         <Sparkles aria-hidden="true" className="h-12 w-12 mx-auto mb-4 text-gray-500" />
                         <p className="text-gray-300 font-medium">
-                            {t('propicks.noResults')}
+                            {!lastGenerated ? 'Sin selección publicada' : passedCount === 0 ? 'Sin candidatos aptos' : t('propicks.noResults')}
                         </p>
                         <p className="text-sm text-gray-500 mt-2">
                             {!lastGenerated &&
@@ -231,7 +231,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                             ) : (
                                 <RefreshCw aria-hidden="true" className="h-4 w-4" />
                             )}
-                            {t('common.actions.retry')}
+                            Actualizar selección
                         </Button>
                     </Card>
                 ) : picks.length > 0 ? (
