@@ -22,6 +22,12 @@ test('más compradas: sin dos trimestres de 13F ofrece la misma acción de sincr
   assert.ok(page.includes('faltan dos trimestres de 13F sincronizados.'), 'la razón honesta se conserva');
 });
 
+test('hub inversores: sin ningún 13F ofrece la misma acción de sincronizar', () => {
+  const page = read('app/(root)/inversores/page.tsx');
+  assert.ok(page.includes('SyncPortfoliosButton'), 'el hub reutiliza el botón de sincronización en su estado vacío');
+  assert.ok(page.includes('.every((investor) => !investor.report_date)'), 'solo cuando NINGÚN inversor tiene 13F');
+});
+
 test('la acción de sincronización llama a la ruta async que encola el actor', () => {
   assert.ok(read('lib/actions/investors.actions.ts').includes('/api/ownership/managers/sync-async'));
   const route = read('data-engine/app/api/routes/ownership.py');

@@ -6,6 +6,7 @@ import { getInvestors } from '@/lib/actions/investors.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 
 import { InvestorAvatar } from './_components/Avatar';
+import { SyncPortfoliosButton } from './_components/SyncPortfoliosButton';
 import { periodLabel } from './_components/format';
 import { Pagination, paginate } from './_components/Pagination';
 
@@ -36,12 +37,22 @@ export default async function InvestorsPage({ searchParams }: PageProps) {
     }
 
     const paged = paginate(data.investors, pagina, PAGE_SIZE);
+    // Misma primera carga que /inversores/carteras: sin ningún 13F descargado,
+    // el hub ofrece la acción real en vez de una lista de "sin sincronizar".
+    const noneSynced = data.investors.length > 0 && data.investors.every((investor) => !investor.report_date);
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-12 overflow-x-clip py-6">
             <header className="flex flex-col gap-3">
                 <h1 className="text-3xl font-semibold text-gray-100">Inversores</h1>
             </header>
+
+            {noneSynced ? (
+                <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-8 text-center">
+                    <p className="text-gray-300">Aún no hay carteras descargadas en esta cuenta.</p>
+                    <SyncPortfoliosButton />
+                </div>
+            ) : null}
 
             <ul className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {paged.items.map((investor) => (
