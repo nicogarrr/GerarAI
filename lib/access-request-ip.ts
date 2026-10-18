@@ -12,8 +12,15 @@ export function hashIp(ip: string, salt: string): string {
     return createHash('sha256').update(`${salt}|${ip.trim()}`).digest('hex').slice(0, 32);
 }
 
-/** Primera IP de `x-forwarded-for` (la del cliente); `unknown` si no hay. */
+/**
+ * IP del cliente para el limite. El primer valor de `x-forwarded-for` lo puede
+ * fijar el propio cliente, asi que no se usa: se prefiere `x-real-ip` (la pone la
+ * plataforma) y, si falta, el ULTIMO valor de `x-forwarded-for` (el que anade el
+ * proxy mas cercano). `unknown` si no hay ninguno.
+ */
 export function clientIp(forwardedFor: string | null | undefined, realIp?: string | null): string {
-    const first = (forwardedFor ?? '').split(',')[0]?.trim();
-    return first || (realIp ?? '').trim() || 'unknown';
+    const real = (realIp ?? '').trim();
+    if (real) return real;
+    const parts = (forwardedFor ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+    return parts[parts.length - 1] || 'unknown';
 }
