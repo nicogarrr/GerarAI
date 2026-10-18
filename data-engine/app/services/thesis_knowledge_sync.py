@@ -1,6 +1,6 @@
 """La tesis PUBLICADA pasa a ser conocimiento consultable (Biblioteca/RAG).
 
-Regla de producto (Nico, 2026-10-19): aprobar una tesis la da al Cerebro
+Decision de producto: aprobar una tesis la da al Cerebro
 como conocimiento de forma automatica; rechazarla o publicar una version
 nueva retira la anterior. Solo versiones publicadas, con su version y sus
 fuentes (el memo Markdown ya las trae); reversible en ambos sentidos.
