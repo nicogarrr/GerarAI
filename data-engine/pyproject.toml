@@ -140,7 +140,7 @@ torch = { index = "pytorch-cpu" }
 py-modules = ["main"]
 
 [tool.setuptools.packages.find]
-include = ["app*", "modules*", "routers*", "quantstats*"]
+include = ["app*", "routers*", "quantstats*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

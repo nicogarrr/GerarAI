@@ -21,7 +21,6 @@
 #                  agentes en paralelo; medirlo haria el gate fragil).
 #   tests/      -> los propios tests no se auto-cubren.
 #   scripts/    -> utileria de repo (sync_requirements.py, etc.), no producto.
-#   modules/    -> compatibilidad heredada, no importada por app/.
 #   quantstats/ -> third-party vendorizado, no codigo de CavaAI.
 #   alembic/    -> SI se mide: las migraciones son esquema de producto, no
 #                  harness. Ojo con el numero: los tests lanzan `python -m
