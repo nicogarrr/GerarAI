@@ -111,7 +111,8 @@ def test_general_pregunta_por_buffett_filtra_otros_autores(db):
         question="¿Qué es el margen de seguridad según Buffett?", baseline=baseline, db=None,
     ))
     # Sin fragmento de Buffett, la atribucion es invalida: cae al degradado sin fuentes.
-    assert resp.model == "fallback"
+    assert resp.model == "deterministic"
+    assert "fragmento verificable" in resp.answer
     assert resp.sources == []
 
 

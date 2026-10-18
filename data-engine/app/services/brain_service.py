@@ -33,9 +33,9 @@ SMALL_TALK_RE = re.compile(
 )
 
 _SMALL_TALK_ANSWER = (
-    f"¡Hola! Soy el asistente de {BRAND_NAME}. Puedo responder a cualquier "
-    "tema y, ademas, tengo acceso a tu cartera, tus tesis, tu research y tus "
-    "documentos. Preguntame lo que quieras."
+    f"¡Hola! Soy el Cerebro de {BRAND_NAME}. Puedo responder a cualquier "
+    "tema y, además, tengo acceso a tu cartera, tus tesis, tu research y tus "
+    "documentos. Pregúntame lo que quieras."
 )
 
 

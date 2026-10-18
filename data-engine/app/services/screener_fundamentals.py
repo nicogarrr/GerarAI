@@ -69,13 +69,14 @@ def load_screener_ratios(
         return {}
     prices = db.scalars(
         select(MarketPrice)
-        .where(MarketPrice.company_id.in_(ids), MarketPrice.date >= today - timedelta(days=_PRICE_MAX_AGE_DAYS))
+        .where(MarketPrice.company_id.in_(ids), MarketPrice.date >= today - timedelta(days=_PRICE_MAX_AGE_DAYS), MarketPrice.date <= today)
         .order_by(MarketPrice.date.desc(), MarketPrice.id.desc())
     ).all()
     facts = db.scalars(
         select(FinancialFact)
         .where(
             FinancialFact.company_id.in_(ids),
+            FinancialFact.tenant_id == db.info.get("tenant_id"),
             FinancialFact.metric.in_(_METRICS),
             FinancialFact.fiscal_year >= today.year - _FACT_MAX_AGE_YEARS,
             FinancialFact.source_type.in_(_TRUSTED_SOURCES),

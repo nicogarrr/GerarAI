@@ -33,3 +33,19 @@ test('chatWithCompany dead code stays removed', async () => {
     const { existsSync } = await import('node:fs');
     assert.equal(existsSync(new URL('../lib/actions/chat.actions.ts', import.meta.url)), false);
 });
+
+test('Cerebro enlaza datos propios solo a rutas internas conocidas', () => {
+    for (const url of ['/portfolio', '/research/AAPL?view=financials', '/research/MSFT?view=thesis', '/research/AAPL?view=news']) {
+        assert.equal(toPortfolioChatCitations([{ type: 'market_price', id: 1, title: 'Dato', url }])[0]?.url, url);
+    }
+    for (const url of ['//evil.example', '/api/admin', '/research/AAPL?view=financials&redirect=https://evil.example']) {
+        assert.equal(toPortfolioChatCitations([{ type: 'market_price', id: 1, title: 'Dato', url }])[0]?.url, null);
+    }
+});
+
+test('panel Cerebro bloquea y restaura el scroll de fondo', async () => {
+    const { readFileSync } = await import('node:fs');
+    const ui = readFileSync('components/brain/GlobalBrain.tsx', 'utf8');
+    assert.ok(ui.includes("document.body.style.overflow = 'hidden'"));
+    assert.ok(ui.includes('document.body.style.overflow = previousOverflow'));
+});

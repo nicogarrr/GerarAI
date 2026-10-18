@@ -289,6 +289,16 @@ def _general_scope(question: str) -> str:
     return "inferred"
 
 
+def _clock_context(question: str) -> dict | None:
+    """Runtime clock, not model memory. Only attach a requested known zone."""
+    from zoneinfo import ZoneInfo
+
+    if re.search(r"(?i)\bhora\b", question) and re.search(r"(?i)\b(?:Tokio|Tokyo)\b", question):
+        return {"place": "Tokio", "timezone": "Asia/Tokyo",
+                "local_time": datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(timespec="minutes")}
+    return None
+
+
 def _general_quantity_context(text: str) -> bool:
     # Un porcentaje de bateria no es un dato financiero. Moneda junto a una
     # cantidad si lo es, incluso cuando falta un nombre de empresa.
@@ -806,6 +816,14 @@ class ChatSynthesisService:
                 source for source in doctrine_sources
                 if any(name in _author_key(source.get("author")) for name in asked_investors)
             ]
+        if asked_investors and not doctrine_sources:
+            return ChatResponse(
+                answer=("No tengo un fragmento verificable de ese autor para darte una cita literal. "
+                        "Puedes añadir su carta o documento a la biblioteca; también puedo explicar "
+                        "el concepto sin atribuírselo ni presentarlo como una cita."),
+                sources=[], model="deterministic", prompt_version="author-source-missing-v1",
+                confidence=0.9, llm_trace={"path": "author_source_missing", "provider_calls": 0},
+            )
         doctrine_sources = doctrine_sources[:3]
         # Autores con fragmento propio en contexto: solo a ellos se puede
         # atribuir una opinion en la respuesta.
@@ -844,6 +862,7 @@ class ChatSynthesisService:
                                 "no son fuentes ni datos verificados."
                             ) if history else None,
                             "scope": scope,
+                            "current_time_context": _clock_context(question),
                             "reviewed_at_utc": datetime.now(UTC).date().isoformat(),
                             "sources_available": bool(doctrine),
                             "doctrine_context": doctrine or None,

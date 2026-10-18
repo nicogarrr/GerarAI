@@ -146,6 +146,8 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     useEffect(() => {
         if (!isOpen) return;
         inputRef.current?.focus();
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
 
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key !== 'Escape') return;
@@ -153,7 +155,10 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
             setIsOpen(false);
         };
         document.addEventListener('keydown', onKeyDown);
-        return () => document.removeEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('keydown', onKeyDown);
+            document.body.style.overflow = previousOverflow;
+        };
     }, [isOpen]);
 
     /**
