@@ -12,7 +12,7 @@ from app.api.routes.alerts import (
     list_telegram_subscriptions,
     set_telegram_subscription,
 )
-from app.models import AlertDelivery, Company, NewsEvent, ResearchAlert, Tenant
+from app.models import AlertDelivery, Company, NewsEvent, Position, ResearchAlert, Tenant
 from app.models.entities import Base
 from app.services import notification_service
 from app.services.outbound_alerts import dispatch_pending, event_type, subscription_for
@@ -100,6 +100,8 @@ def test_fresh_short_interest_only_not_volume(db):
     company = Company(ticker="ACME", name="ACME", exchange="NASDAQ", company_type="compounders", valuation_model="dcf")
     db.add(company)
     db.commit()
+    db.add(Position(company_id=company.id, quantity=1))
+    db.commit()
     now = datetime.now(UTC)
     emit_shorts_increase(db, company, {}, {"short_volume_ratio": .9}, now)
     assert db.scalar(select(ResearchAlert)) is None
@@ -112,6 +114,18 @@ def test_fresh_short_interest_only_not_volume(db):
     payload["short_interest"]["settlement_date"] = (now-timedelta(days=60)).date().isoformat()
     emit_shorts_increase(db, company, {}, payload, now)
     assert len(list(db.scalars(select(ResearchAlert)))) == 1
+
+
+def test_shorts_alert_requires_tenant_interest(db):
+    company = Company(ticker="ZZZ", name="ZZZ", exchange="NASDAQ", company_type="compounders", valuation_model="dcf")
+    db.add(company)
+    db.commit()
+    now = datetime.now(UTC)
+    payload = {"short_interest": {"previous_short_interest": 100, "short_interest": 130,
+                                "settlement_date": now.date().isoformat(), "source_url": "https://www.finra.org/"}}
+    emit_shorts_increase(db, company, {}, payload, now)
+    db.commit()
+    assert db.scalar(select(ResearchAlert)) is None
 
 
 def test_bot_api_200_error_is_not_delivery(monkeypatch):
@@ -154,6 +168,8 @@ def test_no_starvation_by_old_other_type_events(db, monkeypatch):
 def test_cnmv_holder_set_changes_not_total_market(db):
     company = Company(ticker="CNMV", name="CNMV", exchange="BME", company_type="compounders", valuation_model="dcf")
     db.add(company)
+    db.commit()
+    db.add(Position(company_id=company.id, quantity=1))
     db.commit()
     now = datetime.now(UTC)
     old = {"source":"CNMV", "public_total_percent":.6, "positions":[{"holder":"A", "percent":.6, "position_date":(now-timedelta(days=1)).date().isoformat()}]}

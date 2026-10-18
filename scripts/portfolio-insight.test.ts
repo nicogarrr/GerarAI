@@ -36,7 +36,7 @@ describe('buildPortfolioInsight', () => {
     assert.deepEqual(insight, { kind: 'no-cost-basis' });
   });
 
-  it('con base de coste resume el movimiento agregado y nombra la posicion que mas se mueve', () => {
+  it('con base de coste resume el movimiento agregado y nombra la posicion con mayor variacion desde la compra', () => {
     const insight = buildPortfolioInsight({
       holdings: [
         { symbol: 'AAPL', cost: 100, gain: 10, gainPercent: 10 },

@@ -37,7 +37,7 @@ describe('Impuestos: casillas y fichero 720 sin estados intermedios', () => {
   it('el bloqueo del IRPF muestra el motivo del backend y, si falta, qué se necesita', () => {
     assert.match(
       src,
-      /typeof filing\.reason === 'string' && filing\.reason\s*\?\s*filing\.reason/,
+      /typeof filing\.reason === 'string' && filing\.reason\s*\?\s*(?:humanizeTaxText\()?filing\.reason/,
       'el reason real del backend tiene prioridad',
     );
     // El texto de reserva (cuando el backend no da reason) dice qué haría falta.

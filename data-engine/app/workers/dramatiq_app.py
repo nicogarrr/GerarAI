@@ -2191,7 +2191,7 @@ def scan_contradictions(
                         change_type=claim_change_type("contradicted"),
                         impact_direction="negative",
                         materiality_score=claim.materiality_score,
-                        summary=f"Contradictory evidence found for claim: {claim.statement[:220]}",
+                        summary=f"La evidencia automática encontró contradicciones con la afirmación: {claim.statement[:220]}",
                         affected_claim_ids=[claim.id],
                         affected_metrics=[],
                         requires_review=True,

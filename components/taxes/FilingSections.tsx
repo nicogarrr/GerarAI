@@ -7,6 +7,7 @@ import { formatUserDate } from '@/lib/format';
 import { Landmark, FileDown, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatMoney, NA } from '@/lib/format';
+import { humanizeTaxText } from '@/lib/taxes/humanize-text';
 
 /**
  * Secciones de declaración de la página Impuestos (Modelo 100 + Modelo 720).
@@ -106,7 +107,7 @@ function WarningList({ items }: { items: string[] }) {
             {items.map((item) => (
                 <li key={item} className="flex gap-2">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>{item}</span>
+                    <span>{humanizeTaxText(item)}</span>
                 </li>
             ))}
         </ul>
@@ -122,7 +123,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
     if (!filing) return (
         <Section title="Declaración (Modelo 100)" description="Ayuda de cálculo del IRPF."
             icon={<Landmark className="h-5 w-5 text-teal-400" />}>
-            <p className="text-sm text-gray-400">SIN_DATOS: genera el informe fiscal para consultar las casillas.</p>
+            <p className="text-sm text-gray-400">N/D: genera el informe fiscal para consultar las casillas.</p>
         </Section>
     );
     if (filing.available === false) {
@@ -137,7 +138,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
                     disponible»: dice qué se necesita para que se pueda calcular. */}
                 <p className="text-sm text-gray-400">
                     {typeof filing.reason === 'string' && filing.reason
-                        ? filing.reason
+                        ? humanizeTaxText(filing.reason)
                         : 'GerarAI no ha calculado las casillas del Modelo 100 para esta cartera y el motor no ha devuelto el motivo del bloqueo. Las casillas son importes en euros: hace falta que la cartera use EUR como divisa base y que el ejercicio tenga su mapeo verificado contra la orden ministerial vigente.'}
                 </p>
             </Section>
@@ -153,7 +154,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
             >
                 <p className="text-sm text-gray-400">
                     {typeof casillas.unavailable_reason === 'string' && casillas.unavailable_reason
-                        ? casillas.unavailable_reason
+                        ? humanizeTaxText(casillas.unavailable_reason)
                         : 'Las casillas solo se publican para ejercicios cuyo mapeo está verificado contra la orden ministerial de ese año. Para el resto no se muestran números: haría falta verificar ese mapeo antes de darlos por buenos.'}
                 </p>
             </Section>
@@ -162,7 +163,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
     if (filing.available !== true || casillas.available !== true) return (
         <Section title="Declaración (Modelo 100)" description="Ayuda de cálculo del IRPF."
             icon={<Landmark className="h-5 w-5 text-teal-400" />}>
-            <p className="text-sm text-gray-400">SIN_DATOS: el motor no ha confirmado el mapeo de este ejercicio.</p>
+            <p className="text-sm text-gray-400">N/D: el motor no ha confirmado el mapeo de este ejercicio.</p>
         </Section>
     );
     const acciones = (casillas.acciones_negociadas ?? {}) as DataRecord;
@@ -174,7 +175,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
         ? dividendos.special_payment_tickers as string[]
         : [];
     const warnings: string[] = [
-        ...manualReview.map((item) => `${String(item.ticker ?? '')}: ${String(item.reason ?? '')}`),
+        ...manualReview.map((item) => `${String(item.ticker ?? '')}: ${humanizeTaxText(String(item.reason ?? ''))}`),
         ...(specialTickers.length > 0
             ? [`Pagos especiales fuera de los dividendos ordinarios (revisión manual): ${specialTickers.join(', ')}`]
             : []),
@@ -215,7 +216,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
                     />
                 )}
             </div>
-            {dt.partial === true && <p className="mt-2 text-xs text-amber-300">SIN_DATOS en la deducción total: hay pagos que requieren revisión manual.</p>}
+            {dt.partial === true && <p className="mt-2 text-xs text-amber-300">N/D en la deducción total: hay pagos que requieren revisión manual.</p>}
             {typeof filing.tme_percent_manual === 'number' && <Row label="TME manual aplicado (%)" value={String(filing.tme_percent_manual)} />}
             <TmePreviewForm key={year} year={year} onPreview={onPreview} onReset={onReset} />
             <SaleCasillas key={year} rows={Array.isArray(acciones.rows) ? acciones.rows as DataRecord[] : []} />
@@ -276,9 +277,9 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
     const file720Name = `modelo720-${typeof fiscalYear === 'number' ? String(fiscalYear) : 'ejercicio'}.720`;
     const warnings: string[] = [
         ...(missingIsin.length > 0 ? [`Sin ISIN (necesario para declarar el valor): ${missingIsin.join(', ')}`] : []),
-        ...foreignUnverified.map((item) => `${String(item.ticker ?? '')}: ${String(item.reason ?? '')}`),
+        ...foreignUnverified.map((item) => `${String(item.ticker ?? '')}: ${humanizeTaxText(String(item.reason ?? ''))}`),
         ...shortPositions.map((item) => `${String(item.ticker ?? '')}: posición corta, no cuenta como bien en el 720`),
-        ...unvalued.map((item) => `${String(item.ticker ?? '')}: ${String(item.reason ?? '')}`),
+        ...unvalued.map((item) => `${String(item.ticker ?? '')}: ${humanizeTaxText(String(item.reason ?? ''))}`),
     ];
     return (
         <Section
@@ -295,14 +296,14 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                             <div className="flex flex-wrap items-center justify-between gap-2">
                                 <span className="text-gray-400">{CATEGORY_LABELS[key]}</span>
                                 <span className="flex items-center gap-3">
-                                    <span className="text-gray-200">{money(category.total_base)}</span>
+                                    <span className="text-gray-200">{(category.status === 'desconocido' || category.status === 'no_evaluable') && !Number(category.total_base) ? NA : money(category.total_base)}</span>
                                     <Chip status={String(category.status ?? 'desconocido')} />
                                 </span>
                             </div>
                             {Array.isArray(category.reasons) && (category.reasons as string[]).length > 0 && (
                                 <ul className="mt-1 space-y-0.5 text-xs leading-5 text-gray-500">
                                     {(category.reasons as string[]).map((reason) => (
-                                        <li key={reason}>{reason}</li>
+                                        <li key={reason}>{humanizeTaxText(reason)}</li>
                                     ))}
                                 </ul>
                             )}
@@ -346,7 +347,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                                     <p className="text-xs font-semibold uppercase text-gray-500">Lo que hay que revisar antes de usarlo</p>
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-gray-400">
                                         {(file720.notas as string[]).map((nota, i) => (
-                                            <li key={`nota-${i}`}>{nota}</li>
+                                            <li key={`nota-${i}`}>{humanizeTaxText(nota)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -357,7 +358,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-amber-200/80">
                                         {(file720.excluded as DataRecord[]).map((item, i) => (
                                             <li key={`${String(item.ticker ?? 'item')}-${i}`}>
-                                                {String(item.ticker ?? '')}: {String(item.reason ?? '')}
+                                                {String(item.ticker ?? '')}: {humanizeTaxText(String(item.reason ?? ''))}
                                             </li>
                                         ))}
                                     </ul>
@@ -369,7 +370,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-amber-200/80">
                                         {(file720.manual_review as DataRecord[]).map((item, i) => (
                                             <li key={`${String(item.ticker ?? 'item')}-${i}`}>
-                                                {String(item.ticker ?? '')}: {String(item.reason ?? '')}
+                                                {String(item.ticker ?? '')}: {humanizeTaxText(String(item.reason ?? ''))}
                                             </li>
                                         ))}
                                     </ul>
@@ -379,7 +380,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                     ) : (
                         <p className="text-sm text-gray-400">
                             {typeof file720.reason === 'string' && file720.reason
-                                ? file720.reason
+                                ? humanizeTaxText(file720.reason)
                                 : 'El generador no ha producido fichero y no ha devuelto el motivo del bloqueo; revisa los registros excluidos y la revisión manual de arriba para saber qué falta.'}
                         </p>
                     )}

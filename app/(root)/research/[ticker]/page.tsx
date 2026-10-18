@@ -1,3 +1,4 @@
+import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import { healthText, listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
 import { factDisplayAudit } from '@/lib/research/fact-display-audit';
@@ -163,6 +164,7 @@ const STATUS_LABELS: Record<string, string> = {
   positive: 'positivo',
   negative: 'negativo',
   neutral: 'neutral',
+  mixed: 'mixto',
   up: 'al alza',
   down: 'a la baja',
   operating_company: 'empresa operativa',
@@ -939,7 +941,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                       Materialidad {change.materiality_score} · {formatDate(change.created_at)}
                     </span>
                   </div>
-                  <p className="break-words leading-6 [overflow-wrap:anywhere]">{change.summary}</p>
+                  <p className="break-words leading-6 [overflow-wrap:anywhere]">{changeSummaryText(change.summary)}</p>
                 </li>
               ))}
             </ul>
@@ -1118,7 +1120,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 directionLabel={label(change.impact_direction)}
                 key={change.id}
                 ticker={ticker}
-                typeLabel={label(change.change_type)}
+                typeLabel={changeTypeLabel(change.change_type)}
               />
             )) : (
               <EmptyState

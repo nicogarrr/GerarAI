@@ -34,6 +34,7 @@ from app.schemas import (
 )
 from app.services.company_resolver import resolve_company
 from app.services.review_alert_service import ReviewAlertService
+from app.services.review_copy import claim_status_label
 from app.services.source_hierarchy_service import classify_source
 from app.services.thesis_change_types import claim_change_type
 
@@ -202,8 +203,8 @@ def add_claim_evidence(
             ),
             materiality_score=claim.materiality_score,
             summary=(
-                f"Evidence classified claim as {relation_status}: "
-                f"{claim.statement[:220]}"
+                f"La evidencia clasificó la afirmación como "
+                f"{claim_status_label(relation_status)}: {claim.statement[:220]}"
             ),
             affected_claim_ids=[claim.id],
             affected_metrics=[],
