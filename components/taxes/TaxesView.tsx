@@ -15,7 +15,7 @@ import { getTaxHoldings, getTaxReport, regenerateTaxReport } from '@/lib/actions
 import { FilingSection, Modelo720Section } from '@/components/taxes/FilingSections';
 import { recordDetailKey } from '@/components/taxes/record-detail-key';
 import { reportForYear, type ReportOverride } from '@/lib/taxes/report-state';
-import { formatUserDateTime, formatMoney, NA, USER_TZ } from '@/lib/format';
+import { formatUserDateTime, formatMoney, formatNumber, NA, USER_TZ } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { showErrorToast } from '@/lib/toast';
 import { toast } from 'sonner';
@@ -72,6 +72,9 @@ const TAX_LABELS: Record<string, string> = {
     generated_at: 'Generado',
     unattributed_tickers: 'Tickers sin atribuir',
     unattributed_dividends_base: 'Dividendos sin atribuir',
+    inconsistent_cash_rows: 'Filas de caja inconsistentes',
+    ambiguous_cash: 'Tickers con caja ambigua',
+    manual_review: 'Revisión manual',
 };
 
 /** Valores conocidos del método de valoración (el backend manda el id en
@@ -105,6 +108,23 @@ function humanizeUnattributedTicker(item: string): string {
     return `Sin atribuir: ${match[1]}`;
 }
 
+/** Filas de caja inconsistentes del resumen: el importe es un CANDIDATO
+ *  (price x quantity no canónica), nunca un pago medido; se lista legible
+ *  para su revisión manual en vez de volcarse como objeto crudo. */
+function formatInconsistentCashRows(value: unknown): string {
+    if (!Array.isArray(value) || value.length === 0) return 'Ninguna';
+    return (value as DataRecord[]).map((row) => {
+        const ticker = typeof row.ticker === 'string' && row.ticker ? row.ticker : NA;
+        const date = typeof row.date === 'string' && row.date ? row.date : NA;
+        const action = typeof row.action === 'string' && row.action ? row.action : NA;
+        const currency = typeof row.currency === 'string' && /^[A-Za-z]{3}$/.test(row.currency) ? row.currency.toUpperCase() : 'EUR';
+        const amount = row.amount === null || row.amount === undefined
+            ? NA
+            : `${formatMoney(row.amount as number | string, currency)} (candidato)`;
+        return `${ticker} · ${date} · ${action} · ${amount}`;
+    }).join(' | ');
+}
+
 /** Convierte el resumen fiscal a filas etiquetadas en español con valores
  *  formateados (importes con divisa, listas de tickers, fechas). Nunca
  *  inventa: los null quedan como `NA` («N/D») y las claves raras se
@@ -121,7 +141,7 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
         'net_taxable_base',
         'unattributed_dividends_base',
     ]);
-    const listKeys = new Set(['wash_sale_window_open', 'over_sell', 'missing_fx', 'unattributed_tickers']);
+    const listKeys = new Set(['wash_sale_window_open', 'over_sell', 'missing_fx', 'unattributed_tickers', 'ambiguous_cash']);
     // La causa del null importa: con FX presente pero una fila de caja
     // ambigua sin resolver, decir "faltan tipos de cambio" miente. Se
     // declaran ambas causas si coexisten.
@@ -144,6 +164,8 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
             display[label] = Array.isArray(value) && value.length > 0
                 ? value.map((item) => humanizeUnattributedTicker(String(item))).join(', ')
                 : 'Ninguno';
+        } else if (key === 'inconsistent_cash_rows') {
+            display[label] = formatInconsistentCashRows(value);
         } else if (key === 'wash_sale_rule') {
             display[label] = WASH_RULE_LABELS[String(value)] ?? String(value);
         } else if (key === 'wash_sale_basis') {
@@ -321,12 +343,15 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                     currency: 'Divisa',
                 }}
                 emptyMessage="Aún no hay posiciones con datos fiscales. Cuando compres valores aparecerán aquí."
-                formatColumns={Object.fromEntries(
-                    TAX_HOLDING_MONEY_COLUMNS.map((column) => [
+                formatColumns={Object.fromEntries([
+                    // Cantidades fraccionadas (IBKR) con separadores es-ES:
+                    // «6.0572» crudo -> «6,0572». Hasta 6 decimales reales.
+                    ['quantity', (value: unknown) => formatNumber(value as number | string, { maximumFractionDigits: 6 })],
+                    ...TAX_HOLDING_MONEY_COLUMNS.map((column) => [
                         column,
                         (value: unknown, record: DataRecord) => formatHoldingCell(column, value, record),
                     ]),
-                )}
+                ])}
                 linkColumns={{ ticker: (record) => researchHrefFor(record) }}
                 footer={
                     <Button
