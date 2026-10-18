@@ -232,12 +232,13 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         if (!input.trim() || loading) return;
 
         const userMsg = input.trim();
+        const history = messages.map(({ role, content }) => ({ role, content }));
         setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
         setInput('');
         setLoading(true);
 
         try {
-            const result = await chatWithPortfolio(userMsg, userId, page);
+            const result = await chatWithPortfolio(userMsg, userId, page, history);
             if (result.context) setEcho(result.context);
             if (result.success) {
                 setMessages(prev => [...prev, { role: 'assistant', content: result.message, citations: result.citations }]);

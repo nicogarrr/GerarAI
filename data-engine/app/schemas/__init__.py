@@ -3,6 +3,7 @@ from app.schemas.api import (
     CalculatedMetricOut,
     CalculatedMetricsResponse,
     ChatPageContext,
+    ChatTurn,
     ChatRequest,
     ChatResponse,
     ClaimCreate,
@@ -58,6 +59,7 @@ from app.schemas.api import (
 
 __all__ = [
     "ChatPageContext",
+    "ChatTurn",
     "ChatRequest",
     "ChatResponse",
     "CalculatedMetricOut",

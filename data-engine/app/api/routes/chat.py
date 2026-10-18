@@ -24,6 +24,7 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
                 payload.ticker,
                 enable_debate=payload.enable_debate,
                 page=payload.page,
+                history=payload.history,
             )
         )
     )

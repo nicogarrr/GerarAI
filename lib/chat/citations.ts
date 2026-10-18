@@ -98,13 +98,15 @@ const CITATION_KIND_LABELS: Record<string, string> = {
     rag_chunk: 'Documento',
     memory_item: 'Nota guardada',
     portfolio: 'Cartera',
+    position: 'Posición',
+    knowledge_chunk: 'Biblioteca',
 };
 
 /**
  * Etiqueta legible del tipo de fuente. El localizador interno
  * (`financial_fact:123`) es un ID técnico y no se muestra al usuario.
  */
-export function citationKindLabel(locator: string): string {
+export function citationKindLabel(locator: string): string | null {
     const kind = locator.split(':', 1)[0] ?? '';
-    return CITATION_KIND_LABELS[kind] ?? 'Fuente';
+    return CITATION_KIND_LABELS[kind] ?? null;
 }

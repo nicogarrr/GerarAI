@@ -35,7 +35,22 @@ type ResearchChatResponse = {
  * y se resuelve en servidor; la respuesta lo devuelve ya resuelto para la
  * pastilla. Las rutas degradadas hablan castellano.
  */
-export async function chatWithPortfolio(query: string, userId: string, page?: BrainPageContext | null) {
+export type BrainHistoryTurn = { role: 'user' | 'assistant'; content: string };
+
+/** Últimos turnos que viajan con la pregunta: acotados, solo texto. */
+function trimBrainHistory(history?: BrainHistoryTurn[] | null): BrainHistoryTurn[] {
+    return (history ?? [])
+        .filter((turn) => (turn.role === 'user' || turn.role === 'assistant') && turn.content.trim())
+        .slice(-6)
+        .map((turn) => ({ role: turn.role, content: turn.content.slice(0, 1500) }));
+}
+
+export async function chatWithPortfolio(
+    query: string,
+    userId: string,
+    page?: BrainPageContext | null,
+    history?: BrainHistoryTurn[] | null,
+) {
     const user = await requireAuthenticatedUser();
     if (userId !== user.id) {
         throw new AuthorizationError('Cannot access another user portfolio');
@@ -48,7 +63,7 @@ export async function chatWithPortfolio(query: string, userId: string, page?: Br
     try {
         response = await researchRequest<ResearchChatResponse>('/api/chat', {
             method: 'POST',
-            body: jsonBody({ question, scope: 'portfolio', ticker: null, page: page ?? null }),
+            body: jsonBody({ question, scope: 'portfolio', ticker: null, page: page ?? null, history: trimBrainHistory(history) }),
         });
     } catch (error) {
         // Return known transport errors as data: Next hides server exception

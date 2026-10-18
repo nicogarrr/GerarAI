@@ -27,7 +27,7 @@ def test_chat_service_call_off_the_event_loop(monkeypatch):
     init_db()
     calls: list[bool] = []
 
-    def fake_answer(self, db, question, scope, ticker, enable_debate=False, page=None):  # noqa: ARG001
+    def fake_answer(self, db, question, scope, ticker, enable_debate=False, page=None, history=None):  # noqa: ARG001
         calls.append(_off_loop())
 
         async def _result():
