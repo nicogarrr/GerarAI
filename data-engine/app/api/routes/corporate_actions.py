@@ -8,12 +8,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
-from app.models import Company, DividendRecord, Position
+from app.models import Company, CorporateAction, DividendRecord, Position
 from app.services.async_bridge import run_from_any_context
 from app.services.corporate_actions_service import CorporateActionService
 from app.services.split_ingestion_service import SplitIngestionService
@@ -106,6 +106,24 @@ async def sync_portfolio_splits(db: Session = Depends(get_db)) -> dict:
     return await run_in_threadpool(
         lambda: run_from_any_context(SplitIngestionService().sync_portfolio(db))
     )
+
+
+@router.get("/sync-status")
+def sync_status(db: Session = Depends(get_db)) -> dict:
+    """Última importación REAL de datos por fuente (None = nunca importó nada).
+
+    Es la fecha del último registro importado del proveedor (fetched_at): una
+    sincronización que no trajo filas nuevas no deja huella, así que no se
+    presenta como "última comprobación".
+    """
+    dividends = db.scalar(select(func.max(DividendRecord.fetched_at)))
+    splits = db.scalar(
+        select(func.max(CorporateAction.fetched_at)).where(CorporateAction.fetched_at.is_not(None))
+    )
+    return {
+        "dividends_last_import": dividends.isoformat() if dividends else None,
+        "splits_last_import": splits.isoformat() if splits else None,
+    }
 
 
 @router.get("")

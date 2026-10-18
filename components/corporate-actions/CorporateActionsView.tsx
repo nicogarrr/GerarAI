@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 interface CorporateActionsViewProps {
     initialActions: DataRecord[];
+    emptyMessage?: string;
 }
 
 /** Etiquetas visibles de esas columnas. Sin este mapa el usuario leía
@@ -50,7 +51,7 @@ function isApplied(record: DataRecord): boolean {
     return typeof record.applied_at === 'string' && record.applied_at !== '';
 }
 
-export default function CorporateActionsView({ initialActions }: CorporateActionsViewProps) {
+export default function CorporateActionsView({ initialActions, emptyMessage }: CorporateActionsViewProps) {
     const [applyingId, setApplyingId] = useState<number | null>(null);
 
     const handleApply = async (record: DataRecord, replace: ReplaceRecord) => {
@@ -94,7 +95,7 @@ export default function CorporateActionsView({ initialActions }: CorporateAction
                         : String(value ?? '—'),
                 ratio: (value) => formatNumber(value as number | string | null, { maximumFractionDigits: 4 }),
             }}
-            emptyMessage="No hay acciones corporativas pendientes. ¡Todo al día!"
+            emptyMessage={emptyMessage ?? 'Sin eventos pendientes.'}
             linkColumns={{ ticker: (record) => researchHrefFor(record) }}
             rowActions={(record, _index, replace) => {
                 const actionId = recordActionId(record);

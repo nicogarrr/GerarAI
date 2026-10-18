@@ -21,3 +21,17 @@ export async function applyCorporateAction(actionId: number): Promise<CorporateA
         method: 'POST',
     });
 }
+export type CorporateActionsSyncStatus = {
+    dividends_last_import: string | null;
+    splits_last_import: string | null;
+};
+
+/** GET /api/corporate-actions/sync-status — última importación real por fuente. */
+export async function getCorporateActionsSyncStatus(): Promise<CorporateActionsSyncStatus | null> {
+    await requireAuthenticatedUser();
+    try {
+        return await researchRequest<CorporateActionsSyncStatus>('/api/corporate-actions/sync-status');
+    } catch {
+        return null;
+    }
+}
