@@ -29,7 +29,7 @@ export default async function OverlapPage({ searchParams }: { searchParams: Prom
     {data.message && <p className="text-sm text-gray-400">{data.message}</p>}
     <ul className="flex flex-col gap-3">
       {paged.items.map(position => <li key={position.ticker} className="rounded-xl border border-gray-800 p-4">
-        <Link href={`/stocks/${encodeURIComponent(position.ticker)}`} className="font-medium text-lime-300">{position.ticker} · {position.name}</Link>
+        <Link href={`/research/${encodeURIComponent(position.ticker)}`} className="font-medium text-lime-300">{position.ticker} · {position.name}</Link>
         <p className="mt-1 text-xs text-gray-500">{position.identity_source ?? 'Sin CUSIP verificado: no se puede cruzar.'}</p>
         {position.status === 'sin_coincidencias' && <p className="mt-2 text-sm text-gray-400">Sin coincidencias en los informes disponibles.</p>}
         <ul className="mt-2 flex flex-col gap-2">
