@@ -96,6 +96,12 @@ describe('página /temas', () => {
     assert.ok(page.includes("data.intraday ? 'intradía' : 'cierre'"));
   });
 
+  it('QA 19: sin as_of el pie lo declara, no pinta «del —»', () => {
+    assert.ok(page.includes('sin fecha de datos disponible'));
+    assert.ok(page.includes('data.as_of'));
+    assert.ok(!page.includes('del {formatMarketDate(data.as_of)}'));
+  });
+
   it('el backend caído muestra el estado desconectado, no un ranking vacío', () => {
     assert.ok(page.includes('isBackendUnavailableError') && page.includes('<BackendOffline'));
     const action = source('lib/actions/market-themes.actions.ts');
