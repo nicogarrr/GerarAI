@@ -4,7 +4,7 @@ export type InvestorVideo = {
     published_at: string;
     channel_name: string;
     channel_url: string;
-    channel_kind: 'personal_confirmed' | 'archive';
+    channel_kind: 'personal_confirmed' | 'firm_confirmed' | 'archive';
 };
 
 export function isYouTubeVideoId(value: unknown): value is string {
@@ -50,7 +50,7 @@ export function validInvestorVideos(value: unknown): InvestorVideo[] {
         if (!isYouTubeVideoId(row.video_id) || seen.has(row.video_id)
             || typeof row.title !== 'string' || !row.title.trim()
             || typeof row.channel_name !== 'string' || !row.channel_name.trim()
-            || !['personal_confirmed', 'archive'].includes(String(row.channel_kind))
+            || !['personal_confirmed', 'firm_confirmed', 'archive'].includes(String(row.channel_kind))
             || !isYouTubeChannelUrl(row.channel_url)
             || !isVideoTimestamp(row.published_at)) return false;
         seen.add(row.video_id);
