@@ -5237,7 +5237,7 @@ export interface components {
             limit: number;
             /**
              * Note
-             * @default Candidatos INFERIDOS por un modelo a partir de evidencias almacenadas; son hipotesis, no hechos ni recomendaciones. Las URLs proceden de la fuente guardada, nunca del modelo
+             * @default Candidatos INFERIDOS por un modelo a partir de evidencias almacenadas; son hipótesis, no hechos ni recomendaciones. Las URLs proceden de la fuente guardada, nunca del modelo
              */
             note: string;
             /** Offset */
