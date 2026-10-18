@@ -138,6 +138,7 @@ def test_general_geography_uses_model_with_company_page_context(db, monkeypatch)
 
 def test_general_clock_calls_model_with_real_clock_not_a_refusal():
     import json
+
     from app.llm import LLMResponse, Message, Usage
     from app.schemas import ChatResponse
     from app.services.chat_synthesis_service import ChatSynthesisService
