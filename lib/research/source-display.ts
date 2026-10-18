@@ -1,7 +1,7 @@
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
 import { METRIC_LABELS } from './metric-labels.ts';
 
-const SOURCE_LABELS: Record<string, string> = {
+export const SOURCE_LABELS: Record<string, string> = {
   primary_official: 'Fuente oficial primaria',
   yahoo_finance_intraday: 'Yahoo Finance · intradía',
   yahoo_finance: 'Yahoo Finance',
@@ -17,17 +17,4 @@ const SOURCE_LABELS: Record<string, string> = {
 /** Solo cambia la presentación; nunca modifica claves ni cifras de la fuente. */
 export function sourceDisplay(value: string): string {
   return SOURCE_LABELS[value] ?? value.replaceAll('_', ' ');
-}
-
-const AUDIT_FIXES: Record<string, string> = {
-  'No calculation trace -> no valuation.': 'Falta el desglose del cálculo de valoración.',
-  'Add source_id to every material claim.': 'Falta citar la fuente de algunas afirmaciones relevantes.',
-  'Resolve data conflicts before saving final thesis.': 'Hay datos contradictorios pendientes de resolver.',
-  'SEC/FMP reconciliation missing for reported financial facts.': 'Falta contrastar los datos financieros de SEC y FMP.',
-};
-
-export function auditFixDisplay(value: string): string {
-  if (AUDIT_FIXES[value]) return AUDIT_FIXES[value];
-  return value.replace(/\b[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b/g,
-    (token) => METRIC_LABELS[token] ?? SOURCE_LABELS[token] ?? token.replaceAll('_', ' '));
 }
