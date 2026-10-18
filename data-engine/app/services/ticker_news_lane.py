@@ -65,7 +65,8 @@ STRICT_NAME_PATTERNS: dict[str, tuple[str, ...]] = {
 _STRICT_CONTEXT = {
     "AENA": re.compile(
         r"aeropuert|aeroportuari|pasajeros|tarifas|barajas|el\s+prat|enaire|ferrovial|"
-        r"\bBME\b|\bIBEX\b|\bCNMC\b|aerol(?:í|i)neas|\bvuelos\b",
+        r"\bBME\b|\bIBEX\b|\bCNMC\b|aerol(?:í|i)neas|\bvuelos\b|"
+        r"beneficio|resultados|dividendo|facturaci(?:ó|o)n|ingresos",
         flags=re.IGNORECASE,
     ),
 }

@@ -273,6 +273,8 @@ def test_aena_requires_full_name_not_the_bare_word():
     assert not fails_strict_name(aena, "Los aeropuertos de Aena baten récord")
     # «Aena» suelto con contexto del sector: noticia legitima.
     assert not fails_strict_name(aena, "AENA Aena sube tarifas")
+    assert not fails_strict_name(aena, "AENA Aena dispara su beneficio un 15%")
+    assert not fails_strict_name(aena, "Aena eleva el dividendo tras los resultados")
     assert not fails_strict_name(aena, "AENA Aena prevé más pasajeros en Barajas")
     # Solo la sigla pegada delante (etiqueta) con contexto no basta.
     assert fails_strict_name(aena, "AENA Rio de Janeiro airport tarifas")
