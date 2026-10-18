@@ -419,6 +419,7 @@ def run_thesis_job(run_id: int) -> None:
                     raise ValueError("No se pudo resolver la empresa para SEC")
                 financial_refresh = run_from_any_context(refresh_free_financials(db, company))
                 kwargs["stored_evidence_only"] = True
+                kwargs["refresh_receipt"] = financial_refresh
             thesis = ThesisService().generate(
                 db,
                 payload["ticker"],

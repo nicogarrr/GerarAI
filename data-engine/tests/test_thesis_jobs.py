@@ -564,7 +564,8 @@ def test_tracked_worker_refreshes_sec_before_stored_only_generation(monkeypatch)
     monkeypatch.setitem(sys.modules, "app.services.tracked_financial_refresh", SimpleNamespace(refresh_free_financials=refresh))
     def generate(self, db, ticker, force_new_version=False, phase_callback=None, **kwargs):
         calls.append("thesis")
-        assert kwargs == {"stored_evidence_only": True}
+        assert kwargs["stored_evidence_only"] is True
+        assert kwargs["refresh_receipt"]["status"] == "ok"
         return _fake_generate()(self, db, ticker, force_new_version, phase_callback)
     monkeypatch.setattr(ThesisService, "generate", generate)
     run, _ = _enqueue_without_dispatch(monkeypatch)
