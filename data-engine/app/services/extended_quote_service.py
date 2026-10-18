@@ -259,8 +259,17 @@ def parse_extended_chart(ticker: str, node: dict[str, Any], now: int, daily_node
             # Closed daily bar can include the real closing auction beyond the
             # last regular minute. Require dated post-end regular metadata and
             # matching daily raw close. Never promote an old intraday meta price.
-            if (today and now >= bounds["regular"][1] and daily_time is not None
-                    and bounds["regular"][1] <= daily_time <= now
+            # El fin de sesion se mide contra la ULTIMA sesion completada
+            # (bounds o historico), no contra los bounds: en fin de semana o
+            # antes de la apertura los bounds ya son la PROXIMA sesion, asi
+            # que `now >= bounds end` no se cumpliria nunca y quedaba como
+            # falso cierre el ultimo tick intradia (ASML 17:29, pre-subasta:
+            # 1.473,40 frente al cierre oficial de subasta 1.477,20).
+            completed_ends = [end for _, end in regular_intervals if end <= now]
+            session_end = max(completed_ends) if completed_ends else None
+            if (today and session != "regular" and session_end is not None
+                    and daily_time is not None
+                    and session_end <= daily_time <= now
                     and datetime.fromtimestamp(daily_time, tz).date() == session_date):
                 _, day, close = max(today, key=lambda row: row[0])
                 if close is not None and daily_price is not None and math.isclose(close, daily_price, rel_tol=1e-6, abs_tol=1e-5):

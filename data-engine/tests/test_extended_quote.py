@@ -390,6 +390,54 @@ def test_bme_weekend_previous_close_dated_against_displayed_session():
     assert q.regular_close == 12.034 and q.regular_close_date == "2026-10-16"
 
 
+def test_weekend_auction_close_overrides_pre_auction_last_tick():
+    """Caso ASML prod (18 oct 2026): con bounds ya en lunes, la cabecera
+    mostraba «Cierre regular 1.473,40 16 oct 17:29» (ultimo tick intradia,
+    pre-subasta) mientras tecnica/watchlist mostraban el cierre oficial
+    1.477,20. La vela diaria con print de subasta datado tras la campanada
+    gana tambien en fin de semana; el tick de las 17:29 nunca es el cierre."""
+    from datetime import datetime
+
+    def ts(y, m, d, hh, mm, ss=0):
+        return int(datetime(y, m, d, hh, mm, ss, tzinfo=UTC).timestamp())
+
+    fri_start, fri_end = ts(2026, 10, 16, 7, 0), ts(2026, 10, 16, 15, 30)
+    mon_start, mon_end = ts(2026, 10, 19, 7, 0), ts(2026, 10, 19, 15, 30)
+    minutes = list(range(fri_start, fri_end, 60))
+    closes = [1469.0] * len(minutes)
+    closes[-1] = 1473.4  # ultimo tick 17:29 CEST, ANTES de la subasta
+    minute = {
+        "meta": {
+            "symbol": "ASML.AS", "currency": "EUR",
+            "exchangeTimezoneName": "Europe/Amsterdam",
+            "previousClose": 1464.2,
+            "regularMarketPrice": 1473.4,
+            "regularMarketTime": ts(2026, 10, 16, 15, 29),
+            "currentTradingPeriod": {
+                "pre": {"start": mon_start, "end": mon_start},
+                "regular": {"start": mon_start, "end": mon_end},
+                "post": {"start": mon_end, "end": mon_end},
+            },
+            "tradingPeriods": {"regular": [[{"start": fri_start, "end": fri_end}]]},
+        },
+        "timestamp": minutes,
+        "indicators": {"quote": [{"close": closes, "open": closes, "high": closes, "low": closes}]},
+    }
+    daily = {
+        "meta": {"symbol": "ASML.AS", "currency": "EUR",
+                 "exchangeTimezoneName": "Europe/Amsterdam", "dataGranularity": "1d",
+                 "regularMarketTime": ts(2026, 10, 16, 15, 37, 55),
+                 "regularMarketPrice": 1477.2},
+        "timestamp": [ts(2026, 10, 15, 12, 0), ts(2026, 10, 16, 12, 0)],
+        "indicators": {"quote": [{"close": [1464.2, 1477.2]}]},
+    }
+    sunday_now = ts(2026, 10, 18, 12, 0)
+    q = parse_extended_chart("ASML.AS", minute, sunday_now, daily)
+    assert q.regular_close == 1477.2
+    assert q.regular_close_date == "2026-10-16"
+    assert q.regular_close_timestamp is None  # fecha conocida, segundo exacto no
+
+
 def test_daily_listing_guard_accepts_normalized_share_class():
     """BRK.B pedido al backend se convierte a BRK-B en Yahoo: la guarda de
     mismo-listado compara contra el simbolo normalizado, no el literal."""
