@@ -1104,7 +1104,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         <div className="flex flex-wrap items-center gap-3">
           <ThesisGenerateButton ticker={ticker} />
           <ThesisApproveButton ticker={ticker} disabled={data.history.length === 0} />
-          <ThesisExportMenu ticker={ticker} />
+          <ThesisExportMenu
+            hasPublished={data.historyDetail.history.some((entry) => entry.status === 'published')}
+            latestDraftVersion={data.historyDetail.history.filter((entry) => entry.status !== 'published').map((entry) => entry.version).reduce((a, b) => Math.max(a, b), 0) || null}
+            ticker={ticker}
+          />
           <Badge variant="outline">{data.history.length} versiones</Badge>
           <Badge variant="outline">{data.claims.length} afirmaciones</Badge>
         </div>
@@ -1507,7 +1511,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             </Link>
           ))}
         </nav>
-        <nav aria-label={`Módulos de ${activeGroupLabel}`} className="-mx-4 mb-7 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] sm:mx-0 sm:px-0">
+        <nav aria-label={`Módulos de ${activeGroupLabel}`} className="-mx-4 mb-7 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] sm:mx-0 sm:flex-wrap sm:overflow-x-visible sm:px-0 sm:pb-0">
           {groupModules.map((module) => (
             <Link
               aria-current={activeView === module.key ? 'page' : undefined}

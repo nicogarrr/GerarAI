@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowLeft, FileDown, FileText } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
-import { EmptyState } from '@/components/ui/empty-state';
+import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { formatGeneratedDate, formatPercent } from '@/lib/format';
 import {
   getResearchCompanySnapshot,
@@ -17,6 +17,21 @@ import { publicEditorial } from '@/lib/public-fonts';
 export const dynamic = 'force-dynamic';
 
 type PageProps = { params: Promise<{ ticker: string }> };
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'borrador',
+  review: 'en revisión',
+  approved: 'aprobada',
+  published: 'publicada',
+  rejected: 'rechazada',
+  stale: 'desactualizada',
+  superseded: 'sustituida',
+};
+
+function statusLabel(status: string | null | undefined): string {
+  if (!status) return 'desconocido';
+  return STATUS_LABELS[status] ?? 'desconocido';
+}
 
 const RATING_LABELS: Record<string, string> = {
   buy: 'compra', accumulate: 'acumular', overweight: 'sobreponderar',
@@ -66,6 +81,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
           >
             <ArrowLeft className="mr-2 h-4 w-4" />Ficha de {ticker}
           </Link>
+          {published ? (
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <PrintButton />
             <a
@@ -83,13 +99,15 @@ export default async function ThesisReadingPage({ params }: PageProps) {
               <FileText className="h-4 w-4" />Markdown
             </a>
           </div>
+          ) : null}
         </div>
 
         {!published ? (
           <div className="mt-10">
             <EmptyState
+              action={latest ? <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink> : undefined}
+              description={latest ? `La v${latest.version} está en estado «${statusLabel(latest.status)}»: solo se enseñan las cifras y el margen de una versión publicada.` : undefined}
               title={`Aún no hay ninguna tesis publicada de ${ticker}.`}
-              description={latest ? `La v${latest.version} está en estado «${latest.status}»: un borrador no enseña cifras ni margen hasta que se aprueba.` : undefined}
             />
           </div>
         ) : (
