@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getMarketIndicesResult } from '@/lib/actions/market.actions';
 import { getSavedScreenerEngines, getScreenerStocksReal } from '@/lib/actions/screener.actions';
-import { formatNumber, formatPercent, formatPrice } from '@/lib/format';
+import { formatMarketCapUsd, formatNumber, formatPercent, formatPrice } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { indicesCardState } from '@/lib/market/indices-card-state';
@@ -43,13 +43,8 @@ const sectorEn = (value: string) =>
 
 const sectorEs = (value: string) => etiquetaSector(value);
 
-// Los miles de millones se expresan en billones anglosajones (B),
-// no con la etiqueta "mil M" que ocupa media celda en el screener.
 function screenerMarketCap(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return 'N/D';
-  if (value >= 1e9) return `${formatNumber(value / 1e9, { maximumFractionDigits: 2 })} B US$`;
-  if (value >= 1e6) return `${formatNumber(value / 1e6, { maximumFractionDigits: 2 })} M US$`;
-  return `${formatNumber(value, { maximumFractionDigits: 0 })} US$`;
+  return value > 0 ? formatMarketCapUsd(value) : 'N/D';
 }
 
 // La fila del screener no trae divisa: `RealScreenerRow` no la declara y
