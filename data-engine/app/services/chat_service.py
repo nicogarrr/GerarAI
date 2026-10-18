@@ -734,6 +734,12 @@ class ChatService:
                 llm_trace={"path": "page_content_unavailable", "generated": False, "provider_calls": 0},
                 context=context_echo,
             )
+        from app.services.chat_metric_answer import metric_question_answer
+
+        metric_answer = metric_question_answer(db, question, company)
+        if metric_answer is not None:
+            metric_answer.context = context_echo
+            return metric_answer
         # Memoria SOLO ante "recuerda ..." explicito; respuesta visible, sin LLM.
         note = remember_note(question)
         if note is not None:
