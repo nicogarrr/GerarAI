@@ -19,6 +19,17 @@ const REPLACEMENTS: Array<[RegExp, string]> = [
     [/\bmetadata del tenant\b/g, 'tus datos fiscales'],
     [/\bdel tenant\b/g, 'de tu cuenta'],
     [/\bcash[-:]([A-Z]{3})\b/g, 'caja $1'],
+    // Jerga del motor: «snapshot» se dice «captura» en pantalla. Las frases
+    // con concordancia van primero; lo genérico al final.
+    [/Partidas con snapshot demasiado antiguo/g, 'Partidas con captura demasiado antigua'],
+    [/con SU snapshot/g, 'con SU captura'],
+    [/uno reciente no certifica a otro viejo/g, 'una reciente no certifica a otra vieja'],
+    [/snapshot antiguo/g, 'captura antigua'],
+    [/a fecha del snapshot/g, 'a fecha de la captura'],
+    [/\bsnapshots\b/g, 'capturas'],
+    [/\bSnapshots\b/g, 'Capturas'],
+    [/\bsnapshot\b/g, 'captura'],
+    [/\bSnapshot\b/g, 'Captura'],
     [/\bSIN_DATOS\b/g, 'N/D'],
 ];
 

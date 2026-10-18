@@ -305,7 +305,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
             <RecordDetail
                 key={recordDetailKey(year, reportKey)}
                 title={`Reporte Fiscal ${year}`}
-                description="Resumen orientativo del ejercicio — no apto para declarar sin la validación de un asesor fiscal"
+                description="Resumen orientativo del ejercicio"
                 icon={<FileText className="h-5 w-5 text-teal-400" />}
                 hiddenKeys={['trace']}
                 record={toDisplayReport(report)}
