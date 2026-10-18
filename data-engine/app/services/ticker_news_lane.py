@@ -35,6 +35,15 @@ PRIORITY_TICKERS = frozenset({"ASTS", "SPCX"})
 VERIFIED_ALIASES: dict[str, tuple[str, ...]] = {
     "SPCX": ("SpaceX", "Space Exploration Technologies", "Starlink"),
     "ASTS": ("AST SpaceMobile", "SpaceMobile", "BlueBird"),
+    # Marcas propias que la prensa cita en vez del nombre legal (Alphabet, Meta
+    # Platforms, Amazon.com...). Solo marcas oficiales de cada grupo.
+    "GOOGL": ("Google", "YouTube", "Waymo", "DeepMind"),
+    "GOOG": ("Google", "YouTube", "Waymo", "DeepMind"),
+    "META": ("Facebook", "Instagram", "WhatsApp"),
+    "AMZN": ("AWS", "Amazon Web Services", "Whole Foods"),
+    "MSFT": ("Azure", "LinkedIn", "GitHub", "Xbox"),
+    "AAPL": ("iPhone", "iPad", "App Store"),
+    "ADBE": ("Photoshop", "Acrobat"),
 }
 # Competidores que el feed de Yahoo etiqueta con nuestro ticker aunque el
 # titular trate de ellos (ASTS recibia titulares de Rocket Lab). Solo se descarta

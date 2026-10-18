@@ -9,8 +9,8 @@ from app.models import Company, NewsEvent
 from app.schemas import ManualNewsRequest, ManualNewsResponse, NewsIngestRequest, NewsIngestResponse
 from app.services.news_headline_translation import display_translation, original_headline, translate_headline
 from app.services.news_service import NewsService
-from app.services.ticker_news_lane import _only_ticker_prefix_mention
 from app.services.second_order_news_service import analyze_second_order
+from app.services.ticker_news_lane import _only_ticker_prefix_mention
 
 router = APIRouter()
 
