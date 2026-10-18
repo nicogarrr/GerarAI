@@ -11,6 +11,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.models.entities import Base, Company, FinancialFact
 from app.services import financial_ingestion_service as ingestion
@@ -19,7 +20,14 @@ from app.services.financial_ingestion_service import FinancialIngestionService
 
 @pytest.fixture
 def db():
-    engine = create_engine("sqlite:///:memory:")
+    # StaticPool + check_same_thread=False: el endpoint refresh/sec ejecuta
+    # su trabajo en un hilo del pool (run_in_threadpool) y esta sesion debe
+    # poder usarse secuencialmente desde ese hilo sin perder la BD en memoria.
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
     with factory() as session:
