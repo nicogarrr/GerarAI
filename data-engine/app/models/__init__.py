@@ -101,22 +101,7 @@ from app.models.entities import (
     WorkflowStepRun,
 )
 
-# #E5: metricas de backend (latencia por endpoint, profundidad de cola, hit-rate
-# de tesis y % de claims con evidencia). Viven en su propio modulo porque
-# entities.py esta congelado mientras otros agentes trabajan sobre el; el import
-# basta para que `Base.metadata.create_all()` las cree igual que al resto.
-from app.models.metrics import (
-    ApiLatencyWindow,
-    EvidenceCoverageSnapshot,
-    QueueDepthSnapshot,
-    ThesisHitRateCell,
-)
-
 __all__ = [
-    "ApiLatencyWindow",
-    "EvidenceCoverageSnapshot",
-    "QueueDepthSnapshot",
-    "ThesisHitRateCell",
     "WorkflowStepRun",
     "WorkflowRun",
     "InsiderTransaction",
