@@ -51,6 +51,8 @@ export interface InsiderFilingTransaction {
     code?: string | null;
     /** Derivado (opciones) vs acciones; explica tramos M duplicados. */
     is_derivative?: boolean | null;
+    /** Operacion declarada bajo plan 10b5-1 (checkbox o nota al pie del Form 4). */
+    rule_10b5_1?: boolean | null;
     shares?: number | null;
     price?: number | null;
     value?: number | null;
@@ -125,6 +127,8 @@ export interface InsiderFeedTransaction {
     date?: string | null;
     /** Tramos Form 4 agregados en esta fila (mismo filing + insider + codigo). */
     tranches?: number;
+    /** Plan 10b5-1 declarado en todos los tramos de la fila. */
+    rule_10b5_1?: boolean;
     accession_number: string;
     source_url?: string | null;
 }

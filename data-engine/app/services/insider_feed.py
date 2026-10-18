@@ -44,6 +44,7 @@ def _tx_dict(row: InsiderTransaction, filing: InsiderFiling, line: int) -> dict[
         "value": row.value,
         "date": row.tx_date or filing.filing_date,
         "is_derivative": bool(row.is_derivative),
+        "rule_10b5_1": bool(row.rule_10b5_1),
         "accession_number": row.accession_number,
         "tx_line": line,
         "filing_date": filing.filing_date,
@@ -74,6 +75,8 @@ def _group_tranches(items: list[dict]) -> list[dict]:
             groups[key] = group
             order.append(key)
         group["tranches"] += 1
+        # Planificado solo si TODOS los tramos de la operacion lo son.
+        group["rule_10b5_1"] = bool(group.get("rule_10b5_1")) and bool(tx.get("rule_10b5_1"))
         if tx.get("shares") is not None:
             group["_shares_sum"] += float(tx["shares"])
         if tx.get("value") is not None:
@@ -181,6 +184,7 @@ def build_feed(
                 "date": t["date"],
                 "multi_reporter": t["multi_reporter"],
                 "tranches": t["tranches"],
+                "rule_10b5_1": t["rule_10b5_1"],
                 "accession_number": t["accession_number"],
                 "source_url": t["source_url"],
             }

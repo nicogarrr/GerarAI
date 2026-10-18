@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import InsiderFiling, InsiderTransaction
 
-PARSER_VERSION = "1.1"  # post PR-1: 4/A, wording honesto, multi-reporter, source_url
+PARSER_VERSION = "1.2"  # 1.2: rule_10b5_1 (planes 10b5-1 via notas al pie/checkbox)
 
 
 def transaction_fingerprint(accession: str, row_index: int, tx: dict) -> str:
@@ -128,6 +128,7 @@ def persist_filing(
                 value=tx.get("value"),
                 tx_date=tx.get("date"),
                 is_derivative=bool(tx.get("is_derivative")),
+                rule_10b5_1=bool(tx.get("rule_10b5_1")),
                 source_url=tx.get("source_url") or filing.get("document_url"),
                 data_quality=_data_quality(tx),
             )

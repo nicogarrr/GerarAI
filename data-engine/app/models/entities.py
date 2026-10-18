@@ -391,6 +391,7 @@ class InsiderTransaction(TenantOwnedMixin, Base, TimestampMixin):
     value: Mapped[float | None] = mapped_column(Float, nullable=True)
     tx_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
     is_derivative: Mapped[bool] = mapped_column(Boolean, default=False)
+    rule_10b5_1: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     data_quality: Mapped[dict] = mapped_column(JSON, default=dict)
 

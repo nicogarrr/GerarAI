@@ -236,6 +236,40 @@ def fetch_filing_xml(
 
 # ---------------- Parse del XML <ownershipDocument> ----------------
 
+_RULE_10B51_RE = re.compile(r"10b5-?1", re.IGNORECASE)
+
+
+def _footnotes(root: ET.Element) -> dict[str, str]:
+    """Notas al pie del documento, id -> texto (ahi vive el «pursuant to a
+    Rule 10b5-1 trading plan» de las ventas planificadas)."""
+    notes: dict[str, str] = {}
+    for note in root.findall("footnotes/footnote"):
+        note_id = (note.get("id") or "").strip()
+        if note_id and note.text and note.text.strip():
+            notes[note_id] = note.text.strip()
+    return notes
+
+
+def _rule_10b5_1(node: ET.Element, footnotes: dict[str, str]) -> bool:
+    """True si la transaccion se declara bajo un plan 10b5-1.
+
+    Dos vias, las dos declaradas por el propio insider en el filing:
+    - el checkbox 10b5-1 del esquema (cualquier elemento cuyo tag lo
+      mencione con valor verdadero; el nombre exacto varia por version);
+    - una nota al pie REFERENCIADA por esta transaccion que mencione
+      10b5-1. Las notas no referenciadas no cuentan: un filing puede
+      mezclar operaciones planificadas y discrecionales.
+    """
+    for elem in node.iter():
+        if "10b5" in elem.tag.lower() and elem.text and elem.text.strip() in {"1", "true", "True"}:
+            return True
+    for ref in node.iter("footnoteId"):
+        note = footnotes.get((ref.get("id") or "").strip())
+        if note and _RULE_10B51_RE.search(note):
+            return True
+    return False
+
+
 
 def _text(elem: ET.Element | None, path: str) -> str | None:
     if elem is None:
@@ -296,6 +330,8 @@ def parse_form4_xml(source: str | bytes) -> dict:
     issuer_name = _text(issuer, "issuerName") or ""
     issuer_cik = _text(issuer, "issuerCik") or ""
     period = _date(root, "periodOfReport")
+
+    footnotes = _footnotes(root)
 
     reporters: list[dict] = []
     for node in root.findall("reportingOwner"):
@@ -369,6 +405,7 @@ def parse_form4_xml(source: str | bytes) -> dict:
                     "value": float(value) if value is not None else None,
                     "date": tx_date.isoformat() if tx_date else None,
                     "is_derivative": is_derivative,
+                    "rule_10b5_1": _rule_10b5_1(node, footnotes),
                 }
             )
 
