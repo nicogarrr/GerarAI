@@ -55,6 +55,22 @@ function SignalCard({ signal }: { signal: Awaited<ReturnType<typeof getBottlenec
           ? `${signal.n_sources} fuentes independientes · última señal ${formatUserDate(signal.last_seen)}`
           : 'Sin evidencia suficiente en las fuentes guardadas'}
       </p>
+      {signal.evidence?.length ? (
+        <details className="mt-3 text-xs">
+          <summary className="cursor-pointer text-teal-300">Ver evidencias guardadas ({signal.evidence.length})</summary>
+          <ul className="mt-2 space-y-2">
+            {signal.evidence.map((item) => (
+              <li key={item.id}>
+                {item.status === 'verificada' && item.url ? (
+                  <a className="inline-flex min-h-11 items-center break-words text-teal-300 underline" href={item.url} rel="noopener noreferrer" target="_blank">
+                    {item.title ?? item.url}
+                  </a>
+                ) : <span className="text-gray-500">{item.title ?? 'Evidencia no disponible'} · sin enlace verificable</span>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : detected ? <p className="mt-2 text-xs text-gray-500">Evidencias guardadas no disponibles para consultar.</p> : null}
     </li>
   );
 }

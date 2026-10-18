@@ -15,9 +15,17 @@ from app.services.bottleneck_service import THEMES
 router = APIRouter()
 
 
+class DiscoveryEvidenceOut(BaseModel):
+    id: str
+    title: str | None
+    url: str | None
+    status: Literal["verificada", "N/D"]
+
+
 class BottleneckSignalOut(BaseModel):
     theme: str
     evidence_ids: list[str]
+    evidence: list[DiscoveryEvidenceOut] = []
     first_seen: datetime | None
     last_seen: datetime | None
     n_sources: int
@@ -38,25 +46,25 @@ def list_bottlenecks(db: Session = Depends(get_db)) -> BottlenecksOut:
             BottleneckSignal.tenant_id == tenant
         ))
     }
+    resolved = resolve_evidence(db, [ident for row in rows.values() for ident in row.evidence_ids or []])
     signals = []
     for theme in THEMES:
         row = rows.get(theme)
         signals.append(BottleneckSignalOut(
             theme=theme,
             evidence_ids=row.evidence_ids if row else [],
+            evidence=[DiscoveryEvidenceOut(
+                id=ident,
+                title=resolved[ident].title if ident in resolved else None,
+                url=resolved[ident].url if ident in resolved else None,
+                status="verificada" if ident in resolved and resolved[ident].url else NO_DATA,
+            ) for ident in (row.evidence_ids or [])] if row else [],
             first_seen=row.first_seen if row else None,
             last_seen=row.last_seen if row else None,
             n_sources=row.n_sources if row else 0,
             status="detectado" if row and row.n_sources >= 2 else "N/D",
         ))
     return BottlenecksOut(signals=signals)
-
-
-class DiscoveryEvidenceOut(BaseModel):
-    id: str
-    title: str | None
-    url: str | None
-    status: Literal["verificada", "N/D"]
 
 
 class DiscoveryOut(BaseModel):

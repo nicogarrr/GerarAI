@@ -14,6 +14,7 @@ import { researchRequest } from '@/lib/research/client';
 export interface BottleneckSignalView {
   theme: string;
   evidence_ids: string[];
+  evidence?: DiscoveryEvidenceView[];
   first_seen: string | null;
   last_seen: string | null;
   n_sources: number;
