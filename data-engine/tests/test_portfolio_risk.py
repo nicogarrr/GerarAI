@@ -84,6 +84,18 @@ def test_alerta_caja_negativa():
     assert alertas[0]["ticker"] is None
 
 
+def test_alerta_caja_neta_nombra_la_divisa_negativa_y_no_la_base():
+    result = calculate_portfolio_risk(
+        [],
+        [{"currency": "EUR", "balance": -9000.0, "net_of": {"EUR": 7933.6, "USD": -19739.27}}],
+    )
+    mensajes = [a["message"] for a in result["alerts"]]
+    assert len(mensajes) == 1
+    assert "saldo neto de caja, convertido a EUR" in mensajes[0]
+    assert "USD (-19,739.27)" in mensajes[0]
+    assert "EUR (" not in mensajes[0]
+
+
 def test_portfolio_vacio_no_divide_entre_cero():
     result = calculate_portfolio_risk([], [])
     assert result["total_value"] == 0
