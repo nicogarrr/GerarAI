@@ -26,26 +26,30 @@ class WaccInputService:
         sources: list[int] = []
 
         fred = FREDClient()
-        # DGS10 es el bono del Tesoro de EE.UU.: solo es la tasa libre de
-        # riesgo coherente para companias cuyos flujos estan en USD. Para otra
-        # divisa no se inventa un proxy: no se genera el hecho y el motor WACC
-        # lo reporta como input ausente (missing_inputs / publication_blockers).
+        # La tasa libre de riesgo es la del bono benchmark de la DIVISA de
+        # los flujos: DGS10 (Tesoro EE.UU.) para USD y el Bund aleman
+        # (IRLTLT01DEM156N, via OCDE en FRED) para EUR - convencion
+        # Damodaran: el bono aleman es el activo sin riesgo de default del
+        # euro; el riesgo pais va aparte en country_risk_premium. Para otra
+        # divisa no se inventa un proxy: no se genera el hecho y el motor
+        # WACC lo reporta como input ausente (missing_inputs).
         company_currency = (company.currency or "USD").upper()
-        risk_free_supported = company_currency == "USD"
+        series_by_currency = {
+            "USD": getattr(settings, "wacc_risk_free_series", "DGS10"),
+            "EUR": getattr(
+                settings, "wacc_risk_free_series_eur", "IRLTLT01DEM156N"
+            ),
+        }
+        risk_free_series = series_by_currency.get(company_currency)
+        risk_free_supported = risk_free_series is not None
         # Sin clave FRED se usa fredgraph.csv (publico, fuente declarada):
         # el dato es el mismo, la via queda en el documento fuente.
         if not risk_free_supported:
             payload = {"observations": []}
         elif fred.configured():
-            payload = await fred.series(
-                getattr(settings, "wacc_risk_free_series", "DGS10"),
-                limit=10,
-            )
+            payload = await fred.series(risk_free_series, limit=10)
         else:
-            payload = await fred.series_csv(
-                getattr(settings, "wacc_risk_free_series", "DGS10"),
-                limit=10,
-            )
+            payload = await fred.series_csv(risk_free_series, limit=10)
         observation = next(
             (
                 item
@@ -63,17 +67,13 @@ class WaccInputService:
                     db,
                     company,
                     source_type="FRED",
-                    title=(
-                        f"FRED {getattr(settings, 'wacc_risk_free_series', 'DGS10')} "
-                        f"{risk_free_date}"
-                    ),
+                    title=f"FRED {risk_free_series} {risk_free_date}",
                     metadata={
-                        "series": getattr(
-                            settings, "wacc_risk_free_series", "DGS10"
-                        ),
+                        "series": risk_free_series,
                         "date": risk_free_date,
-                        # Divisa de la SERIE (USD), no la de la compania.
-                        "currency": "USD",
+                        # Divisa de la SERIE (= la de los flujos), no la del
+                        # emisor cuando difiere.
+                        "currency": company_currency,
                         "via": "api_key" if fred.configured() else "fredgraph_csv",
                     },
                 )
