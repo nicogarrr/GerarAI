@@ -47,6 +47,37 @@ KEY_FACT_METRICS = [
     "shares_diluted",
 ]
 
+# Estados y ratings de tesis: la respuesta visible nunca muestra la clave
+# interna en ingles ("estado insufficient_data"); lo desconocido se omite.
+_THESIS_STATUS_ES = {
+    "draft": "borrador",
+    "final": "final",
+    "published": "publicada",
+    "approved": "aprobada",
+    "changes_requested": "cambios solicitados",
+    "draft_failed_audit": "borrador (auditoría no superada)",
+    "active": "activa",
+    "review": "en revisión",
+    "archived": "archivada",
+    "stale": "desactualizada",
+    "insufficient_data": "datos insuficientes",
+}
+_THESIS_RATING_ES = {
+    "buy": "compra",
+    "overweight": "sobreponderar",
+    "outperform": "mejor que el mercado",
+    "accumulate": "acumular",
+    "add": "añadir",
+    "hold": "mantener",
+    "sell": "venta",
+    "underweight": "infraponderar",
+    "underperform": "peor que el mercado",
+    "exit": "salir",
+    "watch": "seguimiento",
+    "reduce": "reducir",
+    "insufficient_data": "datos insuficientes",
+}
+
 _METRIC_LABELS_ES = {
     "revenue": "ingresos",
     "free_cash_flow": "flujo de caja libre",
@@ -56,6 +87,7 @@ _METRIC_LABELS_ES = {
     "cash_and_equivalents": "efectivo y equivalentes",
     "total_debt": "deuda total",
     "shares_diluted": "acciones diluidas",
+    "market_cap": "capitalización bursátil",
 }
 
 _MONTHS_ES = (
@@ -138,6 +170,7 @@ def _natural_company_answer(
     contradiction_claims: list[Claim],
     price_line: str | None,
     memory_notes: list[str] | None = None,
+    market_cap_fact: FinancialFact | None = None,
 ) -> str:
     """Respuesta visible: prosa natural en castellano.
 
@@ -149,6 +182,13 @@ def _natural_company_answer(
     parts: list[str] = []
     if price_line:
         parts.append(price_line)
+    if market_cap_fact is not None and market_cap_fact.value is not None:
+        parts.append(
+            "Capitalización bursátil: "
+            f"{_fmt_value_es(_decimal_to_float(market_cap_fact.value), market_cap_fact.unit)} "
+            f"({_fmt_period_es(market_cap_fact.period, market_cap_fact.fiscal_year, market_cap_fact.fiscal_quarter)}, "
+            f"{market_cap_fact.source_type or 'fuente almacenada'})."
+        )
     if facts:
         rendered = "; ".join(
             f"{_METRIC_LABELS_ES.get(fact.metric, fact.metric)} "
@@ -165,10 +205,16 @@ def _natural_company_answer(
             f"respondo con cifras."
         )
     if thesis:
-        rating = f", rating {thesis.rating}" if thesis.rating else ""
+        detalles = []
+        estado = _THESIS_STATUS_ES.get((thesis.status or "").strip())
+        rating_es = _THESIS_RATING_ES.get((thesis.rating or "").strip())
+        if estado:
+            detalles.append(f"estado {estado}")
+        if rating_es:
+            detalles.append(f"rating {rating_es}")
         parts.append(
-            f"Tengo guardada la tesis v{thesis.version} "
-            f"(estado {thesis.status}{rating})."
+            f"Tengo guardada la tesis v{thesis.version}"
+            + (f" ({', '.join(detalles)})." if detalles else ".")
         )
     seen_notes: set[str] = set()
     for content in (memory_notes or [])[:3]:
@@ -183,11 +229,21 @@ def _natural_company_answer(
             (event for event in news if event.date),
             key=lambda event: event.date, reverse=True,
         )
-        headlines = [
-            f"'{_short(event.title, 110)}' ({_fmt_date_es(event.date.isoformat())})"
-            for event in (dated or news)[:2]
-        ]
-        parts.append("Ultimas noticias guardadas: " + "; ".join(headlines) + ".")
+        # Sin duplicados (mismo titular normalizado) y sin truncar: el
+        # titular va entero, como mucho los dos mas recientes.
+        seen_titles: set[str] = set()
+        headlines = []
+        for event in dated or news:
+            title = " ".join((event.title or "").split())
+            key = title.lower()
+            if not title or key in seen_titles:
+                continue
+            seen_titles.add(key)
+            headlines.append(f"'{title}' ({_fmt_date_es(event.date.isoformat())})")
+            if len(headlines) == 2:
+                break
+        if headlines:
+            parts.append("Últimas noticias guardadas: " + "; ".join(headlines) + ".")
     if contradiction_claims:
         parts.append(
             f"Hay {len(contradiction_claims)} afirmaciones contradichas o "
@@ -210,7 +266,9 @@ def _short(text: str, limit: int = 420) -> str:
     compact = " ".join(text.split())
     if len(compact) <= limit:
         return compact
-    return f"{compact[: limit - 3]}..."
+    # Corte en el ultimo espacio: un titular nunca se trunca a mitad de palabra.
+    cut = compact[: limit - 1].rsplit(" ", 1)[0]
+    return f"{cut}…"
 
 
 
@@ -987,6 +1045,33 @@ class ChatService:
                         adjusted=adjusted,
                     )
                 )
+            market_cap_fact = db.scalars(
+                select(FinancialFact)
+                .where(
+                    FinancialFact.company_id == company.id,
+                    FinancialFact.metric == "market_cap",
+                )
+                .order_by(
+                    FinancialFact.fiscal_year.desc().nullslast(),
+                    desc(FinancialFact.created_at),
+                    desc(FinancialFact.id),
+                )
+                .limit(1)
+            ).first()
+            if market_cap_fact is not None:
+                sources.append(
+                    self._source_entry(
+                        "financial_fact",
+                        market_cap_fact.id,
+                        f"{_METRIC_LABELS_ES['market_cap']} {market_cap_fact.period}",
+                        metric=market_cap_fact.metric,
+                        value=_decimal_to_float(market_cap_fact.value),
+                        unit=market_cap_fact.unit,
+                        source_type=market_cap_fact.source_type,
+                        source_tier=source_tier_key(market_cap_fact.source_type),
+                        confidence=_decimal_to_float(market_cap_fact.confidence),
+                    )
+                )
             for event in news:
                 sources.append(
                     self._source_entry(
@@ -1118,6 +1203,7 @@ class ChatService:
                 contradiction_claims=contradiction_claims,
                 price_line=price_line,
                 memory_notes=[item.item.content for item in retrieved_memory[:3]],
+                market_cap_fact=market_cap_fact,
             )
 
             sections = [
@@ -1125,7 +1211,8 @@ class ChatService:
                     "key": "facts",
                     "body": "\n".join([facts_text, *news_lines]),
                     "citations": [
-                        f"financial_fact:{fact.id}" for fact in facts[:5]
+                        *(f"financial_fact:{fact.id}" for fact in facts[:5]),
+                        *([f"financial_fact:{market_cap_fact.id}"] if market_cap_fact is not None else []),
                     ],
                 },
                 {

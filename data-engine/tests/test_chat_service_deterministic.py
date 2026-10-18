@@ -82,7 +82,7 @@ def test_populated_company_cites_stored_sourced_rows(db):
     fact_source = next(s for s in response.sources if s["type"] == "financial_fact")
     assert fact_source["source_type"] == "SEC"
     assert fact_source["value"] == 391000000000.0
-    assert "Tengo guardada la tesis v3 (estado published, rating watch)." in response.answer
+    assert "Tengo guardada la tesis v3 (estado publicada, rating seguimiento)." in response.answer
     assert "ingresos 391 mil millones USD (ejercicio 2025, SEC)" in response.answer
     assert "Aun faltan datos almacenados de:" in response.answer  # other key metrics absent
     assert "efectivo y equivalentes" in response.answer  # cash_and_equivalents traducido
