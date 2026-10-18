@@ -15,3 +15,13 @@ def test_complete_last_word_is_kept() -> None:
 
 def test_single_giant_word_cuts_at_limit() -> None:
     assert clip_words("abcdefghij", 5) == "abcde…"
+
+
+def test_thesis_news_summary_does_not_cut_mid_word():
+    from app.services.text_clip import clip_words
+
+    headline = "AST SpaceMobile reports record quarterly satellite deployment progress " * 3
+    out = clip_words(headline.strip(), 140, ellipsis="...")
+    assert len(out) <= 143
+    assert out.endswith("...")
+    assert out[:-3].split(" ")[-1] in headline.split(" ")

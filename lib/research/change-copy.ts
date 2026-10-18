@@ -17,6 +17,9 @@ export function changeTypeLabel(value: string | null | undefined): string {
 }
 
 const LEGACY_PREFIXES: Array<[RegExp, string]> = [
+    [/No stored thesis is available for semantic impact mapping\./g, 'No hay una tesis guardada para evaluar el impacto.'],
+    [/No structural thesis node matched with sufficient confidence\./g, 'No se ha encontrado una relación suficientemente fiable con la tesis.'],
+    [/Affects (\d+) claims and thesis nodes:\s*/g, 'Afecta a $1 afirmaciones y a estos apartados de la tesis: '],
     [/^Contradictory evidence found for claim:\s*/i, 'La evidencia automática encontró contradicciones con la afirmación: '],
     [/^Evidence classified claim as (\w+):\s*/i, 'La evidencia clasificó la afirmación: '],
 ];
@@ -38,5 +41,11 @@ export function changeSummaryText(summary: string): string {
         seen.push(key);
         return true;
     });
-    return kept.join(' ');
+    return kept.join(' ').replace(/(Afecta a \d+ afirmaciones y a estos apartados de la tesis: )([^.!?]+)/g, (_, prefix: string, labels: string) => {
+        const nodes: Record<string, string> = {
+            Technology: 'Tecnología', Funding: 'Financiación', Commercialization: 'Comercialización',
+            Execution: 'Ejecución', Regulatory: 'Regulación', Economics: 'Economía del negocio', Moat: 'Ventaja competitiva',
+        };
+        return prefix + labels.split(', ').map((label) => nodes[label] ?? label).join(', ');
+    });
 }

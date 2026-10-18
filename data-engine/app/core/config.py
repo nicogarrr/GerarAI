@@ -430,9 +430,6 @@ class Settings(BaseSettings):
     # Lower defaults: the catalog refreshes a few times a day at most.
     asts_llm_calls_per_minute: int = Field(default=2, ge=0, le=100)
     asts_llm_calls_per_day: int = Field(default=30, ge=0, le=10000)
-    # Entry-price explanation LLM quota, independent of the other LLM ledgers.
-    entry_price_llm_calls_per_minute: int = Field(default=2, ge=0, le=100)
-    entry_price_llm_calls_per_day: int = Field(default=20, ge=0, le=10000)
 
     @property
     def is_production(self) -> bool:

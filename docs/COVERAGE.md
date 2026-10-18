@@ -67,13 +67,12 @@ El desglose sentencias/ramas no esta en el baseline: sale en el informe de
 | `app/core` | 88.21 % | 780 | 88 |
 | `app/llm` | 81.26 % | 1281 | 81 |
 | `app/workers` | 53.43 % | 1284 | 53 |
-| `app/metrics` | 82.58 % | 1757 | 82 |
 | `alembic` | 1.82 % | 1211 | **exento** (ver abajo) |
 | **TOTAL gateado** | **84.27 %** | **42570** | **84** |
 | **TOTAL con exentos** | **81.99 %** | **43781** | 81 (`fail_under`) |
 
 La tabla es la linea base de `data-engine/coverage_baseline.json` (2026-10-02,
-incluye `app/metrics`, registrado como paquete propio en #779). Los umbrales son
+Los umbrales son
 `floor(linea_base) - 0` y no objetivos. El ruido entre dos corridas es de
 centesimas. Cuando se regenere el baseline con `--update-baseline` hay que subir los
 numeros de aqui a la vez.

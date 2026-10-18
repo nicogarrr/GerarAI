@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, FileText, ShieldCheck, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,8 @@ function sourceTierLabel(value: string): string {
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+export const metadata: Metadata = { title: 'Fuentes' };
 
 export default async function ResearchSourcesPage({
   searchParams,

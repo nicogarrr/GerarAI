@@ -737,7 +737,10 @@ class PreRevenueScenarioEngine(ValuationEngine):
                 "scenarios": scenario_results,
                 "weighted": weighted["trace"],
                 "notice": (
-                    "INDICATIVE RANGE — uses assumed FCF margin (base 15%, band 1-35%)"
+                    "INDICATIVE RANGE — uses assumed FCF margin "
+                    f"(base {assumed_margin_base:.0%}, band "
+                    f"{min(float(sc.assumptions['fcf_margin']) for sc in scenarios):.0%}"
+                    f"-{max(float(sc.assumptions['fcf_margin']) for sc in scenarios):.0%})"
                     + (" and $1 revenue floor (no coherent revenue)" if revenue_assumed else "")
                     + " because no coherent snapshot exists. Not a final fair value; "
                     "resolve missing inputs before publishing."

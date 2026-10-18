@@ -68,7 +68,6 @@ PACKAGE_PREFIXES: tuple[str, ...] = (
     "app/schemas",
     "app/data",
     "app/workers",
-    "app/metrics",
     "app/valuation",
     "app/api",
     "app",

@@ -1,6 +1,6 @@
 'use client';
 
-import { formatCompact, formatUserDateTime, formatMoney, formatNumber, formatPercent, isValidCurrencyCode, NA } from '@/lib/format';
+import { formatCompact, formatUserDateTime, formatMarketDate, formatMoney, formatNumber, formatPercent, isValidCurrencyCode, NA } from '@/lib/format';
 import {
     DCF_CANDIDATE_LIMIT,
     DCF_MIN_UPSIDE_PCT,
@@ -43,6 +43,9 @@ interface WatchlistItem {
     price: number | null;
     currency: string | null;
     changePercent: number | null;
+    // F358: frescura del precio; un cierre se etiqueta con su fecha si la fuente la da.
+    priceKind: 'live' | 'close' | null;
+    priceAsOf: string | null;
 }
 
 interface UndervaluedStock {
@@ -253,9 +256,11 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                             price: data.price,
                             currency: data.currency,
                             changePercent: data.changePercent,
+                            priceKind: data.priceKind,
+                            priceAsOf: data.priceAsOf,
                         };
                     } catch {
-                        return { symbol: item.symbol, name: item.symbol, price: null, currency: null, changePercent: null };
+                        return { symbol: item.symbol, name: item.symbol, price: null, currency: null, changePercent: null, priceKind: null, priceAsOf: null };
                     }
                 }),
             );
@@ -603,6 +608,9 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                             {stock.price != null ? (
                                                 <>
                                                     <div className="text-white font-mono">{isValidCurrencyCode(stock.currency) ? formatMoney(stock.price, stock.currency) : formatNumber(stock.price)}</div>
+                                                    {stock.priceKind === 'close' && (
+                                                        <div className="text-[10px] text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</div>
+                                                    )}
                                                     {stock.changePercent != null && (
                                                         <div className={`text-xs ${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                                             {formatPercent(stock.changePercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}

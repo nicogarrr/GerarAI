@@ -22,6 +22,8 @@ describe("avatar sin foto", () => {
         assert.equal(avatarInitials("ackman"), "A")
         assert.equal(avatarInitials("   "), "?")
         assert.equal(avatarInitials("Álvaro Ñ"), "ÁÑ")
+        // QA 22: el paréntesis de «Harris Associates (Oakmark)» no es una inicial.
+        assert.equal(avatarInitials("Harris Associates (Oakmark)"), "HO")
     })
     it("InvestorAvatar usa NameAvatar, no un círculo propio con color fijo", () => {
         const src = readFileSync("app/(root)/inversores/_components/Avatar.tsx", "utf8")

@@ -46,7 +46,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { exchangeDisplayName } from '@/lib/exchangeName';
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
-import { sectorIndustryLine } from '@/lib/labels';
+import { companyTypeLabel, sectorIndustryLine } from '@/lib/labels';
 import { cleanThesisText } from '@/lib/research/thesis-text';
 import { Button } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
@@ -539,6 +539,45 @@ function isEsefIssuer(ticker: string): boolean {
   const idx = ticker.lastIndexOf('.');
   if (idx < 0) return false;
   return ESEF_MARKET_SUFFIXES.has(ticker.slice(idx + 1).toUpperCase());
+}
+
+// QA 18: los tickers canonicos europeos se guardan SIN sufijo (AENA, no
+// AENA.MC: resolve_company quita el sufijo conocido), asi que el sufijo
+// solo no basta y un emisor espanol veia los botones FMP (plan free, solo
+// US) y SEC. El mercado declarado en la ficha es la senal estable.
+// Mercados regulados UE/EEE cuyos emisores reportan via ESEF; Suiza y UK
+// quedan fuera, como en ESEF_MARKET_SUFFIXES.
+const ESEF_EXCHANGE_PATTERNS = [
+  /BME|BOLSA DE MADRID/i,
+  /EURONEXT/i, // cubre la nomenclatura historica «NYSE EURONEXT - ...» de Finnhub
+  /XETRA|FRANKFURT|DEUTSCHE B.O.RSE/i,
+  /BORSA ITALIANA|MILAN/i,
+  /WIENER|VIENNA/i,
+  /HELSINKI/i,
+  /STOCKHOLM/i,
+  /COPENHAGEN|COPENHAGUE/i,
+  /OSLO/i,
+  /LISBON|LISBOA/i,
+  /ATHENS|ATENAS/i,
+  /DUBLIN/i,
+  /WARSAW|VARSOVIA/i,
+  /PRAGUE|PRAGA/i,
+  /BUDAPEST/i,
+  /BRATISLAVA/i,
+  /LJUBLJANA/i,
+  /LUXEMBOURG/i,
+];
+
+function isEsefIssuerProfile(ticker: string, exchange: string | null | undefined): boolean {
+  if (isEsefIssuer(ticker)) return true;
+  const value = exchange?.trim();
+  if (!value) return false;
+  return ESEF_EXCHANGE_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+/** FMP plan free solo cubre mercado US: ni sufijo de mercado ni emisor ESEF. */
+function fmpCovers(ticker: string, exchange: string | null | undefined): boolean {
+  return !ticker.includes('.') && !isEsefIssuerProfile(ticker, exchange);
 }
 
 /**
@@ -1160,7 +1199,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </Panel>
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <Panel title="Revisiones abiertas"><div className="space-y-2">{data.reviews.length ? data.reviews.map((review) => <div className="rounded-lg border border-gray-800 p-3 text-sm text-gray-300" key={review.id}>{review.title}</div>) : <EmptyState title="Sin revisiones abiertas." />}</div></Panel>
-          <Panel title="Alertas"><div className="space-y-2">{data.alerts.length ? data.alerts.map((alert) => <div className="rounded-lg border border-gray-800 p-3 text-sm" key={alert.id}><Badge variant="outline">{label(alert.severity)}</Badge><p className="mt-2 text-gray-300">{alert.message}</p>{safeHttpUrl(alert.source_url) ? <a className="mt-2 inline-block text-xs text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(alert.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">Ver fuente</a> : null}</div>) : <EmptyState title="Sin alertas." />}</div></Panel>
+          <Panel title="Alertas"><div className="space-y-2">{data.alerts.length ? data.alerts.map((alert) => <div className="rounded-lg border border-gray-800 p-3 text-sm" key={alert.id}><Badge variant="outline">{label(alert.severity)}</Badge><p className="mt-2 text-gray-300">{alert.message}</p><p className="mt-2 text-xs text-gray-500">Registrada el {formatUserDateTime(alert.created_at)} (Madrid)</p>{safeHttpUrl(alert.source_url) ? <a className="mt-2 inline-block text-xs text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(alert.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">Ver fuente</a> : null}</div>) : <EmptyState title="Sin alertas." />}</div></Panel>
         </div>
         <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} />
       </div>
@@ -1171,11 +1210,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <div className="space-y-6">
         <div className="flex flex-wrap gap-3">
           {/* FMP plan free solo cubre mercado US (402 en el resto): el boton
-              solo se ofrece en tickers sin sufijo de mercado (B30). */}
-          {!ticker.includes('.') ? (
+              solo se ofrece cuando el emisor entra en esa cobertura (B30).
+              La decision usa el perfil (mercado declarado), no solo el
+              sufijo del ticker: los europeos canonicos no lo llevan (AENA). */}
+          {fmpCovers(ticker, company.exchange) ? (
             <MutationForm action={refreshCompanyFinancials.bind(null, ticker)} successMessage="Financieros actualizados (FMP)"><Button type="submit" variant="outline">Refrescar financieros (FMP)</Button></MutationForm>
           ) : null}
-          {isEsefIssuer(ticker) ? (
+          {isEsefIssuerProfile(ticker, company.exchange) ? (
             <MutationForm action={refreshCompanyFinancialsESEF.bind(null, ticker)} successMessage="Financieros ESEF refrescados"><Button type="submit" variant="outline">Refrescar ESEF</Button></MutationForm>
           ) : (
             <MutationForm action={refreshCompanyFinancialsSEC.bind(null, ticker)} successMessage="Financieros SEC refrescados"><Button type="submit" variant="outline">Refrescar SEC</Button></MutationForm>
@@ -1184,9 +1225,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </div>
         <Panel title="Métricas calculadas trazables"><MetricsGrid metrics={data.calculatedMetrics} /></Panel>
         <Panel title="Hechos financieros canónicos"><FactTable ticker={ticker} facts={data.facts} refreshLabel={
-            !ticker.includes('.')
+            fmpCovers(ticker, company.exchange)
               ? 'Refrescar financieros (FMP)'
-              : isEsefIssuer(ticker)
+              : isEsefIssuerProfile(ticker, company.exchange)
                 ? 'Refrescar ESEF'
                 : 'Refrescar SEC'
           } /></Panel>
@@ -1331,7 +1372,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // posicion viva se muestra como candidato de analisis.
   const holdingBadge = snapshot.in_portfolio
     ? 'en cartera'
-    : label(company.company_type === 'portfolio_holding' ? 'research_candidate' : company.company_type);
+    : companyTypeLabel(company.company_type === 'portfolio_holding' ? 'research_candidate' : company.company_type);
 
   return (
     <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8">

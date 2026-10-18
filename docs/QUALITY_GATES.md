@@ -94,7 +94,7 @@ Detalle de los controles negativos por dataset:
 
 | Workflow | Job | Quando | Que ejecuta |
 |---|---|---|---|
-| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | `evals` | cada push y cada PR, sin filtros | Los runners `run_rag_evals`, `run_valuation_evals`, `run_llm_evals`, `run_ingest_evals`, `run_backtest_evals` y `run_realized_evals` (ver el bucle del job en `ci.yml`; es la fuente de verdad de que runners son bloqueantes). Publica los logs `run_*_evals.log` como artefacto. |
+| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | `evals` | cada push y cada PR, sin filtros | Los runners `run_rag_evals`, `run_valuation_evals`, `run_llm_evals` y `run_ingest_evals` (ver el bucle del job en `ci.yml`; es la fuente de verdad de que runners son bloqueantes). Publica los logs `run_*_evals.log` como artefacto. |
 | `ci.yml` | `backend` | cada push y cada PR | Suite completa, ruff, pyright, y el gate fail-closed de `tests/test_rag_activation.py` contra Qdrant real. |
 | [`.github/workflows/coverage.yml`](../.github/workflows/coverage.yml) | `coverage` | push/PR que tocan `data-engine/**` | `run_coverage_gate.py` con `branch=True`, sin Qdrant (la medicion tiene que ser determinista). Publica `htmlcov/` y el `.coverage` como artefacto. |
 | [`llm-evals.yml`](../.github/workflows/llm-evals.yml) | `llm-layer-evals` | push/PR filtrados por paths de evals | `run_llm_evals.py` + contratos, sin `requirements.txt` ni red. |

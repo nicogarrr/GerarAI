@@ -106,6 +106,39 @@ def _facts_for_metric(db: Session, company_id: int, metric: str) -> list[Financi
     )
 
 
+def _missing_without_revenue_anchor(
+    db: Session, company_id: int
+) -> tuple[list[str], list[str]]:
+    """Entradas genuinamente ausentes cuando falta el ancla de revenue.
+
+    QA datos (ASML, 2026-10-18): el corte temprano declaraba ausentes
+    shares_diluted y FCF sin comprobarlo, y shares_diluted estaba guardado
+    (la ficha mostraba «Acciones diluidas (media) 2025-12-31:FY 388,9 M
+    SEC»). Sin revenue no hay snapshot coherente, pero una entrada
+    presente no esta «ausente»: solo se reportan las que faltan de verdad
+    y las presentes quedan explicadas en warnings.
+    """
+    missing = ["revenue"]
+    warnings: list[str] = []
+    if _facts_for_metric(db, company_id, "shares_diluted"):
+        warnings.append(
+            "Hay acciones diluidas guardadas, pero no se usan porque falta "
+            "el revenue."
+        )
+    else:
+        missing.append("shares_diluted")
+    has_fcf = bool(_facts_for_metric(db, company_id, "free_cash_flow"))
+    has_margin = bool(_facts_for_metric(db, company_id, "fcf_margin"))
+    if has_fcf or has_margin:
+        warnings.append(
+            "Hay flujo de caja libre guardado, pero no se usa porque falta "
+            "el revenue."
+        )
+    else:
+        missing.append("free_cash_flow_or_fcf_margin")
+    return missing, warnings
+
+
 def _same_duration_period(anchor: FinancialFact, candidate: FinancialFact) -> bool:
     # A TTM anchor is not interchangeable with an FY fact (nor with a quarter):
     # both are "duration" facts but they cover different windows, so pairing
@@ -206,9 +239,11 @@ class FinancialSnapshotBuilder:
     def build(self, db: Session, company: Company) -> FinancialSnapshot:
         revenue_candidates = _facts_for_metric(db, company.id, "revenue")
         if not revenue_candidates:
+            missing, warnings = _missing_without_revenue_anchor(db, company.id)
             return FinancialSnapshot(
-                missing_inputs=["revenue", "shares_diluted", "free_cash_flow_or_fcf_margin"],
+                missing_inputs=missing,
                 coherent=False,
+                warnings=warnings,
             )
 
         anchor = revenue_candidates[0]

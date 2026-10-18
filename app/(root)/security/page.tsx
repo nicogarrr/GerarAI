@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/auth/require-user";
 import { getTwoFactorStatus } from "@/lib/actions/auth.actions";
@@ -6,6 +7,8 @@ import InstallApp from "@/components/pwa/InstallApp";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+export const metadata: Metadata = { title: 'Seguridad' };
 
 export default async function SecurityPage() {
     let user;

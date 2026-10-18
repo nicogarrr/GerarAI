@@ -9,6 +9,7 @@ URL oficial de SEC (``official_document``). Lectura pura: no descarga nada.
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -101,6 +102,33 @@ _OFFICIAL_TITLE_START = (
     "Temporary Suspension", "Amendment to", "Submission of Matters", "Shareholder Nominations", "Regulation FD",
     "Other Events", "Financial Statements", "Material Cybersecurity", "Bankruptcy", "Mine Safety",
 )
+
+
+# QA 10: published_at puede faltar aunque el propio nombre del filing la
+# lleve (jpm-20261013.htm). Se deriva del nombre del documento o de su
+# URL; una fecha invalida o ausente sigue siendo None, nunca se inventa.
+# Los limites de digitos evitan falsos positivos en CIK y accession.
+_FILENAME_DATE_RE = re.compile(
+    r"(?<!\d)((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)"
+)
+
+
+def _filing_date_from_name(*texts: str | None) -> str | None:
+    for text in texts:
+        for match in _FILENAME_DATE_RE.finditer(text or ""):
+            try:
+                return date(
+                    int(match.group(1)), int(match.group(2)), int(match.group(3))
+                ).isoformat()
+            except ValueError:  # p.ej. 2026-02-30: se prueba la siguiente pista
+                continue
+    return None
+
+
+def _filed_at(document: Document) -> str | None:
+    if document.published_at:
+        return document.published_at.date().isoformat()
+    return _filing_date_from_name(document.source_url, document.title)
 
 
 def _looks_like_official_title(text: str) -> bool:
@@ -210,13 +238,12 @@ def eight_k_digest(db: Session, *, page: int = 1, page_size: int = 10) -> dict[s
                     previous.update(status="ready", items=items[:MAX_ITEMS_PER_FILING],
                                     document_id=document.id,
                                     source_url=document.source_url,
-                                    filed_at=document.published_at.date().isoformat()
-                                    if document.published_at else previous["filed_at"])
+                                    filed_at=_filed_at(document) or previous["filed_at"])
                     previous.pop("reason", None)
             continue
         base = {
             "document_id": document.id, "ticker": company.ticker, "company": company.name,
-            "filed_at": document.published_at.date().isoformat() if document.published_at else None,
+            "filed_at": _filed_at(document),
             "source": "SEC", "source_url": document.source_url, "label": "OFICIAL",
             "matching": tracked[document.company_id],
             "filing_intelligence": (document.metadata_ or {}).get(KEY),

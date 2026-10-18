@@ -220,7 +220,7 @@ jobs:
       - run: uv run --frozen python scripts/run_financial_evals.py
 
   evals:
-    # Los evals de RAG, valuation, LLM, ingest, backtest y realized viven aqui y
+    # Los evals de RAG, valuation, LLM e ingest viven aqui y
     # no dentro de `backend` por dos motivos: `backend` ya esta a 30 min (su
     # timeout) y los evals son el paso mas lento; y un eval en rojo no debe
     # esconderse detras de `pytest`.
@@ -230,7 +230,7 @@ jobs:
     # equivalente a `fail-fast: false` se consigue con el bucle de abajo: TODOS
     # los evals se ejecutan aunque uno falle y el job sale rojo si alguno fallo.
     # Se pierde el timeline por script en la UI, se gana no gastar 6 runners.
-    name: Evals (RAG, valuation, LLM, ingest, backtest, realized)
+    name: Evals (RAG, valuation, LLM, ingest)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
@@ -244,7 +244,7 @@ jobs:
     env:
       APP_ENV: test
       DATABASE_URL: sqlite:///./cavaai_evals_ci.db
-      # Vectors ON: los evals de RAG y backtest necesitan el motor de verdad. Si
+      # Vectors ON: los evals de RAG necesitan el motor de verdad. Si
       # un eval se los encuentra apagados se auto-skipearia, que es justo lo que
       # el gate fail-closed de abajo tiene que cazar.
       CAVAAI_ENABLE_VECTOR_INGEST: "1"
@@ -259,7 +259,7 @@ jobs:
         run: |
           present=""
           missing=""
-          for s in run_rag_evals run_valuation_evals run_llm_evals run_ingest_evals run_backtest_evals run_realized_evals; do
+          for s in run_rag_evals run_valuation_evals run_llm_evals run_ingest_evals; do
             if [ -f "scripts/$s.py" ]; then
               present="$present $s"
             else
@@ -280,10 +280,10 @@ jobs:
             echo "Ausentes (NO ejecutados):${missing:- ninguno}"
           } >> "$GITHUB_STEP_SUMMARY"
           # Obligatorios: los 6 estan integrados en main y corren verdes en CI
-          # (rag, valuation, llm, ingest, backtest, realized). Si se borra o
+          # (rag, valuation, llm, ingest). Si se borra o
           # renombra uno, el CI se pone en rojo en vez de quedar en verde
-          # evaluando menos (antes solo valuation y realized eran obligatorios).
-          required="run_rag_evals run_valuation_evals run_llm_evals run_ingest_evals run_backtest_evals run_realized_evals"
+          # evaluando menos (antes solo valuation y realized eran obligatorios; realized se borro con su codigo).
+          required="run_rag_evals run_valuation_evals run_llm_evals run_ingest_evals"
           for r in $required; do
             if [ ! -f "scripts/$r.py" ]; then
               echo "::error title=Eval obligatorio ausente::scripts/$r.py no existe"
