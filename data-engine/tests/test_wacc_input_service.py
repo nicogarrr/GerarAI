@@ -295,6 +295,8 @@ def test_yahoo_symbol_keeps_us_and_already_suffixed_tickers():
 
 
 def test_non_usd_company_does_not_get_us_treasury_risk_free(db, monkeypatch):
+    """EUR: nunca DGS10 (bono USD); la libre de riesgo es el Bund aleman,
+    benchmark sin default del euro, con la serie declarada."""
     _patch_no_yfinance(monkeypatch)
     _patch_fred(monkeypatch, _StubFred(configured=True))
     company = _company(db)
@@ -302,20 +304,67 @@ def test_non_usd_company_does_not_get_us_treasury_risk_free(db, monkeypatch):
     db.commit()
     result = _run(WaccInputService().refresh(db, company))
 
-    assert result["risk_free_unavailable_for_currency"] == "EUR"
-    assert "risk_free_rate" in result["missing"]
-    assert (
-        db.scalar(
-            select(FinancialFact).where(
-                FinancialFact.company_id == company.id,
-                FinancialFact.metric == "risk_free_rate",
-            )
+    assert result["risk_free_unavailable_for_currency"] is None
+    assert "risk_free_rate" not in result["missing"]
+    risk_free = db.scalar(
+        select(FinancialFact).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == "risk_free_rate",
         )
-        is None
     )
+    assert risk_free is not None
     fred_doc = db.scalar(
         select(Document).where(
             Document.company_id == company.id, Document.source_type == "FRED"
         )
     )
-    assert fred_doc is None
+    assert fred_doc.metadata_["series"] == "IRLTLT01DEM156N"
+    assert fred_doc.metadata_["currency"] == "EUR"
+
+
+def test_eur_company_gets_bund_risk_free(db, monkeypatch):
+    """EUR: la libre de riesgo es el Bund aleman (IRLTLT01DEM156N), no
+    DGS10 ni un proxy inventado; la serie queda declarada en el documento."""
+    _patch_no_yfinance(monkeypatch)
+    _patch_fred(monkeypatch, _StubFred(configured=True))
+    company = _company(db)
+    company.currency = "EUR"
+    db.commit()
+    result = _run(WaccInputService().refresh(db, company))
+
+    risk_free = db.scalar(
+        select(FinancialFact).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == "risk_free_rate",
+        )
+    )
+    assert risk_free is not None
+    assert risk_free.value == Decimal("0.0425")
+    doc = db.scalar(
+        select(Document).where(
+            Document.company_id == company.id, Document.source_type == "FRED"
+        )
+    )
+    assert doc.metadata_["series"] == "IRLTLT01DEM156N"
+    assert doc.metadata_["currency"] == "EUR"
+    assert "risk_free_rate" not in result["missing"]
+    assert result["risk_free_unavailable_for_currency"] is None
+
+
+def test_unsupported_currency_keeps_honest_missing(db, monkeypatch):
+    """GBP (sin rail configurado): sin hecho, declarado no disponible."""
+    _patch_no_yfinance(monkeypatch)
+    _patch_fred(monkeypatch, _StubFred(configured=True))
+    company = _company(db)
+    company.currency = "GBP"
+    db.commit()
+    result = _run(WaccInputService().refresh(db, company))
+
+    assert db.scalar(
+        select(FinancialFact).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == "risk_free_rate",
+        )
+    ) is None
+    assert "risk_free_rate" in result["missing"]
+    assert result["risk_free_unavailable_for_currency"] == "GBP"
