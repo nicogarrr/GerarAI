@@ -12,7 +12,7 @@ export function InvestorVideos({ videos }: { videos?: unknown }) {
         <section aria-labelledby="investor-videos-title" className="flex flex-col gap-4 border-t border-gray-800 pt-6">
             <h2 className="text-xl font-semibold text-gray-100" id="investor-videos-title">Vídeos</h2>
             {items.length === 0 ? <div className="rounded-lg border border-gray-800 p-4">
-                <p className="text-sm font-medium text-gray-300">Sin vídeos verificados.</p>
+                <p className="text-sm font-medium text-gray-300">No hay vídeos verificados disponibles para este inversor.</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                     <Link href="/inversores/canales" className="inline-flex min-h-11 items-center rounded-lg border border-gray-700 px-3 text-sm text-teal-300">Ver canales de inversión</Link>
                     <Link href="/inversores/cartas" className="inline-flex min-h-11 items-center rounded-lg border border-gray-700 px-3 text-sm text-teal-300">Explorar cartas</Link>
