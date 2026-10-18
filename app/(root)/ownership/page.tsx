@@ -122,10 +122,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                     <p className="text-sm font-semibold uppercase text-teal-300">{t('ownership.title')}</p>
                     <h1 className="mt-1 text-3xl font-bold text-gray-100">Propiedad institucional (13F)</h1>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                        Carteras de gestores institucionales revisados, tal como se declaran ante la SEC
-                        (Form 13F, EDGAR; fuente oficial y gratuita). Datos tal y como se presentaron:
-                        CUSIP y nombre del emisor, sin inferir tickers. Las enmiendas (13F-HR/A) son
-                        filings inmutables independientes.
+                        Posiciones declaradas ante la SEC. Los 13F pueden publicarse con hasta 45 días de retraso.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -285,7 +282,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                     </section>
                 ) : (
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5 text-sm text-gray-400">
-                        <h2 className="font-semibold text-gray-100">Cambios QoQ no disponibles todavía</h2>
+                        <h2 className="font-semibold text-gray-100">Cambios trimestrales no disponibles todavía</h2>
                         <p className="mt-2">
                             {changes.status === 'insufficient_history'
                                 ? 'Hacen falta dos informes 13F almacenados para comparar; estará disponible tras el próximo trimestre.'
