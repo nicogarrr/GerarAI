@@ -590,7 +590,7 @@ class ThesisEvidenceService:
         if not coming:
             return _pending(
                 "NASDAQ earnings calendar",
-                f"Sin earnings de {wanted} en los proximos {EARNINGS_LOOKAHEAD_DAYS} dias.",
+                f"Sin earnings de {wanted} en los próximos {EARNINGS_LOOKAHEAD_DAYS} días.",
             )
         nxt = coming[0]
         return {
