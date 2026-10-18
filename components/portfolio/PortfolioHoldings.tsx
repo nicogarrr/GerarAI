@@ -13,6 +13,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw } from 'lucide-react';
+import AddTransactionButton from '@/components/portfolio/AddTransactionButton';
+import ImportIBKRButton from '@/components/portfolio/ImportIBKRButton';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
@@ -138,7 +140,10 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
         {currentHoldings.length === 0 && !showCash ? (
           <div className="text-center py-8">
             <p className="text-gray-400">No tienes posiciones abiertas</p>
-            <p className="text-sm text-gray-500 mt-2">Agrega tu primera transacción para comenzar</p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              <AddTransactionButton userId={userId} />
+              <ImportIBKRButton userId={userId} />
+            </div>
           </div>
         ) : (
           <>
