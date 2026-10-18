@@ -110,10 +110,19 @@ def _fmt_money_es(number: float, digits: int = 2) -> str:
 
 def _currency_display(currency: str) -> str:
     return "€" if currency == "EUR" else currency
-def _price_display(value: Decimal | int | float, currency: str) -> str:
+
+
+def _price_display(value: Decimal | int | float, currency: str | None) -> str:
+    # Preserve small quotes instead of rounding a real nonzero price to zero.
+    magnitude = abs(Decimal(str(value)))
+    digits = max(2, -magnitude.adjusted() + 3) if 0 < magnitude < 1 else 2
+    text = f"{value:,.{digits}f}"
     if currency == "USD":
-        return f"${value:,.2f}"
-    return f"{_fmt_money_es(float(value))} {'€' if currency == 'EUR' else currency}"
+        return f"${text}"
+    text = text.replace(",", "\x07").replace(".", ",").replace("\x07", ".")
+    if not currency or not currency.strip():
+        return f"{text} (divisa no declarada)"
+    return f"{text} {'€' if currency == 'EUR' else currency}"
 
 
 def _fmt_value_es(value: float | None, unit: str | None) -> str:
@@ -1296,7 +1305,7 @@ class ChatService:
                 # de manana no es cotizacion actual.
                 adjusted = latest_price.adj_close is not None
                 value = latest_price.adj_close if adjusted else latest_price.close
-                kind = "cierre" if adjusted else "spot"
+                kind = "cierre ajustado" if adjusted else "spot"
                 price_line = (
                     f"{company.ticker} cotiza a "
                     f"{_price_display(value, company.currency)} "
