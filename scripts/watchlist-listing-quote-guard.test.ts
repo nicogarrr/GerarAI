@@ -50,10 +50,14 @@ test('la divisa visible la pone solo el master: nunca un USD inventado', () => {
     assert.ok(!/\? 'USD' : null/.test(action), 'asumir USD sin divisa real contradice F253');
 });
 
-test('el market cap (solo líneas US, Finnhub en USD) declara su divisa', () => {
+test('el market cap declara su divisa (formato multi-divisa con la divisa real)', () => {
     assert.equal(
-        page.match(/stock\.marketCap !== null \? formatMarketCapUsd\(stock\.marketCap\) : NA/g)?.length ?? 0,
+        page.match(/stock\.marketCap !== null \? formatMarketCap\(stock\.marketCap, stock\.currency\) : NA/g)?.length ?? 0,
         2,
-        'tarjeta y tabla: valor en $ solo con dato; null es NA pelado, nunca «N/D US$»',
+        'tarjeta y tabla: valor con divisa real solo con dato; null es NA pelado',
+    );
+    assert.ok(
+        !/formatMarketCapUsd\(stock\.marketCap\)/.test(page),
+        'el cap ya no es solo-US (respaldo backend): formatear siempre en $ inventaría la divisa',
     );
 });
