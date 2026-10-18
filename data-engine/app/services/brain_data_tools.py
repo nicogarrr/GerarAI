@@ -185,7 +185,7 @@ def _thesis_valuation_answer(db: Session, question: str, tenant: int) -> ChatRes
         ).order_by(ThesisVersion.version.desc()).limit(1))
         if latest is None:
             return _response([f"No hay ninguna tesis guardada de {company.ticker}."], [], "thesis_valuation")
-        return _response([f"{company.ticker} solo tiene una versión no publicada (v{latest.version}, {latest.status}); no la uso para dar el margen de seguridad."],
+        return _response([f"{company.ticker} solo tiene una versión no publicada (v{latest.version}, {latest.status}); no la uso para dar el margen de seguridad. Publica la tesis para ver el margen."],
                          [_source("thesis_version", latest.id, f"Tesis {company.ticker} v{latest.version}", _link(company, "thesis"))], "thesis_valuation")
     ccy = company.currency
     lines = [f"**Tesis de {company.ticker} · v{published.version} (publicada)**"]
