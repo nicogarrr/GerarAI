@@ -172,7 +172,7 @@ def export_year(
             io.BytesIO(content.encode("utf-8")),
             media_type="application/json",
             headers={
-                "Content-Disposition": f'attachment; filename="cavaai-export-{year}.json"'
+                "Content-Disposition": f'attachment; filename="gerarai-export-{year}.json"'
             },
         )
 
@@ -193,5 +193,5 @@ def export_year(
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode("utf-8-sig")),
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="cavaai-export-{year}.csv"'},
+        headers={"Content-Disposition": f'attachment; filename="gerarai-export-{year}.csv"'},
     )
