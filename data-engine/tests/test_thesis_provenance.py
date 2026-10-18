@@ -98,9 +98,9 @@ def test_provenance_markdown_table():
     service = ThesisService()
     text = service._provenance_markdown(build_inputs_provenance(_model()))
     assert "| input | etiqueta | valor | método | cita |" in text
-    assert "| wacc | derivado | 0.1 | CAPM con beta sectorial | facts: 11, 12 |" in text
-    assert "| terminal_growth | supuesto |" in text
-    assert "| satellites_on_orbit | dato | 5 |" in text
+    assert "| WACC | derivado | 0,1 | CAPM con beta sectorial | 2 hechos citados |" in text
+    assert "| Crecimiento terminal | supuesto |" in text
+    assert "| Satélites en órbita | dato | 5 |" in text
     assert "estimacion_llm" in text  # glosario de etiquetas en el header
     assert "revenue_growth" not in text
 
@@ -125,7 +125,7 @@ def test_render_markdown_includes_provenance_section():
         evidence=None,
     )
     assert "## 22. Procedencia de los inputs" in md
-    assert "| wacc | derivado |" in md
+    assert "| WACC | derivado |" in md
 
 
 def _session() -> Session:
