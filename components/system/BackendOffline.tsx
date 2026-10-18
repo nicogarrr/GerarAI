@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { RefreshCcw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { BackendOfflineAutoRetry } from '@/components/system/BackendOfflineAutoRetry';
 
 type Props = {
   /** Nombre de la pantalla afectada, p. ej. "Tu cartera". */
@@ -33,6 +34,7 @@ export default function BackendOffline({ feature, retryHref }: Props) {
           Reintentar
         </Link>
       </Button>
+      <BackendOfflineAutoRetry />
       <p className="text-xs text-gray-500">
         El servidor de GerarAI no ha podido completar la consulta. Reintenta en unos segundos.
       </p>
