@@ -345,6 +345,7 @@ export default function ThesisMemo({
             <div className="mt-1 text-base font-semibold text-gray-100">
               {marginOfSafetyDisplay(thesis.margin_of_safety, thesis.base_value)}
             </div>
+            {scenarios.values.expected != null ? <div className="mt-0.5 text-xs text-gray-500">sobre valor esperado</div> : null}
           </div>
         </div>
         <ScenarioAssumptions />

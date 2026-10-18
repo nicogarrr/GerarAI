@@ -586,7 +586,7 @@ export type ResearchLongTermModel = {
   current_snapshot: { period: string | null; fiscal_year: number | null; metrics: Record<string, { value: number | null; source_fact_ids: number[]; status: string }> };
   assumptions: Record<string, { value: number | null; unit: string; source_type: string; basis: string; source_fact_ids: number[]; fuentes?: Array<{ fact_id: number; titulo: string | null; url: string | null; fecha: string | null }>; confidence: number }>;
   scenarios: Record<string, ResearchLongTermScenario>;
-  reverse_dcf: { status: string; required_revenue_growth?: number; base_revenue_growth?: number; growth_gap_vs_base?: number; market_price?: number | null; missing_inputs?: string[] };
+  reverse_dcf: { status: string; required_revenue_growth?: number; base_revenue_growth?: number; fcf_margin?: number | null; growth_gap_vs_base?: number; market_price?: number | null; missing_inputs?: string[] };
   market_opportunity: {
     status: string;
     mode: string;

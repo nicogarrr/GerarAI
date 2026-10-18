@@ -59,7 +59,7 @@ function conditionInSpanish(
     case 'roic_above_wacc':
       return `El ROIC (${pct(item.value)}) debe mantenerse por encima del WACC (${waccHasSource ? pct(item.comparison) : 'N/D, sin fuente'}) para crear valor`;
     case 'price_expectations':
-      return `El precio actual descuenta un crecimiento de ingresos de en torno al ${pct(item.value)}`;
+      return `El precio actual descuenta un crecimiento de ingresos de en torno al ${pct(item.value)}${item.comparison != null ? ` (con margen FCF normalizado ${pct(item.comparison)})` : ''}`;
     case 'share_count':
       return `El número de acciones no debe crecer más rápido que lo asumido por el modelo (${pct(item.value)} anual)`;
     case 'competitive_position':
@@ -113,9 +113,9 @@ export function termLabel(raw: string): string {
   return frameworkTerm(raw) ?? metricLabel(raw);
 }
 
-function ModelStat({ label, value, positive = false }: { label: string; value: string; positive?: boolean }) {
+function ModelStat({ label, value, positive = false, hint }: { label: string; value: string; positive?: boolean; hint?: string }) {
   return (
-    <div className="rounded-lg border border-gray-800 bg-surface-1 p-4">
+    <div className="rounded-lg border border-gray-800 bg-surface-1 p-4" title={hint}>
       <div className="text-xs font-semibold uppercase text-gray-500">{label}</div>
       <div className={`mt-2 text-2xl font-semibold ${positive ? 'text-teal-300' : 'text-gray-100'}`}>{value}</div>
     </div>
@@ -192,7 +192,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
         <ModelStat label={`Ingresos ${year5?.year ?? 'año 5'}`} value={compactNumber(year5?.revenue)} />
         <ModelStat label={`FCF ${year5?.year ?? 'año 5'}`} value={compactNumber(year5?.free_cash_flow)} positive />
         <ModelStat label="Margen FCF" value={percentage(year5?.fcf_margin)} />
-        <ModelStat label="FCF / acción" value={compactNumber(year5?.fcf_per_share)} positive />
+        <ModelStat label="FCF / acción" value={compactNumber(year5?.fcf_per_share)} positive hint={year5?.fcf_per_share == null ? 'N/D: el modelo no proyecta el número de acciones cuando no puede determinar cómo se financia el hueco de caja.' : undefined} />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -278,7 +278,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
             </div>
             <p className="mt-2 text-gray-300">
               {model.reverse_dcf.status === 'ok'
-                ? `El precio actual exige ${percentage(model.reverse_dcf.required_revenue_growth)} de crecimiento; la base asume ${percentage(model.reverse_dcf.base_revenue_growth)}.`
+                ? `El precio actual exige ${percentage(model.reverse_dcf.required_revenue_growth)} de crecimiento; la base asume ${percentage(model.reverse_dcf.base_revenue_growth)}${model.reverse_dcf.fcf_margin != null ? `, con margen FCF normalizado ${percentage(model.reverse_dcf.fcf_margin)}` : ''}.`
                 : `No disponible: ${(model.reverse_dcf.missing_inputs ?? []).map(termLabel).join(', ') || 'faltan inputs de mercado o financieros'}.`}
             </p>
             <p className="mt-2 text-xs leading-5 text-gray-500">

@@ -40,7 +40,7 @@ from app.services.thesis_provenance import (
     inputs_provenance_from_snapshot,
 )
 from app.services.valuation_service import ValuationService
-from app.valuation.engines.base import MODEL_VERSION
+from app.valuation.engines.base import MODEL_VERSION, margin_of_safety_reference
 from app.valuation.financial_snapshot import FinancialSnapshotBuilder
 from app.valuation.moat_framework import empty_moat_framework
 
@@ -784,26 +784,32 @@ class ThesisService:
             )
         reverse = valuation.get("reverse_dcf") or {}
         required_growth = reverse.get("required_revenue_growth")
+        reverse_margin = reverse.get("fcf_margin")
+        margin_txt = (
+            f" con un margen FCF del {_thesis_percent(reverse_margin)}" if isinstance(reverse_margin, (int, float)) else ""
+        )
         growth_txt = (
-            f" El reverse DCF exige un crecimiento de ingresos del {_thesis_percent(required_growth)} anual."
+            f" El reverse DCF exige un crecimiento de ingresos del {_thesis_percent(required_growth)} anual{margin_txt}."
             if required_growth is not None
             else ""
         )
-        # MoS = base/price - 1 (valuation/engines/base.py): se nombra
-        # explicitamente. Describirlo como distancia precio/base ("un X% por
+        # MoS = valor esperado/precio - 1 (valuation/engines/base.py): se nombra
+        # explicitamente su base. Describirlo como distancia precio/base ("un X% por
         # encima del escenario base") usaria el denominador equivocado: con
         # precio 336.56 y base 106.85 diria "68% por encima" cuando el precio
         # esta un ~215% por encima.
+        ref_label, ref_value = margin_of_safety_reference(valuation) or ("escenario base", base)
+        ref_text = _thesis_money(float(ref_value), currency)
         if mos >= 0:
             return (
                 f"A {price_text}, {company.name} cotiza con un margen de seguridad "
-                f"del {_thesis_percent(mos)} respecto al escenario base ({base_text}). Hipótesis: "
+                f"del {_thesis_percent(mos)} respecto al {ref_label} ({ref_text}). Hipótesis: "
                 f"los fundamentales modelados son alcanzables y el mercado corrige "
                 f"ese descuento.{growth_txt}"
             )
         return (
             f"A {price_text}, {company.name} cotiza con un margen de seguridad "
-            f"del {_thesis_percent(mos)} respecto al escenario base ({base_text}). Hipótesis: "
+            f"del {_thesis_percent(mos)} respecto al {ref_label} ({ref_text}). Hipótesis: "
             f"el precio descuenta más de lo que los fundamentales modelados "
             f"soportan.{growth_txt}"
         )

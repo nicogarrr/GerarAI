@@ -259,6 +259,10 @@ class StandardDCFEngine(ValuationEngine):
                     shares_outstanding=shares,
                 )
             )
+            # Base explicita: la cifra solo se entiende con el margen FCF y el
+            # WACC con los que se resolvio (la vista del modelo usa el margen
+            # normalizado y puede dar otra cifra con otra base).
+            reverse = {**reverse, "fcf_margin": margin, "wacc": wacc}
 
         sensitivity = sensitivity_grid(
             base_inputs,

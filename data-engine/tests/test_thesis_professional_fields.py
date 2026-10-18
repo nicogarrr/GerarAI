@@ -122,3 +122,28 @@ def test_banda_y_porcentajes_del_memo_en_castellano() -> None:
     assert _band_es([0.16999999999999998, 0.25, 0.3]) == "17 % / 25 % / 30 %"
     assert _band_es(None) == "N/D"
     assert _pct_es(0.25) == "25 %" and _pct_es(0.155) == "15,5 %"
+
+def test_hypothesis_names_expected_value_as_margin_basis() -> None:
+    """MSFT: MoS = valor esperado/precio - 1; con base 309,10 no sale -31%."""
+    service = ThesisService()
+    valuation = {
+        "current_price": 529.05,
+        "base_value": 309.10,
+        "expected_value": 365.0,
+        "margin_of_safety": 365.0 / 529.05 - 1,
+    }
+    hypothesis = service._hypothesis(_company(), valuation)
+    assert "margen de seguridad del -31,0 % respecto al valor esperado (365.00)" in hypothesis
+    assert "escenario base" not in hypothesis
+
+
+def test_hypothesis_states_margin_basis_of_reverse_dcf() -> None:
+    service = ThesisService()
+    valuation = {
+        "current_price": 80.0,
+        "base_value": 100.0,
+        "margin_of_safety": 0.2,
+        "reverse_dcf": {"required_revenue_growth": 0.319, "fcf_margin": 0.202},
+    }
+    hypothesis = service._hypothesis(_company(), valuation)
+    assert "31,9 % anual con un margen FCF del 20,2 %." in hypothesis

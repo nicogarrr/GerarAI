@@ -491,3 +491,17 @@ def test_negative_base_fragment_has_no_margin_percentage():
     assert "-249%" not in text
     assert "no es interpretable" in text
     assert "-84.70" in text
+
+
+def test_position_fragment_names_expected_value_when_margin_comes_from_it():
+    valuation = {
+        **VALUATION,
+        "current_price": 529.05,
+        "base_value": 309.10,
+        "expected_value": 365.0,
+        "margin_of_safety": 365.0 / 529.05 - 1,
+    }
+    fragments = narrative._fragment_templates(_company(), valuation, NEWS)
+    assert "valor esperado de 365.00" in fragments["valoracion_posicion"]
+    assert "margen de seguridad del -31%" in fragments["valoracion_posicion"]
+    assert "escenario base" not in fragments["valoracion_posicion"]
