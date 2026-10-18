@@ -6,6 +6,7 @@
 'use server';
 
 import { validateArticle, formatArticle, getDateRange } from '@/lib/utils';
+import { isFinanciallyRelevant } from '@/lib/newsRelevance';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { NewsSource } from '@/lib/types/vendorSources';
 
@@ -322,6 +323,7 @@ export async function getNewsWithFallback(symbols?: string[], maxArticles = 6): 
 
     for (const article of allNews) {
         if (!article.url) continue;
+        if (!isFinanciallyRelevant(article)) continue;
         const normalizedUrl = article.url.toLowerCase().trim();
         if (seen.has(normalizedUrl)) continue;
         seen.add(normalizedUrl);
