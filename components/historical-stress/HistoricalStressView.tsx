@@ -39,7 +39,7 @@ export default function HistoricalStressView({ report }: { report: HistoricalStr
     const pages = Math.ceil(report.companies.length / size);
     return <div className="space-y-6">
         {report.mode === 'portfolio' && <section aria-label="Escenario de cartera">
-            <h2 className="mb-3 font-semibold text-gray-100">Cartera actual · INFERIDO</h2>
+            <h2 className="mb-3 font-semibold text-gray-100">Cartera actual</h2>
             <p className="mb-4 text-sm text-gray-400">Pesos actuales de renta variable, comprar y mantener. Sin caja ni efecto divisa. No es tu rendimiento real.</p>
             <div className="grid gap-3 md:grid-cols-3">{report.portfolio.map(window => <WindowCard key={window.year} window={window} />)}</div>
         </section>}
