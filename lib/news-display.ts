@@ -20,7 +20,7 @@ export function newsDisplayTitle(
     originalHeadline?: string | null,
 ): string {
     return stripTickerPrefix(
-        untokenizeHeadline(sourceHeadlineWithoutAddedTicker(title, ticker, headlineFromSource, originalHeadline)),
+        dedupeRepeatedHeadline(untokenizeHeadline(sourceHeadlineWithoutAddedTicker(title, ticker, headlineFromSource, originalHeadline))),
         ticker,
         headlineFromSource,
     );
@@ -140,4 +140,17 @@ export function stripLeadingTicker(title: string, ticker: string | null | undefi
     const parenthesized = new RegExp(`^\\(${escapeRegExp(t)}\\)\\s+`, 'i');
     const separated = new RegExp(`^${escapeRegExp(t)}\\s*[:·—–-]\\s+`, 'i');
     return title.replace(parenthesized, '').replace(separated, '').trim();
+}
+
+
+/** Legacy ingestion joined identical title and summary. Remove only exact
+ * repeated whole headlines, never repeated words within a real headline. */
+export function dedupeRepeatedHeadline(title: string): string {
+    const words = title.trim().split(/\s+/);
+    for (let size = 4; size <= words.length / 2; size++) {
+        if (words.length % size !== 0) continue;
+        const first = words.slice(0, size).join(' ');
+        if (words.every((word, index) => word === words[index % size])) return first;
+    }
+    return title;
 }

@@ -142,3 +142,22 @@ def test_get_news_legacy_event_without_assessment_returns_honest_nulls(monkeypat
         assert row["source_policy"] is None
         assert row["model_route"] is None
     engine.dispose()
+
+
+def test_legacy_solicitation_projects_low_materiality_without_changing_storage():
+    engine, factory = _make_db()
+    with factory() as db:
+        db.add(Tenant(id=1, external_id="t"))
+        titles = ["ASTS SHAREHOLDER ALERT: Bronstein invites investors", "ASTS Deadline in 26 Days: Class Action reminder", "AST SpaceMobile settles securities class action"]
+        for title in titles:
+            db.add(NewsEvent(tenant_id=1, title=title, summary=title, source="prnewswire/GDELT", date=NOW, materiality_score=3, requires_update=True))
+        db.commit()
+        rows = {row["title"]: row for row in _client(db).get("/api/news").json()}
+        for title in titles[:2]:
+            assert rows[title]["materiality_score"] == 1
+            assert rows[title]["event_type"] == "legal_solicitation"
+            assert rows[title]["requires_update"] is False
+        assert rows[titles[2]]["materiality_score"] == 3
+        assert rows[titles[2]]["requires_update"] is True
+        assert all(event.materiality_score == 3 for event in db.query(NewsEvent).all())
+    engine.dispose()
