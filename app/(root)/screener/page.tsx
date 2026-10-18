@@ -216,7 +216,6 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                           <span className="text-xs text-gray-500 md:hidden">Ticker</span>
                           <Link
                             href={`/research/${r.symbol}`}
-                            prefetch
                             className="inline-flex min-h-[44px] items-center font-semibold text-teal-300 hover:text-teal-200"
                           >
                             {r.symbol}
@@ -224,7 +223,7 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4">
                           <span className="shrink-0 text-xs text-gray-500 md:hidden">Nombre</span>
-                          <Link href={`/research/${r.symbol}`} prefetch className="max-w-[180px] truncate text-right text-gray-300 hover:text-teal-200 md:max-w-[220px] md:text-left" title={r.name}>{r.name}</Link>
+                          <Link href={`/research/${r.symbol}`} className="max-w-[180px] truncate text-right text-gray-300 hover:text-teal-200 md:max-w-[220px] md:text-left" title={r.name}>{r.name}</Link>
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
                           <span className="text-xs text-gray-500 md:hidden">Precio</span>
