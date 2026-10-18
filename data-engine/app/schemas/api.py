@@ -42,6 +42,12 @@ class FinancialFactOut(BaseModel):
     is_adjusted: bool
     confidence: Decimal
     created_at: datetime
+    # Procedencia enlazable (documento de origen del dato). Nulos cuando el
+    # hecho no tiene documento asociado: el frontend muestra la fuente como
+    # texto plano, nunca un enlace inventado.
+    source_url: str | None = None
+    source_title: str | None = None
+    source_published_at: datetime | None = None
 
 
 class CompanyKPIOut(BaseModel):
