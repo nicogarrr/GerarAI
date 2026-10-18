@@ -1,5 +1,5 @@
 import { ExtractionRefresh } from '@/components/knowledge/ExtractionRefresh';
-import { extractionResultText, hasDefaultCollections } from '@/lib/knowledge/job-feedback';
+import { extractionResultText, hasDefaultCollections, noPrinciplesText } from '@/lib/knowledge/job-feedback';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownComponents } from '@/components/research/ThesisMarkdown';
@@ -410,7 +410,27 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
               {['proposed', 'approved'].includes(principle.status) ? <details className="mt-4 border-t border-gray-800 pt-3"><summary className="cursor-pointer text-xs font-semibold uppercase text-gray-500">Corregir como nueva versión</summary><MutationForm action={reviseKnowledgePrinciple.bind(null, principle.id)} className="mt-3 grid grid-cols-1 gap-2" successMessage="Revisión propuesta"><Textarea className="min-h-[88px] w-full text-base md:text-sm" defaultValue={principle.principle} name="principle" required /><Input className="h-11 w-full" defaultValue={principle.category} name="category" required /><Input className="h-11 w-full" defaultValue={principle.application_conditions.join(', ')} name="application_conditions" placeholder="Condiciones, separadas por comas" /><Input className="h-11 w-full" defaultValue={principle.exceptions.join(', ')} name="exceptions" placeholder="Excepciones, separadas por comas" /><Button className="h-11 w-full sm:w-fit" size="sm" type="submit">Crear revisión</Button></MutationForm></details> : null}
             </article>
           ))}
-          {!visiblePrinciples.length ? <p className="text-sm text-gray-500">Ningún principio coincide con este filtro.</p> : null}
+          {!visiblePrinciples.length ? (
+            principles.length ? (
+              <p className="text-sm text-gray-500">
+                Ningún principio coincide con este filtro.{' '}
+                <Link className="text-teal-300 underline underline-offset-2" href="/knowledge?tab=principios">Ver todos</Link>
+              </p>
+            ) : (
+              <div className="rounded-lg border border-dashed border-gray-800 p-4">
+                <p className="text-sm text-gray-400">
+                  {activeJobs.length
+                    ? 'Extracción en curso: los principios aparecen aquí al terminar.'
+                    : noPrinciplesText(jobs)}
+                </p>
+                {!activeJobs.length ? (
+                  <Button asChild className="mt-3 min-h-[44px]" size="sm" variant="outline">
+                    <Link href="/knowledge">Ir a la Biblioteca</Link>
+                  </Button>
+                ) : null}
+              </div>
+            )
+          ) : null}
         </div>
       </section>
         </TabsContent>
