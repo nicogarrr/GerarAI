@@ -37,22 +37,55 @@ jobs:
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
 
-      - name: Comprueba la clave de Zen
-        id: key
+      # POR QUE UN PRECHECK: el free tier de OpenCode Zen empezo a responder
+      # 403 ("free tier can only be used from within OpenCode") a cualquier
+      # cliente que no sea OpenCode, y este workflow se puso en rojo en TODOS
+      # los deploys (328 rojos seguidos desde el 2-oct). Un proveedor caido
+      # no es un bug del producto: con el precheck, la pasada de agente se
+      # salta con aviso grande en el summary y los tests DETERMINISTAS
+      # (Playwright puro, sin LLM) siguen gateando el producto. Cuando Zen
+      # vuelva, la pasada de agente se reanuda sola en el siguiente run.
+      # La llamada replica exactamente el cliente de e2e.config.ts (misma
+      # baseURL, cabecera de sesion, User-Agent y modelo), asi que un 200
+      # aqui significa que los tests de agente pueden correr de verdad.
+      - name: Precheck del proveedor (Zen)
+        id: zen
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         run: |
           if [ -z "$OPENCODE_API_KEY" ]; then
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-            echo "### QA e2e no ejecutado" >> "$GITHUB_STEP_SUMMARY"
-            echo "Falta el secret de repo OPENCODE_API_KEY." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
+            echo "agent=0" >> "$GITHUB_OUTPUT"
+            echo "reason=Falta el secret de repo OPENCODE_API_KEY" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-          echo "ok=true" >> "$GITHUB_OUTPUT"
+          code=$(curl -sS -o /tmp/zen-precheck.json -w '%{http_code}' --max-time 30 \
+            -X POST "${ZEN_BASE_URL:-https://opencode.ai/zen/v1}/chat/completions" \
+            -H "Authorization: Bearer $OPENCODE_API_KEY" \
+            -H "x-opencode-session: ${ZEN_SESSION_ID:-cavaai-e2e-readonly}" \
+            -H "User-Agent: curl/8.5.0" \
+            -H "Content-Type: application/json" \
+            -d '{"model":"'"${ZEN_MODEL:-space-bunny-free}"'","messages":[{"role":"user","content":"responde ok"}],"max_tokens":1}')
+          echo "http=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = "200" ]; then
+            echo "agent=1" >> "$GITHUB_OUTPUT"
+            echo "reason=" >> "$GITHUB_OUTPUT"
+          else
+            echo "agent=0" >> "$GITHUB_OUTPUT"
+            echo "reason=El proveedor Zen respondio HTTP $code (free tier de OpenCode bloqueado o proveedor caido)" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Pasada de agente NO ejecutada::El proveedor Zen respondio HTTP $code; solo corren los tests deterministas."
+            # El cuerpo puede dar una pista (sin secretos: la clave viaja en
+            # la cabecera de la peticion, no en la respuesta).
+            head -c 300 /tmp/zen-precheck.json || true
+          fi
 
       - name: Ejecuta e2e (paginas publicas y rutas autenticadas)
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          # 1 = el precheck confirmo que el proveedor responde: corren tambien
+          # los tests de agente. 0 = esos tests se saltan con razon registrada
+          # (ver SKIP_AGENT en qa-e2e/tests/) y el run cierra con los
+          # deterministas.
+          E2E_AGENT: ${{ steps.zen.outputs.agent }}
           # Cuenta que indiquen estos secrets (la cuenta indicada, con autorizacion; solo lectura,
           # escrituras bloqueadas en el navegador). Si los secrets
           # no existen, tests/authenticated.e2e.ts se salta y el resumen lo indica.
@@ -68,9 +101,20 @@ jobs:
         env:
           E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
           E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+          AGENT_OK: ${{ steps.zen.outputs.agent }}
+          AGENT_REASON: ${{ steps.zen.outputs.reason }}
         run: |
           {
-            echo "### QA e2e (solo lectura) contra ${E2E_BASE_URL:-https://cavaai.vercel.app}"
+            echo "### QA e2e (solo lectura) contra ${E2E_BASE_URL:-https://gerarai.vercel.app}"
+            if [ "$AGENT_OK" != "1" ]; then
+              echo
+              echo "## ⚠️ PASADA DE AGENTE NO EJECUTADA"
+              echo
+              echo "**Motivo: ${AGENT_REASON:-precheck del proveedor fallido}.**"
+              echo
+              echo "Solo se ejecutaron los tests deterministas (Playwright, sin LLM). La auditoria de UI por agente queda pendiente de que el proveedor Zen vuelva a responder; este verde NO la cubre."
+              echo
+            fi
             if [ -z "$E2E_USER_EMAIL" ] || [ -z "$E2E_USER_PASSWORD" ]; then
               echo "**Rutas autenticadas NO ejecutadas: faltan los secrets E2E_USER_EMAIL / E2E_USER_PASSWORD (solo se probaron las paginas publicas).**"
             fi

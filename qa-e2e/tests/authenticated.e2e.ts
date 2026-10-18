@@ -33,6 +33,14 @@ const REPORT =
 const SKIP_AUTH: string | false =
   (!EMAIL || !PASSWORD) && 'Faltan los secrets E2E_USER_EMAIL / E2E_USER_PASSWORD: no se ejecuta.';
 
+// Mismo criterio que readonly.e2e.ts: la pasada de agente solo corre cuando el
+// precheck del workflow confirmo que el proveedor Zen responde (E2E_AGENT=1).
+// El bloqueo mecanico de escritura y el login son deterministas y corren
+// siempre que haya credenciales, con o sin agente.
+const SKIP_AGENT: string | false =
+  process.env.E2E_AGENT !== '1' &&
+  'Pasada de agente NO ejecutada: el precheck del proveedor Zen fallo o falta OPENCODE_API_KEY.';
+
 test.describe('rutas autenticadas (solo lectura)', { skip: SKIP_AUTH }, () => {
 
   test.beforeEach(async ({ app, browser }) => {
@@ -99,13 +107,15 @@ test.describe('rutas autenticadas (solo lectura)', { skip: SKIP_AUTH }, () => {
     { tag: 'watchlist', path: '/watchlist', task: 'Read the watchlist rows and check dates and N/D values.' },
   ];
 
-  for (const s of scenarios) {
-    test(`${s.tag}: navega pestanas y detecta problemas`, async ({ app, agent }) => {
-      await app.open(s.path);
-      await agent.act(`${RULES} ${s.task}`);
-      await agent.assert('the page is not showing a crash, a blank screen or an unhandled error', { screenshot: false });
-      const info = await agent.extract(REPORT, { schema: FINDINGS });
-      console.log(`[${s.tag}]`, JSON.stringify(info.problems.length ? info.problems : 'ninguno'));
-    });
-  }
+  test.describe('pasada de agente (proveedor Zen)', { skip: SKIP_AGENT }, () => {
+    for (const s of scenarios) {
+      test(`${s.tag}: navega pestanas y detecta problemas`, async ({ app, agent }) => {
+        await app.open(s.path);
+        await agent.act(`${RULES} ${s.task}`);
+        await agent.assert('the page is not showing a crash, a blank screen or an unhandled error', { screenshot: false });
+        const info = await agent.extract(REPORT, { schema: FINDINGS });
+        console.log(`[${s.tag}]`, JSON.stringify(info.problems.length ? info.problems : 'ninguno'));
+      });
+    }
+  });
 });
