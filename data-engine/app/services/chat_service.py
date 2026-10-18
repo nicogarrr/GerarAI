@@ -110,6 +110,10 @@ def _fmt_money_es(number: float, digits: int = 2) -> str:
 
 def _currency_display(currency: str) -> str:
     return "€" if currency == "EUR" else currency
+def _price_display(value: Decimal | int | float, currency: str) -> str:
+    if currency == "USD":
+        return f"${value:,.2f}"
+    return f"{_fmt_money_es(float(value))} {'€' if currency == 'EUR' else currency}"
 
 
 def _fmt_value_es(value: float | None, unit: str | None) -> str:
@@ -1295,7 +1299,7 @@ class ChatService:
                 kind = "cierre" if adjusted else "spot"
                 price_line = (
                     f"{company.ticker} cotiza a "
-                    f"{_fmt_number_es(float(value))} {company.currency} "
+                    f"{_price_display(value, company.currency)} "
                     f"({kind} del {_fmt_date_es(latest_price.date.isoformat())}, "
                     f"fuente {latest_price.source})."
                 )
@@ -1303,7 +1307,7 @@ class ChatService:
                     self._source_entry(
                         "market_price",
                         latest_price.id,
-                        f"{company.ticker} {value} {company.currency} ({kind} {latest_price.date.isoformat()}, {latest_price.source})",
+                        f"{company.ticker} {_price_display(value, company.currency)} ({kind} {latest_price.date.isoformat()}, {latest_price.source})",
                         date=latest_price.date.isoformat(),
                         price=str(value),
                         currency=company.currency,
