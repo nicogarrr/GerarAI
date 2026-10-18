@@ -43,7 +43,7 @@ export default async function VideosPage({
       <header className="flex flex-wrap justify-between gap-3">
         <h1 className="text-3xl font-semibold text-gray-100">Vídeos</h1>
         <Link
-          className="text-sm text-lime-300 hover:underline"
+          className="inline-flex min-h-11 items-center text-sm text-lime-300 hover:underline"
           href="/inversores/canales"
         >
           Canales de inversión
@@ -80,9 +80,10 @@ export default async function VideosPage({
           <InvestorVideos videos={detail.videos} />
         </section>
       ) : (
-        <p className="text-sm text-gray-500">
-          {inversor ? "Inversor no encontrado" : "Selecciona un inversor"}
-        </p>
+        <div className="rounded-xl border border-gray-800 p-5 text-sm text-gray-400">
+          <p>{inversor ? "No encontramos ese inversor en el catálogo. Elige uno de la lista para ver sus vídeos disponibles." : "Elige un inversor de la lista para consultar sus vídeos verificados. También puedes explorar los canales de inversión."}</p>
+          {inversor ? <Link href="/inversores/videos" className="mt-2 inline-flex min-h-11 items-center text-teal-300">Volver a la lista de inversores</Link> : null}
+        </div>
       )}
     </main>
   );
