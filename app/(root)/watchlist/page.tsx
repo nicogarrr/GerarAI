@@ -2,7 +2,8 @@ import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus
 import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-analysis-status';
 import type { Metadata } from 'next';
 import { formatMarketCap, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
-import { getWatchlistState, getWatchlistEntryData } from '@/lib/actions/watchlist.actions';
+import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, getExtendedQuote, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
+import { extendedQuoteLabel, type ExtendedQuote } from '@/lib/market/extended-quote';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -43,6 +44,8 @@ interface WatchlistStock {
     priceKind: 'live' | 'close' | null;
     priceAsOf: string | null;
     metricsNotApplicable: boolean;
+    monitor: WatchlistMonitorItem | null;
+    extended: ExtendedQuote | null;
     addedAt: Date;
 }
 
@@ -63,13 +66,17 @@ export default async function WatchlistPage({
 
     // Cotizar solo la página visible, no toda la lista.
     const datedChanges = await fetchDatedChanges(pageItems.map((item) => item.symbol));
+    // Monitor denso: minimo 52 sem y cierre desde market_prices propio,
+    // proximos resultados via NASDAQ publico, comparacion con la ultima
+    // tesis publicada. Una sola llamada por pagina visible.
+    const monitorData = await getWatchlistMonitor(pageItems.map((item) => item.symbol));
     const watchlistStocks: WatchlistStock[] = await Promise.all(
         pageItems.map(async (item) => {
             try {
                 // Precio y divisa del LISTADO REAL (master), nunca del ticker
                 // desnudo: Finnhub free lo resuelve en la línea US (ADR en USD
                 // u otro emisor) y contradecía la ficha research (F253/F254).
-                const entry = await getWatchlistEntryData(item.symbol);
+                const [entry, extended] = await Promise.all([getWatchlistEntryData(item.symbol), getExtendedQuote(item.symbol)]);
                 // Mismo cierre datado y mismo % que Movers y Mercado.
                 const dated = entry.priceKind === 'live' ? undefined : datedChanges[item.symbol.trim().toUpperCase()];
                 const data = dated
@@ -97,6 +104,8 @@ export default async function WatchlistPage({
                     peRatio: data.peRatio,
                     peKind: data.peKind,
                     analysis: item.analysis,
+                    monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
+                    extended,
                     addedAt: item.addedAt
                 };
             } catch {
@@ -116,6 +125,8 @@ export default async function WatchlistPage({
                     peRatio: null,
                     peKind: null,
                     analysis: item.analysis,
+                    monitor: null,
+                    extended: null,
                     addedAt: item.addedAt
                 };
             }
@@ -123,6 +134,10 @@ export default async function WatchlistPage({
     );
 
     const sortedStocks = [...watchlistStocks].sort((a, b) => Number(a.price === null) - Number(b.price === null));
+    // Solo cuentan tickers con tesis PUBLICADA de K (expected_value real);
+    // sin valoracion no se juzga caro/barato.
+    const undervaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'infravalorada').length;
+    const overvaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'sobrevalorada').length;
 
     // Un único formateador para móvil y desktop: sin dato -> NA ('N/D'),
     // nunca un número interpolado sin guarda.
@@ -141,6 +156,19 @@ export default async function WatchlistPage({
     // número pelado, nunca un «US$» asumido (F253).
     const formatPriceCell = (price: number | null, currency: string | null) =>
         price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
+    // Pre/post-mercado (Yahoo, via backend propio): segunda linea bajo el
+    // precio con sesion y hora del dato; nada sin sesion extendida.
+    const ExtendedHoursLine = ({ stock }: { stock: WatchlistStock }) => {
+        const quote = stock.extended;
+        if (!quote || quote.price == null || (quote.price_session !== 'pre' && quote.price_session !== 'post')) return null;
+        return (
+            <div className="text-[10px] font-normal text-gray-500">
+                {extendedQuoteLabel(quote)}: {formatPriceCell(quote.price, stock.currency)}
+                {typeof quote.change_percent === 'number' && Number.isFinite(quote.change_percent) ? ` (${formatChangePercent(quote.change_percent)})` : ''}
+            </div>
+        );
+    };
+
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip p-4 sm:p-6">
@@ -150,7 +178,11 @@ export default async function WatchlistPage({
                         <Eye className="h-7 w-7 shrink-0 text-purple-400 sm:h-8 sm:w-8" aria-hidden="true" />
                         Watchlist
                     </h1>
-
+                    {undervaluedCount + overvaluedCount > 0 ? (
+                        <p className="text-xs text-gray-500">
+                            Según la tesis publicada de K: {undervaluedCount} infravaloradas · {overvaluedCount} sobrevaloradas
+                        </p>
+                    ) : null}
                 </div>
             </div>
 
@@ -223,6 +255,11 @@ export default async function WatchlistPage({
                                         {stock.priceKind === 'close' ? (
                                             <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</dd>
                                         ) : null}
+                                        <ExtendedHoursLine stock={stock} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <dt className="text-[11px] text-gray-500">Próx. resultados</dt>
+                                        <dd className="font-mono text-sm text-gray-300">{stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}</dd>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Market Cap</dt>
@@ -261,6 +298,7 @@ export default async function WatchlistPage({
                                     <TableHead className="text-right text-gray-300">Cambio sesión</TableHead>
                                     <TableHead className="text-right text-gray-300">Market Cap</TableHead>
                                     <TableHead className="text-right text-gray-300">PER</TableHead>
+                                    <TableHead className="text-right text-gray-300">Próx. resultados</TableHead>
 
                                 </TableRow>
                             </TableHeader>
@@ -280,6 +318,11 @@ export default async function WatchlistPage({
                                                                 sin datos
                                                             </Badge>
                                                         ) : null}
+                                                        {stock.monitor && stock.price !== null && stock.monitor.low_52w !== null && stock.monitor.low_52w_sessions >= 120 && stock.price <= stock.monitor.low_52w * 1.02 ? (
+                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={`Mínimo de 52 semanas: ${formatPrice(stock.monitor.low_52w, stock.monitor.currency ?? 'USD')} (${stock.monitor.low_52w_sessions} cierres en la serie propia)`}>
+                                                                Mínimo 52 sem
+                                                            </Badge>
+                                                        ) : null}
                                                     </div>
                                                     {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} />
                                                 </div>
@@ -297,6 +340,7 @@ export default async function WatchlistPage({
                                             {stock.priceKind === 'close' ? (
                                                 <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</div>
                                             ) : null}
+                                            <ExtendedHoursLine stock={stock} />
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {stock.changePercent === null ? (
@@ -326,6 +370,9 @@ export default async function WatchlistPage({
                                             ) : (
                                                 <span className="text-gray-500">{NA}</span>
                                             )}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono text-sm text-gray-300" title={stock.monitor?.next_earnings_source ?? undefined}>
+                                            {stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}
                                         </TableCell>
 
                                     </TableRow>

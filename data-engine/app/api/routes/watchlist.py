@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import Company, FinancialFact, MarketPrice, WatchItem
+from app.models import Company, FinancialFact, MarketPrice, ThesisVersion, WatchItem
+from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
 
 router = APIRouter()
@@ -69,6 +72,92 @@ def delete_watch_item(symbol: str, db: Session = Depends(get_db)) -> None:
         raise HTTPException(status_code=404, detail="Watch item not found")
     db.delete(item)
     db.commit()
+
+@router.get("/monitor")
+async def watchlist_monitor(
+    tickers: str = Query(..., description="CSV de tickers, max 60"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Datos densos por ticker para el monitor de watchlist.
+
+    Solo datos propios o de fuentes publicas con trazabilidad: minimo de 52
+    semanas desde ``market_prices`` (ingesta propia), proximo resultado desde
+    el conector publico de NASDAQ (misma fuente que /api/calendar/earnings) y
+    comparacion con la ultima tesis PUBLICADA de K (``expected_value``).
+    Cualquier pieza sin dato va a ``None``; nunca se inventa.
+    """
+    wanted = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))[:60]
+    today = date.today()
+    cutoff = today - timedelta(days=365)
+
+    companies = db.scalars(select(Company).where(Company.ticker.in_(wanted))).all()
+    items: dict[str, dict] = {}
+    for company in companies:
+        ticker = str(company.ticker).upper()
+        low_row = db.execute(
+            select(MarketPrice)
+            .where(MarketPrice.company_id == company.id,
+                   MarketPrice.date >= cutoff,
+                   MarketPrice.close.isnot(None), MarketPrice.close > 0)
+            .order_by(MarketPrice.close.asc()).limit(1)
+        ).scalar_one_or_none()
+        sessions = db.execute(
+            select(MarketPrice.id)
+            .where(MarketPrice.company_id == company.id,
+                   MarketPrice.date >= cutoff,
+                   MarketPrice.close.isnot(None), MarketPrice.close > 0)
+        ).all()
+        last_close = db.execute(
+            select(MarketPrice)
+            .where(MarketPrice.company_id == company.id,
+                   MarketPrice.close.isnot(None), MarketPrice.close > 0)
+            .order_by(desc(MarketPrice.date)).limit(1)
+        ).scalar_one_or_none()
+        thesis = db.execute(
+            select(ThesisVersion)
+            .where(ThesisVersion.company_id == company.id,
+                   ThesisVersion.status == "published",
+                   ThesisVersion.expected_value.isnot(None))
+            .order_by(desc(ThesisVersion.version)).limit(1)
+        ).scalar_one_or_none()
+        fair_value = float(thesis.expected_value) if thesis is not None else None
+        price = float(last_close.close) if last_close is not None else None
+        side = None
+        if fair_value is not None and price is not None and fair_value > 0:
+            side = "infravalorada" if price < fair_value else "sobrevalorada"
+        items[ticker] = {
+            "low_52w": float(low_row.close) if low_row is not None else None,
+            "low_52w_date": low_row.date.isoformat() if low_row is not None else None,
+            "low_52w_sessions": len(sessions),
+            "last_close": price,
+            "last_close_date": last_close.date.isoformat() if last_close is not None else None,
+            "fair_value": fair_value,
+            "fair_value_thesis_version": int(thesis.version) if thesis is not None else None,
+            "valuation_side": side,
+            "currency": company.currency,
+            "next_earnings_date": None,
+            "next_earnings_source": None,
+        }
+
+    # Proximos resultados (NASDAQ publico, mismo conector que /api/calendar).
+    earnings_status = "skipped"
+    us_wanted = [t for t in items]
+    if us_wanted:
+        try:
+            result = await fetch_earnings_range(today, today + timedelta(days=31))
+            earnings_status = str(result.get("status", "unavailable"))
+            for event in result.get("events", []):
+                symbol = str(event.get("symbol") or "").upper()
+                day = str(event.get("date") or "")
+                row = items.get(symbol)
+                if row is not None and day and row["next_earnings_date"] is None:
+                    row["next_earnings_date"] = day
+                    row["next_earnings_source"] = "NASDAQ (api.nasdaq.com)"
+        except Exception:
+            earnings_status = "unavailable"
+
+    return {"items": items, "earnings_status": earnings_status}
+
 
 @router.get("/metrics/{symbol}")
 def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
