@@ -73,6 +73,16 @@ export async function getLatestFunnelPicks(): Promise<FunnelPicksResult | null> 
   };
 }
 
+/** Ejecuta el embudo completo ahora (POST /api/propicks/runs) y devuelve el run creado. */
+export async function generateFunnelRunNow(): Promise<FunnelRunSummary | { error: string }> {
+  try {
+    return await researchRequest<FunnelRunSummary>('/api/propicks/runs', { method: 'POST' });
+  } catch (error) {
+    console.error('generateFunnelRunNow error:', error);
+    return { error: error instanceof Error ? error.message : 'No se pudo generar la selección.' };
+  }
+}
+
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const pct = (ratio: number) => round1(ratio * 100);

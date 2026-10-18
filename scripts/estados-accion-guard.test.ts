@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+
+const read = (p: string) => readFileSync(p, 'utf8');
+
+test('inversores: cuenta nueva sin 13F ofrece la acción real de sincronizar', () => {
+  const page = read('app/(root)/inversores/carteras/page.tsx');
+  assert.ok(page.includes('SyncPortfoliosButton'), 'la página de carteras debe usar SyncPortfoliosButton');
+  assert.ok(page.includes('Aún no hay carteras descargadas en esta cuenta.'));
+  assert.ok(page.includes('.every((investor) => !investor.report_date)'), 'el estado vacío solo aparece cuando NINGÚN inversor tiene 13F descargado');
+
+  const button = read('app/(root)/inversores/_components/SyncPortfoliosButton.tsx');
+  assert.ok(button.includes('Sincronizar carteras ahora'));
+  assert.ok(button.includes('bg-teal-600 text-white'), 'botón teal con texto blanco legible');
+  assert.ok(button.includes('Sincronización en curso'), 'confirma que la sincronización quedó encolada');
+});
+
+test('la acción de sincronización llama a la ruta async que encola el actor', () => {
+  assert.ok(read('lib/actions/investors.actions.ts').includes('/api/ownership/managers/sync-async'));
+  const route = read('data-engine/app/api/routes/ownership.py');
+  assert.ok(route.includes('"/managers/sync-async"'));
+  assert.ok(route.includes('sync_investor_holdings.send('), 'la ruta encola el actor existente, no reimplementa el trabajo');
+});
+
+test('propicks: sin run publicado el botón genera la selección, no relee el vacío', () => {
+  const src = read('components/proPicks/EnhancedProPicksContent.tsx');
+  assert.ok(src.includes('handleGenerateRun'), 'debe existir la acción de generar el primer run');
+  assert.ok(src.includes('generateFunnelRunNow'));
+  assert.ok(src.includes('Generar selección ahora'));
+  assert.ok(src.includes('Actualizando selección...'), 'el botón anuncia la actualización en curso también en el estado vacío');
+  assert.ok(src.includes("onClick={lastGenerated ? handleRefresh : handleGenerateRun}"), 'con run publicado actualiza; sin run, genera');
+  assert.ok(read('lib/actions/propicks-funnel.actions.ts').includes("'/api/propicks/runs', { method: 'POST' }"));
+});

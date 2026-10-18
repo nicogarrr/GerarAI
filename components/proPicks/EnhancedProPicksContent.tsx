@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { TrendingUp, Sparkles, ArrowRight, Loader2, RefreshCw, Clock, Plus, Check } from 'lucide-react';
 import EnhancedProPicksFilters, { ProPicksFilters } from './EnhancedProPicksFilters';
 import { generateEnhancedProPicksWithRun, type ProPick } from '@/lib/actions/proPicks.actions';
+import { generateFunnelRunNow } from '@/lib/actions/propicks-funnel.actions';
 import { allNeutralCategory, categoryDisplay } from '@/lib/propicks/category-display';
 import { CATEGORY_KEYS, categoryNeutralNote } from './category-display';
 import { addToWatchlist } from '@/lib/actions/watchlist.actions';
@@ -89,6 +90,35 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
 
     const handleApplyFilters = loadPicks;
     const handleRefresh = loadPicks;
+
+    // Sin ningún run publicado, «Actualizar» relee una lista vacía: la acción
+    // real es ejecutar el embudo (POST /api/propicks/runs) y consultar después.
+    const handleGenerateRun = async () => {
+        if (requestInFlight.current) return;
+        requestInFlight.current = true;
+        setLoading(true);
+        setError(null);
+        setRefreshStatus(null);
+        try {
+            const run = await generateFunnelRunNow();
+            if ('error' in run) {
+                setError('No se pudo generar la selección. Inténtalo de nuevo.');
+                return;
+            }
+            setRefreshStatus(run.passed_count > 0
+                ? `Selección generada: ${run.passed_count} empresas superan el embudo.`
+                : 'Selección generada: 0 empresas superan el embudo con los datos disponibles.');
+            requestInFlight.current = false;
+            setLoading(false);
+            await loadPicks();
+            return;
+        } catch {
+            setError('No se pudo generar la selección. Inténtalo de nuevo.');
+        } finally {
+            requestInFlight.current = false;
+            setLoading(false);
+        }
+    };
 
     const formatLastGenerated = (isoString: string | null) => {
         if (!isoString) return null;
@@ -224,14 +254,14 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                         </p>
                         <p className="text-sm text-gray-500 mt-2">
                             {!lastGenerated &&
-                                'El embudo todavía no ha publicado un run completado. Pulsa «Actualizar selección» para consultar de nuevo.'}
+                                'El embudo todavía no ha publicado un run completado. Pulsa «Generar selección ahora» para ejecutarlo con las empresas disponibles.'}
                             {lastGenerated && passedCount === 0 &&
                                 `La selección del ${formatLastGenerated(lastGenerated)} no contiene candidatos que superen los criterios del embudo.`}
                             {lastGenerated && passedCount !== 0 &&
                                 `Ninguna acción de la selección del ${formatLastGenerated(lastGenerated)} cumple los filtros actuales (score ≥ ${appliedFilters.minScore}${appliedFilters.sector !== 'all' ? `, sector ${etiquetaSector(appliedFilters.sector)}` : ''}). Prueba a bajar el score mínimo o cambiar de sector.`}
                         </p>
                         <Button
-                            onClick={handleRefresh}
+                            onClick={lastGenerated ? handleRefresh : handleGenerateRun}
                             disabled={loading}
                             aria-busy={loading}
                             className="mt-4 h-11 w-full gap-2 bg-teal-600 text-white hover:bg-teal-700 sm:w-auto"
@@ -241,7 +271,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                             ) : (
                                 <RefreshCw aria-hidden="true" className="h-4 w-4" />
                             )}
-                            <span>{loading ? 'Actualizando selección...' : 'Actualizar selección'}</span>
+<span>{lastGenerated ? (loading ? 'Actualizando selección...' : 'Actualizar selección') : (loading ? 'Generando selección...' : 'Generar selección ahora')}</span>
                         </Button>
                     </Card>
                 ) : picks.length > 0 ? (
