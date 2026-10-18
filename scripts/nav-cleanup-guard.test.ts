@@ -35,7 +35,7 @@ test('la sección del plan tiene un solo destino: sin título duplicado', () => 
     assert.match(constants, /export function showsNavSectionTitle[\s\S]*?section\.items\.length > 1/);
 });
 
-test('/research/workflows eliminado (decision de Nico, 2-oct)', () => {
+test('/research/workflows eliminado (pagina sin uso)', () => {
     assert.ok(!constants.includes('/research/workflows'), 'Workflows no debe estar en la navegacion');
     assert.ok(!breadcrumbs.includes("'workflows'"));
 });
