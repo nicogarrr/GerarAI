@@ -254,3 +254,23 @@ def test_thesis_style_question_lists_recent_sources(db):
             mode="explore", ticker="ASTS", question=question)))
         assert r.status == "answered", question
         assert r.citations
+
+
+def test_valuation_and_thesis_question_answers_from_saved_thesis(db):
+    from decimal import Decimal
+
+    from app.models import ThesisVersion
+
+    tenant, _, company = setup(db)
+    db.add(ThesisVersion(
+        tenant_id=tenant.id, company_id=company.id, version=11, status="draft",
+        thesis_markdown="x", executive_summary="Negocio sólido con riesgo de valoración.",
+        rating="watch", base_value=Decimal("120.5"), bear_value=Decimal("80"),
+        bull_value=Decimal("160"), margin_of_safety=Decimal("0.123"),
+    ))
+    db.commit()
+    r = AssistantResponse.model_validate(answer(db, AssistantRequest(
+        mode="explore", ticker="ASTS", question="¿Cómo va la valoración y la tesis?")))
+    assert r.status == "answered"
+    assert r.citations[0].kind == "thesis_record"
+    assert "base 120,50" in r.answer and "12,3 %" in r.answer and "v11" in r.answer

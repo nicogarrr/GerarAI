@@ -4536,7 +4536,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "news_event" | "financial_fact" | "document_chunk" | "claim_evidence" | "market_observation";
+            kind: "news_event" | "financial_fact" | "document_chunk" | "claim_evidence" | "market_observation" | "thesis_record";
             /** Source */
             source: string;
             /** Url */

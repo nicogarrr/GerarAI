@@ -1,7 +1,7 @@
 /** Contrato v1 congelado del asistente de investigación. Sin writeback. */
 export type AssistantMode = 'explore' | 'guide';
 export type AssistantSectionKey = 'facts' | 'calculations' | 'hypotheses' | 'inferences' | 'contradictions' | 'insufficient_data' | 'conclusion';
-export type AssistantCitationKind = 'news_event' | 'financial_fact' | 'document_chunk' | 'claim_evidence' | 'market_observation';
+export type AssistantCitationKind = 'news_event' | 'financial_fact' | 'document_chunk' | 'claim_evidence' | 'market_observation' | 'thesis_record';
 export type AssistantRequest = {
   mode: AssistantMode;
   question: string;

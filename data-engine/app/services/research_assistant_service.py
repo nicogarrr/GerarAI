@@ -12,7 +12,15 @@ from urllib.parse import urlsplit
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.models import Company, Document, DocumentChunk, FinancialFact, NewsEvent, ResearchReview
+from app.models import (
+    Company,
+    Document,
+    DocumentChunk,
+    FinancialFact,
+    NewsEvent,
+    ResearchReview,
+    ThesisVersion,
+)
 from app.services.text_clip import clip_words
 
 
@@ -169,7 +177,7 @@ def is_general_question(question: str, ticker: str) -> bool:
 
 def _overview(citations: list[dict]) -> list[dict]:
     """Pregunta general: las fuentes más recientes, primarias antes que titulares, una por fuente."""
-    order = {"document_chunk": 0, "financial_fact": 1, "news_event": 2}
+    order = {"thesis_record": 0, "document_chunk": 1, "financial_fact": 2, "news_event": 3}
     picked, seen = [], set()
     for citation in sorted(citations, key=lambda c: order.get(c["kind"], 3)):
         key = (citation["kind"], citation["source"])
@@ -249,7 +257,37 @@ def _evidence(db: Session, company: Company, tenant_id: int, question: str) -> l
         citations.append({"id": f"document_chunk:{chunk.id}", "kind": "document_chunk",
                           "source": doc.title, "url": _url(doc.source_url),
                           "as_of": doc.published_at.isoformat(), "excerpt": clip_words(chunk.text, 450, ellipsis="")})
+    citations.extend(_thesis_citations(db, company, tenant_id))
     return _rank(citations, question, company.ticker)
+
+
+def _money(value, currency: str | None) -> str:
+    text = f"{float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{text} {currency or ''}".strip()
+
+
+def _thesis_citations(db: Session, company: Company, tenant_id: int) -> list[dict]:
+    """Ultima tesis guardada del tenant: cifras tal cual se guardaron, sin recalcular."""
+    thesis = db.scalar(select(ThesisVersion).where(
+        ThesisVersion.tenant_id == tenant_id, ThesisVersion.company_id == company.id,
+    ).order_by(desc(ThesisVersion.version)).limit(1))
+    if thesis is None:
+        return []
+    parts = [f"Tesis v{thesis.version} ({thesis.status}), rating {thesis.rating}."]
+    values = [("bajista", thesis.bear_value), ("base", thesis.base_value), ("alcista", thesis.bull_value)]
+    shown = [f"{label} {_money(v, company.currency)}" for label, v in values if v is not None]
+    if shown:
+        parts.append("Valoración por acción: " + ", ".join(shown) + ".")
+    if thesis.expected_value is not None:
+        parts.append(f"Valor esperado {_money(thesis.expected_value, company.currency)}.")
+    if thesis.margin_of_safety is not None:
+        parts.append(f"Margen de seguridad {float(thesis.margin_of_safety) * 100:,.1f} %".replace(".", ",") + ".")
+    if thesis.executive_summary:
+        parts.append(clip_words(thesis.executive_summary.strip(), 300, ellipsis=""))
+    created = thesis.created_at.date().isoformat() if thesis.created_at else "fecha sin datos"
+    return [{"id": f"thesis_record:{thesis.id}", "kind": "thesis_record",
+             "source": f"Tesis v{thesis.version} de {company.ticker}", "url": None,
+             "as_of": created, "excerpt": " ".join(parts)}]
 
 
 def answer(db: Session, payload) -> dict:
@@ -272,6 +310,8 @@ def answer(db: Session, payload) -> dict:
         stamp = re.sub(r"(\d{4}-\d{2}-\d{2})T[\d:.+\-Z]+", r"\1", citation["as_of"] or "fecha sin datos")
         statement = (f"Dato documentado en {citation['source']} ({stamp}): {citation['excerpt']}"
                      if citation["kind"] == "financial_fact"
+                     else f"Registro guardado, {citation['source']} ({stamp}): {citation['excerpt']}"
+                     if citation["kind"] == "thesis_record"
                      else f"Extracto de {citation['source']} ({stamp}): {citation['excerpt']}"
                      if citation["kind"] == "document_chunk"
                      else f"Titular atribuido a {citation['source']} ({stamp}): {citation['excerpt']}")
