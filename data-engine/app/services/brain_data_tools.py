@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import re
 from datetime import date
+from decimal import Decimal
 from urllib.parse import quote
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Company, MarketPrice, NewsEvent, Position, ThesisVersion
+from app.models import Company, DividendRecord, MarketPrice, NewsEvent, Position, ThesisVersion
 from app.schemas import ChatResponse
 from app.services.screener_fundamentals import load_screener_ratios
 
@@ -60,6 +61,83 @@ def _company_data(db: Session, company: Company) -> tuple[list[str], list[dict]]
     return lines, sources
 
 
+_NAME_NOISE = {"inc", "corp", "co", "company", "the", "sa", "plc", "ltd", "nv", "ag", "se", "holdings", "group"}
+
+
+def _squash(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def _company_in_question(db: Session, question: str) -> Company | None:
+    """Empresa del catalogo nombrada por ticker o nombre; None si hay 0 o varias."""
+    squashed = _squash(question)
+    found: dict[int, Company] = {}
+    for company in db.scalars(select(Company)).all():
+        core = _squash(" ".join(w for w in re.split(r"[\s,.]+", company.name.lower()) if w and w not in _NAME_NOISE))
+        by_ticker = re.search(rf"(?<![A-Za-z0-9]){re.escape(company.ticker)}(?![A-Za-z0-9])", question) is not None
+        if by_ticker or (len(core) >= 4 and core in squashed):
+            found[company.id] = company
+    return next(iter(found.values())) if len(found) == 1 else None
+
+
+def _dividend_line(company: Company, record: DividendRecord) -> str:
+    pay = f", pago {record.pay_date.isoformat()}" if record.pay_date else ""
+    return (f"{company.ticker}: {_number(record.amount)} {record.currency} por acción, "
+            f"ex-dividendo {record.ex_date.isoformat()}{pay} ({record.source}).")
+
+
+def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | None:
+    """Dividendos GUARDADOS (declarados por el proveedor); nada proyectado ni inventado."""
+    today = date.today()
+    portfolio = bool(re.search(r"(?i)\bmi\s+cartera\b|\bmis\s+(?:posiciones|acciones|empresas)\b|\bcobrar\w*\b", question))
+    company = None if portfolio else _company_in_question(db, question)
+    if company is not None:
+        records = list(db.scalars(select(DividendRecord).where(
+            DividendRecord.company_id == company.id, DividendRecord.tenant_id == tenant,
+        ).order_by(DividendRecord.ex_date.desc()).limit(40)).all())
+        sources = [_source("dividend_record", r.id, f"Dividendo {company.ticker} · {r.ex_date}", _link(company)) for r in records[:1]]
+        upcoming = sorted((r for r in records if r.ex_date >= today), key=lambda r: r.ex_date)
+        past = [r for r in records if r.ex_date < today]
+        if not records:
+            return _response([f"No tengo dividendos guardados de {company.ticker}. No he consultado el proveedor en directo."], [], "company_dividends")
+        lines = [f"**Dividendos guardados de {company.ticker} · {company.name}**"]
+        if upcoming:
+            lines.append("Próximo declarado: " + _dividend_line(company, upcoming[0]))
+            sources = [_source("dividend_record", upcoming[0].id, f"Dividendo {company.ticker} · {upcoming[0].ex_date}", _link(company))]
+        else:
+            lines.append("No hay un próximo dividendo declarado guardado.")
+        if past:
+            lines.append("Último pagado guardado: " + _dividend_line(company, past[0]))
+            sources.append(_source("dividend_record", past[0].id, f"Dividendo {company.ticker} · {past[0].ex_date}", _link(company)))
+        return _response(lines, sources, "company_dividends")
+    if not portfolio:
+        return None
+    rows = db.execute(select(Position, Company).join(Company, Company.id == Position.company_id).where(
+        Position.tenant_id == tenant, Position.quantity > 0)).all()
+    if not rows:
+        return _response(["No hay posiciones abiertas en tu cartera."], [], "portfolio_dividends")
+    lines, sources, totals, without = [], [], {}, []
+    for position, comp in sorted(rows, key=lambda r: r[1].ticker):
+        records = [r for r in db.scalars(select(DividendRecord).where(
+            DividendRecord.company_id == comp.id, DividendRecord.tenant_id == tenant,
+            DividendRecord.ex_date >= date(today.year, 1, 1), DividendRecord.ex_date <= date(today.year, 12, 31),
+        ).order_by(DividendRecord.ex_date)).all() if r.currency == position.currency]
+        if not records:
+            without.append(comp.ticker)
+            continue
+        amount = sum((r.amount for r in records), Decimal("0")) * Decimal(str(position.quantity))
+        totals[position.currency] = totals.get(position.currency, Decimal("0")) + amount
+        lines.append(f"- {comp.ticker}: {len(records)} pago(s) en {today.year}, {_number(amount)} {position.currency} "
+                     f"({_number(position.quantity)} acciones, importes brutos declarados).")
+        sources.append(_source("dividend_record", records[-1].id, f"Dividendo {comp.ticker} · {records[-1].ex_date}", _link(comp)))
+    if not lines:
+        return _response([f"No hay dividendos guardados de tus posiciones para {today.year}. No he consultado el proveedor en directo."], [], "portfolio_dividends")
+    head = f"Dividendos declarados guardados de tus posiciones abiertas en {today.year} (brutos, cantidad actual por acción declarada):"
+    total = "Total: " + " · ".join(f"{_number(v)} {cur}" for cur, v in sorted(totals.items())) + "."
+    tail = [f"Sin dividendos guardados: {', '.join(without)}."] if without else []
+    return _response([head, *lines, total, *tail], sources, "portfolio_dividends")
+
+
 def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     """None means this tool does not own the question; never guess user intent."""
     tenant = db.info.get("tenant_id")
@@ -69,9 +147,14 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     theses = bool(re.search(r"(?i)\btesis\b", question)) and bool(re.search(r"(?i)\b(?:tengo|mis|activas|vigentes)\b", question))
     comparison = bool(re.search(r"(?i)\bcompara\w*\b", question))
     valuation = bool(re.search(r"(?i)\b(?:precio|PER|cotiza\w*)\b", question)) and not re.search(r"(?i)\b(?:medio|coste|peso|posici[oó]n|tengo)\b", question)
-    if not (news or theses or comparison or valuation):
+    dividends = bool(re.search(r"(?i)\bdividend\w*|\bcobrar\w*", question))
+    if not (news or theses or comparison or valuation or dividends):
         return None
     if re.search(r"(?i)\b(?:compra|comprar|vende|vender|ejecuta|buy|sell)\b", question):
+        return None
+    if dividends and not (news or theses or comparison or valuation):
+        return _dividend_answer(db, question, tenant)
+    if not (news or theses or comparison or valuation):
         return None
     if news:
         company_ids = select(Position.company_id).where(Position.tenant_id == tenant, Position.quantity > 0)
