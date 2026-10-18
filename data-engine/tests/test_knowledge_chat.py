@@ -211,3 +211,27 @@ def test_degraded_analysis_message_does_not_claim_citations(monkeypatch):
     assert "no está disponible" in result["message"]
     assert "citados" not in result["message"]
     assert result["answers"] and all(a["text"] is None for a in result["answers"])
+
+
+def test_chunk_id_como_cadena_se_acepta(monkeypatch):
+    monkeypatch.setenv("CAVAAI_ENABLE_VECTOR_SEARCH", "0")
+    db = setup_library()
+    chunk = retrieve(db, "repurchases", scope="letters", author="Buffett")[0][0][0]
+    provider = Provider({"answers": [
+        {"text": "Las recompras se valoran según el precio.", "chunk_id": str(chunk.id),
+         "quote": "Repurchases can add value at sensible prices."}
+    ]})
+    result = asyncio.run(ask_library(db, "repurchases", author="Buffett", provider=provider))
+    assert result["status"] == "ok"
+    assert result["answers"][0]["citation"]["chunk_id"] == chunk.id
+
+
+def test_respuestas_descartadas_en_verificacion_se_distinguen(monkeypatch):
+    monkeypatch.setenv("CAVAAI_ENABLE_VECTOR_SEARCH", "0")
+    db = setup_library()
+    provider = Provider({"answers": [
+        {"text": "fake", "chunk_id": 99999, "quote": "Repurchases can add value at sensible prices."}
+    ]})
+    result = asyncio.run(ask_library(db, "repurchases", author="Buffett", provider=provider))
+    assert result["status"] == "fragmentos"
+    assert "no superaron la verificacion de citas" in result["message"]
