@@ -1009,6 +1009,11 @@ def discover_bottlenecks(tenant_id: int | None = None, user_id: str | None = Non
     db = _session(tenant_id, user_id)
     try:
         deadline = Deadline(DISCOVERY_DEADLINE_SECONDS)
+        # Derive contexts from current stored evidence, not a possibly empty
+        # signal table waiting for the hourly reconciliation.
+        from app.services.bottleneck_service import refresh_signals
+        refresh_signals(db)
+        db.commit()
         outcome = _run(discover(db, deadline=deadline))
         status = "partial" if deadline.truncated and outcome.get("status") == "ok" else outcome["status"]
         return {"actor": "discover_bottlenecks", **outcome, "status": status}

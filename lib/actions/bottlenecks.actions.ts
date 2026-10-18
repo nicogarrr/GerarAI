@@ -72,3 +72,9 @@ export async function getBottleneckDiscoveries(offset: number, limit = 20): Prom
   }
   return payload;
 }
+
+/** Explicit user request: the worker enforces free-model and daily quota gates. */
+export async function runBottleneckDiscovery() {
+  await researchRequest('/api/bottlenecks/discoveries/run', {method: 'POST'});
+  return {message: 'Barrido inferido en cola. No garantiza candidatos: vuelve a cargar el listado cuando termine.'};
+}

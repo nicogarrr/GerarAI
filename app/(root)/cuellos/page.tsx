@@ -3,10 +3,13 @@ import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 
 import BackendOffline from '@/components/system/BackendOffline';
+import { MutationForm } from '@/components/forms/MutationForm';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   getBottleneckDiscoveries,
   getBottlenecks,
+  runBottleneckDiscovery,
   type DiscoveryView,
 } from '@/lib/actions/bottlenecks.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
@@ -146,11 +149,15 @@ export default async function CuellosPage({ searchParams }: PageProps) {
 
       <section aria-label="Candidatos inferidos">
         <h2 className="mb-3 text-xl font-semibold text-gray-100">Candidatos inferidos</h2>
+        <MutationForm action={runBottleneckDiscovery} showSuccessInline className="mb-3">
+          <Button type="submit" variant="outline">Buscar candidatos inferidos</Button>
+          <p className="mt-2 text-sm text-gray-400">Solo evidencias guardadas y modelos gratuitos. Las hipótesis no son hechos ni recomendaciones.</p>
+        </MutationForm>
         {discoveries.items.length === 0 && discoveries.total === 0 ? (
           <div className="rounded-xl border border-gray-800 bg-surface-1 p-5">
             <p className="font-semibold text-gray-100">Sin candidatos todavía</p>
             <p className="mt-1 text-sm text-gray-400">
-              El barrido inferido todavía no ha guardado ningún candidato.
+              No hay candidatos guardados. Puedes solicitar un barrido; si no hay evidencias suficientes o el modelo gratuito no está disponible, no se inventan resultados.
             </p>
           </div>
         ) : discoveries.items.length === 0 ? (
