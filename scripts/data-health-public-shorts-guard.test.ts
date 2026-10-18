@@ -7,7 +7,7 @@ test('data health and public shorts expose honest dates, provenance and paginati
   const shorts = fs.readFileSync('app/(root)/research/[ticker]/shorts/page.tsx', 'utf8');
   assert.match(health, /coverage_pct === null/);
   assert.match(health, /Última escritura/);
-  assert.match(health, /Páginas del inventario/);
+  assert.match(health, /Páginas de fuentes de noticias/);
   assert.match(health, /Páginas de consultas/);
   assert.match(shorts, /Fecha de posición/);
   assert.match(shorts, /Fecha de negociación/);

@@ -13,6 +13,7 @@ import {
 import { formatDate, formatNumber, NA } from '@/lib/format';
 import { firstSearchParam, normalizeSourcesTicker, sourcesHref } from '@/lib/research/sources-inventory';
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
+import { auditFixDisplay, sourceDisplay } from '@/lib/research/source-display';
 
 /** F323: tipo y nivel de fuente llegan como ids internos en ingles
  *  (manual_upload, tier_1_regulatory...) y se pintaban en crudo en la tabla.
@@ -29,8 +30,8 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   fmp: 'FMP',
   fmp_profile: 'Perfil FMP',
   manual_transcript: 'Transcripción manual',
-  filing: 'Filing regulatorio',
-  company_ir: 'IR de la compañía',
+  filing: 'Documento regulatorio',
+  company_ir: 'Relaciones con inversores',
   transcript: 'Transcripción',
 };
 
@@ -49,16 +50,12 @@ const SOURCE_TIER_LABELS: Record<string, string> = {
   secondary: 'Secundaria',
 };
 
-function humanizeId(value: string): string {
-  return value.replaceAll('_', ' ');
-}
-
 function sourceTypeLabel(value: string): string {
-  return SOURCE_TYPE_LABELS[value] ?? humanizeId(value);
+  return SOURCE_TYPE_LABELS[value] ?? sourceDisplay(value);
 }
 
 function sourceTierLabel(value: string): string {
-  return SOURCE_TIER_LABELS[value] ?? humanizeId(value);
+  return SOURCE_TIER_LABELS[value] ?? sourceDisplay(value);
 }
 
 export const dynamic = 'force-dynamic';
@@ -90,9 +87,6 @@ export default async function ResearchSourcesPage({
           </Button>
           <p className="text-sm font-semibold uppercase text-teal-300">Evidencia</p>
           <h1 className="mt-1 text-3xl font-bold text-gray-100">Fuentes</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
-            Documentos, transcripts y auditorías que alimentan tesis, RAG y valoraciones.
-          </p>
         </div>
         <div className="rounded-lg border border-gray-800 bg-surface-1 px-4 py-3 text-sm text-gray-300">
           {documentsTotal !== null
@@ -161,7 +155,7 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-type">Tipo de fuente</label>
-                <Input id="file-source-type" name="source_type" placeholder="filing, company_ir, transcript" defaultValue="manual_upload" />
+                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-url">URL de la fuente</label>
@@ -194,7 +188,7 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url-source-type">Tipo de fuente</label>
-                <Input id="url-source-type" name="source_type" placeholder="url, company_ir, filing" defaultValue="url" />
+                <select id="url-source-type" name="source_type" defaultValue="url" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url">URL</label>
@@ -220,13 +214,10 @@ export default async function ResearchSourcesPage({
                   <span className={audit.passed ? 'font-semibold text-teal-300' : 'font-semibold text-amber-300'}>
                     {auditStatusLabel(audit.passed)}
                   </span>
-                  <span className="text-sm text-gray-500" title="Afirmaciones materiales con fuente citada menos 5 puntos por afirmación de baja confianza; no mide completitud de la valoración">{auditScoreText(audit.passed, audit.source_coverage_score, (value) => formatNumber(value, { maximumFractionDigits: 2 }))}</span>
-                </div>
-                <div className="mt-2 text-sm text-gray-400">
-                  Tesis #{audit.thesis_version_id ?? NA}
+                  <span className="text-sm text-gray-500" title={auditScoreText(audit.passed, audit.source_coverage_score, (value) => formatNumber(value, { maximumFractionDigits: 2 }))}>Citas: {formatNumber(audit.source_coverage_score, { maximumFractionDigits: 2 })}/100</span>
                 </div>
                 {audit.required_fixes.length ? (
-                  <div className="mt-2 text-xs text-amber-200">{audit.required_fixes.join('; ')}</div>
+                  <div className="mt-2 text-xs text-amber-200">{audit.required_fixes.map(auditFixDisplay).join(' ')}</div>
                 ) : null}
               </div>
             ))}
