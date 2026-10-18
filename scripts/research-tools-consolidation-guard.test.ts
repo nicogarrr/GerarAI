@@ -9,9 +9,7 @@ test("research tools have one contextual navigation, not an obsolete sidebar foo
  // El subnav se DERIVA del ROUTE_CATALOG (campo hub): aqui ya no puede vivir
  // una tupla hardcodeada que se desincronice del resto de la navegacion.
  assert.doesNotMatch(nav,/\[.\/research\/workflows.,.Workflows.\]/);
- // /research/workflows conserva el enlace que tenia (subnav de Research via
- // catalogo): mantener o eliminar la pagina es decision pendiente de Nico.
- assert.match(constants,/\{ href: '\/research\/workflows', label: 'Workflows'/);
+ assert.doesNotMatch(constants,/\/research\/workflows/);
  // Contrato del e2e research-tools-consolidation: la raiz de Research se
  // anuncia «Empresas» en el subnav (subnavLabel) sin renombrar la miga.
  assert.match(constants,/subnavLabel: 'Empresas'/);

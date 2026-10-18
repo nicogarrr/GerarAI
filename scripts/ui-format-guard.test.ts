@@ -104,7 +104,6 @@ describe('guardas de UI', () => {
   });
 
   it('mantiene las etiquetas de estado en español sin cambiar enums de API', () => {
-    assert.ok(source('app/(root)/research/workflows/page.tsx').includes("partial: 'Parcial'"));
     assert.ok(source('app/(root)/research/[ticker]/management-credibility/page.tsx').includes("partial: 'Parcial'"));
   });
 
