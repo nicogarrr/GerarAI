@@ -73,7 +73,7 @@ export default function ImportIBKRButton({ userId }: ImportIBKRButtonProps) {
             const result = await importFromIBKR(userId);
 
             if (result.status !== 'imported') {
-                toast.error(`Importación falló: ${result.status}`);
+                toast.error(result.message ?? `Importación falló: ${result.status}`, { duration: 10000 });
                 return;
             }
 
@@ -103,7 +103,7 @@ export default function ImportIBKRButton({ userId }: ImportIBKRButtonProps) {
                 ? await importIBKRCsv(userId, text)
                 : await importIBKRXml(userId, text);
             if (result.status !== 'imported') {
-                toast.error(`Importación falló: ${result.status}`);
+                toast.error(result.message ?? `Importación falló: ${result.status}`, { duration: 10000 });
                 return;
             }
             toast.success(describeResult(result));
@@ -161,7 +161,7 @@ export default function ImportIBKRButton({ userId }: ImportIBKRButtonProps) {
                 disabled={busy}
                 aria-busy={isUploading}
                 className="border-gray-600 hover:bg-gray-700 text-gray-200"
-                title="Subir un Flex XML o CSV de actividad descargado de IBKR"
+                title="CSV con cabecera symbol, action, quantity, price, date (opcionales fees, currency) o Flex XML de IBKR"
             >
                 {isUploading ? (
                     <>
