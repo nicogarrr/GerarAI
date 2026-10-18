@@ -217,7 +217,7 @@ def test_yahoo_drops_headline_whose_only_company_mention_is_a_ticker_prefix():
     out = label_yahoo(
         ConnectorResult(source="rss", items=[fastenal, real, plain, other_ticker_news]), _Co, _ticker_evidence_level
     )
-    assert [i.title for i in out.items] == [real.title, plain.title, other_ticker_news.title]
+    assert [i.title for i in out.items] == [real.title, plain.title]
 
 
 def test_law_firm_solicitation_is_detected_but_real_news_is_not():
@@ -243,8 +243,6 @@ def test_impact_direction_whole_words_and_valuation_phrases():
     assert direction("analysts praise the execution plan") == "neutral"
     assert direction("record revenue but valuation concern grows") == "mixed"
     assert direction("beats estimates, record quarter") == "positive"
-
-    assert [i.title for i in out.items] == [real.title, plain.title]
 
 
 def test_yahoo_ticker_feed_only_keeps_items_that_cite_the_company():
