@@ -258,3 +258,33 @@ def test_thesis_margin_draft_only_and_missing_are_honest(db):
     assert "no publicada" in draft.answer and "0,20" not in draft.answer
     none = asyncio.run(ChatService().answer(db, "¿Qué margen de seguridad tiene MSFT según mi tesis?", "portfolio", None))
     assert "No hay ninguna tesis guardada de MSFT" in none.answer
+
+
+def _plan_setup(db, targets):
+    from app.models import InvestmentPlan, Portfolio
+    p = Portfolio(name="P", base_currency="USD", is_default=True)
+    db.add(p)
+    db.flush()
+    db.add(InvestmentPlan(portfolio_id=p.id, monthly_contribution=Decimal("500"), start_date=date(2026, 1, 1), horizon_years=20, target_allocations=targets))
+
+
+def test_plan_question_reads_plan_and_underweight_targets(db):
+    a = company(db, "AAA")
+    a.sector = "Tech"
+    _plan_setup(db, [{"kind": "sector", "label": "Tech", "target_pct": 100, "band_pct": 5}, {"kind": "ticker", "label": "BBB", "target_pct": 20, "band_pct": 5}])
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("1"), average_cost=Decimal("100"), currency="USD", base_currency="USD", as_of=date.today(), market_value=Decimal("100"), market_value_base=Decimal("100")))
+    db.commit()
+    response = asyncio.run(ChatService().answer(db, "Tengo 500 € este mes. Según mi plan, ¿qué compro?", "portfolio", None))
+    assert "500,00 al mes" in response.answer
+    assert "Objetivos por debajo de su banda" in response.answer
+    assert "BBB: 0,00 % actual frente a 20,00 % objetivo, hueco de 20,00" in response.answer
+    assert "Tech:" not in response.answer
+    assert response.sources == [{"type": "investment_plan", "id": "plan", "title": "Plan de inversión", "url": "/plan"}]
+    assert "no una orden" in response.answer
+    assert response.llm_trace["provider_calls"] == 0
+
+
+def test_plan_question_without_plan_is_honest(db):
+    response = asyncio.run(ChatService().answer(db, "Tengo 500 € este mes. Según mi plan, ¿qué compro?", "portfolio", None))
+    assert "No tienes un plan de inversión guardado" in response.answer
+    assert response.sources == []
