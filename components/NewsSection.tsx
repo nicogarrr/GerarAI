@@ -1,6 +1,7 @@
 import { getNews } from '@/lib/actions/finnhub.actions';
 import { newsSummaryToShow } from '@/lib/news-summary';
 import { newsBadge } from '@/lib/newsBadge';
+import { stripLeadingTicker, stripSourceSuffix } from '@/lib/news-display';
 import { formatMarketDateTime } from '@/lib/format';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -52,8 +53,8 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                 {news.length > 0 && (
                     <p className="mb-3 text-xs leading-5 text-gray-500">
                         {symbols?.length
-                            ? 'Titulares vinculados a tus símbolos cuando los hay (insignia con el ticker); el resto menciona otras compañías o es mercado general, sin vínculo con tu cartera.'
-                            : 'Titulares de mercado general. La insignia indica la compañía mencionada en el titular, no una posición tuya.'}
+                            ? 'La insignia con ticker marca tus posiciones; el resto son compañías mencionadas o mercado general.'
+                            : 'La insignia indica la compañía mencionada en el titular, no una posición tuya.'}
                     </p>
                 )}
                 {news.length === 0 ? (
@@ -92,7 +93,13 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                     )}
                                     <div className="flex-1 min-w-0">
                                         <h3 className="text-white text-sm sm:text-base font-semibold mb-2 line-clamp-2 group-hover:text-[#0FEDBE] transition-colors break-words">
-                                            {article.headline}
+                                            {(() => {
+                                                const badge = newsBadge(article, symbols);
+                                                return stripLeadingTicker(
+                                                    stripSourceSuffix(article.headline, article.source),
+                                                    badge.kind === 'general' ? null : badge.ticker,
+                                                );
+                                            })()}
                                         </h3>
                                         {newsSummaryToShow(article.headline, article.summary) && (
                                             <p className="text-gray-400 text-sm mb-2 line-clamp-2 break-words">

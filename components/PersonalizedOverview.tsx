@@ -367,10 +367,6 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
             <div>
                 <p className="text-sm font-semibold uppercase text-teal-300">Tu research hoy</p>
                 <h1 className="mt-1 text-2xl font-bold break-words text-gray-100 sm:text-3xl">Qué ha cambiado</h1>
-                <p className="mt-1 text-sm text-gray-400 sm:text-base">
-                    Primero lo que ha cambiado en tus posiciones, luego el valor de la cartera, las alertas
-                    disparadas y dónde buscar nuevas ideas.
-                </p>
             </div>
 
             {/* 1 · Cartera hoy. La frase «tu cartera en una línea» vive DENTRO de
