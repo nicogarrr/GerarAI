@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Company, Position
 from app.models.entities import InstrumentReference
-from app.services.investors import INVESTORS, _latest_view, _manager, most_bought
+from app.services.investors import INVESTORS, _latest_view, _manager, _value_usd, most_bought
 
 
 def _isin_cusip(isin: str | None) -> str | None:
@@ -115,3 +115,78 @@ def portfolio_overlap(db: Session) -> dict:
             "comparison_complete": unresolved == 0 and missing == 0 and partial == 0,
             "limitations": ["Derivado por CUSIP exacto. Sin coincidencia no significa ausencia en todas sus carteras.",
                             "13F histórico, con hasta 45 días de retraso. Solo posiciones largas declaradas; no opciones."]}
+
+
+_LIMITATIONS_13F = [
+    "Derivado por CUSIP exacto. Sin coincidencia no significa ausencia en todas sus carteras.",
+    "13F histórico, con hasta 45 días de retraso. Solo posiciones largas declaradas; no opciones.",
+]
+
+
+def holders_by_ticker(db: Session, ticker: str) -> dict | None:
+    """Gestores revisados que declaran el ticker en su último 13F (vista inversa).
+
+    Mismo cruce que el solape de cartera: CUSIP exacto con las comprobaciones
+    de identidad de `_cusip`; sin identidad verificada no se afirma nada.
+    Devuelve None si el ticker no existe en el universo.
+    """
+    normalized = ticker.strip().upper()
+    company = db.scalar(select(Company).where(Company.ticker == normalized))
+    if company is None:
+        return None
+    reference = db.scalar(
+        select(InstrumentReference).where(InstrumentReference.ticker_normalized == normalized)
+    )
+    cusip, source = _cusip(company, reference)
+    base = {
+        "ticker": company.ticker,
+        "name": company.name,
+        "cusip": cusip,
+        "identity_source": source,
+        "holders": [],
+        "managers_with_data": 0,
+        "managers_without_data": 0,
+        "managers_partial": 0,
+        "limitations": _LIMITATIONS_13F,
+    }
+    if cusip is None:
+        return {**base, "status": "sin_identificador"}
+    available = missing = partial = 0
+    holders = []
+    for inv in INVESTORS:
+        if not inv.cik:
+            continue
+        manager = _manager(db, inv)
+        rows = _latest_view(db, manager) if manager else []
+        if not rows:
+            missing += 1
+            continue
+        available += 1
+        partial += int(manager.coverage == "partial")
+        seen = set()
+        for row in rows:
+            if row.put_call or row.cusip != cusip or row.cusip in seen:
+                continue
+            seen.add(row.cusip)
+            holders.append({
+                "slug": inv.slug,
+                "name": inv.name,
+                "report_date": row.report_date.isoformat() if row.report_date else None,
+                "filing_date": row.filing_date.isoformat() if row.filing_date else None,
+                "filing_url": row.filing_url or None,
+                "coverage": manager.coverage,
+                "value_usd": _value_usd(
+                    row.value_usd_thousands,
+                    row.report_date.isoformat() if row.report_date else None,
+                ),
+                "shares": float(row.shares) if row.shares is not None else None,
+            })
+    holders.sort(key=lambda h: h["value_usd"] or 0.0, reverse=True)
+    return {
+        **base,
+        "status": "ok" if available else "sin_datos",
+        "holders": holders,
+        "managers_with_data": available,
+        "managers_without_data": missing,
+        "managers_partial": partial,
+    }

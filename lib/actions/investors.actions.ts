@@ -152,6 +152,40 @@ export async function getPortfolioOverlap(): Promise<PortfolioOverlap> {
   return requestJson('/api/investors/portfolio-overlap');
 }
 
+export type CompanyHolder = {
+  slug: string;
+  name: string;
+  report_date: string | null;
+  filing_date: string | null;
+  filing_url: string | null;
+  coverage: string | null;
+  value_usd: number | null;
+  shares: number | null;
+};
+
+export type CompanyHolders = {
+  status: 'ok' | 'sin_datos' | 'sin_identificador';
+  ticker: string;
+  name: string;
+  cusip: string | null;
+  identity_source: string | null;
+  holders: CompanyHolder[];
+  managers_with_data: number;
+  managers_without_data: number;
+  managers_partial: number;
+  limitations: string[];
+};
+
+/** Vista inversa del 13F: gestores revisados que declaran la empresa. `null` si el ticker no existe. */
+export async function getCompanyHolders(ticker: string): Promise<CompanyHolders | null> {
+  try {
+    return await requestJson<CompanyHolders>(`/api/investors/holders/${encodeURIComponent(ticker)}`);
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'RESEARCH_API_ERROR' && error.statusCode === 404) return null;
+    throw error;
+  }
+}
+
 export type InvestorDatum = {
   value: number | null;
   label: "OFICIAL" | "INFERIDO" | "SIN_DATOS";
