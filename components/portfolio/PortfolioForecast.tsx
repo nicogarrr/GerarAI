@@ -18,12 +18,12 @@ function fmtNumber(digits: number) {
 }
 
 function pct(value: number | null | undefined, digits = 1): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return 'Sin datos';
+  if (value === null || value === undefined || !Number.isFinite(value)) return 'N/D';
   return `${fmtNumber(digits).format(value * 100)}%`;
 }
 
 function signedPct(value: number | null | undefined, digits = 1): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return 'Sin datos';
+  if (value === null || value === undefined || !Number.isFinite(value)) return 'N/D';
   const rendered = fmtNumber(digits).format(value * 100);
   return value > 0 ? `+${rendered}%` : `${rendered}%`;
 }
@@ -93,7 +93,7 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
             </div>
           ) : (
             <p className="text-sm text-gray-400">
-              Sin datos: el backend no devolvió agregado ni motivo.
+              N/D: no hay agregado ni motivo disponible.
             </p>
           )}
           {forecast.excluded.length > 0 ? <ExcludedList items={forecast.excluded} /> : null}
@@ -104,10 +104,6 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
   const scenarioOrder = ['bear', 'base', 'bull'] as const;
   return (
     <div className="space-y-6">
-      <p className="text-xs text-gray-500">
-        Contribuciones del subset valorado (proxy anual: cada tesis converge en su propio
-        horizonte). No es la rentabilidad total de la cartera.
-      </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {scenarioOrder.map((key) => {
           const scenario = portfolio.scenarios?.[key];
@@ -115,15 +111,15 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
             <div className="rounded-lg border border-gray-800 p-4" key={key}>
               <p className="text-xs uppercase tracking-wide text-gray-500">{SCENARIO_LABELS[key]}</p>
               <p className="mt-1 text-2xl font-semibold text-gray-100">
-                {scenario ? signedPct(scenario.contribution_cagr) : 'Sin datos'}
+                {scenario ? signedPct(scenario.contribution_cagr) : 'N/D'}
               </p>
               <p className="mt-1 text-xs text-gray-500">
-                Contribución anual · aporte total {scenario ? signedPct(scenario.contribution_total_return) : 'Sin datos'}
+                Contribución anual · aporte total {scenario ? signedPct(scenario.contribution_total_return) : 'N/D'}
               </p>
               <p className="mt-1 text-xs text-gray-500">
                 {scenario
                   ? `Cobertura ${pct(scenario.coverage)} de la cartera valorada`
-                  : 'Sin datos'}
+                  : 'N/D'}
                 {scenario?.horizon_scope === 'mixed' ? ' · horizontes mezclados (proxy anual)' : ''}
               </p>
             </div>
@@ -136,14 +132,14 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
           </p>
           <p className="mt-1 text-xs text-gray-500">
             {portfolio.expected_cagr !== null
-              ? 'Media ponderada por probabilidad de los CAGR por escenario (esperado del CAGR, no el CAGR del valor esperado). Solo con masa completa y cobertura total.'
-              : 'Solo se emite con masa completa y cobertura total de la cartera valorada; abajo van las contribuciones y esperados parciales con su masa.'}
+              ? 'Media de los CAGR por escenario, ponderada por probabilidad.'
+              : 'Sin cobertura completa de la cartera valorada: abajo van los esperados parciales.'}
           </p>
         </div>
       </div>
       <Panel
         title="Por posición"
-        description={`Cobertura: ${portfolio.covered_weight !== null ? pct(portfolio.covered_weight) : 'Sin datos (hay posiciones sin conversión; pesos sobre el subset valorado)'} de la cartera con tesis computable (${portfolio.covered_count} de ${portfolio.position_count} posiciones). Veracidad del precio rotulada por fila con fuente y fecha; valores intrínsecos INFERIDOS del modelo vigente.`}
+        description={`Cobertura: ${portfolio.covered_weight !== null ? pct(portfolio.covered_weight) : 'N/D (hay posiciones sin conversión; pesos sobre el subset valorado)'} de la cartera con tesis computable (${portfolio.covered_count} de ${portfolio.position_count} posiciones).`}
       >
         <div className="overflow-x-auto" role="region" aria-label="Contribuciones por posición" tabIndex={0}>
           <table className="w-full text-left text-sm">
@@ -176,7 +172,7 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
                       ? signedPct(item.expected_cagr)
                       : item.partial_expected_cagr !== null
                         ? `Parcial ${signedPct(item.partial_expected_cagr)} · masa ${pct(item.probability_mass, 0)}`
-                        : 'Sin datos'}
+                        : 'N/D'}
                   </td>
                   <td className="py-2 text-xs text-gray-500">
                     Precio {item.price_source} · <Veracity value={item.price_veracity} /> · {item.price_as_of} · tesis v{item.thesis_version} ({item.thesis_status})
