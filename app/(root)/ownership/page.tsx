@@ -18,20 +18,7 @@ import { t } from '@/lib/i18n/t';
 
 import SyncButton from './SyncButton';
 import { ownershipManagerName } from '@/lib/ownership-display';
-
-/** El backend publica las limitaciones del 13F como constante revisada en
- *  inglés; en UI van en español (F33). Texto desconocido: se muestra tal cual,
- *  nunca se oculta una limitación. */
-const LIMITATION_LABELS: Record<string, string> = {
-    'Quarterly cadence with up to a 45-day reporting lag':
-        'Periodicidad trimestral con hasta 45 días de retardo en la declaración',
-    'Long-only US-listed positions; no shorts, no non-13F securities':
-        'Solo posiciones largas cotizadas en EE. UU.; sin cortos ni valores fuera del 13F',
-    'Holdings as filed: CUSIP + issuer name; tickers never inferred':
-        'Posiciones tal como se declararon: CUSIP y nombre del emisor; nunca se infieren tickers',
-    'Amendments are separate immutable filings':
-        'Las enmiendas son filings inmutables independientes',
-};
+import { ownershipLimitations } from '@/lib/research/ownership-display';
 
 const CHANGE_LABELS: Record<string, string> = {
     new: 'nueva posición',
@@ -138,7 +125,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                 <section className="rounded-xl border border-amber-900/60 bg-amber-950/20 p-4">
                     <h2 className="text-sm font-semibold text-amber-200">Límites de este dato</h2>
                     <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-400">
-                        {limitations.map((item) => <li key={item}>{LIMITATION_LABELS[item] ?? item}</li>)}
+                        {limitations.map((item) => <li key={item}>{ownershipLimitations(item)}</li>)}
                     </ul>
                 </section>
             ) : null}

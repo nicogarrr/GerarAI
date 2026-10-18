@@ -7,3 +7,16 @@ test('display names use reviewed CIKs and preserve unknown official names', () =
  assert.equal(ownershipManagerName('0001376879', 'AKO CAPITAL LLP'), 'AKO Capital');
  assert.equal(ownershipManagerName('unknown', 'ABC LLC'), 'ABC LLC');
 });
+// @ts-expect-error TS5097: ejecución directa con Node.
+import { ownershipLimitations } from '../lib/research/ownership-display.ts';
+
+test('traduce los cuatro límites incluso cuando vienen concatenados', () => {
+  const text = ownershipLimitations('Quarterly cadence with up to a 45-day reporting lag. Long-only US-listed positions; no shorts, no non-13F securities. Holdings as filed: CUSIP + issuer name; tickers never inferred. Amendments are separate immutable filings.');
+  assert.ok(text.includes('45 días'));
+  assert.ok(text.includes('sin cortos'));
+  assert.ok(text.includes('nunca se infieren tickers'));
+  assert.ok(text.includes('Las enmiendas son declaraciones inmutables independientes'));
+  assert.ok(!text.includes('Quarterly'));
+  assert.ok(!text.includes('no sustituyen'));
+  assert.equal(ownershipLimitations('Nueva advertencia del proveedor'), 'Nueva advertencia del proveedor');
+});
