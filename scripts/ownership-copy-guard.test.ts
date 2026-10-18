@@ -11,8 +11,9 @@ test('F327: la vista /ownership no pierde tildes en su copy', () => {
     assert.doesNotMatch(page, /gestor aun no/);
     assert.match(page, /nueva posición/);
     assert.match(page, /se declaró\)/);
-    assert.match(page, /su último informe/);
-    assert.match(page, /Pulsa &quot;Sincronizar 13F&quot;/);
+    // #1440: el estado vacío trae el botón real, no copy que lo anunciaba.
+    assert.match(page, /el último informe declarado ante la SEC/);
+    assert.match(page, /label="Sincronizar 13F"/);
 });
 
 test('F14: cabeceras y avisos de /ownership con tildes (límites, todavía, estará, próximo)', () => {
