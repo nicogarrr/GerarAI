@@ -1,5 +1,6 @@
 'use client';
 
+import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { formatMoney, formatNumber, formatPercent, NA } from '@/lib/format';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -39,6 +40,12 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
   const format = (value: number, currency: string) => formatMoney(value, currency, { maximumFractionDigits: 2 });
   const cashCurrency = baseCurrency ?? holdings[0]?.baseCurrency ?? 'EUR';
   const showCash = typeof cash === 'number' && cash !== 0;
+
+  // Same valued-position subset and denominator as Resumen's allocation.
+  const weights = new Map(buildAllocationSlices(currentHoldings.filter(
+    (holding) => !holding.valueMissing && !holding.fxMissing,
+  )).map((slice) => [slice.symbol, slice.percentage]));
+  const weight = (symbol: string) => formatPercent(weights.get(symbol), { fromRatio: false, digits: 1 }, NA);
 
   // Sync props if they change (e.g. from server revalidation)
   useEffect(() => {
@@ -166,6 +173,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Promedio</dt><dd className="text-gray-200">{holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : NA}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Actual</dt><dd className="font-medium text-gray-200">{format(holding.currentPrice, holding.nativeCurrency)}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Valor</dt><dd className="font-semibold text-gray-100">{holding.fxMissing ? 'Conversión o coste no disponible' : format(holding.value, holding.baseCurrency)}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Peso</dt><dd className="font-semibold text-gray-100">{weight(holding.symbol)}</dd></div>
                       <div className="flex items-center justify-between gap-2">
                         <dt className="text-gray-500">G/P</dt>
                         <dd className="flex items-center gap-2">
@@ -213,6 +221,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                   </div>
                   <dl className="mt-3 space-y-1.5 text-sm">
                     <div className="flex justify-between gap-2"><dt className="text-gray-500">Valor</dt><dd className="font-semibold text-gray-100">{format(cash, cashCurrency)}</dd></div>
+                    <div className="flex justify-between gap-2"><dt className="text-gray-500">Peso</dt><dd className="text-gray-500">{NA}</dd></div>
                     <div className="flex justify-between gap-2"><dt className="text-gray-500">G/P</dt><dd className="text-gray-500">{NA}</dd></div>
                   </dl>
                 </div>
@@ -221,7 +230,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
             {/* Escritorio: la acción se despliega junto al símbolo, sin columna propia. */}
             <div className="hidden overflow-x-auto md:block">
             <Table regionLabel="Posiciones de la cartera">
-              <TableCaption className="sr-only">Posiciones abiertas: símbolo, cantidad, precio medio, precio actual, valor y ganancia o pérdida. Eliminar una posición está en el menú de cada símbolo.</TableCaption>
+              <TableCaption className="sr-only">Posiciones abiertas: símbolo, cantidad, precio medio, precio actual, valor, peso y ganancia o pérdida. Eliminar una posición está en el menú de cada símbolo.</TableCaption>
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-gray-700">
                   <TableHead className="text-gray-400">Símbolo</TableHead>
@@ -229,6 +238,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                   <TableHead className="text-right text-gray-400">Promedio</TableHead>
                   <TableHead className="text-right text-gray-400">Actual</TableHead>
                   <TableHead className="text-right text-gray-400">Valor</TableHead>
+                  <TableHead className="text-right text-gray-400">Peso</TableHead>
                   <TableHead className="text-right text-gray-400">G/P</TableHead>
 
                 </TableRow>
@@ -274,6 +284,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                       <TableCell className="text-right font-semibold text-gray-100">
                         {holding.fxMissing ? <Badge variant="outline">Conversión o coste no disponible</Badge> : format(holding.value, holding.baseCurrency)}
                       </TableCell>
+                      <TableCell className="text-right font-semibold text-gray-100">{weight(holding.symbol)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end gap-1">
                           <span className={`font-semibold ${!gainKnown ? 'text-gray-400' : isPositive ? 'text-green-400' : 'text-red-400'}`}>
@@ -301,6 +312,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <TableCell className="text-right font-semibold text-gray-100">
                       {format(cash, cashCurrency)}
                     </TableCell>
+                    <TableCell className="text-right text-gray-500">{NA}</TableCell>
                     <TableCell className="text-right text-gray-500">{NA}</TableCell>
 
                   </TableRow>
