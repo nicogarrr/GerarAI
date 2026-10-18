@@ -161,6 +161,7 @@ def test_is_production_is_a_denylist_not_an_allowlist():
                 "research_auth_secret": SECRET,
                 "minio_secret_key": "production-minio-secret-not-a-default",
                 "minio_access_key": "production-minio-access-not-a-default",
+                "database_url": PROD_TEST_DATABASE_URL,
             }
             if expected
             else {}
