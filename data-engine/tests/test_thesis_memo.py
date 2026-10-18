@@ -86,7 +86,7 @@ def test_full_thesis_renders_every_section(db):
     memo = build_memo_markdown(db, company, thesis)
 
     assert memo.startswith("# Memo de tesis — AAPL (Apple)")
-    assert "Version 2 · estado `published` · rating `buy`" in memo
+    assert "Versión 2 · estado `published` · rating `buy`" in memo
     assert "La base instalada monetiza servicios a doble digito." in memo
     # Valuation table: money formatting + probabilities.
     assert "| Bajista | $150.00 | 20 |" in memo
@@ -98,7 +98,7 @@ def test_full_thesis_renders_every_section(db):
     assert "- Ciclo de renovacion de iPhone" in memo
     assert "- Crecimiento de servicios < 5%" in memo
     # Evidence quality scores.
-    assert "Confianza de datos 82/100 · cobertura de fuentes 74/100 · red-team 61/100 · riesgo de valoracion 35/100" in memo
+    assert "Confianza de datos 82/100 · cobertura de fuentes 74/100 · red-team 61/100 · riesgo de valoración 35/100" in memo
     # Custom sections in order.
     assert memo.index("### Foso competitivo") < memo.index("### Riesgos")
     assert "Ecosistema cerrado." in memo
@@ -107,8 +107,8 @@ def test_full_thesis_renders_every_section(db):
     # Footer + disclaimer always close the memo.
     assert "fingerprint fp-abc123" in memo
     assert memo.rstrip().endswith(
-        "Documento informativo de investigacion. NO es asesoramiento financiero "
-        "ni recomendacion de compra o venta."
+        "Documento informativo de investigación. NO es asesoramiento financiero "
+        "ni recomendación de compra o venta."
     )
 
 

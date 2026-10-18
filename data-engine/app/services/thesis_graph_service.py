@@ -259,10 +259,10 @@ class ThesisGraphService:
         impact_score = min(10, base_materiality + semantic_boost)
         labels = [node.label for node in affected_nodes[:4]]
         summary = (
-            f"Affects {len(affected_claim_ids)} claims and thesis nodes: "
+            f"Afecta a {len(affected_claim_ids)} afirmaciones y nodos de la tesis: "
             f"{', '.join(labels)}."
             if labels
-            else "No structural thesis node matched with sufficient confidence."
+            else "Ningún nodo estructural de la tesis coincide con confianza suficiente."
         )
         return ThesisImpact(
             affected_claim_ids=affected_claim_ids,

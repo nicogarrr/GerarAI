@@ -125,7 +125,7 @@ def test_build_real_nasdaq_formats_and_us_only():
     )
     got = [(e["date"], e["ticker"], e["type"], e["detail"]) for e in events]
     assert got == [
-        ("2026-10-16", "KO", "dividend_ex", "0,5100 por accion"),
+        ("2026-10-16", "KO", "dividend_ex", "0,5100 por acción"),
         ("2026-10-22", "LOOP", "earnings", "antes de la apertura, BPA estimado -0,05"),
         ("2026-10-22", "ALM", "corporate_action", "ratio 2"),
         ("2026-10-23", "KO", "earnings", None),
@@ -232,7 +232,7 @@ def test_filing_deadline_10k_after_third_quarter_52_53_weeks():
     assert event["type"] == "filing_deadline" and event["ticker"] == "AAPL"
     assert event["date"] == "2026-11-25"
     assert event["title"] == "Plazo para presentar el 10-K (INFERIDO)"
-    assert "60 dias" in event["detail"] and "Large accelerated filer" in event["detail"]
+    assert "60 días" in event["detail"] and "Large accelerated filer" in event["detail"]
     assert "52/53 semanas" in event["detail"]
     assert event["source"] == svc.SOURCE_SEC_RULE
 
@@ -276,7 +276,7 @@ def test_filing_deadline_month_end_issuer_and_category_variants():
 def test_filing_deadline_unknown_category_uses_max_and_says_so():
     event = _ev({**APPLE, "category": ""}, "AAPL")
     assert event["date"] == "2026-12-25"  # 26-sep + 90 d (viernes; la Navidad no se modela)
-    assert "plazo maximo" in event["detail"]
+    assert "plazo máximo" in event["detail"]
 
 
 def test_filing_deadline_no_data_means_none_not_invented():
@@ -349,4 +349,4 @@ def test_route_includes_filing_deadlines_sorted_and_status(engine, db, monkeypat
 
 
 def test_calendar_corporate_action_source_uses_current_visible_brand():
-    assert svc.SOURCE_CAVAAI == 'Accion corporativa registrada en GerarAI'
+    assert svc.SOURCE_CAVAAI == 'Acción corporativa registrada en GerarAI'

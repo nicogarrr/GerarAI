@@ -147,8 +147,8 @@ class PreRevenueScenarioEngine(ValuationEngine):
                 missing_inputs=["non_negative_fcf_margin"],
                 reason=(
                     f"El margen FCF reportado es {margin:.4f} (quema de caja): "
-                    "un DCF FCFF daria un valor por accion negativo. No se "
-                    "publica rango por accion sin un margen normalizado con "
+                    "un DCF FCFF daria un valor por acción negativo. No se "
+                    "publica rango por acción sin un margen normalizado con "
                     "fuente."
                 ),
                 snapshot=snapshot,
@@ -432,7 +432,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
             missing_inputs=list(snapshot.missing_inputs) + ["non_negative_fcf_margin"],
             reason=(
                 "El FCF o margen FCF reportado es cero o negativo; un margen "
-                "inferido no puede sustituir ese dato. Sin valor por accion "
+                "inferido no puede sustituir ese dato. Sin valor por acción "
                 "hasta tener un margen normalizado con fuente."
             ),
             snapshot=snapshot,
@@ -506,7 +506,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
                         else "Sin dato reportado de flujo de caja (operating_cash_flow / "
                         "free_cash_flow): el margen FCF seria un supuesto sin base. "
                     )
-                    + "No se publica rango por accion hasta tener un margen FCF "
+                    + "No se publica rango por acción hasta tener un margen FCF "
                     "normalizado o una curva de despliegue/financiacion con fuente."
                 ),
                 snapshot=snapshot,

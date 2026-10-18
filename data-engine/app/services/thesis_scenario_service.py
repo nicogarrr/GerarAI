@@ -106,13 +106,13 @@ class ThesisScenarioService:
         trace_scenarios = _mapping(trace.get("escenarios"))
         reason = None
         if model is None:
-            reason = "No hay una proyeccion thesis-5y guardada para esta accion."
+            reason = "No hay una proyección thesis-5y guardada para esta acción."
         elif trace.get("model_version") != MODEL_VERSION or trace.get("model_type") != MODEL_TYPE:
-            reason = "Version de proyeccion sin contrato de procedencia compatible."
+            reason = "Versión de proyección sin contrato de procedencia compatible."
         elif cutoff is None or cutoff > date.today():
             reason = "La fecha de corte falta, es invalida o es futura."
         elif not rows:
-            reason = "La ultima version no tiene filas anuales; no se usa una version anterior."
+            reason = "La última versión no tiene filas anuales; no se usa una versión anterior."
         source = {
             "tabla": "thesis_projection_years",
             "valuation_model_id": model.id if model else None,
@@ -133,7 +133,7 @@ class ThesisScenarioService:
                 raw = matches[0] if len(matches) == 1 else {}
                 row_reason = reason
                 if not row_reason and (not raw or row.as_of != cutoff):
-                    row_reason = "Fila anual sin traza unica de la misma version y fecha de corte."
+                    row_reason = "Fila anual sin traza unica de la misma versión y fecha de corte."
                 values = {}
                 for metric, column in METRICS.items():
                     blocked = row_reason or self._lineage_reason(metric, raw, base, cutoff)
@@ -161,9 +161,9 @@ class ThesisScenarioService:
                     if not blocked and (value is None or expected is None):
                         blocked = "Falta el valor persistido o su valor en la traza."
                     if not blocked and value is not None and expected is not None and abs(value - expected) > tolerance:
-                        blocked = "La cifra anual no coincide con la traza de esta version."
+                        blocked = "La cifra anual no coincide con la traza de esta versión."
                     if not blocked and row.label != "INFERIDO":
-                        blocked = "La fila no esta etiquetada como proyeccion inferida."
+                        blocked = "La fila no esta etiquetada como proyección inferida."
                     values[metric] = {
                         "valor": float(value) if not blocked and value is not None else None,
                         "etiqueta": "N/D" if blocked else "INFERIDO",
@@ -194,7 +194,7 @@ class ThesisScenarioService:
             "fuente": source,
             "escenarios": scenarios,
             "aviso_coherencia": trace.get("aviso_coherencia"),
-            "disclaimer": "Escenarios del modelo, no datos oficiales ni recomendaciones de inversion. "
+            "disclaimer": "Escenarios del modelo, no datos oficiales ni recomendaciones de inversión. "
                           "Vista de solo lectura: no genera cifras ni consume cuota o servicios de pago.",
         }
 

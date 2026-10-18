@@ -346,7 +346,7 @@ def test_section_templates_titles_and_slots():
     assert sections["lo_que_sabemos"]["titulo"] == "Lo que sabemos"
     assert sections["lo_que_cambio"]["titulo"] == "Lo que cambió"
     assert sections["lo_que_descuenta"]["titulo"] == "Lo que exige el precio actual"
-    assert sections["no_sabemos"]["titulo"] == "Lo que aun no sabemos"
+    assert sections["no_sabemos"]["titulo"] == "Lo que aún no sabemos"
     # Los parrafos salen de los mismos slots verificados de la capa resumen.
     assert sections["lo_que_sabemos"]["parrafos"][0] == FRAGMENTS["valoracion_posicion"]
     # La hipotesis (interpretacion) no convive con los hechos: seccion propia.
@@ -368,7 +368,7 @@ def test_unknown_section_questions_are_ticker_specific():
     assert any("ebitda" in p and "META" in p for p in preguntas)
     assert any("parcial-indicativa" in p and "META" in p for p in preguntas)
     assert any("fecha registrada es la de ingesta" in p for p in preguntas)
-    assert any("pendiente de actualizacion" in p for p in preguntas)
+    assert any("pendiente de actualización" in p for p in preguntas)
     # Sin huecos reales no hay seccion de preguntas (nunca genericas).
     sections_full = _sections(VALUATION, NEWS)
     assert "no_sabemos" not in sections_full
@@ -400,9 +400,9 @@ def test_section_selection_appends_fixed_disclaimer():
     )
     assert result is not None
     assert result[-1]["titulo"] == "Salvedad"
-    assert "no es recomendacion de inversion" in result[-1]["parrafos"][0]
+    assert "no es recomendación de inversión" in result[-1]["parrafos"][0]
     assert result[0]["titulo"] == "Lo que sabemos"
-    assert result[-2]["titulo"] == "Lo que aun no sabemos"
+    assert result[-2]["titulo"] == "Lo que aún no sabemos"
 
 
 def test_sections_flag_off_returns_none(db, monkeypatch):
