@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.services import tax_declarant_service
 from app.services.tax_modelo720_file import Modelo720FileService
 from app.services.tax_modelo720_service import Modelo720Service
 from app.services.tax_report_service import TaxReportService, build_tax_summary_rows
@@ -98,5 +99,34 @@ def preview_tax_filing(
         return TaxReportService().get_report(
             db, fiscal_year, tme=inputs.tme_percent / Decimal("100")
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class DeclarantInput(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    nif: str | None = None
+    apellidos_nombre: str | None = None
+    numero_declaracion: str | None = None
+    telefono: str | None = None
+    filed_720_before: bool | None = None
+    custody: dict[str, str | None] | None = None
+
+
+@router.get("/declarant")
+def get_declarant(db: Session = Depends(get_db)) -> dict:
+    try:
+        return tax_declarant_service.read(db)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@router.put("/declarant")
+def put_declarant(body: DeclarantInput, db: Session = Depends(get_db)) -> dict:
+    try:
+        return tax_declarant_service.write(db, body.model_dump(exclude_unset=True))
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

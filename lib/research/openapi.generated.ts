@@ -3740,6 +3740,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/taxes/declarant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Declarant */
+        get: operations["get_declarant_api_taxes_declarant_get"];
+        /** Put Declarant */
+        put: operations["put_declarant_api_taxes_declarant_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/taxes/holdings": {
         parameters: {
             query?: never;
@@ -5227,6 +5245,23 @@ export interface components {
              */
             taxonomy: "overestimating_TAM" | "underestimating_dilution" | "extrapolating_peak_margin" | "ignoring_balance_sheet" | "management_trust_error" | "valuation_anchoring" | "position_sizing_error" | "selling_too_early" | "ignoring_cyclicality" | "thesis_drift";
         };
+        /** DeclarantInput */
+        DeclarantInput: {
+            /** Apellidos Nombre */
+            apellidos_nombre?: string | null;
+            /** Custody */
+            custody?: {
+                [key: string]: string | null;
+            } | null;
+            /** Filed 720 Before */
+            filed_720_before?: boolean | null;
+            /** Nif */
+            nif?: string | null;
+            /** Numero Declaracion */
+            numero_declaracion?: string | null;
+            /** Telefono */
+            telefono?: string | null;
+        };
         /** DiscoveriesOut */
         DiscoveriesOut: {
             /** Has More */
@@ -5237,7 +5272,7 @@ export interface components {
             limit: number;
             /**
              * Note
-             * @default Candidatos INFERIDOS por un modelo a partir de evidencias almacenadas; son hipotesis, no hechos ni recomendaciones. Las URLs proceden de la fuente guardada, nunca del modelo
+             * @default Candidatos INFERIDOS por un modelo a partir de evidencias almacenadas; son hipótesis, no hechos ni recomendaciones. Las URLs proceden de la fuente guardada, nunca del modelo
              */
             note: string;
             /** Offset */
@@ -16696,6 +16731,90 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ManualTranscriptImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_declarant_api_taxes_declarant_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_declarant_api_taxes_declarant_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclarantInput"];
             };
         };
         responses: {
