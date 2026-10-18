@@ -27,3 +27,9 @@ describe('/cuellos paginación honesta', () => {
     assert.ok(page.includes('pageHref(totalPages)'), 'enlace a la última página real');
   });
 });
+
+it('las señales permiten comprobar las fuentes, no solo ver un recuento', () => {
+  assert.ok(page.includes('Ver evidencias guardadas'));
+  assert.ok(page.includes("item.status === 'verificada' && item.url"));
+  assert.ok(page.includes('sin enlace verificable'));
+});

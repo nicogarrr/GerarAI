@@ -636,3 +636,12 @@ def test_actor_reports_partial_when_deadline_crosses_during_call(actor_env, monk
     monkeypatch.setattr(svc, "create_llm_provider", lambda: Slow(out(cand())))
     result = _fn()(1, "u")
     assert result["status"] == "partial" and result["stop_reason"] == "deadline" and result["saved"] == 0
+
+
+def test_signals_return_resolved_sources_not_only_opaque_ids(db):
+    from app.api.routes.bottlenecks import list_bottlenecks
+    refresh_signals(db)
+    signals = list_bottlenecks(db).signals
+    found = [e for signal in signals for e in signal.evidence]
+    assert any(e.url == 'https://pub-a.example/n1' and e.status == 'verificada' for e in found)
+    assert all(e.id for e in found)
