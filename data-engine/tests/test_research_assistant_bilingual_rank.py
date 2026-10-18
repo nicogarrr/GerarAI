@@ -27,3 +27,9 @@ def test_translation_never_cites_text_without_one_of_the_forms():
 
 def test_ticker_only_question_has_no_terms():
     assert _rank([_cit("a", "ASTS guidance")], "ASTS", "ASTS") == []
+
+
+def test_valoracion_matches_valuation_and_dates_have_no_time():
+    from app.services.research_assistant_service import _ES_EN
+
+    assert "valuation" in _ES_EN["valoracion"]

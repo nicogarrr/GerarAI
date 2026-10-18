@@ -127,6 +127,11 @@ _ES_EN: dict[str, frozenset[str]] = {
     "dividendo": frozenset({"dividend"}),
     "dividendos": frozenset({"dividend", "dividends"}),
     "licencia": frozenset({"license", "licence"}),
+    "valoracion": frozenset({"valuation"}),
+    "competencia": frozenset({"competition", "competitors"}),
+    "crecimiento": frozenset({"growth"}),
+    "inversion": frozenset({"investment", "capex"}),
+    "inversiones": frozenset({"investment", "investments", "capex"}),
     "espectro": frozenset({"spectrum"}),
 }
 
@@ -247,7 +252,7 @@ def answer(db: Session, payload) -> dict:
     lines = []
     primary = any(citation["kind"] in {"financial_fact", "document_chunk"} for citation in selected)
     for citation in selected:
-        stamp = citation["as_of"] or "fecha sin datos"
+        stamp = re.sub(r"(\d{4}-\d{2}-\d{2})T[\d:.+\-Z]+", r"\1", citation["as_of"] or "fecha sin datos")
         statement = (f"Dato documentado en {citation['source']} ({stamp}): {citation['excerpt']}"
                      if citation["kind"] == "financial_fact"
                      else f"Extracto de {citation['source']} ({stamp}): {citation['excerpt']}"
