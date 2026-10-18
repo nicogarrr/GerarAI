@@ -1,7 +1,7 @@
 /**
  * Selector de la ficha de empresa. El recorrido simple (WorldStocks punto 1,
  * aprobado por Nico 2026-10-16) son 3 pasos: Entender -> Valorar -> Seguir.
- * Los 18 destinos (13 vistas + 5 subrutas) se agrupan bajo esos 3 pasos;
+ * Los 19 destinos (14 vistas + 5 subrutas) se agrupan bajo esos 3 pasos;
  * nada se borra, lo secundario queda un nivel debajo.
  *
  * COMPATIBILIDAD: los `?view=` antiguos siguen siendo URLs validas. Cada
@@ -34,6 +34,7 @@ export const MODULES = [
   { key: 'sources', label: 'Fuentes', group: 'entender' },
   { key: 'chat', label: 'Chat con fuentes', group: 'entender' },
   { key: 'changes', label: 'Cambios y revisiones', group: 'seguir' },
+  { key: 'holders', label: 'Superinversores', group: 'seguir' },
   { key: 'lecciones', label: 'Lecciones de decisiones', group: 'seguir', path: 'decision-lessons' },
   { key: 'directiva', label: 'Credibilidad de la directiva', group: 'seguir', path: 'management-credibility' },
 ] as const;

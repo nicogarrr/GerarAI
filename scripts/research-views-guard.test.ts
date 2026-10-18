@@ -22,7 +22,7 @@ describe('ficha en 3 pasos: mapeo de vistas', () => {
     it('cada módulo ?view= se abre a sí mismo y las subrutas caen a overview', () => {
         const views = MODULES.filter((m) => !('path' in m));
         const subs = MODULES.filter((m) => 'path' in m);
-        assert.equal(views.length, 13);
+        assert.equal(views.length, 14);
         assert.equal(subs.length, 5);
         for (const m of views) assert.equal(asView(m.key), m.key);
         for (const m of subs) assert.equal(asView(m.key), 'overview');

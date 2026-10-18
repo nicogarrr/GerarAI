@@ -86,6 +86,7 @@ import {
   getResearchNews,
 } from '@/lib/actions/research.actions';
 import { getCompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
+import { getCompanyHolders } from '@/lib/actions/investors.actions';
 import { getWatchlist } from '@/lib/actions/watchlist.actions';
 import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
@@ -100,7 +101,7 @@ import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import CitationsList from '@/components/chat/CitationsList';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
-import { formatDate, formatMarketDate, formatNumber, formatUserDateTime, formatMoney, NA } from '@/lib/format';
+import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDateTime, formatMoney, NA } from '@/lib/format';
 import { glossary, moatGlossaryKey } from '@/lib/glossary';
 import {
   RESEARCH_RENDER_BUDGET_MS,
@@ -602,6 +603,7 @@ type ViewWorkspaces = {
   valuation: Awaited<ReturnType<typeof getResearchValuationWorkspace>>;
   documents: Awaited<ReturnType<typeof getResearchDocumentsWorkspace>>;
   sources: Awaited<ReturnType<typeof getResearchSourceAuditsWorkspace>>;
+  holders: Awaited<ReturnType<typeof getCompanyHolders>>;
   chat: Awaited<ReturnType<typeof askResearchCompanyChat>>;
 };
 
@@ -638,6 +640,7 @@ const EMPTY_VIEW_DATA: { [K in keyof ViewWorkspaces]: ViewWorkspaces[K] } = {
   valuation: null,
   documents: [],
   sources: [],
+  holders: null,
   chat: null,
 };
 
@@ -684,6 +687,8 @@ function launchViewData(
       return { key: 'documents', promise: withResearchTelemetry('documents-workspace', () => getResearchDocumentsWorkspace(ticker, false)) };
     case 'sources':
       return { key: 'sources', promise: withResearchTelemetry('source-audits', () => getResearchSourceAuditsWorkspace(ticker)) };
+    case 'holders':
+      return { key: 'holders', promise: withResearchTelemetry('company-holders', () => getCompanyHolders(ticker)) };
     default:
       // 'overview' no tiene workspace (el snapshot lo trae) y 'chat' depende de
       // `?chat=`, que no es parte de la clave de vista: se lanza aparte.
@@ -1220,6 +1225,50 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           <Panel title="Alertas"><div className="space-y-2">{data.alerts.length ? data.alerts.map((alert) => <div className="rounded-lg border border-gray-800 p-3 text-sm" key={alert.id}><Badge variant="outline">{label(alert.severity)}</Badge><p className="mt-2 text-gray-300">{alert.message}</p><p className="mt-2 text-xs text-gray-500">Registrada el {formatUserDateTime(alert.created_at)} (Madrid)</p>{safeHttpUrl(alert.source_url) ? <a className="mt-2 inline-block text-xs text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(alert.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">Ver fuente</a> : null}</div>) : <EmptyState title="Sin alertas." />}</div></Panel>
         </div>
         <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} />
+      </div>
+    );
+  } else if (activeView === 'holders') {
+    const holders = await viewData('holders');
+    content = (
+      <div className="space-y-6">
+        {holders === null ? (
+          <EmptyState title="No se pudieron cargar los superinversores de esta empresa." />
+        ) : holders.status === 'sin_identificador' ? (
+          <EmptyState title={holders.identity_source ?? 'Sin identidad CUSIP verificada para cruzar los 13F.'} />
+        ) : holders.status === 'sin_datos' ? (
+          <EmptyState title="Sin informes 13F sincronizados." />
+        ) : (
+          <Panel title="Superinversores que la declaran">
+            {holders.holders.length ? (
+              <ul className="space-y-3">
+                {holders.holders.map((holder) => (
+                  <li className="rounded-lg border border-gray-800 p-3 text-sm" key={holder.slug}>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <Link className="font-medium text-teal-300 hover:text-teal-200" href={`/inversores/${holder.slug}`}>{holder.name}</Link>
+                      <span className="text-gray-200">{holder.value_usd !== null ? formatMarketCapUsd(holder.value_usd) : NA}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Cartera a {holder.report_date ? formatDate(holder.report_date) : 'fecha desconocida'}
+                      {holder.coverage === 'partial' ? ' · Datos parciales' : ''}
+                      {holder.filing_url ? (
+                        <>
+                          {' · '}
+                          <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={holder.filing_url} rel="noopener noreferrer" target="_blank">13F original</a>
+                        </>
+                      ) : null}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState title="Ningún gestor revisado la declara en su último 13F." />
+            )}
+            <p className="mt-4 text-xs text-gray-500">
+              {holders.managers_with_data} gestores con datos · {holders.managers_without_data} sin datos
+              {holders.managers_partial ? ` · ${holders.managers_partial} parciales` : ''} · {holders.limitations.join(' ')}
+            </p>
+          </Panel>
+        )}
       </div>
     );
   } else if (activeView === 'financials') {

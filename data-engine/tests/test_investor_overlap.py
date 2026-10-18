@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Company, FundManager, ManagerHolding, Position
 from app.models.entities import Base, InstrumentReference
-from app.services.investor_overlap import _cusip, portfolio_overlap
+from app.services.investor_overlap import _cusip, holders_by_ticker, portfolio_overlap
 
 
 def setup_portfolio():
@@ -165,3 +165,29 @@ def test_portfolio_companies_query_no_distinct_sobre_entidad():
         "SELECT DISTINCT sobre companies.* es invalido en postgres (columnas json): "
         + companies_select
     )
+
+
+def test_holders_by_ticker_reverse_lookup():
+    result = holders_by_ticker(setup_portfolio(), "aapl")
+    assert result is not None and result["status"] == "ok"
+    assert result["cusip"] == "037833100"
+    assert len(result["holders"]) == 1
+    holder = result["holders"][0]
+    assert holder["slug"] == "buffett"
+    assert holder["filing_date"] == "2026-08-20"  # la enmienda A-2 sustituye al filing base
+    assert holder["value_usd"] == 100.0
+    assert result["managers_with_data"] == 1
+
+
+def test_holders_by_ticker_unknown_company_returns_none():
+    assert holders_by_ticker(setup_portfolio(), "NOEXISTE") is None
+
+
+def test_holders_by_ticker_without_identity_claims_nothing():
+    db = setup_portfolio()
+    company = db.query(Company).filter_by(ticker="AAPL").one()
+    company.isin = None
+    db.commit()
+    result = holders_by_ticker(db, "AAPL")
+    assert result["status"] == "sin_identificador"
+    assert result["holders"] == []
