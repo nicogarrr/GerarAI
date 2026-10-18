@@ -45,8 +45,6 @@ def _change_summary(headline: str, impact: str) -> str:
     body = (impact or "").strip()
     if body and head and body.lower().lstrip().startswith(head.lower()[:60]):
         return body
-    if body and body.lower() == head.lower():
-        return body
     prefix = "Noticia material que requiere revisión de la tesis"
     return f"{prefix}: {head}. {body}".strip() if body else f"{prefix}: {head}."
 

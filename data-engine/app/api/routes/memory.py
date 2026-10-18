@@ -34,8 +34,8 @@ from app.schemas import (
 )
 from app.services.company_resolver import resolve_company
 from app.services.review_alert_service import ReviewAlertService
-from app.services.source_hierarchy_service import classify_source
 from app.services.review_copy import claim_status_label
+from app.services.source_hierarchy_service import classify_source
 from app.services.thesis_change_types import claim_change_type
 
 router = APIRouter()

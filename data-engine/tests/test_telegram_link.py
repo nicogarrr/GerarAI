@@ -138,10 +138,12 @@ def test_successful_authenticated_relay_and_replay(db, monkeypatch):
 
 
 def test_cnmv_backward_stale_future_and_same_date_blocked(db):
-    from app.models import Company, ResearchAlert
+    from app.models import Company, Position, ResearchAlert
     from app.services.short_positions_service import emit_shorts_increase
     company = Company(ticker="CNMV", name="CNMV", exchange="BME", company_type="compounders", valuation_model="dcf")
     db.add(company)
+    db.commit()
+    db.add(Position(company_id=company.id, quantity=1))
     db.commit()
     now = datetime(2026, 10, 8, tzinfo=UTC)
     old = {"source":"CNMV", "public_total_percent":.5, "positions":[{"holder":"A", "percent":.5, "position_date":"2026-09-30"}]}
