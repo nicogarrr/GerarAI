@@ -39,7 +39,7 @@ concurrency:
 jobs:
   hygiene:
     name: Diff, secretos y plantilla
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       # Declarado: el resumen del run lo leen el autor y el revisor.

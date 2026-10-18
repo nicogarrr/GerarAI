@@ -48,7 +48,7 @@ concurrency:
 jobs:
   restore-drill:
     name: Backup -> restore -> verify (Postgres, MinIO, Qdrant)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Margen para: install de requirements (torch CPU), seed, backup, destruccion,
     # restore y arranque de uvicorn. Si se pasa, algo esta colgado, no lento.
     timeout-minutes: 45
@@ -337,7 +337,7 @@ jobs:
     # que reejecuta el job principal con `needs` y falla si el evento no es un
     # push a main; el nombre del check que ve el branch protection es este.
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: restore-drill
     timeout-minutes: 5
     steps:

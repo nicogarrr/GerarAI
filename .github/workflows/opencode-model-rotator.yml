@@ -36,7 +36,7 @@ concurrency:
 
 jobs:
   rotate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       # FIX-3.12: fetch-depth 0 explicito (clon completo). El push a main es

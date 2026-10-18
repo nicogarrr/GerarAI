@@ -46,7 +46,7 @@ concurrency:
 jobs:
   coverage:
     name: Backend coverage gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # La suite instrumentada con branch=True tarda bastante mas que la normal.
     # Sal timeout de margen: cortarlo a mitad dejaria a medias el .coverage y
     # el gate leeria un numero sin sentido.

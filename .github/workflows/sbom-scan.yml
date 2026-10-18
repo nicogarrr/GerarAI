@@ -60,7 +60,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build:
     name: Build ${{ matrix.name }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       contents: read
@@ -147,7 +147,7 @@ jobs:
     name: SBOM ${{ matrix.name }}
     needs: build
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
       contents: read
@@ -248,7 +248,7 @@ jobs:
     name: Motor 2 ${{ matrix.name }}
     needs: [sbom]
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -329,7 +329,7 @@ jobs:
     # always() + gate explicito: si build o sbom fallaron, este job corre igual
     # y el gate dice POR QUE esta en rojo. Un job saltado se lee como verde.
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 60 min y no 40: en la auditoria E3 el analisis de trivy de la imagen de
     # backend (3,4 GB) se comio mas de 25 min solo, y este job encadena
     # reconstruccion + vuln + secrets + misconfig + motor 2 + gate.
