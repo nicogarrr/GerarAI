@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { syncInvestorPortfoliosNow } from '@/lib/actions/investors.actions';
+
+const AUTO_SYNC_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 // Interactivo (estado + server action en onClick): no puede ser servidor.
 export function SyncPortfoliosButton({
@@ -20,7 +22,22 @@ export function SyncPortfoliosButton({
         setState('syncing');
         const result = await syncInvestorPortfoliosNow();
         setState(result.success ? 'queued' : 'error');
+        return result.success;
     };
+
+    // Estado vacío: primer uso sin datos encola la sincronización una vez; si ya
+    // se intentó hace menos de 6 h (cualquier pantalla) no se repite.
+    useEffect(() => {
+        const key = 'sync-13f-last-auto';
+        try {
+            const last = Number(window.localStorage.getItem(key));
+            if (Number.isFinite(last) && Date.now() - last < AUTO_SYNC_MIN_INTERVAL_MS) return;
+            window.localStorage.setItem(key, String(Date.now()));
+        } catch {
+            return;
+        }
+        void handleSync();
+    }, []);
 
     const loading = state === 'syncing';
     return (
