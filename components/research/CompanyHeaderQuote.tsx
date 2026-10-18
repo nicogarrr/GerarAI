@@ -50,6 +50,8 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
     const label = extendedQuoteLabel(quote);
     const showPrice = label !== NA && quote?.price != null && isValidCurrencyCode(currency);
     const signBase = quote?.change ?? quote?.change_percent ?? 0;
+    // «Cierre regular» repite «Cierre anterior» cuando ambos son el mismo dato: se muestra una sola vez.
+    const duplicatedClose = quote?.regular_close != null && quote.regular_close === quote.previous_close;
     const hasDatedMetrics = !!quote?.metrics_timestamp && !!quote.metrics_session;
     return (
         <div className="flex w-full flex-col gap-4" data-testid="company-header-quote">
@@ -66,9 +68,11 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                         ].filter(Boolean).join(' · ')}
                     </div>
                 ) : null}
-                <p className="mt-2 text-xs text-gray-500">
-                    Cierre regular: {showPrice && quote?.regular_close != null && (quote.regular_close_timestamp || quote.regular_close_date) ? `${formatMoney(quote.regular_close, currency)} · ${quote.regular_close_timestamp ? `${quoteDate(quote.regular_close_timestamp)} · ${quoteTime(quote.regular_close_timestamp)}` : quoteSessionDate(quote.regular_close_date)}` : NA}
-                </p>
+                {duplicatedClose ? null : (
+                    <p className="mt-2 text-xs text-gray-500">
+                        Cierre regular: {showPrice && quote?.regular_close != null && (quote.regular_close_timestamp || quote.regular_close_date) ? `${formatMoney(quote.regular_close, currency)} · ${quote.regular_close_timestamp ? `${quoteDate(quote.regular_close_timestamp)} · ${quoteTime(quote.regular_close_timestamp)}` : quoteSessionDate(quote.regular_close_date)}` : NA}
+                    </p>
+                )}
                 {showPrice ? <p className="mt-1 text-xs text-gray-500">{quote!.source} · {quoteTime(quote!.timestamp)} (Madrid)</p> : null}
             </div>
             <div className="overflow-x-auto">
