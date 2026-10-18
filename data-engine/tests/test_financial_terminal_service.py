@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.models.entities import Base, Company, FinancialFact
+from app.models.entities import Base, CalculatedMetric, Company, FinancialFact
 from app.services.financial_terminal_service import FinancialTerminalService
 
 
@@ -52,6 +52,18 @@ def _fact(db, company, *, metric="revenue", period, fiscal_year, value, quarter=
         db.flush()
     db.commit()
     return fact
+
+
+def _calculated(db, company, *, metric="roic", period, fiscal_year, value, status="ok"):
+    row = CalculatedMetric(
+        company_id=company.id, metric=metric,
+        value=None if value is None else Decimal(str(value)),
+        unit="decimal", period=period, fiscal_year=fiscal_year,
+        status=status, formula="test", numerator=None, denominator=None,
+    )
+    db.add(row)
+    db.commit()
+    return row
 
 
 def test_restated_fact_dedupes_latest_wins(db):
@@ -170,3 +182,41 @@ def test_missing_metric_is_reported_never_fabricated(db):
     assert by_metric["free_cash_flow"]["series"] == []
     assert result["coverage"]["missing"] == ["free_cash_flow"]
     assert result["coverage"]["percent"] == 50.0
+
+def test_calculated_without_inputs_is_missing_not_available(db):
+    """Prod ASTS: ROIC figuraba «disponible / 1 periodo» y el cuerpo decia
+    «Sin observaciones». La fila persistida por el calculo sin entradas
+    (value=None, period "unknown") es trazabilidad, no una observacion:
+    status y periods se derivan de observaciones validas."""
+    company = _company(db)
+    _calculated(db, company, metric="roic", period="unknown", fiscal_year=None, value=None, status="unavailable")
+    result = FinancialTerminalService().build(db, company, metrics=["roic"])
+    metric = result["metrics"][0]
+    assert metric["status"] == "missing"
+    assert metric["periods"] == 0
+    assert metric["series"] == []
+
+
+def test_calculated_with_real_period_but_null_value_is_missing(db):
+    """Owner earnings y margenes de ASTS: «disponible» con unico valor N/D.
+    Una fila con periodo real pero valor nulo tampoco es una observacion."""
+    company = _company(db)
+    _calculated(db, company, metric="owner_earnings", period="FY2025", fiscal_year=2025, value=None, status="unavailable")
+    result = FinancialTerminalService().build(db, company, metrics=["owner_earnings"])
+    metric = result["metrics"][0]
+    assert metric["status"] == "missing"
+    assert metric["periods"] == 0
+    assert metric["series"] == []
+
+
+def test_valid_calculated_rows_still_count(db):
+    """El filtro no se lleva observaciones reales: una calculada con valor
+    y una de trazabilidad conviven; solo cuenta la valida."""
+    company = _company(db)
+    _calculated(db, company, metric="roic", period="FY2025", fiscal_year=2025, value="0.12")
+    _calculated(db, company, metric="roic", period="unknown", fiscal_year=None, value=None, status="unavailable")
+    result = FinancialTerminalService().build(db, company, metrics=["roic"])
+    metric = result["metrics"][0]
+    assert metric["status"] == "available"
+    assert metric["periods"] == 1
+    assert len(metric["series"]) == 1

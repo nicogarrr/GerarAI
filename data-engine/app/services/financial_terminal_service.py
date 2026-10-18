@@ -222,6 +222,15 @@ class FinancialTerminalService:
                     row["period"],
                 ),
             )
+            # Solo es observación una fila con valor real. Una métrica
+            # calculada sin entradas persiste su fila de trazabilidad
+            # (value=None, a menudo period="unknown") para constar los
+            # missing_inputs, pero NO es un dato: si cuenta, la tarjeta dice
+            # «disponible / 1 periodo» sobre un cuerpo «Sin observaciones»
+            # (ROIC de ASTS en prod) y los márgenes salen «disponible» con
+            # único valor N/D. Status y periods se derivan de observaciones
+            # válidas; la fila de trazabilidad sigue en BD.
+            points = [row for row in points if row["value"] is not None]
             formula_spec = METRIC_DEFINITIONS.get(metric)
             metric_payloads.append(
                 {
