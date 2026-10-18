@@ -166,7 +166,7 @@ def _fmt_period_es(period: str | None, fiscal_year: int | None = None,
 def _fmt_date_es(iso_date: str | None) -> str:
     """'2026-10-16' -> '16 oct 2026'."""
     text = (iso_date or "").strip()
-    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", text)
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$", text)
     if not match:
         return text or "sin fecha"
     year, month, day = match.groups()
@@ -589,14 +589,17 @@ class ChatService:
         return live_claims(db, company, limit=limit)
 
     def _recent_news(self, db: Session, company: Company, limit: int = 4) -> list[NewsEvent]:
-        return list(
-            db.scalars(
-                select(NewsEvent)
-                .where(NewsEvent.company_id == company.id)
-                .order_by(desc(NewsEvent.date))
-                .limit(limit)
-            ).all()
-        )
+        from app.services.ticker_news_lane import _cites_company
+
+        # Se leen más filas y se descartan las que no citan a la empresa (feeds por
+        # ticker con artículos de otra: "AAPL ... Broadcom ...").
+        rows = db.scalars(
+            select(NewsEvent)
+            .where(NewsEvent.company_id == company.id)
+            .order_by(desc(NewsEvent.date))
+            .limit(limit * 6)
+        ).all()
+        return [r for r in rows if _cites_company(company, r.title or "", getattr(r, "summary", "") or "")][:limit]
 
     def _recent_sessions(self, db: Session, company: Company | None, limit: int = 4) -> list[ResearchSession]:
         statement = select(ResearchSession).order_by(desc(ResearchSession.updated_at)).limit(limit)

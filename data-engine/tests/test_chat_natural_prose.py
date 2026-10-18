@@ -219,3 +219,9 @@ def test_memoria_visible_en_prosa_con_marcador():
     assert db.query(MemoryItem).count() == 1
     for label in ("HECHO", "HIPOTESIS", "memory_item:", "memory_writeback:"):
         assert label not in response.answer
+
+
+def test_fmt_date_es_accepts_iso_datetime():
+    from app.services.chat_service import _fmt_date_es
+
+    assert _fmt_date_es("2026-10-18T18:00:02+00:00") == "18 oct 2026"
