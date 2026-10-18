@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Company, NewsEvent, Position, ResearchAlert, WatchItem
 from app.services.notification_service import NotificationService
+from app.services.ticker_news_lane import _NAME_NOISE, VERIFIED_ALIASES
 
 VERSION = "tracked-news-v1"
 MAX_AGE = timedelta(hours=48)
@@ -43,6 +44,13 @@ def _valid_source_url(url: str | None) -> str | None:
     except ValueError:
         return None
     return url.strip()
+
+
+def _headline_cites(company: Company, headline: str) -> bool:
+    ticker = (company.ticker or "").upper()
+    terms = [ticker, *VERIFIED_ALIASES.get(ticker, ())]
+    terms += [w for w in re.split(r"\W+", company.name or "") if len(w) >= 4 and w.lower() not in _NAME_NOISE]
+    return any(re.search(rf"(?<![\w]){re.escape(t)}(?![\w])", headline, flags=re.IGNORECASE) for t in terms if t)
 
 
 def _aware(value: datetime) -> datetime:
@@ -115,6 +123,11 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
                 continue
             company = companies.get(event.company_id)
             if company is None:
+                continue
+            # Noticias ya ingestadas ligadas al ticker del feed sin citar a la empresa
+            # (p. ej. un titular de Novo bajo NVDA): no generan alerta.
+            if not _headline_cites(company, provenance["source_headline"]):
+                stats["unverified_skips"] += 1
                 continue
             fp = _fingerprint(tenant_id, company.id, url)
             prior_alert = db.scalar(select(ResearchAlert).where(
