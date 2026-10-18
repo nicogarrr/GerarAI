@@ -31,7 +31,7 @@ export function NewsSecondOrder({ eventId }: { eventId: number }) {
     if (load.state !== 'idle' && load.state !== 'error') return;
     setLoad({ state: 'loading' });
     try {
-      const res = await fetch(`/api/news/${eventId}/second-order`, { signal: AbortSignal.timeout(50_000) });
+      const res = await fetch(`/api/news/${eventId}/second-order`, { signal: AbortSignal.timeout(58_000) });
       const data = res.ok ? ((await res.json()) as SecondOrder) : null;
       setLoad(data && Array.isArray(data.candidates) ? { state: 'ready', data } : { state: 'error' });
     } catch {
