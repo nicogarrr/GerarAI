@@ -682,25 +682,42 @@ class MetricCalculationService:
                 }, {"effective_tax_rate": fact}
             rejected_inputs.append(f"{fact.metric}:outside_0_to_1")
 
-        tax_expense = self._match_alias(
+        # Pares (gasto por impuestos, resultado antes de impuestos) del MISMO
+        # periodo. Se recorren del ejercicio mas reciente al mas antiguo y gana
+        # el primero coherente (pretax > 0 y tasa en [0, 1]); un ultimo ejercicio
+        # con perdidas o con un hecho sin pareja no tapa un ejercicio anterior
+        # valido. La tasa declara el periodo del que sale; nunca hay default.
+        pairs: list[tuple[FinancialFact, FinancialFact]] = []
+        seen_expense: set[int] = set()
+        anchor_expense = self._match_alias(
             db,
             company,
             ("income_tax_expense", "tax_expense"),
             anchor,
             reported_only=True,
-            allow_latest=allow_latest,
         )
-        pretax_anchor = tax_expense[1] if tax_expense else anchor
-        pretax_income = self._match_alias(
-            db,
-            company,
-            ("income_before_tax", "pretax_income", "income_before_taxes"),
-            pretax_anchor,
-            reported_only=True,
-        )
-        if tax_expense and pretax_income:
-            _, expense_fact = tax_expense
-            _, pretax_fact = pretax_income
+        expense_candidates: list[FinancialFact] = []
+        if anchor_expense:
+            expense_candidates.append(anchor_expense[1])
+        if allow_latest:
+            for alias in ("income_tax_expense", "tax_expense"):
+                for candidate in self._facts_for_metric(db, company, alias):
+                    if candidate.is_reported:
+                        expense_candidates.append(candidate)
+        for expense_fact in expense_candidates:
+            if expense_fact.id in seen_expense:
+                continue
+            seen_expense.add(expense_fact.id)
+            pretax_match = self._match_alias(
+                db,
+                company,
+                ("income_before_tax", "pretax_income", "income_before_taxes"),
+                expense_fact,
+                reported_only=True,
+            )
+            if pretax_match:
+                pairs.append((expense_fact, pretax_match[1]))
+        for expense_fact, pretax_fact in pairs:
             pretax = Decimal(pretax_fact.value)
             if pretax > 0:
                 derived_rate = Decimal(expense_fact.value) / pretax
@@ -710,6 +727,7 @@ class MetricCalculationService:
                         "tax_rate_source": "reported_income_statement",
                         "tax_rate_fallback": False,
                         "tax_rate_formula": "income_tax_expense / income_before_tax",
+                        "tax_rate_period": expense_fact.period,
                         "tax_rate_input_fact_ids": [
                             expense_fact.id,
                             pretax_fact.id,
@@ -718,7 +736,10 @@ class MetricCalculationService:
                         "income_tax_expense": expense_fact,
                         "income_before_tax": pretax_fact,
                     }
+        if pairs:
             rejected_inputs.append("income_tax_expense/income_before_tax:incoherent")
+        elif expense_candidates:
+            rejected_inputs.append("income_tax_expense:sin_income_before_tax_del_mismo_periodo")
 
         if not allow_fallback:
             return None, {

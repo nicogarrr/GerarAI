@@ -418,3 +418,42 @@ def test_funding_gap_never_treats_missing_capex_or_ocf_as_zero_money():
         result = estimate_funding_gap(_snapshot_completo(**{absent: None}), current_price=10, value_per_share=8)
         assert result.funding_gap is None
         assert result.dilution is None
+
+
+def test_tax_rate_uses_latest_coherent_year_when_newest_pair_is_a_loss(company_factory):
+    db, company = company_factory
+    svc = MetricCalculationService()
+    anchor = _fact(company, "risk_free_rate", "0.04", "2026-10-18", None, None)
+    db.add(anchor)
+    for metric, value, period, fy in (
+        ("income_tax_expense", "10", "2025-12-31:FY", 2025),
+        ("income_before_tax", "-50", "2025-12-31:FY", 2025),
+        ("income_tax_expense", "20", "2024-12-31:FY", 2024),
+        ("income_before_tax", "100", "2024-12-31:FY", 2024),
+    ):
+        db.add(_fact(company, metric, value, period, fy, None))
+    db.flush()
+
+    rate, trace, facts = svc._tax_rate_for_period(
+        db, company, anchor, allow_fallback=False, allow_latest=True
+    )
+
+    assert rate == Decimal("0.2")
+    assert trace["tax_rate_period"] == "2024-12-31:FY"
+    assert trace["tax_rate_fallback"] is False
+    assert set(facts) == {"income_tax_expense", "income_before_tax"}
+
+
+def test_tax_rate_stays_missing_without_pretax_pair(company_factory):
+    db, company = company_factory
+    anchor = _fact(company, "risk_free_rate", "0.04", "2026-10-18", None, None)
+    db.add(anchor)
+    db.add(_fact(company, "income_tax_expense", "10", "2025-12-31:FY", 2025, None))
+    db.flush()
+
+    rate, trace, _ = MetricCalculationService()._tax_rate_for_period(
+        db, company, anchor, allow_fallback=False, allow_latest=True
+    )
+
+    assert rate is None
+    assert trace["tax_rate_source"] == "unavailable"
