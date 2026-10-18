@@ -6,7 +6,10 @@ import re
 import time
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 from urllib.parse import urlparse
 
 import dramatiq
@@ -1283,6 +1286,83 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("refresh_portfolio_moves", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
+SPLIT_SYNC_UNIVERSE_CHUNK = 100
+
+
+def split_sync_tickers(
+    db: Session, scope: str, cursor: int = 0, chunk: int = SPLIT_SYNC_UNIVERSE_CHUNK
+) -> tuple[list[str], int | None]:
+    """Tickers a sincronizar y cursor del siguiente chunk (None = fin).
+
+    tracked: cartera (Position.company_id) + watchlist (WatchItem.symbol).
+    universe: todas las empresas, en chunks para respetar el presupuesto de
+    peticiones a Yahoo/FMP."""
+    from sqlalchemy import select as _select
+
+    from app.models import Company, Position, WatchItem
+
+    if scope == "tracked":
+        company_ids = list(db.scalars(_select(Position.company_id).distinct()).all())
+        tickers = set(
+            db.scalars(_select(Company.ticker).where(Company.id.in_(company_ids))).all()
+        ) if company_ids else set()
+        tickers |= {str(sym).upper() for sym in db.scalars(_select(WatchItem.symbol).distinct()).all()}
+        return sorted(tickers), None
+    tickers = list(db.scalars(_select(Company.ticker).order_by(Company.id)).all())
+    chunk_tickers = tickers[cursor:cursor + chunk]
+    next_cursor = cursor + chunk if cursor + chunk < len(tickers) else None
+    return chunk_tickers, next_cursor
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000)
+def ingest_corporate_splits(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+    scope: str = "tracked",
+    cursor: int = 0,
+) -> dict[str, Any]:
+    """Splits/reverse splits declarados (Yahoo; FMP de respaldo) -> CorporateAction.
+
+    Sin estos hechos el modelo no puede expresar los recuentos historicos de
+    acciones en unidades actuales y degrada el CAGR de acciones a N/D. Se
+    programa semanal: tracked (cartera+watchlist) completo y universo en
+    chunks auto-encolados. La ingesta es idempotente (dedup por fila).
+    """
+    from app.services.async_bridge import run_from_any_context
+    from app.services.split_ingestion_service import SplitIngestionService
+
+    db = _session(tenant_id, user_id)
+    try:
+        tickers, next_cursor = split_sync_tickers(db, scope, cursor, chunk=SPLIT_SYNC_UNIVERSE_CHUNK)
+        service = SplitIngestionService()
+        results = [
+            run_from_any_context(service.sync_company(db, ticker=ticker))
+            for ticker in tickers
+        ]
+        if next_cursor is not None:
+            ingest_corporate_splits.send(
+                tenant_id, user_id, scope=scope, cursor=next_cursor
+            )
+        return {
+            "actor": "ingest_corporate_splits",
+            "status": "ok",
+            "scope": scope,
+            "cursor": cursor,
+            "next_cursor": next_cursor,
+            "companies": len(results),
+            "synced": sum(1 for r in results if r["status"] == "ok"),
+            "unavailable": sum(1 for r in results if r["status"] == "unavailable"),
+            "unknown": sum(1 for r in results if r["status"] == "unknown_company"),
+            "inserted": sum(r.get("inserted", 0) for r in results),
+            "existing": sum(r.get("existing", 0) for r in results),
+        }
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("ingest_corporate_splits", exc, tenant_id=tenant_id)
     finally:
         db.close()
 

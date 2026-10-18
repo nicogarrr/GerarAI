@@ -13,6 +13,7 @@ from app.workers.dramatiq_app import (
     dispatch_tracked_news_alerts,
     evaluate_alert_rules,
     freeze_propicks_snapshot,
+    ingest_corporate_splits,
     recompute_fundamental_metrics,
     reconcile_alert_analyses,
     reconcile_alert_deliveries,
@@ -354,6 +355,13 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # alimentan /corporate-actions y las respuestas de Cerebro. Una vez al dia.
     _register(scheduler, partial(enqueue_for_all_tenants, sync_portfolio_dividends),
               "cron", job_id="portfolio_dividends_daily", hour=6, minute=20, jitter=300)
+    # Splits declarados (Yahoo, FMP de respaldo): sin ellos el modelo no puede
+    # ajustar los recuentos historicos de acciones y degrada el CAGR a N/D.
+    # Semanal: cartera+watchlist completo; universo en chunks auto-encolados.
+    _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="tracked"),
+              "cron", job_id="splits_tracked_weekly", day_of_week="sun", hour=5, minute=10, jitter=600)
+    _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="universe"),
+              "cron", job_id="splits_universe_weekly", day_of_week="sun", hour=5, minute=50, jitter=600)
     # F2 ProPicks: precios diarios + momentum del top-40 del ultimo run.
     # Tras el cierre de mercado US (21:45 UTC ~ cierre + margen).
     _register(
