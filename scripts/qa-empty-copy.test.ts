@@ -6,9 +6,10 @@ test('ProPicks never calls an empty selection Top 0 and uses the real refresh ac
  const src = read('components/proPicks/EnhancedProPicksContent.tsx');
  assert.ok(src.includes("picks.length > 0 ? `Top ${formatNumber(picks.length"));
  assert.ok(src.includes(": 'Sin selección'"));
- assert.ok(src.includes('Pulsa «Actualizar selección»'));
+ assert.ok(src.includes('Pulsa «Generar selección ahora»'));
  // #1406: el botón anuncia su estado (etiqueta que cambia con loading).
  assert.ok(src.includes("{loading ? 'Actualizando selección...' : 'Actualizar selección'}"));
+ assert.ok(src.includes("{lastGenerated ? (loading ? 'Actualizando selección...' : 'Actualizar selección') : (loading ? 'Generando selección...' : 'Generar selección ahora')}"));
 });
 test('plan and export avoid repeated page names and English labels', () => {
  assert.ok(!read('app/(root)/plan/page.tsx').includes('>Planificación<'));

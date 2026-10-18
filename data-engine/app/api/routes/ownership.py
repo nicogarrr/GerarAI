@@ -22,6 +22,24 @@ def list_managers() -> dict:
     }
 
 
+@router.post("/managers/sync-async", status_code=202)
+def sync_managers_async(db: Session = Depends(get_db)) -> dict:
+    """Encola el actor semanal de carteras para este tenant y responde de inmediato.
+
+    La primera carga de una cuenta nueva no espera al cron del lunes 04:20 ni
+    bloquea la peticion durante los minutos que tarda la descarga de la SEC:
+    el actor `sync_investor_holdings` hace el trabajo con el contexto de
+    tenant del solicitante.
+    """
+    from app.workers.dramatiq_app import sync_investor_holdings
+
+    message = sync_investor_holdings.send(
+        tenant_id=db.info.get("tenant_id"),
+        user_id=db.info.get("user_id"),
+    )
+    return {"status": "queued", "broker_message_id": str(message.message_id)}
+
+
 @router.post("/managers/sync")
 def sync_managers(cik: str | None = None, db: Session = Depends(get_db)) -> dict:
     """Sync the latest 13F report for one reviewed manager or all of them."""

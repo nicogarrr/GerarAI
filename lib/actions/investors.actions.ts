@@ -79,6 +79,19 @@ async function requestJson<T>(path: string): Promise<T> {
   return researchRequest<T>(path, { fast: true });
 }
 
+export type SyncPortfoliosResult = { success: true } | { success: false; message: string };
+
+/** Encola la descarga de carteras 13F de este tenant y responde de inmediato (202). */
+export async function syncInvestorPortfoliosNow(): Promise<SyncPortfoliosResult> {
+    try {
+        await researchRequest('/api/ownership/managers/sync-async', { method: 'POST' });
+        return { success: true };
+    } catch (error) {
+        console.error('syncInvestorPortfoliosNow error:', error);
+        return { success: false, message: error instanceof AppError ? error.message : 'No se pudo encolar la sincronización.' };
+    }
+}
+
 export async function getInvestors(): Promise<{ investors: InvestorSummary[]; limitations: string[] }> {
   return requestJson('/api/investors');
 }

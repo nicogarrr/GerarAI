@@ -11,8 +11,10 @@ test('refresh announces consultation result without claiming a new run', () => {
 
 test('el botón anuncia el estado por sí mismo (QA: sin feedback)', () => {
   const source = readFileSync('components/proPicks/EnhancedProPicksContent.tsx', 'utf8');
-  const buttons = source.match(/<span>\{loading \? 'Actualizando selección\.\.\.' : 'Actualizar selección'\}<\/span>/g) ?? [];
-  assert.equal(buttons.length, 2, 'los dos botones «Actualizar selección» cambian su etiqueta mientras cargan');
+  const simple = source.match(/<span>\{loading \? 'Actualizando selección\.\.\.' : 'Actualizar selección'\}<\/span>/g) ?? [];
+  assert.equal(simple.length, 1, 'el botón principal «Actualizar selección» cambia su etiqueta mientras carga');
+  const condicional = source.match(/<span>\{lastGenerated \? \(loading \? 'Actualizando selección\.\.\.' : 'Actualizar selección'\) : \(loading \? 'Generando selección\.\.\.' : 'Generar selección ahora'\)\}<\/span>/g) ?? [];
+  assert.equal(condicional.length, 1, 'el botón del estado vacío anuncia «Actualizando selección...» al actualizar y «Generando selección...» al generar el primer run');
   const teal = source.match(/bg-teal-600 text-white/g) ?? [];
   assert.equal(teal.length, 2, 'texto blanco legible también deshabilitado (opacity-50)');
 });
