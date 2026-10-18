@@ -33,6 +33,7 @@ from app.llm import (
 from app.models.entities import Company
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
+from app.services.text_clip import clip_words
 
 _OUTPUT_SCHEMA = {
     "type": "object",
@@ -485,12 +486,12 @@ def _section_templates(
         if item.get("date_source") == "ingested_at_fallback":
             preguntas.append(
                 f'Cuando publico realmente {item.get("source") or "el medio"} '
-                f'"{headline[:120]}"? La fecha registrada es la de ingesta, '
+                f'"{clip_words(headline, 120)}"? La fecha registrada es la de ingesta, '
                 "no la de publicacion."
             )
         if item.get("requires_update"):
             preguntas.append(
-                f'"{headline[:120]}" esta marcada como pendiente de '
+                f'"{clip_words(headline, 120)}" esta marcada como pendiente de '
                 "actualizacion: hay una version mas reciente del hecho?"
             )
     if "expectativas_mercado" not in fragments and status not in (
