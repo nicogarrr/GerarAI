@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import IntentLink from '@/components/layout/IntentLink'
 import {usePathname} from 'next/navigation'
 import {isNavItemActive, NAV_SECTIONS, showsNavSectionTitle, type NavItem} from '@/lib/constants'
 
@@ -40,27 +40,25 @@ function ItemLink({item, pathname}: {item: NavItem; pathname: string}) {
 
     return (
         <>
-            <Link
+            <IntentLink
                 href={item.href}
-                prefetch
                 aria-current={active ? 'page' : undefined}
                 className={classes(active, 'text-base', branchActive)}
             >
                 {item.icon && <item.icon aria-hidden="true" className="h-4 w-4 shrink-0" />}
                 <span className="truncate">{item.label}</span>
-            </Link>
+            </IntentLink>
             {item.children && (
                 <ul className="mt-1 flex flex-col gap-1 border-l border-gray-700/50 pl-3">
                     {item.children.map((child) => (
                         <li className="shrink-0" key={child.href}>
-                            <Link
+                            <IntentLink
                                 href={child.href}
-                                prefetch
                                 aria-current={isNavItemActive(pathname, child.href) ? 'page' : undefined}
                                 className={classes(isNavItemActive(pathname, child.href), 'text-base')}
                             >
                                 <span className="truncate">{child.label}</span>
-                            </Link>
+                            </IntentLink>
                         </li>
                     ))}
                 </ul>
