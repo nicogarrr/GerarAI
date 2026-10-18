@@ -85,6 +85,23 @@ def _date(value: Any) -> date | None:
         return None
 
 
+SCALE_JUMP_RATIO = Decimal(100)
+
+
+def detect_scale_jump(period_totals: dict[str, Decimal]) -> dict | None:
+    """Total de dos trimestres del mismo gestor que difiere >100x: casi seguro un error de escala.
+
+    Un gestor no multiplica ni divide su cartera por 100 de un trimestre al siguiente; si pasa,
+    la escala inferida de uno de los dos filings es sospechosa. Solo avisa, no corrige.
+    """
+    usable = sorted((d, t) for d, t in period_totals.items() if t and t > 0)
+    for (d0, t0), (d1, t1) in zip(usable, usable[1:]):
+        ratio = max(t0, t1) / min(t0, t1)
+        if ratio > SCALE_JUMP_RATIO:
+            return {"periods": [d0, d1], "totals": [str(t0), str(t1)], "ratio": str(round(ratio, 1))}
+    return None
+
+
 def _verify_totals(
     summary: dict | None, raw_rows: list[dict], merged: list[dict], factor: int = 1
 ) -> dict:
@@ -181,6 +198,7 @@ class ManagerHoldingIngestionService:
         verification: list[dict] = []
         skipped_amendments: list[dict] = []
         fetched_at = datetime.now(UTC)
+        period_totals: dict[str, Decimal] = {}
 
         for filing in group:
             accession = filing["accession_number"]
@@ -228,6 +246,10 @@ class ManagerHoldingIngestionService:
             merged = form13f.apply_value_scale(merged, scale_info["scale"])
             factor = 1000 if scale_info["scale"] == form13f.SCALE_THOUSANDS else 1
             check = _verify_totals(summary, rows, merged, factor)
+            if not filing["is_amendment"]:
+                period_totals[str(filing["report_date"])] = sum(
+                    (_decimal(r.get("value_usd_thousands")) or Decimal(0) for r in merged), Decimal(0)
+                )
             verification.append({"accession": accession, **check, "value_scale": scale_info})
             if check["status"] == "mismatch":
                 errors.append({"accession": accession, "error": "totals_mismatch"})
@@ -262,6 +284,10 @@ class ManagerHoldingIngestionService:
                     )
                 )
                 ingested += 1
+
+        scale_jump = detect_scale_jump(period_totals)
+        if scale_jump is not None:
+            errors.append({"error": "scale_jump_between_quarters", **scale_jump})
 
         manager.last_report_date = _date(latest_report)
         manager.coverage = Coverage.PARTIAL.value if errors else Coverage.OK.value
