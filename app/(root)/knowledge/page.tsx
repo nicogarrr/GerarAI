@@ -190,6 +190,8 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         principios en un solo scroll de 8 secciones. Las pestañas separan las
         tres tareas (mirar la biblioteca / curar principios / subir) y el estado
         va en la URL, así que no hace falta JavaScript para cambiar de sección.
+        `scroll={false}` en pestañas y filtros: cambiar de sección no devuelve
+        al usuario al inicio de la página.
       */}
       <Tabs className="gap-4" value={activeTab}>
         <TabsList
@@ -204,7 +206,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
               key={key}
               value={key}
             >
-              <Link href={key === TABS.biblioteca ? '/knowledge' : `/knowledge?tab=${key}`}>{TAB_LABELS[key]}</Link>
+              <Link href={key === TABS.biblioteca ? '/knowledge' : `/knowledge?tab=${key}`} scroll={false}>{TAB_LABELS[key]}</Link>
             </TabsTrigger>
           ))}
         </TabsList>
@@ -397,7 +399,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
 
         <TabsContent className="mt-2" value={TABS.principios}>
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center"><div className="flex items-center gap-2"><Sparkles aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="text-lg font-semibold text-gray-100">Principios de inversión</h2></div><div className="flex flex-wrap gap-2 md:ml-auto">{['', 'proposed', 'approved', 'rejected', 'merged', 'superseded'].map((status) => <Button asChild className="min-h-[44px]" key={status || 'all'} size="sm" variant={(query.status ?? '') === status ? 'default' : 'outline'}><Link href={status ? `/knowledge?tab=principios&status=${status}` : '/knowledge?tab=principios'}>{PRINCIPLE_STATUS_LABELS[status] ?? status}</Link></Button>)}</div></div>
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center"><div className="flex items-center gap-2"><Sparkles aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="text-lg font-semibold text-gray-100">Principios de inversión</h2></div><div className="flex flex-wrap gap-2 md:ml-auto">{['', 'proposed', 'approved', 'rejected', 'merged', 'superseded'].map((status) => <Button asChild className="min-h-[44px]" key={status || 'all'} size="sm" variant={(query.status ?? '') === status ? 'default' : 'outline'}><Link href={status ? `/knowledge?tab=principios&status=${status}` : '/knowledge?tab=principios'} scroll={false}>{PRINCIPLE_STATUS_LABELS[status] ?? status}</Link></Button>)}</div></div>
         <div className="grid gap-4 xl:grid-cols-2">
           {visiblePrinciples.map((principle) => (
             <article className="min-w-0 rounded-lg border border-gray-800 bg-black/30 p-4 break-words" key={principle.id}>
