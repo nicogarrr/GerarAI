@@ -8,7 +8,7 @@ test.describe("investor screener flow", () => {
   test("screener table renders one Seguir button per row", async ({ page }) => {
     await page.goto("/screener");
 
-    await expect(page.getByRole("heading", { name: "Screener", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mercado", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: "Tecnología" })).toBeVisible();
 
     const rows = page.locator("table tbody tr");
