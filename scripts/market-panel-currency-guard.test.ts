@@ -17,7 +17,9 @@ describe('panel de mercado: divisa', () => {
     it('no asume USD', () => {
         assert.ok(!/'USD'/.test(panel));
         assert.ok(!panel.includes('safeCurrency'));
-        assert.match(panel, /isValidCurrencyCode\(currency\) \? formatMoney\(value, currency\) : formatNumber\(value\)/);
+        // formatPrice es el formato adaptativo de precios (USD en locale en-US por
+        // regla de producto); lo que guarda el guard es el ternario de divisa válida.
+        assert.match(panel, /isValidCurrencyCode\(currency\) \? formatPrice\(value, currency\) : formatNumber\(value\)/);
     });
 });
 
