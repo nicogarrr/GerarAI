@@ -292,9 +292,11 @@ type ResearchSourceChunk = {
   metadata?: Record<string, unknown>;
 };
 
-type ResearchSourceAudit = {
+export type ResearchSourceAudit = {
   id: number;
   thesis_version_id: number | null;
+  thesis_version?: number | null;
+  created_at?: string | null;
   passed: boolean;
   source_coverage_score: number;
   unsupported_claims: string[];

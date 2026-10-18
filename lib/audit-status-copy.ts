@@ -23,3 +23,14 @@ export function auditScoreText(
         ? base
         : `${base} — mide solo citas, no el motivo del bloqueo`;
 }
+
+const FIX_LABELS: Record<string, string> = {
+    'No calculation trace -> no valuation.': 'Sin traza de cálculo no hay valoración: faltan variables de entrada; completa los datos y regenera la tesis.',
+    'Add source_id to every material claim.': 'Hay afirmaciones materiales sin fuente: añade el documento que las respalda y regenera la tesis.',
+    'Resolve data conflicts before saving final thesis.': 'Hay datos en conflicto entre fuentes: resuélvelos antes de guardar la tesis final.',
+};
+
+/** Motivo de bloqueo en español; un texto desconocido se muestra tal cual. */
+export function auditFixLabel(fix: string): string {
+    return FIX_LABELS[fix] ?? fix;
+}

@@ -90,6 +90,7 @@ import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
+import { SourceAuditDetail } from '@/components/research/SourceAuditDetail';
 import { dedupeNewsEvents } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import CitationsList from '@/components/chat/CitationsList';
@@ -1270,7 +1271,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     content = (
       <Panel title="Auditorías de fuentes">
         {audits.length ? (
-          <div className="space-y-3">{audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">tesis {audit.thesis_version_id ?? 'desconocida'}</Badge></div>{audit.required_fixes.length ? <p className="mt-3 text-sm text-amber-300">{audit.required_fixes.join(' · ')}</p> : null}</div>)}</div>
+          <div className="space-y-3">{audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">tesis {audit.thesis_version_id ?? 'desconocida'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>)}</div>
         ) : (
           <EmptyState
             action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>Genera una tesis para auditar fuentes</EmptyLink>}
