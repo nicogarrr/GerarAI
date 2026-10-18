@@ -60,12 +60,34 @@ STRICT_NAME_PATTERNS: dict[str, tuple[str, ...]] = {
 }
 
 
+# «Aena» suelto vale si el texto trae ademas una palabra del sector o de su
+# entorno en Espana; sin ella, es una colision de palabra.
+_STRICT_CONTEXT = {
+    "AENA": re.compile(
+        r"aeropuert|aeroportuari|pasajeros|tarifas|barajas|el\s+prat|enaire|ferrovial|"
+        r"\bBME\b|\bIBEX\b|\bCNMC\b|aerol(?:í|i)neas|\bvuelos\b",
+        flags=re.IGNORECASE,
+    ),
+}
+
+
 def fails_strict_name(company, text: str) -> bool:
-    """True si la empresa exige nombre completo y el texto no lo trae."""
-    patterns = STRICT_NAME_PATTERNS.get((getattr(company, "ticker", "") or "").upper())
+    """True si la sigla es una palabra corriente y el texto no vincula a la empresa.
+
+    Vale: una forma completa verificada, o «Aena» suelto (fuera del ticker pegado
+    delante) junto a una palabra de contexto del sector.
+    """
+    ticker = (getattr(company, "ticker", "") or "").upper()
+    patterns = STRICT_NAME_PATTERNS.get(ticker)
     if not patterns:
         return False
-    return not any(re.search(pattern, text or "", flags=re.IGNORECASE) for pattern in patterns)
+    text = text or ""
+    if any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in patterns):
+        return False
+    first = re.sub(rf"^\s*{re.escape(ticker)}\s+", "", text.strip(), count=1, flags=re.IGNORECASE)
+    bare_name = re.search(rf"(?<![\w$]){re.escape(ticker)}(?![\w])", first, flags=re.IGNORECASE)
+    context = _STRICT_CONTEXT.get(ticker)
+    return not (bare_name and context and context.search(first))
 
 
 # Competidores que el feed de Yahoo etiqueta con nuestro ticker aunque el
