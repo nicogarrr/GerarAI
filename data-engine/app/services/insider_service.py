@@ -394,6 +394,7 @@ def get_signals_for_ticker(
         )
         transactions: list[dict] = []
         errors: list[str] = []
+        failure_reasons: list[str] = []
         persisted_dates: list[str] = []
         persisted_count = 0
         # Fase 1: SOLO red y parseo, sin tocar la sesion de BD. Antes cada filing
@@ -464,6 +465,7 @@ def get_signals_for_ticker(
                     f"{filing.get('accession_number')}: "
                     f"{type(exc).__name__}: {redact_secrets(str(exc))[:200]}"
                 )
+                failure_reasons.append(public_reason(exc))
         signals = detect_signals(transactions)
         parse_error_count = len(errors)
         scanned = len(filings[:limit])
@@ -503,6 +505,11 @@ def get_signals_for_ticker(
                 ),
             ),
         }
+        if status == "degraded" and failure_reasons and len(set(failure_reasons)) == 1:
+            # Todos los filings fallaron por la misma causa (p. ej. 403 de la
+            # SEC a la IP del servidor): se declara en vez de dejar solo el
+            # recuento, que no dice por que no se pudo leer ninguno.
+            result["reason"] = failure_reasons[0]
         if persisted_count:
             latest = max(persisted_dates) if persisted_dates else None
             result["filings_from_persisted"] = persisted_count
