@@ -8,11 +8,17 @@ const REPLACEMENTS: Array<[RegExp, string]> = [
     [/'?\bnumero_declaracion\b'?/g, 'el número de declaración'],
     [/'?\bapellidos_nombre\b'?/g, 'apellidos y nombre'],
     [/'?\bnif\b'?/g, 'el NIF'],
+    // Frases completas primero: sustituir solo la clave dejaba «en la tus datos
+    // fiscales bajo la los datos del declarante».
+    [/(?:en\s+)?la\s+metadata\s+del\s+tenant\s+bajo\s+la\s+clave\s+'?tax_declarant'?/g, 'en tus datos fiscales, en los datos del declarante'],
+    [/(?:en\s+)?la\s+metadata\s+del\s+tenant/g, 'en tus datos fiscales'],
+    [/bajo\s+la\s+clave\s+'?tax_declarant'?/g, 'en los datos del declarante'],
     [/clave\s+'?tax_declarant'?/g, 'los datos del declarante'],
     [/'?\btax_declarant\b'?/g, 'los datos del declarante'],
     [/'?\bcustody\b'?/g, 'la custodia por partida'],
     [/\bmetadata del tenant\b/g, 'tus datos fiscales'],
     [/\bdel tenant\b/g, 'de tu cuenta'],
+    [/\bcash[-:]([A-Z]{3})\b/g, 'caja $1'],
     [/\bSIN_DATOS\b/g, 'N/D'],
 ];
 
