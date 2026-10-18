@@ -13,3 +13,8 @@ test('market and company headlines are kept', () => {
     assert.equal(isFinanciallyRelevant({ headline: 'Stocks slide as chip shares fall', summary: '' }), true);
     assert.equal(isFinanciallyRelevant({ headline: 'Anything at all', summary: '', related: 'NVDA' }), true);
 });
+
+test('parenting advice is not promoted by generic financial words',()=>{
+ assert.equal(isFinanciallyRelevant({headline:'A parenting coach shares tips from a CEO',summary:'CNBC Make It: investor advice for raising children'}),false);
+ assert.equal(isFinanciallyRelevant({headline:'Parenting products company reports earnings growth'}),true);
+});

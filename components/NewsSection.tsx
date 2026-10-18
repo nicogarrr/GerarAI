@@ -118,7 +118,7 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                                     {article.source}
                                                 </span>
                                             )}
-                                            {article.datetime && (
+                                            {typeof article.datetime === 'number' && Number.isFinite(article.datetime) && article.datetime > 0 ? (
                                                 <span>
                                                     {formatMarketDateTime(new Date(article.datetime * 1000), {
                                                         day: 'numeric',
@@ -128,7 +128,7 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                                         minute: '2-digit',
                                                     })}
                                                 </span>
-                                            )}
+                                            ) : <span>Fecha no disponible</span>}
                                         </div>
                                     </div>
                                 </div>

@@ -1,3 +1,4 @@
+import { isFinanciallyRelevant } from '@/lib/newsRelevance';
 'use server';
 
 import { exactSymbolFirst, onePerIssuer } from '@/lib/market/search-results';
@@ -171,7 +172,7 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
         const seen = new Set<string>();
         const unique: RawNewsArticle[] = [];
         for (const art of general || []) {
-            if (!validateArticle(art)) continue;
+            if (!validateArticle(art) || !isFinanciallyRelevant(art)) continue;
             const key = `${art.id}-${art.url}-${art.headline}`;
             if (seen.has(key)) continue;
             seen.add(key);
