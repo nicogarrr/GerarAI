@@ -5,9 +5,9 @@ import type {
 import { Panel } from '@/components/ui/panel';
 
 const SCENARIO_LABELS: Record<string, string> = {
-  bear: 'Oso',
+  bear: 'Bajista',
   base: 'Base',
-  bull: 'Toro',
+  bull: 'Alcista',
 };
 
 function fmtNumber(digits: number) {

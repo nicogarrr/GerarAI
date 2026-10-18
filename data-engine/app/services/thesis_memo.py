@@ -66,9 +66,9 @@ def build_memo_markdown(
     lines.append("## Valoracion y escenarios")
     lines.append("| Escenario | Valor | Probabilidad |")
     lines.append("|---|---|---|")
-    lines.append(f"| Bear | {_money(thesis.bear_value)} | {probs.get('bear', 'pendiente')} |")
+    lines.append(f"| Bajista | {_money(thesis.bear_value)} | {probs.get('bear', 'pendiente')} |")
     lines.append(f"| Base | {_money(thesis.base_value)} | {probs.get('base', 'pendiente')} |")
-    lines.append(f"| Bull | {_money(thesis.bull_value)} | {probs.get('bull', 'pendiente')} |")
+    lines.append(f"| Alcista | {_money(thesis.bull_value)} | {probs.get('bull', 'pendiente')} |")
     lines.append(
         f"\nPrecio actual: {_money(thesis.current_price)} · Valor esperado: "
         f"{_money(thesis.expected_value)} · Margen de seguridad: "
