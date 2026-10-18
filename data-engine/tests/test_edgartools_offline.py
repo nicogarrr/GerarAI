@@ -184,6 +184,10 @@ def test_429_feeds_breaker_and_degrades(db, monkeypatch):
     breaker = client.default_breaker()
     breaker.reset_for_tests()
     company = _company(db)
+    # CIK almacenado sin payload en el snapshot: fuerza la via live (el 429
+    # es lo que alimenta el breaker). Sin CIK, la resolucion por manifest
+    # encontraria el snapshot primero y nunca llamaria a live.
+    company.cik = "9999999999"
     result = refresh_from_edgartools(db, company, force=True, snapshot_root=FIXTURES)
     assert result["status"] == "ingested" and result["transport"] == "snapshot"
     for _ in range(4):
@@ -294,3 +298,31 @@ def test_company_without_industry_still_ingests(db):
     subs = json.loads((FIXTURES / "submissions" / "CIK0001234567.json").read_text(encoding="utf-8"))
     result = refresh_from_edgartools(db, company, force=True, companyfacts=facts_payload, submissions=subs)
     assert result["status"] == "ingested"
+
+
+def test_pad_cik_never_fabricates_zeros():
+    """Lista 11.3: "".zfill(10) == "0000000000" (truthy) fabricaba un CIK."""
+    from app.services.edgartools_ingestion_service import _pad_cik
+
+    assert _pad_cik("") is None
+    assert _pad_cik(None) is None
+    assert _pad_cik("   ") is None
+    assert _pad_cik("320193") == "0000320193"
+    assert _pad_cik("0000320193") == "0000320193"
+    assert _pad_cik(320193) == "0000320193"
+
+
+def test_refresh_without_company_cik_falls_back_to_manifest(db, monkeypatch):
+    """Sin CIK en la compania, refresh debe resolver por ticker via manifest,
+    nunca usar el CIK fabricado 0000000000 ni exponerlo en la respuesta."""
+    import app.services.edgartools_ingestion_service as service
+
+    company = _company(db)
+    facts_payload = json.loads((FIXTURES / "companyfacts" / "CIK0001234567.json").read_text(encoding="utf-8"))
+    subs = json.loads((FIXTURES / "submissions" / "CIK0001234567.json").read_text(encoding="utf-8"))
+    monkeypatch.setattr(service.client, "manifest_cik", lambda ticker, root=None: "0001234567")
+
+    result = refresh_from_edgartools(db, company, force=True, companyfacts=facts_payload, submissions=subs)
+    assert result["status"] == "ingested"
+    assert result["cik"] == "0001234567"
+    assert result["cik"] != "0000000000"
