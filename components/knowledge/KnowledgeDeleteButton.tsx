@@ -40,7 +40,7 @@ export function KnowledgeDeleteButton({ documentId, title }: { documentId: numbe
   return (
     <div className="flex max-w-xs flex-col items-end gap-2 text-right">
       <p className="text-xs leading-5 text-gray-400">
-        ¿Borrar «{title}»? También se eliminan sus fragmentos y los principios extraídos de él.
+        ¿Borrar «{title}»? Se eliminan el documento, sus fragmentos y los principios extraídos, también los ya aprobados. Los casos de estudio se conservan sin el enlace y el archivo original sigue en el almacén. No se puede deshacer.
       </p>
       <div className="flex gap-2">
         <Button size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>Cancelar</Button>

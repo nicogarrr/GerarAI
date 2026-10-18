@@ -26,7 +26,10 @@ describe('knowledge delete button guard', () => {
     assert.match(button, /setConfirming\(true\)/);
     assert.match(button, /Sí, borrar/);
     assert.match(button, /Cancelar/);
-    assert.match(button, /fragmentos y los principios/, 'avisa de la cascada');
+    assert.match(button, /principios extraídos, también los ya aprobados/, 'avisa de la cascada completa');
+    assert.match(button, /casos de estudio se conservan sin el enlace/, 'los casos de estudio sobreviven sin enlace');
+    assert.match(button, /archivo original sigue en el almacén/, 'el archivo original se conserva');
+    assert.match(button, /No se puede deshacer/, 'avisa de que es irreversible');
   });
 
   it('la acción llama al DELETE del backend y revalida', () => {
