@@ -163,7 +163,6 @@ export const ROUTE_CATALOG: NavSection[] = [
         hub: '/research',
         subnavLabel: 'Empresas',
         children: [
-          { href: '/research/assistant', label: 'Asistente', icon: Sparkles, hub: '/research' },
           { href: '/research/news', label: 'Noticias', icon: Newspaper, hub: '/research' },
           { href: '/research/sources', label: 'Fuentes', icon: Library, hub: '/research' },
         ],

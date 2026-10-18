@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { safeAssistantSourceUrl } from '../lib/research/assistant-contract.ts';
 
-const ui = readFileSync(new URL('../components/research/ResearchAssistant.tsx', import.meta.url), 'utf8');
+const ui = readFileSync(new URL('../components/brain/BrainGuideAnswer.tsx', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../lib/research/assistant-client.ts', import.meta.url), 'utf8');
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/research-assistant.json', import.meta.url), 'utf8'));
 

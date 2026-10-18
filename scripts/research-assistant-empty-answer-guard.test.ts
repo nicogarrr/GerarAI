@@ -1,5 +1,5 @@
 /**
- * Guard del asistente de investigación (components/research/ResearchAssistant.tsx):
+ * Guard del asistente de investigación (components/brain/BrainGuideAnswer.tsx):
  * una respuesta o sección vacía se explica, no se tapa con «Sin datos».
  *
  * El contrato (lib/research/assistant-contract.ts) permite `answer: ''` y
@@ -13,7 +13,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const src = readFileSync('components/research/ResearchAssistant.tsx', 'utf8');
+const src = readFileSync('components/brain/BrainGuideAnswer.tsx', 'utf8');
 
 describe('asistente: respuesta vacía explicada, no tapada con «Sin datos»', () => {
   it('no queda ningún «Sin datos» como respuesta', () => {

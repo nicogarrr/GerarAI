@@ -19,7 +19,6 @@ import { redirect } from 'next/navigation';
 import { canonicalRedirectTicker } from '@/lib/research/canonical-ticker';
 import {
   ArrowLeft,
-  BookOpen,
   FileText,
   History,
   RefreshCcw,
@@ -34,6 +33,9 @@ import { MutationForm } from '@/components/forms/MutationForm';
 import { FileUploadInput } from '@/components/forms/FileUploadInput';
 import { CompanyHeaderQuote } from '@/components/research/CompanyHeaderQuote';
 import { ChangesSinceVisit } from '@/components/research/ChangesSinceVisit';
+import { GuideBrainButton } from '@/components/research/GuideBrainButton';
+import { GuideContextPanel } from '@/components/research/GuideContextPanel';
+import { getGuideContext } from '@/lib/research/assistant-client';
 import { ChangeImpactCard } from '@/components/research/ChangeImpactCard';
 import { ChatIntentLinks } from '@/components/research/ChatIntentLinks';
 import { NextStepLink } from '@/components/research/NextStepLink';
@@ -1219,6 +1221,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     );
   } else if (activeView === 'changes') {
     const data = await viewData('changes');
+    // Contexto de guía (revisiones anclables + noticias atribuidas): opcional,
+    // su fallo no puede romper la pestaña Seguir.
+    const guideContext = await getGuideContext(ticker).catch(() => null);
     content = (
       <div className="space-y-6">
         <Panel title="Qué ha cambiado">
@@ -1243,6 +1248,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           <Panel title="Revisiones abiertas"><div className="space-y-2">{data.reviews.length ? data.reviews.map((review) => <div className="rounded-lg border border-gray-800 p-3 text-sm text-gray-300" key={review.id}>{review.title}</div>) : <EmptyState title="Sin revisiones abiertas." />}</div></Panel>
           <Panel title="Alertas"><div className="space-y-2">{data.alerts.length ? data.alerts.map((alert) => <div className="rounded-lg border border-gray-800 p-3 text-sm" key={alert.id}><Badge variant="outline">{label(alert.severity)}</Badge><p className="mt-2 text-gray-300">{alert.message}</p><p className="mt-2 text-xs text-gray-500">Registrada el {formatUserDateTime(alert.created_at)} (Madrid)</p>{safeHttpUrl(alert.source_url) ? <a className="mt-2 inline-block text-xs text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(alert.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">Ver fuente</a> : null}</div>) : <EmptyState title="Sin alertas." />}</div></Panel>
         </div>
+        <GuideContextPanel ticker={ticker} context={guideContext} />
         <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} />
       </div>
     );
@@ -1483,7 +1489,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           {headerMarket ? <CompanyHeaderQuote snapshot={headerMarket} /> : null}
           <ChangesSinceVisit ticker={ticker} />
           <div className="flex flex-col gap-3 border-t border-gray-900 pt-4">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><Target className="h-4 w-4" />{holdingBadge}</span><Link className="inline-flex items-center gap-1 text-teal-300 transition hover:text-teal-200" href={`/research/assistant?mode=guide&ticker=${encodeURIComponent(ticker)}`}><BookOpen className="h-4 w-4" />Guía de investigación</Link><Link className="inline-flex items-center gap-1 text-gray-400 transition hover:text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=changes`}><History className="h-4 w-4" />Qué ha cambiado{recentChangeCount ? <span aria-hidden="true" className="rounded-full bg-gray-800 px-1.5 text-xs font-semibold text-gray-300">{recentChangeCount}</span> : null}</Link></div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><Target className="h-4 w-4" />{holdingBadge}</span><GuideBrainButton ticker={ticker} /><Link className="inline-flex items-center gap-1 text-gray-400 transition hover:text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=changes`}><History className="h-4 w-4" />Qué ha cambiado{recentChangeCount ? <span aria-hidden="true" className="rounded-full bg-gray-800 px-1.5 text-xs font-semibold text-gray-300">{recentChangeCount}</span> : null}</Link></div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <Link className="text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}/shorts`}>Cortos públicos</Link>

@@ -29,7 +29,7 @@ const SCOPE: Record<string, string> = {
   'components/taxes/FilingSections.tsx': 'components/taxes/FilingSections.tsx',
   'components/insider/InsiderSignalsView.tsx': 'components/insider/InsiderSignalsView.tsx',
   'lib/insider-status-copy.ts': 'lib/insider-status-copy.ts',
-  'components/research/ResearchAssistant.tsx': 'components/research/ResearchAssistant.tsx',
+  'components/brain/BrainGuideAnswer.tsx': 'components/brain/BrainGuideAnswer.tsx',
 };
 
 /** Promesas de trabajo futuro o estados sin cerrar, por fichero (case-insensitive). */

@@ -10,7 +10,11 @@ import { X, Send, User, Bot, Loader2, Maximize2, Minimize2 } from 'lucide-react'
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { brainStorageKey, restoreConversation, serializeConversation, BRAIN_SUGGESTED_QUESTIONS } from '@/lib/brain/conversation';
 import { chatWithPortfolio } from '@/lib/actions/brain.actions';
+import { askResearchAssistantAction } from '@/lib/research/assistant-actions';
+import type { AssistantResponse } from '@/lib/research/assistant-contract';
+import { OPEN_BRAIN_PENDING_KEY, type OpenBrainDetail } from '@/lib/brain/open-brain';
 import { brainPageContext } from '@/lib/brain/page-context';
+import { BrainGuideAnswer } from './BrainGuideAnswer';
 import ReactMarkdown from 'react-markdown';
 import type { PortfolioChatCitation } from '@/lib/chat/citations';
 import { BrainSources } from './BrainSources';
@@ -19,6 +23,7 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     citations?: PortfolioChatCitation[];
+    guide?: AssistantResponse;
 }
 
 interface GlobalBrainProps {
@@ -44,11 +49,11 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     const page = brainPageContext(pathname);
     const [isOpen, setIsOpen] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
-    useEffect(() => {
-        const openFromNavigation = () => setIsOpen(true);
-        window.addEventListener('gerarai:open-brain', openFromNavigation);
-        return () => window.removeEventListener('gerarai:open-brain', openFromNavigation);
-    }, []);
+    // Modo guía (asistente de research unificado): con ticker en el selector el
+    // Cerebro pregunta a /api/research/assistant en vez de al chat general.
+    const [guideTicker, setGuideTicker] = useState('');
+    const [reviewId, setReviewId] = useState<number | undefined>(undefined);
+
     const [echo, setEcho] = useState<ContextEcho | null>(null);
     const [messages, setMessages] = useState<Message[]>([
         { role: 'assistant', content: '¡Hola! Soy el cerebro de GerarAI. Pregúntame sobre tu cartera, tus tesis de inversión o lo que estés viendo.' }
@@ -62,6 +67,46 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     // cliente, así el SSR siempre pinta el saludo y no hay desajuste de
     // hidratación) y se guarda recortada tras cada cambio.
     const restoredRef = useRef(false);
+
+    function applyOpenBrainDetail(detail?: OpenBrainDetail | null) {
+        if (!detail) return;
+        if (detail.ticker && /^[A-Z0-9.\-]{1,20}$/i.test(detail.ticker)) {
+            setGuideTicker(detail.ticker.toUpperCase());
+        }
+        if (typeof detail.review_id === 'number' && Number.isSafeInteger(detail.review_id) && detail.review_id > 0) {
+            setReviewId(detail.review_id);
+        }
+        if (detail.question) setInput(detail.question.slice(0, 2000));
+    }
+
+    useEffect(() => {
+        const openFromNavigation = (event: Event) => {
+            setIsOpen(true);
+            applyOpenBrainDetail((event as CustomEvent<OpenBrainDetail>).detail);
+        };
+        window.addEventListener('gerarai:open-brain', openFromNavigation);
+        return () => window.removeEventListener('gerarai:open-brain', openFromNavigation);
+    }, []);
+
+    // Handoff sin carrera: la página-redirect del antiguo /research/assistant
+    // escribe el detalle ANTES de navegar y aquí se recoge ya montado (también
+    // en la carga directa, donde los efectos hijos corren antes que este).
+    useEffect(() => {
+        let pending: OpenBrainDetail | null = null;
+        try {
+            const raw = window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY);
+            if (raw) {
+                window.sessionStorage.removeItem(OPEN_BRAIN_PENDING_KEY);
+                pending = JSON.parse(raw) as OpenBrainDetail;
+            }
+        } catch {
+            pending = null;
+        }
+        if (pending) {
+            setIsOpen(true);
+            applyOpenBrainDetail(pending);
+        }
+    }, [pathname]);
 
     useEffect(() => {
         try {
@@ -77,7 +122,11 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     useEffect(() => {
         if (!restoredRef.current) return;
         try {
-            window.sessionStorage.setItem(brainStorageKey(userId), serializeConversation(messages));
+            // Las respuestas de guía se guardan solo como texto: el payload
+            // estructurado (secciones y citas tipadas) no viaja a sessionStorage.
+            window.sessionStorage.setItem(brainStorageKey(userId), serializeConversation(
+                messages.map((m) => ({ role: m.role, content: m.content, ...(m.citations ? { citations: m.citations } : {}) })),
+            ));
         } catch {
             // Cuota llena o almacenamiento bloqueado: no pasa nada, se sigue sin persistir.
         }
@@ -144,6 +193,33 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         setInput('');
         setLoading(true);
 
+        const cleanTicker = guideTicker.trim().toUpperCase();
+        if (cleanTicker) {
+            // Modo guía: asistente de research (solo lectura), secciones y citas tipadas.
+            if (userMsg.length < 3 || userMsg.length > 2000) {
+                setMessages(prev => [...prev, { role: 'assistant', content: 'La pregunta debe tener entre 3 y 2000 caracteres.' }]);
+                setLoading(false);
+                return;
+            }
+            try {
+                const result = await askResearchAssistantAction({
+                    mode: 'guide',
+                    question: userMsg,
+                    ticker: cleanTicker,
+                    ...(reviewId ? { review_id: reviewId } : {}),
+                });
+                setMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: result.answer?.trim() ? result.answer : `Guía de ${cleanTicker}: respuesta sin texto.`,
+                    guide: result,
+                }]);
+            } catch {
+                setMessages(prev => [...prev, { role: 'assistant', content: 'No se pudo obtener la guía. Reintenta; no se ha modificado nada.' }]);
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
         try {
             const result = await chatWithPortfolio(userMsg, userId, page, history);
             if (result.context) setEcho(result.context);
@@ -189,9 +265,22 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
             }`}
         >
             <CardHeader className="p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <BrainGlassesIcon className="h-9 w-9 shrink-0 object-contain" />
                     <CardTitle id="global-brain-title" className="text-sm font-medium">Cerebro GerarAI</CardTitle>
+                    <input
+                        value={guideTicker}
+                        onChange={(event) => { setGuideTicker(event.target.value.toUpperCase().replace(/[^A-Z0-9.\-]/g, '').slice(0, 20)); setReviewId(undefined); }}
+                        placeholder="Ticker"
+                        aria-label="Ticker de la guía de investigación"
+                        className="w-20 min-w-0 rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-200 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
+                    />
+                    {reviewId ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300">
+                            Revisión #{reviewId}
+                            <button type="button" aria-label="Quitar la revisión anclada" onClick={() => setReviewId(undefined)} className="text-indigo-400 hover:text-indigo-200">×</button>
+                        </span>
+                    ) : null}
                     {viewing && (
                         viewingHref ? (
                             <Link
@@ -254,7 +343,9 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                                     ? 'bg-blue-600 text-white rounded-tr-none'
                                     : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none'
                                     }`}>
-                                    {m.role === 'assistant' ? (
+                                    {m.role === 'assistant' && m.guide ? (
+                                        <BrainGuideAnswer result={m.guide} />
+                                    ) : m.role === 'assistant' ? (
                                         <div className="prose prose-invert prose-sm max-w-none [&>h3]:text-indigo-400 [&>h3]:font-bold [&>h3]:mt-2 [&>h3]:mb-1 [&>ul]:list-disc [&>ul]:pl-4 [&>strong]:text-white">
                                             <ReactMarkdown
                                                 components={{
@@ -340,7 +431,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                         id="global-brain-input"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="Pregunta al cerebro..."
+                        placeholder={guideTicker.trim() ? `Pregunta sobre ${guideTicker.trim().toUpperCase()}...` : 'Pregunta al cerebro...'}
                         className="bg-slate-950 border-slate-700 focus-visible:ring-indigo-500"
                     />
                     <Button type="submit" size="icon" aria-label="Enviar pregunta" disabled={loading || !input.trim()} aria-busy={loading} className="bg-indigo-600 hover:bg-indigo-500">

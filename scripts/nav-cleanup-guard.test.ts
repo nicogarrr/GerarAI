@@ -104,6 +104,9 @@ const CATALOG_EXCEPTIONS: Record<string, string> = {
     '/inversores/conceptos': 'subnav propio de Inversores (HubNav)',
     '/inversores/mas-compradas': 'subnav propio de Inversores (HubNav)',
     '/inversores/solape': 'subnav propio de Inversores (HubNav)',
+    // El asistente de research se unificó en el Cerebro: la ruta queda solo
+    // como redirect que lo abre (handoff sessionStorage + evento open-brain).
+    '/research/assistant': 'redirect de compatibilidad al Cerebro (asistente unificado)',
 };
 
 const HUBS = new Set(['/inicio', '/portfolio', '/research', '/discover', '/watchlist', '/knowledge']);
