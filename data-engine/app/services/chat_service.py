@@ -159,6 +159,72 @@ def _fmt_date_es(iso_date: str | None) -> str:
     return f"{int(day)} {_MONTHS_ES[month_index]} {year}"
 
 
+_INLINE_REF_RE = re.compile(r"\[([a-z_]+:[^\]\s]+)\]")
+
+
+def _prune_sources(
+    sources: list[dict], sections: list[dict], answer: str
+) -> list[dict]:
+    """Fuentes visibles: solo las que la respuesta USA de verdad.
+
+    Se conserva una fuente si alguna seccion la cita (lista de citas o
+    referencia inline ``[tipo:id]`` en el cuerpo), si es el precio mostrado
+    en la prosa o si es una noticia cuyo titular aparece en la respuesta.
+    Las afirmaciones (claim) se conservan siempre: son el estado vivo y
+    auditado de la tesis (acotado a 8 por la recuperacion), cada una lleva
+    su estado visible y de ellas se computa la respuesta (avisos de
+    pendientes/contradichas y acciones propuestas). Y con cada afirmacion
+    viaja su evidencia: la cadena de veracidad afirmacion -> evidencia no
+    se puede cortar, sin ella la afirmacion parece respaldarse en nada.
+    La evidencia huerfana (de una afirmacion que ya no esta en la lista)
+    si se poda.
+    El resto (recuperadas "por si acaso") no se adjunta: ensenarlas sugiere
+    un respaldo que la respuesta no tiene. Ademas se deduplican por tipo y
+    titulo normalizado (cuatro chunks del mismo documento son una fuente).
+    """
+    cited: set[str] = set()
+    for section in sections:
+        for citation in section.get("citations") or []:
+            cited.add(str(citation))
+        for ref in _INLINE_REF_RE.findall(section.get("body") or ""):
+            cited.add(ref)
+    answer_plain = " ".join((answer or "").lower().split())
+    kept: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    kept_claim_ids: set = set()
+    for source in sources:
+        kind = str(source.get("type"))
+        key = f"{kind}:{source.get('id')}"
+        keep = key in cited
+        if not keep and kind == "claim":
+            # Las afirmaciones vivas son el libro mayor auditado de la
+            # tesis: la respuesta se computa sobre ellas (avisos de
+            # pendientes/contradichas, acciones propuestas) y cada una
+            # declara su propio estado, asi que mostrarlas nunca sugiere
+            # un respaldo que no existe.
+            keep = True
+        if not keep and kind == "claim_evidence":
+            # Las evidencias siguen a su afirmacion en `sources`; si la
+            # afirmacion se conserva, su evidencia tambien (va citada por
+            # transitividad: la respuesta muestra la afirmacion).
+            keep = source.get("claim_id") in kept_claim_ids
+        if not keep and kind == "market_price":
+            keep = True
+        if not keep and kind == "news_event":
+            title = " ".join(str(source.get("title") or "").lower().split())
+            keep = bool(title) and (title in answer_plain or _short(title, 110).lower() in answer_plain)
+        if not keep:
+            continue
+        dedupe_key = (kind, " ".join(str(source.get("title") or "").lower().split()))
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        if kind == "claim":
+            kept_claim_ids.add(source.get("id"))
+        kept.append(source)
+    return kept
+
+
 def _natural_company_answer(
     *,
     company: Company,
@@ -256,6 +322,18 @@ def _natural_company_answer(
         parts.append(f"Aun faltan datos almacenados de: {labels}.")
     return "\n\n".join(parts)
 
+_GENERATED_SUMMARY_RE = re.compile(r"^Generated from (.+?) source\.?$")
+
+
+def _human_evidence_title(summary: str | None, limit: int = 140) -> str:
+    """Titulo visible de una evidencia: nunca la plantilla interna en ingles."""
+    text = (summary or "").strip()
+    match = _GENERATED_SUMMARY_RE.match(text)
+    if match:
+        return f"Generado desde la fuente {match.group(1)}"
+    return _short(text, limit)
+
+
 def _decimal_to_float(value: Decimal | int | float | None) -> float | None:
     if value is None:
         return None
@@ -291,6 +369,29 @@ _COMPANY_CUE_RE = re.compile(
     r"acci[oó]n(?:es)?|cotiza\w*|precio|valoraci[oó]n|resultados|balance|"
     r"riesgos?|catalizadores?|noticias?|dividendos?|fundamentales|stock)\b"
 )
+# "Que puedes hacer?" se responde de forma determinista con lo que el
+# asistente cumple de verdad; el generador libre prometia capacidades que
+# no existen ("revisar carteras y sugerir ajustes").
+_CAPABILITIES_RE = re.compile(
+    r"(?i)^\s*[¿¡]?\s*(?:"
+    r"qu[eé]\s+(?:puedes|puede|sabes)\s+hacer|"
+    r"(?:en\s+)?qu[eé]\s+(?:me\s+)?puedes\s+ayudar|"
+    r"c[oó]mo\s+(?:es\s+que\s+)?(?:me\s+)?puedes\s+ayudar|"
+    r"qu[eé]\s+(?:eres|es\s+esto)|para\s+qu[eé]\s+sirves|"
+    r"what can you do|who are you"
+    r")\s*[?!.]*\s*$"
+)
+_CAPABILITIES_ANSWER = (
+    "Soy el asistente de GerarAI. Puedo contarte qué posiciones tienes "
+    "guardadas, cuánto pesa cada una y cuánto vale tu cartera, incluida la "
+    "caja y la deuda de margen. Puedo responder sobre una empresa concreta "
+    "con los datos guardados: precio, cifras financieras, tesis, noticias y "
+    "sus fuentes. También explico conceptos de inversión y, si tienes cartas "
+    "o documentos ingeridos en la biblioteca, los uso para responderte con "
+    "su autor. No ejecuto órdenes ni doy recomendaciones personalizadas: "
+    "te muestro tus datos guardados y conocimiento general."
+)
+
 _PORTFOLIO_SELF_RE = re.compile(
     r"(?i)\b(?:mi|mis)\s+(?:cartera|posici[oó]n(?:es)?|inversi[oó]n(?:es)?|acciones|holdings)\b"
     r"|\bmy\s+(?:portfolio|positions|holdings)\b"
@@ -574,6 +675,16 @@ class ChatService:
                 prompt_version="memory-note-v1",
                 confidence=1.0,
                 llm_trace={"path": "memory_note"},
+                context=context_echo,
+            )
+        if _CAPABILITIES_RE.match(question or ""):
+            return ChatResponse(
+                answer=_CAPABILITIES_ANSWER,
+                sources=[],
+                model="deterministic",
+                prompt_version="capabilities-v1",
+                confidence=0.9,
+                llm_trace={"path": "capabilities", "generated": False, "provider_calls": 0},
                 context=context_echo,
             )
         if (
@@ -927,7 +1038,7 @@ class ChatService:
                     self._source_entry(
                         "thesis_version",
                         thesis.id,
-                        f"{company.ticker} thesis v{thesis.version}",
+                        f"Tesis {company.ticker} v{thesis.version}",
                         status=thesis.status,
                     )
                 )
@@ -946,7 +1057,8 @@ class ChatService:
                     self._source_entry(
                         "financial_fact",
                         fact.id,
-                        f"{fact.metric} {fact.period}",
+                        f"{_METRIC_LABELS_ES.get(fact.metric, fact.metric)} "
+                        f"({_fmt_period_es(fact.period, fact.fiscal_year, fact.fiscal_quarter)})",
                         metric=fact.metric,
                         value=_decimal_to_float(fact.value),
                         unit=fact.unit,
@@ -971,7 +1083,7 @@ class ChatService:
                         self._source_entry(
                             "claim_evidence",
                             evidence.id,
-                            _short(evidence.summary, 140),
+                            _human_evidence_title(evidence.summary),
                             claim_id=claim.id,
                             evidence_type=evidence.evidence_type,
                             document_id=evidence.document_id,
@@ -1285,6 +1397,7 @@ class ChatService:
                 },
             ]
 
+            sources = _prune_sources(sources, sections, answer)
             return ChatResponse(
                 answer=answer,
                 sections=sections,
