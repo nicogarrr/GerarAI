@@ -26,6 +26,19 @@ export interface PaperScore {
 }
 export type PaperState = { trades: PaperTradeView[]; score: PaperScore; error?: string };
 
+export type PaperFeedResult = { success: true } | { success: false; message: string };
+
+/** Encola un lote de propuestas simuladas del modelo (202; cuota diaria compartida). */
+export async function feedPaperProposalsNow(): Promise<PaperFeedResult> {
+    try {
+        await researchRequest('/api/paper-trading/feed', { method: 'POST' });
+        return { success: true };
+    } catch (error) {
+        console.error('feedPaperProposalsNow error:', error);
+        return { success: false, message: error instanceof AppError ? error.message : 'No se pudo encolar la generación.' };
+    }
+}
+
 export async function getPaperTrading(): Promise<PaperState> {
     try {
         const [trades, score] = await Promise.all([

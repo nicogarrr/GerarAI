@@ -1,10 +1,39 @@
 import { useEffect, useState } from 'react';
 import { PaperProposalCard } from './PaperProposalCard';
 import { PaperCalibrationView } from './PaperCalibrationView';
-import { getPaperTrading, type PaperState } from '@/lib/actions/paper-trading.actions';
+import { feedPaperProposalsNow, getPaperTrading, type PaperState } from '@/lib/actions/paper-trading.actions';
 
 const number = (value: string | number | null) => value === null ? 'Sin datos' : Number(value).toLocaleString('es-ES', { maximumFractionDigits: 2 });
 const horizon = (value: string) => value === 'five_years' ? 'Tesis 5 años' : 'Operación a 30 días';
+
+
+function PaperFeedButton() {
+    const [state, setState] = useState<'idle' | 'feeding' | 'queued' | 'error'>('idle');
+    const handleFeed = async () => {
+        setState('feeding');
+        const result = await feedPaperProposalsNow();
+        setState(result.success ? 'queued' : 'error');
+    };
+    const loading = state === 'feeding';
+    return (
+        <div className="flex flex-col items-center gap-2">
+            <button
+                onClick={handleFeed}
+                disabled={loading || state === 'queued'}
+                aria-busy={loading}
+                className="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+            >
+                {loading ? 'Encolando generación...' : 'Generar propuestas simuladas'}
+            </button>
+            {state === 'queued' ? (
+                <p className="text-sm text-teal-300">Generación en curso; recarga la página en unos minutos para ver las propuestas.</p>
+            ) : null}
+            {state === 'error' ? (
+                <p className="text-sm text-red-400">No se pudo encolar la generación. Inténtalo de nuevo.</p>
+            ) : null}
+        </div>
+    );
+}
 
 export function PaperTradingContent({ data }: { data: PaperState }) {
     if (data.error) return <p role="alert" className="text-red-300">{data.error}</p>;
@@ -24,7 +53,12 @@ export function PaperTradingContent({ data }: { data: PaperState }) {
             </article>)}
         </div>
         <PaperCalibrationView data={data.score.calibracion} />
-        {data.trades.length === 0 && <p className="text-gray-400">Sin propuestas del modelo registradas. No se ha generado una operación simulada para mostrar.</p>}
+        {data.trades.length === 0 && (
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center">
+                <p className="text-gray-400">Sin propuestas del modelo registradas. No se ha generado una operación simulada para mostrar.</p>
+                <PaperFeedButton />
+            </div>
+        )}
         {data.trades.map(trade => <PaperProposalCard key={trade.id} trade={trade} />)}
         <details className="text-xs text-gray-400"><summary>Base de medición</summary><p className="mt-2">Acierto = resultado bruto positivo al cerrar. Divisas separadas. Sin comisiones, dividendos, financiación ni ajustes por splits. Una salida anticipada no valida una tesis a 5 años. Cantidad simulada: supuesto.</p></details>
     </section>;
