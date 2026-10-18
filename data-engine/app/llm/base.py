@@ -19,7 +19,12 @@ logger = logging.getLogger(__name__)
 
 # OpenCode answers 502 with this fixed message when its free tier is used from outside
 # OpenCode. It does not change between attempts, so retrying only burns seconds.
-_FREE_TIER_ORIGIN_MARKER = "free tier can only be used from within"
+_FREE_TIER_ORIGIN_MARKERS = (
+    "free tier can only be used from within",
+    # Same deterministic 502 when OpenCode blocks the egress IP of the server.
+    "free models aren't available from your current network",
+    "abusive traffic from this ip",
+)
 _FREE_TIER_BREAKER_SECONDS = 120.0
 # (provider, model) -> monotonic time until which calls fail fast. After it passes,
 # the next call is a real probe; if the 502 persists the breaker closes again.
@@ -30,7 +35,8 @@ def _is_free_tier_origin_error(response: httpx.Response) -> bool:
     if response.status_code != 502:
         return False
     try:
-        return _FREE_TIER_ORIGIN_MARKER in response.text.lower()
+        text = response.text.lower()
+        return any(marker in text for marker in _FREE_TIER_ORIGIN_MARKERS)
     except Exception:
         return False
 
