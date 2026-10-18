@@ -882,44 +882,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const per = await getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: 'No se pudo consultar el PER' }));
     content = (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <Stat label="Cobertura" value={healthText(snapshot.research_health.score, listingStatus(company.exchange, headerMarket?.quote?.priceAsOf ?? null, new Date()))} />
-          <Stat label="Hechos" value={snapshot.counts.facts} />
-          <Stat label="Afirmaciones" value={snapshot.counts.claims} />
-          <Stat label="Documentos" value={snapshot.counts.documents} />
-          <Stat label="PER (TTM)" value={per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA} hint={per.note} />
-        </div>
-        <p className="text-xs leading-5 text-gray-500">
-          Cobertura = 20 por capa (documentos, hechos, tesis, modelo) +10 métricas
-          +10 afirmaciones. Sin tesis se limita a 59; sin afirmaciones,
-          a 69. Mide presencia de capas, no fiabilidad ni publicabilidad.
-        </p>
-        <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
-          {researchValuability(snapshot)}
-        </p>
-        <Panel collapsible="mobile"
-          description="Las 5 noticias de mayor materialidad entre las 25 más recientes de esta empresa, con fuente y fecha."
-          title="Últimas noticias"
-        >
-          {overviewNewsError ? (
-            <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-              No se pudieron cargar las noticias. Reintenta en unos segundos.
-            </p>
-          ) : overviewNews.length === 0 ? (
-            <EmptyState title="Sin noticias recientes de esta empresa." />
-          ) : (
-            <ul className="space-y-3">
-              {overviewNews.map((event) => (
-                <li className="text-sm" key={event.id}>
-                  <NewsHeadline event={event} />
-                  <p className="mt-1 text-xs text-gray-500">
-                    {event.source} · {newsDateLabel(event)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <Panel collapsible="mobile" title="Última tesis">
             {snapshot.latest_thesis ? (
@@ -971,21 +933,29 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             )}
           </Panel>
         </div>
-        {moatScore ? (
-          <Panel collapsible="mobile"
-            actions={
-              <Link
-                className="text-sm text-teal-300 hover:text-teal-200"
-                href={`/research/${encodeURIComponent(ticker)}?view=moat`}
-              >
-                Ver la evaluación del foso
-              </Link>
-            }
-            title="Calidad financiera según la empresa"
-          >
-            <MoatPanel company={company} metric={moatScore} />
-          </Panel>
-        ) : null}
+        <Panel collapsible="mobile"
+          description="Las 5 noticias de mayor materialidad entre las 25 más recientes de esta empresa, con fuente y fecha."
+          title="Últimas noticias"
+        >
+          {overviewNewsError ? (
+            <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
+              No se pudieron cargar las noticias. Reintenta en unos segundos.
+            </p>
+          ) : overviewNews.length === 0 ? (
+            <EmptyState title="Sin noticias recientes de esta empresa." />
+          ) : (
+            <ul className="space-y-3">
+              {overviewNews.map((event) => (
+                <li className="text-sm" key={event.id}>
+                  <NewsHeadline event={event} />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {event.source} · {newsDateLabel(event)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
         {/*
             Los cambios recientes vienen en el snapshot y no se pintaban en
             ninguna vista: son la respuesta a "¿esto sigue valiendo lo que
@@ -1044,6 +1014,21 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             </ul>
           </div>
         ) : null}
+        {moatScore ? (
+          <Panel collapsible="mobile"
+            actions={
+              <Link
+                className="text-sm text-teal-300 hover:text-teal-200"
+                href={`/research/${encodeURIComponent(ticker)}?view=moat`}
+              >
+                Ver la evaluación del foso
+              </Link>
+            }
+            title="Calidad financiera según la empresa"
+          >
+            <MoatPanel company={company} metric={moatScore} />
+          </Panel>
+        ) : null}
         {/*
             Los cuatro saltos que se piden antes que nada al abrir una ficha.
             Están aquí, en el resumen, y no repartidos por las 16 píldoras
@@ -1054,7 +1039,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           density="compact"
           title="Por dónde seguir"
         >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
             {[
               ['Modelo a largo plazo', 'model'],
               ['Oportunidad de mercado', 'market-opportunity'],
@@ -1068,6 +1053,24 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </div>
         </Panel>
         {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><p className="text-sm text-gray-400">Elementos orbitales de CelesTrak y evolución del semieje mayor.</p><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
+          <Stat label="Cobertura" value={healthText(snapshot.research_health.score, listingStatus(company.exchange, headerMarket?.quote?.priceAsOf ?? null, new Date()))} />
+          <Stat label="Hechos" value={snapshot.counts.facts} />
+          <Stat label="Afirmaciones" value={snapshot.counts.claims} />
+          <Stat label="Documentos" value={snapshot.counts.documents} />
+          <Stat label="PER (TTM)" value={per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA} hint={per.note} />
+        </div>
+        <details className="text-xs leading-5 text-gray-500">
+          <summary className="cursor-pointer select-none py-1 hover:text-gray-300">Cómo se calcula la cobertura</summary>
+          <p className="mt-1">
+            20 por capa (documentos, hechos, tesis, modelo) +10 métricas
+            +10 afirmaciones. Sin tesis se limita a 59; sin afirmaciones,
+            a 69. Mide presencia de capas, no fiabilidad ni publicabilidad.
+          </p>
+        </details>
+        <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
+          {researchValuability(snapshot)}
+        </p>
         {/* Price chart lives once in the company header, across all views. */}
       </div>
     );
