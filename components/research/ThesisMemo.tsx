@@ -182,7 +182,7 @@ export default function ThesisMemo({
   ].filter((paragraph): paragraph is string => typeof paragraph === 'string' && paragraph.trim().length > 0);
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 max-w-full space-y-5 [overflow-wrap:anywhere]">
       <div className="flex flex-wrap items-center gap-2">
         <Badge>{enumLabel(RATING_LABELS, thesis.rating)}</Badge>
         <Badge variant="outline">{enumLabel(STATUS_LABELS, thesis.status)}</Badge>
@@ -244,9 +244,9 @@ export default function ThesisMemo({
                     </span>
                   )}
                   <span className="order-1 text-gray-300">{capitalizeLabel(metricLabel(item.key))}</span>
-                  <span className="order-2 ml-auto font-medium tabular-nums text-gray-100">{formatProvenanceValue(item.value, item.unit)}</span>
+                  <span className="order-2 min-w-0 max-w-full ml-auto font-medium tabular-nums text-gray-100">{formatProvenanceValue(item.value, item.unit)}</span>
                   {isVerifiedOficial(item) ? (
-                    <span className="order-3 basis-full text-xs text-gray-500">
+                    <span className="order-3 min-w-0 max-w-full basis-full text-xs text-gray-500">
                       ·{' '}
                       {(item.fuentes ?? []).map((fuente, index) => (
                         <span key={fuente.fact_id}>
@@ -256,7 +256,7 @@ export default function ThesisMemo({
                               href={fuente.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-teal-400 underline"
+                              className="break-all text-teal-400 underline"
                             >
                               {fuente.titulo ?? 'Fuente oficial'}
                             </a>
@@ -268,7 +268,7 @@ export default function ThesisMemo({
                       ))}
                     </span>
                   ) : (
-                    <span className="order-3 basis-full text-xs text-amber-400/90">
+                    <span className="order-3 min-w-0 max-w-full basis-full text-xs text-amber-400/90">
                       · INFERIDO:{' '}
                       {item.base_documentada !== true || !item.base_inferencia
                         ? 'base no documentada'
