@@ -625,6 +625,29 @@ export async function createSavedScreen(formData: FormData) {
   revalidatePath('/screeners');
 }
 
+export async function updateSavedScreen(formData: FormData) {
+  const id = assertPositiveInt(Number(formData.get('screen_id')), 'screen_id');
+  await requestJson(`/api/screeners/screens/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      name: required(formData, 'name', 'Nombre'),
+      description: String(formData.get('description') ?? ''),
+      criteria: JSON.parse(required(formData, 'criteria_json', 'Criterios')),
+      ranking_formula: String(formData.get('ranking_formula') ?? '').trim() || null,
+      ranking_direction: String(formData.get('ranking_direction') ?? 'desc'),
+      alerts_enabled: formData.get('alerts_enabled') === 'on',
+    }),
+  });
+  revalidatePath('/screeners');
+}
+
+export async function deleteSavedScreen(formData: FormData) {
+  if (formData.get('confirm') !== 'on') throw new Error('Confirma que quieres eliminar el filtro.');
+  const id = assertPositiveInt(Number(formData.get('screen_id')), 'screen_id');
+  await requestJson(`/api/screeners/screens/${id}`, { method: 'DELETE' });
+  revalidatePath('/screeners');
+}
+
 export async function runAdHocScreen(input: {
   left: string;
   operator: ScreenCriterion['operator'];

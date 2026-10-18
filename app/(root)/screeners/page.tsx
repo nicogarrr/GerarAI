@@ -10,6 +10,8 @@ import { CriterionFields, CustomMetricFields, FormulaField, RankingFields } from
 import {
   createCustomMetric,
   createSavedScreen,
+  updateSavedScreen,
+  deleteSavedScreen,
   getScreenerWorkspace,
   runAdHocScreen,
   type ScreenCriterion,
@@ -107,7 +109,24 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
         </form>
       </section>
 
-      <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><h2 className="font-semibold text-gray-100">Filtros guardados</h2><div className="mt-4 grid gap-3">{screens.map((screen) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={screen.id}><div className="flex items-start gap-3"><div><h3 className="font-semibold text-gray-200">{screen.name}</h3><p className="mt-1 text-xs text-gray-500">{formatNumber(screen.criteria.length, { maximumFractionDigits: 0 })} criterios · {screen.alerts_enabled ? 'alertas activadas' : 'alertas desactivadas'} · última {formatDate(screen.last_run_at, { day: 'numeric', month: 'short', year: 'numeric' }, NO_CORRIDO)}</p></div><Button asChild className="ml-auto" size="sm"><Link href={`/screeners/${screen.id}`}><Play aria-hidden="true" className="h-4 w-4" />Ejecutar</Link></Button></div>{screen.description ? <p className="mt-3 text-sm text-gray-400">{screen.description}</p> : null}</article>)}{!screens.length ? <p className="text-sm text-gray-500">Aún no hay filtros guardados.</p> : null}</div></section>
+      <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><h2 className="font-semibold text-gray-100">Filtros guardados</h2><div className="mt-4 grid gap-3">{screens.map((screen) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={screen.id}><div className="flex items-start gap-3"><div><h3 className="font-semibold text-gray-200">{screen.name}</h3><p className="mt-1 text-xs text-gray-500">{formatNumber(screen.criteria.length, { maximumFractionDigits: 0 })} criterios · {screen.alerts_enabled ? 'alertas activadas' : 'alertas desactivadas'} · última {formatDate(screen.last_run_at, { day: 'numeric', month: 'short', year: 'numeric' }, NO_CORRIDO)}</p></div><Button asChild className="ml-auto" size="sm"><Link href={`/screeners/${screen.id}`}><Play aria-hidden="true" className="h-4 w-4" />Ejecutar</Link></Button></div>{screen.description ? <p className="mt-3 text-sm text-gray-400">{screen.description}</p> : null}
+        <details className="mt-3"><summary className="cursor-pointer py-2 text-sm text-teal-300">Editar o eliminar</summary>
+          <MutationForm action={updateSavedScreen} className="mt-3 grid gap-3" showSuccessInline>
+            <input type="hidden" name="screen_id" value={screen.id} />
+            <label className="text-sm">Nombre<Input name="name" defaultValue={screen.name} required /></label>
+            <label className="text-sm">Descripción<Input name="description" defaultValue={screen.description} /></label>
+            <label className="text-sm">Criterios (JSON)<textarea className="mt-1 w-full rounded border border-gray-700 bg-black p-2 font-mono text-xs" name="criteria_json" defaultValue={JSON.stringify(screen.criteria, null, 2)} rows={6} required /></label>
+            <label className="text-sm">Ordenar por<Input name="ranking_formula" defaultValue={screen.ranking_formula ?? ''} /></label>
+            <label className="text-sm">Dirección<select className="ml-3 rounded bg-black p-2" name="ranking_direction" defaultValue={screen.ranking_direction}><option value="desc">Mayor primero</option><option value="asc">Menor primero</option></select></label>
+            <label className="text-sm"><input type="checkbox" name="alerts_enabled" defaultChecked={screen.alerts_enabled} /> Avisar de nuevas coincidencias</label>
+            <Button type="submit" variant="outline">Guardar cambios</Button>
+          </MutationForm>
+          <MutationForm action={deleteSavedScreen} className="mt-5 grid gap-3" showSuccessInline>
+            <input type="hidden" name="screen_id" value={screen.id} />
+            <label className="text-sm text-gray-400"><input type="checkbox" name="confirm" required /> Eliminar este filtro y desactivar sus alertas. Se conserva el historial.</label>
+            <Button type="submit" variant="outline">Eliminar filtro</Button>
+          </MutationForm>
+        </details></article>)}{!screens.length ? <p className="text-sm text-gray-500">Aún no hay filtros guardados.</p> : null}</div></section>
 
       {/* Los dos formularios de creación son configuración, no consulta: van
           plegados para que no compitan con los resultados ni con la lista. */}

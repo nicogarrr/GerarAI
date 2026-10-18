@@ -98,7 +98,7 @@ def create_custom_metric(
 def list_screens(db: Session = Depends(get_db)) -> list[dict]:
     return [
         _screen_payload(row)
-        for row in db.scalars(select(SavedScreen).order_by(SavedScreen.name)).all()
+        for row in db.scalars(select(SavedScreen).where(SavedScreen.active.is_(True)).order_by(SavedScreen.name)).all()
     ]
 
 
@@ -119,10 +119,53 @@ def create_screen(payload: ScreenCreate, db: Session = Depends(get_db)) -> dict:
     return _screen_payload(row)
 
 
+@router.put("/screens/{screen_id}")
+def update_screen(screen_id: int, payload: ScreenCreate, db: Session = Depends(get_db)) -> dict:
+    screen = db.get(SavedScreen, screen_id)
+    if screen is None or not screen.active:
+        raise HTTPException(status_code=404, detail="Saved screen not found")
+    service = ScreenerService()
+    try:
+        criteria = [service._criterion(item.model_dump()) for item in payload.criteria]
+        if payload.ranking_formula:
+            from app.services.screener_service import SafeFormula
+            SafeFormula(payload.ranking_formula)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="El nombre no puede estar vacío")
+    duplicate = db.scalar(select(SavedScreen.id).where(
+        SavedScreen.name == payload.name.strip(), SavedScreen.id != screen.id,
+    ))
+    if duplicate is not None:
+        raise HTTPException(status_code=400, detail="Ya existe un filtro con ese nombre")
+    screen.name = payload.name.strip()
+    screen.description = payload.description.strip()
+    screen.criteria = criteria
+    screen.ranking_formula = payload.ranking_formula
+    screen.ranking_direction = payload.ranking_direction
+    screen.alerts_enabled = payload.alerts_enabled
+    db.commit()
+    db.refresh(screen)
+    return _screen_payload(screen)
+
+
+@router.delete("/screens/{screen_id}")
+def delete_screen(screen_id: int, db: Session = Depends(get_db)) -> dict:
+    screen = db.get(SavedScreen, screen_id)
+    if screen is None:
+        raise HTTPException(status_code=404, detail="Saved screen not found")
+    # Archive instead of destroying match history and alert references.
+    screen.active = False
+    screen.alerts_enabled = False
+    db.commit()
+    return {"id": screen.id, "status": "archived"}
+
+
 @router.post("/screens/{screen_id}/run")
 def run_saved_screen(screen_id: int, db: Session = Depends(get_db)) -> dict:
     screen = db.get(SavedScreen, screen_id)
-    if screen is None:
+    if screen is None or not screen.active:
         raise HTTPException(status_code=404, detail="Saved screen not found")
     return ScreenerService().run_saved(db, screen)
 
