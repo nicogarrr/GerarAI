@@ -648,8 +648,8 @@ def test_fmp_refresh_normalizes_facts_and_valuation_uses_them(monkeypatch):
     thesis = client.post("/api/thesis/generate", json={"ticker": "MSFT", "force_new_version": True})
     assert thesis.status_code == 200
     thesis_payload = thesis.json()
-    assert "Fuente de los inputs de valoración: `financial_facts`" in thesis_payload["thesis_markdown"]
-    assert "| revenue |" in thesis_payload["thesis_markdown"]
+    assert "Fuente de los inputs de valoración: Datos financieros" in thesis_payload["thesis_markdown"]
+    assert "| Ingresos |" in thesis_payload["thesis_markdown"]
     assert f"Tesis de MSFT — v{thesis_payload['version']}" in thesis_payload["thesis_markdown"]
     assert thesis_payload["status"] == "draft"
     assert thesis_payload["data_confidence_score"] == 55
