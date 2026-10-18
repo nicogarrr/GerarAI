@@ -9,7 +9,7 @@ interface CacheEntry<T> {
     promise?: Promise<T>;
 }
 
-class RequestCache {
+export class RequestCache {
     private cache = new Map<string, CacheEntry<any>>();
     private pendingRequests = new Map<string, Promise<any>>();
 
@@ -39,12 +39,21 @@ class RequestCache {
         // Create new request
         const promise = fetcher()
             .then((data) => {
-                this.cache.set(key, { data, timestamp: now });
-                this.pendingRequests.delete(key);
+                // Solo repuebla la caché si esta promesa sigue siendo la
+                // vigente para la clave: un invalidate() durante el vuelo
+                // borra la entrada de pendingRequests, y sin este guard el
+                // .then tardío reintroduciría el dato obsoleto DESPUÉS de
+                // la invalidación (race invalidación-repoblación).
+                if (this.pendingRequests.get(key) === promise) {
+                    this.cache.set(key, { data, timestamp: now });
+                    this.pendingRequests.delete(key);
+                }
                 return data;
             })
             .catch((error) => {
-                this.pendingRequests.delete(key);
+                if (this.pendingRequests.get(key) === promise) {
+                    this.pendingRequests.delete(key);
+                }
                 throw error;
             });
 
