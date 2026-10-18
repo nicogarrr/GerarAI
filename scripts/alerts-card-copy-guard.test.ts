@@ -27,6 +27,13 @@ test('unknown form/date are not guessed from machine prose or alert created_at',
   assert.doesNotMatch(card.summary, /8-K|2025/);
 });
 
+test('alerts without a company never print a placeholder company', () => {
+  const digest = alertCardCopy({ ...base, alert_type: 'daily_digest', title: 'Resumen diario de tu cartera al 2026-10-17', ticker: null, companyName: null, eventDate: null, eventForm: null });
+  assert.equal(digest.heading, 'Resumen diario de tu cartera al 2026-10-17');
+  assert.doesNotMatch(`${digest.heading} ${digest.summary}`, /Empresa sin identificar/);
+  assert.match(digest.summary, /Resumen diario de tu cartera/);
+});
+
 test('source and detail controls exist on both surfaces', () => {
   for (const path of ['components/PersonalizedOverview.tsx', 'components/alerts/AlertsManager.tsx']) {
     const view = readFileSync(path, 'utf8');
