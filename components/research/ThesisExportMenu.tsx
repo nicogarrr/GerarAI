@@ -14,8 +14,33 @@ import {
  * descargarla en PDF o Markdown de la version PUBLICADA. El vault Obsidian
  * completo sigue en /export; Journal y EPUB salen del menu (apenas se usan).
  */
-export default function ThesisExportMenu({ ticker }: { ticker: string }) {
+export default function ThesisExportMenu({
+  ticker,
+  hasPublished,
+  latestDraftVersion = null,
+}: {
+  ticker: string;
+  /** Sin versión publicada, leer/descargar lleva a un 404: se explica. */
+  hasPublished: boolean;
+  /** Versión más reciente en borrador, para nombrarla en la explicación. */
+  latestDraftVersion?: number | null;
+}) {
   const encoded = encodeURIComponent(ticker);
+  if (!hasPublished) {
+    const motivo = latestDraftVersion !== null
+      ? `La v${latestDraftVersion} está en borrador: se puede leer y descargar cuando se apruebe.`
+      : 'Aún no hay ninguna tesis publicada: se puede leer y descargar cuando exista una versión aprobada.';
+    return (
+      <span
+        className="inline-flex min-h-[44px] cursor-not-allowed items-center gap-2 rounded-md border border-gray-800 px-4 py-2 text-sm font-medium text-gray-500 sm:min-h-0"
+        title={motivo}
+      >
+        <FileDown className="h-4 w-4" />
+        Leer / Descargar
+        <span className="text-xs text-gray-600">· borrador sin publicar</span>
+      </span>
+    );
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-teal-700 hover:text-teal-200 sm:min-h-0">

@@ -111,7 +111,7 @@ export function Panel({
             className={cn('rounded-xl border border-gray-700/50 bg-surface-1', spacing.container, className)}
             {...props}
         >
-            <div className="flex items-start gap-3">
+            <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
                 {renderIcon(icon)}
                 <div className="min-w-0">
                     {React.createElement(titleAs, { className: 'text-base font-semibold text-gray-100' }, title)}
