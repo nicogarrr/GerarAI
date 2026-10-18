@@ -22,3 +22,13 @@ test('quote header changes USD formatting only, never the listing currency', () 
  assert.ok(src.includes('return formatMoney(value, currency)'));
  assert.ok(src.includes('headerMoney(quote!.price, currency)'));
 });
+
+test('formulas cannot invent USD and per-share figures retain cents', () => {
+ assert.equal(formatResearchMetric(250.75, 'USD/share'), '$250.75/acción');
+ assert.equal(formatResearchMetric(343.46, 'USD'), '$343.46');
+ assert.equal(formatResearchMetric(250.75, 'EUR/share'), '€250.75/acción');
+ assert.equal(formatResearchMetric(148.4, 'USD_millions'), '148,4');
+ const src=readFileSync('app/(root)/research/[ticker]/page.tsx','utf8');
+ assert.ok(src.includes("metricValue(formula.value, formula.unit ?? '')"));
+ assert.ok(!src.includes("metricValue(formula.value, 'USD')"));
+});

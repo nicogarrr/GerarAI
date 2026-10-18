@@ -517,7 +517,7 @@ function MarketOpportunityView({ model, ticker }: { model: ResearchLongTermModel
             <div className="rounded-lg border border-gray-800 p-3" key={formula.label}>
               <div className="flex justify-between gap-4 text-sm">
                 <span className="text-gray-200">{formula.label}</span>
-                <span className="text-teal-300">{formula.value === null ? label(formula.status) : metricValue(formula.value, 'USD')}</span>
+                <span className="text-teal-300">{formula.value === null ? label(formula.status) : metricValue(formula.value, formula.unit ?? '')}</span>
               </div>
               {formula.missing_inputs?.length ? <p className="mt-2 text-xs text-amber-300">Faltan entradas: {formula.missing_inputs.map(termLabel).join(', ')}</p> : null}
             </div>
