@@ -670,7 +670,7 @@ function launchViewData(
       // Solo ASTS tiene orbitales: pedirlo para cualquier otro ticker sería una
       // llamada segura de quedar sin usar.
       return ticker === 'ASTS'
-        ? { key: 'satellites', promise: withResearchTelemetry('ast-orbits', async () => { const [orbits, analysis] = await Promise.all([getAstOrbitOverview(), getAstsAnalysis()]); return { orbits, analysis }; }) }
+        ? { key: 'satellites', promise: withResearchTelemetry('ast-orbits', async () => { const [orbits, analysis] = await Promise.all([getAstOrbitOverview().catch(() => null), getAstsAnalysis()]); return { orbits, analysis }; }) }
         : undefined;
     case 'peers':
       return { key: 'peers', promise: withResearchTelemetry('peers-workspace', () => getResearchPeersWorkspace(ticker)) };
