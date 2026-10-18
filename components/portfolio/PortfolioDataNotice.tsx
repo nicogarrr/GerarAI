@@ -10,6 +10,7 @@ export default function PortfolioDataNotice({ quality }: { quality?: PortfolioDa
             {quality.missing_cost_positions > 0 && <p className="mt-2 text-amber-300">
                 Falta una base de coste válida en {quality.missing_cost_positions} posiciones.
                 {quality.position_sources.includes('ibkr_flex') ? ' La sincronización no puede recuperar un coste que IBKR no entrega. Se necesita un extracto Flex completo con la PyG preparada.' : ' Revisa el coste original de los movimientos registrados.'}
+                {' '}No se sustituyen por ceros ni estimaciones.
             </p>}
             {quality.reasons.includes('mixed_valuation_dates') && <p className="mt-2 text-amber-300">
                 Posiciones y caja tienen fechas distintas: el valor mostrado no es una foto conciliada del mismo día.
@@ -19,7 +20,7 @@ export default function PortfolioDataNotice({ quality }: { quality?: PortfolioDa
                 <p className="mt-2">{Object.entries(quality.cash_native).map(([currency, balance]) => formatMoney(balance, currency)).join(' · ') || 'Sin saldos registrados'}.
                     {' '}Un saldo negativo se conserva como deuda de margen; no se convierte en cero.</p>
                 <p className="mt-2">{quality.snapshots} fotos guardadas, {quality.complete_snapshots} con cobertura de precios marcada al 100% y {quality.return_observations} retornos con cálculo completo.
-                    {' '}La cobertura de precios no acredita por sí sola una conciliación con IBKR.</p>
+                    {' '}La cobertura de precios no acredita por sí sola una conciliación con IBKR. No se reconstruye el pasado con las posiciones de hoy.</p>
             </details>
         </div>
     );
