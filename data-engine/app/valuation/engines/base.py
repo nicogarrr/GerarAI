@@ -273,6 +273,24 @@ def margin_of_safety(expected_value: float | None, current_price: float | None) 
     return expected_value / current_price - 1
 
 
+def margin_of_safety_reference(valuation: dict[str, Any]) -> tuple[str, float] | None:
+    """Valor contra el que se calculo ``margin_of_safety`` y su etiqueta.
+
+    Todos los motores calculan MoS = valor esperado / precio - 1. Un texto que
+    lo presente «respecto al escenario base» con un MoS de valor esperado
+    muestra una cifra que no sale de los numeros citados (MSFT: -31% con base
+    309,10 y precio 529,05, cuando base/precio - 1 = -41,6%). Sin valor
+    esperado (valoraciones parciales) se cae al escenario base, como antes.
+    """
+    expected = valuation.get("expected_value")
+    if isinstance(expected, (int, float)):
+        return "valor esperado", float(expected)
+    base = valuation.get("base_value")
+    if isinstance(base, (int, float)):
+        return "escenario base", float(base)
+    return None
+
+
 def apply_publication_blockers(result: dict[str, Any]) -> dict[str, Any]:
     """A valuation with publication blockers is not a publishable valuation.
 

@@ -34,6 +34,7 @@ from app.models.entities import Company
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
 from app.services.text_clip import clip_words
+from app.valuation.engines.base import margin_of_safety_reference
 
 _OUTPUT_SCHEMA = {
     "type": "object",
@@ -117,12 +118,12 @@ def _fragment_templates(
             f"modelo es {base:.2f} {currency} (no positivo): el margen de seguridad no es interpretable."
         )
     elif status != "insufficient_data" and price is not None and base is not None and mos is not None:
-        # MoS = base/price - 1 (valuation/engines/base.py): se nombra
-        # explicitamente. Describirlo como distancia precio/base usaria el
-        # denominador equivocado.
+        # MoS = valor esperado/price - 1 (valuation/engines/base.py): se nombra
+        # su base. Sin valor esperado cae al escenario base.
+        ref_label, ref_value = margin_of_safety_reference(valuation) or ("escenario base", base)
         fragments["valoracion_posicion"] = (
-            f"{company.name} cotiza a {price:.2f} {currency} frente a un escenario "
-            f"base de {base:.2f} {currency} (margen de seguridad del {mos:.0%})."
+            f"{company.name} cotiza a {price:.2f} {currency} frente a un "
+            f"{ref_label} de {ref_value:.2f} {currency} (margen de seguridad del {mos:.0%})."
         )
     growth = (valuation.get("reverse_dcf") or {}).get("required_revenue_growth")
     if status != "insufficient_data" and growth is not None:
@@ -446,11 +447,12 @@ def _section_templates(
         base_value is not None and base_value <= 0
     ):
         # Hechos vs interpretacion: el patron es fijo, el numero es un slot.
+        ref_label = (margin_of_safety_reference(valuation) or ("escenario base", 0.0))[0]
         parrafos.append(
-            f"Un margen de seguridad del {mos:.0%} (escenario base/precio - 1: "
-            f"el escenario base equivale al {mos + 1:.0%} del precio actual) no "
+            f"Un margen de seguridad del {mos:.0%} ({ref_label}/precio - 1: "
+            f"el {ref_label} equivale al {mos + 1:.0%} del precio actual) no "
             "es una prediccion de revalorizacion ni de caida: es la relacion "
-            "entre precio y escenario base con los supuestos registrados en "
+            f"entre precio y {ref_label} con los supuestos registrados en "
             "esta tesis."
         )
     if parrafos:
