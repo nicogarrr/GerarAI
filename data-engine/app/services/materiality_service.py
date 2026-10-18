@@ -26,7 +26,14 @@ MATERIAL_KEYWORDS = {
     ],
     "earnings": ["earnings", "guidance", "revenue", "eps", "fcf", "margin"],
     "regulatory": ["fda", "sec", "fcc", "ema", "regulatory", "investigation", "approval"],
-    "contract": ["contract", "award", "customer", "backlog", "launch", "partnership"],
+    # "launch", "customer" y "award" como palabra suelta marcaban ruido como
+    # evento de contrato (QA: «Reese Witherspoon launches lifestyle brand»):
+    # solo cuentan frases con contexto de negocio.
+    "contract": [
+        "contract", "backlog", "partnership",
+        "launches new", "product launch", "launch of", "new customers",
+        "customer win", "contract award", "awarded",
+    ],
     "capital_allocation": ["buyback", "repurchase", "dividend", "spin-off", "asset sale"],
 }
 
@@ -38,13 +45,39 @@ ASSUMPTIONS_BY_EVENT_TYPE = {
     "capital_allocation": ["share_count", "capital_allocation"],
 }
 
-POSITIVE_TERMS = ["beat", "approval", "award", "buyback", "raise", "record", "accelerate"]
+# Palabra completa inequívoca; lo ambiguo va por frase con contexto abajo.
+POSITIVE_TERMS = ["approval", "buyback", "accelerate"]
 NEGATIVE_TERMS = [
-    "miss", "cut", "delay", "offering", "investigation", "default", "halt", "fraud",
-    "priced for perfection", "overvalued", "downgrade", "valuation concern",
-    "valuation risk", "stretched valuation", "sell-off", "selloff", "plunge", "lawsuit",
+    "delay", "offering", "investigation", "default", "halt", "fraud",
+    "overvalued", "downgrade", "sell-off", "selloff", "plunge", "lawsuit",
 ]
 CRITICAL_TERMS = ["bankruptcy", "fraud", "halt", "default"]
+
+# Sentimiento por patrón verificado: «raise»/«record»/«beat»/«miss»/«cut» a
+# palabra suelta invertían el signo con ruido (QA: «preorders fuertes» salía
+# negativo; «praise» no debe contar como «raise»). Cada frase fija el objeto.
+POSITIVE_PATTERNS = [
+    "beats estimates", "beat estimates", "beats expectations",
+    "beat expectations", "tops estimates", "tops expectations",
+    "record revenue", "record sales", "record earnings", "record quarter",
+    "record preorders", "record orders", "record demand", "record profit",
+    "record results",
+    "raises guidance", "raised guidance", "raises outlook", "raises forecast",
+    "raises its dividend", "raises the dividend", "raises price target",
+    "price target raised",
+    "strong demand", "strong preorders", "preorders strong", "strong orders",
+    "strong sales", "demand exceeds",
+    "contract award",
+]
+NEGATIVE_PATTERNS = [
+    "misses estimates", "missed estimates", "misses expectations",
+    "missed expectations", "earnings miss", "revenue miss",
+    "cuts guidance", "cut guidance", "guidance cut", "cuts forecast",
+    "cuts outlook", "dividend cut", "price target cut",
+    "priced for perfection", "valuation concern", "valuation risk",
+    "stretched valuation",
+    "weak demand", "weak preorders", "slowing demand", "demand slows",
+]
 
 def _fold(text: str) -> str:
     """Minusculas y sin tildes: "emisión" casa con "emision"."""
@@ -63,6 +96,13 @@ def _has_term(lower_text: str, term: str) -> bool:
     text, word = _fold(lower_text), _fold(term)
     suffix = "" if len(word) <= 3 else _INFLECTION
     return re.search(rf"(?<![a-z0-9]){re.escape(word)}{suffix}(?![a-z0-9])", text) is not None
+
+
+def _has_phrase(lower_text: str, phrase: str) -> bool:
+    """Frase con contexto, borde de palabra en ambos extremos y sin flexion:
+    "raises guidance" no casa "praises guidance" ni "raised his guidance"."""
+    text, words = _fold(lower_text), _fold(phrase)
+    return re.search(rf"(?<![a-z0-9]){re.escape(words)}(?![a-z0-9])", text) is not None
 
 
 # Un evento mas viejo que esta ventana nunca es "urgente" por recencia: un
@@ -215,9 +255,15 @@ class MaterialityService:
         return sorted(set(assumptions))
 
     def _impact_direction(self, lower_text: str) -> str:
-        # Palabra completa: "cut" no casa en "execute" ni "raise" en "praise".
-        positive = any(_has_term(lower_text, word) for word in POSITIVE_TERMS)
-        negative = any(_has_term(lower_text, word) for word in NEGATIVE_TERMS)
+        # Palabra completa para lo inequívoco y frase con contexto para lo
+        # ambiguo: "cut" no casa en "execute", "raise" no casa en "praise" y
+        # "preorders fuertes" es positivo aunque el titular traiga ruido.
+        positive = any(_has_term(lower_text, word) for word in POSITIVE_TERMS) or any(
+            _has_phrase(lower_text, phrase) for phrase in POSITIVE_PATTERNS
+        )
+        negative = any(_has_term(lower_text, word) for word in NEGATIVE_TERMS) or any(
+            _has_phrase(lower_text, phrase) for phrase in NEGATIVE_PATTERNS
+        )
         if positive and negative:
             return "mixed"
         if positive:
