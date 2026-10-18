@@ -336,14 +336,14 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                                     {isSearchMode ? 'Sin resultados' : 'No hay acciones disponibles'}
                                 </div>
                             ) : (
-                                <CommandGroup heading={isSearchMode ? `Resultados de búsqueda (${displayStocks.length})` : 'Acciones populares'}>
+                                <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading={isSearchMode ? `Resultados de búsqueda (${displayStocks.length})` : 'Acciones populares'}>
                                     {displayStocks.map(stock => (
                                         <CommandItem
                                             key={stock.symbol}
                                             value={`stock:${stock.symbol}`}
                                             onSelect={() => handleSelectStock(stock.symbol)}
                                             onMouseEnter={() => handlePrefetchStock(stock.symbol)}
-                                            className="search-item-link min-h-11 w-full text-left"
+                                            className="search-item-link min-h-11 w-full text-left aria-selected:bg-teal-950/60 aria-selected:ring-1 aria-selected:ring-inset aria-selected:ring-teal-700"
                                         >
                                             <TrendingUp aria-hidden="true" className="h-4 w-4 text-gray-500" />
                                             <div className="min-w-0 flex-1">
