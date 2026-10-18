@@ -412,6 +412,7 @@ class ThesisService:
         phase_callback=None,
         *,
         stored_evidence_only: bool = False,
+        refresh_receipt: dict | None = None,
     ) -> ThesisVersion:
         """Persist model, valuation, thesis, evidence, graph and red team atomically.
 
@@ -430,6 +431,7 @@ class ThesisService:
                 db, ticker, force_new_version, phase_callback, savepoint=savepoint,
                 prepared_narrative=narrative_sections,
                 stored_evidence_only=stored_evidence_only,
+                refresh_receipt=refresh_receipt,
             )
         except Exception as exc:
             # Guard the savepoint: the phase callback and _generate_atomic both
@@ -459,6 +461,7 @@ class ThesisService:
         savepoint=None,
         prepared_narrative=None,
         stored_evidence_only=False,
+        refresh_receipt=None,
     ) -> ThesisVersion:
         def _phase(name: str) -> None:
             if phase_callback is not None:
@@ -472,7 +475,9 @@ class ThesisService:
         # empresa tiene filings): SEC companyfacts + Finnhub quote/profile +
         # filings/news/earnings/IR/tesis. Nunca rompe la generacion.
         _phase("collect_evidence")
-        evidence: dict = {}
+        from app.services.tracked_evidence import tracked_evidence
+
+        evidence: dict = tracked_evidence(refresh_receipt) if stored_evidence_only else {}
         try:
             from app.services.thesis_evidence_service import ThesisEvidenceService
 
@@ -1343,6 +1348,9 @@ class ThesisService:
     def _source_ok_detail(self, key: str, block: dict) -> str:
         if key == "fundamentals":
             metrics = ", ".join(block.get("metrics") or [])
+            if block.get("detail"):
+                timestamp = block.get("last_refreshed_at")
+                return f"{block['source']}: {block['detail']}" + (f" Fecha: {timestamp}." if timestamp else "")
             return f"{block.get('source')}, {block.get('facts_imported')} hechos: {metrics}"
         if key == "market":
             parts = []
