@@ -65,7 +65,7 @@ function MoversTable({ rows, caption, tickerSets, showVolume = false }: { rows: 
                 {row.date ? (
                   <div className="ml-auto max-w-[7.5rem] text-xs text-gray-500">
                     <span className="whitespace-nowrap">del {row.date}</span>
-                    {row.registered_at ? <span className="whitespace-nowrap">{` · ${formatUserDateTime(row.registered_at, { hour: '2-digit', minute: '2-digit' })}`}</span> : null}
+                    {row.registered_at ? <span className="whitespace-nowrap">{` · ${formatUserDateTime(row.registered_at, { hour: '2-digit', minute: '2-digit' })} (Madrid)`}</span> : null}
                   </div>
                 ) : null}
               </td>
@@ -107,7 +107,7 @@ export default async function MoversPage() {
             ? `Subidas, bajadas y más activas de la sesión del ${movers.session_date} frente a la anterior.`
             : 'Subidas, bajadas y más activas con los precios registrados.'}
           {movers.as_of
-            ? ' Cada fila declara la fecha de su precio y la hora en que se registró.'
+            ? ' Cada fila declara la fecha de su precio y la hora en que se registró (hora de Madrid).'
             : ' Aún no hay precios registrados.'}
           {movers.excluded_not_comparable
             ? ` ${movers.excluded_not_comparable} ${movers.excluded_not_comparable === 1 ? 'valor queda' : 'valores quedan'} fuera por no tener cierre en esa sesión.`

@@ -16,6 +16,9 @@ test('movers declara frescura por fila: fecha del precio + hora de registro, sin
     assert.match(page, /del \{row\.date\}/);
     assert.match(page, /formatUserDateTime\(row\.registered_at/);
     assert.match(page, /la hora en que se registró/);
+    // QA 9: la hora de captura declara su zona, como la ficha («(Madrid)»).
+    assert.match(page, /\} \(Madrid\)`\}<\/span>/);
+    assert.match(page, /la hora en que se registró \(hora de Madrid\)/);
     assert.match(market, /MarketPrice\.updated_at/);
     assert.match(market, /"registered_at": registered\.isoformat\(\) if registered else None/);
     assert.match(actions, /registered_at\?: string \| null/);
