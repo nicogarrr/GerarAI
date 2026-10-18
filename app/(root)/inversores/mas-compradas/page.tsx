@@ -9,6 +9,7 @@ import { formatMarketCapUsd, formatNumber, NA } from '@/lib/format';
 import { periodLabel } from '../_components/format';
 import { newLabel } from '../_components/labels';
 import { Pagination, paginate } from '../_components/Pagination';
+import { SyncPortfoliosButton } from '../_components/SyncPortfoliosButton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -42,7 +43,10 @@ export default async function MostBoughtPage({ searchParams }: { searchParams: P
             </header>
 
             {data.status === 'sin_datos' || data.items.length === 0 ? (
-                <p className="text-base text-gray-500">Sin datos todavía: faltan dos trimestres de 13F sincronizados.</p>
+                <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-8 text-center">
+                    <p className="text-base text-gray-500">Sin datos todavía: faltan dos trimestres de 13F sincronizados.</p>
+                    <SyncPortfoliosButton />
+                </div>
             ) : (
                 <ul className="flex flex-col gap-4">
                     {paged.items.map((item) => (

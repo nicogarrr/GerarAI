@@ -16,6 +16,12 @@ test('inversores: cuenta nueva sin 13F ofrece la acción real de sincronizar', (
   assert.ok(button.includes('Sincronización en curso'), 'confirma que la sincronización quedó encolada');
 });
 
+test('más compradas: sin dos trimestres de 13F ofrece la misma acción de sincronizar', () => {
+  const page = read('app/(root)/inversores/mas-compradas/page.tsx');
+  assert.ok(page.includes('SyncPortfoliosButton'), 'más-compradas reutiliza el botón de sincronización en su estado vacío');
+  assert.ok(page.includes('faltan dos trimestres de 13F sincronizados.'), 'la razón honesta se conserva');
+});
+
 test('la acción de sincronización llama a la ruta async que encola el actor', () => {
   assert.ok(read('lib/actions/investors.actions.ts').includes('/api/ownership/managers/sync-async'));
   const route = read('data-engine/app/api/routes/ownership.py');
