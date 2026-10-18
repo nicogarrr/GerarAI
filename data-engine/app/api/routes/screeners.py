@@ -292,8 +292,13 @@ _real_response_cache: dict[tuple, dict] = {}
 _REAL_RESPONSE_CACHE_MAX = 256
 _real_cache_lock = threading.RLock()
 _real_refresh_state_lock = threading.RLock()
-_real_refresh_future = None
-_real_refresh_generation = 0
+# Futuro de refresco POR TENANT: los ratios se calculan con los hechos del
+# tenant y un refresh tarda (Finnhub free, 60 llamadas/min compartidas). Con
+# un unico futuro global, un tenant cuyo bucket estaba frio esperaba detras
+# del refresh de OTRO tenant; el cold start no espera y su pantalla (tarjeta
+# DCF de Inicio) salia vacia de forma permanente.
+_real_refresh_futures: dict[int | None, object] = {}
+_real_refresh_generations: dict[int | None, int] = {}
 _real_refresh_executor = ThreadPoolExecutor(
     max_workers=1, thread_name_prefix="cavaai-screener-refresh"
 )
@@ -745,7 +750,7 @@ def _refresh_real_items_background(
     try:
         items = _refetch_real_items(vendor=vendor, tenant_id=tenant_id)
         with _real_refresh_state_lock:
-            stale_generation = generation != _real_refresh_generation
+            stale_generation = generation != _real_refresh_generations.get(tenant_id, 0)
         if items and not stale_generation:
             _store_real_items(items, vendor, tenant_id)
     except Exception:  # noqa: BLE001 — SWR nunca convierte un fallo upstream en 500
@@ -754,18 +759,18 @@ def _refresh_real_items_background(
 
 
 def _schedule_real_refresh(vendor: str, tenant_id: int | None = None):
-    """Programa un único refresh y devuelve el Future para el cold start."""
-    global _real_refresh_future, _real_refresh_generation
+    """Programa el refresh DE ESTE TENANT y devuelve su Future (cold start)."""
     with _real_refresh_state_lock:
-        current = _real_refresh_future
+        current = _real_refresh_futures.get(tenant_id)
         if current is not None and not current.done():
             return current
-        _real_refresh_generation += 1
-        generation = _real_refresh_generation
-        _real_refresh_future = _real_refresh_executor.submit(
+        generation = _real_refresh_generations.get(tenant_id, 0) + 1
+        _real_refresh_generations[tenant_id] = generation
+        future = _real_refresh_executor.submit(
             _refresh_real_items_background, vendor, generation, tenant_id
         )
-        return _real_refresh_future
+        _real_refresh_futures[tenant_id] = future
+        return future
 
 
 def active_vendor_allows_cold_wait(vendor: str, settings) -> bool:

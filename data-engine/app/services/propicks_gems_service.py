@@ -208,6 +208,7 @@ def find_gems(
         .where(MarketPrice.company_id.in_(list(companies)))
         .where(MarketPrice.close.isnot(None))
         .order_by(MarketPrice.date.desc())
+        .execution_options(include_all_tenants=True)
     ).all():
         prices.setdefault(p.company_id, p)
     since = (today - timedelta(days=INSIDER_WINDOW_DAYS)).isoformat()

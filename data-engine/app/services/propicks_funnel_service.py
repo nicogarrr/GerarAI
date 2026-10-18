@@ -333,6 +333,7 @@ def _average_volumes(db: Session, company_ids: list[int]) -> dict[int, float]:
             MarketPrice.volume > 0,
         )
         .group_by(MarketPrice.company_id)
+        .execution_options(include_all_tenants=True)
     ).all()
     return {int(cid): float(avg) for cid, avg in rows if avg is not None}
 

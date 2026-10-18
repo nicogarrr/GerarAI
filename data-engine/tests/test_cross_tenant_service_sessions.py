@@ -259,8 +259,8 @@ def test_screener_items_cache_does_not_leak_ratios_between_tenants(monkeypatch):
             client, SECRET, tenant, user,
             "GET", "/api/screeners/real", params={"limit": 1},
         )
-        future = screeners._real_refresh_future
-        if future is not None:
+        # Los refrescos son por tenant: se drenan todos los pendientes.
+        for future in list(screeners._real_refresh_futures.values()):
             future.result(timeout=5)
         response = signed_request(
             client, SECRET, tenant, user,
