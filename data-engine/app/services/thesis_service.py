@@ -198,6 +198,36 @@ def _metric_claim_statement(ticker: str, metric: str, fact: FinancialFact) -> st
     amount = f"{value} {unit}" if unit else value
     return f"{ticker}: {label} de {amount} ({fact.period})."
 
+_CODE_ES = {
+    "research_candidate": "candidata de investigación",
+    "standard_dcf": "DCF estándar",
+    "indicative_assumptions": "supuestos indicativos",
+    "financial_facts": "datos financieros reportados",
+    "traceable_wacc": "WACC trazable",
+    "generic_fcf": "FCF genérico",
+    "fact_anchored_sensitivity": "sensibilidad anclada a datos",
+    "preview_only": "solo vista previa",
+    "no_revenue_reported": "sin ingresos reportados",
+    "revenue": "ingresos",
+    "fcf_margin": "margen FCF",
+    "shares_diluted": "acciones diluidas",
+    "net_debt": "deuda neta",
+    "market_price": "precio de mercado",
+    "wacc": "WACC",
+    "terminal_growth": "crecimiento terminal",
+    "revenue_growth": "crecimiento de ingresos",
+    "gross_margin": "margen bruto",
+    "operating_margin": "margen operativo",
+    "net_margin": "margen neto",
+    "unassigned": "sin asignar",
+}
+
+
+def _code_es(code) -> str:
+    """Código técnico -> texto en español; si no hay traducción, se muestra legible sin guiones bajos."""
+    text = str(code if code is not None else "N/D")
+    return _CODE_ES.get(text) or text.replace("_", " ")
+
 
 def _thesis_money(value: float, currency: str | None) -> str:
     if currency == "USD":
@@ -1004,7 +1034,7 @@ class ThesisService:
                 "subject": company.ticker,
                 "predicate": "company_type",
                 "object": company.company_type,
-                "claim": f"{company.ticker} is tracked as {company.company_type}.",
+                "claim": f"{company.ticker} se sigue como {_code_es(company.company_type)}.",
                 "source_id": None,
                 "source_type": "company_master",
                 "confidence": 1.0,
@@ -1019,7 +1049,7 @@ class ThesisService:
                 "subject": company.ticker,
                 "predicate": "valuation_model",
                 "object": company.valuation_model,
-                "claim": f"Valuation method selected: {company.valuation_model}.",
+                "claim": f"Método de valoración elegido: {_code_es(company.valuation_model)}.",
                 "source_id": None,
                 "source_type": "company_master",
                 "confidence": 1.0,
@@ -1060,8 +1090,8 @@ class ThesisService:
                     "predicate": "valuation_status",
                     "object": "insufficient_data",
                     "claim": (
-                        f"{company.ticker} fair value is blocked pending: "
-                        f"{', '.join(valuation.get('missing_inputs') or [])}."
+                        f"El valor razonable de {company.ticker} está bloqueado a la espera de: "
+                        f"{', '.join(_code_es(m) for m in (valuation.get('missing_inputs') or []))}."
                     ),
                     "source_id": None,
                     "source_type": "valuation_engine",
@@ -1081,11 +1111,11 @@ class ThesisService:
                     "predicate": "valuation_assumptions",
                     "object": "indicative",
                     "claim": (
-                        f"{company.ticker} indicative range assumes "
-                        f"FCF margin base {assumed.get('fcf_margin_base')} "
-                        f"(band {assumed.get('fcf_margin_band')})"
+                        f"El rango indicativo de {company.ticker} supone "
+                        f"un margen FCF base de {assumed.get('fcf_margin_base')} "
+                        f"(banda {assumed.get('fcf_margin_band')})"
                         + (
-                            " and $1 revenue floor"
+                            " y un suelo de ingresos de $1"
                             if assumed.get("revenue_floor_used")
                             else ""
                         )
@@ -1144,7 +1174,7 @@ class ThesisService:
             return (
                 "**RANGO INDICATIVO PARCIAL — no es un valor justo final**\n\n"
                 f"Motor: {term_es(trace.get('engine', 'unknown'))} "
-                f"(base: `{trace.get('valuation_basis', 'indicative_assumptions')}`).\n\n"
+                f"(base: {_code_es(trace.get('valuation_basis', 'indicative_assumptions'))}).\n\n"
                 f"{self._range_lines(valuation)}\n\n"
                 f"Supuestos documentados (NO son datos reportados): {supuestos}.\n\n"
                 f"DCF inverso frente a precio de mercado: ver sección 14.\n\n"
@@ -1315,8 +1345,8 @@ class ThesisService:
             "con cita), **derivado** (fórmula documentada + inputs), "
             "**estimacion_llm** (método + confianza) o **supuesto** (justificación).",
             "",
-            "| input | etiqueta | valor | método | cita |",
-            "|---|---|---|---|---|",
+            "| input | etiqueta | valor | método |",
+            "|---|---|---|---|",
         ]
         for item in items:
             value = item.get("value")
