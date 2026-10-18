@@ -213,15 +213,17 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                             </div>
                         )}
                     </div>
-                    <p className="text-sm text-gray-400">
-                        Acciones seleccionadas con score mínimo de {appliedFilters.minScore} ordenadas por {
-                            appliedFilters.sortBy === 'score' ? 'score general' :
-                                appliedFilters.sortBy === 'momentum' ? 'momentum' :
-                                    appliedFilters.sortBy === 'value' ? 'valor' :
-                                        appliedFilters.sortBy === 'growth' ? 'crecimiento' :
-                                            'rentabilidad'
-                        }
-                    </p>
+                    {picks.length > 0 ? (
+                        <p className="text-sm text-gray-400">
+                            Acciones seleccionadas con puntuación mínima de {appliedFilters.minScore} ordenadas por {
+                                appliedFilters.sortBy === 'score' ? 'puntuación general' :
+                                    appliedFilters.sortBy === 'momentum' ? 'momentum' :
+                                        appliedFilters.sortBy === 'value' ? 'valor' :
+                                            appliedFilters.sortBy === 'growth' ? 'crecimiento' :
+                                                'rentabilidad'
+                            }
+                        </p>
+                    ) : null}
                 </div>
 
                 {error && (
@@ -258,7 +260,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                             {lastGenerated && passedCount === 0 &&
                                 `La selección del ${formatLastGenerated(lastGenerated)} no contiene candidatos que superen los criterios del embudo.`}
                             {lastGenerated && passedCount !== 0 &&
-                                `Ninguna acción de la selección del ${formatLastGenerated(lastGenerated)} cumple los filtros actuales (score ≥ ${appliedFilters.minScore}${appliedFilters.sector !== 'all' ? `, sector ${etiquetaSector(appliedFilters.sector)}` : ''}). Prueba a bajar el score mínimo o cambiar de sector.`}
+                                `Ninguna acción de la selección del ${formatLastGenerated(lastGenerated)} cumple los filtros actuales (puntuación ≥ ${appliedFilters.minScore}${appliedFilters.sector !== 'all' ? `, sector ${etiquetaSector(appliedFilters.sector)}` : ''}). Prueba a bajar la puntuación mínima o cambiar de sector.`}
                         </p>
                         <Button
                             onClick={lastGenerated ? handleRefresh : handleGenerateRun}
