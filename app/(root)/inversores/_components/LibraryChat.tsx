@@ -11,7 +11,11 @@ type Turn = { id: number; question: string; analysis: boolean; result: LibraryAn
 type Citation = LibraryAnswer['answers'][number]['citation'];
 
 function citationLine(cite: Citation) {
-  return `${cite.author ?? 'Autor no registrado'} · ${cite.title} · ${cite.page_number === null ? 'Página no registrada' : `Página ${cite.page_number}`} · Fragmento ${cite.chunk_index + 1} · ${cite.publication_date ?? 'Fecha no registrada'}`;
+  const parts = [cite.author ?? 'Autor no registrado', cite.title];
+  if (cite.page_number !== null) parts.push(`Página ${cite.page_number}`);
+  parts.push(`Fragmento ${cite.chunk_index + 1}`);
+  if (cite.publication_date) parts.push(cite.publication_date);
+  return parts.join(' · ');
 }
 
 function links(cite: Citation) {
