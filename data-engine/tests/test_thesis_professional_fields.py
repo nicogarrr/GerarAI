@@ -114,3 +114,11 @@ def test_visible_copy_has_accents_and_no_english_label() -> None:
     assert "Hipotesis en formacion" not in source
     hypothesis = ThesisService()._hypothesis(_company(), {"current_price": None, "base_value": None, "margin_of_safety": None})
     assert "Hipótesis en formación" in hypothesis
+
+
+def test_banda_y_porcentajes_del_memo_en_castellano() -> None:
+    from app.services.thesis_service import _band_es, _pct_es
+
+    assert _band_es([0.16999999999999998, 0.25, 0.3]) == "17 % / 25 % / 30 %"
+    assert _band_es(None) == "N/D"
+    assert _pct_es(0.25) == "25 %" and _pct_es(0.155) == "15,5 %"

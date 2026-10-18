@@ -167,5 +167,5 @@ def test_cifras_y_claves_del_memo_en_es():
     facts = ThesisService()._facts_markdown(
         {"revenue": type("F", (), {"value": Decimal("416161000000.000000"), "unit": "USD", "period": "FY2025", "source_type": "sec_filing", "source_id": 23})()}
     )
-    assert "| Ingresos | 416.161.000.000 | USD | FY2025 | Informe SEC #23 |" in facts
+    assert "| Ingresos | 416,16 mil M | USD | FY2025 | Informe SEC #23 |" in facts
     assert "revenue" not in facts

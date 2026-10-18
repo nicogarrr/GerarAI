@@ -242,6 +242,23 @@ def _thesis_percent(value: float) -> str:
     return f"{value * 100:.1f}".replace(".", ",") + " %"
 
 
+def _pct_es(value: object) -> str:
+    """Fracción (0,25) -> «25 %»; texto original si no es numérica."""
+    try:
+        number = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return str(value)
+    text = f"{number * 100:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+    return f"{text} %"
+
+
+def _band_es(band: object) -> str:
+    """Banda de margen [mín, base, máx] legible; N/D si falta."""
+    if not isinstance(band, (list, tuple)) or not band:
+        return "N/D"
+    return " / ".join(_pct_es(v) for v in band)
+
+
 class ThesisService:
     def __init__(self) -> None:
         self.valuation_service = ValuationService()
@@ -1112,14 +1129,14 @@ class ThesisService:
                     "object": "indicative",
                     "claim": (
                         f"El rango indicativo de {company.ticker} supone "
-                        f"un margen FCF base de {assumed.get('fcf_margin_base')} "
-                        f"(banda {assumed.get('fcf_margin_band')})"
+                        f"un margen FCF base de {_pct_es(assumed.get('fcf_margin_base'))} "
+                        f"(banda {_band_es(assumed.get('fcf_margin_band'))})"
                         + (
                             " y un suelo de ingresos de $1"
                             if assumed.get("revenue_floor_used")
                             else ""
                         )
-                        + "; not reported facts."
+                        + "; no son datos reportados."
                     ),
                     "source_id": None,
                     "source_type": "valuation_engine",
@@ -1144,7 +1161,7 @@ class ThesisService:
         ]
         for metric, fact in facts.items():
             rows.append(
-                f"| {term_es(metric)} | {number_es(fact.value)} | {fact.unit} | {fact.period} | "
+                f"| {term_es(metric)} | {format_compact_es(fact.value) or number_es(fact.value)} | {fact.unit} | {fact.period} | "
                 f"{term_es(fact.source_type)} #{fact.source_id or 's/d'} |"
             )
         return "\n".join(rows)
@@ -1164,8 +1181,8 @@ class ThesisService:
             assumed = trace.get("assumed") or {}
             missing = "\n".join(f"- {item}" for item in (valuation.get("missing_inputs") or []))
             supuestos = (
-                f"margen FCF base {assumed.get('fcf_margin_base')} "
-                f"(banda {assumed.get('fcf_margin_band')})"
+                f"margen FCF base {_pct_es(assumed.get('fcf_margin_base'))} "
+                f"(banda {_band_es(assumed.get('fcf_margin_band'))})"
                 + ("; suelo de ingresos de 1 $ (sin ingresos coherentes)" if assumed.get("revenue_floor_used") else "")
                 + f"; crecimiento de ingresos {assumed.get('revenue_growth')}"
                 + f"; WACC {assumed.get('wacc')}"
@@ -1587,8 +1604,8 @@ Invalidadores estructurales: afirmaciones sin respaldo, trazas de cálculo ausen
 
 ## 19. Auditoría de fuentes
 Superada: {"sí" if audit["passed"] else "no"}
-Cobertura de fuentes: {audit["source_coverage_score"]}
-Afirmaciones sin respaldo: {audit["unsupported_claims"]}
+Cobertura de fuentes: {audit["source_coverage_score"]} %
+Afirmaciones sin respaldo: {len(audit["unsupported_claims"] or [])}
 
 ## 20. Fuentes
 {self._sources_markdown(sources)}
