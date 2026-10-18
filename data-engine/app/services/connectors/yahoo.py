@@ -8,10 +8,29 @@ que el caller pueda pasar al siguiente proveedor de la cadena.
 
 from __future__ import annotations
 
+import re
 import time
 from typing import Any
 
 import httpx
+
+# Yahoo nombra las clases de acciones US con guion (BRK-B), no con punto
+# (BRK.B, convención de Finnhub y del master). Las bolsas no-US llevan
+# sufijo de DOS letras (.MC, .AS, .TO, .SW, .DE); la clase US es UNA letra
+# A o B, así que el patrón no colisiona con sufijos de bolsa. Verificado
+# contra la chart API el 2026-10-19: BRK.B da 404 y BRK-B devuelve serie.
+_SHARE_CLASS_DOTTED = re.compile(r"^([A-Z]{1,5})\.([AB])$")
+
+
+def yahoo_chart_symbol(symbol: str) -> str:
+    """Símbolo de la chart API de Yahoo para el ticker pedido.
+
+    Convierte la clase US en notación de punto (BRK.B) a la notación de
+    guion que Yahoo exige (BRK-B); cualquier otro símbolo pasa intacto.
+    """
+    normalized = symbol.strip().upper()
+    match = _SHARE_CLASS_DOTTED.fullmatch(normalized)
+    return f"{match.group(1)}-{match.group(2)}" if match else normalized
 
 
 class YahooFinanceClient:
@@ -43,7 +62,7 @@ class YahooFinanceClient:
             }
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.get(
-                f"{self.base_url}/{ticker.upper()}", params=params, headers=self.headers
+                f"{self.base_url}/{yahoo_chart_symbol(ticker)}", params=params, headers=self.headers
             )
             response.raise_for_status()
             payload = response.json()

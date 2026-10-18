@@ -65,3 +65,37 @@ def test_dotless_miss_returns_none(db):
 
 def test_suffix_without_base_company_returns_none(db):
     assert resolve_company(db, "FALTA.MC") is None
+
+
+def test_us_share_class_dash_resolves_to_master_dot(db):
+    """BRK-B (notacion Yahoo/SEC) resuelve a la ficha BRK.B del master."""
+    brk = _company(db, "BRK.B")
+    assert resolve_company(db, "BRK-B").id == brk.id
+    assert resolve_company(db, "brk-b").id == brk.id
+
+
+def test_us_share_class_dot_resolves_to_master_dash(db):
+    """Simetrico: si el master guardara guion, el punto tambien resuelve."""
+    brk = _company(db, "BRK-B")
+    assert resolve_company(db, "BRK.B").id == brk.id
+
+
+def test_share_class_exact_match_still_wins(db):
+    dashed = _company(db, "BRK-B")
+    _company(db, "BRK.B")
+    assert resolve_company(db, "BRK-B").id == dashed.id
+
+
+def test_share_class_variant_never_creates_identity(db):
+    _company(db, "BRK.A")
+    assert resolve_company(db, "BRK-B") is None  # variante distinta: no es la clase A
+    assert resolve_company(db, "BTC-USD") is None  # sufijo >1 letra: no es clase US
+
+
+def test_resolve_companies_share_class_bulk(db):
+    from app.services.company_resolver import resolve_companies
+
+    brk = _company(db, "BRK.B")
+    companies, missing = resolve_companies(db, ["BRK-B", "AAPL"])
+    assert [c.id for c in companies] == [brk.id]
+    assert missing == ["AAPL"]

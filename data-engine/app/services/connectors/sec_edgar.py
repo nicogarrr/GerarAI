@@ -341,11 +341,18 @@ async def cik_for_ticker(
     if from_manifest is not None:
         return from_manifest
     table = await _get_json(TICKER_MAP_URL, client)
-    wanted = ticker.strip().upper()
-    for entry in table.values():
-        if isinstance(entry, dict) and str(entry.get("ticker", "")).upper() == wanted:
-            return _pad_cik(entry["cik_str"])
-    return None
+    # Mismo criterio que SECClient.cik_for_ticker: exacto primero y, si no,
+    # comparación sin separadores de clase con match único (BRK.B == BRK-B).
+    from app.services.sec_ticker import match_cik
+
+    return match_cik(
+        (
+            (str(entry.get("ticker", "")), _pad_cik(entry["cik_str"]))
+            for entry in table.values()
+            if isinstance(entry, dict) and entry.get("cik_str") is not None
+        ),
+        ticker,
+    )
 
 
 async def company_facts(

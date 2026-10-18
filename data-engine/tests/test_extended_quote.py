@@ -316,3 +316,88 @@ def test_closed_no_extended_market_uses_dated_auction_price_not_prior_minute():
     q=parse_extended_chart('MSFT',minute,START+40000,daily)
     assert q.price==103 and q.timestamp==START+24000 and q.price_session=='regular'
     assert q.regular_close==103 and q.regular_close_timestamp is None
+
+
+def _bme_weekend_nodes():
+    """SAN.MC un domingo: bounds ya en lunes, velas/meta del viernes y
+    minutos sin contratacion en null (patron real de BME en Yahoo)."""
+    from datetime import datetime, timezone
+
+    def ts(y, m, d, hh, mm):
+        return int(datetime(y, m, d, hh, mm, tzinfo=timezone.utc).timestamp())
+
+    fri_start, fri_end = ts(2026, 10, 16, 7, 0), ts(2026, 10, 16, 15, 30)
+    mon_start, mon_end = ts(2026, 10, 19, 7, 0), ts(2026, 10, 19, 15, 30)
+    minutes = list(range(fri_start, fri_end, 60))
+    closes = [12.03] * len(minutes)
+    closes[-1] = 12.034
+    highs = [12.10] * len(minutes)
+    lows = [12.01] * len(minutes)
+    opens = [12.03] * len(minutes)
+    opens[0] = 12.09
+    for i in (100, 250, 400):  # minutos sin contratacion: OHLC en null
+        highs[i] = lows[i] = opens[i] = closes[i] = None
+    minute = {
+        "meta": {
+            "symbol": "SAN.MC", "currency": "EUR",
+            "exchangeTimezoneName": "Europe/Madrid",
+            "previousClose": 11.998,
+            "regularMarketPrice": 12.034,
+            "regularMarketTime": ts(2026, 10, 16, 15, 42),
+            "regularMarketDayHigh": 12.128, "regularMarketDayLow": 12.012,
+            "currentTradingPeriod": {
+                "pre": {"start": mon_start, "end": mon_start},
+                "regular": {"start": mon_start, "end": mon_end},
+                "post": {"start": mon_end, "end": mon_end},
+            },
+            "tradingPeriods": {"regular": [[{"start": fri_start, "end": fri_end}]]},
+        },
+        "timestamp": minutes,
+        "indicators": {"quote": [{"close": closes, "open": opens, "high": highs, "low": lows}]},
+    }
+    daily = {
+        "meta": {"symbol": "SAN.MC", "currency": "EUR",
+                 "exchangeTimezoneName": "Europe/Madrid", "dataGranularity": "1d"},
+        "timestamp": [ts(2026, 10, 12, 12, 0), ts(2026, 10, 13, 12, 0),
+                      ts(2026, 10, 14, 12, 0), ts(2026, 10, 15, 12, 0),
+                      ts(2026, 10, 16, 12, 0)],
+        "indicators": {"quote": [{"close": [12.264, 12.178, 12.130, 11.998, 12.034]}]},
+    }
+    sunday_now = ts(2026, 10, 18, 22, 50)
+    return minute, daily, sunday_now
+
+
+def test_bme_weekend_extrema_from_dated_meta_not_null_candles():
+    """SAN.MC/TRE.MC: los minutos sin contratacion (null) tumban la auditoria
+    de velas; los extremos salen de la meta fechada de Yahoo, fechados en la
+    ultima sesion completada aunque los bounds ya sean la proxima."""
+    minute, daily, now = _bme_weekend_nodes()
+    q = parse_extended_chart("SAN.MC", minute, now, daily)
+    assert q.session == "cerrado" and q.price == 12.034
+    assert (q.high, q.low) == (12.128, 12.012)
+    assert q.metrics_session == "2026-10-16" and q.metrics_timestamp is not None
+    assert q.open == 12.09
+
+
+def test_bme_weekend_previous_close_dated_against_displayed_session():
+    """El cierre anterior (jueves) se fecha contra la sesion mostrada
+    (viernes), no contra la proxima sesion de los bounds (lunes)."""
+    minute, daily, now = _bme_weekend_nodes()
+    q = parse_extended_chart("SAN.MC", minute, now, daily)
+    assert q.previous_close == 11.998
+    assert q.previous_close_date == "2026-10-15"
+    assert q.regular_close == 12.034 and q.regular_close_date == "2026-10-16"
+
+
+def test_daily_listing_guard_accepts_normalized_share_class():
+    """BRK.B pedido al backend se convierte a BRK-B en Yahoo: la guarda de
+    mismo-listado compara contra el simbolo normalizado, no el literal."""
+    minute, daily = nodes()
+    for node in (minute, daily):
+        node["meta"]["symbol"] = "BRK-B"
+    q = parse_extended_chart("BRK.B", minute, START + 200, daily)
+    assert q.previous_close_date == "2026-10-07"
+    # Y sigue rechazando otro listado real.
+    daily["meta"]["symbol"] = "BRK-A"
+    q = parse_extended_chart("BRK.B", minute, START + 200, daily)
+    assert q.previous_close_date is None

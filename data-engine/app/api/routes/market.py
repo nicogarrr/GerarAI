@@ -97,17 +97,9 @@ _quote_cache_lock = threading.RLock()
 
 _YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
-# Yahoo nombra las clases de acciones US con guion (BRK-B), no con punto
-# (BRK.B, convención de Finnhub y del master). Las bolsas no-US llevan
-# sufijo de DOS letras (.MC, .AS, .TO, .SW, .DE); la clase US es UNA letra
-# A o B, así que el patrón no colisiona con sufijos de bolsa. Verificado
-# contra la chart API el 2026-09-27: BRK-B devuelve serie y BRK.B da 404.
-_SHARE_CLASS_DOTTED = re.compile(r"^([A-Z]{1,5})\.([AB])$")
-
-
-def _yahoo_chart_symbol(symbol: str) -> str:
-    match = _SHARE_CLASS_DOTTED.fullmatch(symbol)
-    return f"{match.group(1)}-{match.group(2)}" if match else symbol
+# La conversión de clases US punto->guion (BRK.B -> BRK-B) vive en el
+# conector Yahoo (fuente única); aquí se reexporta con el nombre histórico.
+from app.services.connectors.yahoo import yahoo_chart_symbol as _yahoo_chart_symbol
 
 
 def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
