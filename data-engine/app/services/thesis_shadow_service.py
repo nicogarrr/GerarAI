@@ -6,6 +6,11 @@ structured comparison as a durable WorkflowRun. The shadow never mutates
 domain artifacts: the graph writes control state only, and this service
 reads the classic path's persisted outputs.
 
+Tenant contract: ``tenant_external_id`` is required (no default). The API
+passes the caller's real tenant so graph threads are namespaced per tenant
+(``thesis:{tenant}:{company}:...``); a shared default namespace would
+collide across tenants the day the shadow moves to a durable checkpointer.
+
 Comparison contract (honest by construction):
 - graph_execution: did all graph nodes commit in order under the checkpointer
   (resuming the 6c approval interrupt with an explicit synthetic shadow
@@ -188,7 +193,7 @@ class ThesisShadowService:
         db: Session,
         *,
         ticker: str,
-        tenant_external_id: str = "shadow",
+        tenant_external_id: str,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         company = resolve_company(db, ticker)
@@ -332,5 +337,9 @@ class ThesisShadowService:
             "divergences": divergences,
             "shadow_only": True,
         }
+        # El run_id viaja dentro del payload persistido: la ruta no
+        # re-consulta "el ultimo run" (carrera entre runs concurrentes del
+        # mismo tenant) y un replay idempotente devuelve el run original.
+        result["run_id"] = envelope.run.id
         envelope.finish(result)
         return result
