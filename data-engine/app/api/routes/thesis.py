@@ -568,12 +568,14 @@ def approve_thesis(ticker: str, payload: ThesisApproveRequest, db: Session = Dep
     # state check and a different vocabulary, so an `insufficient_data` or
     # `draft_failed_audit` version could be marked approved while its own memo
     # said "NO VALUATION".
+    side_effects: dict = {}
     try:
         thesis = apply_approval_decision(
             db,
             thesis.id,
             DECISION_APPROVE if payload.decision == "approved" else DECISION_REJECT,
             via="api",
+            out=side_effects,
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -590,6 +592,9 @@ def approve_thesis(ticker: str, payload: ThesisApproveRequest, db: Session = Dep
         "actor": payload.actor,
         "approved_at": thesis.updated_at.isoformat(),
         "telegram_auto_approval": "future",
+        # Resultado real del indexado en la Biblioteca (RAG): indexed /
+        # unchanged / removed / none / failed. Nunca inventado por la UI.
+        "knowledge_sync": side_effects.get("knowledge_sync"),
         "provenance": provenance(
             "Base de datos de GerarAI",
             SourceKind.INTERNAL,

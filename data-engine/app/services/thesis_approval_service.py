@@ -193,6 +193,7 @@ def apply_approval_decision(
     thesis_id: int,
     decision: str,
     via: str = "telegram",
+    out: dict | None = None,
 ) -> ThesisVersion:
     """Aplica approve��'published / reject��'changes_requested. Idempotente.
 
@@ -225,9 +226,13 @@ def apply_approval_decision(
 
     company = db.get(Company, thesis.company_id)
     if company is not None:
-        sync_thesis_knowledge(
+        knowledge_sync = sync_thesis_knowledge(
             db, company, thesis, published=decision == DECISION_APPROVE
         )
+        # La UI cuenta el indexado con lo devuelto, sin suponerlo: el sync
+        # nunca rompe la aprobacion y un fallo queda como "failed".
+        if out is not None:
+            out["knowledge_sync"] = knowledge_sync
     return thesis
 
 

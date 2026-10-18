@@ -127,3 +127,54 @@ def test_reject_unpublished_keeps_older_published_document(db_thesis):
     docs = _auto_docs(db, company.ticker)
     assert len(docs) == 1
     assert docs[0].metadata_["thesis_version_id"] == thesis.id
+
+
+def test_approve_reports_indexed_status(db_thesis):
+    db, company, thesis = db_thesis
+    out: dict = {}
+    apply_approval_decision(db, thesis.id, "approve", via="test", out=out)
+    assert out["knowledge_sync"]["status"] == "indexed"
+    assert isinstance(out["knowledge_sync"]["document_id"], int)
+
+
+def test_second_approve_reports_unchanged(db_thesis):
+    db, company, thesis = db_thesis
+    apply_approval_decision(db, thesis.id, "approve", via="test")
+    out: dict = {}
+    apply_approval_decision(db, thesis.id, "approve", via="test", out=out)
+    assert out["knowledge_sync"]["status"] == "unchanged"
+    assert isinstance(out["knowledge_sync"]["document_id"], int)
+    # Idempotente: sigue habiendo un unico documento automatico.
+    assert len(_auto_docs(db, company.ticker)) == 1
+
+
+def test_reject_reports_removed_status(db_thesis):
+    db, company, thesis = db_thesis
+    apply_approval_decision(db, thesis.id, "approve", via="test")
+    out: dict = {}
+    apply_approval_decision(db, thesis.id, "reject", via="test", out=out)
+    assert out["knowledge_sync"] == {"status": "removed", "document_id": None}
+
+
+def test_reject_without_document_reports_none(db_thesis):
+    db, company, thesis = db_thesis
+    out: dict = {}
+    apply_approval_decision(db, thesis.id, "reject", via="test", out=out)
+    assert out["knowledge_sync"] == {"status": "none", "document_id": None}
+
+
+def test_sync_failure_reports_failed_and_never_raises(db_thesis, monkeypatch):
+    db, company, thesis = db_thesis
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("ingesta rota")
+
+    monkeypatch.setattr(
+        "app.services.thesis_knowledge_sync._sync", _boom
+    )
+    out: dict = {}
+    apply_approval_decision(db, thesis.id, "approve", via="test", out=out)
+    # La aprobacion se mantiene; el fallo de indexado se reporta, no se oculta.
+    db.refresh(thesis)
+    assert thesis.status == "published"
+    assert out["knowledge_sync"] == {"status": "failed", "document_id": None}
