@@ -187,6 +187,9 @@ def portfolio_summary(db: Session = Depends(get_db)) -> dict:
         "cash_native": risk["cash_native"],
         "missing_fx": risk["missing_fx"],
         "data_as_of": risk.get("data_as_of"),
+        "cash_as_of": risk.get("cash_as_of"),
+        "fx_rates": risk.get("fx_rates", []),
+        "valuation_dates_differ": risk.get("valuation_dates_differ", False),
         "provenance": risk.get("provenance"),
     }
 

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RecordDetail, formatRecordValue, type DataRecord } from '@/components/data/RecordViews';
 import { etiquetaFactor, etiquetaSector, etiquetaSeveridad } from '@/lib/labels';
-import { formatUserDateTime, formatMoney, formatPercent, NA } from '@/lib/format';
+import { formatDate, formatUserDateTime, formatMoney, formatNumber, formatPercent, NA } from '@/lib/format';
 import { getRiskDashboard } from '@/lib/actions/risk.actions';
 
 interface RiskDashboardViewProps {
@@ -80,6 +80,9 @@ const RISK_LABELS: Record<string, string> = {
     missing_fx: 'Sin tipo de cambio para',
     data_as_of: 'Datos a fecha de',
     provenance: 'Fuente',
+    cash_as_of: 'Caja a fecha de',
+    fx_rates: 'Tipos de cambio usados',
+    valuation_dates_differ: 'Fechas de valoración',
 };
 
 const RISK_STATUS_LABELS: Record<string, string> = {
@@ -160,6 +163,20 @@ function humanizeRiskDashboard(dashboard: DataRecord | null): DataRecord | null 
             display[label] = value
                 .map((item) => (isRecord(item) ? String(item.ticker ?? item.quote_currency ?? item.currency ?? '?') : String(item)))
                 .join(', ');
+        } else if (key === 'cash_as_of') {
+            display[label] = typeof value === 'string' && value ? formatDate(value) : NA;
+        } else if (key === 'fx_rates') {
+            if (!Array.isArray(value) || value.length === 0) continue;
+            display[label] = value
+                .map((item) => {
+                    if (!isRecord(item) || typeof item.rate !== 'number') return NA;
+                    const scope = item.scope === 'cash' ? 'Caja' : 'Posiciones';
+                    return `${scope}: 1 ${String(item.currency)} = ${formatNumber(item.rate, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${baseCurrency} (${typeof item.as_of === 'string' ? formatDate(item.as_of) : NA})`;
+                })
+                .join(' · ');
+        } else if (key === 'valuation_dates_differ') {
+            if (value !== true) continue;
+            display[label] = 'Posiciones y caja a fechas distintas: el total combina ambas';
         } else if (key === 'data_as_of') {
             display[label] = typeof value === 'string' && value ? formatUserDateTime(value) : NA;
         } else if (key === 'provenance') {

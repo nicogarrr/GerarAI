@@ -89,8 +89,15 @@ export type PortfolioSummary = {
     baseCurrency: string;
     status: 'ok' | 'incomplete_fx';
     missingFx: Array<Record<string, unknown>>;
+    /** Tipo (divisa base por unidad de divisa original) y fecha usados en cada conversion. */
+    fxRates?: PortfolioFxRate[];
+    cashAsOf?: string | null;
+    positionsAsOf?: string | null;
+    valuationDatesDiffer?: boolean;
     quality?: PortfolioDataQuality | null;
 };
+
+export type PortfolioFxRate = { scope: 'cash' | 'positions'; currency: string; rate: number; as_of: string };
 
 type ResearchPortfolioTransaction = {
     id: number;
@@ -141,6 +148,10 @@ type ResearchPortfolioSummaryResponse = {
     status: 'ok' | 'incomplete_fx';
     base_currency: string;
     missing_fx: Array<Record<string, unknown>>;
+    fx_rates?: PortfolioFxRate[];
+    cash_as_of?: string | null;
+    data_as_of?: string | null;
+    valuation_dates_differ?: boolean;
 };
 
 export async function addTransaction(
@@ -249,6 +260,10 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         baseCurrency: backendSummary.base_currency,
         status: backendSummary.status,
         missingFx: backendSummary.missing_fx,
+        fxRates: backendSummary.fx_rates,
+        cashAsOf: backendSummary.cash_as_of,
+        positionsAsOf: backendSummary.data_as_of,
+        valuationDatesDiffer: backendSummary.valuation_dates_differ,
         quality,
     };
 }
