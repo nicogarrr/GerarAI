@@ -10,7 +10,7 @@ from app.schemas import ManualNewsRequest, ManualNewsResponse, NewsIngestRequest
 from app.services.news_headline_translation import display_translation, original_headline, translate_headline
 from app.services.news_service import NewsService
 from app.services.second_order_news_service import analyze_second_order
-from app.services.ticker_news_lane import _only_ticker_prefix_mention
+from app.services.ticker_news_lane import _only_ticker_prefix_mention, fails_strict_name
 
 router = APIRouter()
 
@@ -22,6 +22,8 @@ def _is_off_topic(event: NewsEvent, company: Company | None) -> bool:
     metadata = event.metadata_ or {}
     if company is None or not metadata.get("headline_from_source", True):
         return False
+    if fails_strict_name(company, f"{event.title or ''} {event.summary or ''}"):
+        return True
     return _only_ticker_prefix_mention(company, event.title or "", event.summary or "")
 
 
