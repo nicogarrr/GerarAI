@@ -7,6 +7,8 @@ unknown-vendor fallback.
 
 from __future__ import annotations
 
+import threading
+
 import pytest
 
 from app.api.routes import screeners
@@ -212,7 +214,18 @@ def test_quote_client_never_leaks_finnhub_token_to_yahoo(monkeypatch):
         }
     )
     clients = [quote_client, profile_client]
-    monkeypatch.setattr(screeners.httpx, "Client", lambda **kwargs: clients.pop(0))
+    test_thread = threading.get_ident()
+
+    def _client_factory(**kwargs):
+        # httpx.Client se parchea en el modulo global: un hilo de fondo ajeno a
+        # este test (p. ej. un refresco del screener de otro test) que cree un
+        # Client aqui consumiria los fakes y dejaba la lista vacia (flaky en
+        # CI: IndexError). Solo el hilo del test recibe los fakes.
+        if threading.get_ident() != test_thread:
+            return _FakeClient({})
+        return clients.pop(0)
+
+    monkeypatch.setattr(screeners.httpx, "Client", _client_factory)
 
     items = screeners._refetch_real_items(vendor="yahoo", tenant_id=None)
     assert items, "Yahoo falso debe producir items"
