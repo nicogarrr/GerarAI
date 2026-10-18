@@ -13,10 +13,11 @@ import {
 } from '@/lib/actions/ownership.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { form13fValueToUsd } from '@/lib/form13f-value';
-import { formatCompact, formatDate, formatUserDateTime, formatNumber, NA } from '@/lib/format';
+import { formatMarketCapUsd, formatDate, formatUserDateTime, formatNumber, NA } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 
 import SyncButton from './SyncButton';
+import { ownershipManagerName } from '@/lib/ownership-display';
 
 /** El backend publica las limitaciones del 13F como constante revisada en
  *  inglés; en UI van en español (F33). Texto desconocido: se muestra tal cual,
@@ -50,10 +51,10 @@ export const metadata: Metadata = {
 };
 
 /** El <value> del 13F va en dolares desde 2023 y en miles antes: se normaliza por
- *  la fecha del informe y se muestra la cifra compacta es-ES ("416,16 mil M"). */
+ *  la fecha del informe y se muestra el importe en USD. */
 function formatValueUsd(raw: number | null, reportDate: string | null | undefined): string {
     const dollars = form13fValueToUsd(raw, reportDate);
-    return dollars === null ? NA : formatCompact(dollars, { maximumFractionDigits: 2 });
+    return dollars === null ? NA : formatMarketCapUsd(dollars);
 }
 
 function formatShares(shares: number | null): string {
@@ -121,10 +122,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                     <p className="text-sm font-semibold uppercase text-teal-300">{t('ownership.title')}</p>
                     <h1 className="mt-1 text-3xl font-bold text-gray-100">Propiedad institucional (13F)</h1>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                        Carteras de gestores institucionales revisados, tal como se declaran ante la SEC
-                        (Form 13F, EDGAR; fuente oficial y gratuita). Datos tal y como se presentaron:
-                        CUSIP y nombre del emisor, sin inferir tickers. Las enmiendas (13F-HR/A) son
-                        filings inmutables independientes.
+                        Posiciones declaradas ante la SEC. Los 13F pueden publicarse con hasta 45 días de retraso.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -154,11 +152,11 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                 <section className="flex flex-wrap gap-2">
                     {managers.map((manager) => (
                         <a
-                            className={`rounded-lg border px-3 py-2 text-sm ${manager.cik === activeCik ? 'border-teal-700 bg-teal-950/30 text-teal-200' : 'border-gray-800 bg-surface-1 text-gray-300 hover:border-gray-700'}`}
+                            className={`max-w-full rounded-lg border px-3 py-2 text-sm ${manager.cik === activeCik ? 'border-teal-700 bg-teal-950/30 text-teal-200' : 'border-gray-800 bg-surface-1 text-gray-300 hover:border-gray-700'}`}
                             href={`/ownership?cik=${manager.cik}`}
                             key={manager.cik}
                         >
-                            {manager.name}
+                            {ownershipManagerName(manager.cik, manager.name)}
                             <span className="ml-2 text-xs text-gray-500">CIK {manager.cik}</span>
                         </a>
                     ))}
@@ -170,7 +168,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">
                             <h2 className="font-semibold text-gray-100">
-                                {holdings.manager} - informe {reportLabel(holdings.report_date)}
+                                {ownershipManagerName(activeCik, holdings.manager ?? activeCik)} - informe {reportLabel(holdings.report_date)}
                             </h2>
                             <Badge className="md:ml-auto" variant="outline">
                                 cobertura {holdings.coverage}
@@ -231,10 +229,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                 ) : (
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5 text-sm text-gray-400">
                         <h2 className="font-semibold text-gray-100">Sin datos 13F todavía</h2>
-                        <p className="mt-2">
-                            Este gestor aún no se ha sincronizado. Pulsa &quot;Sincronizar 13F&quot; para
-                            descargar su último informe desde SEC EDGAR (gratuito, fuente oficial).
-                        </p>
+                        <p className="mt-2">Pulsa &quot;Sincronizar 13F&quot; para consultar su último informe en SEC.</p>
                     </section>
                 )
             ) : null}
@@ -287,7 +282,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                     </section>
                 ) : (
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5 text-sm text-gray-400">
-                        <h2 className="font-semibold text-gray-100">Cambios QoQ no disponibles todavía</h2>
+                        <h2 className="font-semibold text-gray-100">Cambios trimestrales no disponibles todavía</h2>
                         <p className="mt-2">
                             {changes.status === 'insufficient_history'
                                 ? 'Hacen falta dos informes 13F almacenados para comparar; estará disponible tras el próximo trimestre.'
