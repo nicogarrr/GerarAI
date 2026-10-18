@@ -303,7 +303,7 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
 
                 <TabsContent value="dividendos" className="mt-0">
                     {dividends ? (
-                        <PortfolioDividends projection={dividends} />
+                        <PortfolioDividends projection={dividends} userId={userId} />
                     ) : (
                         <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
                             No se pudo cargar la proyección de dividendos. Reintenta en unos segundos.

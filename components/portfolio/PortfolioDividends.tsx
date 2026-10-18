@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { PortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
 import { formatMoney, formatDate, formatPrice } from '@/lib/format';
+import SyncDividendsButton from '@/components/portfolio/SyncDividendsButton';
 import { Panel } from '@/components/ui/panel';
 import {
     declaredFutureNoteView,
@@ -117,7 +118,7 @@ function DeclaredFuturePanel({ items }: { items: PortfolioDividendProjection['de
  * marca como null se pinta N/D (nunca 0,00); la etiqueta INFERIDO, las notas
  * de veracidad y las condiciones del escenario fiscal viajan con los datos.
  */
-export default function PortfolioDividends({ projection }: { projection: PortfolioDividendProjection }) {
+export default function PortfolioDividends({ projection, userId }: { projection: PortfolioDividendProjection; userId?: string }) {
     const baseCurrency = projection.base_currency;
     const activeMonths = projection.months.filter(
         (month) => month.covered_tickers.length > 0 || month.excluded_tickers.length > 0,
@@ -131,6 +132,7 @@ export default function PortfolioDividends({ projection }: { projection: Portfol
 
     return (
         <div className="space-y-6">
+            {userId ? <div className="flex justify-end"><SyncDividendsButton userId={userId} /></div> : null}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                 <span className="rounded border border-amber-900/70 bg-amber-950/30 px-1.5 py-0.5 font-medium text-amber-300">
                     {projection.label}
