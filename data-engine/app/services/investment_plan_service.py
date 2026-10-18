@@ -296,7 +296,7 @@ class InvestmentPlanService:
                         "label": label,
                         "direction": "buy",
                         "amount_base": float(amount.quantize(Decimal("0.01"))),
-                        "detail": f"{label} esta {float(target_pct - current):+.1f} puntos por debajo del objetivo",
+                        "detail": f"{label} está {float(target_pct - current):+.1f} puntos por debajo del objetivo",
                     }
                 )
             elif current > upper:
@@ -307,7 +307,7 @@ class InvestmentPlanService:
                         "label": label,
                         "direction": "sell",
                         "amount_base": float(amount.quantize(Decimal("0.01"))),
-                        "detail": f"{label} esta {float(current - target_pct):+.1f} puntos por encima del objetivo",
+                        "detail": f"{label} está {float(current - target_pct):+.1f} puntos por encima del objetivo",
                     }
                 )
 

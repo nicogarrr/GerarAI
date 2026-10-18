@@ -413,7 +413,7 @@ export function RecordDetail({
                             <div key={key} className="flex flex-col gap-1 bg-surface-0/60 p-3">
                                 <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{columnLabels?.[key] ?? key}</span>
                                 <span className="break-words text-sm text-gray-200">
-                                    <span className="line-clamp-4">{formatColumns?.[key] ? formatColumns[key](value, data!) : formatRecordValue(value)}</span>
+                                    <span className={formatColumns?.[key] ? "whitespace-pre-line" : "line-clamp-4"}>{formatColumns?.[key] ? formatColumns[key](value, data!) : formatRecordValue(value)}</span>
                                 </span>
                             </div>
                         ))}
