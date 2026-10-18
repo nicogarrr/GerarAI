@@ -168,9 +168,10 @@ def test_latest_holdings_serves_latest_report(db):
     result = service.latest_holdings(db, cik=CIK)
     assert result["status"] == "ok"
     assert result["report_date"] == "2026-06-30"
-    assert len(result["holdings"]) == 4
+    # La enmienda (filing mas reciente) sustituye al base: 2 posiciones, no 4.
+    assert len(result["holdings"]) == 2
     assert result["holdings"][0]["value_usd_thousands"] == 75000000.0
-    assert any(h["is_amendment"] for h in result["holdings"])
+    assert all(h["is_amendment"] for h in result["holdings"])
     assert result["limitations"]
 
 
@@ -251,6 +252,22 @@ def _sec_client_two() -> httpx.Client:
         return httpx.Response(404, text="not found")
 
     return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_latest_holdings_serves_only_the_winning_amendment(db):
+    """Regresion lista 11.2: con 13F-HR + 13F-HR/A del mismo periodo,
+    latest_holdings duplicaba cada posicion (base + enmienda)."""
+    service = ManagerHoldingIngestionService(client=_sec_client_two())
+    service.sync_manager(db, cik=CIK)
+    result = service.latest_holdings(db, cik=CIK)
+    assert result["status"] == "ok"
+    keys = [(h["cusip"], h["title_of_class"], h["put_call"]) for h in result["holdings"]]
+    assert len(keys) == len(set(keys)), "ninguna posicion puede aparecer dos veces"
+    aapl = next(h for h in result["holdings"] if h["cusip"] == "037833100")
+    assert aapl["value_usd_thousands"] == 75000001.0, (
+        "se sirve el valor de la enmienda (RESTATEMENT), no el del filing base"
+    )
+    assert all(h["accession_number"] == "0000950123-26-000002" for h in result["holdings"])
 
 
 def test_changes_compute_quarter_over_quarter(db):

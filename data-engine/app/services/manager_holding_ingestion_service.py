@@ -102,6 +102,23 @@ def _verify_totals(summary: dict | None, raw_rows: list[dict], merged: list[dict
     }
 
 
+def _latest_accession(rows: list) -> str:
+    """Accession vigente de un periodo: gana la enmienda con filing_date mas
+    reciente (desempate por accession). Las filas de TODOS los filings quedan
+    guardadas inmutables; esta regla solo decide cual se sirve."""
+    return max(
+        {row.accession_number for row in rows},
+        key=lambda acc: (
+            max(
+                (r.filing_date or date.min)
+                for r in rows
+                if r.accession_number == acc
+            ),
+            acc,
+        ),
+    )
+
+
 class ManagerHoldingIngestionService:
     def __init__(self, client: httpx.Client | None = None) -> None:
         self.client = client
@@ -322,17 +339,7 @@ class ManagerHoldingIngestionService:
                 )
             ).all()
             # Latest accession wins (amendments supersede base filings).
-            accession = max(
-                {row.accession_number for row in rows},
-                key=lambda acc: (
-                    max(
-                        (r.filing_date or date.min)
-                        for r in rows
-                        if r.accession_number == acc
-                    ),
-                    acc,
-                ),
-            )
+            accession = _latest_accession(rows)
             view = {
                 (row.cusip, row.title_of_class, row.put_call): row
                 for row in rows
@@ -412,14 +419,22 @@ class ManagerHoldingIngestionService:
                 "holdings": [],
                 "provenance": provenance(SOURCE, SourceKind.OFFICIAL, coverage=Coverage.UNAVAILABLE),
             }
-        rows = db.scalars(
-            select(ManagerHolding)
-            .where(
-                ManagerHolding.manager_id == manager.id,
-                ManagerHolding.report_date == manager.last_report_date,
-            )
-            .order_by(ManagerHolding.value_usd_thousands.desc().nulls_last())
-        ).all()
+        rows = list(
+            db.scalars(
+                select(ManagerHolding)
+                .where(
+                    ManagerHolding.manager_id == manager.id,
+                    ManagerHolding.report_date == manager.last_report_date,
+                )
+                .order_by(ManagerHolding.value_usd_thousands.desc().nulls_last())
+            ).all()
+        )
+        # Una enmienda 13F-HR/A no suma posiciones: sustituye al filing base.
+        # Servir todas las filas del periodo duplicaba cada posicion (y su valor)
+        # siempre que existiera enmienda; solo se sirve el accession vigente.
+        if rows:
+            accession = _latest_accession(rows)
+            rows = [row for row in rows if row.accession_number == accession]
         return {
             "cik": cik,
             "manager": manager.name,
