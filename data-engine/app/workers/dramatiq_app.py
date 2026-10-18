@@ -2316,7 +2316,9 @@ def run_daily_research() -> dict[str, Any]:
         ("news_refresh", refresh_news),
         ("memory_consolidation", consolidate_memory),
         ("contradiction_scan", scan_contradictions),
-        ("thesis_review", review_theses),
+        # review_theses NO va aqui: tiene su propio cron (thesis_review, 07:00,
+        # tras las noticias de run_daily_research) y estar en las dos listas lo
+        # ejecutaba dos veces al dia por tenant.
     ]
     queued: list[dict] = []
     errors: list[dict] = []
