@@ -169,10 +169,15 @@ def _prune_sources(
 
     Se conserva una fuente si alguna seccion la cita (lista de citas o
     referencia inline ``[tipo:id]`` en el cuerpo), si es el precio mostrado
-    en la prosa, si es una noticia cuyo titular aparece en la respuesta o si
-    es la evidencia de una afirmacion que si se conserva (la cadena de
-    veracidad afirmacion -> evidencia no se puede cortar: sin la evidencia
-    la afirmacion mostrada parece respaldarse en nada).
+    en la prosa o si es una noticia cuyo titular aparece en la respuesta.
+    Las afirmaciones (claim) se conservan siempre: son el estado vivo y
+    auditado de la tesis (acotado a 8 por la recuperacion), cada una lleva
+    su estado visible y de ellas se computa la respuesta (avisos de
+    pendientes/contradichas y acciones propuestas). Y con cada afirmacion
+    viaja su evidencia: la cadena de veracidad afirmacion -> evidencia no
+    se puede cortar, sin ella la afirmacion parece respaldarse en nada.
+    La evidencia huerfana (de una afirmacion que ya no esta en la lista)
+    si se poda.
     El resto (recuperadas "por si acaso") no se adjunta: ensenarlas sugiere
     un respaldo que la respuesta no tiene. Ademas se deduplican por tipo y
     titulo normalizado (cuatro chunks del mismo documento son una fuente).
@@ -191,6 +196,13 @@ def _prune_sources(
         kind = str(source.get("type"))
         key = f"{kind}:{source.get('id')}"
         keep = key in cited
+        if not keep and kind == "claim":
+            # Las afirmaciones vivas son el libro mayor auditado de la
+            # tesis: la respuesta se computa sobre ellas (avisos de
+            # pendientes/contradichas, acciones propuestas) y cada una
+            # declara su propio estado, asi que mostrarlas nunca sugiere
+            # un respaldo que no existe.
+            keep = True
         if not keep and kind == "claim_evidence":
             # Las evidencias siguen a su afirmacion en `sources`; si la
             # afirmacion se conserva, su evidencia tambien (va citada por

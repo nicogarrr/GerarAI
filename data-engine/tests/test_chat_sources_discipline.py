@@ -125,6 +125,8 @@ def test_prune_sources_solo_lo_citado_y_deduplicado():
         {"type": "financial_fact", "id": 1, "title": "Ingresos (ejercicio 2025)"},
         {"type": "document_chunk", "id": 10, "title": "SEC XBRL facts - HIMS"},
         {"type": "document_chunk", "id": 11, "title": "SEC XBRL facts - HIMS"},
+        {"type": "claim", "id": 15, "title": "Afirmacion viva no citada"},
+        {"type": "claim_evidence", "id": 21, "title": "Evidencia de la afirmacion viva", "claim_id": 15},
         {"type": "claim_evidence", "id": 20, "title": "Generado desde la fuente SEC"},
         {"type": "market_price", "id": 30, "title": "HIMS 40 USD"},
         {"type": "news_event", "id": 40, "title": "HIMS anuncia resultados"},
@@ -139,7 +141,9 @@ def test_prune_sources_solo_lo_citado_y_deduplicado():
     titles = [s["title"] for s in kept]
     assert "Ingresos (ejercicio 2025)" in titles
     assert titles.count("SEC XBRL facts - HIMS") == 1
-    assert "Generado desde la fuente SEC" not in titles  # evidencia no citada
+    assert "Afirmacion viva no citada" in titles  # las claims vivas siempre viajan
+    assert "Evidencia de la afirmacion viva" in titles  # la evidencia acompaña a su claim
+    assert "Generado desde la fuente SEC" not in titles  # evidencia huerfana (sin claim), podada
     assert "HIMS 40 USD" in titles  # precio visible
     assert "HIMS anuncia resultados" in titles
     assert "Otra noticia no usada" not in titles
