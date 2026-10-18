@@ -6,6 +6,7 @@ import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import type { NewsLane } from '@/lib/news-paging';
 import { formatPercent, NA } from '@/lib/format';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
+import { NewsSecondOrder } from '@/components/research/NewsSecondOrder';
 import { etiquetaDireccionImpacto, etiquetaTemaMacro, etiquetaTierFuente, etiquetaTipoEvento } from "@/lib/labels";
 
 const CARRILES = [
@@ -139,6 +140,7 @@ export function NewsEventsFlow({
                   <span className={`ml-auto font-semibold ${materialityColor}`}>{event.materiality_score}</span>
                 </div>
                 <div className="mt-2 text-sm text-gray-200"><NewsHeadline event={event} /></div>
+                <NewsSecondOrder eventId={event.id} />
                 <div className="mt-2 flex items-center justify-between gap-2 text-xs text-gray-500">
                   <span className="min-w-0 break-words">{event.source || NA}</span>
                   {event.requires_update ? (
@@ -227,6 +229,7 @@ export function NewsEventsFlow({
                           {event.news_lane === 'macro' && event.macro_theme ? <div><dt className="inline font-medium">Tema: </dt><dd className="inline">{etiquetaTemaMacro(event.macro_theme)}</dd></div> : null}
                         </dl>
                       </details>
+                      <NewsSecondOrder eventId={event.id} />
                     </td>
                   </tr>
                 );
