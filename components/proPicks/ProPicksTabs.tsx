@@ -110,7 +110,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 className="flex h-auto w-full min-w-0 max-w-full justify-start snap-x gap-1 overflow-x-auto border border-gray-700 bg-gray-800 pb-2 text-gray-400 sm:inline-flex sm:h-9 sm:w-auto sm:max-w-none sm:overflow-visible sm:pb-[3px]"
             >
                 <TabsTrigger value="picks" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">
-                    Picks IA
+                    Selección IA
                 </TabsTrigger>
                 <TabsTrigger value="estrategia" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">
                     Estrategia y rebalanceo
@@ -166,7 +166,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                     <p className="max-w-xl text-sm leading-6 text-gray-400">
                         Baseline walk-forward point-in-time (momentum 12-1M,
                         universo líquido de 30 valores, costes 15 pb por pata,
-                        SPY como benchmark). No valida los Picks IA:
+                        SPY como benchmark). No valida la selección IA:
                         valida que el motor no mira el futuro. El backtest por
                         estrategia con fundamentales point-in-time llegará
                         cuando haya TTM persistido.

@@ -51,7 +51,7 @@ describe('ProPicks sin estados intermedios (ficha, backtest, rebalanceo)', () =>
     assert.match(factsheet, /import \{ getStrategyById \} from '@\/lib\/utils\/proPicksStrategies';/);
     assert.match(factsheet, /CATEGORY_KEYS\.map\(\(key\)/);
     assert.match(factsheet, /strategy\.categoryWeights\[key\]/);
-    assert.match(factsheet, /Score mínimo de entrada:/);
+    assert.match(factsheet, /Puntuación mínima de entrada:/);
   });
 
   it('la ficha explica la estrategia no disponible sin prometer nada', () => {
@@ -90,3 +90,9 @@ describe('ProPicks sin estados intermedios (ficha, backtest, rebalanceo)', () =>
     assert.match(rebalance, /previousSnapshotError\(parsed, strategyId, month\)/);
   });
 });
+ it('la referencia de la ficha coincide con la pestaña Selección IA', () => {
+    const tabs = readFileSync('components/proPicks/ProPicksTabs.tsx', 'utf8');
+    assert.match(tabs, />\s*Selección IA\s*</);
+    assert.match(tabs, /No valida la selección IA:/);
+    assert.match(factsheet, /pestaña «Selección IA»/);
+ });

@@ -164,10 +164,10 @@ export default function StrategyFactsheet({
                             ))}
                         </div>
                         <p className="mt-2 text-xs leading-5 text-gray-500">
-                            Score mínimo de entrada: {formatNumber(strategy.filters.minScore ?? 0, { maximumFractionDigits: 0 })}/100.
+                            Puntuación mínima de entrada: {formatNumber(strategy.filters.minScore ?? 0, { maximumFractionDigits: 0 })}/100.
                             Los pesos son la regla real de la estrategia (así calcula el embudo su{' '}
-                            <span className="font-mono">strategyScore</span>). Una categoría sin datos en el run
-                            entra neutra (50) y no aporta nada al ranking: en las tarjetas del tab «Picks IA»
+                            <span>puntuación de estrategia</span>). Una categoría sin datos en la ejecución
+                            entra neutra (50) y no aporta nada a la clasificación: en las tarjetas de la pestaña «Selección IA»
                             aparece como <span className="font-mono">n/d</span>.
                         </p>
                     </div>

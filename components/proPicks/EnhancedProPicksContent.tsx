@@ -98,7 +98,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
         return formatUserDateTime(isoString);
     };
 
-    // Estado MEDIDO de las categorías en el run visible: se deriva de estos
+    // Estado MEDIDO de las categorías en la ejecución visible: se deriva de estos
     // picks (categoryDisplay honra el flag de ausencia de cada categoría).
     const neutralNote = useMemo(
         () => categoryNeutralNote(CATEGORY_KEYS.filter((key) => allNeutralCategory(picks, key)), picks.length),
@@ -282,7 +282,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                             <div className="text-2xl font-bold">
                                                 {pick.score}
                                             </div>
-                                            <div className="text-xs">Score</div>
+                                            <div className="text-xs">Puntuación</div>
                                         </div>
                                     </div>
 

@@ -4,12 +4,12 @@ import { PaperCalibrationView } from './PaperCalibrationView';
 import { getPaperTrading, type PaperState } from '@/lib/actions/paper-trading.actions';
 
 const number = (value: string | number | null) => value === null ? 'Sin datos' : Number(value).toLocaleString('es-ES', { maximumFractionDigits: 2 });
-const horizon = (value: string) => value === 'five_years' ? 'Tesis 5 años' : 'Trade 30 días';
+const horizon = (value: string) => value === 'five_years' ? 'Tesis 5 años' : 'Operación a 30 días';
 
 export function PaperTradingContent({ data }: { data: PaperState }) {
     if (data.error) return <p role="alert" className="text-red-300">{data.error}</p>;
     return <section className="min-w-0 space-y-4" aria-label="Cartera simulada LLM">
-        <h2 className="text-xl font-semibold text-gray-100">Paper trading · LLM</h2>
+        <h2 className="text-xl font-semibold text-gray-100">Cartera simulada · IA</h2>
         <div className="grid gap-3 sm:grid-cols-2">
             {data.score.groups.map(group => <article key={`${group.horizon}-${group.currency}`} className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
                 <h3 className="font-medium text-teal-300">{horizon(group.horizon)} · {group.currency === 'sin_datos' ? 'Sin divisa' : group.currency}</h3>
@@ -17,16 +17,16 @@ export function PaperTradingContent({ data }: { data: PaperState }) {
                     <dt>Aciertos / cerradas</dt><dd>{group.wins} / {group.closed}</dd>
                     <dt>Tasa de acierto</dt><dd>{group.hit_rate === null ? 'Sin datos' : `${number(group.hit_rate * 100)} %`}</dd>
                     <dt>Errores / neutras</dt><dd>{group.losses} / {group.flat}</dd>
-                    <dt>P&amp;L bruto cerrado</dt><dd>{number(group.realized_pnl)}</dd>
-                    <dt>P&amp;L bruto abierto</dt><dd>{number(group.unrealized_pnl)}</dd>
+                    <dt>Resultado bruto cerrado</dt><dd>{number(group.realized_pnl)}</dd>
+                    <dt>Resultado bruto abierto</dt><dd>{number(group.unrealized_pnl)}</dd>
                     <dt>Abiertas sin precio</dt><dd>{group.missing_marks}</dd>
                 </dl>
             </article>)}
         </div>
         <PaperCalibrationView data={data.score.calibracion} />
-        {data.trades.length === 0 && <p className="text-gray-400">Sin propuestas LLM registradas. No se ha generado una operación simulada para mostrar.</p>}
+        {data.trades.length === 0 && <p className="text-gray-400">Sin propuestas del modelo registradas. No se ha generado una operación simulada para mostrar.</p>}
         {data.trades.map(trade => <PaperProposalCard key={trade.id} trade={trade} />)}
-        <details className="text-xs text-gray-400"><summary>Base de medición</summary><p className="mt-2">Acierto = P&amp;L bruto positivo al cerrar. Divisas separadas. Sin comisiones, dividendos, financiación ni ajustes por splits. Una salida anticipada no valida una tesis a 5 años. Cantidad simulada: supuesto.</p></details>
+        <details className="text-xs text-gray-400"><summary>Base de medición</summary><p className="mt-2">Acierto = resultado bruto positivo al cerrar. Divisas separadas. Sin comisiones, dividendos, financiación ni ajustes por splits. Una salida anticipada no valida una tesis a 5 años. Cantidad simulada: supuesto.</p></details>
     </section>;
 }
 
