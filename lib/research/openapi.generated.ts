@@ -1134,6 +1134,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/peers/comparison/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Peer Comparison */
+        post: operations["refresh_peer_comparison_api_companies__ticker__peers_comparison_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/red-team": {
         parameters: {
             query?: never;
@@ -10184,7 +10201,51 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
-                refresh?: boolean;
+                metrics?: string | null;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_peer_comparison_api_companies__ticker__peers_comparison_refresh_post: {
+        parameters: {
+            query?: {
+                limit?: number;
                 metrics?: string | null;
             };
             header?: {
