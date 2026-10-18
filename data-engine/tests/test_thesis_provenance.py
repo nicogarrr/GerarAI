@@ -98,7 +98,7 @@ def test_provenance_markdown_table():
     service = ThesisService()
     text = service._provenance_markdown(build_inputs_provenance(_model()))
     assert "| input | etiqueta | valor | método | cita |" in text
-    assert "| WACC | derivado | 0,1 | CAPM con beta sectorial | 2 hechos citados |" in text
+    assert "| WACC | derivado | 0,1 | CAPM con beta sectorial | 2 hechos citados (11, 12) |" in text
     assert "| Crecimiento terminal | supuesto |" in text
     assert "| Satélites en órbita | dato | 5 |" in text
     assert "estimacion_llm" in text  # glosario de etiquetas en el header

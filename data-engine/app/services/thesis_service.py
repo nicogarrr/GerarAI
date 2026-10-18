@@ -1297,7 +1297,8 @@ class ThesisService:
             value = item.get("value")
             value_txt = "s/d" if value is None else number_es(f"{float(value):.4g}")
             facts = item.get("source_fact_ids") or []
-            citation = (f"{len(facts)} hecho citado" if len(facts) == 1 else f"{len(facts)} hechos citados") if facts else "-"
+            ids = ", ".join(str(f) for f in facts)
+            citation = (f"{len(facts)} hecho citado ({ids})" if len(facts) == 1 else f"{len(facts)} hechos citados ({ids})") if facts else "-"
             method = (item.get("method") or "-").replace("|", "/")
             lines.append(
                 f"| {term_es(item.get('key'))} | {item.get('label')} | {value_txt} | {method} | {citation} |"
