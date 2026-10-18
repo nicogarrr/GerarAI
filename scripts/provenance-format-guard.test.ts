@@ -60,3 +60,8 @@ describe("ThesisMemo", () => {
         assert.match(src, /formatProvenanceValue\(item\.value, item\.unit\)/)
     })
 })
+
+describe('unidades en inglés', () => { it('count y USD_per_unit nunca se pintan crudas', () => {
+  assert.equal(formatProvenanceValue(9, 'count'), '9');
+  assert.match(formatProvenanceValue(12.5, 'USD_per_unit'), /USD por unidad$/);
+}); })

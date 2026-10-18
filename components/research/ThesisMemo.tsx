@@ -305,7 +305,7 @@ export default function ThesisMemo({
           </h3>
           {thesis.narrative_sections.map((section, index) => (
             <div key={`${section.titulo}-${index}`} className="space-y-2">
-              <h4 className="text-sm font-semibold text-gray-200">{section.titulo}</h4>
+              <h4 className="text-sm font-semibold text-gray-200">{section.titulo === 'Lo que cambio' ? 'Lo que cambió' : section.titulo}</h4>
               {section.parrafos.map((parrafo, pIndex) => (
                 <p key={pIndex} className="text-sm leading-6 text-gray-300">
                   {parrafo}

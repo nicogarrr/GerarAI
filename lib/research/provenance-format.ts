@@ -79,7 +79,9 @@ export function formatProvenanceValue(
         }).format(ratio);
     }
     if (isCurrencyCode(rawUnit)) return formatMoneyShort(parsed, rawUnit);
-    if (['pure', 'unitless', 'dimensionless'].includes(lower)) return plainNumber(parsed);
+    if (['pure', 'unitless', 'dimensionless', 'count', 'number', 'units', 'unit'].includes(lower)) return plainNumber(parsed);
+    const perUnit = /^([A-Za-z]{3})_per_unit$/.exec(rawUnit);
+    if (perUnit) return `${plainNumber(parsed)} ${perUnit[1].toUpperCase()} por unidad`;
     if (rawUnit) return `${plainNumber(parsed)} ${UNIT_NAMES[lower] ?? rawUnit}`;
     return plainNumber(parsed);
 }
