@@ -16,7 +16,20 @@ class RiskService:
         missing_fx: list[dict] = []
         rows = db.execute(select(Position, Company).join(Company, Position.company_id == Company.id)).all()
         positions = []
+        fx_used: dict[tuple, dict] = {}
         for position, company in rows:
+            if (
+                position.currency
+                and position.currency != base_currency
+                and position.fx_rate is not None
+                and position.as_of is not None
+            ):
+                fx_used[("positions", position.currency, float(position.fx_rate), position.as_of)] = {
+                    "scope": "positions",
+                    "currency": position.currency,
+                    "rate": float(position.fx_rate),
+                    "as_of": position.as_of.isoformat(),
+                }
             value_base = position.market_value_base
             if value_base is None and position.currency == base_currency:
                 value_base = position.market_value_native or position.market_value
@@ -70,6 +83,13 @@ class RiskService:
                     }
                 )
                 continue
+            if row.currency != base_currency:
+                fx_used[("cash", row.currency, float(rate), row.as_of)] = {
+                    "scope": "cash",
+                    "currency": row.currency,
+                    "rate": float(rate),
+                    "as_of": row.as_of.isoformat(),
+                }
             converted = float(row.balance * rate)
             cash_base += converted
             cash_assets_base += max(converted, 0.0)
@@ -95,6 +115,14 @@ class RiskService:
         }
         position_dates = [p["as_of"] for p in positions if p.get("as_of")]
         result["data_as_of"] = min(position_dates) if position_dates else None
+        # Tipo y fecha de cada conversion a divisa base, y si caja y posiciones
+        # se valoran en dias distintos (el total mezcla ambas fechas).
+        cash_dates = sorted({row.as_of.isoformat() for row in cash_rows})
+        result["cash_as_of"] = cash_dates[0] if cash_dates else None
+        result["fx_rates"] = sorted(
+            fx_used.values(), key=lambda item: (item["scope"], item["currency"], item["as_of"])
+        )
+        result["valuation_dates_differ"] = len(set(position_dates) | set(cash_dates)) > 1
         result["provenance"] = provenance(
             "Base de datos de GerarAI",
             SourceKind.INTERNAL,

@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.entities import Base, CashBalance, Company, Position
+from app.models.entities import Base, CashBalance, Company, Portfolio, Position
 from app.services.risk_service import RiskService
 
 
@@ -136,3 +136,30 @@ def test_margin_breakdown_does_not_guess_unconvertible_debt(db):
     assert result["cash_assets_base"] == result["margin_debt_base"] == 0
     assert result["status"] == "incomplete_fx"
     assert result["missing_fx"][0]["kind"] == "cash"
+
+
+def test_dashboard_reports_fx_rate_and_date_used_per_scope(db):
+    from app.models.entities import FXRate
+
+    db.add(Portfolio(name="Main", base_currency="EUR", is_default=True))
+    company = _company(db, "AAPL")
+    db.add(
+        Position(
+            company_id=company.id, quantity=Decimal("5"), market_price=Decimal("200"),
+            currency="USD", market_value=Decimal("1000"), market_value_native=Decimal("1000"),
+            market_value_base=Decimal("888.7"), fx_rate=Decimal("0.8887"),
+            as_of=date(2026, 10, 16),
+        )
+    )
+    db.add(CashBalance(currency="USD", balance=Decimal("3200"), as_of=date(2026, 9, 25)))
+    db.add(FXRate(base_currency="EUR", quote_currency="USD", rate=Decimal("0.8769"),
+                  rate_date=date(2026, 9, 25), source="test"))
+    db.commit()
+
+    result = RiskService().dashboard(db)
+    assert result["fx_rates"] == [
+        {"scope": "cash", "currency": "USD", "rate": 0.8769, "as_of": "2026-09-25"},
+        {"scope": "positions", "currency": "USD", "rate": 0.8887, "as_of": "2026-10-16"},
+    ]
+    assert result["cash_as_of"] == "2026-09-25"
+    assert result["valuation_dates_differ"] is True
