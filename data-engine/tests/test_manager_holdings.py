@@ -589,3 +589,23 @@ def test_sync_of_a_dollar_filing_stores_raw_values_and_flags_the_scale(db):
     result = ManagerHoldingIngestionService(_multi_client(_primary_doc(str(total), 5))).sync_manager(db, cik=CIK)
     assert result["verification"][0]["value_scale"]["scale"] == form13f.SCALE_DOLLARS
     assert {r.value_scale for r in db.scalars(select(ManagerHolding)).all()} == {form13f.SCALE_DOLLARS}
+
+
+def test_detect_scale_jump_flags_100x_between_quarters() -> None:
+    from decimal import Decimal
+
+    from app.services.manager_holding_ingestion_service import detect_scale_jump
+
+    jump = detect_scale_jump({"2026-03-31": Decimal("5115380"), "2026-06-30": Decimal("5415853000")})
+    assert jump is not None
+    assert jump["periods"] == ["2026-03-31", "2026-06-30"]
+
+
+def test_detect_scale_jump_ignores_normal_moves_and_missing_data() -> None:
+    from decimal import Decimal
+
+    from app.services.manager_holding_ingestion_service import detect_scale_jump
+
+    assert detect_scale_jump({"2026-03-31": Decimal("5000"), "2026-06-30": Decimal("9000")}) is None
+    assert detect_scale_jump({"2026-03-31": Decimal("0"), "2026-06-30": Decimal("9000")}) is None
+    assert detect_scale_jump({"2026-06-30": Decimal("9000")}) is None
