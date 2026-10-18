@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Input } from '@/components/ui/input';
 import { X, Send, User, Bot, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
+import { brainStorageKey, restoreConversation, serializeConversation, BRAIN_SUGGESTED_QUESTIONS } from '@/lib/brain/conversation';
 import { chatWithPortfolio } from '@/lib/actions/brain.actions';
 import { brainPageContext } from '@/lib/brain/page-context';
 import ReactMarkdown from 'react-markdown';
@@ -48,8 +49,42 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
+    const [copied, setCopied] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    // La conversación se conserva al navegar: se restaura al montar (solo
+    // cliente, así el SSR siempre pinta el saludo y no hay desajuste de
+    // hidratación) y se guarda recortada tras cada cambio.
+    const restoredRef = useRef(false);
+
+    useEffect(() => {
+        try {
+            const stored = restoreConversation(window.sessionStorage.getItem(brainStorageKey(userId)));
+            if (stored) setMessages(stored as Message[]);
+        } catch {
+            // sessionStorage no disponible: el panel funciona sin persistencia.
+        } finally {
+            restoredRef.current = true;
+        }
+    }, [userId]);
+
+    useEffect(() => {
+        if (!restoredRef.current) return;
+        try {
+            window.sessionStorage.setItem(brainStorageKey(userId), serializeConversation(messages));
+        } catch {
+            // Cuota llena o almacenamiento bloqueado: no pasa nada, se sigue sin persistir.
+        }
+    }, [messages, userId]);
+
+    async function copyMessage(index: number, content: string) {
+        try {
+            await navigator.clipboard.writeText(content);
+            setCopied(index);
+        } catch {
+            setCopied(null);
+        }
+    }
 
     // La pastilla "Viendo X": el eco del servidor manda sobre la etiqueta local.
     const viewing = echo?.label ?? page?.label ?? null;
@@ -275,10 +310,33 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                                     ) : (
                                         m.content
                                     )}
+                                    {m.role === 'assistant' && i > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => void copyMessage(i, m.content)}
+                                            className="mt-2 block text-xs text-indigo-300 hover:text-indigo-200"
+                                        >
+                                            {copied === i ? 'Copiado' : 'Copiar'}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
                     ))}
+                    {messages.length === 1 && !loading && (
+                        <div className="flex flex-wrap gap-2" aria-label="Preguntas sugeridas">
+                            {BRAIN_SUGGESTED_QUESTIONS.map((text) => (
+                                <button
+                                    key={text}
+                                    type="button"
+                                    onClick={() => { setInput(text); inputRef.current?.focus(); }}
+                                    className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:border-indigo-400 hover:text-indigo-200"
+                                >
+                                    {text}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     {loading && (
                         <div className="flex justify-start">
                             <div className="flex items-start gap-2 max-w-[80%]">
