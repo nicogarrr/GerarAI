@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import EnhancedProPicksContent from './EnhancedProPicksContent';
+import GemsView from './GemsView';
 import PaperTradingView from './PaperTradingView';
 import MonthlyRebalanceView from './MonthlyRebalanceView';
 import StrategyFactsheet from './StrategyFactsheet';
@@ -112,6 +113,9 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 <TabsTrigger value="picks" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">
                     Selección IA
                 </TabsTrigger>
+                <TabsTrigger value="joyas" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">
+                    Joyas
+                </TabsTrigger>
                 <TabsTrigger value="estrategia" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">
                     Estrategia y rebalanceo
                 </TabsTrigger>
@@ -125,6 +129,10 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
 
             <TabsContent value="picks" className="mt-6">
                 <EnhancedProPicksContent initialPicks={initialPicks} generatedAt={generatedAt} initialPassedCount={passedCount} />
+            </TabsContent>
+
+            <TabsContent value="joyas" className="mt-6">
+                {activeTab === 'joyas' && <GemsView />}
             </TabsContent>
 
             {/* Selector + ficha + rebalanceo son la MISMA estrategia con dos
