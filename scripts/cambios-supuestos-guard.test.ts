@@ -28,6 +28,9 @@ describe('cambios y revisiones: qué supuesto toca y qué revisión queda', () =
     });
     it('la ficha monta la tarjeta y el panel de revisiones abiertas sigue', () => {
         assert.match(page, /<ChangeImpactCard/);
+        // QA 5: la vista declara fecha en cambios y alertas, como las demas vistas.
+        assert.match(card, /formatUserDateTime\(change\.created_at\)/);
+        assert.match(page, /formatUserDateTime\(alert\.created_at\)/);
         assert.match(page, /<Panel title="Revisiones abiertas">/);
     });
 });
