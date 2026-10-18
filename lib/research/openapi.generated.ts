@@ -5655,6 +5655,14 @@ export interface components {
             change?: number | null;
             /** Change Percent */
             change_percent?: number | null;
+            /** Close Change */
+            close_change?: number | null;
+            /** Close Change Date */
+            close_change_date?: string | null;
+            /** Close Change Percent */
+            close_change_percent?: number | null;
+            /** Close Change Previous Date */
+            close_change_previous_date?: string | null;
             /** Currency */
             currency?: string | null;
             /** Fetched At */

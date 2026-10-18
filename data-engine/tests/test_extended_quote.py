@@ -130,16 +130,22 @@ def test_yahoo_query_contract(monkeypatch):
     assert dict(seen[0].url.params) == {'includePrePost': 'true', 'interval': '1m', 'range': '1d'}
 
 
-def test_endpoint_read_only_no_db(monkeypatch):
+def test_endpoint_live_session_never_touches_db(monkeypatch):
     from app.api.routes.companies import router
     app = FastAPI()
     app.include_router(router, prefix='/companies')
     fake = AsyncMock(return_value=parse_extended_chart('MSFT', chart(), START + 60))
     monkeypatch.setattr('app.api.routes.companies.extended_quote_service.get', fake)
+    from app.core.database import get_db
+
+    class ForbiddenDb:
+        def __getattr__(self, name):
+            raise AssertionError('DB must not be used while the market is open')
+
+    app.dependency_overrides[get_db] = lambda: ForbiddenDb()
     response = TestClient(app).get('/companies/MSFT/extended-quote')
     assert response.status_code == 200 and response.json()['session'] == 'regular'
-    route = next(r for r in router.routes if r.path == '/{ticker}/extended-quote')
-    assert not route.dependant.dependencies
+    assert response.json()['close_change_percent'] is None
 
 
 def test_incomplete_open_and_unknown_timezone_never_invented():

@@ -330,3 +330,114 @@ def test_cold_start_declares_filter_and_empty_rankings(db: Session):
     assert out["excluded_illiquid"] == 0
     assert out["liquidity_floor"]["min_price"] == 5.0
     assert out["last_registered_at"] is None
+
+def test_ticker_close_change_uses_official_consecutive_sessions(db: Session):
+    from app.services.market_change import ticker_close_change
+
+    aaa = _company(db, "AAA")
+    bbb = _company(db, "BBB")
+    for company in (aaa, bbb):
+        _price(db, company, date(2026, 9, 21), "100")
+    _price(db, aaa, date(2026, 9, 22), "110")
+    _price(db, bbb, date(2026, 9, 22), "90")
+    info = ticker_close_change(db, aaa.id)
+    assert info is not None
+    assert info["date"] == "2026-09-22" and info["previous_date"] == "2026-09-21"
+    assert info["change"] == pytest.approx(10) and info["change_percent"] == pytest.approx(10)
+    assert ticker_close_change(db, bbb.id)["change_percent"] == pytest.approx(-10)
+
+
+def test_ticker_close_change_none_without_two_official_closes(db: Session):
+    from app.services.market_change import ticker_close_change
+
+    aaa = _company(db, "AAA")
+    other = _company(db, "OTH")
+    _price(db, other, date(2026, 9, 21), "100")
+    _price(db, other, date(2026, 9, 22), "101")
+    # one official close only
+    _price(db, aaa, date(2026, 9, 22), "110")
+    assert ticker_close_change(db, aaa.id) is None
+    # a non-official intraday snapshot never counts as a close
+    _price(db, aaa, date(2026, 9, 21), "50", source="finnhub")
+    assert ticker_close_change(db, aaa.id) is None
+
+
+def test_ticker_close_change_none_when_previous_session_is_not_adjacent(db: Session):
+    from app.services.market_change import ticker_close_change
+
+    aaa = _company(db, "AAA")
+    other = _company(db, "OTH")
+    for day in (date(2026, 9, 21), date(2026, 9, 22)):
+        _price(db, other, day, "100")
+    _price(db, aaa, date(2026, 9, 18), "100")
+    _price(db, aaa, date(2026, 9, 22), "110")
+    assert ticker_close_change(db, aaa.id) is None
+
+
+def test_ticker_close_change_none_when_last_close_is_stale(db: Session):
+    from app.services.market_change import ticker_close_change
+
+    aaa = _company(db, "AAA")
+    other = _company(db, "OTH")
+    for day in (date(2026, 9, 21), date(2026, 9, 22)):
+        _price(db, other, day, "100")
+    _price(db, aaa, date(2026, 9, 17), "100")
+    _price(db, aaa, date(2026, 9, 18), "110")
+    assert ticker_close_change(db, aaa.id) is None
+
+
+def _quote(session: str):
+    from app.services.extended_quote_service import ExtendedQuote
+
+    return ExtendedQuote(ticker="AAA", status="available", session=session, price=110.0, fetched_at=1)
+
+
+def test_extended_quote_route_adds_official_close_change_only_when_closed(db: Session, monkeypatch):
+    import asyncio
+
+    from app.api.routes import companies as routes
+
+    aaa = _company(db, "AAA")
+    for day, close in ((date(2026, 9, 21), "100"), (date(2026, 9, 22), "110")):
+        _price(db, aaa, day, close)
+
+    async def closed(_ticker):
+        return _quote("cerrado")
+
+    async def live(_ticker):
+        return _quote("regular")
+
+    async def inline(fn):  # in-memory sqlite cannot cross threads
+        return fn()
+
+    monkeypatch.setattr(routes, "run_in_threadpool", inline)
+    monkeypatch.setattr(routes.extended_quote_service, "get", closed)
+    out = asyncio.run(routes.company_extended_quote("AAA", db))
+    assert out.change is None and out.change_percent is None  # Yahoo-based fields untouched
+    assert out.close_change_percent == pytest.approx(10)
+    assert out.close_change_date == "2026-09-22" and out.close_change_previous_date == "2026-09-21"
+
+    monkeypatch.setattr(routes.extended_quote_service, "get", live)
+    out = asyncio.run(routes.company_extended_quote("AAA", db))
+    assert out.close_change_percent is None
+
+
+def test_extended_quote_route_survives_db_failure(db: Session, monkeypatch):
+    import asyncio
+
+    from app.api.routes import companies as routes
+
+    async def closed(_ticker):
+        return _quote("cerrado")
+
+    def boom(*_a, **_k):
+        raise RuntimeError("db down")
+
+    async def inline(fn):
+        return fn()
+
+    monkeypatch.setattr(routes, "run_in_threadpool", inline)
+    monkeypatch.setattr(routes.extended_quote_service, "get", closed)
+    monkeypatch.setattr(routes, "resolve_company", boom)
+    out = asyncio.run(routes.company_extended_quote("AAA", db))
+    assert out.price == 110.0 and out.close_change_percent is None
