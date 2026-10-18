@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas import ValuationResponse
 from app.services.company_resolver import resolve_company
-from app.services.entry_price_service import entry_price_report
 from app.services.historical_valuation_service import HistoricalValuationService
 from app.services.valuation_service import ValuationService
 
@@ -29,15 +28,3 @@ def historical_valuation(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     return HistoricalValuationService().build(db, company, years=years)
-
-
-@router.get("/{ticker}/entry-price")
-def entry_price(
-    ticker: str,
-    target_mos: float = Query(default=0.25, ge=0.0005, le=0.9),
-    db: Session = Depends(get_db),
-) -> dict:
-    company = resolve_company(db, ticker)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-    return entry_price_report(db, company, target_mos=target_mos)
