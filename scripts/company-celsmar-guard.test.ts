@@ -15,7 +15,9 @@ describe('ficha: cifra grande y métricas compactas', () => {
     it('cuatro métricas verificadas de la cotización, sin adivinar múltiplos', () => {
         assert.match(quote, /company-metric-strip/);
         for (const label of ['Apertura', 'Máximo', 'Mínimo', 'Cierre anterior']) assert.ok(quote.includes(label));
-        assert.match(quote, /value == null \|\| !isValidCurrencyCode\(currency\) \? NA : formatMoney/);
+        assert.match(quote, /value == null \|\| !isValidCurrencyCode\(currency\) \? NA : headerMoney/);
+        assert.match(quote, /if \(currency === 'USD' && value != null && Number.isFinite\(value\)\)/);
+        assert.match(quote, /return formatMoney\(value, currency\)/);
         assert.match(quote, /divide-gray-800/);
         assert.match(quote, /isValidCurrencyCode\(currency\)/);
     });
@@ -27,4 +29,10 @@ describe('ficha: cifra grande y métricas compactas', () => {
         for (const legacy of ['resumen', 'tesis', 'financieros', 'modelo', 'evidencia', 'seguimiento']) assert.ok(views.includes(`['${legacy}',`));
         assert.doesNotMatch(page, /captura de solo lectura/);
     });
+});
+
+it('alertas anuncia una sola copia de carga traducida', () => {
+    const alerts = readFileSync('components/alerts/AlertsManager.tsx', 'utf8');
+    assert.doesNotMatch(alerts, /Cargando alertas[.…]/);
+    assert.match(alerts, /t\('common.states.loadingAlerts'\)/);
 });

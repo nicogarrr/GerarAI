@@ -347,10 +347,7 @@ function AlertsManager() {
 
             {loading ? (
                 <div className="space-y-3 py-8">
-                    {/* Una region live presente en el primer render no se anuncia y
-                        desaparece con el esqueleto: el texto va en sr-only y el spinner
-                        queda como decoracion aria-hidden. */}
-                    <span className="sr-only">Cargando alertas…</span>
+                    {/* Un único texto de carga accesible; el spinner es decorativo. */}
                     <div aria-hidden="true" className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-gray-700 border-t-teal-300" />
                     <div className="text-center text-sm text-gray-500">{t('common.states.loadingAlerts')}</div>
                 </div>
