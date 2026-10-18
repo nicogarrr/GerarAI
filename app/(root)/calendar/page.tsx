@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { CalendarDays } from 'lucide-react';
+import AlertsManager from '@/components/alerts/AlertsManager';
+import { Badge } from '@/components/ui/badge';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getCatalystCalendar, type CatalystCalendar, type CatalystEvent } from '@/lib/actions/catalysts.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
@@ -9,8 +12,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-    title: 'Calendario de catalizadores',
-    description: 'Resultados, ex-dividendos y plazos de presentación 10-Q/10-K (inferidos por regla SEC) de tus posiciones en EE. UU. (USD) y acciones corporativas de todas tus posiciones, en un solo calendario.',
+    title: 'Calendario de resultados y alertas',
+    description: 'Resultados de tus posiciones y de tu watchlist en EE. UU. (USD), ex-dividendos, plazos 10-Q/10-K y acciones corporativas, y tus alertas, en un solo sitio.',
 };
 
 const TYPE_LABEL: Record<CatalystEvent['type'], string> = {
@@ -28,7 +31,47 @@ function groupByDate(events: CatalystEvent[]): [string, CatalystEvent[]][] {
     return [...groups.entries()];
 }
 
-export default async function CalendarPage() {
+export default async function CalendarPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ view?: string }>;
+}) {
+    const { view } = await searchParams;
+    const showAlerts = view === 'alertas';
+
+    const tabs = (
+        <nav aria-label="Calendario y alertas" className="flex gap-2 text-sm">
+            <Link
+                href="/calendar"
+                aria-current={showAlerts ? undefined : 'page'}
+                className={`inline-flex min-h-11 items-center rounded-lg px-3 font-medium ${showAlerts ? 'text-gray-400 hover:bg-gray-800 hover:text-gray-100' : 'bg-teal-400/10 text-teal-300'}`}
+            >
+                Calendario
+            </Link>
+            <Link
+                href="/calendar?view=alertas"
+                aria-current={showAlerts ? 'page' : undefined}
+                className={`inline-flex min-h-11 items-center rounded-lg px-3 font-medium ${showAlerts ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-100'}`}
+            >
+                Alertas
+            </Link>
+        </nav>
+    );
+
+    if (showAlerts) {
+        // Pieza 5: resultados y alertas en un solo sitio (/calendar). La ruta
+        // /alerts sigue viva para enlaces existentes y apunta aquí.
+        return (
+            <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+                <header className="flex flex-col gap-3 border-b border-gray-800 pb-5">
+                    <h1 className="text-3xl font-bold text-gray-100">Calendario y alertas</h1>
+                    {tabs}
+                </header>
+                <AlertsManager />
+            </main>
+        );
+    }
+
     let calendar: CatalystCalendar;
     try {
         calendar = await getCatalystCalendar();
@@ -47,11 +90,13 @@ export default async function CalendarPage() {
             <header className="flex flex-col gap-3 border-b border-gray-800 pb-5 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <p className="text-sm font-semibold uppercase text-teal-300">Cartera</p>
-                    <h1 className="mt-1 text-3xl font-bold text-gray-100">Calendario de catalizadores</h1>
+                    <h1 className="mt-1 text-3xl font-bold text-gray-100">Calendario de resultados y alertas</h1>
+                    {tabs}
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                        Del {formatMarketDate(calendar.desde)} al {formatMarketDate(calendar.hasta)}. Resultados y
-                        ex-dividendos solo cubren tus posiciones cotizadas en EE. UU. (USD); las acciones corporativas
-                        registradas cubren todas tus posiciones abiertas.
+                        Del {formatMarketDate(calendar.desde)} al {formatMarketDate(calendar.hasta)}. Los resultados
+                        cubren tus posiciones y tu watchlist cotizadas en EE. UU. (USD); ex-dividendos y plazos
+                        10-Q/10-K solo cubren posiciones, y las acciones corporativas registradas cubren todas tus
+                        posiciones abiertas.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
@@ -68,9 +113,9 @@ export default async function CalendarPage() {
                 </p>
             ) : null}
 
-            {calendar.held_count === 0 ? (
+            {calendar.held_count === 0 && !calendar.watchlist_count ? (
                 <p className="rounded-lg border border-gray-800 p-4 text-sm text-gray-400">
-                    No tienes posiciones abiertas, así que no hay catalizadores que seguir.
+                    No tienes posiciones abiertas ni watchlist, así que no hay catalizadores que seguir.
                 </p>
             ) : groups.length === 0 && !degraded ? (
                 <p className="rounded-lg border border-gray-800 p-4 text-sm text-gray-400">
@@ -96,6 +141,9 @@ export default async function CalendarPage() {
                                             {event.type === 'corporate_action' ? event.title : (TYPE_LABEL[event.type] ?? event.title)}
                                         </span>
                                         {event.detail ? <span className="text-gray-400">{event.detail}</span> : null}
+                                        {event.origin === 'watchlist' ? (
+                                            <Badge variant="outline" className="border-gray-700 font-normal text-gray-400">Watchlist</Badge>
+                                        ) : null}
                                         <span className="ml-auto text-xs text-gray-500">Fuente: {event.source}</span>
                                     </li>
                                 ))}

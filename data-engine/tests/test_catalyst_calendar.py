@@ -350,3 +350,47 @@ def test_route_includes_filing_deadlines_sorted_and_status(engine, db, monkeypat
 
 def test_calendar_corporate_action_source_uses_current_visible_brand():
     assert svc.SOURCE_CAVAAI == 'Acción corporativa registrada en GerarAI'
+
+
+def test_watchlist_us_tickers_excludes_held_and_non_us(db):
+    from app.models.entities import WatchItem
+
+    held = _company(db, "HELDX", 5)
+    watch_us = _company(db, "WUS", 0)
+    _company(db, "WEU", 0, exchange="BME", currency="EUR")
+    for sym in ("HELDX", "WUS", "WEU"):
+        db.add(WatchItem(symbol=sym))
+    db.commit()
+    result = svc.watchlist_us_tickers(db, {"HELDX"})
+    assert result == {"WUS"}
+    assert held.ticker == "HELDX" and watch_us.ticker == "WUS"
+
+
+def test_build_catalysts_tags_watchlist_origin_on_earnings():
+    events = svc.build_catalysts(
+        held={"KO"},
+        held_us={"KO"},
+        desde=D0,
+        hasta=D1,
+        earnings=[
+            connector.normalize_earnings_row(
+                {"symbol": "KO", "time": "time-pre-market", "epsForecast": "$0.60"},
+                date(2026, 10, 22),
+            ),
+            connector.normalize_earnings_row(
+                {"symbol": "WUS", "time": "time-after-hours", "epsForecast": "$1.00"},
+                date(2026, 10, 22),
+            ),
+            connector.normalize_earnings_row(
+                {"symbol": "FUERA", "time": "time-pre-market", "epsForecast": "$1.00"},
+                date(2026, 10, 22),
+            ),
+        ],
+        dividends=[],
+        actions=[],
+        watchlist_us={"WUS"},
+    )
+    by_ticker = {e["ticker"]: e for e in events}
+    assert set(by_ticker) == {"KO", "WUS"}
+    assert by_ticker["KO"]["origin"] == "cartera"
+    assert by_ticker["WUS"]["origin"] == "watchlist"
