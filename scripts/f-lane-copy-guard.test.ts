@@ -43,6 +43,7 @@ test('el cuerpo del cambio no repite el titular y las etiquetas van en español'
   assert.equal(out.match(/Acme gana/g)?.length, 1);
   assert.equal(changeTypeLabel('news_material_update'), 'noticia material');
   assert.match(changeSummaryText('Evidence classified claim as contradicted: X sube'), /^La evidencia clasificó/);
+  assert.doesNotMatch(changeSummaryText('Material news requires thesis review. No structural thesis node matched with sufficient confidence.'), /No structural/);
 });
 
 test('alerta genérica usa su propio texto', () => {

@@ -14,7 +14,8 @@ import {
 import { formatDate, formatNumber, NA } from '@/lib/format';
 import { firstSearchParam, normalizeSourcesTicker, sourcesHref } from '@/lib/research/sources-inventory';
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
-import { auditFixDisplay, sourceDisplay } from '@/lib/research/source-display';
+import { auditFixLabel } from '@/lib/audit-status-copy';
+import { sourceDisplay } from '@/lib/research/source-display';
 
 /** F323: tipo y nivel de fuente llegan como ids internos en ingles
  *  (manual_upload, tier_1_regulatory...) y se pintaban en crudo en la tabla.
@@ -220,7 +221,7 @@ export default async function ResearchSourcesPage({
                   <span className="text-sm text-gray-500" title={auditScoreText(audit.passed, audit.source_coverage_score, (value) => formatNumber(value, { maximumFractionDigits: 2 }))}>Citas: {formatNumber(audit.source_coverage_score, { maximumFractionDigits: 2 })}/100</span>
                 </div>
                 {audit.required_fixes.length ? (
-                  <div className="mt-2 text-xs text-amber-200">{audit.required_fixes.map(auditFixDisplay).join(' ')}</div>
+                  <div className="mt-2 text-xs text-amber-200">{audit.required_fixes.map(auditFixLabel).join(' ')}</div>
                 ) : null}
               </div>
             ))}
