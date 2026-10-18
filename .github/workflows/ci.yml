@@ -361,7 +361,27 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r data-engine/requirements.txt
       - run: npm run generate:openapi
-      - run: git diff --exit-code -- data-engine/openapi.json lib/research/openapi.generated.ts
+      # Si hay drift, el rojo dice EXACTAMENTE que regenerar: antes el unico
+      # mensaje era el diff de `git diff --exit-code`, que no dice ni el
+      # comando ni que hay que commitear los dos ficheros.
+      - name: Drift = rojo con las instrucciones exactas
+        run: |
+          if ! git diff --exit-code -- data-engine/openapi.json lib/research/openapi.generated.ts; then
+            echo "::error title=OpenAPI drift::El cliente generado no coincide con el esquema. Regenera y commitea: npm run generate:openapi && git add data-engine/openapi.json lib/research/openapi.generated.ts"
+            {
+              echo "## OpenAPI drift: los generados no estan al dia"
+              echo
+              echo "El esquema del backend cambio y los ficheros generados no se regeneraron. En local, desde la raiz del repo:"
+              echo
+              echo '```bash'
+              echo "npm run generate:openapi"
+              echo "git add data-engine/openapi.json lib/research/openapi.generated.ts"
+              echo '```'
+              echo
+              echo "(\`npm run generate:openapi\` es \`python data-engine/scripts/export_openapi.py && openapi-typescript data-engine/openapi.json -o lib/research/openapi.generated.ts\`.)"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
   migrations:
     name: Postgres migration round trip
