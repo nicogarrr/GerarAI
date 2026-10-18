@@ -185,3 +185,18 @@ def test_ingest_in_chunks_returns_created_total():
     result = ConnectorResult(source="rss", items=[_item(f"x{i}") for i in range(11)])
     total = ingest_in_chunks(lambda part: {"created": len(part.items)}, result, Deadline(10, clock=lambda: now[0]))
     assert total == 11
+
+
+def test_yahoo_drops_competitor_only_headlines_but_keeps_company_mentions():
+    items = [
+        _item("Rocket Lab Has Imploded For 3 Months: 145% Gains Are Coming According to This Pro Analyst", "Rocket Lab has shed a fifth of its value."),
+        _item("Rocket Lab vs AST SpaceMobile: which space stock wins?", "ASTS and Rocket Lab compared."),
+        _item("Analyst raises price target", "No names here."),
+    ]
+    out = label_yahoo(ConnectorResult(source="rss", items=items), ASTS, _ticker_evidence_level)
+    assert [i.title for i in out.items] == [
+        "Rocket Lab vs AST SpaceMobile: which space stock wins?",
+        "Analyst raises price target",
+    ]
+    # Sin empresa (compatibilidad) no se filtra por competidor.
+    assert len(label_yahoo(ConnectorResult(source="rss", items=list(items))).items) == 3

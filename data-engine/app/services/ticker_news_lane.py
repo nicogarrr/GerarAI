@@ -36,6 +36,13 @@ VERIFIED_ALIASES: dict[str, tuple[str, ...]] = {
     "SPCX": ("SpaceX", "Space Exploration Technologies", "Starlink"),
     "ASTS": ("AST SpaceMobile", "SpaceMobile", "BlueBird"),
 }
+# Competidores que el feed de Yahoo etiqueta con nuestro ticker aunque el
+# titular trate de ellos (ASTS recibia titulares de Rocket Lab). Solo se descarta
+# si el texto nombra al competidor Y no cita a la empresa; nada de terminos de
+# sector. Lista verificada a mano, ampliable por caso.
+COMPETITOR_ONLY_TERMS: dict[str, tuple[str, ...]] = {
+    "ASTS": ("Rocket Lab",),
+}
 _NAME_NOISE = frozenset({
     "inc", "corp", "corporation", "co", "company", "ltd", "plc", "sa", "nv", "ag",
     "the", "group", "holdings", "holding", "limited", "sme", "s.a.",
@@ -97,12 +104,26 @@ def google_feed_url(company, *, lang: str = "en") -> str:
     )
 
 
-def label_yahoo(result: ConnectorResult) -> ConnectorResult:
+def _is_competitor_only(company, text: str, evidence_level) -> bool:
+    terms = COMPETITOR_ONLY_TERMS.get((getattr(company, "ticker", "") or "").upper(), ())
+    if not terms or not any(
+        re.search(rf"(?<![\w]){re.escape(term)}(?![\w])", text, flags=re.IGNORECASE) for term in terms
+    ):
+        return False
+    return not company_mentioned(company, text, evidence_level)
+
+
+def label_yahoo(result: ConnectorResult, company=None, evidence_level=None) -> ConnectorResult:
     """Fuente legible y estable: el titulo del feed es 'Yahoo! Finance: X News'."""
     result.items = [
         dataclasses.replace(item, source="Yahoo Finance")
         for item in result.items
         if not is_data_page_headline(item.title)
+        and not (
+            company is not None
+            and evidence_level is not None
+            and _is_competitor_only(company, f"{item.title} {item.summary}", evidence_level)
+        )
     ]
     return result
 
