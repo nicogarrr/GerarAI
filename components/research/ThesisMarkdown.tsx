@@ -28,7 +28,7 @@ export const markdownComponents: Components = {
           ),
           a: ({ node: _node, ...props }) => (
             <a
-              className="text-teal-400 underline"
+              className="break-all text-teal-400 underline"
               target="_blank"
               rel="noopener noreferrer"
               {...props}
@@ -41,15 +41,15 @@ export const markdownComponents: Components = {
             />
           ),
           pre: ({ node: _node, ...props }) => (
-            <pre className="mb-2 overflow-x-auto rounded-lg bg-gray-900 p-3" {...props} />
+            <pre className="mb-2 min-w-0 max-w-full overflow-x-auto rounded-lg bg-gray-900 p-3" {...props} />
           ),
           blockquote: ({ node: _node, ...props }) => (
             <blockquote className="mb-2 border-l-2 border-gray-700 pl-3 text-gray-400" {...props} />
           ),
           hr: ({ node: _node, ...props }) => <hr className="my-4 border-gray-800" {...props} />,
           table: ({ node: _node, ...props }) => (
-            <div className="mb-2 overflow-x-auto">
-              <table className="w-full border-collapse text-xs" {...props} />
+            <div className="mb-2 min-w-0 max-w-full overflow-x-auto">
+              <table className="w-full min-w-[480px] border-collapse text-xs [overflow-wrap:normal]" {...props} />
             </div>
           ),
           th: ({ node: _node, ...props }) => (
@@ -68,7 +68,7 @@ export const markdownComponents: Components = {
  */
 export default function ThesisMarkdown({ content }: { content: string }) {
   return (
-    <div className="rounded-lg border border-gray-800 bg-black/20 p-4 text-sm leading-6 text-gray-300">
+    <div className="min-w-0 max-w-full [overflow-wrap:anywhere] rounded-lg border border-gray-800 bg-black/20 p-4 text-sm leading-6 text-gray-300">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {content}
       </ReactMarkdown>

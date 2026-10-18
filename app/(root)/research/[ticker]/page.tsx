@@ -1070,7 +1070,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   } else if (activeView === 'thesis') {
     const data = await viewData('thesis');
     content = (
-      <div className="space-y-6">
+      <div className="min-w-0 max-w-full space-y-6 [overflow-wrap:anywhere]">
         <div className="flex flex-wrap items-center gap-3">
           <ThesisGenerateButton ticker={ticker} />
           <ThesisApproveButton ticker={ticker} disabled={data.history.length === 0} />
