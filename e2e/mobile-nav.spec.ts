@@ -36,7 +36,7 @@ const NAV_ROUTES: { path: string; heading?: string }[] = [
   { path: "/screeners" },
   { path: "/screener", heading: "Screener" },
   { path: "/watchlist", heading: "Watchlist" },
-  { path: "/movers", heading: "Movers" },
+  { path: "/screener?vista=subidas", heading: "Screener" },
   { path: "/propicks" },
   { path: "/alerts", heading: "Alertas" },
   { path: "/security", heading: "Seguridad" },

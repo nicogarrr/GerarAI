@@ -23,9 +23,9 @@ test('desktop portfolio and watchlist keep destructive action within symbol menu
 });
 
 test('volume belongs to most-active movers only and screener has units', () => {
-  const movers = read('app/(root)/movers/page.tsx');
+  const movers = (read('components/market/MoversTable.tsx') + read('app/(root)/screener/page.tsx'));
   assert.match(movers, /showVolume \? <th/);
-  assert.match(movers, /caption="Mayor volumen" tickerSets=\{tickerSets\} showVolume/);
+  assert.match(movers, /caption=\{caption\} tickerSets=\{tickerSets\} showVolume=\{vista === 'activas'\}/);
   const screener = read('app/(root)/screener/page.tsx');
   assert.match(screener, /formatMarketCapUsd\(value\)/);
   assert.match(screener, /screenerMarketCap\(r.marketCap\)/);

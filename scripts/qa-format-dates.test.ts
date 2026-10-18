@@ -11,7 +11,7 @@ test('market dates stay on the quoted day and show a Spanish month', () => {
 });
 test('watchlist and movers do not interpolate raw quote dates', () => {
   const watchlist = readFileSync('app/(root)/watchlist/page.tsx', 'utf8');
-  const movers = readFileSync('app/(root)/movers/page.tsx', 'utf8');
+  const movers = (readFileSync('components/market/MoversTable.tsx', 'utf8') + readFileSync('app/(root)/screener/page.tsx', 'utf8'));
   assert.equal(watchlist.match(/formatMarketDate\(stock.priceAsOf\)/g)?.length, 2);
   assert.ok(watchlist.includes('col-span-2 min-w-0'));
   assert.ok(movers.includes('formatMarketDate(row.date)'));

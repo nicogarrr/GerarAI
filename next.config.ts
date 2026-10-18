@@ -68,7 +68,10 @@ const nextConfig: NextConfig = {
 
     // Headers for better caching and security
     async redirects() {
-        return [{ source: '/research/settings', destination: '/settings', permanent: true }];
+        return [
+            { source: '/research/settings', destination: '/settings', permanent: true },
+            { source: '/movers', destination: '/screener?vista=subidas', permanent: true },
+        ];
     },
     async headers() {
         return [

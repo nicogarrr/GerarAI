@@ -370,7 +370,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                                         <CommandItem
                                             key={item.href}
                                             value={`ir ${item.label}`}
-                                            keywords={[section.title]}
+                                            keywords={[section.title, ...(item.description ? [item.description] : [])]}
                                             onSelect={() => go(item.href)}
                                             className="flex min-h-11 items-center gap-2 px-4"
                                         >
