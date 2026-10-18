@@ -393,6 +393,9 @@ services:
       - ESEF_SNAPSHOT_DIR=${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
       - RSS_FEEDS=${RSS_FEEDS:-}
     volumes:
+      - ./data-engine:/app
+      - /app/__pycache__
+      - /app/.venv
       - duckdb_data:/data
       - ./data-esef-snapshots:/data/esef-snapshots:ro
     healthcheck:
@@ -470,6 +473,9 @@ services:
       - ESEF_SNAPSHOT_DIR=${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
       - RSS_FEEDS=${RSS_FEEDS:-}
     volumes:
+      - ./data-engine:/app
+      - /app/__pycache__
+      - /app/.venv
       - duckdb_data:/data
       - ./data-esef-snapshots:/data/esef-snapshots:ro
     healthcheck:
@@ -499,6 +505,10 @@ services:
     # reglas cada 5 min y las entregas se hambreaban detras de la ingesta
     # larga de GDELT (~3 h) en la cola default compartida.
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "2", "-Q", "alerts"]
+    volumes:
+      - ./data-engine:/app
+      - /app/__pycache__
+      - /app/.venv
     environment:
       - PYTHONUNBUFFERED=1
       - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
@@ -581,6 +591,9 @@ services:
       - SEC_USER_AGENT=${SEC_USER_AGENT:-CavaAI research contact@cavaai.local}
       - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
     volumes:
+      - ./data-engine:/app
+      - /app/__pycache__
+      - /app/.venv
       - duckdb_data:/data
     healthcheck:
       test:
@@ -632,6 +645,9 @@ services:
       - KNOWLEDGE_RAG_DOCLING_TABLE_MODE=${KNOWLEDGE_RAG_DOCLING_TABLE_MODE:-fast}
       - KNOWLEDGE_RAG_RERANKER_MODEL=${KNOWLEDGE_RAG_RERANKER_MODEL:-}
     volumes:
+      - ./data-engine:/app
+      - /app/__pycache__
+      - /app/.venv
       - duckdb_data:/data
       - ./knowledge-inbox:/data/knowledge-inbox:ro
     healthcheck:
