@@ -1,5 +1,7 @@
 import threading
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal, Protocol
 
@@ -443,6 +445,16 @@ _YAHOO_HEADERS = {
 }
 
 
+def _candle_market_date(timestamp: Any, tz_name: Any) -> str | None:
+    """Fecha ISO de una vela diaria en la zona del mercado; None si falta algo (nunca se inventa)."""
+    if not isinstance(timestamp, (int, float)) or not isinstance(tz_name, str) or not tz_name:
+        return None
+    try:
+        return datetime.fromtimestamp(timestamp, ZoneInfo(tz_name)).date().isoformat()
+    except (KeyError, ValueError, OSError):
+        return None
+
+
 class YahooScreenVendor:
     """Vendor alternativo: Yahoo Finance chart API (gratuita, sin key).
 
@@ -496,6 +508,12 @@ class YahooScreenVendor:
                 "volume": float(volumes[-1]) if volumes else None,
                 "prevClose": float(previous) if previous else None,
                 "asOf": timestamps[valid_closes[-1][0]] if valid_closes[-1][0] < len(timestamps) else None,
+                # Dia de calendario de la vela diaria en la zona del mercado (el
+                # epoch de una vela diaria es su apertura, no una hora de cotizacion).
+                "asOfDate": _candle_market_date(
+                    timestamps[valid_closes[-1][0]] if valid_closes[-1][0] < len(timestamps) else None,
+                    meta.get("exchangeTimezoneName"),
+                ),
             }
         except (KeyError, IndexError, TypeError, ValueError):
             return None
@@ -916,6 +934,7 @@ def _refetch_real_items(
                 "name": name,
                 "price": quote["price"],
                 "priceAsOf": quote.get("asOf"),
+                "priceDate": quote.get("asOfDate"),
                 "currency": quote.get("currency"),
                 "change": quote["change"],
                 "changePercent": quote["changePercent"],
