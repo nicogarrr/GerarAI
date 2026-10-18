@@ -105,9 +105,6 @@ export default async function TaxesPage({ searchParams }: PageProps) {
                 <div>
                     <p className="text-sm font-semibold uppercase text-teal-300">Fiscal</p>
                     <h1 className="mt-1 text-3xl font-bold text-gray-100">Impuestos</h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                        Posiciones con base de coste, reportes fiscales anuales y plusvalías latentes de tu cartera.
-                    </p>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
                     <Receipt className="h-4 w-4 text-teal-300" />

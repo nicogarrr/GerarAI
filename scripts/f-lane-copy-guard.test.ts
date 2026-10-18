@@ -20,6 +20,21 @@ test('plantilla del declarante sin sustituciones rotas ni ids de caja crudos', (
   assert.equal(humanizeTaxText('cash-EUR'), 'caja EUR');
 });
 
+test('la jerga «snapshot» del motor fiscal llega como «captura»', () => {
+    assert.equal(
+        humanizeTaxText('Partidas con snapshot demasiado antiguo (V): cada valor afirma su 31/12 con SU snapshot; uno reciente no certifica a otro viejo. Resultado no concluyente.'),
+        'Partidas con captura demasiado antigua (V): cada valor afirma su 31/12 con SU captura; una reciente no certifica a otra vieja. Resultado no concluyente.',
+    );
+    assert.equal(
+        humanizeTaxText('Sin snapshots de valoración a cierre del ejercicio: no se puede afirmar nada sobre esta categoría.'),
+        'Sin capturas de valoración a cierre del ejercicio: no se puede afirmar nada sobre esta categoría.',
+    );
+    assert.equal(
+        humanizeTaxText('Sin tipo de cambio a fecha del snapshot: fuera del total EUR, valorar a mano.'),
+        'Sin tipo de cambio a fecha de la captura: fuera del total EUR, valorar a mano.',
+    );
+});
+
 test('el cuerpo del cambio no repite el titular y las etiquetas van en español', () => {
   const out = changeSummaryText('Noticia material que requiere revisión de la tesis: Acme gana un contrato de 5 millones con la NASA. Acme gana un contrato de 5 millones con la NASA.');
   assert.equal(out.match(/Acme gana/g)?.length, 1);
