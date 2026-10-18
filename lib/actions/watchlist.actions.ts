@@ -136,7 +136,11 @@ export type WatchlistEntryData = {
     change: number | null;
     changePercent: number | null;
     marketCap: number | null;
+    /** True cuando el cap lo deriva el backend (precio x acciones): se marca «· derivado». */
+    marketCapDerived: boolean;
     peRatio: number | null;
+    /** 'ttm' = Finnhub peTTM (línea US); 'fy' = respaldo backend cierre/EPS diluido FY. */
+    peKind: 'ttm' | 'fy' | null;
     // F358: frescura del precio: 'live' = sesión en curso; 'close' = último
     // cierre fechado (con fecha en priceAsOf si se conoce). Un cierre NUNCA
     // se pinta como cotización actual.
@@ -159,7 +163,9 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         change: null,
         changePercent: null,
         marketCap: null,
+        marketCapDerived: false,
         peRatio: null,
+        peKind: null,
         priceKind: null,
         priceAsOf: null,
         metricsNotApplicable: false,
@@ -176,7 +182,12 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         // precio x acciones; PER = cierre / EPS diluido FY).
         usListing ? getStockFinancialDataLight(normalized) : Promise.resolve(null),
         !usListing
-            ? researchRequest<{ market_cap: number | null; per: number | null }>(
+            ? researchRequest<{
+                  market_cap: number | null;
+                  per: number | null;
+                  currency: string | null;
+                  sources: string[];
+              }>(
                   `/api/watchlist/metrics/${encodeURIComponent(normalized)}`,
               ).catch(() => null)
             : Promise.resolve(null),
@@ -195,6 +206,9 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
     const metrics = light?.metrics?.metric ?? {};
     const marketCapM = typeof metrics.marketCapitalization === 'number' ? metrics.marketCapitalization : null;
     const peRatio = typeof metrics.peTTM === 'number' && Number.isFinite(metrics.peTTM) ? metrics.peTTM : null;
+    const backendCap = backend && typeof backend.market_cap === 'number' ? backend.market_cap : null;
+    const backendPer = backend && typeof backend.per === 'number' && Number.isFinite(backend.per) ? backend.per : null;
+    const backendDerived = (backend?.sources ?? []).some((src) => src.toLowerCase().includes('derivada'));
 
     return {
         ...base,
@@ -202,7 +216,9 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         // La divisa visible la pone SOLO el master (curado): ni la del
         // proveedor (puede ser discordante, F163) ni un «USD» asumido por
         // ser línea US — sin divisa real, número pelado.
-        currency: base.currency,
+        // Master curado manda; para no-US el backend devuelve la divisa real
+        // de la compañía y la rellena cuando el master no la conoce.
+        currency: base.currency ?? backend?.currency ?? null,
         price,
         change:
             price === null || !hasPriorClose(quote)
@@ -218,8 +234,10 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
                   : null,
         marketCap: marketCapM !== null
             ? marketCapM * 1e6 // Finnhub devuelve M USD
-            : (backend && typeof backend.market_cap === 'number' ? backend.market_cap : null),
-        peRatio: peRatio ?? (backend && typeof backend.per === 'number' ? backend.per : null),
+            : backendCap,
+        marketCapDerived: marketCapM === null && backendCap !== null && backendDerived,
+        peRatio: peRatio ?? backendPer,
+        peKind: peRatio !== null ? 'ttm' : backendPer !== null ? 'fy' : null,
         priceKind,
         priceAsOf,
         metricsNotApplicable: !usListing,

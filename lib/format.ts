@@ -216,11 +216,19 @@ export function formatMarketCapUsd(value: NumericInput, fallback: string = NA): 
  * conoce; USD solo cuando la divisa consta como USD). Compacta.
  */
 export function formatMarketCap(value: NumericInput, currency: string | null, fallback: string = NA): string {
-  if (!currency) return formatMarketCapUsd(value, fallback);
   const parsed = toFinite(value);
   if (parsed === null) return fallback;
+  // Sin divisa real no se asume USD: numero compacto pelado, sin simbolo.
+  if (!currency) {
+    return new Intl.NumberFormat('es-ES', {
+      notation: 'compact',
+      maximumFractionDigits: 2,
+    }).format(parsed);
+  }
+  // Locale segun divisa: EUR en es-ES (25,7 mil M EUR), USD en en-US.
+  const locale = currency.toUpperCase() === 'USD' ? 'en-US' : 'es-ES';
   try {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
       minimumFractionDigits: 0,

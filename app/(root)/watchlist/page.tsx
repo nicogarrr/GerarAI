@@ -25,7 +25,7 @@ export const revalidate = 0;
 export const metadata: Metadata = {
     title: 'Watchlist',
     description:
-        'Seguimiento detallado de los símbolos que sigues: precio, cambio de sesión, market cap y PER (TTM) de cada uno.',
+        'Seguimiento detallado de los símbolos que sigues: precio, cambio de sesión, market cap y PER de cada uno.',
 };
 
 interface WatchlistStock {
@@ -37,7 +37,9 @@ interface WatchlistStock {
     change: number | null;
     changePercent: number | null;
     marketCap: number | null;
+    marketCapDerived: boolean;
     peRatio: number | null;
+    peKind: 'ttm' | 'fy' | null;
     priceKind: 'live' | 'close' | null;
     priceAsOf: string | null;
     metricsNotApplicable: boolean;
@@ -91,7 +93,9 @@ export default async function WatchlistPage({
                     metricsNotApplicable: data.metricsNotApplicable,
                     currency: data.currency,
                     marketCap: data.marketCap,
+                    marketCapDerived: data.marketCapDerived,
                     peRatio: data.peRatio,
+                    peKind: data.peKind,
                     analysis: item.analysis,
                     addedAt: item.addedAt
                 };
@@ -108,7 +112,9 @@ export default async function WatchlistPage({
                     metricsNotApplicable: false,
                     currency: null,
                     marketCap: null,
+                    marketCapDerived: false,
                     peRatio: null,
+                    peKind: null,
                     analysis: item.analysis,
                     addedAt: item.addedAt
                 };
@@ -221,12 +227,12 @@ export default async function WatchlistPage({
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Market Cap</dt>
                                         <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
                                         </dd>
                                     </div>
                                     <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500">PER (TTM)</dt>
-                                        <dd className="font-mono text-sm text-gray-300" title={stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
+                                        <dt className="text-[11px] text-gray-500">{stock.peKind === 'fy' ? 'PER (FY)' : 'PER (TTM)'}</dt>
+                                        <dd className="font-mono text-sm text-gray-300" title={stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>{formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
                                     </div>
                                 </dl>
                                 <div className="mt-3 flex items-center gap-2">
@@ -254,7 +260,7 @@ export default async function WatchlistPage({
                                     <TableHead className="text-right text-gray-300">Precio</TableHead>
                                     <TableHead className="text-right text-gray-300">Cambio sesión</TableHead>
                                     <TableHead className="text-right text-gray-300">Market Cap</TableHead>
-                                    <TableHead className="text-right text-gray-300">PER (TTM)</TableHead>
+                                    <TableHead className="text-right text-gray-300">PER</TableHead>
 
                                 </TableRow>
                             </TableHeader>
@@ -305,7 +311,7 @@ export default async function WatchlistPage({
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {stock.peRatio !== null && stock.peRatio !== undefined && Number.isFinite(stock.peRatio) ? (
@@ -315,7 +321,7 @@ export default async function WatchlistPage({
                                                 // una app de «datos, no recomendaciones». Color
                                                 // neutro, como en la vista de tarjetas.
                                                 <Badge variant="outline" className="border-gray-700 font-mono text-gray-300">
-                                                    {formatPeRatio(stock.peRatio)}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}
+                                                    {formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}
                                                 </Badge>
                                             ) : (
                                                 <span className="text-gray-500">{NA}</span>
