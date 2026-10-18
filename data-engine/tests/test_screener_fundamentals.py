@@ -89,7 +89,7 @@ def test_missing_facts_stay_null(db):
     company = _company(db)
     _price(db, company, "180")
     result = load_screener_ratios(db, {"AAPL"}, today=TODAY)["AAPL"]
-    assert result == {"pe": None, "pb": None, "roe": None}
+    assert result == {"pe": None, "pb": None, "roe": None, "has_fundamentals": False}
 
 
 def test_seed_facts_and_seed_prices_ignored(db):
@@ -97,7 +97,7 @@ def test_seed_facts_and_seed_prices_ignored(db):
     _price(db, company, "180", source="seed")
     _fact(db, company, "eps_diluted", "6", "USD/share", source="seed")
     result = load_screener_ratios(db, {"AAPL"}, today=TODAY)["AAPL"]
-    assert result == {"pe": None, "pb": None, "roe": None}
+    assert result == {"pe": None, "pb": None, "roe": None, "has_fundamentals": False}
 
 
 def test_cross_fiscal_years_never_combined(db):
@@ -114,7 +114,7 @@ def test_stale_price_and_old_facts_ignored(db):
     _price(db, company, "180", day=TODAY - timedelta(days=10))
     _fact(db, company, "eps_diluted", "6", "USD/share", year=2022)
     result = load_screener_ratios(db, {"AAPL"}, today=TODAY)["AAPL"]
-    assert result == {"pe": None, "pb": None, "roe": None}
+    assert result == {"pe": None, "pb": None, "roe": None, "has_fundamentals": False}
 
 
 def test_currency_mismatch_and_negative_eps_rejected(db):
@@ -272,3 +272,31 @@ def test_live_without_comparable_date_loses_to_local(db):
     )
     assert out["AAPL"]["pe"] == 20.0
     assert out["AAPL"]["ratioProvenance"]["price"]["source"] == "finnhub"
+
+
+def test_has_fundamentals_true_with_revenue_and_shares(db):
+    """QA inicio DCF: revenue + acciones diluidas SEC/ESEF marcan la candidata
+    como prioritaria para la sonda DCF de la tarjeta de inicio."""
+    company = _company(db, "AAPL")
+    _price(db, company, "100")
+    _fact(db, company, "revenue", "1000", "USD", year=2025)
+    _fact(db, company, "shares_diluted", "100", "shares", year=2025)
+    result = load_screener_ratios(db, {"AAPL"}, today=TODAY)["AAPL"]
+    assert result["has_fundamentals"] is True
+
+
+def test_has_fundamentals_false_without_revenue(db):
+    company = _company(db, "AAPL")
+    _price(db, company, "100")
+    _fact(db, company, "net_income", "50", "USD", year=2025)
+    result = load_screener_ratios(db, {"AAPL"}, today=TODAY)["AAPL"]
+    assert result["has_fundamentals"] is False
+
+
+def test_has_fundamentals_false_for_quarterly_only(db):
+    company = _company(db, "AAPL")
+    _price(db, company, "100")
+    _fact(db, company, "revenue", "250", "USD", year=2025, quarter="Q1", period="2025-03-31:Q1")
+    _fact(db, company, "shares_diluted", "100", "shares", year=2025, quarter="Q1", period="2025-03-31:Q1")
+    result = load_screener_ratios(db, {"AAPL"}, today=TODAY)["AAPL"]
+    assert result["has_fundamentals"] is False

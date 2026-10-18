@@ -244,6 +244,9 @@ export type RealScreenerRow = {
   pb: number | null;
   roe: number | null;
   beta: number | null;
+  /** true = hay fundamentales SEC/ESEF persistidos (revenue y acciones
+   *  diluidas): el DCF de la tarjeta de inicio es calculable. */
+  has_fundamentals?: boolean;
 };
 
 export type RealScreenerResponse = {

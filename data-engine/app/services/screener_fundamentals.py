@@ -18,6 +18,12 @@ from sqlalchemy.orm import Session
 from app.models import Company, FinancialFact, MarketPrice
 
 _METRICS = {"eps_diluted", "total_equity", "shares_diluted", "net_income"}
+# QA inicio DCF: la tarjeta de oportunidades del inicio prueba candidatas del
+# screener con /api/valuation/{ticker}; sin fundamentales persistidos el DCF
+# no es calculable y la tarjeta quedaba «0 de 6 calculables». Se marca por
+# fila si hay revenue y acciones diluidas (los dos inputs estrictamente
+# necesarios del DCF estándar) para que la UI priorice esas candidatas.
+_DCF_READINESS_METRICS = {"revenue"}
 _TRUSTED_SOURCES = {"SEC", "ESEF"}
 _PRICE_MAX_AGE_DAYS = 7  # weekends/holidays around the latest trading day
 _FACT_MAX_AGE_YEARS = 2
@@ -77,7 +83,7 @@ def load_screener_ratios(
         .where(
             FinancialFact.company_id.in_(ids),
             FinancialFact.tenant_id == db.info.get("tenant_id"),
-            FinancialFact.metric.in_(_METRICS),
+            FinancialFact.metric.in_(_METRICS | _DCF_READINESS_METRICS),
             FinancialFact.fiscal_year >= today.year - _FACT_MAX_AGE_YEARS,
             FinancialFact.source_type.in_(_TRUSTED_SOURCES),
             FinancialFact.is_reported.is_(True),
@@ -106,6 +112,13 @@ def load_screener_ratios(
     for company in companies:
         price = latest_price.get(company.id)
         metrics: dict = {"pe": None, "pb": None, "roe": None}
+        # QA inicio DCF: la tarjeta de oportunidades prioriza candidatas con
+        # fundamentales persistidos (revenue y acciones diluidas, inputs
+        # estrictamente necesarios del DCF estándar); se declara aunque no
+        # haya precio para que la sonda elija bien sus candidatas.
+        facts_for_company = by_company.get(company.id, {})
+        metric_names = {metric for _, metric in facts_for_company}
+        metrics["has_fundamentals"] = {"revenue", "shares_diluted"} <= metric_names
         live = live_prices.get(company.ticker.upper())
         live_close: Decimal | None = None
         live_date: date | None = None
@@ -138,7 +151,6 @@ def load_screener_ratios(
             else {"source": price.source, "date": price.date.isoformat(), "id": price.id}
         )
         currency = (company.currency or "").upper()
-        facts_for_company = by_company.get(company.id, {})
         years = sorted({year for year, _ in facts_for_company}, reverse=True)
         provenance = {"price": price_provenance, "facts": {}}
 
