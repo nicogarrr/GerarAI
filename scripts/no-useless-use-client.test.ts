@@ -154,6 +154,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/NextStepLink.tsx': 'jsx-onClick, browser:window',
   'components/research/QuickAlertButton.tsx': 'useSyncExternalStore, useState, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/select.tsx',
   'components/research/ResearchAssistant.tsx': 'useState, useEffect, jsx-onSubmit, jsx-onChange, importa cliente: components/ui/panel.tsx',
+  'components/research/CompanyChatForm.tsx': 'useFormStatus',
   'components/research/ScrollToOnMount.tsx': 'useEffect, browser:document',
   'components/research/ShareCapitalPanel.tsx': 'jsx-onClick, useState, jsx-onChange, libreria cliente: recharts, importa cliente: components/ui/panel.tsx',
   'components/research/ThesisApproveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',

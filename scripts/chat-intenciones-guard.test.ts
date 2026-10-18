@@ -13,6 +13,8 @@ import { CHAT_INTENTS, chatIntentHref } from '../lib/research/chat-intents.ts';
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 const links = readFileSync('components/research/ChatIntentLinks.tsx', 'utf8');
 
+const form = readFileSync('components/research/CompanyChatForm.tsx', 'utf8');
+
 describe('chat de la ficha: asistente por intención', () => {
     it('existen las 3 intenciones con su etiqueta en español', () => {
         assert.deepEqual(CHAT_INTENTS.map((i) => i.label), ['Entender', 'Revisar supuestos', 'Cuestionar']);
@@ -33,13 +35,14 @@ describe('chat de la ficha: asistente por intención', () => {
     });
     it('la ficha monta los atajos y el formulario libre sigue intacto', () => {
         assert.match(page, /<ChatIntentLinks ticker=\{ticker\} \/>/);
-        assert.match(page, /<Input name="chat"/);
-        assert.match(page, /<input type="hidden" name="view" value="chat" \/>/);
+        assert.match(page, /<CompanyChatForm ticker=\{ticker\}/);
+        assert.match(form, /<Input name="chat"/);
+        assert.match(form, /<input type="hidden" name="view" value="chat" \/>/);
     });
     it('al enviar, el navegador vuelve al panel del chat y los atajos también', () => {
         assert.match(chatIntentHref('AAPL', CHAT_INTENTS[0]), /#chat-empresa$/);
         assert.match(page, /id="chat-empresa"/);
-        assert.match(page, /action=\{`\/research\/\$\{encodeURIComponent\(ticker\)\}#chat-empresa`\}/);
+        assert.match(form, /action=\{`\/research\/\$\{encodeURIComponent\(ticker\)\}#chat-empresa`\}/);
     });
     it('un fallo del chat no tapa la página con BackendOffline: aviso dentro del panel y campo visible', () => {
         const chatBlock = page.slice(page.indexOf('let chatFailed = false;'), page.indexOf('content = (', page.indexOf('let chatFailed = false;')));
