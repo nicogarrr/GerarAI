@@ -10,9 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.models import Company
+from app.services.async_bridge import run_from_any_context
 from app.services.corporate_actions_service import CorporateActionService
 from app.services.split_ingestion_service import SplitIngestionService
 
@@ -56,7 +58,11 @@ async def sync_portfolio_splits(db: Session = Depends(get_db)) -> dict:
     /corporate-actions/{id}/apply after verifying against issuer/exchange
     notices. Provider failures mark the symbol unavailable.
     """
-    return await SplitIngestionService().sync_portfolio(db)
+    # La ingesta mezcla sqlalchemy y el proveedor entre sus awaits: hilo del
+    # pool con la corutina puenteado, no el event loop.
+    return await run_in_threadpool(
+        lambda: run_from_any_context(SplitIngestionService().sync_portfolio(db))
+    )
 
 
 @router.get("")

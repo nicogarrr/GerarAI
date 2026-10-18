@@ -2,9 +2,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.models import Company
+from app.services.async_bridge import run_from_any_context
 from app.services.data_health_service import read_inventory
 from app.services.short_positions_service import read_shorts, refresh_shorts
 
@@ -30,4 +32,8 @@ def shorts(ticker: str = Path(min_length=1, max_length=20), db: Session = Depend
 
 @router.post("/shorts/{ticker}/refresh")
 async def shorts_refresh(ticker: str = Path(min_length=1, max_length=20), db: Session = Depends(get_db)) -> dict:
-    return await refresh_shorts(db, _company(db, ticker))
+    def _refresh() -> dict:
+        return run_from_any_context(refresh_shorts(db, _company(db, ticker)))
+
+    # _company y el refresh (sqlalchemy + proveedor entre awaits): hilo del pool.
+    return await run_in_threadpool(_refresh)

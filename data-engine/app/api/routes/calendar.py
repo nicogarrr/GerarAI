@@ -5,6 +5,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.services import catalyst_calendar_service as catalyst_service
@@ -76,7 +77,8 @@ async def catalysts_calendar(
     start = desde or date.today()
     end = hasta or (start + timedelta(days=14))
     start, end = _resolve_range(start, end)
-    held, held_us = catalyst_service.held_tickers(db)
+    # held_tickers y pending_actions son sqlalchemy sincrono: hilo del pool.
+    held, held_us = await run_in_threadpool(catalyst_service.held_tickers, db)
     if not held:
         return {
             "status": "ok",
@@ -95,6 +97,9 @@ async def catalysts_calendar(
         )
     else:  # sin posiciones US no hay nada que cruzar con NASDAQ/EDGAR: no se les pregunta
         earnings = dividends = filings = {"status": "ok", "events": [], "errors": []}
+    pending_actions = await run_in_threadpool(
+        catalyst_service.pending_actions, db, start, end
+    )
     events = catalyst_service.build_catalysts(
         held=held,
         held_us=held_us,
@@ -102,7 +107,7 @@ async def catalysts_calendar(
         hasta=end,
         earnings=earnings["events"],
         dividends=dividends["events"],
-        actions=catalyst_service.pending_actions(db, start, end),
+        actions=pending_actions,
     )
     events = sorted(
         [*events, *filings["events"]],
