@@ -31,6 +31,7 @@ from app.models.entities import (
     Company,
     ConnectorState,
     InsiderFiling,
+    InsiderTransaction,
     Position,
     WatchItem,
 )
@@ -121,6 +122,7 @@ def scan(
     sleeper: Callable[[float], None] = time.sleep,
     client=None,
     fetcher: Callable[[dict], str] | None = None,
+    backfill: bool = False,
 ) -> dict[str, Any]:
     """Una corrida acotada del monitor. Devuelve stats; nunca lanza."""
     state = _connector_state(db, tenant_id)
@@ -200,6 +202,16 @@ def scan(
                 if delay_seconds > 0:
                     sleeper(delay_seconds)
 
+        if backfill and budget > 0:
+            stats["backfill"] = backfill_empty_filings(
+                db,
+                tenant_id=tenant_id,
+                max_fetches=budget,
+                delay_seconds=delay_seconds,
+                sleeper=sleeper,
+                client=client,
+                fetcher=fetcher,
+            )
         if stats["errors"]:
             stats["status"] = "partial" if stats["tickers_scanned"] else "error"
         _record_success(db, state, stats)
@@ -216,6 +228,74 @@ def scan(
         db.add(state)
         db.commit()
         return stats
+
+
+def backfill_empty_filings(
+    db: Session,
+    *,
+    tenant_id: int | None = None,
+    max_fetches: int = 25,
+    delay_seconds: float = DEFAULT_DELAY_SECONDS,
+    sleeper: Callable[[float], None] = time.sleep,
+    client=None,
+    fetcher: Callable[[dict], str] | None = None,
+) -> dict[str, Any]:
+    """Rellena filings persistidos que no tienen ninguna transaccion.
+
+    Un filing sin filas es un filing sin insider/cargo/importe. Se vuelve a
+    leer su XML y se persisten las transacciones (idempotente por fingerprint).
+    Si el XML se lee bien y de verdad no trae operaciones, el filing queda
+    ``status="empty"`` y no se reintenta; un fallo de red no lo marca.
+    """
+    stats: dict[str, Any] = {"examined": 0, "filled": 0, "empty": 0, "failed": 0}
+    has_tx = select(InsiderTransaction.filing_id).where(
+        InsiderTransaction.filing_id == InsiderFiling.id
+    )
+    stmt = (
+        select(InsiderFiling)
+        .where(
+            InsiderFiling.tenant_id.is_(tenant_id) if tenant_id is None
+            else InsiderFiling.tenant_id == tenant_id,
+            InsiderFiling.status != "empty",
+            ~has_tx.exists(),
+        )
+        .order_by(InsiderFiling.filing_date.desc(), InsiderFiling.id.desc())
+        .limit(max_fetches)
+    )
+    for record in list(db.scalars(stmt)):
+        stats["examined"] += 1
+        filing = {
+            "accession_number": record.accession_number,
+            "form": record.form,
+            "filing_date": record.filing_date,
+            "report_date": record.report_date,
+            "document_url": record.source_url,
+            "index_url": record.index_url,
+        }
+        try:
+            if fetcher is not None:
+                xml_text = fetcher(filing)
+            else:
+                xml_text = form4_connector.fetch_filing_xml(
+                    str(record.source_url), client=client
+                )
+            parsed = form4_connector.parse_form4_xml(xml_text)
+            result = insider_persistence.persist_filing(
+                db, filing, parsed, xml_text=xml_text, tenant_id=tenant_id
+            )
+            if result["transactions_created"]:
+                stats["filled"] += 1
+            elif not parsed.get("transactions"):
+                record.status = "empty"
+                db.add(record)
+                db.commit()
+                stats["empty"] += 1
+        except Exception:  # noqa: BLE001 - best-effort por filing
+            db.rollback()
+            stats["failed"] += 1
+        if delay_seconds > 0:
+            sleeper(delay_seconds)
+    return stats
 
 
 def _record_success(db: Session, state: ConnectorState, stats: dict[str, Any]) -> None:

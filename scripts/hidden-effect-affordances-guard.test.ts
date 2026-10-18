@@ -17,8 +17,8 @@ test('el CTA de alertas declara que ejecuta una revisión', () => {
     assert.doesNotMatch(alerts, />\s*Revisar\s*</);
 });
 
-test('el aviso insider se presenta como evaluación inmediata, no como preferencia', () => {
-    assert.match(insider, /Evaluar aviso Telegram ahora/);
+test('la pantalla insider no expone el botón de depuración del aviso Telegram', () => {
+    assert.doesNotMatch(insider, /Evaluar aviso Telegram ahora/);
     assert.doesNotMatch(insider, /Avisarme por Telegram/);
     assert.doesNotMatch(insider, /type="checkbox"[^>]*notify/);
 });

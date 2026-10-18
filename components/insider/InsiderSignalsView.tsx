@@ -13,19 +13,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatRecordValue, type DataRecord } from '@/components/data/RecordViews';
 import type { InsiderFilingsResult, InsiderSignalsResult } from '@/lib/actions/insider.actions';
-import { getInsiderSignals, loadMoreInsiderFilings } from '@/lib/actions/insider.actions';
+import { loadMoreInsiderFilings } from '@/lib/actions/insider.actions';
 import type { InsiderFilingEntry } from '@/lib/actions/insider.actions';
-import type { InsiderShortcuts } from '@/lib/insider/shortcuts';
+import { insiderName, insiderRole, sideLabel } from '@/lib/insider/format';
 import { analyzedCountCopy, degradedCopy, persistedSourceCopy, durableReadCopy } from '@/lib/insider-status-copy';
-import { toast } from 'sonner';
 
 interface InsiderSignalsViewProps {
     initialTicker: string;
     initialResult: InsiderSignalsResult | null;
     /** Filings Form 4/4-A persistidos (GET /api/insider/filings). */
     initialFilings?: InsiderFilingsResult | null;
-    /** Tickers de cartera y watchlist como atajos (solo lectura). */
-    shortcuts?: InsiderShortcuts;
 }
 
 function signalTone(signal: unknown): 'default' | 'outline' {
@@ -92,35 +89,15 @@ function signalKey(signal: DataRecord): string {
     return `${type}|${subject}|${date}|${form}|${execution}|${formatRecordValue(signal.detail)}`;
 }
 
-export default function InsiderSignalsView({ initialTicker, initialResult, initialFilings, shortcuts }: InsiderSignalsViewProps) {
+export default function InsiderSignalsView({ initialTicker, initialResult, initialFilings }: InsiderSignalsViewProps) {
     const router = useRouter();
     const [ticker, setTicker] = useState(initialTicker);
-    const [notifying, setNotifying] = useState(false);
 
     const handleSearch = (event: React.FormEvent) => {
         event.preventDefault();
         const clean = ticker.trim().toUpperCase();
         if (!clean) return;
         router.push(`/insider?ticker=${encodeURIComponent(clean)}`);
-    };
-
-    /** Evaluacion inmediata con notify=true (enganche Telegram best-effort, una sola vez). */
-    const handleEvaluateNotify = async () => {
-        if (!initialTicker) return;
-        setNotifying(true);
-        try {
-            const result = await getInsiderSignals(initialTicker, { notify: true });
-            const notification = result.notification as { status?: string } | undefined;
-            toast.success(
-                notification?.status === 'delivered'
-                    ? `Aviso insider enviado para ${initialTicker}`
-                    : `Evaluado ${initialTicker}: sin aviso Telegram (${notification?.status ?? 'omitido'})`,
-            );
-        } catch {
-            toast.error(`No se pudo evaluar el aviso para ${initialTicker}`);
-        } finally {
-            setNotifying(false);
-        }
     };
 
     const signals: DataRecord[] = Array.isArray(initialResult?.signals)
@@ -166,9 +143,6 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             <CardTitle className="text-lg font-semibold text-gray-100">
                                 Buscar señales por ticker
                             </CardTitle>
-                            <CardDescription className="mt-0.5 text-sm text-gray-500">
-                                Compras insider (Form 4, código P — mercado abierto o privado): cluster, C-suite y grandes compras
-                            </CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -219,46 +193,10 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             ) : null}
                         </span>
                     ) : null}
-                    {/* El efecto real es una evaluacion inmediata de una sola
-                        vez (evalua y, si hay senal, envia Telegram ahora): no
-                        suscribe nada. Un checkbox sugeriria una preferencia
-                        persistente que no existe (F173). */}
-                    <Button
-                        className="ml-auto min-h-[44px] text-xs sm:min-h-0"
-                        disabled={notifying || !initialResult}
-                        onClick={() => handleEvaluateNotify()}
-                        size="sm"
-                        variant="outline"
-                    >
-                        {notifying ? 'Evaluando aviso…' : 'Evaluar aviso Telegram ahora'}
-                    </Button>
                 </div>
             ) : null}
 
-            {!initialTicker ? (
-                <div className="rounded-lg border border-dashed border-gray-800 p-6 text-sm text-gray-500">
-                    <p>Introduce un ticker para ver sus señales insider.</p>
-                    {[
-                        ['De tu cartera', shortcuts?.portfolio ?? []],
-                        ['De tu watchlist', shortcuts?.watchlist ?? []],
-                    ].map(([label, symbols]) =>
-                        (symbols as string[]).length ? (
-                            <div className="mt-3 flex flex-wrap items-center gap-2" key={label as string}>
-                                <span className="text-xs text-gray-500">{label as string}:</span>
-                                {(symbols as string[]).map((symbol) => (
-                                    <Link
-                                        className="rounded-md border border-gray-700 px-2 py-1 text-xs font-semibold text-teal-300 hover:border-teal-700"
-                                        href={`/insider?ticker=${encodeURIComponent(symbol)}`}
-                                        key={symbol}
-                                    >
-                                        {symbol}
-                                    </Link>
-                                ))}
-                            </div>
-                        ) : null,
-                    )}
-                </div>
-            ) : !initialResult ? (
+            {!initialTicker ? null : !initialResult ? (
                 <p className="rounded-lg border border-red-900/50 bg-red-950/20 p-6 text-sm text-red-200">
                     No se pudieron cargar las señales de {initialTicker}. Reintenta más tarde.
                 </p>
@@ -447,35 +385,46 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                         <CardTitle className="text-lg font-semibold text-gray-100">
                             Filings persistidos · {initialFilings.total ?? initialFilings.count}
                         </CardTitle>
-                        <CardDescription className="mt-0.5 text-sm text-gray-500">
-                            Lectura durable (Form 4/4-A inmutables; las enmiendas son filas propias)
-                        </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4">
                         <ul className="space-y-2">
                             {filings.map((filing) => (
-                                <li
-                                    key={filing.accession_number}
-                                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
-                                >
-                                    <Badge variant="outline">{filing.form}</Badge>
-                                    {filing.is_amendment ? <Badge>Enmienda</Badge> : null}
-                                    <span className="font-mono text-gray-300">
-                                        {filingDateText(filing.filing_date)}
-                                    </span>
-                                    <span className="text-gray-500">
-                                        {formatNumber(filing.transaction_count, { maximumFractionDigits: 0 })} operaciones
-                                    </span>
-                                    {secLink(filing.source_url) ? (
-                                        <a
-                                            href={secLink(filing.source_url)!}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline"
-                                        >
-                                            Ver filing SEC <ExternalLink aria-hidden="true" className="h-3 w-3" />
-                                        </a>
-                                    ) : null}
+                                <li key={filing.accession_number} className="rounded-lg border border-gray-800 p-3 text-sm">
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                        <Badge variant="outline">{filing.form}</Badge>
+                                        {filing.is_amendment ? <Badge>Enmienda</Badge> : null}
+                                        <span className="font-mono text-gray-300">
+                                            {filingDateText(filing.filing_date)}
+                                        </span>
+                                        {secLink(filing.source_url) ? (
+                                            <a
+                                                href={secLink(filing.source_url)!}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline"
+                                            >
+                                                Ver filing SEC <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                                            </a>
+                                        ) : null}
+                                    </div>
+                                    {filing.transactions.length > 0 ? (
+                                        <ul className="mt-2 space-y-1">
+                                            {filing.transactions.map((tx, index) => (
+                                                <li className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs" key={index}>
+                                                    <span className="font-semibold text-gray-100">{insiderName(tx.insider)}</span>
+                                                    <span className="text-gray-400">{insiderRole(tx.role, tx.officer_title)}</span>
+                                                    <span className={tx.code === 'P' ? 'text-teal-300' : tx.code === 'S' ? 'text-red-400' : 'text-gray-400'}>
+                                                        {tx.code === 'P' ? sideLabel('compra') : tx.code === 'S' ? sideLabel('venta') : `Código ${tx.code ?? '—'}`}
+                                                    </span>
+                                                    <span className="tabular-nums text-gray-300">{formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 })} acc.</span>
+                                                    <span className="tabular-nums text-gray-300">{moneyText(tx.price ?? null)}</span>
+                                                    <span className="tabular-nums text-gray-100">{moneyText(tx.value ?? null)}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="mt-2 text-xs text-gray-500">Sin operaciones extraídas.</p>
+                                    )}
                                 </li>
                             ))}
                         </ul>

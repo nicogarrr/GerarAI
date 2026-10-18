@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.entities import InsiderFiling, InsiderTransaction
-from app.services import insider_service
+from app.services import insider_feed, insider_service
 
 router = APIRouter()
 
@@ -30,6 +30,30 @@ def insider_signals(
             result.get("ticker", ticker), result.get("signals", [])
         )
     return result
+
+
+@router.get("/feed")
+def insider_feed_route(
+    days: int = Query(default=90, ge=1, le=730),
+    side: str = Query(default="all", pattern="^(all|buy|sell)$"),
+    ticker: str | None = Query(default=None, max_length=20),
+    limit: int = Query(default=100, ge=1, le=300),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Operaciones insider persistidas de todos los emisores (sin red)."""
+    try:
+        return insider_feed.build_feed(db, days=days, side=side, ticker=ticker, limit=limit)
+    except Exception as exc:  # noqa: BLE001 - best-effort por contrato del modulo
+        return {
+            "status": "unavailable",
+            "reason": type(exc).__name__,
+            "days": days,
+            "side": side,
+            "count": 0,
+            "transactions": [],
+            "clusters": [],
+            "c_suite_buys": [],
+        }
 
 
 @router.get("/filings")
