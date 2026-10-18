@@ -4,6 +4,7 @@ import { Building2, ExternalLink, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import BackendOffline from '@/components/system/BackendOffline';
+import { SyncPortfoliosButton } from '../inversores/_components/SyncPortfoliosButton';
 import {
     getManagerChanges,
     getManagerHoldings,
@@ -216,7 +217,8 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                 ) : (
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5 text-sm text-gray-400">
                         <h2 className="font-semibold text-gray-100">Sin datos 13F todavía</h2>
-                        <p className="mt-2">Pulsa &quot;Sincronizar 13F&quot; para consultar su último informe en SEC.</p>
+                        <p className="mt-2">Sincroniza para consultar el último informe declarado ante la SEC.</p>
+                        <SyncPortfoliosButton label="Sincronizar 13F" queuedText="Sincronización en curso; recarga la página en unos minutos para ver el informe." />
                     </section>
                 )
             ) : null}
