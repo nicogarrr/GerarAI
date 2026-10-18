@@ -34,6 +34,7 @@ from app.workers.dramatiq_app import (
     scan_insider_watchlist,
     sync_ibkr_flex,
     sync_investor_holdings,
+    sync_portfolio_dividends,
     tenant_contexts,
 )
 
@@ -335,6 +336,10 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     )
     _register(scheduler, partial(enqueue_for_all_tenants, refresh_portfolio_moves),
               "cron", job_id="portfolio_moves_daily", hour=5, minute=15)
+    # Dividendos declarados de las posiciones abiertas (ex-date, pago, fuente):
+    # alimentan /corporate-actions y las respuestas de Cerebro. Una vez al dia.
+    _register(scheduler, partial(enqueue_for_all_tenants, sync_portfolio_dividends),
+              "cron", job_id="portfolio_dividends_daily", hour=6, minute=20, jitter=300)
     # F2 ProPicks: precios diarios + momentum del top-40 del ultimo run.
     # Tras el cierre de mercado US (21:45 UTC ~ cierre + margen).
     _register(
