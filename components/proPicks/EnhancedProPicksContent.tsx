@@ -26,6 +26,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
     const [picks, setPicks] = useState<ProPick[]>(initialPicks);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [refreshStatus, setRefreshStatus] = useState<string | null>(null);
     const [lastGenerated, setLastGenerated] = useState<string | null>(generatedAt || null);
     const [passedCount, setPassedCount] = useState<number | null>(initialPassedCount);
     const [filters, setFilters] = useState<ProPicksFilters>({
@@ -68,12 +69,16 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
         const requestedFilters = { ...filters };
         setLoading(true);
         setError(null);
+        setRefreshStatus(null);
         try {
             const result = await generateEnhancedProPicksWithRun(requestedFilters);
             setPicks(result.picks);
             setLastGenerated(result.runAsOf);
             setPassedCount(result.passedCount);
             setAppliedFilters(requestedFilters);
+            setRefreshStatus(result.picks.length
+                ? `Selección consultada: ${result.picks.length} empresas.`
+                : 'Consulta completada: 0 empresas con estos filtros.');
         } catch {
             setError('No se pudo actualizar la selección. Los resultados anteriores se conservan.');
         } finally {
@@ -142,6 +147,9 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                         )}
                         Actualizar selección
                     </Button>
+                    <p aria-live="polite" role="status" className="mt-3 text-xs text-gray-400">
+                        {loading ? 'Consultando selección...' : refreshStatus}
+                    </p>
                     {lastGenerated && (
                         <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
                             <Clock aria-hidden="true" className="h-3 w-3" />
