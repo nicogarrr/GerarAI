@@ -36,6 +36,7 @@ from app.workers.dramatiq_app import (
     scan_insider_watchlist,
     sync_ibkr_flex,
     sync_investor_holdings,
+    sync_official_closes,
     sync_portfolio_dividends,
     tenant_contexts,
 )
@@ -370,6 +371,17 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         "cron",
         job_id="propicks_snapshot_monthly",
         day=1,
+        hour=22,
+        minute=30,
+    )
+    # Cierres oficiales de todo el universo (base de Movers/Mercado/watchlist).
+    # 22:30 UTC: tras el cierre US tanto en EDT como en EST.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, sync_official_closes),
+        "cron",
+        job_id="official_closes_daily",
+        day_of_week="mon-fri",
         hour=22,
         minute=30,
     )

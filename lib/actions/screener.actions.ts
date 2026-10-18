@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { jsonBody, researchRequest } from '@/lib/research/client';
 import { formatNumber } from '@/lib/format';
+import { fetchDatedChanges } from '@/lib/market/dated-change';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -279,7 +280,21 @@ export const getScreenerStocksReal = cache(
       `/api/screeners/real${qs ? `?${qs}` : ''}`,
       { cache: 'no-store' },
     );
-    return data?.screener ?? [];
+    const rows = data?.screener ?? [];
+    // Precio, variación y fecha salen de los mismos cierres datados que Movers.
+    const dated = await fetchDatedChanges(rows.map((row) => row.symbol));
+    return rows.map((row) => {
+      const d = dated[row.symbol.toUpperCase()];
+      if (!d) return row;
+      return {
+        ...row,
+        price: d.price,
+        change: d.change,
+        changePercent: d.changePercent,
+        prevClose: d.previousClose,
+        priceDate: d.date,
+      };
+    });
   },
 );
 
