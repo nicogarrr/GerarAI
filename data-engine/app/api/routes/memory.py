@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -36,6 +37,7 @@ from app.services.company_resolver import resolve_company
 from app.services.review_alert_service import ReviewAlertService
 from app.services.review_copy import claim_status_label
 from app.services.source_hierarchy_service import classify_source
+from app.services.ticker_news_lane import is_law_firm_solicitation
 from app.services.thesis_change_types import claim_change_type
 
 router = APIRouter()
@@ -231,6 +233,42 @@ def add_claim_evidence(
     return evidence
 
 
+# «Qué ha cambiado» solo muestra cambios con relación fiable con la tesis.
+_NO_RELIABLE_RELATION_MARKERS = (
+    # Prefijos persistidos por el motor cuando NO encontro relacion (legacy y actual).
+    "No structural thesis node matched with sufficient confidence.",
+    "No stored thesis is available for semantic impact mapping.",
+)
+
+
+def _change_dedupe_key(text: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()[:200]
+
+
+def _visible_thesis_changes(rows: list[ThesisChange], limit: int) -> list[ThesisChange]:
+    """Filtra el feed de cambios: sin captacion de despachos, sin tarjetas sin
+    relacion con la tesis y sin el mismo cambio repetido por ingesta multiple."""
+    visible: list[ThesisChange] = []
+    seen: set[str] = set()
+    for row in rows:
+        summary = row.summary or ""
+        if is_law_firm_solicitation(summary):
+            continue
+        if any(marker in summary for marker in _NO_RELIABLE_RELATION_MARKERS):
+            continue
+        if not (row.affected_claim_ids or []) and not (row.affected_metrics or []):
+            continue
+        key = _change_dedupe_key(summary)
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        visible.append(row)
+        if len(visible) >= limit:
+            break
+    return visible
+
+
 @router.get("/thesis/{ticker}/changes", response_model=list[ThesisChangeOut])
 def list_thesis_changes(
     ticker: str,
@@ -238,14 +276,17 @@ def list_thesis_changes(
     db: Session = Depends(get_db),
 ) -> list[ThesisChange]:
     company = _company_by_ticker(db, ticker)
-    return list(
+    # Sobremuestreo x4: el filtro de visibilidad descarta duplicados y tarjetas
+    # sin relacion, y el limite debe aplicar a lo que la UI realmente muestra.
+    rows = list(
         db.scalars(
             select(ThesisChange)
             .where(ThesisChange.company_id == company.id)
             .order_by(desc(ThesisChange.created_at))
-            .limit(limit)
+            .limit(limit * 4)
         ).all()
     )
+    return _visible_thesis_changes(rows, limit)
 
 
 @router.post("/thesis/changes", response_model=ThesisChangeOut)
