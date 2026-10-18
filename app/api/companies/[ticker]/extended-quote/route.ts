@@ -6,7 +6,11 @@ import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import type { ExtendedQuote } from '@/lib/market/extended-quote';
 
 export async function GET(request: Request, { params }: { params: Promise<{ ticker: string }> }) {
-    await requireAuthenticatedUser();
+    try {
+        await requireAuthenticatedUser();
+    } catch {
+        return Response.json({ status: 'unavailable' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+    }
     const { ticker } = await params;
     if (!/^[A-Za-z0-9.^=-]{1,32}$/.test(ticker)) return Response.json({ status: 'unavailable' }, { status: 400 });
     // Same exact gate as the server market/history fixture. No live Yahoo
