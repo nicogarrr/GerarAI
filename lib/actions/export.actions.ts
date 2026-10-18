@@ -59,6 +59,10 @@ export async function exportJournal(year: number, format: ExportFormat = 'csv'):
     const response = await fetch(exportUrl, {
         headers: { ...identityHeaders },
         cache: 'no-store',
+        // La exportación de un año completo puede tardar más que una lectura
+        // normal, pero sin límite un engine colgado dejaba la acción
+        // esperando indefinidamente.
+        signal: AbortSignal.timeout(30_000),
     });
 
     if (!response.ok) {

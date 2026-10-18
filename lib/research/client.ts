@@ -48,7 +48,7 @@ export function researchTimeoutFor(
     : RESEARCH_TIMEOUTS.GLOBAL_MS;
 }
 
-function requestSignal(external: AbortSignal | null | undefined, timeoutMs: number): AbortSignal {
+export function requestSignal(external: AbortSignal | null | undefined, timeoutMs: number): AbortSignal {
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
   if (!external) return timeoutSignal;
   // Hay que respetar ambos límites: el del caller y el presupuesto de la app.

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { normalizeResearchBody, researchIdentityHeaders } from '@/lib/auth/research-identity';
+import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
 import { AppError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 
@@ -340,6 +341,10 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
       ...init,
       body: normalized.body ?? undefined,
       cache: 'no-store',
+      // Sin timeout una lectura lenta del engine dejaba la página colgada en
+      // silencio; respeta la señal del caller si la hay (mismo patrón que
+      // lib/research/client.ts).
+      signal: requestSignal(init?.signal, RESEARCH_TIMEOUTS.GLOBAL_MS),
       headers: {
         ...identity,
         ...(normalized.contentType

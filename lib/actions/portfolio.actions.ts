@@ -30,10 +30,19 @@ function invalidatePortfolioReads(userId: string): void {
 async function getQuote(symbol: string): Promise<{ c: number } | null> {
     try {
         if (!FINNHUB_API_KEY) return null;
-        const response = await fetch(
-            `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`,
-            { next: { revalidate: 60 } }
-        );
+        // Timeout por carrera y NO por signal: pasar `signal` al fetch
+        // desactivaría la Data Cache de Next (revalidate: 60) y multiplicaría
+        // las llamadas a Finnhub (cuota free compartida). Si Finnhub no
+        // responde en 8s se devuelve null como cualquier otro fallo.
+        const response = await Promise.race([
+            fetch(
+                `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`,
+                { next: { revalidate: 60 } }
+            ),
+            new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Finnhub quote timeout (8s)')), 8_000)
+            ),
+        ]);
         if (!response.ok) return null;
         return await response.json();
     } catch (error) {
