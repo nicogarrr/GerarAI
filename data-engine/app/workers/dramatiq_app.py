@@ -1435,6 +1435,29 @@ def refresh_propicks_prices(
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000)
+def freeze_propicks_snapshot(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Snapshot mensual congelado (point-in-time) del embudo ProPicks."""
+    from app.services.propicks_snapshot_service import freeze_monthly_snapshot
+
+    db = _session(tenant_id, user_id)
+    try:
+        row = freeze_monthly_snapshot(db)
+        return {
+            "actor": "freeze_propicks_snapshot",
+            "month": row.month if row else None,
+            "passed_count": row.passed_count if row else 0,
+        }
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("freeze_propicks_snapshot", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
 def refresh_sec_filings(
     tenant_id: int | None = None,
