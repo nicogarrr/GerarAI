@@ -10,6 +10,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import CalculatedMetric, Company, Document, FinancialFact
+from app.services.financial_ingestion_service import SOURCE_PRIORITY
 from app.services.metric_calculation_service import METRIC_DEFINITIONS
 
 DEFAULT_TERMINAL_METRICS = (
@@ -106,7 +107,15 @@ class FinancialTerminalService:
         )
         earliest_year = latest_year - years + 1
         series: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        seen: set[tuple[str, str, str, str]] = set()
+        # Deduplicacion con criterio explicito: un (metrica, periodo, segmento)
+        # tenia DOS filas cuando convivian el dato del filing (reported) y la
+        # refundicion del proveedor (normalized) — MSFT/V mostraban dos
+        # «Deuda total» distintas para el mismo FY. Gana la fuente con mejor
+        # SOURCE_PRIORITY (filing regulador > vendor > manual), y a empate la
+        # ingesta mas reciente. El segmento sigue en la identidad: una fila
+        # por segmento, no por proveedor.
+        best_fact: dict[tuple[str, str, str, str], tuple[float, ...]] = {}
+        last_fact_id: dict[tuple[str, str, str, str], int] = {}
         for fact in facts:
             if fact.fiscal_year and fact.fiscal_year < earliest_year:
                 continue
@@ -115,10 +124,19 @@ class FinancialTerminalService:
                 continue
             document = documents.get(fact.source_id)
             segment = str((document.metadata_ or {}).get("segment") or "consolidated") if document else "consolidated"
-            key = (fact.metric, fact.period, segment, "reported" if fact.is_reported else "normalized")
-            if key in seen:
+            key = (fact.metric, fact.period, segment, frequency)
+            rank = (
+                SOURCE_PRIORITY.get(fact.source_type or "", 50),
+                -(fact.created_at.timestamp() if fact.created_at else 0.0),
+            )
+            if key in best_fact and best_fact[key] <= rank:
                 continue
-            seen.add(key)
+            if key in best_fact:
+                series[fact.metric] = [
+                    row for row in series[fact.metric] if row["id"] != last_fact_id[key]
+                ]
+            best_fact[key] = rank
+            last_fact_id[key] = fact.id
             series[fact.metric].append(
                 {
                     "id": fact.id,
@@ -143,6 +161,7 @@ class FinancialTerminalService:
                     "definition_version": None,
                 }
             )
+        seen: set[tuple[str, str, str, str]] = set()
         for metric in calculated:
             if metric.fiscal_year and metric.fiscal_year < earliest_year:
                 continue
