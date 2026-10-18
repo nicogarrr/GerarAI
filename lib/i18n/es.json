@@ -87,8 +87,7 @@
   "propicks": {
     "follow": "Seguir",
     "followed": "Siguiendo",
-    "noResults": "Sin resultados con estos filtros",
-    "regenerate": "Regenerar Picks"
+    "noResults": "Sin resultados con estos filtros"
   },
   "research": {
     "sources": "Fuentes",
