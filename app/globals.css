@@ -24,6 +24,7 @@
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);
+    --color-destructive-foreground: var(--destructive-foreground);
     --color-destructive: var(--destructive);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
@@ -87,6 +88,10 @@
     --accent: oklch(0.22 0.03 260.031);
     --accent-foreground: oklch(0.95 0.005 247.858);
     --destructive: oklch(0.704 0.191 22.216);
+    /* El Badge destructive lo usa (badge.tsx): sin este token la clase
+       text-destructive-foreground no existia y el texto heredaba un color
+       ilegible sobre el rojo. */
+    --destructive-foreground: oklch(0.95 0.005 247.858);
     --border: oklch(1 0 0 / 8%);
     --input: oklch(1 0 0 / 8%);
     --ring: oklch(0.7 0.09 256.788);
