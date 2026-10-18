@@ -1,3 +1,4 @@
+import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { getNews } from '@/lib/actions/finnhub.actions';
 import { newsSummaryToShow } from '@/lib/news-summary';
 import { newsBadge } from '@/lib/newsBadge';
@@ -74,12 +75,10 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                 key={`${article.id}-${index}`}
                                 className="relative min-w-0 p-4 bg-surface-2 hover:bg-surface-1 rounded-lg border border-gray-800 transition-all duration-200 group"
                             >
-                            <a
-                                href={article.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block after:absolute after:inset-0"
-                            >
+                            <div className="mb-2 flex justify-end">
+                                {badge.kind === 'general' ? <span className="text-xs text-gray-400">Mercado general</span> : <Link href={`/research/${encodeURIComponent(badge.ticker)}`} className="text-xs text-teal-300">{badge.kind === 'mentioned' ? 'Menciona ' : ''}{badge.ticker}</Link>}
+                            </div>
+                            <div>
                                 <div className="flex flex-col min-[420px]:flex-row gap-3 sm:gap-4">
                                     {article.image && (
                                         <div className="h-40 w-full min-w-0 shrink-0 relative rounded-lg overflow-hidden min-[420px]:h-24 min-[420px]:w-32">
@@ -101,12 +100,11 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="pr-14 text-white text-sm sm:text-base font-semibold mb-2 line-clamp-2 group-hover:text-[#0FEDBE] transition-colors break-words">
-                                            {stripLeadingTicker(
-                                                stripSourceSuffix(article.headline, article.source),
-                                                badge.kind === 'general' ? null : badge.ticker,
-                                            )}
-                                        </h3>
+                                        <ExternalNewsHeadline
+                                            headline={stripLeadingTicker(stripSourceSuffix(article.headline, article.source), badge.kind === 'general' ? null : badge.ticker)}
+                                            url={article.url}
+                                            className="text-white text-sm sm:text-base font-semibold mb-2 break-words"
+                                        />
                                         {newsSummaryToShow(article.headline, article.summary) && (
                                             <p className="text-gray-400 text-sm mb-2 line-clamp-2 break-words">
                                                 {newsSummaryToShow(article.headline, article.summary)}
@@ -132,31 +130,7 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                         </div>
                                     </div>
                                 </div>
-                            </a>
-                            {/* related del proveedor = compañía mencionada, NO tenencia:
-                                «holding» solo si el ticker está entre los símbolos del usuario.
-                                La insignia con ticker enlaza a su ficha. */}
-                            {badge.kind === 'holding' && (
-                                <Link
-                                    href={`/research/${encodeURIComponent(badge.ticker)}`}
-                                    className="absolute right-3 top-3 z-10 rounded bg-[#0FEDBE]/10 px-2 py-0.5 text-xs text-[#0FEDBE] transition-colors hover:bg-[#0FEDBE]/20"
-                                >
-                                    {badge.ticker}
-                                </Link>
-                            )}
-                            {badge.kind === 'mentioned' && (
-                                <Link
-                                    href={`/research/${encodeURIComponent(badge.ticker)}`}
-                                    className="absolute right-3 top-3 z-10 rounded bg-gray-700/40 px-2 py-0.5 text-xs text-gray-300 transition-colors hover:bg-gray-700/70 hover:text-gray-100"
-                                >
-                                    Menciona {badge.ticker}
-                                </Link>
-                            )}
-                            {badge.kind === 'general' && (
-                                <span className="absolute right-3 top-3 rounded bg-gray-700/40 px-2 py-0.5 text-xs text-gray-400">
-                                    Mercado general
-                                </span>
-                            )}
+                            </div>
                             </article>
                         );})}
                     </div>
