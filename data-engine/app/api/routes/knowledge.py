@@ -3,7 +3,7 @@ from datetime import date
 from typing import Annotated, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel, Field, HttpUrl, TypeAdapter, ValidationError
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
@@ -274,6 +274,17 @@ async def upload_document(
         raise _ref_error(400, "Knowledge upload rejected", exc) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Knowledge ingestion failed") from exc
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+def delete_document(document_id: int, db: Session = Depends(get_db)) -> Response:
+    # db.get va con el filtro de tenant de la sesion: un documento de otro
+    # tenant es None aqui y responde 404, igual que uno inexistente.
+    document = db.get(KnowledgeDocument, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Knowledge document not found")
+    KnowledgeLibraryService.delete_document(db, document)
+    return Response(status_code=204)
 
 
 @router.get("/documents/{document_id}/chunks")

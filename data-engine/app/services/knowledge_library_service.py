@@ -11,13 +11,14 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import delete, desc, func, select, update
 from sqlalchemy.orm import Session
 
 from app.llm import LLMProvider, LLMRequest, Message, ResponseFormat, create_llm_provider
 from app.llm.json import parse_json_response
 from app.models import (
     Company,
+    InvestmentCaseStudy,
     InvestmentPrinciple,
     KnowledgeChunk,
     KnowledgeCollection,
@@ -726,6 +727,88 @@ class KnowledgeLibraryService:
             KnowledgeLibraryService.document_dict(document)
             for document in db.scalars(statement).all()
         ]
+
+    @staticmethod
+    def delete_document(db: Session, document: KnowledgeDocument) -> dict[str, int]:
+        """Borra un documento de conocimiento y lo derivado de el.
+
+        Cascada: principios extraidos (FK obligatoria), fragmentos y, en
+        mejor esfuerzo, sus puntos vectoriales (Qdrant es un indice
+        desechable: ``rebuild_tenant`` lo recrea desde PostgreSQL, asi que
+        un fallo alli no bloquea el borrado). Los casos de estudio
+        conservan su contenido y solo pierden el enlace (FK nullable).
+        Los filtros de tenant de la sesion (eventos de database.py) se
+        aplican a cada sentencia. Devuelve contadores para logs y tests.
+        """
+        principles = db.execute(
+            delete(InvestmentPrinciple).where(
+                InvestmentPrinciple.knowledge_document_id == document.id
+            )
+        ).rowcount
+        db.execute(
+            update(InvestmentCaseStudy)
+            .where(InvestmentCaseStudy.knowledge_document_id == document.id)
+            .values(knowledge_document_id=None)
+        )
+        chunks = db.execute(
+            delete(KnowledgeChunk).where(
+                KnowledgeChunk.knowledge_document_id == document.id
+            )
+        ).rowcount
+        KnowledgeLibraryService._delete_vector_points(db, document)
+        db.delete(document)
+        db.commit()
+        logger.info(
+            "knowledge document %s deleted (%s chunks, %s principles)",
+            document.id, chunks, principles,
+        )
+        return {"chunks_deleted": int(chunks), "principles_deleted": int(principles)}
+
+    @staticmethod
+    def _delete_vector_points(db: Session, document: KnowledgeDocument) -> None:
+        """Mejor esfuerzo: quita los puntos Qdrant del documento.
+
+        La ingesta vectorial es opt-in y el indice es reconstruible; un
+        fallo se loguea y no impide borrar la fila y sus fragmentos.
+        """
+        try:
+            if os.getenv("CAVAAI_ENABLE_VECTOR_INGEST") != "1":
+                return
+            tenant_id = db.info.get("tenant_id")
+            if tenant_id is None:
+                return
+            from qdrant_client.models import (
+                FieldCondition,
+                Filter,
+                FilterSelector,
+                MatchValue,
+            )
+
+            from app.services.rag import RAGIndex
+
+            index = RAGIndex()
+            index.client().delete(
+                collection_name=index._collection(),
+                points_selector=FilterSelector(
+                    filter=Filter(
+                        must=[
+                            FieldCondition(
+                                key="tenant_id", match=MatchValue(value=tenant_id)
+                            ),
+                            FieldCondition(
+                                key="knowledge_document_id",
+                                match=MatchValue(value=document.id),
+                            ),
+                        ]
+                    )
+                ),
+                wait=True,
+            )
+        except Exception:  # noqa: BLE001 - mejor esfuerzo, ver docstring
+            logger.warning(
+                "knowledge vector delete failed for document %s",
+                document.id, exc_info=True,
+            )
 
     @staticmethod
     def get_document(db: Session, document_id: int) -> dict | None:
