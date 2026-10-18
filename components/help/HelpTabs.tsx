@@ -256,8 +256,11 @@ export default function HelpTabs() {
           <section className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-lg p-8 text-center">
             <h2 className="text-2xl font-bold text-gray-100 mb-4">Contacto</h2>
             <p className="text-gray-300 mb-6">
-              ¿Tienes preguntas o sugerencias? Escríbenos por email.
+              {SUPPORT_EMAIL
+                ? '¿Tienes preguntas o sugerencias? Escríbenos por email.'
+                : '¿Tienes preguntas o sugerencias? El canal de contacto se publicará aquí.'}
             </p>
+            {SUPPORT_EMAIL && (
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <a
                     href={`mailto:${SUPPORT_EMAIL}`}
@@ -266,6 +269,7 @@ export default function HelpTabs() {
                     Enviar email a {SUPPORT_EMAIL}
                 </a>
             </div>
+            )}
           </section>
         </TabsContent>
       </Tabs>

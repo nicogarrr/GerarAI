@@ -130,9 +130,11 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                                 {link.label}
                             </Link>
                         ))}
-                        <a href={`mailto:${SUPPORT_EMAIL}`} className="public-footer-link">
-                            {SUPPORT_EMAIL}
-                        </a>
+                        {SUPPORT_EMAIL && (
+                            <a href={`mailto:${SUPPORT_EMAIL}`} className="public-footer-link">
+                                {SUPPORT_EMAIL}
+                            </a>
+                        )}
                     </nav>
                 </div>
             </footer>
