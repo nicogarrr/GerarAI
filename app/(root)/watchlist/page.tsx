@@ -115,9 +115,7 @@ export default async function WatchlistPage({
     // La divisa la fija el listado real; sin divisa verificada se muestra el
     // número pelado, nunca un «US$» asumido (F253).
     const formatPriceCell = (price: number | null, currency: string | null) =>
-        price === null ? NA : currency === 'USD'
-            ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)
-            : currency ? formatPrice(price, currency) : formatNumber(price);
+        price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip p-4 sm:p-6">

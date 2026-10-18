@@ -133,7 +133,8 @@ export function formatMoney(
 }
 
 /**
- * Precio con decimales dinámicos: los valores muy pequeños (microcaps,
+ * Precio: USD en inglés ($93.90), otras divisas con su locale español.
+ * Decimales dinámicos: los valores muy pequeños (microcaps,
  * abs < 0,01) necesitan más de 2 decimales para no salir como "0,00 US$"
  * cuando el precio real es distinto de cero (F35, SANW 0,0011 US$).
  * Por debajo de 0,01 se usan dígitos significativos en vez de decimales fijos.
@@ -147,7 +148,7 @@ export function formatPrice(
   const parsed = toFinite(value);
   if (parsed === null) return fallback;
   const small = parsed !== 0 && Math.abs(parsed) < 0.01;
-  return new Intl.NumberFormat(FORMAT_LOCALE, {
+  return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : FORMAT_LOCALE, {
     style: 'currency',
     currency,
     useGrouping: 'always',
@@ -217,12 +218,15 @@ export function formatPercent(
 ): string {
   const parsed = toFinite(value);
   if (parsed === null) return fallback;
-  const ratio = fromRatio ? parsed : parsed / 100;
+  const rawRatio = fromRatio ? parsed : parsed / 100;
+  // A displayed zero is neutral, even if a tiny signed value rounds to zero.
+  const roundedZero = Math.abs(rawRatio * 100) < 0.5 * 10 ** -digits;
+  const ratio = roundedZero ? 0 : rawRatio;
   return new Intl.NumberFormat(FORMAT_LOCALE, {
     style: 'percent',
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
-    ...(signDisplay ? { signDisplay } : {}),
+    ...(signDisplay ? { signDisplay: roundedZero && signDisplay === 'always' ? 'auto' : signDisplay } : {}),
   }).format(ratio);
 }
 

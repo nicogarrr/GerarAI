@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 
-import { formatMarketDate, formatMoney, formatNumber, formatPercent, isValidCurrencyCode, NA } from '@/lib/format';
+import { formatMarketDate, formatPrice, formatNumber, formatPercent, isValidCurrencyCode, NA } from '@/lib/format';
 import { exchangeDisplayName } from '@/lib/exchangeName';
 
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,7 @@ const CompanyMarketChart = dynamic(() => import('./CompanyMarketChart'), {
 // USD (mismo criterio que CompanyHeaderQuote).
 function money(value: number | null, currency: string | null) {
     if (value == null) return NA;
-    return isValidCurrencyCode(currency) ? formatMoney(value, currency) : formatNumber(value);
+    return isValidCurrencyCode(currency) ? formatPrice(value, currency) : formatNumber(value);
 }
 
 export function CompanyMarketPanel({ snapshot }: { snapshot: CompanyMarketSnapshot }) {
