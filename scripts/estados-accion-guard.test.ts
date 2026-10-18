@@ -16,6 +16,24 @@ test('inversores: cuenta nueva sin 13F ofrece la acción real de sincronizar', (
   assert.ok(button.includes('Sincronización en curso'), 'confirma que la sincronización quedó encolada');
 });
 
+test('más compradas: sin dos trimestres de 13F ofrece la misma acción de sincronizar', () => {
+  const page = read('app/(root)/inversores/mas-compradas/page.tsx');
+  assert.ok(page.includes('SyncPortfoliosButton'), 'más-compradas reutiliza el botón de sincronización en su estado vacío');
+  assert.ok(page.includes('faltan dos trimestres de 13F sincronizados.'), 'la razón honesta se conserva');
+});
+
+test('hub inversores: sin ningún 13F ofrece la misma acción de sincronizar', () => {
+  const page = read('app/(root)/inversores/page.tsx');
+  assert.ok(page.includes('SyncPortfoliosButton'), 'el hub reutiliza el botón de sincronización en su estado vacío');
+  assert.ok(page.includes('.every((investor) => !investor.report_date)'), 'solo cuando NINGÚN inversor tiene 13F');
+});
+
+test('ficha de inversor: con 13F sin sincronizar ofrece la acción en vez de «N/D · 0 posiciones»', () => {
+  const page = read('app/(root)/inversores/[slug]/page.tsx');
+  assert.ok(page.includes('SyncPortfoliosButton'), 'la ficha reutiliza el botón de sincronización');
+  assert.ok(page.includes('investor.has_13f && portfolio.positions.length === 0'), 'solo cuando el inversor tiene 13F y no hay posiciones');
+});
+
 test('la acción de sincronización llama a la ruta async que encola el actor', () => {
   assert.ok(read('lib/actions/investors.actions.ts').includes('/api/ownership/managers/sync-async'));
   const route = read('data-engine/app/api/routes/ownership.py');

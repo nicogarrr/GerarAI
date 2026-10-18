@@ -17,6 +17,7 @@ import { InvestorVideos } from "../_components/InvestorVideos";
 import { InvestorAvatar } from "../_components/Avatar";
 import { INVESTOR_PHOTOS } from "../_components/photos";
 import { PublicProfileSection } from "../_components/PublicProfile";
+import { SyncPortfoliosButton } from "../_components/SyncPortfoliosButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -141,11 +142,18 @@ export default async function InvestorPage({
           </Link>
         ))}
       </nav>
-      <Portfolio
-        portfolio={portfolio}
-        view={view ?? "posiciones"}
-        pagina={pagina}
-      />
+      {investor.has_13f && portfolio.positions.length === 0 ? (
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-8 text-center">
+          <p className="text-gray-300">Aún no hay carteras descargadas en esta cuenta.</p>
+          <SyncPortfoliosButton />
+        </div>
+      ) : (
+        <Portfolio
+          portfolio={portfolio}
+          view={view ?? "posiciones"}
+          pagina={pagina}
+        />
+      )}
       {!investor.has_13f && investor.public_profile ? (
         <PublicProfileSection profile={investor.public_profile} />
       ) : null}
