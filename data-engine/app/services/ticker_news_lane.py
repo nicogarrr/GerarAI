@@ -87,6 +87,35 @@ def is_data_page_headline(title: str | None) -> bool:
     return any(pattern.search(text) for pattern in _DATA_PAGE_PATTERNS)
 
 
+# Comunicados de despachos de abogados captando demandantes. No son hechos de la
+# empresa (no aportan cifras ni eventos) pero el motor los puntuaba como criticos
+# por palabras como "fraud" o "investigation". Solo se descarta la captacion
+# (nombre de despacho, plazo de demandante principal, "en nombre de inversores");
+# la noticia periodistica de una demanda colectiva no encaja aqui.
+_LAW_FIRM_SOLICITATION = re.compile(
+    "|".join(
+        (
+            r"\b(?:rosen law firm|pomerantz|levi\s*&\s*korsinsky|bragar eagel|faruqi|"
+            r"kessler topaz|gross law firm|schall law|hagens berman|bernstein liebhard|"
+            r"glancy prongay|robbins geller|johnson fistel|block & leviton|"
+            r"the schall|kirby mcinerney|law offices of|bronstein, gewirtz|"
+            r"portnoy law|howard g\. smith|rigrodsky|holzer & holzer|"
+            r"frank r\. cruz|the law offices)\b",
+            r"\blead plaintiff deadline\b",
+            r"\b(?:investors?|shareholders?|stockholders?)\s+(?:who|that)\s+(?:lost|suffered|incurred)\b",
+            r"\b(?:investigat\w+|announces?|reminds?|encourages?|urges?)\b[^.]{0,80}\bon behalf of\b[^.]{0,40}\b(?:investors?|shareholders?|stockholders?)\b",
+            r"\b(?:securities )?class action (?:lawsuit )?(?:deadline|reminder)\b",
+            r"\bshareholder (?:alert|rights alert)\b",
+        )
+    ),
+    re.IGNORECASE,
+)
+
+
+def is_law_firm_solicitation(title: str | None, summary: str | None = None) -> bool:
+    return bool(_LAW_FIRM_SOLICITATION.search(f"{title or ''} {summary or ''}"))
+
+
 _PUBLISHER_RE = re.compile(r"^(?P<title>.+?)\s+-\s+(?P<publisher>[^-]{2,60})$")
 
 
@@ -153,6 +182,7 @@ def label_yahoo(result: ConnectorResult, company=None, evidence_level=None) -> C
         dataclasses.replace(item, source="Yahoo Finance")
         for item in result.items
         if not is_data_page_headline(item.title)
+        and not is_law_firm_solicitation(item.title, item.summary)
         and not (company is not None and _only_ticker_prefix_mention(company, item.title, item.summary or ""))
         and not (
             company is not None
@@ -191,7 +221,7 @@ def label_google(result: ConnectorResult, company, evidence_level) -> ConnectorR
     kept: list[ConnectorItem] = []
     for item in result.items:
         text = f"{item.title} {item.summary}"
-        if is_data_page_headline(item.title):
+        if is_data_page_headline(item.title) or is_law_firm_solicitation(item.title, item.summary):
             continue
         if not company_mentioned(company, text, evidence_level):
             continue
