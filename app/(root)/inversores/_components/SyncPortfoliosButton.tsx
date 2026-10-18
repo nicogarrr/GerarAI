@@ -7,7 +7,13 @@ import { Button } from '@/components/ui/button';
 import { syncInvestorPortfoliosNow } from '@/lib/actions/investors.actions';
 
 // Interactivo (estado + server action en onClick): no puede ser servidor.
-export function SyncPortfoliosButton() {
+export function SyncPortfoliosButton({
+    label = 'Sincronizar carteras ahora',
+    queuedText = 'Sincronización en curso; recarga la página en unos minutos para ver las carteras.',
+}: {
+    label?: string;
+    queuedText?: string;
+}) {
     const [state, setState] = useState<'idle' | 'syncing' | 'queued' | 'error'>('idle');
 
     const handleSync = async () => {
@@ -26,10 +32,10 @@ export function SyncPortfoliosButton() {
                 className="gap-2 bg-teal-600 text-white hover:bg-teal-700"
             >
                 <RefreshCw aria-hidden="true" className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Encolando sincronización...' : 'Sincronizar carteras ahora'}
+                {loading ? 'Encolando sincronización...' : label}
             </Button>
             {state === 'queued' ? (
-                <p className="text-sm text-teal-300">Sincronización en curso; recarga la página en unos minutos para ver las carteras.</p>
+                <p className="text-sm text-teal-300">{queuedText}</p>
             ) : null}
             {state === 'error' ? (
                 <p className="text-sm text-red-400">No se pudo encolar la sincronización. Inténtalo de nuevo.</p>
