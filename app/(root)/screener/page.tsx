@@ -50,9 +50,7 @@ function screenerMarketCap(value: number): string {
 
 // Solo el proveedor confirma la divisa, nunca se infiere del ticker.
 function screenerPrice(price: number, currency: string | null | undefined): string {
-  return currency === 'USD'
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)
-    : isValidCurrencyCode(currency)
+  return isValidCurrencyCode(currency)
     ? formatPrice(price, currency)
     : formatNumber(price, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
