@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { formatMarketCapUsd, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
+import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 import { getWatchlistState, getWatchlistEntryData } from '@/lib/actions/watchlist.actions';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -194,17 +194,17 @@ export default async function WatchlistPage({
                                         </span>
                                     </div>
                                 </div>
-                                <dl className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-gray-800/50 px-2 py-3 text-center">
-                                    <div className="min-w-0">
+                                <dl className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-gray-800/50 px-2 py-3 text-center">
+                                    <div className="col-span-2 min-w-0">
                                         <dt className="text-[11px] text-gray-500">Precio</dt>
                                         <dd className="truncate font-mono text-sm font-medium text-gray-200">{formatPriceCell(stock.price, stock.currency)}</dd>
                                         {stock.priceKind === 'close' ? (
-                                            <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${stock.priceAsOf}` : 'Cierre sin fecha de la fuente'}</dd>
+                                            <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</dd>
                                         ) : null}
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Market Cap</dt>
-                                        <dd className="truncate font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
+                                        <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
                                             {stock.marketCap !== null ? formatMarketCapUsd(stock.marketCap) : NA}
                                         </dd>
                                     </div>
@@ -276,7 +276,7 @@ export default async function WatchlistPage({
                                         <TableCell className="text-right font-mono font-medium text-gray-200">
                                             {formatPriceCell(stock.price, stock.currency)}
                                             {stock.priceKind === 'close' ? (
-                                                <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? `Cierre ${stock.priceAsOf}` : 'Cierre sin fecha de la fuente'}</div>
+                                                <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</div>
                                             ) : null}
                                         </TableCell>
                                         <TableCell className="text-right">
