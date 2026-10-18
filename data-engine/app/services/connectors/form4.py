@@ -178,16 +178,33 @@ def _looks_like_xml(text: str) -> bool:
     return head.startswith("<")
 
 
+RETRY_STATUSES = {403, 429, 500, 502, 503, 504}
+RETRY_BACKOFF_SECONDS = (2.0, 6.0)
+
+
+def _sleep(seconds: float) -> None:
+    import time
+
+    time.sleep(seconds)
+
+
 def _get_text(url: str, client: httpx.Client | None) -> str:
+    """GET con backoff ante 403/429/5xx de la SEC (limite por IP): hasta 3 intentos."""
     headers = default_headers()
-    _throttle()
-    if client is not None:
-        response = client.get(url, headers=headers)
-    else:
-        with httpx.Client(timeout=30, headers=headers) as owned:
-            response = owned.get(url)
-    response.raise_for_status()
-    return response.text
+    attempt = 0
+    while True:
+        _throttle()
+        if client is not None:
+            response = client.get(url, headers=headers)
+        else:
+            with httpx.Client(timeout=30, headers=headers) as owned:
+                response = owned.get(url)
+        if getattr(response, "status_code", 200) in RETRY_STATUSES and attempt < len(RETRY_BACKOFF_SECONDS):
+            _sleep(RETRY_BACKOFF_SECONDS[attempt])
+            attempt += 1
+            continue
+        response.raise_for_status()
+        return response.text
 
 
 def fetch_filing_xml(

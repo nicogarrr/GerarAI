@@ -1,0 +1,143 @@
+"""Feed insider agregado: operaciones Form 4 persistidas de todos los emisores.
+
+Lee SOLO lo ya persistido (insider_filings / insider_transactions): sin red,
+sin depender del ban de IP de la SEC. Reutiliza ``detect_signals`` para
+clusters y compras de CEO/CFO, de modo que el criterio es el mismo que el de
+la lectura por ticker.
+"""
+
+from __future__ import annotations
+
+from datetime import date, timedelta
+from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.models.entities import InsiderFiling, InsiderTransaction
+from app.services import insider_service
+
+SIDES = {"buy": "P", "sell": "S"}
+
+
+def _side(code: str | None, acquired_disposed: str | None) -> str | None:
+    if code == "P":
+        return "compra"
+    if code == "S":
+        return "venta"
+    return None
+
+
+def _tx_dict(row: InsiderTransaction, filing: InsiderFiling, line: int) -> dict[str, Any]:
+    return {
+        "ticker": row.issuer_ticker or filing.issuer_ticker,
+        "issuer_name": filing.issuer_name,
+        "insider": row.insider,
+        "insider_cik": row.insider_cik,
+        "role": row.role,
+        "officer_title": row.officer_title,
+        "multi_reporter": bool(row.multi_reporter),
+        "type": row.code,
+        "acquired_disposed": row.acquired_disposed,
+        "shares": row.shares,
+        "price": row.price,
+        "value": row.value,
+        "date": row.tx_date or filing.filing_date,
+        "is_derivative": bool(row.is_derivative),
+        "accession_number": row.accession_number,
+        "tx_line": line,
+        "filing_date": filing.filing_date,
+        "source_url": row.source_url or filing.source_url,
+        "form": row.form or filing.form,
+    }
+
+
+def build_feed(
+    db: Session,
+    *,
+    days: int = 90,
+    side: str = "all",
+    ticker: str | None = None,
+    limit: int = 100,
+    today: date | None = None,
+) -> dict[str, Any]:
+    """Operaciones P/S no derivadas de los ultimos ``days`` dias + senales."""
+    today = today or date.today()
+    cutoff = (today - timedelta(days=days)).isoformat()
+    wanted = ticker.strip().upper() if ticker else None
+
+    stmt = (
+        select(InsiderTransaction, InsiderFiling)
+        .join(InsiderFiling, InsiderTransaction.filing_id == InsiderFiling.id)
+        .where(
+            InsiderTransaction.is_derivative.is_(False),
+            InsiderTransaction.code.in_(("P", "S")),
+            func.coalesce(InsiderTransaction.tx_date, InsiderFiling.filing_date) >= cutoff,
+        )
+    )
+    if wanted:
+        stmt = stmt.where(InsiderFiling.issuer_ticker == wanted)
+    rows = db.execute(stmt).all()
+
+    txs = [_tx_dict(tx, filing, i) for i, (tx, filing) in enumerate(rows)]
+    txs.sort(key=lambda t: (str(t["date"] or ""), str(t["accession_number"])), reverse=True)
+
+    signals = insider_service.detect_signals(txs)
+    clusters = [s for s in signals if s["signal"] == "cluster_buy"]
+    c_suite = [s for s in signals if s["signal"] == "c_suite_buy"]
+    c_suite.sort(key=lambda s: str(s.get("date") or ""), reverse=True)
+    clusters.sort(key=lambda s: str(s.get("window_start") or ""), reverse=True)
+
+    code = SIDES.get(side)
+    shown = [t for t in txs if code is None or t["type"] == code]
+
+    buys = [t for t in txs if t["type"] == "P"]
+    sells = [t for t in txs if t["type"] == "S"]
+
+    def _sum(items: list[dict]) -> float:
+        return sum(float(t["value"]) for t in items if t.get("value") is not None)
+
+    total_filings = db.scalar(select(func.count()).select_from(InsiderFiling)) or 0
+    with_data = (
+        db.scalar(
+            select(func.count(func.distinct(InsiderTransaction.filing_id)))
+        )
+        or 0
+    )
+    return {
+        "status": "ok",
+        "days": days,
+        "side": side,
+        "ticker": wanted,
+        "totals": {
+            "buy_count": len(buys),
+            "buy_value": _sum(buys),
+            "sell_count": len(sells),
+            "sell_value": _sum(sells),
+            "filings_total": total_filings,
+            "filings_with_transactions": with_data,
+            "filings_pending": max(0, total_filings - with_data),
+        },
+        "clusters": clusters[:10],
+        "c_suite_buys": c_suite[:20],
+        "count": len(shown),
+        "transactions": [
+            {
+                "ticker": t["ticker"],
+                "issuer_name": t["issuer_name"],
+                "insider": t["insider"],
+                "role": t["role"],
+                "officer_title": t["officer_title"],
+                "side": _side(t["type"], t["acquired_disposed"]),
+                "code": t["type"],
+                "shares": t["shares"],
+                "price": t["price"],
+                "value": t["value"],
+                "date": t["date"],
+                "multi_reporter": t["multi_reporter"],
+                "accession_number": t["accession_number"],
+                "source_url": t["source_url"],
+            }
+            for t in shown[:limit]
+        ],
+    }

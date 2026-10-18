@@ -108,7 +108,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/GlossaryTerm.tsx': 'importa cliente: components/ui/tooltip.tsx',
   'components/help/HelpTabs.tsx': 'importa cliente: components/ui/tabs.tsx',
   'components/historical-stress/HistoricalStressView.tsx': 'useState, jsx-onClick',
-  'components/insider/InsiderSignalsView.tsx': 'useRouter, useState, jsx-onSubmit, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/data/RecordViews.tsx',
+  'components/insider/InsiderSignalsView.tsx': 'useRouter, useState, jsx-onSubmit, jsx-onChange, jsx-onClick, importa cliente: components/data/RecordViews.tsx',
   'components/knowledge-graph/KnowledgeGraphCanvas.tsx': 'browser:document, useRouter, usePathname, useSearchParams, useState, useRef, browser:window, useEffect, browser:navigator, browser:ResizeObserver, browser:new ResizeObserver, jsx-onClick, jsx-onKeyDown, jsx-onPointerCancel, jsx-onPointerDown, jsx-onPointerLeave, jsx-onPointerMove, jsx-onPointerUp, jsx-onPointerEnter, jsx-onChange',
   'components/knowledge/DeleteCollectionButton.tsx': 'useState, browser:window, jsx-onClick',
   'components/knowledge/DeleteDocumentButton.tsx': 'useState, browser:window, jsx-onClick',

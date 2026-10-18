@@ -82,3 +82,37 @@ export function isHot(theme: MarketTheme, order: ThemeOrder): boolean {
   const rank = themeRank(theme, order);
   return rank !== null && rank <= 3;
 }
+
+export type ThemeBadge = { kind: 'turn-up' | 'turn-down' | 'hot'; label: string };
+
+/** Una sola etiqueta por tarjeta. El giro (YTD y 1M con signo contrario) manda
+ *  sobre "caliente" (top 3 del orden): un tema no puede ser a la vez caliente y
+ *  girar a la baja. */
+export function themeBadge(theme: MarketTheme, order: ThemeOrder): ThemeBadge | null {
+  if (theme.turn === 'sube') return { kind: 'turn-up', label: 'Giro al alza' };
+  if (theme.turn === 'baja') return { kind: 'turn-down', label: 'Giro a la baja' };
+  if (isHot(theme, order)) return { kind: 'hot', label: 'Caliente' };
+  return null;
+}
+
+/** Peso real de cada valor en la media simple de la métrica: 1/n entre los que
+ *  tienen dato; 0 para los que no cuentan. Null si la métrica no se publica. */
+export function constituentWeight(
+  theme: MarketTheme,
+  metric: ThemeMetric,
+  value: number | null,
+): number | null {
+  if (metric.pct === null || metric.n <= 0) return null;
+  return value === null ? 0 : 100 / metric.n;
+}
+
+/** Aportación en puntos porcentuales a la rentabilidad del tema. */
+export function constituentContribution(
+  theme: MarketTheme,
+  metric: ThemeMetric,
+  value: number | null,
+): number | null {
+  const weight = constituentWeight(theme, metric, value);
+  if (weight === null || value === null) return null;
+  return (weight / 100) * value;
+}

@@ -2569,6 +2569,7 @@ def scan_insider_watchlist(
                 tenant_id=tenant_id,
                 lookback=lookback,
                 max_new_fetches=max_new_fetches,
+                backfill=True,
             )
         finally:
             release_job_lease(

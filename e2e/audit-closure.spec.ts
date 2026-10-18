@@ -41,15 +41,13 @@ test.describe("audit closure flows", () => {
     expect(states).toBeGreaterThan(0);
   });
 
-  test("insider shows monitor badge and notify action", async ({ page }) => {
+  test("insider shows monitor badge and no debug notify button", async ({ page }) => {
     await page.goto("/insider?ticker=AAPL");
     await expect(page.getByRole("heading", { name: "Señales Insider", level: 1 })).toBeVisible();
     // El badge (con contador) es el objetivo; el resumen del desplegable
     // "Cómo se calculan las señales" también menciona el monitor.
     await expect(page.getByText(/Monitor cada 15 min · \d+/)).toBeVisible();
-    // F173: el control es una evaluación inmediata de una sola vez y su
-    // etiqueta lo dice; ya no hay checkbox con pinta de preferencia.
-    await expect(page.getByRole("button", { name: "Evaluar aviso Telegram ahora" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Evaluar aviso Telegram ahora" })).toHaveCount(0);
   });
 
   test("research thesis exposes debate and approve controls", async ({ page }) => {

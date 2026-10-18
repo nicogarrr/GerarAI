@@ -109,3 +109,62 @@ export async function loadMoreInsiderFilings(
     });
     return researchRequest<InsiderFilingsResult>(`/api/insider/filings?${params.toString()}`, { fast: true });
 }
+
+export interface InsiderFeedTransaction {
+    ticker: string;
+    issuer_name?: string | null;
+    insider?: string | null;
+    role?: string | null;
+    officer_title?: string | null;
+    side?: 'compra' | 'venta' | null;
+    shares?: number | null;
+    price?: number | null;
+    value?: number | null;
+    date?: string | null;
+    accession_number: string;
+    source_url?: string | null;
+}
+
+export interface InsiderFeedSignal {
+    ticker: string;
+    insider?: string | null;
+    role?: string | null;
+    officer_title?: string | null;
+    value?: number | null;
+    date?: string | null;
+    accession_number?: string;
+    tx_line?: number;
+    insider_count?: number;
+    total_value?: number;
+    window_start?: string;
+}
+
+export interface InsiderFeedResult {
+    status: string;
+    days: number;
+    side: string;
+    count: number;
+    totals: {
+        buy_count: number;
+        buy_value: number;
+        sell_count: number;
+        sell_value: number;
+        filings_total: number;
+        filings_with_transactions: number;
+        filings_pending: number;
+    };
+    clusters: InsiderFeedSignal[];
+    c_suite_buys: InsiderFeedSignal[];
+    transactions: InsiderFeedTransaction[];
+}
+
+/** GET /api/insider/feed — operaciones insider persistidas de todos los emisores. */
+export async function getInsiderFeed(side: string, days: number): Promise<InsiderFeedResult> {
+    const { id: userId } = await requireAuthenticatedUser();
+    const params = new URLSearchParams({ side, days: String(days), limit: '100' });
+    return cachedFetch(
+        `insider:user:${userId}:feed:${side}:${days}`,
+        () => researchRequest<InsiderFeedResult>(`/api/insider/feed?${params.toString()}`, { fast: true }),
+        60,
+    );
+}
