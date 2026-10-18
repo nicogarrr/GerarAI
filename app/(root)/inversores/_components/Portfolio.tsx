@@ -4,6 +4,7 @@ import type {
 } from "@/lib/actions/investors.actions";
 import { formatMarketCapUsd, formatNumber, formatPercent, NA } from "@/lib/format";
 import { Pagination, paginate } from "./Pagination";
+import { ownershipLimitations } from "@/lib/research/ownership-display";
 import { periodLabel } from "./format";
 
 const ACTIONS: Record<string, string> = {
@@ -255,7 +256,7 @@ export function Portfolio({
         total={paged.total}
         params={{ vista: view }}
       />
-      <p className="text-xs text-gray-500">{portfolio.limitations}</p>
+      <p className="text-xs text-gray-500">{ownershipLimitations(portfolio.limitations)}</p>
     </section>
   );
 }
