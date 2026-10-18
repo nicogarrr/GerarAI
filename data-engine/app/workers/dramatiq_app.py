@@ -865,8 +865,18 @@ def recompute_fundamental_metrics(
         processed = 0
         status_counts: dict[str, int] = {}
         errors: list[dict] = []
+        from app.services.derived_market_cap_service import (
+            refresh_derived_market_cap,
+        )
+
+        derived_cap: dict[str, int] = {}
         for company in companies:
             try:
+                # Respaldo de market_cap (precio x acciones) ANTES del calculo:
+                # sin el, el WACC sale unavailable y el DCF no arranca (QA:
+                # 6/6 candidatas N/D; watchlist europeas sin cap).
+                cap = refresh_derived_market_cap(db, company)
+                derived_cap[cap["status"]] = derived_cap.get(cap["status"], 0) + 1
                 results = service.calculate_all(db, company, persist=True)
                 processed += 1
                 for result in results:

@@ -168,11 +168,18 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
 
     const usListing = quoteSymbol === normalized;
     base.metricsNotApplicable = !usListing;
-    const [quote, light] = await Promise.all([
+    const [quote, light, backend] = await Promise.all([
         getStockQuote(quoteSymbol),
         // La línea US es el listado real: sus métricas Finnhub son de ESTE
-        // emisor. Para no-US ni se piden (ADR u homónimo).
+        // emisor. Para no-US ni se piden (ADR u homónimo): se usa el
+        // respaldo propio del backend research (cap proveedor o derivado
+        // precio x acciones; PER = cierre / EPS diluido FY).
         usListing ? getStockFinancialDataLight(normalized) : Promise.resolve(null),
+        !usListing
+            ? researchRequest<{ market_cap: number | null; per: number | null }>(
+                  `/api/watchlist/metrics/${encodeURIComponent(normalized)}`,
+              ).catch(() => null)
+            : Promise.resolve(null),
     ]);
 
     // F358: la cotización llega con frescura validada en origen; solo se
@@ -209,8 +216,10 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
                 : typeof quote?.dp === 'number' && Number.isFinite(quote.dp)
                   ? quote.dp
                   : null,
-        marketCap: marketCapM !== null ? marketCapM * 1e6 : null, // Finnhub devuelve M USD
-        peRatio,
+        marketCap: marketCapM !== null
+            ? marketCapM * 1e6 // Finnhub devuelve M USD
+            : (backend && typeof backend.market_cap === 'number' ? backend.market_cap : null),
+        peRatio: peRatio ?? (backend && typeof backend.per === 'number' ? backend.per : null),
         priceKind,
         priceAsOf,
         metricsNotApplicable: !usListing,

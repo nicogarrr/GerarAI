@@ -4,7 +4,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import WatchItem
+from app.models import Company, FinancialFact, MarketPrice, WatchItem
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
 
 router = APIRouter()
@@ -69,3 +69,57 @@ def delete_watch_item(symbol: str, db: Session = Depends(get_db)) -> None:
         raise HTTPException(status_code=404, detail="Watch item not found")
     db.delete(item)
     db.commit()
+
+@router.get("/metrics/{symbol}")
+def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
+    """Market cap y PER de respaldo para emisoras sin cobertura del
+    proveedor US (QA AENA/ASML): market_cap del proveedor o derivado
+    (precio x acciones, servicio derived_market_cap) y PER = ultimo cierre
+    / EPS diluido del ultimo ejercicio anual. Nulo honesto cuando no hay
+    base: nunca se fabrica el numero.
+    """
+    from datetime import date, timedelta
+
+    company = db.scalar(select(Company).where(Company.ticker == symbol.upper()))
+    if company is None:
+        return {"market_cap": None, "per": None, "currency": None, "sources": []}
+
+    today = date.today()
+    sources: list[str] = []
+
+    cap_row = db.execute(
+        select(FinancialFact)
+        .where(FinancialFact.company_id == company.id,
+               FinancialFact.metric == "market_cap")
+        .order_by(desc(FinancialFact.is_reported), desc(FinancialFact.period))
+        .limit(1)
+    ).scalar_one_or_none()
+    market_cap = float(cap_row.value) if cap_row is not None else None
+    if cap_row is not None:
+        sources.append(
+            f"Capitalización: {cap_row.source_type}"
+            + ("" if cap_row.is_reported else " (derivada: precio x acciones)"))
+
+    price_row = db.execute(
+        select(MarketPrice)
+        .where(MarketPrice.company_id == company.id,
+               MarketPrice.date >= today - timedelta(days=7),
+               MarketPrice.close.isnot(None), MarketPrice.close > 0)
+        .order_by(desc(MarketPrice.date)).limit(1)
+    ).scalar_one_or_none()
+    eps_row = db.execute(
+        select(FinancialFact)
+        .where(FinancialFact.company_id == company.id,
+               FinancialFact.metric.in_(["eps_diluted", "eps_basic"]),
+               FinancialFact.fiscal_quarter == "FY",
+               FinancialFact.value > 0)
+        .order_by(desc(FinancialFact.fiscal_year)).limit(1)
+    ).scalar_one_or_none()
+    per = None
+    if price_row is not None and eps_row is not None:
+        per = float(price_row.close) / float(eps_row.value)
+        sources.append(f"PER: cierre {price_row.date.isoformat()} / "
+                       f"{eps_row.metric} FY{eps_row.fiscal_year} ({eps_row.source_type})")
+
+    return {"market_cap": market_cap, "per": per,
+            "currency": company.currency, "sources": sources}
