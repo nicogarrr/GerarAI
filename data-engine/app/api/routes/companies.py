@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.core.errors import safe_detail
@@ -33,6 +34,7 @@ from app.schemas import (
     FinancialRefreshResponse,
     ThesisTickersOut,
 )
+from app.services.async_bridge import run_from_any_context
 from app.services.company_changes_service import changes_since
 from app.services.company_enrichment_service import CompanyEnrichmentService
 from app.services.company_resolver import resolve_companies, resolve_company
@@ -597,20 +599,29 @@ async def create_inferred_input_llm(
     db: Session = Depends(get_db),
 ) -> dict:
     """Estima FCF, WACC o crecimiento terminal desde extractos ingeridos. Guarda INFERIDO."""
-    try:
-        return inferred_input_payload(await infer_input(db, ticker, input_key=payload.input_key))
-    except InferenceQuotaExceeded as exc:
-        db.rollback()
-        raise HTTPException(status_code=429, detail=str(exc)) from exc
-    except InferenceRejected as exc:
-        db.rollback()
-        status = {"empresa_no_encontrada": 404, "llm_deshabilitado": 503, "presupuesto_agotado": 503}.get(
-            exc.reason, 422
-        )
-        detail = "N/D: sin extractos ingeridos con URL https para esta empresa" if exc.reason == "sin_fuentes" else (
-            f"Inferencia rechazada: {exc.reason}"
-        )
-        raise HTTPException(status_code=status, detail=detail) from exc
+
+    def _infer() -> dict:
+        try:
+            return inferred_input_payload(
+                run_from_any_context(infer_input(db, ticker, input_key=payload.input_key))
+            )
+        except InferenceQuotaExceeded as exc:
+            db.rollback()
+            raise HTTPException(status_code=429, detail=str(exc)) from exc
+        except InferenceRejected as exc:
+            db.rollback()
+            status = {"empresa_no_encontrada": 404, "llm_deshabilitado": 503, "presupuesto_agotado": 503}.get(
+                exc.reason, 422
+            )
+            detail = "N/D: sin extractos ingeridos con URL https para esta empresa" if exc.reason == "sin_fuentes" else (
+                f"Inferencia rechazada: {exc.reason}"
+            )
+            raise HTTPException(status_code=status, detail=detail) from exc
+
+    # SQLAlchemy y el LLM son sincronos: todo corre en un hilo del pool y la
+    # corutina del servicio puentea con run_from_any_context. Inline en el
+    # "async def", la inferencia bloqueaba el event loop del proceso.
+    return await run_in_threadpool(_infer)
 
 
 @router.get("/{ticker}/snapshot", response_model=CompanySnapshotOut)
@@ -966,92 +977,112 @@ def _red_team_payload(run) -> dict:
 
 @router.post("/{ticker}/refresh/fmp", response_model=FinancialRefreshResponse)
 async def refresh_fmp_financials(ticker: str, db: Session = Depends(get_db)) -> dict:
-    company = resolve_company(db, ticker)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    # Resolve + ingesta son trabajo sincrono (sqlalchemy, parseo, escrituras):
+    # corren en un hilo del pool; la corutina del servicio puentea con
+    # run_from_any_context. Inline bloqueaban el event loop del proceso.
+    def _refresh() -> dict:
+        company = resolve_company(db, ticker)
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
 
-    try:
-        return await FinancialIngestionService().refresh_from_fmp(
-            db=db,
-            company=company,
-            client=FMPClient(),
-        )
-    except RuntimeError as exc:
-        # El RuntimeError envuelve el texto del error de httpx, que lleva la
-        # URL completa con la api key del proveedor en la query.
-        raise HTTPException(status_code=424, detail=safe_detail(exc, 424)) from exc
-    except httpx.HTTPStatusError as exc:
-        # Sanitize: httpx exception text embeds the full request URL,
-        # which carries the FMP api key - never log or return it.
-        status = exc.response.status_code
-        if status == 402:
-            # El plan gratuito de FMP no cubre mercados fuera de US ni
-            # algunos endpoints; mensaje accionable en vez de un error crudo.
+        try:
+            return run_from_any_context(
+                FinancialIngestionService().refresh_from_fmp(
+                    db=db,
+                    company=company,
+                    client=FMPClient(),
+                )
+            )
+        except RuntimeError as exc:
+            # El RuntimeError envuelve el texto del error de httpx, que lleva la
+            # URL completa con la api key del proveedor en la query.
+            raise HTTPException(status_code=424, detail=safe_detail(exc, 424)) from exc
+        except httpx.HTTPStatusError as exc:
+            # Sanitize: httpx exception text embeds the full request URL,
+            # which carries the FMP api key - never log or return it.
+            status = exc.response.status_code
+            if status == 402:
+                # El plan gratuito de FMP no cubre mercados fuera de US ni
+                # algunos endpoints; mensaje accionable en vez de un error crudo.
+                raise HTTPException(
+                    status_code=424,
+                    detail=(
+                        "El plan gratuito de FMP no cubre este mercado. "
+                        "Para emisores europeos usa la fuente ESEF y para "
+                        "americanos la SEC."
+                    ),
+                ) from None
             raise HTTPException(
                 status_code=424,
-                detail=(
-                    "El plan gratuito de FMP no cubre este mercado. "
-                    "Para emisores europeos usa la fuente ESEF y para "
-                    "americanos la SEC."
-                ),
+                detail=f"FMP request failed with HTTP {status}",
             ) from None
-        raise HTTPException(
-            status_code=424,
-            detail=f"FMP request failed with HTTP {status}",
-        ) from None
+
+    return await run_in_threadpool(_refresh)
 
 
 @router.post("/{ticker}/refresh/sec", response_model=FinancialRefreshResponse)
 async def refresh_sec_financials(ticker: str, db: Session = Depends(get_db)) -> dict:
-    company = resolve_company(db, ticker)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-    try:
-        service = FinancialIngestionService()
-        result = await service.refresh_from_sec(db=db, company=company)
-    except RuntimeError as exc:
-        # El RuntimeError envuelve el texto del error de httpx, que lleva la
-        # URL completa con la api key del proveedor en la query.
-        raise HTTPException(status_code=424, detail=safe_detail(exc, 424)) from exc
-    # Completa el contrato FinancialRefreshResponse (la via SEC solo importa
-    # hechos, no statements; el resumen se calcula aqui para no meter queries
-    # extra en el servicio).
-    result["statements_imported"] = 0
-    result["latest_periods"] = service.latest_periods(db, company)
-    result["valuation_input_ready"] = service.valuation_input_ready(db, company)
-    return result
+    def _refresh() -> dict:
+        company = resolve_company(db, ticker)
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+        try:
+            service = FinancialIngestionService()
+            result = run_from_any_context(service.refresh_from_sec(db=db, company=company))
+        except RuntimeError as exc:
+            # El RuntimeError envuelve el texto del error de httpx, que lleva la
+            # URL completa con la api key del proveedor en la query.
+            raise HTTPException(status_code=424, detail=safe_detail(exc, 424)) from exc
+        # Completa el contrato FinancialRefreshResponse (la via SEC solo importa
+        # hechos, no statements; el resumen se calcula aqui para no meter queries
+        # extra en el servicio).
+        result["statements_imported"] = 0
+        result["latest_periods"] = service.latest_periods(db, company)
+        result["valuation_input_ready"] = service.valuation_input_ready(db, company)
+        return result
+
+    return await run_in_threadpool(_refresh)
 
 
 @router.post("/{ticker}/refresh/esef", response_model=FinancialRefreshResponse)
 async def refresh_esef_financials(ticker: str, db: Session = Depends(get_db)) -> dict:
     """Fundamentales IFRS anuales desde el snapshot ESEF local (IBEX reviewed)."""
-    company = resolve_company(db, ticker)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-    try:
-        service = FinancialIngestionService()
-        result = await service.refresh_from_esef(db=db, company=company)
-    except RuntimeError as exc:
-        # El RuntimeError envuelve el texto del error de httpx, que lleva la
-        # URL completa con la api key del proveedor en la query.
-        raise HTTPException(status_code=424, detail=safe_detail(exc, 424)) from exc
-    result["statements_imported"] = 0
-    return result
+
+    def _refresh() -> dict:
+        company = resolve_company(db, ticker)
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+        try:
+            service = FinancialIngestionService()
+            # refresh_from_esef es una corutina sin awaits internos: la
+            # lectura del snapshot y las escrituras son sincronas.
+            result = run_from_any_context(service.refresh_from_esef(db=db, company=company))
+        except RuntimeError as exc:
+            # El RuntimeError envuelve el texto del error de httpx, que lleva la
+            # URL completa con la api key del proveedor en la query.
+            raise HTTPException(status_code=424, detail=safe_detail(exc, 424)) from exc
+        result["statements_imported"] = 0
+        return result
+
+    return await run_in_threadpool(_refresh)
 
 
 @router.post("/{ticker}/refresh/wacc")
 async def refresh_wacc_inputs(
     ticker: str, db: Session = Depends(get_db)
 ) -> dict:
-    company = resolve_company(db, ticker)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-    try:
-        return await WaccInputService().refresh(db, company)
-    except RuntimeError as exc:
-        # El RuntimeError envuelve el texto del error de httpx, que lleva la
-        # URL completa con la api key del proveedor en la query.
-        raise HTTPException(status_code=424, detail=safe_detail(exc, 424)) from exc
+    def _refresh() -> dict:
+        company = resolve_company(db, ticker)
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+        try:
+            return run_from_any_context(WaccInputService().refresh(db, company))
+        except RuntimeError as exc:
+            # El RuntimeError envuelve el texto del error de httpx, que lleva la
+            # URL completa con la api key del proveedor en la query.
+            raise HTTPException(status_code=424, detail=safe_detail(exc, 424)) from exc
+
+    return await run_in_threadpool(_refresh)
 
 
 @router.get("/{ticker}/share-capital")
