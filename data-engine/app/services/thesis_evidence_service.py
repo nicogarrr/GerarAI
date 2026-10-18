@@ -576,7 +576,7 @@ class ThesisEvidenceService:
         except Exception as exc:  # noqa: BLE001 - best-effort
             return _pending(
                 "NASDAQ earnings calendar",
-                f"Calendario inaccesible: {exc}"[:200],
+                f"Calendario inaccesible ({type(exc).__name__}).",
             )
         wanted = company.ticker.upper()
         coming = sorted(
