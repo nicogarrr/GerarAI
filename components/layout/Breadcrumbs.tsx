@@ -105,6 +105,9 @@ export default function Breadcrumbs() {
   useEffect(() => {
     const listener = (event: Event) => setOverride((event as CustomEvent).detail);
     window.addEventListener('page-breadcrumb-name', listener);
+    // Child effects may publish before this shell subscribes on first hydration.
+    const saved = document.documentElement.dataset.pageBreadcrumb;
+    if (saved) { try { const detail = JSON.parse(saved); queueMicrotask(() => setOverride(detail)); } catch { /* Ignore malformed display metadata. */ } }
     return () => window.removeEventListener('page-breadcrumb-name', listener);
   }, []);
   const crumbs = buildCrumbs(pathname);

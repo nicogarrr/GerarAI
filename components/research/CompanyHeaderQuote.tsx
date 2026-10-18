@@ -81,7 +81,7 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                 {showPrice && quote && quote.session !== 'cerrado' && (quote.change != null || quote.change_percent != null) ? (
                     <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${signBase > 0 ? 'bg-emerald-500/10 text-emerald-300' : signBase < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
                         {[
-                            quote.change != null ? formatNumber(quote.change, { signDisplay: 'always', maximumFractionDigits: 2 }) : null,
+                            quote.change != null ? (currency === 'USD' ? new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', signDisplay:'always', minimumFractionDigits:2, maximumFractionDigits:2}).format(quote.change) : formatNumber(quote.change, { signDisplay: 'always', maximumFractionDigits: 2 })) : null,
                             quote.change_percent != null ? formatPercent(quote.change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }) : null,
                         ].filter(Boolean).join(' · ')}
                     </div>
