@@ -1,5 +1,6 @@
-import { isFinanciallyRelevant } from '@/lib/newsRelevance';
 'use server';
+
+import { isFinanciallyRelevant } from '@/lib/newsRelevance';
 
 import { exactSymbolFirst, onePerIssuer } from '@/lib/market/search-results';
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';

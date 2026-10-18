@@ -28,6 +28,6 @@ export function isFinanciallyRelevant(article: { headline?: string; summary?: st
     const headline = article.headline ?? '';
     // Lifestyle advice can mention money or a CEO without being market news.
     if (/\b(parenting|parenting coach|raise (?:kids|children)|raising (?:kids|children)|toddler|crianza)\b/i.test(headline)
-        && !/\b(earnings|stocks?|shares?|inflation|revenue|bolsa|acciones|resultados)\b/i.test(headline)) return false;
+        && !/\b(earnings|stocks?|share price|inflation|revenue|bolsa|acciones|resultados)\b/i.test(headline)) return false;
     return FINANCE_PATTERN.test(`${article.headline ?? ''} ${article.summary ?? ''}`);
 }
