@@ -203,6 +203,7 @@ def test_finnhub_profile_currency_is_not_quote_currency():
     # profile2.currency is financial-statement currency, never a quote fallback.
     assert profile["currency"] == "EUR"
     import inspect
+
     from app.api.routes.screeners import _refetch_real_items
     assert '"currency": quote.get("currency"),' in inspect.getsource(_refetch_real_items)
     absent = _FakeClient({"/stock/profile2": _FakeResponse({"ticker": "X"})})
