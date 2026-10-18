@@ -171,6 +171,9 @@ def test_oversize_upload_rejected_honestly_by_route():
             "source_type": "test_upload",
         },
         files={"file": ("big.txt", b"x" * (MAX_DOCUMENT_BYTES + 1), "text/plain")},
+        # Una subida legitima viene firmada; sin firma el RawBodyMiddleware la
+        # corta a 1MB (413) antes de que llegue a la ruta.
+        headers={"X-CavaAI-Signature": "present-but-not-checked-by-the-body-middleware"},
     )
     assert response.status_code == 400
     assert "15MB" in response.json()["detail"]
