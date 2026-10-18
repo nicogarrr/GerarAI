@@ -19,8 +19,11 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
         let inFlight = false;
         const controller = new AbortController();
         setQuote(null);
-        const refresh = async () => {
-            if (!requestTicker || document.visibilityState !== 'visible' || inFlight) return;
+        const refresh = async (initial = false) => {
+            // The first read always runs: a tab opened in the background (or a
+            // headless browser) must not stay on N/D forever. Only the polling
+            // pauses while hidden.
+            if (!requestTicker || (!initial && document.visibilityState !== 'visible') || inFlight) return;
             inFlight = true;
             try {
                 const response = await fetch(`/api/companies/${encodeURIComponent(requestTicker)}/extended-quote${recoverListing ? '?resolveListing=1' : ''}`, {
@@ -32,7 +35,7 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                 if (!disposed) setQuote(null); // No stale-on-error price.
             } finally { inFlight = false; }
         };
-        void refresh();
+        void refresh(true);
         const interval = window.setInterval(() => { void refresh(); }, 60000);
         const onVisibility = () => { if (document.visibilityState === 'visible') void refresh(); };
         document.addEventListener('visibilitychange', onVisibility);
