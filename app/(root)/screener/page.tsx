@@ -104,7 +104,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
     <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip p-4 sm:p-6">
       <div className="min-w-0">
         <h1 className="text-2xl font-semibold break-words text-gray-100">{t('nav.screener')}</h1>
-        <p className="mt-1 text-sm text-gray-400">Large caps líquidos con precio y market cap reales (motor de análisis, caché 60s)</p>
+        <p className="mt-1 text-sm text-gray-400">Large caps líquidos con precio y market cap reales.</p>
       </div>
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por sector">
@@ -132,16 +132,14 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
         <CardContent>
           {engineScreens.engineDown ? (
             <p className="text-sm text-gray-500">
-              El motor (POST /api/screeners/run) no ha podido completar la consulta: la tabla de abajo muestra
-              precios Finnhub como lectura offline, sin análisis de cobertura.
+La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertura.
             </p>
           ) : engineScreens.screens.length === 0 ? (
             <p className="text-sm text-gray-500">
               Motor operativo pero sin filtros guardados.{' '}
               <Link href="/screeners" className="text-teal-300 hover:text-teal-200 hover:underline">
                 Crea el primero en Screeners
-              </Link>{' '}
-              (filtros ad-hoc y guardados contra métricas trazables).
+              </Link>.
             </p>
           ) : (
             <ul className="flex flex-wrap gap-2">
@@ -258,8 +256,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                   </tbody>
                 </table>
                 <p className="mt-3 text-xs text-gray-500">
-                  El precio va sin símbolo: la fila no incluye la divisa de la cotización (el
-                  backend no la expone), así que no se da por supuesta.
+El precio va sin símbolo: el backend no expone la divisa de la cotización.
                 </p>
               </div>
             )}
@@ -303,7 +300,6 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                   ))}
                   {validIndices.length === 0 && <p className="text-sm text-gray-500">Sin datos de índices</p>}
                 </div>
-                <p className="mt-4 text-xs text-gray-500">S&amp;P 500, Nasdaq, Bitcoin, Oro, Plata — valores reales.</p>
               </>
             )}
           </CardContent>
