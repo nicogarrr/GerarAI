@@ -2328,7 +2328,7 @@
             "type": "integer"
           },
           "note": {
-            "default": "Candidatos INFERIDOS por un modelo a partir de evidencias almacenadas; son hipotesis, no hechos ni recomendaciones. Las URLs proceden de la fuente guardada, nunca del modelo",
+            "default": "Candidatos INFERIDOS por un modelo a partir de evidencias almacenadas; son hip\u00f3tesis, no hechos ni recomendaciones. Las URLs proceden de la fuente guardada, nunca del modelo",
             "title": "Note",
             "type": "string"
           },
