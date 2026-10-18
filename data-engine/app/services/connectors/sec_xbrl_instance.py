@@ -25,6 +25,13 @@ METRIC_TAGS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# dei:EntityCommonStockSharesOutstanding (portada, INSTANTE por clase). Los
+# filers multi-clase (META, GOOGL, BRK.B, ASTS, V) no tienen el saldo
+# consolidado en companyfacts (la SEC excluye hechos dimensionados): entra
+# por el carril per-clase del class_filer_eps_service, nunca por aqui como
+# hecho suelto.
+ECSO_TAG = "EntityCommonStockSharesOutstanding"
+
 # Unidades declaradas (`unitRef`) que admiten cada metrica. Un BPA etiquetado
 # en acciones, o un saldo de acciones etiquetado en moneda, es OTRA magnitud
 # y no se lee como la metrica (FIX5-5). Con `unitRef` se exige declaracion
@@ -36,9 +43,10 @@ ALLOWED_UNITS: dict[str, frozenset[str]] = {
     "EarningsPerShareBasic": _EPS_UNITS,
     "WeightedAverageNumberOfDilutedSharesOutstanding": _SHARE_UNITS,
     "WeightedAverageNumberOfSharesOutstandingBasic": _SHARE_UNITS,
+    ECSO_TAG: _SHARE_UNITS,
 }
 
-_ALL_TAGS = {tag for tags in METRIC_TAGS.values() for tag in tags}
+_ALL_TAGS = {tag for tags in METRIC_TAGS.values() for tag in tags} | {ECSO_TAG}
 
 
 _XBRLI_NS = "http://www.xbrl.org/2003/instance"
@@ -261,3 +269,21 @@ def parse_instance_dimensioned_facts(
             and (max_days is None or f.duration_days <= max_days)
         ]
     return facts
+
+
+def parse_instance_dimensioned_ecso(stream) -> list[DimensionedFact]:
+    """Hechos dei:EntityCommonStockSharesOutstanding DIMENSIONADOS (por
+    clase) de una instancia XBRL: instantes de portada, no duraciones.
+
+    Los hechos sin dimension los cubre el carril companyfacts (ingesta
+    estandar): aqui solo interesan los miembros de clase que la SEC no
+    consolida. El consumidor decide que miembros son de CLASE (eje
+    *ClassAxis) y como agregarlos (suma derivada documentada).
+    """
+    return [
+        f
+        for f in parse_instance_dimensioned_facts(
+            stream, min_days=None, max_days=None
+        )
+        if f.tag == ECSO_TAG and f.instant is not None
+    ]
