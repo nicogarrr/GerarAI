@@ -13,6 +13,7 @@ from app.api.routes.health import router as health_router
 from app.core.auth import get_research_principal
 from app.core.config import get_settings
 from app.core.database import SessionLocal, init_db
+from app.core.llm_tenant_scope import bind_llm_cache_tenant
 from app.core.rate_limit import AuthFailureLimitMiddleware, enforce_rate_limit
 from app.core.raw_body import RawBodyMiddleware
 from app.llm.factory import validate_llm_configuration
@@ -160,7 +161,11 @@ if get_settings().app_env.lower() != "test":
 
     app.add_middleware(SlowRequestMiddleware)
 
-private_dependencies = [Depends(get_research_principal), Depends(enforce_rate_limit)]
+private_dependencies = [
+    Depends(get_research_principal),
+    Depends(enforce_rate_limit),
+    Depends(bind_llm_cache_tenant),
+]
 
 
 @app.exception_handler(Exception)
