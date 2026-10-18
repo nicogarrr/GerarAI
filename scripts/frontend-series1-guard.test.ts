@@ -27,7 +27,7 @@ test('volume belongs to most-active movers only and screener has units', () => {
   assert.match(movers, /showVolume \? <th/);
   assert.match(movers, /caption="Mayor volumen" tickerSets=\{tickerSets\} showVolume/);
   const screener = read('app/(root)/screener/page.tsx');
-  assert.match(screener, /B US\$/);
+  assert.match(screener, /formatMarketCapUsd\(value\)/);
   assert.match(screener, /screenerMarketCap\(r.marketCap\)/);
 });
 

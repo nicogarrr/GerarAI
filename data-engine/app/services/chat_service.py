@@ -108,6 +108,10 @@ def _fmt_money_es(number: float, digits: int = 2) -> str:
     return text.replace(",", " ").replace(".", ",").replace(" ", ".")
 
 
+def _currency_display(currency: str) -> str:
+    return "€" if currency == "EUR" else currency
+
+
 def _fmt_value_es(value: float | None, unit: str | None) -> str:
     """Cifra legible: -71,5 millones USD / 1,14 mil millones USD / 300 acciones."""
     if value is None:
@@ -382,7 +386,7 @@ _CAPABILITIES_RE = re.compile(
     r")\s*[?!.]*\s*$"
 )
 _CAPABILITIES_ANSWER = (
-    "Soy el asistente de GerarAI. Puedo contarte qué posiciones tienes "
+    "Soy el Cerebro de GerarAI. Puedo contarte qué posiciones tienes "
     "guardadas, cuánto pesa cada una y cuánto vale tu cartera, incluida la "
     "caja y la deuda de margen. Puedo responder sobre una empresa concreta "
     "con los datos guardados: precio, cifras financieras, tesis, noticias y "
@@ -694,11 +698,20 @@ class ChatService:
                 llm_trace={"path": "small_talk"},
                 context=context_echo,
             )
+        from app.services.brain_data_tools import answer_data_question
+
+        data_answer = answer_data_question(db, question)
+        if data_answer is not None:
+            data_answer.context = context_echo
+            return data_answer
         # Routing por compania RESUELTA del texto, no solo por el parametro
         # ticker: "precio de ASTS" sin campo ticker va igualmente por la
         # ruta estructurada con validacion financiera.
         company = self._resolve_company(db, question, scope, ticker)
-        if company is None and page_context is not None:
+        if company is None and page_context is not None and (
+            _PAGE_CONTENT_RE.search(question or "") or _COMPANY_CUE_RE.search(question or "")
+            or re.search(r"(?i)\b(?:evidencia|fuentes?|documentos?|riesgos?)\b", question or "")
+        ):
             company = page_context.company
         # Pregunta sobre el contenido de la página sin empresa: el cerebro solo
         # recibe el nombre de la sección, no sus datos. Lo dice, sin inventar
@@ -721,6 +734,12 @@ class ChatService:
                 llm_trace={"path": "page_content_unavailable", "generated": False, "provider_calls": 0},
                 context=context_echo,
             )
+        from app.services.chat_metric_answer import metric_question_answer
+
+        metric_answer = metric_question_answer(db, question, company)
+        if metric_answer is not None:
+            metric_answer.context = context_echo
+            return metric_answer
         # Memoria SOLO ante "recuerda ..." explicito; respuesta visible, sin LLM.
         note = remember_note(question)
         if note is not None:
@@ -879,22 +898,21 @@ class ChatService:
             )
             lines.append(
                 f"- {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
-                f"coste medio {_fmt_number_es(float(pos.average_cost), 2)} {pos.currency}, "
-                f"valor {_fmt_number_es(_value(pos), 2)} {pos.base_currency or 'EUR'}{weight}"
+                f"coste medio {_fmt_number_es(float(pos.average_cost), 2)} {_currency_display(pos.currency)}, "
+                f"valor {_fmt_number_es(_value(pos), 2)} {_currency_display(pos.base_currency or 'EUR')}{weight}"
             )
-            sources.append(self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of)))
+            sources.append(self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of)))
         extra = f"\n(Se muestran las {limit} mayores de {len(rows)}.)" if len(rows) > limit else ""
         total_text = (
             "monedas base distintas, sin total"
             if mixed
-            else f"valor total {_fmt_money_es(total)} {base}"
+            else f"valor total {_fmt_money_es(total)} {_currency_display(base)}"
         )
         answer = (
             f"Tu cartera guardada tiene {len(rows)} posiciones abiertas, {total_text}, "
             f"con datos a {_fmt_date_es(as_of.isoformat())}:\n"
             + "\n".join(lines)
             + extra
-            + "\n\nPregunta por un ticker para ver su ficha y fuentes."
         )
         cash_line = self._cash_line(
             db, tenant_id, base if not mixed else None,
@@ -965,13 +983,13 @@ class ChatService:
         cur = currencies[0]
         amount = _fmt_number_es(keyfn(rows[0]), 2)
         word = "más alto" if highest else "más bajo"
-        answer = f"La posición con el {label} {word} es {comp.ticker}: {amount} {cur}."
+        answer = f"La posición con el {label} {word} es {comp.ticker}: {amount} {_currency_display(cur)}."
         if len(rows) > 1:
             nxt_pos, nxt = rows[1]
-            answer += f" Le sigue {nxt.ticker} con {_fmt_number_es(keyfn(rows[1]), 2)} {cur}."
+            answer += f" Le sigue {nxt.ticker} con {_fmt_number_es(keyfn(rows[1]), 2)} {_currency_display(cur)}."
         return ChatResponse(
             answer=answer,
-            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of))],
+            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))],
             model="deterministic",
             prompt_version="portfolio-ranking-v1",
             confidence=0.9,
@@ -1006,7 +1024,7 @@ class ChatService:
             native[row.currency] = native.get(row.currency, 0.0) + float(row.balance)
         if base is None:
             parts = [
-                f"{_fmt_money_es(amount)} {currency}"
+                f"{_fmt_money_es(amount)} {_currency_display(currency)}"
                 for currency, amount in sorted(native.items())
             ]
             return (
@@ -1041,17 +1059,17 @@ class ChatService:
         line = ""
         pieces: list[str] = []
         if assets:
-            pieces.append(f"caja {_fmt_money_es(assets)} {base}")
+            pieces.append(f"caja {_fmt_money_es(assets)} {_currency_display(base)}")
         if debt:
-            pieces.append(f"deuda de margen {_fmt_money_es(debt)} {base}")
+            pieces.append(f"deuda de margen {_fmt_money_es(debt)} {_currency_display(base)}")
         if pieces:
             line = "Además: " + " y ".join(pieces)
             if positions_total is not None:
                 net = positions_total + assets - debt
-                line += f"; patrimonio neto {_fmt_money_es(net)} {base}"
+                line += f"; patrimonio neto {_fmt_money_es(net)} {_currency_display(base)}"
             line += "."
         if missing:
-            detalle = ", ".join(f"{_fmt_money_es(native[c])} {c}" for c in missing)
+            detalle = ", ".join(f"{_fmt_money_es(native[c])} {_currency_display(c)}" for c in missing)
             line += (
                 f" Sin tipo de cambio guardado para {', '.join(missing)}"
                 f" ({detalle}): esa caja no entra en la suma."
@@ -1105,8 +1123,8 @@ class ChatService:
             weight_text = " (sin peso: monedas base distintas)"
         answer = (
             f"Tu posición guardada en {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
-            f"coste medio {_fmt_money_es(float(pos.average_cost))} {pos.currency}, "
-            f"valor {_fmt_money_es(_value(pos))} {pos.base_currency or 'EUR'}{weight_text}, "
+            f"coste medio {_fmt_money_es(float(pos.average_cost))} {_currency_display(pos.currency)}, "
+            f"valor {_fmt_money_es(_value(pos))} {_currency_display(pos.base_currency or 'EUR')}{weight_text}, "
             f"con datos a {_fmt_date_es(pos.as_of.isoformat())}."
         )
         if _NET_WORTH_CUE_RE.search(question):
@@ -1118,7 +1136,7 @@ class ChatService:
                 answer += "\n\n" + cash_line
         return ChatResponse(
             answer=answer,
-            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of))],
+            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))],
             model="deterministic",
             prompt_version="portfolio-position-v1",
             confidence=0.9,

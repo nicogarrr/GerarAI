@@ -344,7 +344,7 @@ def test_section_templates_titles_and_slots():
         "no_sabemos",
     }
     assert sections["lo_que_sabemos"]["titulo"] == "Lo que sabemos"
-    assert sections["lo_que_cambio"]["titulo"] == "Lo que cambio"
+    assert sections["lo_que_cambio"]["titulo"] == "Lo que cambió"
     assert sections["lo_que_descuenta"]["titulo"] == "Lo que exige el precio actual"
     assert sections["no_sabemos"]["titulo"] == "Lo que aun no sabemos"
     # Los parrafos salen de los mismos slots verificados de la capa resumen.

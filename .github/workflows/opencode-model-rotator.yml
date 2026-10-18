@@ -1,8 +1,14 @@
 name: OpenCode model rotator
 
 on:
-  schedule:
-    - cron: "23 5 * * 1" # lunes 05:23 UTC (~07:23 Madrid en verano)
+  # CRON PAUSADO (18-oct-2026): el free tier de OpenCode Zen responde 403
+  # ("free tier can only be used from within OpenCode") a cualquier cliente
+  # externo desde el 12-oct, asi que rotar el modelo gratuito de opencode.json
+  # es elegir entre modelos que todos fallan. workflow_dispatch sigue
+  # disponible para rotar a mano si hace falta. Reactivar el cron cuando el
+  # precheck de qa-e2e.yml vuelva a dar 200 (o cuando Zen anuncie el cambio).
+  # schedule:
+  #   - cron: "23 5 * * 1" # lunes 05:23 UTC (~07:23 Madrid en verano)
   workflow_dispatch:
 
 # FIX-3.8: permisos minimos y EXACTOS. `issues: write` sobraba (este

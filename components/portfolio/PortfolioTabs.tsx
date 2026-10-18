@@ -250,7 +250,7 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
                                     </p>
                                 ) : !hasCostBasis(summary) ? (
                                     <p className="text-sm text-gray-500">
-                                        Rentabilidad no disponible: falta una base de coste válida. La cifra superior es el valor neto de la cartera, no el beneficio del periodo seleccionado.
+                                        Rentabilidad no disponible: falta una base de coste válida. La cifra superior es el valor neto, no el beneficio del periodo.
                                     </p>
                                 ) : (
                                 <p className={`text-sm flex items-center gap-1 ${summary.totalGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -267,7 +267,7 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
                             <div className="h-[200px]">
                                 {chartData.length === 0 ? (
                                     <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-gray-800 text-sm text-gray-500">
-                                        No hay una serie continua de valoraciones completas con retornos verificables. Las fotos incompletas no se dibujan como pérdidas ni se rellenan con datos inventados.
+                                        Aún no hay una serie continua de valoraciones verificables: las fotos incompletas no se dibujan.
                                     </div>
                                 ) : (
                                 <PortfolioNavChart data={chartData} positive={summary.totalGain >= 0} currency={summary.baseCurrency} />

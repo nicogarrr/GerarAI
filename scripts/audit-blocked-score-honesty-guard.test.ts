@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { auditScoreText, auditStatusLabel } from '../lib/audit-status-copy.ts';
+import { auditFixLabel, auditScoreText, auditStatusLabel } from '../lib/audit-status-copy.ts';
 
 const sourcesPage = readFileSync('app/(root)/research/sources/page.tsx', 'utf8');
 const tickerPage = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
@@ -47,4 +47,10 @@ test('ancla de verdad: el backend sigue pudiendo bloquear con puntuación alta',
     // conflictos ni traza ausente. Si esto cambia, el copy debe revisarse.
     assert.match(backend, /passed = not unsupported and not conflicts and not fixes/);
     assert.match(backend, /source_coverage_score = max\(0, round\(100 \* covered_count \/ material_count\) - len\(weak\) \* 5\)/);
+});
+
+test('los motivos del backend se muestran en español y lo desconocido tal cual', () => {
+    assert.match(auditFixLabel('No calculation trace -> no valuation.'), /faltan variables de entrada/);
+    assert.match(auditFixLabel('Add source_id to every material claim.'), /sin fuente/);
+    assert.equal(auditFixLabel('otro motivo'), 'otro motivo');
 });

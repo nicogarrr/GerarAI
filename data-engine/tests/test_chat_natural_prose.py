@@ -182,8 +182,11 @@ def test_general_sin_doctrina_no_inventa_atribuciones():
             question="que es el circulo de competencia de Buffett", baseline=baseline,
         )
     )
-    # Sin doctrina recuperada, "segun el informe anual" no es verificable: fallback honesto.
-    assert result.model == "fallback"
+    # Sin doctrina del autor: no atribuir y ofrecer una alternativa útil.
+    assert result.model == "deterministic"
+    assert "fragmento verificable" in result.answer
+    assert result.sources == []
+    assert provider.requests == []
 
 
 def test_memoria_visible_en_prosa_con_marcador():

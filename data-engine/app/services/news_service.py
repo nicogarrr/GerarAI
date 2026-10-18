@@ -11,6 +11,7 @@ from app.services.company_resolver import resolve_company
 from app.services.materiality_service import MaterialityService, apply_recency_policy
 from app.services.review_alert_service import ReviewAlertService
 from app.services.source_hierarchy_service import classify_source
+from app.services.text_clip import clip_words
 from app.services.thesis_graph_service import ThesisGraphService
 
 _NAME_NOISE = {"inc", "corp", "corporation", "co", "company", "ltd", "plc", "sa", "nv", "ag", "the", "group", "holdings", "holding", "limited", "sme", "s.a."}
@@ -221,7 +222,7 @@ class NewsService:
         # impacto semantico: un filing antiguo nunca es urgente por recencia.
         requires_update = apply_recency_policy(requires_update, published_at, materiality_reasons)
 
-        summary = " ".join(text.strip().split())[:320]
+        summary = clip_words(" ".join(text.strip().split()), 320)
         # Tipo de noticia con Jev (earnings/filing/macro/opinion): 1 llamada
         # best-effort (~$0.042/MTok in) guardada en metadata. Sin
         # TYPESAFE_API_KEY o ante error, la noticia se ingiere sin `jev_doc_type`.

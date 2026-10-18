@@ -1,16 +1,18 @@
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import { healthText, listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
-import { factDisplayAudit } from '@/lib/research/fact-display-audit';
+import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
 import { groupClaimsByVersion } from '@/lib/research/claim-groups';
 import { GROUPS, MODULES, asView, moduleHref, type View } from '@/lib/research/research-views';
-import { researchValuability } from '@/lib/research/coverage-state';
+import { researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getProfile } from '@/lib/actions/finnhub.actions';
 import { resolveUnknownListingIdentity } from '@/lib/research/unknown-listing';
 import { drainRejection } from '@/lib/research/drain-rejection';
 import { cache } from 'react';
+import { redirect } from 'next/navigation';
+import { canonicalRedirectTicker } from '@/lib/research/canonical-ticker';
 import {
   ArrowLeft,
   BookOpen,
@@ -35,7 +37,7 @@ import { missingLayerAction, missingLayerLabel } from '@/lib/research/missing-la
 import { metricLabel } from '@/lib/research/metric-labels';
 import { MoatPanel } from '@/components/research/MoatPanel';
 import { AstOrbitPanel } from '@/components/research/AstOrbitPanel';
-import { getAstOrbitOverview } from '@/lib/actions/asts-orbits.actions';
+import { getAstOrbitOverview, getAstsAnalysis } from '@/lib/actions/asts-orbits.actions';
 import {
   DecisionAndRealityPanel,
   LongTermModelPanel,
@@ -88,6 +90,7 @@ import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
+import { SourceAuditDetail } from '@/components/research/SourceAuditDetail';
 import { dedupeNewsEvents } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import CitationsList from '@/components/chat/CitationsList';
@@ -269,7 +272,7 @@ function metricValue(value: number | string | null | undefined, unit: string) {
   return formatCompact(parsed);
 }
 
-function FactCard({ fact, ticker }: { fact: ResearchFact; ticker: string }) {
+function FactCard({ fact, ticker, staleness }: { fact: ResearchFact; ticker: string; staleness: string | null }) {
   const audit = factDisplayAudit(ticker, fact);
   return (
     <div className="rounded-lg border border-gray-800 p-3">
@@ -278,6 +281,7 @@ function FactCard({ fact, ticker }: { fact: ResearchFact; ticker: string }) {
         <span className={`text-sm font-semibold ${audit ? 'text-gray-400' : 'text-teal-300'}`}>{audit ? 'N/D' : metricValue(fact.value, fact.unit)}</span>
       </div>
       {audit ? <p className="mt-2 text-xs text-amber-300">{audit}</p> : null}
+      {!audit && staleness ? <p className="mt-2 text-xs text-amber-300">{staleness}</p> : null}
       <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-gray-500">
         <span>{fact.period}</span>
         <span>·</span>
@@ -299,12 +303,21 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
       />
     );
   }
+  // El último hecho de cada métrica (la lista viene ordenada por año fiscal
+  // descendente) es el que un lector toma por «estado actual».
+  const latestFiscalYear = facts.reduce((acc, fact) => Math.max(acc, fact.fiscal_year ?? 0), 0) || null;
+  const latestIdByMetric = new Map<string, number>();
+  for (const fact of facts) {
+    if (!latestIdByMetric.has(fact.metric)) latestIdByMetric.set(fact.metric, fact.id);
+  }
+  const stalenessOf = (fact: ResearchFact) =>
+    factStalenessNotice(fact, { isLatestForMetric: latestIdByMetric.get(fact.metric) === fact.id, latestFiscalYear });
   return (
     <>
       {/* Móvil: cards paginadas con «ver más» en vez de corte silencioso */}
       <div className="space-y-3 md:hidden">
         {facts.slice(0, FACTS_MOBILE_PAGE).map((fact) => (
-          <FactCard key={fact.id} fact={fact} ticker={ticker} />
+          <FactCard key={fact.id} fact={fact} staleness={stalenessOf(fact)} ticker={ticker} />
         ))}
         {facts.length > FACTS_MOBILE_PAGE ? (
           <details className="rounded-lg border border-gray-800 p-3">
@@ -313,7 +326,7 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
             </summary>
             <div className="mt-3 space-y-3">
               {facts.slice(FACTS_MOBILE_PAGE).map((fact) => (
-                <FactCard key={fact.id} fact={fact} ticker={ticker} />
+                <FactCard key={fact.id} fact={fact} staleness={stalenessOf(fact)} ticker={ticker} />
               ))}
             </div>
           </details>
@@ -336,7 +349,7 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
             <tr key={fact.id} className="text-gray-300">
               <th className="border-b border-gray-900 py-2 text-left text-sm font-medium" scope="row">{metricLabel(fact.metric)}</th>
               <td className="border-b border-gray-900 py-2">{fact.period}</td>
-              <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact) ? <span className="text-gray-400">N/D<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact)}</span></span> : metricValue(fact.value, fact.unit)}</td>
+              <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact) ? <span className="text-gray-400">N/D<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact)}</span></span> : <>{metricValue(fact.value, fact.unit)}{stalenessOf(fact) ? <span className="mt-1 block text-xs text-amber-300">{stalenessOf(fact)}</span> : null}</>}</td>
               <td className="border-b border-gray-900 py-2 text-right text-xs text-gray-500">{label(fact.source_type)}</td>
             </tr>
           ))}
@@ -541,7 +554,7 @@ type ViewWorkspaces = {
   model: Awaited<ReturnType<typeof getResearchLongTermModel>>;
   'market-opportunity': Awaited<ReturnType<typeof getResearchLongTermModel>>;
   moat: Awaited<ReturnType<typeof getResearchMoatWorkspace>>;
-  satellites: Awaited<ReturnType<typeof getAstOrbitOverview>> | null;
+  satellites: { orbits: Awaited<ReturnType<typeof getAstOrbitOverview>>; analysis: Awaited<ReturnType<typeof getAstsAnalysis>> } | null;
   peers: Awaited<ReturnType<typeof getResearchPeersWorkspace>>;
   valuation: Awaited<ReturnType<typeof getResearchValuationWorkspace>>;
   documents: Awaited<ReturnType<typeof getResearchDocumentsWorkspace>>;
@@ -617,7 +630,7 @@ function launchViewData(
       // Solo ASTS tiene orbitales: pedirlo para cualquier otro ticker sería una
       // llamada segura de quedar sin usar.
       return ticker === 'ASTS'
-        ? { key: 'satellites', promise: withResearchTelemetry('ast-orbits', () => getAstOrbitOverview()) }
+        ? { key: 'satellites', promise: withResearchTelemetry('ast-orbits', async () => { const [orbits, analysis] = await Promise.all([getAstOrbitOverview(), getAstsAnalysis()]); return { orbits, analysis }; }) }
         : undefined;
     case 'peers':
       return { key: 'peers', promise: withResearchTelemetry('peers-workspace', () => getResearchPeersWorkspace(ticker)) };
@@ -697,6 +710,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       return <BackendOffline feature={`Research de ${ticker}`} retryHref={`/research/${ticker}`} />;
     }
     throw error;
+  }
+  // Ticker con sufijo de mercado (SAN.MC) que el backend resuelve a su base
+  // (SAN): misma empresa, ficha canonica unica en vez de una ficha N/D.
+  const canonical = canonicalRedirectTicker(ticker, snapshot?.company.ticker);
+  if (canonical) {
+    redirect(`/research/${encodeURIComponent(canonical)}${query.view ? `?view=${encodeURIComponent(query.view)}` : ''}`);
   }
   if (!snapshot) {
     // F286: snapshot null tiene procedencia EXACTA: el frontend solo devuelve
@@ -862,9 +881,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             {snapshot.latest_thesis ? (
               <>
                 <div className="flex flex-wrap gap-2">
-                  <Badge>{label(snapshot.latest_thesis.rating)}</Badge>
+                  {visibleThesisRating(snapshot.latest_thesis.rating, snapshot) ? <Badge>{label(snapshot.latest_thesis.rating)}</Badge> : null}
                   <Badge variant="outline">v{snapshot.latest_thesis.version}</Badge>
-                  <Badge variant="outline">{label(snapshot.latest_thesis.status)}</Badge>
+                  {label(snapshot.latest_thesis.status) !== label(snapshot.latest_thesis.rating) ? (
+                    <Badge variant="outline">{label(snapshot.latest_thesis.status)}</Badge>
+                  ) : null}
                 </div>
                 <p className="mt-3 text-sm leading-6 text-gray-300">{cleanThesisText(snapshot.latest_thesis.executive_summary)}</p>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -1209,8 +1230,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   } else if (activeView === 'satellites') {
     // El panel ya degrada solo cuando no hay datos; aquí la lectura llega del
     // lote en paralelo (null si degradó, igual que antes).
-    const orbits = ticker === 'ASTS' ? await viewData('satellites') : null;
-    content = ticker === 'ASTS' ? <AstOrbitPanel data={orbits} /> : <EmptyState title="Esta vista orbital solo está disponible para ASTS." />;
+    const satellites = ticker === 'ASTS' ? await viewData('satellites') : null;
+    content = ticker === 'ASTS' ? <AstOrbitPanel data={satellites?.orbits ?? null} analysis={satellites?.analysis ?? null} /> : <EmptyState title="Esta vista orbital solo está disponible para ASTS." />;
   } else if (activeView === 'peers') {
     const peers = await viewData('peers');
     content = (
@@ -1250,7 +1271,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     content = (
       <Panel title="Auditorías de fuentes">
         {audits.length ? (
-          <div className="space-y-3">{audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">tesis {audit.thesis_version_id ?? 'desconocida'}</Badge></div>{audit.required_fixes.length ? <p className="mt-3 text-sm text-amber-300">{audit.required_fixes.join(' · ')}</p> : null}</div>)}</div>
+          <div className="space-y-3">{audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">tesis {audit.thesis_version_id ?? 'desconocida'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>)}</div>
         ) : (
           <EmptyState
             action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>Genera una tesis para auditar fuentes</EmptyLink>}

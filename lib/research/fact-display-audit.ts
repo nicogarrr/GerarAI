@@ -16,3 +16,30 @@ export function factDisplayAudit(ticker: string, fact: {
   }
   return null;
 }
+
+/** Métricas de «foto» de balance: su último dato disponible se lee como
+ *  estado actual. JPM tenia efectivo de 2018 y deuda total de 2013 frente
+ *  a ingresos de 2025: el numero es historia, no el estado de hoy. */
+const BALANCE_SNAPSHOT_METRICS = new Set([
+  'cash_and_equivalents',
+  'total_debt',
+  'net_debt',
+  'total_assets',
+  'total_equity',
+  'working_capital',
+]);
+
+/** Aviso cuando el último hecho de una métrica de balance va muy por detrás
+ *  del último dato de la empresa. Tolerancia de un ejercicio (calendarios
+ *  fiscales distintos); más allá, el número se muestra con aviso para que
+ *  nadie lo tome por el estado actual. Las filas históricas (no las últimas)
+ *  no llevan aviso: su antigüedad es evidente. */
+export function factStalenessNotice(
+  fact: { metric: string; fiscal_year: number | null },
+  context: { isLatestForMetric: boolean; latestFiscalYear: number | null },
+): string | null {
+  if (!context.isLatestForMetric || context.latestFiscalYear === null) return null;
+  if (!BALANCE_SNAPSHOT_METRICS.has(fact.metric) || fact.fiscal_year === null) return null;
+  if (context.latestFiscalYear - fact.fiscal_year <= 1) return null;
+  return `Último dato disponible: ${fact.fiscal_year}, sin refresco posterior`;
+}

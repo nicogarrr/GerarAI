@@ -180,3 +180,75 @@ def test_ticker_filter_does_not_leak_other_tenants():
         assert "aapl propia" in titles
         assert "aapl ajena" not in titles
     engine.dispose()
+
+
+def test_ticker_feed_hides_rows_that_only_carry_the_ticker_label():
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine)
+    with factory() as db:
+        db.add(Tenant(id=1, external_id="t"))
+        nvda = Company(
+            ticker="NVDA", name="NVIDIA Corp", exchange="NASDAQ", currency="USD",
+            company_type="holding", valuation_model="unassigned",
+        )
+        googl = Company(
+            ticker="GOOGL", name="Alphabet Inc", exchange="NASDAQ", currency="USD",
+            company_type="holding", valuation_model="unassigned",
+        )
+        db.add_all([nvda, googl])
+        db.flush()
+        meta = {"connector": "rss", "date_source": "source"}
+        db.add_all(
+            [
+                NewsEvent(
+                    tenant_id=1, company_id=nvda.id, source="rss", date=NOW, metadata_=meta,
+                    title="NVDA Novo Nordisk cuts obesity drug price", summary="Novo Nordisk said on Monday",
+                    url="https://publisher.example/a",
+                ),
+                NewsEvent(
+                    tenant_id=1, company_id=nvda.id, source="rss", date=NOW, metadata_=meta,
+                    title="NVDA NVIDIA unveils new Blackwell chip", summary="NVIDIA said on Monday",
+                    url="https://publisher.example/b",
+                ),
+                NewsEvent(
+                    tenant_id=1, company_id=googl.id, source="rss", date=NOW, metadata_=meta,
+                    title="GOOGL Google launches new Gemini model", summary="",
+                    url="https://publisher.example/d",
+                ),
+                NewsEvent(
+                    tenant_id=1, company_id=googl.id, source="rss", date=NOW, metadata_=meta,
+                    title="GOOGL Unity shares jump on game engine deal", summary="Unity said",
+                    url="https://publisher.example/e",
+                ),
+                NewsEvent(
+                    tenant_id=1, company_id=nvda.id, source="rss", date=NOW, metadata_=meta,
+                    title="Chipmakers rally on export news", summary="",
+                    url="https://publisher.example/c",
+                ),
+            ]
+        )
+        db.commit()
+
+        app = FastAPI()
+        app.include_router(news_module.router, prefix="/api/news")
+
+        def _override_db():
+            yield db
+
+        app.dependency_overrides[get_db] = _override_db
+        client = TestClient(app)
+
+        response = client.get("/api/news?ticker=NVDA")
+        assert response.status_code == 200, response.text
+        titles = {row["title"] for row in response.json()}
+        assert titles == {"NVDA NVIDIA unveils new Blackwell chip", "Chipmakers rally on export news"}
+
+        # El feed global no se toca: las filas siguen en la base.
+        # Marca verificada (Google para GOOGL): se conserva; Unity solo con etiqueta: se oculta.
+        googl_titles = {row["title"] for row in client.get("/api/news?ticker=GOOGL").json()}
+        assert googl_titles == {"GOOGL Google launches new Gemini model"}
+        assert len(client.get("/api/news").json()) == 5
+    engine.dispose()

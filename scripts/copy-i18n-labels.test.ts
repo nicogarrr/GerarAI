@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { etiquetaFactor, etiquetaSector, etiquetaSeveridad, etiquetaTierFuente, etiquetaTipoEvento, etiquetaTipoInstrumento } from '../lib/labels.ts';
+import { sectorIndustryLine, etiquetaFactor, etiquetaSector, etiquetaSeveridad, etiquetaTierFuente, etiquetaTipoEvento, etiquetaTipoInstrumento } from '../lib/labels.ts';
 
 void test('sectores de la cabecera de exposición se traducen (F208)', () => {
     assert.equal(etiquetaSector('Communication Services'), 'Servicios de comunicación');
@@ -68,4 +68,10 @@ void test('los componentes usan las etiquetas, no la cadena cruda', () => {
         assert.match(news, /etiquetaTierFuente\(event\.source_tier\)/, 'source_tier solo se muestra via etiquetaTierFuente, nunca crudo');
     }
     assert.match(news, /etiquetaTipoEvento\(event\.event_type\)/);
+});
+
+test('industrias conocidas se traducen en la línea de sector del índice', () => {
+  assert.equal(sectorIndustryLine('Communication Services', 'Communications'), 'Servicios de comunicación · Comunicaciones');
+  assert.equal(sectorIndustryLine('Industrials', 'Professional Services'), 'Industriales · Servicios profesionales');
+  assert.equal(sectorIndustryLine('Industrials', 'Electrical Equipment'), 'Industriales · Equipamiento eléctrico');
 });

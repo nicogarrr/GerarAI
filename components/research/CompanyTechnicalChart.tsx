@@ -8,7 +8,6 @@ import { getCompanyChartHistory, type CompanyChartHistory, type CompanyChartBar 
 import { CHART_RANGES, type CompanyChartRange } from '@/lib/market/chart-ranges';
 import { adx, cleanBars, dailyPivots, fibonacci, rangeBars, sma, structure } from '@/lib/market/technical';
 
-const TABS = ['Completo', 'Tendencia', 'Niveles', 'Fibonacci'] as const;
 function price(value: number, currency: string | null) {
     return isValidCurrencyCode(currency) ? formatMoney(value, currency) : formatNumber(value);
 }
@@ -16,7 +15,6 @@ function price(value: number, currency: string | null) {
 export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyMarketSnapshot }) {
     const [retry, setRetry] = useState(0);
     const [range, setRange] = useState<CompanyChartRange>('1M');
-    const [tab, setTab] = useState<typeof TABS[number]>('Completo');
     const bars = useMemo(() => cleanBars(snapshot.history), [snapshot.history]);
     const [remote, setRemote] = useState<{ range: CompanyChartRange; data: CompanyChartHistory } | null>(null);
     const [requestState, setRequestState] = useState<'loading' | 'ready' | 'error'>('ready');
@@ -43,7 +41,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
     const last = bars.at(-1);
     const shortTerm = !last || average == null ? 'Sin datos' : last.close > average ? 'Sobre SMA50' : last.close < average ? 'Bajo SMA50' : 'En SMA50';
     const slope = average == null || previousAverage == null ? null : average > previousAverage ? 'sube' : average < previousAverage ? 'baja' : 'plana';
-    const chartLevels = tab === 'Fibonacci' ? fib.map((level) => ({ label: `${formatNumber(level.ratio * 100)} %`, price: level.price, kind: 'fibonacci' })) : levels;
+    const chartLevels = levels;
     return (
         <section className="min-w-0 overflow-hidden rounded-xl border border-gray-800 bg-surface-1" data-testid="company-technical-chart" aria-label="Precio y lectura técnica">
             <div className="grid min-w-0 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -63,18 +61,9 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                 </div>
                 <aside className="min-w-0 border-t border-gray-800 p-4 xl:border-l xl:border-t-0" data-testid="technical-reading">
                     <h2 className="text-base font-semibold text-gray-100">Lectura técnica</h2>
-                    <div className="my-3 flex gap-1" role="tablist" aria-label="Lectura técnica">
-                        {TABS.map((value) => <button type="button" key={value} id={`technical-tab-${snapshot.ticker}-${value}`} aria-controls={`technical-panel-${snapshot.ticker}`} role="tab" aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} onKeyDown={(event) => {
-                            const index = TABS.indexOf(value);
-                            const next = event.key === 'ArrowRight' ? (index + 1) % TABS.length : event.key === 'ArrowLeft' ? (index + TABS.length - 1) % TABS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : null;
-                            if (next == null) return;
-                            event.preventDefault(); setTab(TABS[next]);
-                            document.getElementById(`technical-tab-${snapshot.ticker}-${TABS[next]}`)?.focus();
-                        }} onClick={() => setTab(value)} className={`min-h-11 min-w-0 flex-1 rounded-md px-1.5 text-[11px] ${tab === value ? 'bg-gray-100 font-semibold text-gray-900' : 'text-gray-500 hover:text-gray-200'}`}>{value}</button>)}
-                    </div>
-                    <div id={`technical-panel-${snapshot.ticker}`} role="tabpanel" aria-labelledby={`technical-tab-${snapshot.ticker}-${tab}`} className="space-y-4 text-xs text-gray-400">
+                    <div id={`technical-panel-${snapshot.ticker}`} className="mt-3 space-y-4 text-xs text-gray-400">
                         {last ? <p className="text-[11px] text-gray-500">Cierres diarios hasta {formatMarketDate(last.date)}</p> : null}
-                        {tab === 'Completo' || tab === 'Tendencia' ? <>
+                        <>
                             <dl className="grid grid-cols-3 gap-2">
                                 <Metric label="Estructura" value={trend} detail="Dos bloques de 10 sesiones" />
                                 <Metric label="Corto plazo" value={shortTerm} detail={slope ? `SMA50 ${slope}` : '50 sesiones necesarias'} />
@@ -85,17 +74,17 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                                 {average != null && last ? <p>Cierre {price(last.close, snapshot.currency)}, {last.close > average ? 'sobre' : last.close < average ? 'bajo' : 'en'} la media de 50 sesiones ({price(average, snapshot.currency)}).</p> : null}
                                 {strength != null ? <p>ADX14 {formatNumber(strength, { maximumFractionDigits: 1 })}: {strength >= 25 ? 'fuerza de tendencia' : 'sin fuerza de tendencia confirmada'}. No indica dirección.</p> : null}
                             </div>
-                        </> : null}
-                        {tab === 'Completo' || tab === 'Niveles' ? <div>
+                        </>
+                        <div>
                             <h3 className="mb-2 font-medium text-gray-200">Pivotes diarios{last ? ` · ${formatMarketDate(last.date)}` : ''}</h3>
                             {levels.length ? <dl className="space-y-2">{levels.map((level) => <div key={level.label} className="flex justify-between border-b border-gray-800 pb-1.5"><dt className={level.kind === 'support' ? 'text-teal-300' : 'text-red-300'}>{level.label}</dt><dd className="tabular-nums text-gray-200">{price(level.price, snapshot.currency)}</dd></div>)}</dl> : <p>Sin datos OHLC para calcular niveles.</p>}
                             <p className="mt-2 text-[11px] text-gray-500">Calculados con máximo, mínimo y cierre; no son giros confirmados.</p>
-                        </div> : null}
-                        {tab === 'Fibonacci' ? <div>
+                        </div>
+                        <div>
                             <h3 className="mb-2 font-medium text-gray-200">Retrocesos del rango {range}</h3>
                             {fib.length ? <dl className="space-y-3">{fib.map((level) => <div key={level.ratio} className="flex justify-between border-b border-gray-800 pb-2"><dt>{formatNumber(level.ratio * 100)} %</dt><dd className="tabular-nums text-gray-200">{price(level.price, snapshot.currency)}</dd></div>)}</dl> : <p>Sin datos OHLC para Fibonacci.</p>}
                             <p className="mt-3 text-[11px] text-gray-500">Desde el máximo al mínimo del tramo visible.</p>
-                        </div> : null}
+                        </div>
                     </div>
                 </aside>
             </div>
@@ -153,8 +142,10 @@ function PriceCanvas({ bars, levels, currency, hourly = false }: { bars: Company
         } });
         current.line.setData(bars.map((bar) => ({ time: bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date, value: bar.close })));
         current.volume.setData(bars.filter((bar) => typeof bar.volume === 'number' && Number.isFinite(bar.volume) && bar.volume >= 0).map((bar) => ({ time: bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date, value: bar.volume!, color: 'rgba(113,113,122,0.3)' })));
+        // En movil las etiquetas de precio de R/S taparian las del eje; los niveles exactos van en la tabla de pivotes.
+        const wide = window.matchMedia('(min-width: 640px)').matches;
         for (const level of current.levels) current.line.removePriceLine(level);
-        current.levels = levels.map((level) => current.line.createPriceLine({ price: level.price, title: level.label, color: level.kind === 'support' ? '#2dd4bf' : level.kind === 'resistance' ? '#fb7185' : '#a78bfa', lineWidth: 1, lineStyle: 2, axisLabelVisible: true }));
+        current.levels = levels.map((level) => current.line.createPriceLine({ price: level.price, title: level.label, color: level.kind === 'support' ? '#2dd4bf' : level.kind === 'resistance' ? '#fb7185' : '#a78bfa', lineWidth: 1, lineStyle: 2, axisLabelVisible: wide }));
         current.chart.timeScale().fitContent();
     }, [ready, bars, levels, hourly]);
     return <div className="relative">

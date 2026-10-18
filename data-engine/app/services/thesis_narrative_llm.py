@@ -434,7 +434,7 @@ def _section_templates(
         # El caveat de titulares cierra SIEMPRE la seccion (misma regla que
         # en la capa de resumen: un titular acredita publicacion, no verdad).
         sections["lo_que_cambio"] = {
-            "titulo": "Lo que cambio",
+            "titulo": "Lo que cambió",
             "parrafos": [*titulares, fragments["caveat_titulares"]],
         }
 

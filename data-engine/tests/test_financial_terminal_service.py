@@ -1,9 +1,10 @@
-"""FinancialTerminalService contracts: dedupe latest-wins, window, honesty.
+"""FinancialTerminalService contracts: dedupe by source priority, window, honesty.
 
 The terminal series feed the company UI: a restated fact must show once
-(latest created_at wins), the years window must hold, periodicity filters
-must be exact, and missing metrics are reported as missing - never
-fabricated with empty or zero series dressed up as data.
+(filing beats vendor; a empate, la ingesta mas reciente), the years window
+must hold, periodicity filters must be exact, and missing metrics are
+reported as missing - never fabricated with empty or zero series dressed
+up as data.
 """
 
 from datetime import UTC, datetime
@@ -64,6 +65,43 @@ def test_restated_fact_dedupes_latest_wins(db):
     assert len(series) == 1
     assert series[0]["id"] == new.id
     assert series[0]["value"] == new.value
+
+
+def test_duplicate_period_filing_beats_vendor(db):
+    """MSFT/V tenian dos «Deuda total» para el mismo FY: la del filing (SEC)
+    y la refundicion del proveedor (FMP). Una sola fila y gana el filing,
+    aunque el proveedor se ingeste despues."""
+    company = _company(db)
+    sec = _fact(db, company, metric="total_debt", period="2026-06-30:FY", fiscal_year=2026,
+                value="31070000000", when=datetime(2026, 1, 1, tzinfo=UTC))
+    sec.source_type = "SEC"
+    fmp = _fact(db, company, metric="total_debt", period="2026-06-30:FY", fiscal_year=2026,
+                value="40290000000", when=datetime(2026, 2, 1, tzinfo=UTC))
+    fmp.source_type = "FMP"
+    fmp.is_reported = False
+    db.commit()
+    result = FinancialTerminalService().build(db, company, metrics=["total_debt"])
+    series = result["metrics"][0]["series"]
+    assert len(series) == 1
+    assert series[0]["id"] == sec.id
+    assert series[0]["source"]["type"] == "SEC"
+
+
+def test_duplicate_period_vendor_wins_when_no_filing(db):
+    """Sin filing, la refundicion mas reciente del proveedor es la fila."""
+    company = _company(db)
+    old = _fact(db, company, metric="total_debt", period="2026-06-30:FY", fiscal_year=2026,
+                value="100", when=datetime(2026, 1, 1, tzinfo=UTC))
+    old.source_type = "FMP"
+    new = _fact(db, company, metric="total_debt", period="2026-06-30:FY", fiscal_year=2026,
+                value="110", when=datetime(2026, 2, 1, tzinfo=UTC))
+    new.source_type = "FMP"
+    new.is_reported = False
+    db.commit()
+    result = FinancialTerminalService().build(db, company, metrics=["total_debt"])
+    series = result["metrics"][0]["series"]
+    assert len(series) == 1
+    assert series[0]["id"] == new.id
 
 
 def test_years_window_excludes_older_facts(db):

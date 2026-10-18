@@ -420,22 +420,25 @@ def source_audits(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    statement = select(SourceAudit).order_by(desc(SourceAudit.created_at))
+    statement = (
+        select(SourceAudit, ThesisVersion.version)
+        .outerjoin(ThesisVersion, SourceAudit.thesis_version_id == ThesisVersion.id)
+        .order_by(desc(SourceAudit.created_at))
+    )
     if ticker:
         # F313: alias europeo (SAN.MC -> SAN) con la misma política que la
         # ficha; el literal dejaba las auditorías vacías para esos tickers.
         company = resolve_company(db, ticker)
         if company is None:
             return []
-        statement = statement.join(
-            ThesisVersion,
-            SourceAudit.thesis_version_id == ThesisVersion.id,
-        ).where(ThesisVersion.company_id == company.id)
+        statement = statement.where(ThesisVersion.company_id == company.id)
     statement = statement.offset(offset).limit(limit)
     return [
         {
             "id": audit.id,
             "thesis_version_id": audit.thesis_version_id,
+            "thesis_version": version,
+            "created_at": audit.created_at.isoformat() if audit.created_at else None,
             "passed": audit.passed,
             "source_coverage_score": audit.source_coverage_score,
             "unsupported_claims": audit.unsupported_claims,
@@ -443,7 +446,7 @@ def source_audits(
             "data_conflicts": audit.data_conflicts,
             "required_fixes": audit.required_fixes,
         }
-        for audit in db.scalars(statement).all()
+        for audit, version in db.execute(statement).all()
     ]
 
 

@@ -73,7 +73,13 @@ permissions:
 
 concurrency:
   group: sbom-scan-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # PR -> true: el run viejo ya no describe el codigo que se revisa.
+  # push -> false: este workflow PUBLICA SBOMs e informes de escaneo como
+  #   artefactos. Cancelar un push a mitad deja el commit sin la evidencia
+  #   que justifica el gate: la evidencia publicada no se cancela (mismo
+  #   criterio que coverage.yml y llm-evals.yml, y que el comentario de
+  #   ci.yml ya atribuia a este workflow).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ---------------------------------------------------------------------------

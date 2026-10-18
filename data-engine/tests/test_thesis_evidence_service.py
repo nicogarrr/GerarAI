@@ -581,3 +581,18 @@ def test_ingest_market_quote_malformada_no_propaga_excepcion(db):
             MarketPrice.company_id == company.id
         )
     ) == 0
+
+
+def test_collect_earnings_error_no_expone_detalle_interno(db):
+    company = _company(db)
+    service = ThesisEvidenceService()
+
+    def boom():
+        raise RuntimeError("Task <Task pending name='x' coro=<_fetch_day_pooled() at earnings_calendar.py:198>>")
+
+    service._fetch_earnings = boom
+    result = service._collect_earnings(db, company)
+    text = str(result)
+    assert "Calendario inaccesible (RuntimeError)" in text
+    assert "_fetch_day_pooled" not in text
+    assert "earnings_calendar.py" not in text

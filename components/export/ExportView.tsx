@@ -70,9 +70,9 @@ export default function ExportView() {
                 <div className="flex items-center gap-3">
                     <FileDown className="h-5 w-5 text-teal-400" />
                     <div>
-                        <CardTitle className="text-lg font-semibold text-gray-100">Exportación Anual del Journal</CardTitle>
+                        <CardTitle className="text-lg font-semibold text-gray-100">Diario de decisiones</CardTitle>
                         <CardDescription className="mt-0.5 text-sm text-gray-500">
-                            Descarga tu journal de decisiones de inversión de un año completo en CSV o JSON.
+                            Decisiones de un año en CSV o JSON.
                         </CardDescription>
                     </div>
                 </div>
@@ -119,7 +119,7 @@ export default function ExportView() {
                     ) : (
                         <Download className="h-4 w-4" />
                     )}
-                    {loading ? 'Exportando...' : 'Exportar journal'}
+                    {loading ? 'Exportando...' : 'Exportar diario'}
                 </Button>
 
                 {preview !== null && (

@@ -154,3 +154,18 @@ def test_tax_clamp_basis_redondeada_y_en_espanol():
             db.delete(company)
             db.commit()
         db.close()
+
+
+def test_cifras_y_claves_del_memo_en_es():
+    from app.services.memo_text_es import number_es, term_es
+
+    assert number_es("416161000000.000000", "USD") == "416.161.000.000 USD"
+    assert number_es("-0.0060194747112082423") == "-0,00602"
+    assert number_es("12.5") == "12,5"
+    assert term_es("capex_to_revenue") == "Capex sobre ingresos"
+    assert term_es("algo_nuevo") == "algo nuevo"
+    facts = ThesisService()._facts_markdown(
+        {"revenue": type("F", (), {"value": Decimal("416161000000.000000"), "unit": "USD", "period": "FY2025", "source_type": "sec_filing", "source_id": 23})()}
+    )
+    assert "| Ingresos | 416.161.000.000 | USD | FY2025 | Informe SEC #23 |" in facts
+    assert "revenue" not in facts

@@ -9,10 +9,8 @@ for (const viewport of [{ width: 1440, height: 1080 }, { width: 390, height: 844
         await expect(page.getByTestId('technical-price-canvas').locator('canvas').first()).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Lectura técnica', exact: true })).toBeVisible();
         await expect(page.getByText('Pivotes diarios', { exact: false })).toBeVisible();
-        await page.getByRole('tab', { name: 'Fibonacci', exact: true }).click();
         await expect(page.getByText('Retrocesos del rango 1M')).toBeVisible();
-        await page.getByRole('tab', { name: 'Fibonacci', exact: true }).press('Home');
-        await expect(page.getByRole('tab', { name: 'Completo', exact: true })).toHaveAttribute('aria-selected', 'true');
+        await expect(page.getByRole('tab')).toHaveCount(0);
         await page.getByRole('button', { name: '6M', exact: true }).click();
         await expect(page.getByRole('button', { name: '6M', exact: true })).toHaveAttribute('aria-pressed', 'true');
         const chart = await page.getByTestId('technical-price-canvas').boundingBox();
@@ -59,7 +57,6 @@ test('Yahoo close-only through real adapter and normalizer abstains in UI', asyn
     await expect(page.getByTestId('technical-price-canvas').locator('canvas').first()).toBeVisible();
     await expect(page.getByText('Sin datos OHLC para calcular niveles.')).toBeVisible();
     await expect(page.getByText('Estructura: sin datos OHLC suficientes.')).toBeVisible();
-    await page.getByRole('tab', {name:'Fibonacci',exact:true}).click();
     await expect(page.getByText('Sin datos OHLC para Fibonacci.')).toBeVisible();
     await page.screenshot({path:'/downloads/yahoo-close-only-real-boundary.png',fullPage:true});
 });

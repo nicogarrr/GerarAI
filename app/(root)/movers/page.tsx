@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { TrendingDown, TrendingUp, Activity } from 'lucide-react';
 
 import { getMarketMovers, type MarketMover } from '@/lib/actions/market.actions';
-import { NA, formatCompact, formatNumber, formatPercent, formatPrice, formatUserDateTime, isValidCurrencyCode } from '@/lib/format';
+import { NA, formatCompact, formatMarketDate, formatNumber, formatPercent, formatPrice, formatUserDateTime, isValidCurrencyCode } from '@/lib/format';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { TickerContextBadges } from '@/components/common/TickerContextBadges';
@@ -33,14 +33,14 @@ function MoversTable({ rows, caption, tickerSets, showVolume = false }: { rows: 
   }
   return (
     <div aria-label={caption} className="scroll-affordance-x overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}>
-      <table className="w-full text-left text-sm">
+      <table className="w-full text-left text-xs sm:text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className="text-xs uppercase text-gray-500">
           <tr>
             <th className="border-b border-gray-800 py-2 pr-2" scope="col">Empresa</th>
             <th className="border-b border-gray-800 px-2 py-2 text-right" scope="col">Precio</th>
             <th className="border-b border-gray-800 px-2 py-2 text-right" scope="col">Cambio</th>
-            {showVolume ? <th className="border-b border-gray-800 py-2 pl-2 text-right" scope="col">Volumen</th> : null}
+            {showVolume ? <th className="hidden border-b border-gray-800 py-2 pl-2 text-right sm:table-cell" scope="col">Volumen</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -53,6 +53,7 @@ function MoversTable({ rows, caption, tickerSets, showVolume = false }: { rows: 
                 {row.name && row.name.trim().toUpperCase() !== row.ticker.trim().toUpperCase() ? (
                   <div className="max-w-20 truncate text-xs text-gray-500" title={row.name}>{row.name}</div>
                 ) : null}
+                {showVolume ? <div className="mt-1 text-[10px] text-gray-500 sm:hidden">Vol. {row.volume == null ? NA : formatCompact(row.volume, { maximumFractionDigits: 1 })}</div> : null}
                 <TickerContextBadges
                   portfolioTickers={tickerSets.portfolioTickers}
                   ticker={row.ticker}
@@ -64,15 +65,15 @@ function MoversTable({ rows, caption, tickerSets, showVolume = false }: { rows: 
                   <span className="whitespace-nowrap">{isValidCurrencyCode(row.currency) ? formatPrice(row.price, row.currency) : formatNumber(row.price)}</span>
                 {row.date ? (
                   <div className="ml-auto max-w-[7.5rem] text-xs text-gray-500">
-                    <span className="whitespace-nowrap">del {row.date}</span>
-                    {row.registered_at ? <span className="whitespace-nowrap">{` · ${formatUserDateTime(row.registered_at, { hour: '2-digit', minute: '2-digit' })}`}</span> : null}
+                    <span className="whitespace-nowrap">del {formatMarketDate(row.date)}</span>
+                    {row.registered_at ? <span className="block whitespace-nowrap">{`Registro: ${formatUserDateTime(row.registered_at, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}`}</span> : null}
                   </div>
                 ) : null}
               </td>
               <td className={`py-3 px-2 text-right whitespace-nowrap font-medium ${row.change_pct === null ? 'text-gray-500' : row.change_pct >= 0 ? 'text-teal-300' : 'text-red-400'}`}>
                 {formatPct(row.change_pct)}
               </td>
-              {showVolume ? <td className="py-3 pl-2 text-right whitespace-nowrap text-gray-400">{row.volume == null ? NA : formatCompact(row.volume, { maximumFractionDigits: 1 })}</td> : null}
+              {showVolume ? <td className="hidden py-3 pl-2 text-right whitespace-nowrap text-gray-400 sm:table-cell">{row.volume == null ? NA : formatCompact(row.volume, { maximumFractionDigits: 1 })}</td> : null}
             </tr>
           ))}
         </tbody>
@@ -104,7 +105,7 @@ export default async function MoversPage() {
         <h1 className="mt-1 text-3xl font-bold text-gray-100">Movers</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
           {movers.session_date
-            ? `Subidas, bajadas y más activas de la sesión del ${movers.session_date} frente a la anterior.`
+            ? `Subidas, bajadas y más activas de la sesión del ${formatMarketDate(movers.session_date)} frente a la anterior.`
             : 'Subidas, bajadas y más activas con los precios registrados.'}
           {movers.as_of
             ? ' Cada fila declara la fecha de su precio y la hora en que se registró.'
@@ -116,7 +117,7 @@ export default async function MoversPage() {
       </header>
 
       {movers.universe === 0 ? (
-        <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+        <section className="rounded-xl border border-gray-800 bg-surface-1 p-3 sm:p-5">
           <h2 className="font-semibold text-gray-100">Sin movimientos todavía</h2>
           <p className="mt-2 text-sm text-gray-400">
             Esta página se llena sola cuando el refresco de mercado guarde precios.
@@ -126,7 +127,7 @@ export default async function MoversPage() {
         </section>
       ) : (
         <div className="grid gap-6 xl:grid-cols-3 md:grid-cols-1">
-          <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-5">
+          <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-3 sm:p-5">
             <div className="mb-4 flex items-center gap-2">
               <TrendingUp aria-hidden="true" className="h-5 w-5 text-teal-300" />
               <h2 className="font-semibold text-gray-100">Subidas</h2>
@@ -134,7 +135,7 @@ export default async function MoversPage() {
             <MoversTable rows={movers.gainers} caption="Mayores subidas" tickerSets={tickerSets} />
           </section>
 
-          <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-5">
+          <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-3 sm:p-5">
             <div className="mb-4 flex items-center gap-2">
               <TrendingDown aria-hidden="true" className="h-5 w-5 text-red-400" />
               <h2 className="font-semibold text-gray-100">Bajadas</h2>
@@ -142,7 +143,7 @@ export default async function MoversPage() {
             <MoversTable rows={movers.losers} caption="Mayores bajadas" tickerSets={tickerSets} />
           </section>
 
-          <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-5">
+          <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-3 sm:p-5">
             <div className="mb-4 flex items-center gap-2">
               <Activity aria-hidden="true" className="h-5 w-5 text-teal-300" />
               <h2 className="font-semibold text-gray-100">Más activas</h2>

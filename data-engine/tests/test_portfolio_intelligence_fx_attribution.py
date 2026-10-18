@@ -291,3 +291,27 @@ def test_attribution_ambiguous_dividends_leave_component_unknown(db):
     assert position["components"]["multiple"] is None
     assert out["portfolio_components"]["dividends"] is None
     assert "dividends" in out["incomplete_components"]
+
+
+def test_attribution_no_ledger_or_share_facts_is_nd_not_zero(db):
+    """Sin dividendos registrados ni cifras de acciones en el horizonte, los
+    componentes son N/D (None), no un 0,0 % que parece medido; el horizonte
+    real del retorno de precio viaja en la respuesta."""
+    _eur_portfolio(db)
+    c = _company(db, "ATTRND")
+    p = _position(db, c, as_of=date(2026, 6, 1), fx_rate="0.95")
+    prices = _prices(db, c, [(date(2026, 1, 2), 100), (date(2026, 6, 1), 110)])
+    _fx(db, date(2026, 1, 1), "0.90")
+    _fx(db, date(2026, 6, 1), "0.99")
+
+    out = PortfolioIntelligenceService()._attribution(
+        db, [(p, c)], {c.id: 1.0}, {c.id: prices}, CUTOFF
+    )
+    components = out["positions"][0]["components"]
+    assert components["dividends"] is None
+    assert components["buybacks"] is None
+    assert components["dilution"] is None
+    assert out["positions"][0]["period_start"] == "2026-01-02"
+    assert out["period_start"] == "2026-01-02"
+    assert out["period_end"] == "2026-06-01"
+    assert out["basis"] == "adjusted_price_return"

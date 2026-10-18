@@ -1,5 +1,6 @@
+import { thesisMoney, thesisEps } from '@/lib/research/thesis-number-format';
 import { thesisScenarioDisplay } from '@/lib/research/listed-share-values';
-import { formatGeneratedDate, formatMoney, formatPercent, isValidCurrencyCode, marginOfSafetyDisplay, NA } from '@/lib/format';
+import { formatGeneratedDate, formatPercent, isValidCurrencyCode, marginOfSafetyDisplay, NA } from '@/lib/format';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { cleanThesisText } from '@/lib/research/thesis-text';
@@ -73,7 +74,7 @@ function money(
   const parsed = typeof value === 'string' ? Number(value) : value;
   if (parsed === null || parsed === undefined || Number.isNaN(parsed)) return NA;
   if (!isValidCurrencyCode(currency)) return NA;
-  return formatMoney(parsed, currency, { maximumFractionDigits: 2 });
+  return thesisMoney(parsed, currency);
 }
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
@@ -306,7 +307,7 @@ export default function ThesisMemo({
           </h3>
           {thesis.narrative_sections.map((section, index) => (
             <div key={`${section.titulo}-${index}`} className="space-y-2">
-              <h4 className="text-sm font-semibold text-gray-200">{section.titulo}</h4>
+              <h4 className="text-sm font-semibold text-gray-200">{section.titulo === 'Lo que cambio' ? 'Lo que cambió' : section.titulo}</h4>
               {section.parrafos.map((parrafo, pIndex) => (
                 <p key={pIndex} className="text-sm leading-6 text-gray-300">
                   {cleanThesisText(parrafo)}
@@ -378,7 +379,7 @@ export default function ThesisMemo({
                     </span>
                   ) : null}
                   {catalyst.eps_forecast !== undefined ? (
-                    <span className="text-gray-500">· EPS est. {catalyst.eps_forecast}</span>
+                    <span className="text-gray-500">· EPS est. {thesisEps(catalyst.eps_forecast)}</span>
                   ) : null}
                 </li>
               ))}

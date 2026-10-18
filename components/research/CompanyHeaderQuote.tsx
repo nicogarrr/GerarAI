@@ -50,6 +50,8 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
     const label = extendedQuoteLabel(quote);
     const showPrice = label !== NA && quote?.price != null && isValidCurrencyCode(currency);
     const signBase = quote?.change ?? quote?.change_percent ?? 0;
+    // «Cierre regular» repite «Cierre anterior» cuando ambos son el mismo dato: se muestra una sola vez.
+    const duplicatedClose = quote?.regular_close != null && quote.regular_close === quote.previous_close;
     const hasDatedMetrics = !!quote?.metrics_timestamp && !!quote.metrics_session;
     return (
         <div className="flex w-full flex-col gap-4" data-testid="company-header-quote">
@@ -66,27 +68,29 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                         ].filter(Boolean).join(' · ')}
                     </div>
                 ) : null}
-                <p className="mt-2 text-xs text-gray-500">
-                    Cierre regular: {showPrice && quote?.regular_close != null && (quote.regular_close_timestamp || quote.regular_close_date) ? `${formatMoney(quote.regular_close, currency)} · ${quote.regular_close_timestamp ? `${quoteDate(quote.regular_close_timestamp)} · ${quoteTime(quote.regular_close_timestamp)}` : quoteSessionDate(quote.regular_close_date)}` : NA}
-                </p>
+                {duplicatedClose ? null : (
+                    <p className="mt-2 text-xs text-gray-500">
+                        Cierre regular: {showPrice && quote?.regular_close != null && (quote.regular_close_timestamp || quote.regular_close_date) ? `${formatMoney(quote.regular_close, currency)} · ${quote.regular_close_timestamp ? `${quoteDate(quote.regular_close_timestamp)} · ${quoteTime(quote.regular_close_timestamp)}` : quoteSessionDate(quote.regular_close_date)}` : NA}
+                    </p>
+                )}
                 {showPrice ? <p className="mt-1 text-xs text-gray-500">{quote!.source} · {quoteTime(quote!.timestamp)} (Madrid)</p> : null}
             </div>
-            <div className="overflow-x-auto">
-                <dl className="grid grid-cols-2 divide-x divide-gray-800 border-y border-gray-800 sm:grid-cols-4" data-testid="company-metric-strip">
+            <div className="min-w-0 max-w-full">
+                <dl className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800" data-testid="company-metric-strip">
                     {[
                         ['Apertura', hasDatedMetrics ? quote!.open : null],
                         ['Máximo', hasDatedMetrics ? quote!.high : null],
                         ['Mínimo', hasDatedMetrics ? quote!.low : null],
                         ['Cierre anterior', quote?.previous_close_timestamp || quote?.previous_close_date ? quote.previous_close : null],
                     ].map(([metricLabel, value]) => (
-                        <div className="min-w-0 px-2 py-3 first:pl-0 sm:px-3" key={String(metricLabel)}>
+                        <div className="min-w-0 py-3 sm:px-3 sm:first:pl-0" key={String(metricLabel)}>
                             <dt className="text-xs text-gray-500">{metricLabel}</dt>
-                            <dd className="mt-1 text-sm font-medium text-gray-200">{value == null || !isValidCurrencyCode(currency) ? NA : formatMoney(value as number, currency)}</dd>
-                            {metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <p className="text-[11px] text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp)} · ${quoteTime(quote.previous_close_timestamp)}` : quoteSessionDate(quote.previous_close_date)}</p> : null}
+                            <dd className="mt-1 break-words text-sm font-medium text-gray-200">{value == null || !isValidCurrencyCode(currency) ? NA : formatMoney(value as number, currency)}</dd>
+                            {metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <p className="break-words text-[11px] text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp)} · ${quoteTime(quote.previous_close_timestamp)}` : quoteSessionDate(quote.previous_close_date)}</p> : null}
                         </div>
                     ))}
                 </dl>
-                {hasDatedMetrics ? <p className="mt-2 text-xs text-gray-500">{quote!.source} · Sesión regular del {quote!.metrics_session} · {quoteTime(quote!.metrics_timestamp)} (Madrid)</p> : null}
+                {hasDatedMetrics ? <p className="mt-2 text-xs text-gray-500">Sesión regular del {quote!.metrics_session} · {quoteTime(quote!.metrics_timestamp)} (Madrid)</p> : null}
             </div>
             <CompanyTechnicalWorkspace snapshot={snapshot} />
         </div>

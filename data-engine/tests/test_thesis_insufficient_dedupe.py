@@ -168,3 +168,39 @@ def test_generate_legacy_insufficient_without_signature_creates_version(monkeypa
     out = client.post("/api/thesis/generate", json={"ticker": "ASTS"}).json()
     assert out["id"] != first["id"]
     assert len(_versions()) == n + 1
+
+
+def test_insufficient_fingerprint_ignores_price_but_valued_thesis_keeps_it(monkeypatch):
+    client, first = _setup_first(monkeypatch)
+    db = SessionLocal()
+    try:
+        company = db.scalar(select(Company).where(Company.ticker == "ASTS"))
+        service = ThesisService()
+        insufficient = {"status": "insufficient_data", "trace": {}}
+        valued = {"status": "ok", "trace": {}}
+        before_insufficient = service._input_fingerprint(db, company, insufficient, {}, include_price=False)
+        before_valued = service._input_fingerprint(db, company, valued, {}, include_price=True)
+    finally:
+        db.close()
+    _new_price()
+    db = SessionLocal()
+    try:
+        company = db.scalar(select(Company).where(Company.ticker == "ASTS"))
+        service = ThesisService()
+        assert service._input_fingerprint(
+            db, company, {"status": "insufficient_data", "trace": {}}, {}, include_price=False
+        ) == before_insufficient
+        assert service._input_fingerprint(
+            db, company, {"status": "ok", "trace": {}}, {}, include_price=True
+        ) != before_valued
+    finally:
+        db.close()
+
+
+def test_forced_insufficient_versions_share_fingerprint_when_only_price_changes(monkeypatch):
+    client, first = _setup_first(monkeypatch)
+    _new_price()
+    forced = client.post("/api/thesis/generate", json={"ticker": "ASTS", "force_new_version": True}).json()
+    assert forced["id"] != first["id"]
+    assert forced["status"] == "insufficient_data"
+    assert forced["input_fingerprint"] == first["input_fingerprint"]
