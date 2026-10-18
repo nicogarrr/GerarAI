@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
+from app.services.async_bridge import run_from_any_context
 from app.services.connectors import short_interest
 from app.services.risk_service import RiskService
 
@@ -41,4 +43,8 @@ async def historical_stress(
         ticker = ticker.strip().upper()
         if not re.fullmatch(r"[A-Z0-9^][A-Z0-9.^=-]{0,19}", ticker):
             raise HTTPException(status_code=422, detail="Ticker no válido")
-    return await HistoricalStressService().build(db, ticker=ticker)
+    # build() mezcla descargas y sqlalchemy sincronos entre sus awaits: todo
+    # el servicio corre en un hilo del pool, con su corutina puenteado.
+    return await run_in_threadpool(
+        lambda: run_from_any_context(HistoricalStressService().build(db, ticker=ticker))
+    )

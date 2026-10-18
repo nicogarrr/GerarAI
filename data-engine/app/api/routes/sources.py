@@ -23,6 +23,7 @@ from app.schemas import (
     KPIExtractionAction,
     KPIExtractionCandidateOut,
 )
+from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetExceededError
 from app.services.claim_intelligence_service import ClaimIntelligenceService
 from app.services.company_resolver import resolve_company
@@ -226,11 +227,17 @@ def analyze_document(document_id: int, db: Session = Depends(get_db)) -> dict:
 async def extract_document_kpis(
     document_id: int, db: Session = Depends(get_db)
 ) -> list[KPIExtractionCandidate]:
-    document = db.get(Document, document_id)
+    document = await run_in_threadpool(db.get, Document, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     try:
-        return await KPIExtractionService().extract_document(db, document)
+        # La extraccion mezcla sqlalchemy y el LLM: hilo del pool, con la
+        # corutina del servicio puenteado (no bloquea el event loop).
+        return await run_in_threadpool(
+            lambda: run_from_any_context(
+                KPIExtractionService().extract_document(db, document)
+            )
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LLMError as exc:

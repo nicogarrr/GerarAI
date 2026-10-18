@@ -8,6 +8,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.models import Claim, ClaimEvidence, ThesisDiff, ThesisSection, ThesisVersion
@@ -380,10 +381,12 @@ async def debate_thesis_endpoint(ticker: str, db: Session = Depends(get_db)) -> 
     """
     from app.services.thesis_debate_service import debate_thesis
 
-    thesis = ThesisService().latest(db, ticker)
+    # Lecturas sqlalchemy sincronas fuera del event loop (el debate LLM si
+    # es async real y se queda awaitado).
+    thesis = await run_in_threadpool(ThesisService().latest, db, ticker)
     if not thesis:
         raise HTTPException(status_code=404, detail="No thesis for ticker")
-    company = resolve_company(db, ticker)
+    company = await run_in_threadpool(resolve_company, db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     try:
@@ -407,38 +410,42 @@ async def debate_thesis_endpoint(ticker: str, db: Session = Depends(get_db)) -> 
             "materiality_score": 0,
             "portfolio_weight": 0.0,
         }
-    persisted = False
-    try:
-        section = db.scalar(
-            select(ThesisSection).where(
-                ThesisSection.thesis_version_id == thesis.id,
-                ThesisSection.section_key == "thesis_debate",
+    def _persist_verdict() -> bool:
+        try:
+            section = db.scalar(
+                select(ThesisSection).where(
+                    ThesisSection.thesis_version_id == thesis.id,
+                    ThesisSection.section_key == "thesis_debate",
+                )
             )
-        )
-        if section is None:
-            section = ThesisSection(
-                thesis_version_id=thesis.id,
-                company_id=company.id,
-                section_key="thesis_debate",
-                title="Thesis debate (bull vs bear)",
-                status="published",
-                order_index=999,
-            )
-            db.add(section)
-        section.body = f"VEREDICTO: {result['verdict']} | {result['verdict_rationale']}"
-        section.metadata_ = {
-            "bull_case": result["bull_case"],
-            "bear_case": result["bear_case"],
-            "verdict": result["verdict"],
-            "verdict_rationale": result["verdict_rationale"],
-            "llm_calls": result["llm_calls"],
-            "degraded": result["degraded"],
-            "model": result["model"],
-        }
-        db.commit()
-        persisted = True
-    except Exception:  # noqa: BLE001 — el debate ya existe; persistir es best-effort
-        db.rollback()
+            if section is None:
+                section = ThesisSection(
+                    thesis_version_id=thesis.id,
+                    company_id=company.id,
+                    section_key="thesis_debate",
+                    title="Thesis debate (bull vs bear)",
+                    status="published",
+                    order_index=999,
+                )
+                db.add(section)
+            section.body = f"VEREDICTO: {result['verdict']} | {result['verdict_rationale']}"
+            section.metadata_ = {
+                "bull_case": result["bull_case"],
+                "bear_case": result["bear_case"],
+                "verdict": result["verdict"],
+                "verdict_rationale": result["verdict_rationale"],
+                "llm_calls": result["llm_calls"],
+                "degraded": result["degraded"],
+                "model": result["model"],
+            }
+            db.commit()
+            return True
+        except Exception:  # noqa: BLE001 — el debate ya existe; persistir es best-effort
+            db.rollback()
+            return False
+
+    # El upsert del veredicto es escritura sqlalchemy sincrona: hilo del pool.
+    persisted = await run_in_threadpool(_persist_verdict)
     return {
         "ticker": company.ticker,
         "thesis_version_id": thesis.id,
