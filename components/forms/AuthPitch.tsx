@@ -8,7 +8,7 @@ import { productModules } from '@/lib/config/product';
  *
  * `/sign-in` mostraba un formulario y un H1, sin decir qué es GerarAI ni qué
  * se obtiene. Este bloque se pinta encima del formulario (sin quitarlo) con los
- * tres módulos del producto y dos salidas: la demo pública y la metodología.
+ * tres módulos del producto y un enlace a la metodología.
  *
  * Sin estado ni efectos: son enlaces. Se importa también desde páginas cliente
  * (`sign-in`, `sign-up`), así que no puede leer `process.env` del servidor.
@@ -27,13 +27,6 @@ export default function AuthPitch({ className = '' }: { className?: string }) {
                 ))}
             </ul>
             <div className="mt-4 flex flex-col gap-2 text-sm">
-                <Link
-                    href="/#demo"
-                    className="inline-flex min-h-11 items-center gap-1 text-teal-400 underline-offset-4 hover:underline"
-                >
-                    Ver una demo pública del espacio de trabajo
-                    <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                </Link>
                 <Link
                     href="/metodologia"
                     className="inline-flex min-h-11 items-center gap-1 text-gray-400 underline-offset-4 hover:text-teal-300 hover:underline"
