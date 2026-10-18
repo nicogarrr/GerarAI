@@ -80,7 +80,7 @@ def test_el_modo_normal_no_cambia(monkeypatch):
 
 def check_degrada(result):
     assert result["status"] == "fragmentos" and "analysis" not in result
-    assert result["message"].startswith("Análisis no disponible")
+    assert "no está disponible" in result["message"] and "citados" not in result["message"]
     assert result["answers"] and all(a["text"] is None and a["citation"]["quote"] for a in result["answers"])
 
 

@@ -119,7 +119,7 @@ def test_paid_configuration_never_calls_provider(monkeypatch):
     import app.services.knowledge_chat as chat
     settings = chat.get_settings().model_copy(update={"opencode_go_model": "paid-model"})
     monkeypatch.setattr(chat, "get_settings", lambda: settings)
-    monkeypatch.setattr(chat, "create_llm_provider", lambda *args: (_ for _ in ()).throw(AssertionError("paid")))
+    monkeypatch.setattr(chat, "create_chat_llm_provider", lambda *args: (_ for _ in ()).throw(AssertionError("paid")))
     result = asyncio.run(ask_library(setup_library(), "repurchases"))
     assert result["status"] == "fragmentos"
 
@@ -186,3 +186,28 @@ def test_no_pool_checkout_during_vector_or_llm_after_tenant_lookup(monkeypatch):
     assert engine.pool.checkedout() == 0
     db.close()
     engine.dispose()
+
+
+def test_library_chat_uses_verified_free_chat_chain(monkeypatch):
+    """La biblioteca va por la cadena gratuita de chat (OpenCode -> Groq ->
+    Gemini): sin ella, un 403 de OpenCode degradaba cada análisis."""
+    monkeypatch.setenv("CAVAAI_ENABLE_VECTOR_SEARCH", "0")
+    import app.services.knowledge_chat as chat
+    provider = Provider()
+    monkeypatch.setattr(chat, "create_chat_llm_provider", lambda settings: provider)
+    result = asyncio.run(ask_library(setup_library(), "repurchases", author="Buffett"))
+    assert result["status"] == "ok"
+    assert provider.request.task == "chat"
+
+
+def test_degraded_analysis_message_does_not_claim_citations(monkeypatch):
+    """Degradado honesto: sin modelo nada fue «citado»; se muestran los
+    fragmentos relacionados y se dice que el análisis no está disponible."""
+    monkeypatch.setenv("CAVAAI_ENABLE_VECTOR_SEARCH", "0")
+    result = asyncio.run(ask_library(
+        setup_library(), "repurchases", author="Buffett",
+        mode="analisis", provider=Provider(fail=True)))
+    assert result["status"] == "fragmentos"
+    assert "no está disponible" in result["message"]
+    assert "citados" not in result["message"]
+    assert result["answers"] and all(a["text"] is None for a in result["answers"])
