@@ -79,6 +79,19 @@ class ChatFallbackProvider(LLMProvider):
         except TimeoutError:
             raise ProviderTransportError(self.name, "timeout", 1) from None
 
+    async def complete_cjk_retry(self, request: LLMRequest) -> LLMResponse:
+        """Reintento del llm_output_guard tras rechazo CJK del primario.
+
+        Salta directo a la cadena de respaldo verificada (Groq, luego
+        Gemini) con la peticion ya anotada con el RETRY_HINT, en vez de
+        repetir la carrera lenta con el modelo gratuito que acaba de fallar
+        (chat real medido: 94,6 s).
+        """
+        try:
+            return await asyncio.wait_for(self._backup_chain(request), timeout=self.total)
+        except TimeoutError:
+            raise ProviderTransportError(self.name, "timeout", 1) from None
+
     async def _backup_chain(self, request: LLMRequest) -> LLMResponse:
         """Groq gpt-oss-120b, then Gemini 3.5 Flash-Lite and Gemini 3.8 Flash (when configured); sequential, never in parallel."""
         members = [(self.backup, GROQ_MODEL)] + ([(self.backup2, model) for model in GEMINI_MODELS] if self.backup2 is not None else [])

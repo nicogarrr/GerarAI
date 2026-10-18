@@ -448,3 +448,27 @@ def test_gemini_enabled_builds_pinned_free_model_backup():
     prov = create_chat_llm_provider(_gemini_cfg(gemini_chat_fallback_enabled=True, gemini_api_key="synthetic", gemini_free_plan_confirmed=True))
     assert prov.backup2 is not None and prov.backup2.name == "gemini"
     assert GEMINI_MODEL == "gemini-3.5-flash-lite"
+
+
+@run_async
+async def test_cjk_retry_goes_straight_to_backup_chain():
+    """El reintento del guard tras rechazo CJK no repite el primario lento:
+    va directo a la cadena de respaldo (Groq) con el timeout total."""
+    p, b = Fake(), Fake(response("recuperado", provider="groq"))
+    provider = ChatFallbackProvider(p, b, total=.3, delay=.1)
+    out = await provider.complete_cjk_retry(LLMRequest([Message("user", "hola")], task="chat"))
+    assert out.provider == "groq"
+    assert not p.calls, "el primario no participa en el reintento CJK"
+    assert len(b.calls) == 1
+    assert b.calls[0].model == GROQ_MODEL
+
+
+@run_async
+async def test_cjk_retry_respects_total_timeout():
+    p, b = Fake(), Fake(delay=5)
+    provider = ChatFallbackProvider(p, b, total=.05, delay=.01)
+    try:
+        await provider.complete_cjk_retry(LLMRequest([Message("user", "hola")], task="chat"))
+        raise AssertionError("debe agotar el timeout total")
+    except ProviderTransportError:
+        pass

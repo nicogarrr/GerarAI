@@ -403,7 +403,17 @@ async def complete_guarded(
     logger.warning("llm_output_guard[%s]: salida rechazada (%s), reintento unico", source, ",".join(reasons))
     if before_retry is not None:
         before_retry()
-    second = await provider.complete(_with_retry_hint(request))
+    retry_request = _with_retry_hint(request)
+    cjk_retry = getattr(provider, "complete_cjk_retry", None)
+    if REASON_CJK in reasons and callable(cjk_retry):
+        # Chat real medido: 94,6 s cuando el primario gratuito lento fallaba
+        # en idioma y el reintento repetia la carrera completa con el mismo
+        # modelo. Tras un rechazo CJK el reintento salta a la cadena de
+        # respaldo verificada (Groq) cuando el proveedor la ofrece.
+        _count(source, "cjk_backup_retry")
+        second = await cjk_retry(retry_request)
+    else:
+        second = await provider.complete(retry_request)
     if on_response is not None:
         on_response(second)
     retry_reasons = inspect_response_text(getattr(second, "text", "") or "", english=english)
