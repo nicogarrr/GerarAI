@@ -1,6 +1,6 @@
 'use client';
 
-import { formatCompact, formatUserDateTime, formatMarketDate, formatMoney, formatNumber, formatPercent, isValidCurrencyCode, NA } from '@/lib/format';
+import { formatCompact, formatUserDateTime, formatMarketDate, formatMoney, formatNumber, formatPercent, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
 import {
     DCF_CANDIDATE_LIMIT,
     dcfEmptyNote,
@@ -558,7 +558,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                         <div className="shrink-0 text-right">
                                             {stock.price != null ? (
                                                 <>
-                                                    <div className="text-white font-mono">{isValidCurrencyCode(stock.currency) ? formatMoney(stock.price, stock.currency) : formatNumber(stock.price)}</div>
+                                                    <div className="text-white font-mono">{isValidCurrencyCode(stock.currency) ? formatPrice(stock.price, stock.currency) : formatNumber(stock.price)}</div>
                                                     {stock.priceKind === 'close' && (
                                                         <div className="text-[10px] text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</div>
                                                     )}
@@ -638,7 +638,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                                     <div>
                                                         <h3 className="font-bold text-white group-hover:text-purple-400 transition-colors">{op.symbol}</h3>
                                                         <p className="text-xs text-gray-400">
-                                                            {priceLabel}: {isValidCurrencyCode(op.currency) ? formatMoney(op.price, op.currency) : formatNumber(op.price)}
+                                                            {priceLabel}: {isValidCurrencyCode(op.currency) ? formatPrice(op.price, op.currency) : formatNumber(op.price)}
                                                         </p>
                                                     </div>
                                                     <Badge className="bg-green-900/30 text-green-400 border-green-800">
