@@ -39,9 +39,11 @@ describe('formato numérico es-ES', () => {
     assert.equal(formatMarketCapUsd('abc'), 'N/D');
   });
 
-  it('la watchlist usa formatMarketCapUsd y no el sufijo US$', () => {
+  it('la watchlist formatea el cap con su divisa real y no el sufijo US$', () => {
     const page = source('app/(root)/watchlist/page.tsx');
-    assert.ok(page.includes('formatMarketCapUsd(stock.marketCap)'));
+    assert.ok(page.includes('formatMarketCap(stock.marketCap, stock.currency)'));
+    assert.ok(!page.includes('formatMarketCapUsd(stock.marketCap)'),
+      'cap ya multi-divisa (respaldo backend no-US): el $ fijo inventaría la divisa');
     assert.ok(!page.includes('} US$`'), 'sin el sufijo US$ pegado al valor');
   });
 
