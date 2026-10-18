@@ -17,8 +17,18 @@ def create_llm_provider(
     settings: Settings | None = None,
     *,
     client: httpx.AsyncClient | None = None,
+    timeout_seconds: float | None = None,
+    max_retries: int | None = None,
+    total_timeout_seconds: float | None = None,
+    reasoning_effort: str | None = None,
 ) -> LLMProvider:
-    """Create the application LLM provider: OpenCode Go (default) or the free cascade."""
+    """Create the application LLM provider: OpenCode Go (default) or the free cascade.
+
+    Los overrides (timeout_seconds, max_retries, total_timeout_seconds,
+    reasoning_effort) solo aplican al primario OpenCode Go; la cascada
+    gratuita usa sus propios presupuestos por miembro. None = valor de
+    settings.
+    """
     settings = settings or get_settings()
     if not settings.llm_enabled:
         return DisabledProvider("disabled_by_configuration")
@@ -38,7 +48,14 @@ def create_llm_provider(
     if not _has_key(settings.opencode_go_api_key):
         return DisabledProvider("opencode_go_api_key_not_configured")
 
-    return _opencode_go(settings, client=client)
+    return _opencode_go(
+        settings,
+        client=client,
+        timeout_seconds=timeout_seconds,
+        max_retries=max_retries,
+        total_timeout_seconds=total_timeout_seconds,
+        reasoning_effort=reasoning_effort,
+    )
 
 
 def _pin_to_model(model: str) -> dict[str, str]:
@@ -99,7 +116,15 @@ def _create_cascade(settings: Settings, *, client: httpx.AsyncClient | None) -> 
     return CascadeProvider(members, total_timeout_seconds=settings.llm_cascade_total_timeout_seconds)
 
 
-def _opencode_go(settings: Settings, *, client: httpx.AsyncClient | None) -> OpenAICompatibleProvider:
+def _opencode_go(
+    settings: Settings,
+    *,
+    client: httpx.AsyncClient | None,
+    timeout_seconds: float | None = None,
+    max_retries: int | None = None,
+    total_timeout_seconds: float | None = None,
+    reasoning_effort: str | None = None,
+) -> OpenAICompatibleProvider:
     return OpenAICompatibleProvider(
         api_key=settings.opencode_go_api_key,
         base_url=settings.opencode_go_base_url,
@@ -113,7 +138,11 @@ def _opencode_go(settings: Settings, *, client: httpx.AsyncClient | None) -> Ope
         },
         model_overrides=settings.llm_model_overrides,
         fallback_model=settings.opencode_go_fallback_model,
-        reasoning_effort=settings.opencode_go_reasoning_effort,
+        reasoning_effort=(
+            settings.opencode_go_reasoning_effort
+            if reasoning_effort is None
+            else reasoning_effort
+        ),
         reasoning_effort_models={
             model.strip()
             for model in settings.opencode_go_reasoning_effort_models.split(",")
@@ -121,9 +150,15 @@ def _opencode_go(settings: Settings, *, client: httpx.AsyncClient | None) -> Ope
         },
         response_cache=build_response_cache(settings),
         client=client,
-        timeout_seconds=settings.llm_timeout_seconds,
-        max_retries=settings.llm_max_retries,
-        total_timeout_seconds=settings.llm_total_timeout_seconds,
+        timeout_seconds=(
+            settings.llm_timeout_seconds if timeout_seconds is None else timeout_seconds
+        ),
+        max_retries=settings.llm_max_retries if max_retries is None else max_retries,
+        total_timeout_seconds=(
+            settings.llm_total_timeout_seconds
+            if total_timeout_seconds is None
+            else total_timeout_seconds
+        ),
         hidden_reasoning_models={
             model.strip()
             for model in settings.llm_hidden_reasoning_models.split(",")

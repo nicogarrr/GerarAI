@@ -50,6 +50,19 @@ in the OpenAI-compatible envelope, only to the models listed in
 `space-bunny-free,deepseek-v4.1-flash-free`). Empty value disables the
 parameter.
 
+Long calls (document/principle extraction, theses, KPIs) run with a 120 s
+per-attempt timeout, one retry and a 250 s total cap (`LLM_TIMEOUT_SECONDS`,
+`LLM_MAX_RETRIES`, `LLM_TOTAL_TIMEOUT_SECONDS`): with `reasoning_effort=max`
+the bridge takes ~26 s or more per batch and a 30 s client cut dropped ~30 %
+of the calls (BrokenPipe on the bridge when the client went away). The
+interactive chat keeps its own short budget (`CHAT_TOTAL_TIMEOUT_SECONDS`,
+default 45 s) and races the primary with a reduced reasoning effort
+(`OPENCODE_GO_CHAT_REASONING_EFFORT`, default `low`) so the primary can win
+the race instead of being cancelled mid-generation. In the background chain
+(`create_background_llm_provider`) the single retry lives in
+`SequentialFallbackProvider`, not inside the primary, so a down bridge costs
+at most two attempts per batch before Groq/Gemini take over.
+
 If the resolved model fails at the LLM layer (after its own retries), the
 call is retried once with `OPENCODE_GO_FALLBACK_MODEL` before the error
 propagates. The fallback span is traced with the model and error class it
