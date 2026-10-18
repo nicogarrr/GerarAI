@@ -10,6 +10,9 @@
  *   fallaron — se dice «X legibles de Y escaneados».
  */
 
+// @ts-expect-error TS5097: extension explicita para node --experimental-strip-types (guards).
+import { plural } from './utils/plural.ts';
+
 export type InsiderStatusFields = {
     reason?: unknown;
     filings_scanned?: unknown;
@@ -50,7 +53,7 @@ export function degradedCopy(
     // (CIK, listado), asi que la cabecera abarca consulta y lectura.
     const header =
         scanned !== null && failed !== null
-            ? `${ticker}: SEC EDGAR no devolvió ningún Form 4 legible (${countText(failed)} con error de ${countText(scanned)} escaneados).`
+            ? `${ticker}: SEC EDGAR no devolvió ningún Form 4 legible (${countText(failed)} con error de ${plural(scanned, 'escaneado', 'escaneados')}).`
             : `${ticker}: no se pudieron consultar o leer las señales Form 4 de SEC EDGAR.`;
     return { header, detail: reasonCopy(fields.reason) };
 }
@@ -63,9 +66,13 @@ export function analyzedCountCopy(
     const scanned = asNumber(fields.filings_scanned);
     const parsed = asNumber(fields.filings_parsed);
     if (status === 'partial' && scanned !== null && parsed !== null) {
-        return `${countText(parsed)} legibles de ${countText(scanned)} escaneados`;
+        return `${plural(parsed, 'legible', 'legibles')} de ${plural(scanned, 'escaneado', 'escaneados')}`;
     }
-    return `${countText(fields.filings_scanned)} analizados`;
+    const anyScanned = asNumber(fields.filings_scanned);
+    // Sin número fiable no se sabe el plural: se conserva el texto anterior.
+    return anyScanned !== null
+        ? plural(anyScanned, 'analizado', 'analizados')
+        : `${countText(fields.filings_scanned)} analizados`;
 }
 
 /**

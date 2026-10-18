@@ -20,6 +20,11 @@ test('degraded con contadores: cabecera con N de M y sin reason', () => {
     const { header, detail } = degradedCopy('AAPL', { filings_scanned: 20, filings_failed: 20 }, count);
     assert.equal(header, 'AAPL: SEC EDGAR no devolvió ningún Form 4 legible (20 con error de 20 escaneados).');
     assert.equal(detail, null);
+    // Singular: «1 escaneados» era el bug del plural fijo.
+    assert.equal(
+        degradedCopy('AAPL', { filings_scanned: 1, filings_failed: 1 }, count).header,
+        'AAPL: SEC EDGAR no devolvió ningún Form 4 legible (1 con error de 1 escaneado).',
+    );
 });
 
 test('degraded con reason (catch global): cabecera que abarca consulta y lectura + reason como detalle', () => {
@@ -52,6 +57,12 @@ test('partial sin señales: legibles de escaneados, nunca «analizados» inflado
         '13 legibles de 20 escaneados',
     );
     assert.equal(analyzedCountCopy('ok', { filings_scanned: 20 }, count), '20 analizados');
+    // Singular: «1 legibles de 1 escaneados» / «1 analizados» eran el bug.
+    assert.equal(
+        analyzedCountCopy('partial', { filings_scanned: 1, filings_parsed: 1 }, count),
+        '1 legible de 1 escaneado',
+    );
+    assert.equal(analyzedCountCopy('ok', { filings_scanned: 1 }, count), '1 analizado');
 });
 
 test('partial muestra las señales con aviso de cobertura incompleta', () => {
