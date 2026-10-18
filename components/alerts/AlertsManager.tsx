@@ -158,6 +158,8 @@ function AlertsManager() {
     };
 
     const handleDeleteAlert = async (alertId: string) => {
+        const alert = alerts.find(item => item._id === alertId);
+        if (!alert || !window.confirm(`¿Eliminar ${getAlertLabel(alert)}? Esta acción no se puede deshacer.`)) return;
         setDeleting(alertId);
         try {
             await deleteAlert(alertId);
@@ -432,7 +434,7 @@ function AlertsManager() {
                                     onClick={() => handleDeleteAlert(alert._id)}
                                     disabled={deleting === alert._id}
                                     aria-busy={deleting === alert._id}
-                                    aria-label={`Eliminar alerta de ${alert.symbol ?? 'símbolo'}`}
+                                    aria-label={`Eliminar alerta: ${getAlertLabel(alert)}`}
                                     className="min-h-[44px] min-w-[44px] text-gray-400 hover:text-red-400"
                                 >
                                     <Trash2 aria-hidden="true" className="h-4 w-4" />

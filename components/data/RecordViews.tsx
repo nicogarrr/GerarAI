@@ -331,6 +331,7 @@ export interface RecordDetailProps {
      * la tarjeta pintaba la clave del backend en mayúsculas («PLAN_EXISTS»).
      */
     columnLabels?: Record<string, string>;
+    formatColumns?: Record<string, (value: unknown, record: DataRecord) => string>;
 }
 
 /** Tarjeta clave/valor para respuestas de objeto único (plan, drift, risk dashboard, reporte fiscal...) */
@@ -346,6 +347,7 @@ export function RecordDetail({
     maxKeys = 24,
     hiddenKeys,
     columnLabels,
+    formatColumns,
 }: RecordDetailProps) {
     const [data, setData] = useState<DataRecord | null>(record);
 
@@ -411,7 +413,7 @@ export function RecordDetail({
                             <div key={key} className="flex flex-col gap-1 bg-surface-0/60 p-3">
                                 <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{columnLabels?.[key] ?? key}</span>
                                 <span className="break-words text-sm text-gray-200">
-                                    <span className="line-clamp-4">{formatRecordValue(value)}</span>
+                                    <span className="line-clamp-4">{formatColumns?.[key] ? formatColumns[key](value, data!) : formatRecordValue(value)}</span>
                                 </span>
                             </div>
                         ))}

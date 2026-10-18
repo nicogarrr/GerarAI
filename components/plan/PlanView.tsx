@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RecordDetail, RecordList, type DataRecord } from '@/components/data/RecordViews';
 import { getPlan, getPlanContributions, getPlanDrift } from '@/lib/actions/plan.actions';
 import PlanSetupDialog from '@/components/plan/PlanSetupDialog';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatNumber, formatPercent, NA } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 
 interface PlanViewProps {
@@ -59,6 +59,29 @@ const CONTRIBUTION_LABELS: Record<string, string> = {
     note: 'Nota',
 };
 
+const PLAN_KIND: Record<string, string> = { ticker: 'Acción', sector: 'Sector', asset_class: 'Clase de activo' };
+const FIELD_LABELS: Record<string, string> = {
+    kind: 'Tipo', label: 'Objetivo', target_pct: 'Peso objetivo', band_pct: 'Banda de tolerancia',
+    current_pct: 'Peso actual', deviation_pct: 'Desviación', action: 'Acción', amount_base: 'Importe',
+};
+function planValue(value: unknown): string {
+    if (value == null) return NA;
+    if (Array.isArray(value)) return value.length ? value.map(planValue).join(' · ') : NA;
+    if (typeof value === 'object') return Object.entries(value).map(([key, item]) => {
+        const text = (key.endsWith('_pct') || key.startsWith('ticker:') || key.startsWith('asset_class:')) ? formatPercent(item as number, { fromRatio: false, digits: 2 })
+            : key === 'kind' ? PLAN_KIND[String(item)] ?? String(item) : planValue(item);
+        return `${FIELD_LABELS[key] ?? key.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja').replaceAll('_', ' ')}: ${text}`;
+    }).join(' · ');
+    if (typeof value === 'number') return formatNumber(value);
+    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    const text = String(value);
+    return ({ok: 'Completo', incomplete_fx: 'Faltan tipos de cambio', buy: 'Comprar', sell: 'Vender'} as Record<string, string>)[text] ?? text.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja');
+}
+const planMoney = (value: unknown, record: DataRecord) =>
+    typeof record.base_currency === 'string' ? formatMoney(value as number | string | null, record.base_currency) : NA;
+const PLAN_FORMAT = Object.fromEntries(['monthly_contribution', 'expected_contributions_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'next_contribution', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]));
+const DETAIL_FORMAT = Object.fromEntries(['target_allocations', 'current_weights', 'deviations', 'suggestions', 'missing_fx', 'status'].map(key => [key, planValue]));
+
 /** Extrae tickers del drift (current_weights "ticker:XXX", deviations kind ticker) y del plan (targets kind ticker) */
 function extractPlanTickers(drift: DataRecord | null, plan: DataRecord | null): string[] {
     const found = new Set<string>();
@@ -100,6 +123,8 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 record={initialPlan}
                 fetchRecord={getPlan}
                 columnLabels={PLAN_LABELS}
+                hiddenKeys={['id', 'base_currency']}
+                formatColumns={{...PLAN_FORMAT, ...DETAIL_FORMAT}}
                 maxKeys={20}
                 emptyMessage={t('plan.empty')}
                 emptyAction={<PlanSetupDialog />}
@@ -148,6 +173,8 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 record={initialDrift}
                 fetchRecord={getPlanDrift}
                 columnLabels={DRIFT_LABELS}
+                hiddenKeys={['base_currency']}
+                formatColumns={{...PLAN_FORMAT, ...DETAIL_FORMAT}}
                 maxKeys={24}
                 emptyMessage="Sin datos de desviación disponibles."
             />

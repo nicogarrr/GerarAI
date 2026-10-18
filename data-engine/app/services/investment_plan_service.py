@@ -173,6 +173,7 @@ class InvestmentPlanService:
         total_expected = plan.monthly_contribution * Decimal(months_elapsed)
         return {
             "plan_exists": True,
+            "base_currency": base_currency,
             "monthly_contribution": float(plan.monthly_contribution),
             "start_date": plan.start_date.isoformat(),
             "horizon_years": plan.horizon_years,
@@ -206,7 +207,7 @@ class InvestmentPlanService:
                 db,
                 quote_currency=row.currency,
                 base_currency=portfolio.base_currency,
-                as_of=date.today(),
+                as_of=row.as_of,
             )
             if rate is None:
                 # Never count unpriced FX at par: exclude and report, same
@@ -318,6 +319,7 @@ class InvestmentPlanService:
             "plan_exists": True,
             "status": "incomplete_fx" if missing_fx else "ok",
             "suggestions_blocked": bool(missing_fx),
+            "base_currency": portfolio.base_currency,
             "portfolio_value_base": float(total.quantize(Decimal("0.01"))),
             "cash_base": float(cash_total.quantize(Decimal("0.01"))),
             "missing_fx": missing_fx,
