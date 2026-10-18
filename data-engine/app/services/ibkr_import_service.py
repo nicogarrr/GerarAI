@@ -465,8 +465,16 @@ class IBKRImportService:
         dry_run: bool = False,
         query_complete_attested: bool = False,
         max_statement_age_days: int = 5,
+        trades_only: bool = False,
+        only_existing_companies: bool = False,
     ) -> dict:
         """Importa un Flex Query.
+
+        ``trades_only=True`` (backfill historico): solo se leen las filas ``Trade`` de
+        acciones y se escriben como operaciones del libro (idempotente por trade id).
+        No toca posiciones, caja, reconcile ni snapshots; con ``dry_run`` hace rollback.
+        ``only_existing_companies=True`` omite (y lista) los simbolos sin Company, para no
+        crear emisores nuevos.
 
         ``reconcile=True`` hace IBKR fuente de verdad: tras importar un extracto
         completo se eliminan las posiciones y saldos de caja que ya no vienen en el
@@ -552,8 +560,17 @@ class IBKRImportService:
         position_rows_skipped = 0
         cash_rows_skipped = 0
 
+        trades_already_present = 0
+        non_stock_skipped = 0
+        unknown_tickers: dict[str, int] = {}
         for element in root.iter():
             tag = _tag_name(element)
+            if trades_only and tag != "Trade":
+                continue
+            if trades_only and (_attr(element, "assetCategory") or "STK").upper() != "STK":
+                # Divisas (EUR.USD), opciones, etc.: no son compras de acciones del libro.
+                non_stock_skipped += 1
+                continue
             if tag == "OpenPosition":
                 symbol = _attr(element, "symbol", "underlyingSymbol")
                 if not symbol:
@@ -668,6 +685,15 @@ class IBKRImportService:
                     continue
                 external_id = _attr(element, "tradeID", "transactionID", "ibExecID")
                 if external_id and external_id in existing_ids:
+                    trades_already_present += 1
+                    continue
+                if (
+                    trades_only
+                    and only_existing_companies
+                    and symbol.upper().strip() not in companies
+                    and db.scalar(select(Company.id).where(Company.ticker == symbol.upper().strip())) is None
+                ):
+                    unknown_tickers[symbol.upper().strip()] = unknown_tickers.get(symbol.upper().strip(), 0) + 1
                     continue
                 company = self._company(db, companies, symbol)
                 self._capture_isin(company, element)
@@ -807,6 +833,23 @@ class IBKRImportService:
                     existing_ids.add(external_id)
                 db.add(transaction)
                 dividends_imported += 1
+
+        if trades_only:
+            db.flush()
+            result = {
+                "status": "dry_run" if dry_run else "imported",
+                "trades_imported": trades_imported,
+                "trades_already_present": trades_already_present,
+                "non_stock_skipped": non_stock_skipped,
+                "skipped_unknown_tickers": dict(sorted(unknown_tickers.items())),
+                "rows_skipped": rows_skipped,
+                "row_errors": row_errors,
+            }
+            if dry_run:
+                db.rollback()
+            else:
+                db.commit()
+            return result
 
         positions_closed: list[str] = []
         cash_removed: list[str] = []
