@@ -729,7 +729,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                 ) : (
                     <div className="mt-3 space-y-4">
                         <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline">{selectedNode.type}</Badge>
+                            <Badge variant="outline">{graphNodeTypeLabel(selectedNode.type)}</Badge>
                             {selectedId !== null ? <span className="font-mono text-xs text-gray-500">#{selectedId}</span> : null}
                         </div>
                         <p className="text-sm font-medium text-gray-200">{selectedNode.label}</p>
