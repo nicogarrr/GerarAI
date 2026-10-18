@@ -78,12 +78,10 @@ def evidence_sections(filing_items: list[dict], rag_context: list[dict]) -> dict
     paragraphs = [
         (
             f"Doctrina de inversion (no es un dato financiero de esta empresa): {item.get('title') or 'Sin titulo'}. "
-            f"Fuente: {_source_locator(item)}. Biblioteca {item.get('knowledge_document_id')}, "
-            f"chunk {item.get('chunk_id')}: {item.get('text', '')}"
+            f"Fuente: {_source_locator(item)}. Biblioteca {item.get('knowledge_document_id')}: {item.get('text', '')}"
             if item.get("type") == "knowledge_chunk" else
             f"Extracto documental (no verificado): {item.get('title') or 'Sin titulo'}. "
-            f"Fuente: {_source_locator(item)}. Documento {item.get('document_id')}, "
-            f"chunk {item.get('chunk_id')}: {item.get('text', '')}"
+            f"Fuente: {_source_locator(item)}. Documento {item.get('document_id')}: {item.get('text', '')}"
         ) for item in rag_context[:8]
     ]
     if not paragraphs:
