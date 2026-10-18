@@ -14,10 +14,13 @@ def test_second_order_is_read_only_and_marks_source_claim_unverified(monkeypatch
         db.info["tenant_id"] = "tenant-test"
         db.add_all([
             Company(ticker="GRID", name="Grid Co", exchange="NYSE", currency="USD",
-                    sector="Electric Utilities", industry="Power", company_type="holding",
+                    sector="Utilities", industry="Electric Utilities", company_type="holding",
                     valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[]),
             Company(ticker="OIL", name="Oil Co", exchange="NYSE", currency="USD",
-                    sector="Oil & Gas", industry="Energy", company_type="holding",
+                    sector="Energy", industry="Oil & Gas", company_type="holding",
+                    valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[]),
+            Company(ticker="SEC", name="Sector Only Co", exchange="NYSE", currency="USD",
+                    sector="Oil & Gas", industry="Refining", company_type="holding",
                     valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[]),
             Company(ticker="UNR", name="Unknown Co", exchange="NYSE", currency="USD",
                     sector="Unknown", industry="Unknown", company_type="holding",
@@ -38,6 +41,8 @@ def test_second_order_is_read_only_and_marks_source_claim_unverified(monkeypatch
         assert "350 TWh" in result["source_claim"]
         assert result["source"]["published_at"] is not None
         assert {item["ticker"] for item in result["candidates"]} == {"GRID", "OIL"}
+        assert all(item["reason"] for item in result["candidates"])
+        assert result["limited_to"] == 10
         assert all(item["status"] == "hipótesis_no_verificada" for item in result["candidates"])
         assert all(item["sources"][0]["url"] == "https://example.test/story" for item in result["candidates"])
         assert not db.dirty and not db.new
@@ -147,6 +152,9 @@ def test_llm_request_pins_free_model_even_with_paid_override(monkeypatch):
     result, _ = asyncio.run(service._extract_with_llm("Una noticia general"))
     assert result.themes == []
     assert captured[0].model == "space-bunny-free"
+    result, _ = asyncio.run(service._extract_with_llm("Una noticia", context="- Ticker: ASTS"))
+    assert "ASTS" in captured[1].messages[-1].content
+    assert "Noticia:" in captured[1].messages[-1].content
 
 
 def _company_db(*companies):
@@ -330,3 +338,103 @@ def test_no_transaction_is_held_during_either_llm_call(monkeypatch):
     assert seen == [False, False]
     assert result["mode"] == "llm" and result["source"]["name"] == "manual"
     assert result["news_event_id"] == event_id
+
+
+def _allow_quota(monkeypatch):
+    monkeypatch.setenv("SECOND_ORDER_LLM_ENABLED", "1")
+    monkeypatch.setattr(service, "reserve_llm_call", lambda *_a: {
+        "allowed": True, "minute_used": 1, "minute_limit": 4, "day_used": 1, "day_limit": 100})
+
+
+def test_candidates_capped_at_ten_with_concrete_reason(monkeypatch):
+    companies = [_mk_company(f"C{i:02d}", industry="Copper") for i in range(12)]
+    companies.append(_mk_company("SEC", sector="Copper"))  # solo sector: descartado
+    _allow_quota(monkeypatch)
+    _scripted_provider(monkeypatch, GOOD)
+    with _company_db(*companies) as db:
+        result = service.analyze_second_order(db, _llm_event(db), use_llm=True)
+    assert result["mode"] == "llm"
+    assert len(result["candidates"]) == 10
+    assert result["limited_to"] == 10
+    assert "SEC" not in {item["ticker"] for item in result["candidates"]}
+    assert all("Copper" in item["reason"] for item in result["candidates"])
+    assert all(item["status"] == "hipótesis_no_verificada" for item in result["candidates"])
+
+
+def test_sector_only_match_yields_no_candidates(monkeypatch):
+    _allow_quota(monkeypatch)
+    _scripted_provider(monkeypatch, GOOD)
+    with _company_db(_mk_company("CPR", sector="Copper")) as db:
+        result = service.analyze_second_order(db, _llm_event(db), use_llm=True)
+    assert result["mode"] == "llm"
+    assert result["candidates"] == []
+    assert result["status"] == "sin_datos"
+
+
+def _tenant_company_db(*, with_peer: bool):
+    from app.models.entities import PeerRelationship, Tenant
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    db = Session(engine)
+    tenant = Tenant(external_id="ctx-tenant", name="Ctx")
+    asts = _mk_company("ASTS", sector="Technology", industry="Communication Equipment")
+    gsat = _mk_company("GSAT", sector="Technology", industry="Communication Equipment")
+    db.add_all([tenant, asts, gsat])
+    db.flush()
+    if with_peer:
+        db.add(PeerRelationship(tenant_id=tenant.id, company_id=asts.id,
+                                peer_company_id=gsat.id, selected=True))
+    db.commit()
+    db.info["tenant_id"] = tenant.id
+    return db, asts
+
+
+def test_company_context_and_peers_reach_the_llm_prompt(monkeypatch):
+    _allow_quota(monkeypatch)
+    calls = _scripted_provider(monkeypatch, GOOD)
+    db, asts = _tenant_company_db(with_peer=True)
+    try:
+        event = NewsEvent(title="Demanda colectiva contra ASTS", summary="Bufete anuncia demanda",
+                          source="manual", company_id=asts.id,
+                          metadata_={"date_source": "source"})
+        db.add(event)
+        db.commit()
+        result = service.analyze_second_order(db, event, use_llm=True)
+    finally:
+        db.close()
+    assert result["mode"] == "llm"
+    prompt = calls[0].messages[-1].content
+    assert "ASTS" in prompt and "Communication Equipment" in prompt
+    assert "GSAT" in prompt
+    assert "sin relaciones conocidas" not in prompt
+
+
+def test_company_context_says_no_known_relations(monkeypatch):
+    _allow_quota(monkeypatch)
+    calls = _scripted_provider(monkeypatch, GOOD)
+    db, asts = _tenant_company_db(with_peer=False)
+    try:
+        event = NewsEvent(title="Demanda colectiva contra ASTS", summary="Bufete anuncia demanda",
+                          source="manual", company_id=asts.id,
+                          metadata_={"date_source": "source"})
+        db.add(event)
+        db.commit()
+        result = service.analyze_second_order(db, event, use_llm=True)
+    finally:
+        db.close()
+    assert result["mode"] == "llm"
+    assert "sin relaciones conocidas" in calls[0].messages[-1].content
+
+
+def test_generated_display_title_is_not_treated_as_source_claim():
+    with _company_db() as db:
+        event = NewsEvent(title="ASTS Company update New ITU filing", summary="",
+                          source="manual",
+                          metadata_={"date_source": "source", "headline_from_source": False,
+                                     "source_headline": "ASTS ITU filing submitted"})
+        db.add(event)
+        db.commit()
+        result = service.analyze_second_order(db, event)
+    assert "ASTS ITU filing submitted" in result["source_claim"]
+    assert "Company update" not in result["source_claim"]

@@ -309,3 +309,107 @@ def test_reconcile_marks_permanent_gate_failures_and_heals_on_fix(db):
     assert healed_row and healed_row.status == "pending"
     session.refresh(marked)
     assert "analysis_excluded_url" not in (marked.metadata_ or {})
+
+
+def _alert_with_article(session, tenant_id, company, fingerprint="llm-one"):
+    article = NewsEvent(tenant_id=tenant_id, company_id=company.id,
+                        title="ASTS ITU filing", source="Publisher",
+                        url="https://publisher.example/itu", date=NOW,
+                        metadata_={"connector": "rss", "date_source": "source",
+                                   "source_headline": "ASTS ITU filing submitted"})
+    session.add(article)
+    session.flush()
+    alert = ResearchAlert(tenant_id=tenant_id, company_id=company.id,
+                          alert_type="tracked_news", title="Article", message="News",
+                          fingerprint=fingerprint, metadata_={"news_event_id": article.id})
+    session.add(alert)
+    session.commit()
+    queue_analysis(session, alert)
+    return alert, article
+
+
+def _canned_second_order(event_id):
+    return {
+        "news_event_id": event_id, "status": "hipótesis_no_verificadas",
+        "generated_at": "2026-09-27T12:00:00+00:00", "mode": "llm",
+        "llm_model": "space-bunny-free",
+        "themes": [{"exposure": "Communication Equipment", "direction": "perjudicada",
+                    "chain": [{"cause": "Demanda colectiva", "effect": "Riesgo legal"}]}],
+        "candidates": [{"ticker": "GSAT", "company_name": "Globalstar",
+                        "reason": "La industria 'Communication Equipment' de GSAT coincide exactamente con la exposición 'Communication Equipment' de la hipótesis."}],
+        "note": None, "llm_quota": {"allowed": True, "minute_used": 1},
+        "source_verified": False,
+        "warning": "Solo hipótesis. Verificar fuente, cadena causal y exposición antes de usar como conclusión.",
+    }
+
+
+def test_llm_step_runs_for_portfolio_company(db, monkeypatch):
+    session, tenants, company = db
+    alert, article = _alert_with_article(session, tenants[0].id, company)
+    import app.services.alert_analysis_service as service
+    calls = []
+    monkeypatch.setenv("SECOND_ORDER_LLM_ENABLED", "1")
+    monkeypatch.setattr(service, "analyze_second_order",
+                        lambda db_, event, *, use_llm=False: calls.append((event.id, use_llm))
+                        or _canned_second_order(event.id))
+    out = analyze_alert(session, alert.id)
+    assert out["status"] == "hipótesis_no_verificadas"
+    assert calls == [(article.id, True)]
+    row = session.scalar(select(AlertAnalysis))
+    block = row.result["second_order"]
+    assert block["mode"] == "llm" and block["model"] == "space-bunny-free"
+    assert block["scope"] == "cartera" and block["source_verified"] is False
+    assert block["warning"].startswith("Solo hipótesis")
+    keys = [section["key"] for section in row.result["sections"]]
+    assert keys[:2] == ["facts", "insufficient_data"] and "second_order" in keys
+    payload = read_analysis(session, alert.id)["versions"][0]
+    assert payload["status"] == "hipótesis_no_verificadas"
+    assert payload["second_order"]["status"] == "hipótesis_no_verificadas"
+
+
+def test_llm_step_skipped_for_untracked_company(db, monkeypatch):
+    session, tenants, _company = db
+    other = Company(ticker="UNRL", name="Unrelated Co", exchange="NYSE", currency="USD",
+                    company_type="holding", valuation_model="unassigned")
+    session.add(other)
+    session.commit()
+    alert, _article = _alert_with_article(session, tenants[0].id, other, fingerprint="llm-two")
+    import app.services.alert_analysis_service as service
+    calls = []
+    monkeypatch.setenv("SECOND_ORDER_LLM_ENABLED", "1")
+    monkeypatch.setattr(service, "analyze_second_order",
+                        lambda db_, event, *, use_llm=False: calls.append(1) or _canned_second_order(event.id))
+    out = analyze_alert(session, alert.id)
+    assert out["status"] == "insufficient_data"
+    assert calls == []
+    row = session.scalar(select(AlertAnalysis))
+    assert "second_order" not in row.result
+
+
+def test_llm_step_failure_keeps_honest_baseline(db, monkeypatch):
+    session, tenants, company = db
+    alert, _article = _alert_with_article(session, tenants[0].id, company, fingerprint="llm-three")
+    import app.services.alert_analysis_service as service
+
+    def boom(db_, event, *, use_llm=False):
+        raise RuntimeError("provider down")
+
+    monkeypatch.setenv("SECOND_ORDER_LLM_ENABLED", "1")
+    monkeypatch.setattr(service, "analyze_second_order", boom)
+    out = analyze_alert(session, alert.id)
+    assert out["status"] == "insufficient_data"
+    row = session.scalar(select(AlertAnalysis))
+    assert "second_order" not in row.result
+    assert row.result["sections"][0]["key"] == "facts"
+
+
+def test_llm_step_skipped_when_flag_disabled(db, monkeypatch):
+    session, tenants, company = db
+    alert, _article = _alert_with_article(session, tenants[0].id, company, fingerprint="llm-four")
+    import app.services.alert_analysis_service as service
+    calls = []
+    monkeypatch.setenv("SECOND_ORDER_LLM_ENABLED", "0")
+    monkeypatch.setattr(service, "analyze_second_order",
+                        lambda db_, event, *, use_llm=False: calls.append(1) or _canned_second_order(event.id))
+    assert analyze_alert(session, alert.id)["status"] == "insufficient_data"
+    assert calls == []

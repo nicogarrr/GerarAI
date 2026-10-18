@@ -2,7 +2,9 @@
 
 No signal from this service verifies a source claim or changes investment state.
 The generative path is operator-gated and limited to the verified free model.
-No background job calls it during news ingestion.
+No background job calls it during news ingestion; the tracked-news alert
+analysis (portfolio/watchlist companies only) calls it under the same flag
+and per-tenant quota.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
 from app.llm.model_aliases import VERIFIED_FREE_MODELS
-from app.models import Company, NewsEvent
+from app.models import Company, NewsEvent, PeerRelationship
 from app.services.async_bridge import run_from_any_context
 from app.services.llm_output_guard import complete_guarded
 from app.services.second_order_quota import reserve_llm_call
@@ -57,6 +59,14 @@ DETERMINISTIC_THEMES: tuple[tuple[tuple[str, ...], str, str, str], ...] = (
 )
 
 
+# Cap on selected candidates. A bare sector coincidence is not a concrete
+# reason (measured in prod: 100 sector-level candidates for one ASTS news
+# item), so only industry/factor matches count and the list stays short.
+CANDIDATE_LIMIT = 10
+
+_REASON_FIELD_LABEL = {"industry": "industria", "factor_tags": "etiqueta de factor"}
+
+
 def _normalized(text: str) -> str:
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
     return re.sub(r"[^a-z0-9]+", " ", text).strip()
@@ -81,7 +91,7 @@ def _fallback(text: str) -> Extraction:
 _SCHEMA = Extraction.model_json_schema()
 
 
-async def _extract_with_llm(text: str, before_retry=None) -> tuple[Extraction, object]:
+async def _extract_with_llm(text: str, context: str = "", before_retry=None) -> tuple[Extraction, object]:
     provider = create_llm_provider()
     if provider.name == "disabled":
         raise RuntimeError("LLM not configured")
@@ -90,13 +100,17 @@ async def _extract_with_llm(text: str, before_retry=None) -> tuple[Extraction, o
             Message("system", (
                 "Extrae hasta 8 hipótesis causales indirectas de la noticia. "
                 "No verifiques hechos, no afirmes que la noticia es cierta. "
-                "Cada exposure debe ser un nombre de sector, industria o factor "
-                "que pueda coincidir literalmente con los metadatos de empresas. "
+                "Cada exposure debe ser un nombre de industria o factor concreto "
+                "que pueda coincidir literalmente con los metadatos de empresas; "
+                "un sector amplio solo no genera candidatos. "
+                "Si hay contexto verificado de la empresa, úsalo para afinar las "
+                "hipótesis; las relaciones entre empresas solo existen cuando el "
+                "contexto las lista ('sin relaciones conocidas' = no hay datos). "
                 "Devuelve una cadena explícita de 1 a 4 pasos por hipótesis. "
                 "No propongas tickers; no hagas recomendaciones de inversión. "
                 "Si no hay señal, devuelve themes vacío. Responde solo JSON."
             )),
-            Message("user", text[:3500]),
+            Message("user", (context + "\n\nNoticia:\n" if context else "") + text[:3500]),
         ],
         task="news_second_order",
         model="space-bunny-free",
@@ -113,6 +127,49 @@ async def _extract_with_llm(text: str, before_retry=None) -> tuple[Extraction, o
         await complete_guarded(provider, request, source="second_order", before_retry=before_retry)
     ).response
     return Extraction.model_validate(parse_json_response(response.text)), response
+
+
+def _company_context(db: Session, company_id: int | None, tenant_id) -> str:
+    """Verified DB context about the news subject, prepended to the LLM prompt.
+
+    Only persisted metadata is shown (ticker, name, sector, industry, factor
+    tags, selected peer relationships). With no peer rows the prompt says
+    "sin relaciones conocidas" so the model never invents relationships.
+    """
+    if company_id is None or not isinstance(tenant_id, int):
+        return ""
+    company = db.get(Company, company_id)
+    if company is None:
+        return ""
+    lines = [
+        "Contexto verificado de la base de datos sobre la empresa de la noticia:",
+        (f"- Ticker: {company.ticker}; Nombre: {company.name}; "
+         f"Sector: {company.sector}; Industria: {company.industry}"),
+    ]
+    if company.factor_tags:
+        lines.append(f"- Etiquetas de factor: {', '.join(company.factor_tags)}")
+    peers = db.execute(
+        select(Company.ticker, Company.name)
+        .join(PeerRelationship, PeerRelationship.peer_company_id == Company.id)
+        .where(
+            PeerRelationship.tenant_id == tenant_id,
+            PeerRelationship.company_id == company.id,
+            PeerRelationship.selected.is_(True),
+        )
+        .order_by(Company.ticker)
+    ).all()
+    if peers:
+        lines.append("- Relaciones conocidas: " + ", ".join(f"{ticker} ({name})" for ticker, name in peers))
+    else:
+        lines.append("- Relaciones conocidas: sin relaciones conocidas")
+    return "\n".join(lines)
+
+
+def _candidate_reason(company: Company, theme: Theme, field: str, value: str) -> str:
+    """Concrete match reason; a hypothesis is never presented as a fact."""
+    label = _REASON_FIELD_LABEL.get(field, field)
+    return (f"La {label} '{value}' de {company.ticker} coincide exactamente con "
+            f"la exposición '{theme.exposure}' de la hipótesis.")
 
 
 def _company_exposures(company: Company) -> list[tuple[str, str]]:
@@ -163,10 +220,11 @@ def _jev_marker(theme: Theme) -> dict:
 
 
 def _candidate(company: Company, theme: Theme, field: str, value: str,
-               event: Any, marker: dict) -> dict:
+               event: Any, marker: dict, reason: str) -> dict:
     source = {"news_event_id": event.id, "url": event.url, "published_at": _source_date(event)}
     return {
         "ticker": company.ticker, "company_name": company.name,
+        "reason": reason,
         "direction": theme.direction, "confidence": marker["confidence"],
         "jev_direction": marker["direction"],
         "jev_backend": marker["backend"], "status": "hipótesis_no_verificada",
@@ -257,16 +315,26 @@ def analyze_second_order(db: Session, event: NewsEvent, *, use_llm: bool = False
     # Copia escalares y suelta la transaccion antes de cualquier LLM: sin conexion
     # retenida durante la espera ni en el reintento (pool 5+10).
     tenant_id = db.info.get("tenant_id")
+    meta = dict(event.metadata_ or {})
+    title = event.title
+    # Un titular generado por la app (headline_from_source=False) no es un
+    # claim de la fuente: el claim analizable es el titular original.
+    if meta.get("headline_from_source") is False:
+        source_headline = meta.get("source_headline")
+        if isinstance(source_headline, str) and source_headline.strip():
+            title = source_headline.strip()
     snap: Any = SimpleNamespace(
         id=event.id, url=event.url, source=event.source, date=event.date,
-        metadata_=dict(event.metadata_ or {}), title=event.title, summary=event.summary,
+        metadata_=meta, title=title, summary=event.summary, company_id=event.company_id,
     )
+    context = _company_context(db, snap.company_id, tenant_id)
     if use_llm:
         db.commit()
     text = " ".join(part for part in (snap.title, snap.summary) if part)[:3500]
     mode = "determinista"
     llm_note = None
     llm_quota = None
+    llm_model = None
     extraction = _fallback(text)
     if use_llm:
         if os.getenv("SECOND_ORDER_LLM_ENABLED") != "1":
@@ -284,14 +352,16 @@ def analyze_second_order(db: Session, event: NewsEvent, *, use_llm: bool = False
                         if not retry["allowed"]:
                             raise RuntimeError("second-order LLM quota exhausted before retry")
 
-                    extraction, _response = run_from_any_context(
-                        _extract_with_llm(text, before_retry=_reserve_retry)
+                    extraction, response = run_from_any_context(
+                        _extract_with_llm(text, context=context, before_retry=_reserve_retry)
                     )
+                    llm_model = getattr(response, "model", None) or None
                     mode = "llm"
             except Exception:  # noqa: BLE001 - never claim a failed call worked
                 llm_note = "Análisis LLM no disponible; se usa el camino determinista."
     # The LLM does not select companies. Only exact, normalized matches in
-    # existing sector/industry/factor metadata can create a candidate.
+    # existing industry/factor metadata can create a candidate; a bare sector
+    # coincidence has no concrete reason and is discarded.
     candidates = []
     for theme in extraction.themes:
         if not theme.chain or not _normalized(theme.exposure):
@@ -299,26 +369,30 @@ def analyze_second_order(db: Session, event: NewsEvent, *, use_llm: bool = False
         matches = []
         for company in _matching_companies(db, theme.exposure):
             for field, value in _company_exposures(company):
+                if field == "sector":
+                    continue
                 if _normalized(value) == _normalized(theme.exposure):
                     matches.append((company, field, value))
                     break
-            if len(matches) + len(candidates) >= 100:
+            if len(matches) + len(candidates) >= CANDIDATE_LIMIT:
                 break
         if matches:
             marker = _jev_marker(theme)
             candidates.extend(
-                _candidate(company, theme, field, value, snap, marker)
+                _candidate(company, theme, field, value, snap, marker,
+                           _candidate_reason(company, theme, field, value))
                 for company, field, value in matches
             )
-        if len(candidates) >= 100:
+        if len(candidates) >= CANDIDATE_LIMIT:
             break
+    candidates = candidates[:CANDIDATE_LIMIT]
     return {
         "news_event_id": snap.id, "status": "hipótesis_no_verificadas" if candidates else "sin_datos",
         "generated_at": datetime.now(UTC).isoformat(), "mode": mode,
         "source": {"url": snap.url, "published_at": _source_date(snap), "name": snap.source},
         "source_claim": text, "source_verified": False,
         "themes": [theme.model_dump() for theme in extraction.themes],
-        "candidates": candidates, "limited_to": 100, "note": llm_note,
-        "llm_quota": llm_quota,
+        "candidates": candidates, "limited_to": CANDIDATE_LIMIT, "note": llm_note,
+        "llm_model": llm_model, "llm_quota": llm_quota,
         "warning": "Solo hipótesis. Verificar fuente, cadena causal y exposición antes de usar como conclusión.",
     }

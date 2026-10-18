@@ -2,19 +2,49 @@
 
 An attributed headline is not independent verification. This first pipeline
 stores an honest baseline; later primary-record analysis can append a version.
+For portfolio/watchlist companies it also runs the second-order LLM step
+(same flag and per-tenant quota as the on-demand endpoint); its output stays
+hypothesis, never a verified claim.
 """
 from __future__ import annotations
 
+import logging
+import os
 from datetime import UTC, datetime
 
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import AlertAnalysis, NewsEvent, ResearchAlert
+from app.models import AlertAnalysis, Company, NewsEvent, Position, ResearchAlert, WatchItem
 from app.services.research_assistant_service import _url
+from app.services.second_order_news_service import analyze_second_order
+
+logger = logging.getLogger(__name__)
 
 VERSION = "headline-baseline-v1"
 DAILY_LIMIT = 20
+
+
+def _tracked_scope(db: Session, tenant_id, company_id: int | None) -> str | None:
+    """'cartera', 'watchlist' or None for the alert's company in this tenant."""
+    if company_id is None:
+        return None
+    position_id = db.scalar(select(Position.id).where(
+        Position.tenant_id == tenant_id, Position.company_id == company_id,
+        Position.quantity > 0).limit(1))
+    if position_id is not None:
+        return "cartera"
+    company = db.get(Company, company_id)
+    if company is None or not company.ticker:
+        return None
+    ticker = company.ticker.upper()
+    for symbol in db.scalars(select(WatchItem.symbol).where(WatchItem.tenant_id == tenant_id)).all():
+        if not symbol:
+            continue
+        normalized = str(symbol).upper()
+        if normalized == ticker or normalized.split(".")[0] == ticker.split(".")[0]:
+            return "watchlist"
+    return None
 
 
 def queue_analysis(db: Session, alert: ResearchAlert) -> AlertAnalysis | None:
@@ -184,11 +214,55 @@ def analyze_alert(db: Session, alert_id: int) -> dict:
         citation = {"id": f"news_event:{event.id}", "kind": "news_event",
                     "source": event.source, "url": event.url,
                     "as_of": f"{event.date.isoformat()} ({date_label})", "excerpt": headline.strip()[:500]}
-        analysis.status = "insufficient_data"
-        analysis.result = {"sections": [
+        sections = [
             {"key": "facts", "body": f"Titular atribuido a {event.source}: {citation['excerpt']}", "citation_ids": [citation["id"]]},
-            {"key": "insufficient_data", "body": "Fuente primaria no consultada. El titular no verifica el hecho ni su impacto para inversores.", "citation_ids": []}],
-            "citations": [citation], "writeback": False}
+            {"key": "insufficient_data", "body": "Fuente primaria no consultada. El titular no verifica el hecho ni su impacto para inversores.", "citation_ids": []}]
+        analysis.status = "insufficient_data"
+        analysis.result = {"sections": sections, "citations": [citation], "writeback": False}
+        scope = _tracked_scope(db, tenant_id, event.company_id)
+        if scope is not None and os.getenv("SECOND_ORDER_LLM_ENABLED") == "1":
+            # Paso LLM automático solo para cartera/watchlist: reserva cuota
+            # (4/min, 100/día por tenant) dentro de analyze_second_order, que
+            # degrada a determinista con nota si el LLM no está disponible.
+            db.commit()  # suelta el SELECT FOR UPDATE durante la espera del LLM
+            try:
+                second_order = analyze_second_order(db, event, use_llm=True)
+            except Exception:  # noqa: BLE001 - el baseline ya es honesto; un fallo inesperado no lo borra
+                logger.warning("alert_analysis: second-order step failed", exc_info=True)
+                second_order = None
+            analysis = db.scalar(select(AlertAnalysis).where(
+                AlertAnalysis.tenant_id == tenant_id, AlertAnalysis.alert_id == alert_id,
+                AlertAnalysis.version == VERSION).with_for_update())
+            if analysis is None:
+                raise LookupError("Alert analysis not queued for this tenant")
+            if second_order is not None:
+                # JSON plano: reasignar dict/list nuevos o SQLAlchemy no
+                # detecta la mutacion in-place y el commit perderia el bloque.
+                new_result = dict(analysis.result or {})
+                new_sections = list(new_result.get("sections", []))
+                body = (f"Análisis de segundo orden ({second_order['mode']}"
+                        + (f", modelo {second_order['llm_model']}" if second_order.get("llm_model") else "")
+                        + f", {scope}): {len(second_order['themes'])} hipótesis, "
+                        f"{len(second_order['candidates'])} candidatos. {second_order['warning']}")
+                if second_order["note"]:
+                    body += f" Nota: {second_order['note']}"
+                new_sections.append({"key": "second_order", "body": body, "citation_ids": []})
+                new_result["sections"] = new_sections
+                new_result["second_order"] = {
+                    "scope": scope,
+                    "mode": second_order["mode"],
+                    "model": second_order.get("llm_model"),
+                    "status": second_order["status"],
+                    "generated_at": second_order["generated_at"],
+                    "source_verified": False,
+                    "themes": second_order["themes"],
+                    "candidates": second_order["candidates"],
+                    "note": second_order["note"],
+                    "llm_quota": second_order["llm_quota"],
+                    "warning": second_order["warning"],
+                }
+                analysis.status = second_order["status"]
+                analysis.result = new_result
     db.commit()
     return {"status": analysis.status, "analysis_id": analysis.id}
 
@@ -226,5 +300,6 @@ def read_analysis(db: Session, alert_id: int) -> dict:
         else:
             versions.append({"id": row.id, "version": row.version, "status": row.status,
                              "sections": result.get("sections", []), "citations": citations,
+                             "second_order": result.get("second_order"),
                              "missing_data": ["Fuente primaria no consultada."], "writeback": False})
     return {"alert_id": alert_id, "versions": versions}
