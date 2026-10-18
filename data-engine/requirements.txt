@@ -20,7 +20,6 @@ pydantic==2.14.0
 pydantic-settings>=2.4.0,<3
 
 # HTTP
-requests>=2.31.0,<3
 httpx>=0.27.0,<0.29
 # httpcore: public_fetch usa backends privados (IP pinning anti-SSRF);
 # fijar la major para que un upgrade falle controlado, no en silencio.
