@@ -1,7 +1,7 @@
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import { healthText, listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
-import { factDisplayAudit } from '@/lib/research/fact-display-audit';
+import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
 import { groupClaimsByVersion } from '@/lib/research/claim-groups';
 import { GROUPS, MODULES, asView, moduleHref, type View } from '@/lib/research/research-views';
 import { researchValuability } from '@/lib/research/coverage-state';
@@ -266,7 +266,7 @@ function metricValue(value: number | string | null | undefined, unit: string) {
   return formatCompact(parsed);
 }
 
-function FactCard({ fact, ticker }: { fact: ResearchFact; ticker: string }) {
+function FactCard({ fact, ticker, staleness }: { fact: ResearchFact; ticker: string; staleness: string | null }) {
   const audit = factDisplayAudit(ticker, fact);
   return (
     <div className="rounded-lg border border-gray-800 p-3">
@@ -275,6 +275,7 @@ function FactCard({ fact, ticker }: { fact: ResearchFact; ticker: string }) {
         <span className={`text-sm font-semibold ${audit ? 'text-gray-400' : 'text-teal-300'}`}>{audit ? 'N/D' : metricValue(fact.value, fact.unit)}</span>
       </div>
       {audit ? <p className="mt-2 text-xs text-amber-300">{audit}</p> : null}
+      {!audit && staleness ? <p className="mt-2 text-xs text-amber-300">{staleness}</p> : null}
       <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-gray-500">
         <span>{fact.period}</span>
         <span>·</span>
@@ -296,12 +297,21 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
       />
     );
   }
+  // El último hecho de cada métrica (la lista viene ordenada por año fiscal
+  // descendente) es el que un lector toma por «estado actual».
+  const latestFiscalYear = facts.reduce((acc, fact) => Math.max(acc, fact.fiscal_year ?? 0), 0) || null;
+  const latestIdByMetric = new Map<string, number>();
+  for (const fact of facts) {
+    if (!latestIdByMetric.has(fact.metric)) latestIdByMetric.set(fact.metric, fact.id);
+  }
+  const stalenessOf = (fact: ResearchFact) =>
+    factStalenessNotice(fact, { isLatestForMetric: latestIdByMetric.get(fact.metric) === fact.id, latestFiscalYear });
   return (
     <>
       {/* Móvil: cards paginadas con «ver más» en vez de corte silencioso */}
       <div className="space-y-3 md:hidden">
         {facts.slice(0, FACTS_MOBILE_PAGE).map((fact) => (
-          <FactCard key={fact.id} fact={fact} ticker={ticker} />
+          <FactCard key={fact.id} fact={fact} staleness={stalenessOf(fact)} ticker={ticker} />
         ))}
         {facts.length > FACTS_MOBILE_PAGE ? (
           <details className="rounded-lg border border-gray-800 p-3">
@@ -310,7 +320,7 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
             </summary>
             <div className="mt-3 space-y-3">
               {facts.slice(FACTS_MOBILE_PAGE).map((fact) => (
-                <FactCard key={fact.id} fact={fact} ticker={ticker} />
+                <FactCard key={fact.id} fact={fact} staleness={stalenessOf(fact)} ticker={ticker} />
               ))}
             </div>
           </details>
@@ -333,7 +343,7 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
             <tr key={fact.id} className="text-gray-300">
               <th className="border-b border-gray-900 py-2 text-left text-sm font-medium" scope="row">{metricLabel(fact.metric)}</th>
               <td className="border-b border-gray-900 py-2">{fact.period}</td>
-              <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact) ? <span className="text-gray-400">N/D<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact)}</span></span> : metricValue(fact.value, fact.unit)}</td>
+              <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact) ? <span className="text-gray-400">N/D<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact)}</span></span> : <>{metricValue(fact.value, fact.unit)}{stalenessOf(fact) ? <span className="mt-1 block text-xs text-amber-300">{stalenessOf(fact)}</span> : null}</>}</td>
               <td className="border-b border-gray-900 py-2 text-right text-xs text-gray-500">{label(fact.source_type)}</td>
             </tr>
           ))}
