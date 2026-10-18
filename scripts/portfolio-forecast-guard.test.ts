@@ -109,3 +109,10 @@ describe('PortfolioForecast montado con react-dom/server', () => {
         assert.ok(source.includes('Number.isFinite'), 'Infinity/NaN se filtran a Sin datos');
     });
 });
+
+it('los fixtures sin agregado conservan literalmente el copy vigente del backend', async () => {
+    const {readFileSync} = await import('node:fs');
+    const backend = readFileSync('data-engine/app/api/routes/portfolio.py','utf8');
+    assert.ok(backend.includes(REAL_EMPTY_PAYLOAD.assumptions[0]));
+    assert.ok(backend.includes(MIXED_BASE_PAYLOAD.excluded[0].reason));
+});
