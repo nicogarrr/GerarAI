@@ -214,6 +214,10 @@ from app.models.propick_snapshot import PropickSnapshot as PropickSnapshot  # no
 
 __all__.append("PropickSnapshot")
 
+from app.models.propick_review import PropickReview as PropickReview  # noqa: E402
+
+__all__.append("PropickReview")
+
 from app.models.bottleneck import BottleneckSignal as BottleneckSignal  # noqa: E402
 
 __all__.append("BottleneckSignal")

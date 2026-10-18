@@ -189,3 +189,74 @@ def list_snapshots(db: Session = Depends(get_db)) -> list[dict]:
         {"month": r.month, "as_of": r.as_of, "passed_count": r.passed_count, "picks": len(r.payload.get("picks", []))}
         for r in rows
     ]
+
+
+@router.post("/review")
+async def review_gems(
+    limit: int = Query(default=20, ge=1, le=40),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """Revision del LLM sobre la shortlist de joyas. Si el LLM falla o no es
+    gratuito, cada pick vuelve marcado sin_revision_ia con su score determinista."""
+    from datetime import UTC
+
+    from app.llm import create_llm_provider
+    from app.services.budget import BudgetController
+    from app.services.llm_proposal_runner import paid_model_risk
+    from app.services.propicks_review_service import (
+        NO_REVIEW,
+        ReviewCandidate,
+        log_reviews,
+        review_shortlist,
+    )
+
+    results, _ = run_funnel(db, top_n=limit)
+    gems = find_gems(db, results, limit=limit)
+    cands = [
+        ReviewCandidate(
+            g.ticker, g.name, g.score,
+            [{"key": r["key"], "value": r["value"], "source": r["source"]} for r in g.reasons],
+            g.price, g.price_date,
+        )
+        for g in gems
+    ]
+    provider = create_llm_provider()
+    usable = provider.name != "disabled" and paid_model_risk(provider) is None
+    budget = BudgetController()
+    models: list[str] = []
+
+    def _record(resp) -> None:
+        models.append(resp.model)
+        cost = budget.estimate_cost_eur(resp.model, resp.usage.input_tokens, resp.usage.output_tokens)
+        budget.record(db, resp.model, "propicks_review", cost, resp.usage.total_tokens)
+
+    if usable and cands and budget.can_spend(db, 0.05):
+        db.commit()
+        reviews = await review_shortlist(provider, cands, on_response=_record)
+    else:
+        from app.services.propicks_review_service import Review
+
+        reviews = [Review(c.ticker, NO_REVIEW, reject_reason="llm_no_disponible") for c in cands]
+    log_reviews(db, cands, reviews, model=models[-1] if models else None, now=datetime.now(UTC))
+    by_t = {r.ticker: r for r in reviews}
+    return [
+        {
+            "ticker": g.ticker, "name": g.name, "score": g.score, "reasons": g.reasons,
+            "review_status": by_t[g.ticker].status,
+            "decision": by_t[g.ticker].decision,
+            "thesis": by_t[g.ticker].thesis,
+            "risks": by_t[g.ticker].risks,
+            "invalidation": by_t[g.ticker].invalidation,
+            "confidence": by_t[g.ticker].confidence,
+            "veto_reason": by_t[g.ticker].veto_reason,
+        }
+        for g in gems
+    ]
+
+
+@router.get("/review/brier")
+def review_brier(db: Session = Depends(get_db)) -> dict:
+    from app.services.propicks_review_service import brier_report, evaluate_outcomes
+
+    evaluate_outcomes(db)
+    return brier_report(db)
