@@ -1,3 +1,5 @@
+'use client';
+
 import { BookDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -24,6 +26,9 @@ export default function ObsidianVaultCard() {
                 <a
                     className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 sm:min-h-0"
                     href="/api/obsidian/vault.zip"
+                    onClick={(event) => {
+                        if (!window.confirm('¿Descargar tus tesis y datos de cartera en un archivo ZIP en este dispositivo?')) event.preventDefault();
+                    }}
                     download
                 >
                     <BookDown className="h-4 w-4" />
