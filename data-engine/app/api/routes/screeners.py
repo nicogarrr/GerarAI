@@ -424,6 +424,7 @@ class FinnhubScreenVendor:
             market_cap = raw.get("marketCapitalization")
             return {
                 "name": raw.get("name") or symbol,
+                "currency": raw.get("currency") or None,
                 # None cuando Finnhub no lo reporta: 0.0 seria un dato inventado.
                 "marketCap": float(market_cap) * 1_000_000.0 if market_cap else None,
                 "sector": raw.get("finnhubIndustry") or None,
@@ -469,11 +470,9 @@ class YahooScreenVendor:
         try:
             payload = resp.json()
             result = payload["chart"]["result"][0]
-            closes = [
-                value
-                for value in result["indicators"]["quote"][0]["close"]
-                if value is not None
-            ]
+            raw_closes = result["indicators"]["quote"][0]["close"]
+            valid_closes = [(i, value) for i, value in enumerate(raw_closes) if value is not None]
+            closes = [value for _, value in valid_closes]
             if not closes or closes[-1] <= 0:
                 return None
             volumes = [
@@ -489,13 +488,14 @@ class YahooScreenVendor:
             change = (last - previous) if previous else None
             return {
                 "price": float(last),
+                "currency": meta.get("currency") or None,
                 "change": float(change) if change is not None else None,
                 "changePercent": (
                     float(change / previous * 100) if change is not None else None
                 ),
                 "volume": float(volumes[-1]) if volumes else None,
                 "prevClose": float(previous) if previous else None,
-                "asOf": timestamps[-1] if timestamps else None,
+                "asOf": timestamps[valid_closes[-1][0]] if valid_closes[-1][0] < len(timestamps) else None,
             }
         except (KeyError, IndexError, TypeError, ValueError):
             return None
@@ -915,6 +915,8 @@ def _refetch_real_items(
                 "symbol": symbol,
                 "name": name,
                 "price": quote["price"],
+                "priceAsOf": quote.get("asOf"),
+                "currency": quote.get("currency"),
                 "change": quote["change"],
                 "changePercent": quote["changePercent"],
                 # None sin perfil real: la UI muestra N/D; un 0.0 inventado

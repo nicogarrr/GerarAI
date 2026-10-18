@@ -61,11 +61,9 @@ def _fetch_index(client: httpx.Client, symbol: str) -> dict | None:
             return None
         payload = resp.json()
         result = payload["chart"]["result"][0]
-        closes = [
-            value
-            for value in result["indicators"]["quote"][0]["close"]
-            if value is not None
-        ]
+        raw_closes = result["indicators"]["quote"][0]["close"]
+        valid = [(i, value) for i, value in enumerate(raw_closes) if value is not None]
+        closes = [value for _, value in valid]
         if len(closes) < 2:
             return None
         last, previous = closes[-1], closes[-2]
@@ -78,8 +76,12 @@ def _fetch_index(client: httpx.Client, symbol: str) -> dict | None:
         if previous <= 0:
             return None
         change = last - previous
+        timestamps = result.get("timestamp") or []
+        last_idx = valid[-1][0]
+        observed_at = timestamps[last_idx] if last_idx < len(timestamps) else None
         return {
             "symbol": symbol,
+            "priceAsOf": observed_at,
             "price": round(float(last), 2),
             "change": round(float(change), 2),
             "changePercent": round((change / previous) * 100, 2),

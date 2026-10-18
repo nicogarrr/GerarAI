@@ -258,16 +258,18 @@ describe('alertas: el umbral no es un importe en dólares', () => {
     });
 });
 
-describe('screener: la columna Precio declara lo que no sabe', () => {
+describe('screener: solo usa la divisa confirmada por el proveedor', () => {
     const page = readFileSync(join(root, 'app/(root)/screener/page.tsx'), 'utf8');
     const actions = readFileSync(join(root, 'lib/actions/screener.actions.ts'), 'utf8');
 
-    it('la fila no trae divisa: el precio va pelado y la tabla lo dice', () => {
-        assert.ok(!/formatPrice\(r\.price,\s*'USD'\)/.test(page), 'el precio de la fila no se pinta en dólares');
+    it('formatea con divisa opcional y conserva número sin símbolo si falta', () => {
+        assert.ok(!/formatPrice\(r\.price,\s*'USD'\)/.test(page));
         const row = actions.slice(actions.indexOf('export type RealScreenerRow'), actions.indexOf('export type RealScreenerResponse'));
-        assert.ok(!/currency/.test(row), 'RealScreenerRow no expone divisa (declarado: no se puede formatear como dinero)');
-        assert.match(page, /function screenerPrice\(price: number\)/, 'el formateo sin símbolo está en un punto con nombre');
-        assert.match(page, /El precio va sin símbolo/, 'la tabla declara el hueco en vez de taparlo');
+        assert.match(row, /currency\?: string \| null/);
+        assert.ok(page.includes('isValidCurrencyCode(currency)'));
+        assert.ok(page.includes('formatPrice(price, currency)'));
+        assert.ok(page.includes('screenerPrice(r.price, r.currency)'));
+        assert.ok(!page.includes('backend no la expone'));
     });
 });
 

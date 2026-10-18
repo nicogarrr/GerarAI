@@ -1,3 +1,6 @@
+// @ts-expect-error TS5097: explicit extension for node strip-types guards.
+import { formatMarketCapUsd } from '../format.ts';
+
 /**
  * Fichas «etiqueta / valor» para los inputs inferidos de una tesis (F4).
  * Antes salian claves crudas (addressable_subscribers) y decimales largos
@@ -32,6 +35,7 @@ function isCurrencyCode(unit: string): boolean {
 /** Dinero en la divisa DECLARADA, escala inglesa: "$4.87B", "EUR 14.40" segun Intl en-US. */
 export function formatMoneyShort(value: number, currency: string): string {
     const abs = Math.abs(value);
+    if (currency === "USD" && abs >= 1e6) return formatMarketCapUsd(value);
     return new Intl.NumberFormat("en-US", {
         style: "currency",
         currency,

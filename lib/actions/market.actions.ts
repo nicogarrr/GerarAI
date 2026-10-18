@@ -5,6 +5,8 @@ import { cachedFetch } from '@/lib/cache/memoryTTL';
 import { marketIndexUnit } from '@/lib/marketIndexUnit';
 
 export type MarketIndex = {
+  /** Timestamp aligned with the last non-null daily candle. Not a final-close guarantee. */
+  priceAsOf?: number | null;
   symbol: string;
   name: string;
   price: number;
