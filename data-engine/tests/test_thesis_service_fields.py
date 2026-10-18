@@ -178,7 +178,7 @@ def test_card_summary_insufficient_data_es_honesto():
         "trace": {"engine": "dcf_v2"},
     }
     text = service._card_summary(_company(), valuation, "hipotesis")
-    assert "no publicable todavia" in text
+    assert "no publicable todavía" in text
     assert "revenue, shares" in text
     assert "NOT PUBLISHABLE" not in text
 
