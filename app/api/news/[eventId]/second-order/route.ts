@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withAuthErrors } from '@/lib/auth/route-auth';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { AppError } from '@/lib/types/errors';
 import { researchRequest } from '@/lib/research/client';
 
 async function getHandler(_request: Request, { params }: { params: Promise<{ eventId: string }> }) {
@@ -15,7 +16,10 @@ async function getHandler(_request: Request, { params }: { params: Promise<{ eve
       timeoutMs: 55_000,
     });
     return NextResponse.json(data);
-  } catch {
+  } catch (error) {
+    if (error instanceof AppError && error.statusCode === 404) {
+      return NextResponse.json({ status: 'not_found', detail: 'Noticia no encontrada' }, { status: 404 });
+    }
     return NextResponse.json({ status: 'unavailable' }, { status: 502 });
   }
 }
