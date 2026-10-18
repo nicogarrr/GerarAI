@@ -39,7 +39,7 @@ def test_zip_frontmatter_links_and_source_dates():
         assert "[Fuente](<https://example.org/report(1)>) (2026-09-20)" in v3
         assert "Afirmación sin fuente: Sin datos de URL" in v3
         v9 = archive.read("GerarAI/SAN/Tesis SAN v9.md").decode()
-        assert 'fecha: ""' in v9 and "Sin datos" in v9
+        assert 'fecha:' not in v9 and "Sin datos" in v9
         assert "fuentes: []" in v9
 
 
@@ -152,7 +152,8 @@ def test_vault_nulos_honestos_sin_datos():
         assert "- Rol: En cartera · En watchlist" in rklb
         assert "Sin datos: no hay tesis persistida para RKLB." in rklb
         san_index = archive.read("GerarAI/SAN/SAN - Índice.md").decode()
-        assert 'fecha: ""' in san_index and 'fuentes: []' in san_index
+        assert 'fecha:' not in san_index and 'fuentes: []' in san_index
+        assert 'estado: "sin tesis"' in san_index
         asts = archive.read("GerarAI/ASTS/ASTS.md").decode()
         assert 'tipo: "empresa"' in asts and '- "cartera"' in asts
 
@@ -173,7 +174,7 @@ def test_vault_vacio_solo_indice_honesto():
         index = archive.read("GerarAI/Índice.md").decode()
         assert "Sin datos: no hay posiciones en cartera." in index
         assert "Sin datos: no hay empresas en watchlist." in index
-        assert 'fecha: ""' in index
+        assert 'fecha:' not in index
 
 
 def test_vault_rechaza_datos_incoherentes():
