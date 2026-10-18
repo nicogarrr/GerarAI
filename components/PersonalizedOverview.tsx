@@ -501,9 +501,13 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                     ) : alerts.length > 0 ? (
                         <div className="space-y-2">
                             {alerts.slice(0, 3).map((alert) => (
-                                <p className="min-w-0 break-words text-sm text-gray-300" key={alert._id}>
+                                <Link
+                                    href="/alerts"
+                                    className="block min-w-0 break-words rounded px-1 -mx-1 py-0.5 text-sm text-gray-300 transition-colors hover:text-amber-300"
+                                    key={alert._id}
+                                >
                                     {alertRuleLabel(alert)}
-                                </p>
+                                </Link>
                             ))}
                             <p className="text-xs text-gray-500">
                                 {alerts.length === 1 ? '1 regla activa' : `${alerts.length} reglas activas`} · ninguna se ha disparado todavía.
@@ -632,7 +636,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     // en la etiqueta en vez de suponer dólares.
                                     const priceLabel = isValidCurrencyCode(op.currency) ? 'Precio' : 'Precio (divisa N/D)';
                                     return (
-                                        <Link key={op.symbol} href={`/research/${op.symbol}`}>
+                                        <Link key={op.symbol} href={`/research/${op.symbol}?view=valuation`}>
                                             <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700/30 hover:border-purple-500/50 hover:bg-gray-800 transition-all group">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
