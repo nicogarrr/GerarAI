@@ -128,6 +128,8 @@ export type SanitizedQuote = {
     c: number; d: number; dp: number; h: number; l: number; o: number; pc: number;
     /** Timestamp (epoch s) del proveedor; null en el fallback Yahoo (sin fecha). */
     t: number | null;
+    /** Market-local date of the exact daily candle c, supplied by Yahoo backend. */
+    closeDate?: string | null;
     /** 'live' = sesion en curso; 'close' = ultimo cierre fechado. 'stale' nunca se devuelve. */
     kind: 'live' | 'close';
 };
@@ -147,14 +149,14 @@ export function sanitizeFinnhubQuote(data: any, nowMs: number = Date.now()): San
     return { source: 'Finnhub', c: data.c, d: data.d, dp: data.dp, h: data.h, l: data.l, o: data.o, pc: data.pc, t, kind };
 }
 
-/**
- * F358: mapea la respuesta del fallback backend (Yahoo chart, cierres
- * diarios). La respuesta NO trae el timestamp de la vela exacta del c, asi
- * que NO se puede fechar: kind 'close' con t=null y el consumidor rotula
- * "precio de fecha desconocida" en vez de atribuir la fecha de otra serie
- * (exigencia del auditor). Pendiente: que el backend devuelva el t de la
- * vela exacta del c (routes/market.py).
- */
+/** Validate a date without timezone shifts or accepting JS calendar overflow. */
+function validCalendarDate(value: unknown): string | null {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value ? value : null;
+}
+
+/** Yahoo daily close: use only the exact candle's date cd, never retrieval time. */
 export function mapBackendYahooQuote(data: any): SanitizedQuote | null {
     if (!data || !(data.c > 0 || data.pc > 0)) return null;
     const num = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
@@ -162,5 +164,6 @@ export function mapBackendYahooQuote(data: any): SanitizedQuote | null {
         c: num(data.c), d: num(data.d), dp: num(data.dp),
         h: num(data.h), l: num(data.l), o: num(data.o), pc: num(data.pc),
         source: 'Yahoo Finance', t: null, kind: 'close',
+        closeDate: validCalendarDate(data.cd),
     };
 }
