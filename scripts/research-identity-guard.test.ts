@@ -179,6 +179,12 @@ describe('researchRequestPath: canon puro del path', () => {
 
   it('deja intacto un path sin query', () => {
     assert.equal(researchRequestPath('/api/thesis/MSFT/versions'), '/api/thesis/MSFT/versions');
+    // El motor firma la ruta decodificada (request.url.path): ^ y = no se codifican al firmar.
+    assert.equal(researchRequestPath('/api/companies/%5EGSPC/quote'), '/api/companies/^GSPC/quote');
+    assert.equal(researchRequestPath('/api/companies/EURUSD%3DX/quote?x=1'), '/api/companies/EURUSD=X/quote');
+    // No decodificable o no ASCII imprimible: se deja tal cual.
+    assert.equal(researchRequestPath('/api/a/%E0%A4%A'), '/api/a/%E0%A4%A');
+    assert.equal(researchRequestPath('/api/a/%C3%B1'), '/api/a/%C3%B1');
   });
 });
 
