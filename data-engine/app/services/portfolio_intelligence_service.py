@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import CashBalance, Company, FinancialFact, MarketPrice, Position, Transaction
+from app.services.async_bridge import run_from_any_context
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.portfolio_ledger_service import BUY_ACTIONS, SELL_ACTIONS
 from app.services.portfolio_reconstruction_service import PortfolioReconstructionService
@@ -87,6 +88,46 @@ def _fx_rate_with_date(
         if idx >= 0 and inverse[idx][1]:
             return (inverse[idx][0], Decimal("1") / inverse[idx][1])
     return None
+
+
+
+def _live_benchmark_prices(cutoff: date) -> list[Any] | None:
+    """SPY ajustado desde Yahoo (gratis, ya usado en Estrés histórico), sin filas en el master.
+
+    Una empresa SPY global se colaría en listas, ingestas y jobs de todas las
+    cuentas. Si Yahoo falla devuelve None y la comparativa queda honestamente sin datos.
+    """
+    from app.services.historical_stress_service import load_history
+
+    try:
+        history = run_from_any_context(load_history("SPY"), timeout=45)
+    except Exception:
+        return None
+    rows = [
+        SimpleNamespace(date=day, adj_close=Decimal(str(value)))
+        for day, value in sorted(history["prices"].items())
+        if day >= cutoff
+    ]
+    return rows or None
+
+
+def _benchmark_prices(db: Session, cutoff: date) -> list[Any] | None:
+    """Serie SPY: la del master si existe con precios; si no, la de Yahoo."""
+    benchmark = db.scalar(select(Company).where(Company.ticker == "SPY"))
+    if benchmark is not None:
+        stored = list(
+            db.scalars(
+                select(MarketPrice)
+                .where(MarketPrice.company_id == benchmark.id, MarketPrice.date >= cutoff)
+                .order_by(MarketPrice.date)
+            ).all()
+        )
+        if stored:
+            return stored
+    live = _live_benchmark_prices(cutoff)
+    if live is None and benchmark is not None:
+        return []
+    return live
 
 
 class PortfolioIntelligenceService:
@@ -633,16 +674,9 @@ class PortfolioIntelligenceService:
     def _beta(
         db: Session, portfolio_returns: dict[date, float], cutoff: date
     ) -> tuple[float | None, dict[str, Any]]:
-        benchmark = db.scalar(select(Company).where(Company.ticker == "SPY"))
-        if benchmark is None:
+        prices = _benchmark_prices(db, cutoff)
+        if prices is None:
             return None, {"status": "missing_benchmark", "benchmark": "SPY"}
-        prices = list(
-            db.scalars(
-                select(MarketPrice)
-                .where(MarketPrice.company_id == benchmark.id, MarketPrice.date >= cutoff)
-                .order_by(MarketPrice.date)
-            ).all()
-        )
         benchmark_returns = PortfolioIntelligenceService._returns(prices)
         dates = sorted(portfolio_returns.keys() & benchmark_returns.keys())
         if len(dates) < 20:
@@ -865,16 +899,9 @@ class PortfolioIntelligenceService:
             "information_ratio": None,
             "observations": 0,
         }
-        benchmark = db.scalar(select(Company).where(Company.ticker == "SPY"))
-        if benchmark is None:
+        prices = _benchmark_prices(db, cutoff)
+        if prices is None:
             return {**base, "status": "missing_benchmark"}
-        prices = list(
-            db.scalars(
-                select(MarketPrice)
-                .where(MarketPrice.company_id == benchmark.id, MarketPrice.date >= cutoff)
-                .order_by(MarketPrice.date)
-            ).all()
-        )
         benchmark_returns = self._returns(prices)
         dates = sorted(portfolio_returns.keys() & benchmark_returns.keys())
         if len(dates) < 20:
