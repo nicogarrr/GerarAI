@@ -35,3 +35,18 @@ describe('el botón conserva su texto mientras genera', () => {
         assert.match(source, /bg-teal-600 text-white/, 'contraste explícito en todos los estados');
     });
 });
+
+describe('formato de moneda del memo (regla de Nico)', () => {
+    it('USD en escala inglesa y no USD conserva su divisa', () => {
+        const service = readFileSync(SERVICE, 'utf8');
+        assert.match(service, /def _format_usd\(/, 'USD en escala inglesa ($343.46, $5.16T, $394B)');
+        assert.match(service, /1e12, "T"[\s\S]*?1e9, "B"[\s\S]*?1e6, "M"/, 'escala T/B/M');
+        assert.match(service, /currency == "USD"[\s\S]{0,120}_format_usd/, 'solo USD usa escala inglesa');
+        assert.match(service, /formatted = _format\(value\)[\s\S]{0,80}\{formatted\} \{currency\}/, 'no USD conserva su divisa');
+    });
+
+    it('porcentajes es-ES con coma', () => {
+        const service = readFileSync(SERVICE, 'utf8');
+        assert.match(service, /def _format_pct\([\s\S]*?replace\("\.", ","\)[\s\S]*?" %"/, 'porcentaje con coma decimal');
+    });
+});

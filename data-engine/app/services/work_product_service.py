@@ -144,6 +144,52 @@ _WARNING_LABELS = {
     "Data date is unavailable": "La fecha de los datos no está disponible.",
 }
 _OBSERVATION_KEYS = {"value", "unit", "period", "confidence", "citation"}
+# Formato de moneda (regla de Nico): USD en escala inglesa ($343.46, $5.16T,
+# $394B); emisores no USD conservan su divisa en formato es-ES; porcentajes
+# es-ES con coma.
+_MONEY_KEYS = {
+    "close",
+    "current_price",
+    "bear_value",
+    "base_value",
+    "bull_value",
+    "expected_value",
+}
+_PERCENT_KEYS = {"margin_of_safety"}
+
+
+def _format_usd(value: Any) -> str:
+    """USD en escala inglesa: $343.46, $5.16T, $394B."""
+    amount = float(value)
+    if not isfinite(amount):
+        return "sin datos"
+    sign = "-" if amount < 0 else ""
+    amount = abs(amount)
+    if amount >= 1e12:
+        scaled, suffix = amount / 1e12, "T"
+    elif amount >= 1e9:
+        scaled, suffix = amount / 1e9, "B"
+    elif amount >= 1e6:
+        scaled, suffix = amount / 1e6, "M"
+    else:
+        scaled, suffix = amount, ""
+    if suffix or scaled != int(scaled):
+        text = f"{scaled:.2f}".rstrip("0").rstrip(".")
+    else:
+        text = f"{int(scaled):,}"
+    return f"{sign}${text}{suffix}"
+
+
+def _format_pct(value: Any) -> str:
+    """Fracción como porcentaje es-ES con coma: 0.25 -> 25,0 %."""
+    return f"{float(value) * 100:.1f}".replace(".", ",") + " %"
+
+
+def _format_money(value: Any, currency: str | None) -> str:
+    if currency == "USD":
+        return _format_usd(value)
+    formatted = _format(value)
+    return f"{formatted} {currency}" if currency else formatted
 
 
 def _label(key: str) -> str:
@@ -191,10 +237,15 @@ def _render_observation(name: str, obs: dict[str, Any], lines: list[str]) -> Non
     ]
     suffix = f" ({', '.join(_format(extra) for extra in extras)})" if extras else ""
     label = _METRIC_LABELS.get(name, _label(name))
-    lines.append(f"- **{label}**: {_format(value)} {unit}{suffix}".rstrip())
+    if (unit or "").upper() == "USD":
+        lines.append(f"- **{label}**: {_format_usd(value)}{suffix}")
+    else:
+        lines.append(f"- **{label}**: {_format(value)} {unit}{suffix}".rstrip())
 
 
-def _render_payload(payload: Any, lines: list[str]) -> None:
+def _render_payload(
+    payload: Any, lines: list[str], currency: str | None = None
+) -> None:
     """Renderiza un payload arbitrario como markdown legible (recursivo)."""
     if isinstance(payload, dict):
         if payload.get("status") == "missing" and len(payload) == 1:
@@ -211,13 +262,17 @@ def _render_payload(payload: Any, lines: list[str]) -> None:
                 else:
                     lines.append(f"- **{_label(key)}**:")
                     nested: list[str] = []
-                    _render_payload(value, nested)
+                    _render_payload(value, nested, currency)
                     lines.extend(f"  {line}" if line else line for line in nested)
             elif isinstance(value, list):
                 lines.append(f"- **{_label(key)}**:")
                 nested = []
-                _render_payload(value, nested)
+                _render_payload(value, nested, currency)
                 lines.extend(f"  {line}" if line else line for line in nested)
+            elif key in _MONEY_KEYS:
+                lines.append(f"- **{_label(key)}**: {_format_money(value, currency)}")
+            elif key in _PERCENT_KEYS:
+                lines.append(f"- **{_label(key)}**: {_format_pct(value)}")
             else:
                 lines.append(f"- **{_label(key)}**: {_format(value)}")
     elif isinstance(payload, list):
@@ -297,7 +352,12 @@ class WorkProductService:
             "title": title,
             "ticker": company.ticker if company else None,
             "sections": sections,
-            "markdown": self._markdown(title, sections, manifest),
+            "markdown": self._markdown(
+                title,
+                sections,
+                manifest,
+                (company.currency or "").upper() if company else None,
+            ),
             "manifest": manifest,
         }
 
@@ -615,7 +675,11 @@ class WorkProductService:
         return value.date() if isinstance(value, datetime) else value
 
     def _markdown(
-        self, title: str, sections: dict[str, Any], manifest: dict[str, Any]
+        self,
+        title: str,
+        sections: dict[str, Any],
+        manifest: dict[str, Any],
+        currency: str | None = None,
     ) -> str:
         data_as_of = manifest["data_as_of"]
         lines = [
@@ -631,7 +695,7 @@ class WorkProductService:
             )
         for name, payload in sections.items():
             lines.extend(("", f"## {_SECTION_LABELS.get(name, _label(name))}", ""))
-            _render_payload(payload, lines)
+            _render_payload(payload, lines, currency)
         lines.extend(("", "## Fuentes", ""))
         sources = manifest["sources"]
         if sources:
