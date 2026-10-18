@@ -38,7 +38,7 @@ def _company(db: Session, ticker: str) -> Company:
 
 
 def _price(
-    db: Session, company: Company, day: date, close: str, volume: int | None = 100, source: str = "yfinance"
+    db: Session, company: Company, day: date, close: str, volume: int | None = 2_000_000, source: str = "yfinance"
 ) -> None:
     db.add(MarketPrice(
         company_id=company.id, date=day, open=Decimal(close),
@@ -57,14 +57,14 @@ def test_cold_start_returns_empty_universe_without_errors(db: Session):
 
 def test_change_math_and_sorting(db: Session):
     aaa = _company(db, "AAA")  # +10%
-    _price(db, aaa, date(2026, 9, 21), "100", volume=10)
-    _price(db, aaa, date(2026, 9, 22), "110", volume=10)
+    _price(db, aaa, date(2026, 9, 21), "100", volume=2_000_000)
+    _price(db, aaa, date(2026, 9, 22), "110", volume=2_000_000)
     bbb = _company(db, "BBB")  # -20%, más activa
-    _price(db, bbb, date(2026, 9, 21), "100", volume=999)
-    _price(db, bbb, date(2026, 9, 22), "80", volume=999)
+    _price(db, bbb, date(2026, 9, 21), "100", volume=9_000_000)
+    _price(db, bbb, date(2026, 9, 22), "80", volume=9_000_000)
     ccc = _company(db, "CCC")  # +5%
-    _price(db, ccc, date(2026, 9, 21), "100", volume=5)
-    _price(db, ccc, date(2026, 9, 22), "105", volume=5)
+    _price(db, ccc, date(2026, 9, 21), "100", volume=1_500_000)
+    _price(db, ccc, date(2026, 9, 22), "105", volume=1_500_000)
 
     out = market_movers(db, 10)
     assert out["universe"] == 3
@@ -81,7 +81,7 @@ def test_single_price_row_reports_unknown_change_instead_of_zero(db: Session):
     nunca un 0.0% que aparenta un dato inexistente. La empresa sigue
     contando en el universo pero no entra en subidas/bajadas."""
     solo = _company(db, "SOLO")
-    _price(db, solo, date(2026, 9, 22), "50", volume=7)
+    _price(db, solo, date(2026, 9, 22), "50", volume=2_000_000)
     out = market_movers(db, 10)
     assert out["universe"] == 1
     assert out["gainers"] == [] and out["losers"] == []
@@ -108,8 +108,8 @@ def test_unknown_volume_is_null_and_out_of_most_active(db: Session):
     unknown = _company(db, "UVOL")
     day = date(2026, 9, 25)
     prev = date(2026, 9, 24)
-    # Dos cierres por empresa para que el cambio sea medible y ambas entren
-    # en gainers/losers; el volumen desconocido no las expulsa de esas tablas.
+    # Dos cierres por empresa para que el cambio sea medible; con el suelo de
+    # liquidez, el volumen desconocido si las expulsa (negociacion no medible).
     _price(db, known, prev, "90", volume=4_000_000)
     _price(db, known, day, "100", volume=5_000_000)
     _price(db, unknown, prev, "90", volume=None)
@@ -117,9 +117,13 @@ def test_unknown_volume_is_null_and_out_of_most_active(db: Session):
 
     out = market_movers(db, 10)
 
+    # Sin volumen la negociacion no es medible: UVOL tampoco supera el suelo
+    # de liquidez y queda fuera de subidas/bajadas (declarado, nunca colado).
     rows = {row["ticker"]: row for section in ("gainers", "losers") for row in out[section]}
-    assert rows["UVOL"]["volume"] is None
     assert rows["KVOL"]["volume"] == 5_000_000
+    assert "UVOL" not in rows
+    assert out["excluded_illiquid"] == 1
+    assert out["universe"] == 2
     most_active_tickers = [row["ticker"] for row in out["most_active"]]
     assert "KVOL" in most_active_tickers
     assert "UVOL" not in most_active_tickers
@@ -191,7 +195,7 @@ def test_bulk_load_day_does_not_freeze_the_session(db: Session):
     for day, close in ((date(2026, 9, 29), "51"), (date(2026, 9, 30), "52"),
                        (date(2026, 10, 1), "53"), (date(2026, 10, 2), "54")):
         for company in daily:
-            _price(db, company, day, close, volume=1_000)
+            _price(db, company, day, close, volume=2_000_000)
 
     out = market_movers(db, 10)
 
@@ -201,6 +205,9 @@ def test_bulk_load_day_does_not_freeze_the_session(db: Session):
 
 
 def test_zero_volume_is_unknown_not_a_ranked_value(db: Session):
+    """Volumen 0 de la fuente = dato ausente (None). Con el suelo de liquidez,
+    negociacion no medible = fuera de TODOS los rankings, declarado en
+    excluded_illiquid; nunca entra con un dato supuesto."""
     company = _company(db, "ZVOL")
     _price(db, company, date(2026, 9, 24), "90", volume=0)
     _price(db, company, date(2026, 9, 25), "100", volume=0)
@@ -208,7 +215,9 @@ def test_zero_volume_is_unknown_not_a_ranked_value(db: Session):
     out = market_movers(db, 10)
 
     assert out["most_active"] == []
-    assert out["gainers"][0]["volume"] is None
+    assert out["gainers"] == [] and out["losers"] == []
+    assert out["excluded_illiquid"] == 1
+    assert out["universe"] == 1
 
 
 def test_changes_endpoint_uses_same_formula_as_movers(db: Session):
@@ -266,3 +275,58 @@ def test_changes_flat_close_is_zero_not_missing_and_eur_listing(db: Session):
     assert item["change_pct"] == 0.0
     assert item["price"] == 25.7 and item["previous_close"] == 25.7
     assert item["date"] == "2026-10-16" and item["previous_date"] == "2026-10-15"
+
+
+def test_microcap_penny_stock_out_of_gainers_but_in_universe(db: Session):
+    """Una microcap de 2 $ con +80 % es un movimiento real en el dato pero no
+    operable: fuera de Subidas por el suelo de precio (5), contada en el
+    universo y en excluded_illiquid."""
+    penny = _company(db, "PENNY")
+    _price(db, penny, date(2026, 9, 21), "1.00", volume=50_000_000)
+    _price(db, penny, date(2026, 9, 22), "1.80", volume=50_000_000)
+    big = _company(db, "BIG")
+    _price(db, big, date(2026, 9, 21), "100", volume=2_000_000)
+    _price(db, big, date(2026, 9, 22), "110", volume=2_000_000)
+
+    out = market_movers(db, 10)
+
+    assert out["universe"] == 2
+    assert out["excluded_illiquid"] == 1
+    assert [m["ticker"] for m in out["gainers"]] == ["BIG"]
+    assert [m["ticker"] for m in out["most_active"]][0] == "BIG"
+
+
+def test_low_turnover_out_of_rankings(db: Session):
+    """Precio suficiente pero negociacion de la sesion < 1 M: fuera tambien
+    (una orden pequena mueve el precio)."""
+    thin = _company(db, "THIN")
+    _price(db, thin, date(2026, 9, 21), "100", volume=5_000)
+    _price(db, thin, date(2026, 9, 22), "120", volume=5_000)
+    liquid = _company(db, "LIQ")
+    _price(db, liquid, date(2026, 9, 21), "100", volume=2_000_000)
+    _price(db, liquid, date(2026, 9, 22), "105", volume=2_000_000)
+
+    out = market_movers(db, 10)
+
+    assert out["excluded_illiquid"] == 1
+    assert [m["ticker"] for m in out["gainers"]] == ["LIQ"]
+    assert "THIN" not in {m["ticker"] for m in out["losers"] + out["most_active"]}
+
+
+def test_payload_declares_liquidity_floor_and_last_registered_at(db: Session):
+    company = _company(db, "ONE")
+    _price(db, company, date(2026, 9, 21), "100")
+    _price(db, company, date(2026, 9, 22), "101")
+
+    out = market_movers(db, 10)
+
+    assert out["liquidity_floor"] == {"min_price": 5.0, "min_turnover": 1_000_000.0}
+    assert out["excluded_illiquid"] == 0
+    assert out["last_registered_at"] is not None
+
+
+def test_cold_start_declares_filter_and_empty_rankings(db: Session):
+    out = market_movers(db, 10)
+    assert out["excluded_illiquid"] == 0
+    assert out["liquidity_floor"]["min_price"] == 5.0
+    assert out["last_registered_at"] is None

@@ -18,7 +18,14 @@ import path from "node:path";
  */
 export type SeedPriceRow = { date: string; close: number; volume?: number };
 
-export function seedMarketPrices(ticker: string, rows: SeedPriceRow[]): void {
+/**
+ * `source` por defecto "e2e-fixture" (dato de apoyo: valoracion de cartera,
+ * leyendas...). Los specs que siembran para los RANKINGS de movers deben
+ * pasar "yfinance": es la unica fuente que el backend acepta como cierre
+ * oficial (OFFICIAL_CLOSE_SOURCES en market_change.py) y con otra fuente el
+ * universo sale vacio.
+ */
+export function seedMarketPrices(ticker: string, rows: SeedPriceRow[], source = "e2e-fixture"): void {
   const dbPath = path.join(process.cwd(), "data-engine", "cavaai_ui_e2e.db");
   const pythonBin = process.env.PYTHON_BIN ?? "python";
   const script = `
@@ -32,12 +39,12 @@ company_id = row[0]
 for item in json.loads(sys.argv[3]):
     db.execute(
         "INSERT INTO market_prices (company_id, date, open, high, low, close, adj_close, volume, source, created_at, updated_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'e2e-fixture', datetime('now'), datetime('now'))"
+        " VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, datetime('now'), datetime('now'))"
         " ON CONFLICT (company_id, date) DO UPDATE SET open=excluded.open, high=excluded.high,"
         " low=excluded.low, close=excluded.close, volume=excluded.volume, source=excluded.source",
-        (company_id, item["date"], item["close"], item["close"], item["close"], item["close"], item.get("volume")),
+        (company_id, item["date"], item["close"], item["close"], item["close"], item["close"], item.get("volume"), sys.argv[4]),
     )
 db.commit()
 `;
-  execFileSync(pythonBin, ["-c", script, dbPath, ticker, JSON.stringify(rows)], { stdio: "pipe" });
+  execFileSync(pythonBin, ["-c", script, dbPath, ticker, JSON.stringify(rows), source], { stdio: "pipe" });
 }

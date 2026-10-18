@@ -5,7 +5,7 @@ import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { MoversTable } from '@/components/market/MoversTable';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getSavedScreenerEngines, getScreenerStocksReal } from '@/lib/actions/screener.actions';
-import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
+import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, formatUserDateTime, isValidCurrencyCode } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { indicesCardState } from '@/lib/market/indices-card-state';
@@ -105,8 +105,14 @@ async function MoversVista({ vista }: { vista: Exclude<Vista, 'empresas'> }) {
         {movers.session_date ? (
           <p className="mt-1 text-sm text-gray-400">
             {`Sesión del ${formatMarketDate(movers.session_date)} frente a la anterior.`}
+            {movers.last_registered_at
+              ? ` Último dato: ${formatUserDateTime(movers.last_registered_at, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}.`
+              : ''}
             {movers.excluded_not_comparable
               ? ` ${movers.excluded_not_comparable} ${movers.excluded_not_comparable === 1 ? 'valor queda' : 'valores quedan'} fuera por no tener cierre en esa sesión.`
+              : ''}
+            {movers.excluded_illiquid
+              ? ` ${movers.excluded_illiquid} fuera por liquidez mínima (cierre < 5 o negociación < 1 M).`
               : ''}
           </p>
         ) : null}

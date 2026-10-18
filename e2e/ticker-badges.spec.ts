@@ -60,14 +60,17 @@ test("los eventos de noticias muestran En cartera / En watchlist", async ({ page
   // aplicacion): COST sube (+10%) y NFLX baja (-10%).
   await post(request, "/api/companies/ensure", { ticker: "COST", name: "Costco Wholesale" });
   await post(request, "/api/companies/ensure", { ticker: "NFLX", name: "Netflix" });
+  // Fuente "yfinance": la unica que cuenta como cierre oficial en movers.
+  // Volumenes liquidos: el suelo de liquidez de los rankings (cierre >= 5 y
+  // negociacion cierre x volumen >= 1 M) expulsa semillas con volumen de juguete.
   seedMarketPrices("COST", [
-    { date: "2026-09-24", close: 100, volume: 1000 },
-    { date: "2026-09-25", close: 110, volume: 2000 },
-  ]);
+    { date: "2026-09-24", close: 100, volume: 2_000_000 },
+    { date: "2026-09-25", close: 110, volume: 2_000_000 },
+  ], "yfinance");
   seedMarketPrices("NFLX", [
-    { date: "2026-09-24", close: 100, volume: 1000 },
-    { date: "2026-09-25", close: 90, volume: 3000 },
-  ]);
+    { date: "2026-09-24", close: 100, volume: 3_000_000 },
+    { date: "2026-09-25", close: 90, volume: 3_000_000 },
+  ], "yfinance");
 
   await page.goto("/research/news");
   await expect(page.getByRole("heading", { name: "Eventos de noticias", level: 1 })).toBeVisible({ timeout: 60_000 });
