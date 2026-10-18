@@ -62,7 +62,7 @@ export type KnowledgeProcessingJob = {
   job_type: string;
   entity_type: string;
   entity_id: number | null;
-  status: 'queued' | 'running' | 'completed' | 'failed';
+  status: 'queued' | 'running' | 'completed' | 'partial' | 'failed';
   progress_current: number;
   progress_total: number;
   result: Record<string, unknown>;

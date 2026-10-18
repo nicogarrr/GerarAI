@@ -7,6 +7,7 @@ from time import perf_counter
 from typing import Any
 
 from app.core.config import get_settings
+from app.services.tracing import sanitize_metadata
 
 
 @dataclass
@@ -20,6 +21,18 @@ class TraceHandle:
 
     def update(self, **metadata: Any) -> None:
         self.metadata.update(metadata)
+
+
+def _remote_output(output: Any) -> Any:
+    """Solo escalares no textuales salen a Langfuse: una cadena puede ser
+    contenido de usuario, de documentos o de la respuesta del modelo."""
+    if isinstance(output, dict):
+        return {
+            str(k): v for k, v in output.items() if isinstance(v, (bool, int, float)) or v is None
+        }
+    if isinstance(output, (bool, int, float)) or output is None:
+        return output
+    return None
 
 
 class LangfuseTracer:
@@ -44,7 +57,7 @@ class LangfuseTracer:
                     host=self.settings.langfuse_host,
                 )
                 remote_trace = client.start_observation(
-                    name=name, metadata=handle.metadata
+                    name=name, metadata=sanitize_metadata(handle.metadata)
                 )
             except Exception as exc:  # observability must not break analysis
                 handle.metadata["telemetry_setup_error"] = type(exc).__name__
@@ -58,8 +71,8 @@ class LangfuseTracer:
             if remote_trace is not None:
                 try:
                     remote_trace.update(
-                        metadata=handle.metadata,
-                        output=handle.output,
+                        metadata=sanitize_metadata(handle.metadata),
+                        output=_remote_output(handle.output),
                         level="ERROR" if handle.error else "DEFAULT",
                         status_message=handle.error,
                     )

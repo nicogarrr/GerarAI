@@ -53,12 +53,12 @@ def _tracer(monkeypatch: pytest.MonkeyPatch, *, enabled: bool) -> LangfuseTracer
 
 def test_workflow_uses_start_observation_and_ends_span(monkeypatch: pytest.MonkeyPatch) -> None:
     tracer = _tracer(monkeypatch, enabled=True)
-    with tracer.workflow("Wf", {"a": 1}) as trace:
+    with tracer.workflow("Wf", {"model": "m1", "question": "PRIVATE TEXT"}) as trace:
         trace.output = {"ok": True}
     client = _FakeLangfuse.instances[0]
     assert len(client.started) == 1
     assert client.started[0]["name"] == "Wf"
-    assert client.started[0]["metadata"]["a"] == 1
+    assert client.started[0]["metadata"] == {"model": "m1"}  # allowlist: sin texto de usuario
     assert client.span.updates[0]["output"] == {"ok": True}
     assert client.span.updates[0]["level"] == "DEFAULT"
     assert client.span.ended and client.flushed
@@ -82,3 +82,15 @@ def test_workflow_disabled_never_touches_langfuse(monkeypatch: pytest.MonkeyPatc
         pass
     assert _FakeLangfuse.instances == []
     assert "latency_ms" in trace.metadata
+
+
+def test_remote_trace_never_receives_free_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    tracer = _tracer(monkeypatch, enabled=True)
+    with tracer.workflow("Wf", {"model": "m1"}) as trace:
+        trace.update(answer="TEXT FROM USER DOC", cost=0.01)
+        trace.output = {"confidence": 0.7, "answer": "SECRET BODY"}
+    update = _FakeLangfuse.instances[0].span.updates[0]
+    assert "answer" not in update["metadata"]
+    assert update["metadata"]["cost"] == 0.01
+    assert "latency_ms" in update["metadata"]
+    assert update["output"] == {"confidence": 0.7}

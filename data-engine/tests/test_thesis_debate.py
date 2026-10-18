@@ -144,3 +144,58 @@ def test_enganche_chat_opcional_no_rompe_el_flujo():
         )
     )
     assert out2.model == "deterministic"
+
+
+def _budget_db():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.models.entities import Base
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    session = Session(engine)
+    session.info["tenant_id"] = "tenant-test"
+    return session
+
+
+def test_debate_with_db_records_budget_usage_per_call():
+    from sqlalchemy import func, select
+
+    from app.models.entities import BudgetUsage
+
+    db = _budget_db()
+    provider = ScriptedProvider(
+        [
+            "Caso alcista: crecimiento de margenes y recompra de acciones.",
+            "Caso bajista: riesgo de deuda elevada y competencia intensa.",
+            "VEREDICTO: bearish | La deuda pesa mas que el crecimiento.",
+        ]
+    )
+    result = asyncio.run(debate_thesis("SAN", "Tesis de prueba", provider=provider, db=db))
+    assert result["llm_calls"] == 3
+    rows = db.scalar(select(func.count()).select_from(BudgetUsage))
+    assert rows == 3
+
+
+def test_debate_with_exhausted_budget_makes_no_llm_calls():
+    from datetime import date
+    from decimal import Decimal
+
+    from app.core.config import get_settings
+    from app.models.entities import BudgetUsage
+
+    db = _budget_db()
+    db.add(
+        BudgetUsage(
+            usage_date=date.today(), model="m", workflow="w",
+            cost_eur=Decimal(str(get_settings().llm_daily_cap_eur + 1)), token_count=1,
+        )
+    )
+    db.commit()
+    provider = ScriptedProvider(["x", "y", "VEREDICTO: bullish"])
+    result = asyncio.run(debate_thesis("SAN", "Tesis de prueba", provider=provider, db=db))
+    assert provider.calls == 0
+    assert result["degraded"] is True
+    assert result["llm_calls"] == 0
+    assert result["model"] == "deterministic"

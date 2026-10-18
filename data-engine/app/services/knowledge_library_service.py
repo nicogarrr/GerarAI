@@ -308,6 +308,8 @@ class KnowledgeLibraryService:
         # budget.can_spend ni por budget.record. Se comprueba por lote con un
         # tope por llamada derivado del tamano real del prompt.
         budget = BudgetController()
+        budget_stopped = False
+        batches_processed = 0
         for batch_index, batch in enumerate(batches, start=1):
             source = "\n\n".join(
                 f"[chunk:{chunk.id} page:{chunk.page_number or 'unknown'} "
@@ -328,6 +330,7 @@ class KnowledgeLibraryService:
                     batch_index,
                     len(batches),
                 )
+                budget_stopped = True
                 break
             response = await self.provider.complete(
                 LLMRequest(
@@ -394,6 +397,7 @@ class KnowledgeLibraryService:
                 else:
                     exact_duplicates += 1
             db.commit()
+            batches_processed += 1
             if progress:
                 progress(batch_index, len(batches))
 
@@ -401,6 +405,10 @@ class KnowledgeLibraryService:
         return {
             "principles": created,
             "batch_count": len(batches),
+            # Corte por presupuesto: el documento NO esta completo. El llamador
+            # lo marca "partial" en vez de "completed".
+            "budget_stopped": budget_stopped,
+            "batches_processed": batches_processed,
             "exact_duplicates": exact_duplicates,
             "semantic_duplicates": semantic_duplicates,
             "contradictions": contradictions,
