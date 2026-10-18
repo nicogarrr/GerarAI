@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { MethodologyDisclosure } from '@/components/ui/methodology-disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { BarChart3 } from 'lucide-react';
-import { formatNumber, formatPercent, formatUserDate } from '@/lib/format';
+import { formatMarketDate, formatNumber, formatPercent } from '@/lib/format';
 import type { WalkForwardBacktestResult } from '@/lib/actions/propicks-backtest.actions';
 
 interface WalkForwardResultsProps {
@@ -64,7 +64,8 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
                 </p>
                 {first && last && (
                     <p className="mt-2 text-xs text-gray-500">
-                        Período: {formatUserDate(first.asOf)} - {formatUserDate(last.asOf)}
+                        Período: {/* asOf es un instante UTC (fin de mes 23:59:59Z): en la zona del mercado sigue siendo ese dia; en la del usuario saltaba al dia siguiente. */}
+                        {formatMarketDate(first.asOf)} - {formatMarketDate(last.asOf)}
                     </p>
                 )}
             </div>
@@ -101,7 +102,7 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
                         <tbody>
                             {result.tablaMensual.map((row) => (
                                 <tr key={row.asOf} className="border-b border-gray-700/50">
-                                    <th className="py-2 text-left text-sm font-normal text-gray-300" scope="row">{formatUserDate(row.asOf)}</th>
+                                    <th className="py-2 text-left text-sm font-normal text-gray-300" scope="row">{formatMarketDate(row.asOf)}</th>
                                     <td className="py-2 text-gray-400">{row.picks.join(', ')}</td>
                                     <td className={`py-2 text-right font-bold ${signedClass(row.retNeto)}`}>{fmtPct(row.retNeto)}</td>
                                     <td className={`py-2 text-right ${signedClass(row.spy)}`}>{fmtPct(row.spy)}</td>
@@ -115,7 +116,7 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
                     {result.tablaMensual.map((row) => (
                         <div key={row.asOf} className="min-w-0 rounded-lg border border-gray-700/50 bg-gray-900/50 p-4">
                             <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-gray-200">{formatUserDate(row.asOf)}</span>
+                                <span className="font-medium text-gray-200">{formatMarketDate(row.asOf)}</span>
                                 <span className={`shrink-0 font-bold ${signedClass(row.retNeto)}`}>{fmtPct(row.retNeto)}</span>
                             </div>
                             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
