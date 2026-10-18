@@ -92,9 +92,13 @@ class PortfolioReconstructionService:
             [position for position, _ in rows] if rows is not None else list(db.scalars(select(Position)).all())
         )
         # Posiciones sin operaciones en el libro: cantidad constante en la ventana.
-        company_ids = sorted({t.company_id for t in transactions} | {p.company_id for p in held_positions})
-        currency = {p.company_id: (p.currency or "USD").upper() for p in held_positions}
-        currency.update({t.company_id: (t.currency or "USD").upper() for t in transactions})
+        ids: set[int] = {p.company_id for p in held_positions}
+        currency: dict[int, str] = {p.company_id: (p.currency or "USD").upper() for p in held_positions}
+        for t in transactions:
+            if t.company_id is not None:
+                ids.add(t.company_id)
+                currency[t.company_id] = (t.currency or "USD").upper()
+        company_ids = sorted(ids)
         tickers = {company.id: company.ticker for _, company in (rows or [])}
         missing = [cid for cid in company_ids if cid not in tickers]
         if missing:
