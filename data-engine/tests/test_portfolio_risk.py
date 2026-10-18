@@ -151,3 +151,20 @@ def test_mensajes_de_alerta_en_espanol():
     assert "AAA es pre-FCF y supera el 10 % de peso en la cartera" in mensajes
     assert "El saldo de caja en USD es negativo" in mensajes
     assert not any(" exceeds " in m or " is negative" in m for m in mensajes)
+
+
+def test_caja_negativa_pesa_sobre_valor_bruto_y_nunca_pasa_de_100():
+    positions = [_pos("AAA", 60.0, "Tech"), _pos("BBB", 40.0, "Fin")]
+    result = calculate_portfolio_risk(positions, [{"currency": "EUR", "balance": -70.0}])
+    assert result["total_value"] == 30.0
+    assert result["weight_basis"] == "gross_equity"
+    assert result["top_1_weight"] == 0.6
+    assert result["top_5_weight"] == pytest.approx(1.0)
+    assert sum(result["sector_exposure"].values()) == pytest.approx(1.0)
+    assert any("negativo" in a["message"] for a in result["alerts"])
+
+
+def test_caja_positiva_mantiene_pesos_sobre_total_con_caja():
+    result = calculate_portfolio_risk([_pos("AAA", 50.0)], [{"currency": "USD", "balance": 50.0}])
+    assert result["weight_basis"] == "total_with_cash"
+    assert result["top_1_weight"] == 0.5
