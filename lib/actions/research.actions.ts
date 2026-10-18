@@ -1133,7 +1133,7 @@ export async function importResearchDocumentFile(formData: FormData) {
   const result = await postForm<{ document_id: number; ticker: string; status: string } | null>('/api/sources/documents/ingest-file', null, formData);
   revalidatePath('/research/sources');
   revalidatePath(`/research/${ticker}`);
-  if (!result) throw new ExternalAPIError('No se pudo confirmar el documento importado');
+  if (!result) throw new ExternalAPIError('No se pudo confirmar el documento importado', 'research-api');
   return { message: `${result.status === 'duplicate' ? 'Documento ya existente' : 'Documento importado'}: ${result.ticker} · #${result.document_id}.` };
 }
 
