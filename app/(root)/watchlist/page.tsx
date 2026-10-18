@@ -173,7 +173,6 @@ export default async function WatchlistPage({
                                     <div className="min-w-0 flex-1">
                                         <Link
                                             href={`/research/${stock.symbol}`}
-                                            prefetch
                                             className="flex min-h-11 items-center truncate text-base font-bold text-gray-200"
                                         >
                                             {stock.symbol}
@@ -216,7 +215,6 @@ export default async function WatchlistPage({
                                 <div className="mt-3 flex items-center gap-2">
                                     <Link
                                         href={`/research/${stock.symbol}`}
-                                        prefetch
                                         aria-label={`Ver análisis de ${stock.symbol}`}
                                         className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-800 px-4 text-sm font-medium text-gray-200 transition-colors hover:bg-gray-700 hover:text-white"
                                     >
@@ -247,7 +245,7 @@ export default async function WatchlistPage({
                                 {sortedStocks.map((stock) => (
                                     <TableRow key={stock.symbol} className="border-gray-800 transition-colors hover:bg-gray-800/30">
                                         <TableCell>
-                                            <Link href={`/research/${stock.symbol}`} prefetch className="group flex items-center gap-3">
+                                            <Link href={`/research/${stock.symbol}`} className="group flex items-center gap-3">
                                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-800 font-bold text-gray-300 transition-colors group-hover:bg-gray-700" aria-hidden="true">
                                                     {stock.symbol.slice(0, 2)}
                                                 </div>

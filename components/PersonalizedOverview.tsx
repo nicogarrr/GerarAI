@@ -435,7 +435,6 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                         <Link
                                             key={h.symbol}
                                             href={`/research/${h.symbol}`}
-                                            prefetch
                                             className="flex min-h-[44px] items-center justify-between gap-2 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700/30"
                                         >
                                             <span className="text-white font-semibold">{h.symbol}</span>
@@ -588,7 +587,6 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     <Link
                                         key={stock.symbol}
                                         href={`/research/${stock.symbol}`}
-                                        prefetch
                                         className="flex min-h-[44px] items-center justify-between gap-2 p-3 bg-gray-900/30 rounded-lg hover:bg-gray-800/80 transition-colors group"
                                     >
                                         <div className="flex min-w-0 items-center gap-3">
@@ -677,7 +675,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     // en la etiqueta en vez de suponer dólares.
                                     const priceLabel = isValidCurrencyCode(op.currency) ? 'Precio' : 'Precio (divisa N/D)';
                                     return (
-                                        <Link key={op.symbol} href={`/research/${op.symbol}`} prefetch>
+                                        <Link key={op.symbol} href={`/research/${op.symbol}`}>
                                             <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700/30 hover:border-purple-500/50 hover:bg-gray-800 transition-all group">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
