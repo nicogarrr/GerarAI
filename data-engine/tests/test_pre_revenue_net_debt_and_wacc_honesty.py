@@ -167,6 +167,13 @@ def test_missing_net_debt_is_declared_and_never_silently_zero(db, company):
     # El aviso deja claro que el numero por accion es EV/acciones, no equity.
     assert "EV/shares, not equity" in result["trace"]["notice"]
     assert "net_debt" in result["trace"]["publication_blockers"]
+    # El aviso declara el margen realmente usado, no un 15% fijo.
+    assumed = result["trace"]["assumed"]
+    band = assumed["fcf_margin_band"]
+    assert (
+        f"base {assumed['fcf_margin_base']:.0%}, band {min(band):.0%}-{max(band):.0%}"
+        in result["trace"]["notice"]
+    )
 
 
 def test_missing_net_debt_does_not_state_the_enterprise_value_as_equity(db, company):
