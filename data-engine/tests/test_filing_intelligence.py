@@ -202,20 +202,6 @@ def test_spanish_cnmv_annual_report(db):
     assert analyze_document(db, new)["status"] == "changed"
 
 
-def test_api_pagination_and_empty_state(db):
-    from app.api.routes.filing_intelligence import filing_intelligence
-
-    assert filing_intelligence("FILING", page=1, page_size=1, db=db)["status"] == "insufficient_data"
-    for number in (1, 2, 3):
-        analyze_document(db, document(db, form="8-K", text=RELEASE, number=number))
-    db.commit()
-    first = filing_intelligence("FILING", page=1, page_size=2, db=db)
-    second = filing_intelligence("FILING", page=2, page_size=2, db=db)
-    assert first["total"] == 3 and len(first["items"]) == 2
-    assert len(second["items"]) == 1
-    assert first["items"][0]["source"]["document_id"] != second["items"][0]["source"]["document_id"]
-
-
 def test_large_document_is_saved_as_insufficient_data(db, monkeypatch):
     monkeypatch.setattr("app.services.filing_intelligence.MAX_CHUNKS", 1)
     doc = document(db, form="8-K", text=RELEASE)

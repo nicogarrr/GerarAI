@@ -4,7 +4,6 @@
 - Factores de riesgo, guidance y partes relacionadas conservan citas, chunk ID, URL, checksum y fecha. Un apartado ausente es "sin datos", nunca "eliminado". "INFERIDO" identifica la comparación textual, no una valoración de materialidad.
 - Los 8-K y anexos EX-99 vinculados producen extractos de resultados y guidance. El índice SEC debe listar el anexo y coincidir con CIK/accession. Se descargan como máximo tres anexos. No hay llamadas, transcripciones de pago ni uso de LLM.
 - Los avisos son solo in-app y solo para cartera/watchlist del tenant. Fingerprint estable e índice único evitan duplicados. El aviso enlaza al espacio de tesis e incluye el ID de la versión disponible, sin modificarla.
-- GET `/api/companies/{ticker}/filing-intelligence?page=1&page_size=20` devuelve análisis guardados, paginados. No descarga ni calcula en una petición de lectura.
 
 ## Activación y límites
 
