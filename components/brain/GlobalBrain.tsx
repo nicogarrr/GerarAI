@@ -80,6 +80,11 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     const page = brainPageContext(pathname);
     const [isOpen, setIsOpen] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
+    useEffect(() => {
+        const openFromNavigation = () => setIsOpen(true);
+        window.addEventListener('gerarai:open-brain', openFromNavigation);
+        return () => window.removeEventListener('gerarai:open-brain', openFromNavigation);
+    }, []);
     const [echo, setEcho] = useState<ContextEcho | null>(null);
     const [messages, setMessages] = useState<Message[]>([
         { role: 'assistant', content: '¡Hola! Soy el cerebro de GerarAI. Pregúntame sobre tu cartera, tus tesis de inversión o lo que estés viendo.' }
