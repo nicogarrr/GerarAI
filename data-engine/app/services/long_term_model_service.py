@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     CalculatedMetric,
     Company,
+    CorporateAction,
     FinancialFact,
     MarketPrice,
     NewsEvent,
@@ -232,6 +233,86 @@ def _is_annual(fact: FinancialFact) -> bool:
     return not quarter.startswith("Q") and not period.startswith("Q")
 
 
+def _has_fy_marker(fact: FinancialFact) -> bool:
+    """El hecho declara ser el ejercicio completo (no un trimestre suelto).
+
+    Imports antiguos y algunos proveedores dejan filas trimestrales con
+    fiscal_year puesto y fiscal_quarter NULL: sin esta marca un trimestre
+    viejo podia ganar el ano y el DCF partia de unos "Ingresos" de un solo
+    trimestre (caso real AAPL: 117,2B de un Q en vez de 416,16B del FY2025).
+    """
+    quarter = (fact.fiscal_quarter or "").upper()
+    period = (fact.period or "").upper()
+    return quarter == "FY" or period.endswith(":FY") or period.startswith("FY")
+
+
+def _split_events(db: Session, company_id: int) -> list[CorporateAction]:
+    return list(db.scalars(
+        select(CorporateAction)
+        .where(
+            CorporateAction.company_id == company_id,
+            CorporateAction.action_type.in_(["split", "reverse_split"]),
+        )
+        .order_by(CorporateAction.effective_date)
+    ))
+
+
+def _period_end_date(fact: FinancialFact) -> date | None:
+    try:
+        return date.fromisoformat((fact.period or "").split(":")[0])
+    except ValueError:
+        return None
+
+
+@dataclass(frozen=True)
+class _SplitAdjustedFact:
+    """Vista de un hecho de recuento de acciones expresado en acciones
+    ACTUALES: la SEC no reexpone periodos anteriores a los 2-3 anos del
+    filing del split, asi que el 10-K de 2016 de AAPL sigue diciendo 5,5B
+    pre-split 4:1 de 2020. Sin ajuste, la serie 2016-2025 finge dilucion
+    (+11,8 % anual) cuando hubo recompra neta (22B -> 15,3B). Envuelve el
+    hecho original: solo cambia `value`; el resto de atributos (id, period,
+    provenance) pasan tal cual."""
+
+    fact: FinancialFact
+    value: Decimal
+    split_factor: Decimal
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.fact, name)
+
+
+def _adjust_share_facts(
+    facts: list[FinancialFact], splits: list[CorporateAction]
+) -> list[Any]:
+    """Multiplica cada recuento historico por el factor acumulado de los
+    splits posteriores al cierre de su periodo (ratio = acciones despues /
+    antes; los reverse splits llevan ratio < 1 y se tratan igual). Los
+    hechos sin fecha de periodo parseable se dejan como estan: ajustar a
+    ciegas seria inventar."""
+    if not splits:
+        return list(facts)
+    adjusted: list[Any] = []
+    for fact in facts:
+        end = _period_end_date(fact)
+        factor = Decimal(1)
+        if end is not None:
+            for split in splits:
+                if split.effective_date > end:
+                    factor *= Decimal(split.ratio)
+        if factor == 1 or fact.value is None:
+            adjusted.append(fact)
+            continue
+        adjusted.append(
+            _SplitAdjustedFact(
+                fact=fact,
+                value=Decimal(fact.value) * factor,
+                split_factor=factor,
+            )
+        )
+    return adjusted
+
+
 class LongTermModelService:
     """Build the evidence-aware long-term model for one company."""
 
@@ -271,6 +352,9 @@ class LongTermModelService:
                 "income_before_tax",
             }
         }
+        fact_cache["shares_diluted"] = _adjust_share_facts(
+            fact_cache["shares_diluted"], _split_events(db, company.id)
+        )
         revenue_history = self._annual_by_year(fact_cache["revenue"])
         years = sorted(revenue_history)
         latest_year = years[-1] if years else None
@@ -728,14 +812,23 @@ class LongTermModelService:
         return list(reversed(newest))
 
     def _annual_by_year(self, facts: list[FinancialFact]) -> dict[int, FinancialFact]:
-        result: dict[int, FinancialFact] = {}
+        # Facts are ordered oldest-to-newest. Within a year, a fact with an
+        # explicit FY marker (fiscal_quarter FY / period ...:FY) always beats
+        # an unmarked row - unmarked annual-slot rows are how a stale quarter
+        # (fiscal_year set, fiscal_quarter NULL, from a legacy import or a
+        # vendor) used to override the 10-K and seed the DCF with one
+        # quarter's revenue. Among rows of the same markedness the most
+        # recently ingested source wins, as before.
+        by_year: dict[int, tuple[int, FinancialFact]] = {}
         for fact in facts:
             if fact.fiscal_year is None or not _is_annual(fact):
                 continue
-            # Facts are ordered oldest-to-newest. Keeping the last one prefers the
-            # most recently ingested source if a period exists twice.
-            result[int(fact.fiscal_year)] = fact
-        return result
+            rank = 1 if _has_fy_marker(fact) else 0
+            year = int(fact.fiscal_year)
+            previous = by_year.get(year)
+            if previous is None or rank >= previous[0]:
+                by_year[year] = (rank, fact)
+        return {year: fact for year, (_, fact) in by_year.items()}
 
     def _value_for_year(self, facts: list[FinancialFact], year: int | None) -> float | None:
         if year is None:
@@ -770,6 +863,15 @@ class LongTermModelService:
                         )
                         continue
                 metrics[metric] = _fact_line(fact)
+                split_factor = getattr(fact, "split_factor", None) if fact is not None else None
+                if metric == "shares_diluted" and split_factor is not None and split_factor != 1:
+                    metrics[metric] = _calculated_line(
+                        float(fact.value),
+                        unit="shares",
+                        source_fact_ids=[fact.id],
+                        calculation=f"reported x cumulative_split_factor {split_factor}",
+                        basis="ajustado por splits posteriores al cierre del periodo",
+                    )
 
             revenue = metrics["revenue"]["value"]
             for metric, numerator in (
