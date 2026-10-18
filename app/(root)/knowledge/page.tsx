@@ -1,3 +1,4 @@
+import { extractionResultText, hasDefaultCollections } from '@/lib/knowledge/job-feedback';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownComponents } from '@/components/research/ThesisMarkdown';
@@ -219,7 +220,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
 
       {activeJobs.length ? (
         <section className="rounded-xl border border-amber-900/60 bg-amber-950/10 p-4 text-sm text-amber-100">
-          <div className="font-semibold">Extracción en segundo plano en curso</div>
+          <div className="font-semibold">Extracción en segundo plano en curso</div><Link className="inline-flex min-h-11 items-center text-teal-300" href="/knowledge">Consultar estado</Link>
           <div className="mt-2 grid gap-1 text-amber-200/80">
             {activeJobs.map((job) => (
               <div key={job.id}>Tarea #{formatNumber(job.id, { maximumFractionDigits: 0 })} · {documentNames.get(job.entity_id ?? -1) ?? `documento ${job.entity_id}`} · {label(job.status)}{job.progress_total ? ` · lote ${formatNumber(job.progress_current, { maximumFractionDigits: 0 })}/${formatNumber(job.progress_total, { maximumFractionDigits: 0 })}` : ''}</div>
@@ -241,11 +242,15 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
 
         <div className="rounded-xl border border-gray-800 bg-surface-1 p-5">
           <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Colecciones por defecto</h2></div>
-          <p className="mb-4 text-sm text-gray-400">Instala las colecciones base (calidad compounders, operaciones, macro) para no empezar de cero.</p>
-          <MutationForm action={installKnowledgeDefaults} successMessage="Colecciones por defecto listas">
+          {hasDefaultCollections(collections) ? <p className="text-sm text-gray-400">Colecciones por defecto instaladas.</p> : <MutationForm action={installKnowledgeDefaults} successMessage="Colecciones por defecto listas">
             <Button className="h-11 w-full sm:w-fit" type="submit"><Library aria-hidden="true" className="h-4 w-4" />Instalar por defecto</Button>
-          </MutationForm>
+          </MutationForm>}
         </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-800 bg-surface-1 p-4">
+        <h2 className="mb-3 font-semibold text-gray-100">Colecciones</h2>
+        {collections.length ? <ul className="grid gap-2 sm:grid-cols-2">{collections.map(collection => <li key={collection.id} className="rounded-lg border border-gray-800 p-3 text-sm"><span className="font-medium text-gray-200">{collection.name}</span><span className="ml-2 text-xs text-gray-500">{documents.filter(document => document.collection_id === collection.id).length} documentos en esta vista</span></li>)}</ul> : <p className="text-sm text-gray-500">Sin colecciones.</p>}
       </section>
 
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
@@ -266,7 +271,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                   <td className="py-3 text-gray-400">{documentTypeLabel(document.document_type)}</td>
                   <td className="py-3 text-gray-500">{parserLabel(document.metadata.parser)}</td>
                   <td className="py-3"><Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge></td>
-                  <td className="py-3"><div className="flex justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm></div>{job?.status === 'failed' ? <div className="mt-1 max-w-xs text-right text-xs text-red-300">{job.error}</div> : null}</td>
+                  <td className="py-3"><div className="flex justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm></div>{extractionResultText(job) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}</td>
                 </tr>
                 );
               })}
@@ -287,7 +292,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                   <Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge>
                 </div>
                 <div className="mt-2 text-xs text-gray-500">Extractor: {parserLabel(document.metadata.parser)}</div>
-                {job?.status === 'failed' ? <div className="mt-2 text-xs text-red-300">{job.error}</div> : null}
+                {extractionResultText(job) ? <p className="mt-2 text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}
                 <div className="mt-4 grid grid-cols-1 gap-2">
                   <Button asChild className="h-11 w-full" size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button>
                   <MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada">
