@@ -407,7 +407,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                         {insight.kind === 'no-cost-basis' &&
                                             'Todavía no tenemos la base de coste de tus posiciones. Cuando esté cargada, aquí verás cómo va tu cartera desde la compra.'}
                                         {insight.kind === 'movement' &&
-                                            `${insight.partial ? 'Entre las posiciones con base de coste, tu' : 'Tu'} cartera acumula ${insight.direction === 'up' ? 'una subida' : 'una caída'} del ${formatPercent(insight.totalPercent, { fromRatio: false, digits: 2, signDisplay: 'never' })} desde la compra. ${insight.topSymbol} es la posición que más se mueve (${formatPercent(insight.topGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}).`}
+                                            `${insight.partial ? 'Entre las posiciones con base de coste, tu' : 'Tu'} cartera acumula ${insight.direction === 'up' ? 'una subida' : 'una caída'} del ${formatPercent(insight.totalPercent, { fromRatio: false, digits: 2, signDisplay: 'never' })} desde la compra. ${insight.topSymbol} es la posición con mayor variación desde la compra (${formatPercent(insight.topGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}).`}
                                     </p>
                                     <Link
                                         href={topMover ? `/research/${topMover.symbol}?view=changes` : '/portfolio'}

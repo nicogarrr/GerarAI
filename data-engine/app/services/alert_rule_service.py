@@ -126,8 +126,8 @@ class AlertRuleService:
         jev_urgency: dict | None = None
         if triggered:
             alert_message = (
-                f"{company.ticker} rule matched: observed={observed}; "
-                f"condition={rule.condition}"
+                f"{company.ticker}: se cumplió la regla «{rule.name}» "
+                f"(valor observado: {observed})."
             )
             try:
                 from app.services.jev_triage_service import (

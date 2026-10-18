@@ -194,10 +194,10 @@ class EarningsWorkflowService:
                 impact_direction=self._impact_direction(run),
                 materiality_score=materiality,
                 summary=(
-                    f"{company.ticker} {fiscal_year} {fiscal_quarter} earnings "
-                    f"package processed: {len(run.extracted_metrics)} metric candidates, "
-                    f"{len(run.guidance_changes)} guidance statements, "
-                    f"{len(run.risk_updates)} risk updates."
+                    f"{company.ticker} {fiscal_year} {fiscal_quarter}: resultados "
+                    f"procesados con {len(run.extracted_metrics)} métricas candidatas, "
+                    f"{len(run.guidance_changes)} comentarios sobre previsiones y "
+                    f"{len(run.risk_updates)} actualizaciones de riesgos."
                 ),
                 affected_claim_ids=affected_claim_ids,
                 affected_metrics=[

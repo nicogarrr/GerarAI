@@ -31,6 +31,18 @@ export function alertCardCopy(alert: TriggeredAlertDelivery): { heading: string;
       ? `Noticia sobre ${company}; revisa la fuente antes de sacar conclusiones.`
       : alert.alert_type.includes('news')
         ? `Noticia marcada para revisión de la tesis de ${company}; el impacto aún debe verificarse.`
-        : `Alerta de ${company}; consulta la regla y la fuente antes de actuar.`;
+        : alertOwnText(alert, company);
   return { heading: `${company} · ${kind}${suffix}`, summary, technical: `${alert.title}\n${alert.message}` };
+}
+
+/** Texto propio de la alerta (regla, posiciones cortas, cribado) en vez de una frase genérica. */
+function alertOwnText(alert: TriggeredAlertDelivery, company: string): string {
+  const message = (alert.message ?? '').replace(/\s+/g, ' ').trim();
+  if (/rule matched: observed=/i.test(message)) {
+    return `Se cumplió la regla «${alert.title.trim()}» para ${company}.`;
+  }
+  if (message && message.length <= 280 && !/^[\w.-]+: [A-Z][a-z]+ .*\b(found|classified|requires)\b/.test(message)) {
+    return message;
+  }
+  return `Alerta de ${company}: ${alert.title.trim() || 'sin detalle disponible'}.`;
 }

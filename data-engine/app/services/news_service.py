@@ -38,6 +38,19 @@ EVIDENCE_NAME = 2  # ticker + nombre distintivo de la empresa
 EVIDENCE_CONTEXT = 1  # ticker + termino financiero a <= 3 palabras
 
 
+
+def _change_summary(headline: str, impact: str) -> str:
+    """Resumen del cambio sin repetir el titular dentro del cuerpo."""
+    head = (headline or "").strip().rstrip(".")
+    body = (impact or "").strip()
+    if body and head and body.lower().lstrip().startswith(head.lower()[:60]):
+        return body
+    if body and body.lower() == head.lower():
+        return body
+    prefix = "Noticia material que requiere revisión de la tesis"
+    return f"{prefix}: {head}. {body}".strip() if body else f"{prefix}: {head}."
+
+
 def _near_finance_word(ticker: str, text: str) -> bool:
     words = [w.strip(".,;:()[]\"'") for w in _WORD.findall(text)]
     for i, w in enumerate(words):
@@ -350,10 +363,7 @@ class NewsService:
                 change_type=change_type,
                 impact_direction=assessment.impact_direction,
                 materiality_score=materiality_score,
-                summary=(
-                    f"Noticia material que requiere revisión de la tesis: {summary}. "
-                    f"{semantic_impact.summary if semantic_impact else ''}"
-                ).strip(),
+                summary=_change_summary(summary, semantic_impact.summary if semantic_impact else ""),
                 affected_claim_ids=(semantic_impact.affected_claim_ids if semantic_impact else []),
                 affected_metrics=assessment.affected_assumptions,
                 requires_review=True,

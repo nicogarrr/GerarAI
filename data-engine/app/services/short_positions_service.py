@@ -5,7 +5,7 @@ import hashlib
 from datetime import UTC, date, datetime, timedelta
 
 import httpx
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.models import Company, ConnectorState
@@ -97,8 +97,15 @@ async def refresh_shorts(db: Session, company: Company) -> dict:
 
 def emit_shorts_increase(db: Session, company: Company, previous: dict, current: dict, now: datetime) -> None:
     """Open positions only. Daily FINRA short volume is never a position signal."""
+    from app.models import Position, WatchItem
     from app.services.review_alert_service import ReviewAlertService
 
+    # Solo valores que el tenant sigue: abrir la ficha de cualquier ticker no
+    # debe generar alertas de un valor que no está en cartera ni watchlist.
+    held = db.scalar(select(Position.id).where(Position.company_id == company.id, Position.quantity > 0).limit(1))
+    watched = db.scalar(select(WatchItem.id).where(func.upper(WatchItem.symbol) == company.ticker.upper()).limit(1))
+    if held is None and watched is None:
+        return
     parts = None
     message = None
     source_url = None
