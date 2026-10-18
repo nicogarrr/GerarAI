@@ -7,8 +7,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
+from app.services.async_bridge import run_from_any_context
 from app.services.company_events_service import CompanyEventsService
 from app.services.company_resolver import resolve_company
 
@@ -79,15 +81,22 @@ class CompanyFilingsOut(BaseModel):
 
 @router.get("/{ticker}/events", response_model=CompanyEventsOut)
 async def get_company_events(ticker: str, db: Session = Depends(get_db)) -> Any:
-    company = resolve_company(db, ticker)
-    if company is None:
-        raise HTTPException(status_code=404, detail=f"Empresa no encontrada: {ticker}")
-    return await CompanyEventsService(db).get_events(company)
+    def _events() -> Any:
+        company = resolve_company(db, ticker)
+        if company is None:
+            raise HTTPException(status_code=404, detail=f"Empresa no encontrada: {ticker}")
+        return run_from_any_context(CompanyEventsService(db).get_events(company))
+
+    # resolve + servicio (sqlalchemy sincrono entre awaits): hilo del pool.
+    return await run_in_threadpool(_events)
 
 
 @router.get("/{ticker}/filings", response_model=CompanyFilingsOut)
 async def get_company_filings(ticker: str, db: Session = Depends(get_db)) -> Any:
-    company = resolve_company(db, ticker)
-    if company is None:
-        raise HTTPException(status_code=404, detail=f"Empresa no encontrada: {ticker}")
-    return await CompanyEventsService(db).get_filings(company)
+    def _filings() -> Any:
+        company = resolve_company(db, ticker)
+        if company is None:
+            raise HTTPException(status_code=404, detail=f"Empresa no encontrada: {ticker}")
+        return run_from_any_context(CompanyEventsService(db).get_filings(company))
+
+    return await run_in_threadpool(_filings)

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
 from app.core.database import get_db
@@ -19,6 +20,7 @@ from app.models import (
     ThesisVersion,
     Transaction,
 )
+from app.services.async_bridge import run_from_any_context
 from app.services.company_resolver import resolve_company
 from app.services.connectors.ibkr import IBKRFlexClient
 from app.services.dividend_ingestion_service import DividendIngestionService
@@ -350,7 +352,11 @@ async def sync_portfolio_dividends(db: Session = Depends(get_db)) -> dict:
     unavailable; nothing is fabricated. Dividend cash stays a manual ledger
     entry.
     """
-    return await DividendIngestionService().sync_portfolio(db)
+    # La ingesta mezcla sqlalchemy y el proveedor entre sus awaits: hilo del
+    # pool con la corutina puenteado, no el event loop.
+    return await run_in_threadpool(
+        lambda: run_from_any_context(DividendIngestionService().sync_portfolio(db))
+    )
 
 
 @router.get("/dividends")
@@ -675,7 +681,9 @@ def _require_ibkr_owner(db: Session):
 
 @router.post("/import/ibkr")
 async def import_ibkr(db: Session = Depends(get_db)) -> dict:
-    settings = _require_ibkr_owner(db)
+    # _require_ibkr_owner y la importacion del XML son sqlalchemy/parseo
+    # sincronos: hilo del pool. fetch_latest_xml es red async y se queda.
+    settings = await run_in_threadpool(_require_ibkr_owner, db)
     client = IBKRFlexClient()
     if not client.configured():
         return {
@@ -684,8 +692,12 @@ async def import_ibkr(db: Session = Depends(get_db)) -> dict:
         }
     xml_text = await client.fetch_latest_xml()
     try:
-        return IBKRImportService().import_flex_xml(
-            db, xml_text, expected_account_id=settings.ibkr_flex_account_id, max_statement_age_days=5,
+        return await run_in_threadpool(
+            IBKRImportService().import_flex_xml,
+            db,
+            xml_text,
+            expected_account_id=settings.ibkr_flex_account_id,
+            max_statement_age_days=5,
         )
     except IBKRPnlNotReadyError as exc:
         raise HTTPException(status_code=503, detail=str(exc), headers={"Retry-After": "3600"}) from exc
