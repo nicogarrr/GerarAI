@@ -99,7 +99,7 @@ def test_ratio_and_share_units_format(db):
     sync_company_fact_chunks(db, company)
     text = db.scalar(select(DocumentChunk)).text
     assert "margen neto 15,23 %" in text
-    assert "BPA diluido 1,23 USD/accion" in text
+    assert "BPA diluido 1,23 USD/acción" in text
 
 
 def test_company_without_documents_is_a_noop(db):

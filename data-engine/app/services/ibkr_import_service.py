@@ -100,7 +100,7 @@ def validate_flex_xml(xml_text: str) -> list[str]:
             if symbol and missing_fields:
                 errors.append(
                     f"Fila {index} (OpenPosition {symbol}): faltan {', '.join(missing_fields)}. "
-                    "Esa posicion se omite para no crear ceros ni una fecha inventada; "
+                    "Esa posición se omite para no crear ceros ni una fecha inventada; "
                     "incluye esas columnas en la Flex Query."
                 )
             for attr in ("position", "quantity"):
@@ -437,7 +437,7 @@ def _snapshot_blockers(
     if not positions_imported:
         reasons.append("el extracto no trae posiciones")
     if position_rows_skipped:
-        reasons.append("hay filas de posicion omitidas")
+        reasons.append("hay filas de posición omitidas")
     if cash_rows_skipped:
         reasons.append("hay filas de caja omitidas")
     if not cash_imported:

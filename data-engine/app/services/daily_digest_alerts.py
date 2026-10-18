@@ -105,9 +105,9 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
         alert_type="daily_digest",
         title=f"Resumen diario de tu cartera al {as_of.isoformat()}",
         message=(resumen + " Variaciones del valor con cierres ajustados de yfinance al "
-                 f"{as_of.isoformat()}, no el P&L de tu posicion. "
+                 f"{as_of.isoformat()}, no el P&L de tu posición. "
                  f"Cartera medida al generar el resumen ({sampled_txt}); "
-                 "movimientos posteriores no estan incluidos. "
+                 "movimientos posteriores no están incluidos. "
                  f"Cobertura del resumen: {cobertura_resumen}."),
         fingerprint=fp, channels=["in_app"], last_triggered_at=datetime.now(UTC),
         metadata_={"digest_id": digest.id, "digest_date": as_of.isoformat(),

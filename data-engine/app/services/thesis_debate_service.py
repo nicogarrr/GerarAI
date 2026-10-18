@@ -352,11 +352,11 @@ def _deterministic_lenses(analysis: str) -> dict[str, str]:
     return {
         "aggressive": (
             "[Agresivo determinista - LLM no disponible] Maximizar exposicion a los "
-            f"catalizadores: {excerpt}. Dimensionar con stop amplio y revision semanal."
+            f"catalizadores: {excerpt}. Dimensionar con stop amplio y revisión semanal."
         ),
         "neutral": (
-            "[Neutral determinista - LLM no disponible] Mantener posicion base y "
-            f"esperar confirmacion: {excerpt}. Rebalancear solo ante nueva evidencia."
+            "[Neutral determinista - LLM no disponible] Mantener posición base y "
+            f"esperar confirmación: {excerpt}. Rebalancear solo ante nueva evidencia."
         ),
         "conservative": (
             "[Conservador determinista - LLM no disponible] Reducir riesgo: tomar "

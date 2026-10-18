@@ -301,7 +301,7 @@ def test_forecast_invalid_probabilities_discarded(db_session):
     item = result["positions"][0]
     assert item["probabilities"] is None
     assert item["expected_cagr"] is None
-    assert any("invalidas" in a for a in result["assumptions"])
+    assert any("inválidas" in a for a in result["assumptions"])
 
 
 def test_forecast_missing_scenario_keeps_mass_visible(db_session):

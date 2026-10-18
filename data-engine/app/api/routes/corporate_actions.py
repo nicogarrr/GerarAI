@@ -87,6 +87,9 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
                 "historical": False,
                 "no_position": False,
                 "declared": True,
+                "amount_per_share": float(record.amount),
+                "currency": record.currency,
+                "pay_date": record.pay_date.isoformat() if record.pay_date else None,
                 "source": record.source,
             }
         )

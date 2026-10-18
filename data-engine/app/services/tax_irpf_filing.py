@@ -386,8 +386,8 @@ def build_double_taxation(
             "amount": None if es_incomplete else _money(spanish_withholding),
             "status": "SIN_DATOS" if es_incomplete else "calculada",
             "reason": (
-                "Hay dividendos de emisor espanol o de pais desconocido sin tipo de cambio, "
-                "retencion o revision: el total de retenciones espanolas no es verificable."
+                "Hay dividendos de emisor español o de país desconocido sin tipo de cambio, "
+                "retención o revisión: el total de retenciones españolas no es verificable."
                 if es_incomplete
                 else None
             ),

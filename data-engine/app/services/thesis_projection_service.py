@@ -431,7 +431,7 @@ class ThesisProjectionService:
             cagr,
             LABEL_INFERIDO,
             f"CAGR de ingresos FY{first_year}-FY{last_year} sobre facts anuales "
-            f"({span} anos); la historia no garantiza el futuro",
+            f"({span} años); la historia no garantiza el futuro",
         )
 
     def _growth(
@@ -648,8 +648,8 @@ class ThesisProjectionService:
                     multiple = min(multiple, market_multiple)
                     target = projected * multiple
                     base = (
-                        f"multiplo implicito del modelo ({anchor_kind} por acción): "
-                        f"valor/accion actual del escenario / {anchor_kind} por acción "
+                        f"múltiplo implícito del modelo ({anchor_kind} por acción): "
+                        f"valor/acción actual del escenario / {anchor_kind} por acción "
                         f"actual, aplicado al {anchor_kind} por acción proyectado"
                     )
                     if capped:
