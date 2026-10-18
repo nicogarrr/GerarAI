@@ -1,3 +1,4 @@
+import ScrollToOnMount from '@/components/research/ScrollToOnMount';
 import { formatResearchMetric } from '@/lib/research/metric-value';
 import { financialFormula, financialPeriod, financialVersion } from '@/lib/research/financial-display';
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
@@ -1352,6 +1353,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     }
     content = (
       <div className="space-y-6" id="chat-empresa" style={{ scrollMarginTop: '1rem' }}>
+        <ScrollToOnMount targetId="chat-empresa" />
         <Panel title="Chat de la empresa con fuentes">
           {/* Asistente por intención (WorldStocks punto 4): atajos que lanzan
               una pregunta guiada por el MISMO contrato de evidencia
