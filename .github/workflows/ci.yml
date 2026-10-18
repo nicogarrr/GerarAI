@@ -35,7 +35,7 @@ concurrency:
 jobs:
   dep-parity:
     name: Python dep parity (pyproject ↔ requirements)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       # fetch-depth: 1 explicito aunque ya sea el default de checkout@v4+: deja
@@ -52,7 +52,7 @@ jobs:
 
   frontend:
     name: Frontend quality
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       CI: "true"
@@ -99,7 +99,7 @@ jobs:
 
   auth-store:
     name: Auth store smoke (Mongo)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -115,7 +115,7 @@ jobs:
 
   backend:
     name: Backend quality
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       qdrant:
@@ -199,7 +199,7 @@ jobs:
     # los evals se ejecutan aunque uno falle y el job sale rojo si alguno fallo.
     # Se pierde el timeline por script en la UI, se gana no gastar 6 runners.
     name: Evals (RAG, valuation, LLM, ingest, backtest, realized)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       qdrant:
@@ -335,7 +335,7 @@ jobs:
 
   openapi-drift:
     name: OpenAPI generated client drift
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       APP_ENV: test
@@ -365,7 +365,7 @@ jobs:
 
   migrations:
     name: Postgres migration round trip
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       postgres:
@@ -525,7 +525,7 @@ jobs:
 
   supply-chain:
     name: Dependency audits
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -569,7 +569,7 @@ jobs:
 
   e2e:
     name: Research API E2E
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       postgres:
@@ -623,7 +623,7 @@ jobs:
 
   browser-e2e:
     name: Browser E2E
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       CI: "true"
@@ -686,7 +686,7 @@ jobs:
     # abajo. GitHub no expone el listado de jobs del run, asi que un job
     # olvidado aqui NO lo ve este gate y puede quedar verde con ese job en rojo.
     name: CI gate (single required check)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
       - dep-parity

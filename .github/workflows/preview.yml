@@ -52,7 +52,7 @@ jobs:
     # tambien cuando el secret existe. Aqui el secret llega por `env` (que si
     # admite `secrets`) y la decision sale por un output declarado.
     name: Decide si hay Vercel configurado
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       deploy: ${{ steps.plan.outputs.deploy }}
@@ -107,7 +107,7 @@ jobs:
     name: Build y deploy del preview
     needs: gate
     if: ${{ needs.gate.outputs.deploy == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
       contents: read
@@ -196,7 +196,7 @@ jobs:
     # mudos. can_comment cubre fork y secret ausente; en PR cerrado se ejecuta
     # igual, porque hay que limpiar el comentario aunque no haya token.
     if: ${{ always() && github.event_name == 'pull_request' && needs.gate.outputs.can_comment == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
