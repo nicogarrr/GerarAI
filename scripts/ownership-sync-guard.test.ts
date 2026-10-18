@@ -13,3 +13,11 @@ test('ownership: el estado «Sin datos 13F» tiene el botón que el texto anunci
   assert.ok(button.includes('bg-teal-600 text-white'), 'botón teal con texto blanco legible');
   assert.ok(button.includes('syncInvestorPortfoliosNow'), 'encola el actor existente, no reimplementa la descarga');
 });
+
+test('13F: el primer uso sin datos encola la sincronizacion sola, como mucho una vez cada 6 h', () => {
+  const button = readFileSync('app/(root)/inversores/_components/SyncPortfoliosButton.tsx', 'utf8');
+  assert.ok(button.includes('useEffect'), 'se dispara al montar el estado vacío');
+  assert.ok(button.includes('sync-13f-last-auto'), 'marca del último intento automático');
+  assert.ok(button.includes('6 * 60 * 60 * 1000'), 'intervalo mínimo de 6 h entre intentos automáticos');
+  assert.ok(button.includes('syncInvestorPortfoliosNow'), 'reutiliza el actor existente');
+});
