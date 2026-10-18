@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import type { HistoricalStressReport, StressWindow } from '@/types/historical-stress';
-import { formatPercent } from '@/lib/format';
+import { formatPercent, formatMarketDate } from '@/lib/format';
 
-const day = (value?: string | null) => value ? value.slice(0, 10) : 'Sin datos';
+const day = (value?: string | null) => value ? formatMarketDate(value) : 'Sin datos';
 
 const REASON_TEXT: Record<string, string> = {
     history_gaps: 'Histórico con huecos',
@@ -20,7 +20,7 @@ function WindowCard({ window }: { window: StressWindow }) {
         <h3 className="text-xl font-semibold text-gray-100">{window.year}</h3>
         {window.status === 'SIN_DATOS' ? <div className="mt-3 text-sm text-amber-300">
             <p>N/D</p><p className="mt-1 text-gray-400">{REASON_TEXT[window.reason ?? ''] ?? 'Histórico o valoración incompletos'}</p>
-            {window.missing_tickers?.length ? <p className="mt-2 break-words">{window.missing_tickers.join(', ')}</p> : null}
+            {window.missing_tickers?.length ? <p className="mt-2 break-words">Sin histórico suficiente: {window.missing_tickers.join(', ')}</p> : null}
         </div> : <>
             <dl className="mt-3 space-y-3 text-sm">
                 <div className="flex justify-between gap-2"><dt className="text-gray-400">Retorno del año</dt><dd>{formatPercent(window.return)}</dd></div>

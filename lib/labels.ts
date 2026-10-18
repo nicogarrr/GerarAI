@@ -146,7 +146,7 @@ const COMPONENTES_ATRIBUCION: Record<string, string> = {
   buybacks: 'Recompras',
   dilution: 'Dilución',
   fx: 'Divisa',
-  sizing: 'Tamaño de posición',
+  sizing: 'Contribución ponderada',
 };
 
 export function etiquetaComponenteAtribucion(value: string): string {
