@@ -84,7 +84,7 @@ def test_invalidation_criteria_from_model_data() -> None:
     }
     criteria = service._invalidation_criteria(_company(), valuation)
     assert any("margen de seguridad" in c for c in criteria)
-    assert any("12.0%" in c for c in criteria)
+    assert any("12,0 %" in c for c in criteria)
     assert any("switching_costs" in c for c in criteria)
 
 

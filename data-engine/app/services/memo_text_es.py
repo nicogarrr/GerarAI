@@ -78,3 +78,18 @@ def number_es(value: object, unit: object = None) -> str:
         text = f"{float(number):.3g}"
     text = text.replace(",", "§").replace(".", ",").replace("§", ".")
     return f"{text} {unit}" if unit else text
+
+
+def percent_es(value: float, decimals: int = 1) -> str:
+    """Fracción (-0,649) -> «-64,9 %»: coma decimal y espacio antes del signo."""
+    return f"{value * 100:.{decimals}f}".replace(".", ",") + " %"
+
+
+def money_thesis(value: float, currency: str | None) -> str:
+    """Dólares en escala inglesa («$343.46»); otras divisas en es-ES con su código."""
+    if currency == "USD":
+        return f"${value:,.2f}" if value >= 0 else f"-${abs(value):,.2f}"
+    if currency and len(currency) == 3 and currency.isupper():
+        number = f"{value:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
+        return f"{number} {currency}"
+    return f"{value:,.2f}"

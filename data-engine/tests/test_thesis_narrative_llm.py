@@ -98,11 +98,11 @@ def test_templates_are_correct_by_construction():
     # precio/base (que usaria el denominador equivocado: 215%, no 68%).
     assert FRAGMENTS["valoracion_posicion"] == (
         "Meta Platforms cotiza a 336.56 USD frente a un escenario base de "
-        "106.85 USD (margen de seguridad del -68%)."
+        "106.85 USD (margen de seguridad del -68,0 %)."
     )
     assert FRAGMENTS["expectativas_mercado"] == (
         "Con los supuestos de este DCF inverso, el precio actual exigiría "
-        "un crecimiento de ingresos del 35.0% anual."
+        "un crecimiento de ingresos del 35,0 % anual."
     )
     assert FRAGMENTS["titular_0"] == (
         'TechCrunch publico el 2026-09-25 "Meta presenta Muse, su nuevo modelo". Fuente: URL no disponible.'
@@ -356,8 +356,8 @@ def test_section_templates_titles_and_slots():
     assert sections["lo_que_cambio"]["parrafos"][-1] == FRAGMENTS["caveat_titulares"]
     # Hechos vs interpretacion con el numero como slot.
     assert any(
-        "margen de seguridad del -68% (escenario base/precio - 1" in p
-        and "equivale al 32% del precio actual" in p
+        "margen de seguridad del -68,0 % (escenario base/precio - 1" in p
+        and "equivale al 32 % del precio actual" in p
         for p in sections["lo_que_descuenta"]["parrafos"]
     )
 
@@ -503,5 +503,5 @@ def test_position_fragment_names_expected_value_when_margin_comes_from_it():
     }
     fragments = narrative._fragment_templates(_company(), valuation, NEWS)
     assert "valor esperado de 365.00" in fragments["valoracion_posicion"]
-    assert "margen de seguridad del -31%" in fragments["valoracion_posicion"]
+    assert "margen de seguridad del -31,0 %" in fragments["valoracion_posicion"]
     assert "escenario base" not in fragments["valoracion_posicion"]

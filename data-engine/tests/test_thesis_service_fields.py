@@ -125,7 +125,7 @@ def test_invalidation_criteria_from_model_data():
     criteria = service._invalidation_criteria(_company(), valuation)
     assert len(criteria) == 3
     assert any("200.00" in c for c in criteria)
-    assert any("8.0% anual" in c for c in criteria)
+    assert any("8,0 % anual" in c for c in criteria)
     assert any("switching_costs" in c for c in criteria)
 
 

@@ -26,7 +26,7 @@ from app.services.claim_scope import supersede_claims_of
 from app.services.company_resolver import resolve_company
 from app.services.inferred_input_service import validate as validate_inferred
 from app.services.long_term_model_service import LongTermModelService
-from app.services.memo_text_es import number_es, term_es
+from app.services.memo_text_es import money_thesis, number_es, percent_es, term_es
 from app.services.number_format import format_compact_es
 from app.services.source_auditor import SourceAuditor
 from app.services.source_hierarchy_service import classify_source
@@ -243,16 +243,11 @@ def _code_es(code) -> str:
 
 
 def _thesis_money(value: float, currency: str | None) -> str:
-    if currency == "USD":
-        return f"${value:,.2f}" if value >= 0 else f"-${abs(value):,.2f}"
-    if currency and len(currency) == 3 and currency.isupper():
-        number = f"{value:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
-        return f"{number} {currency}"
-    return f"{value:,.2f}"
+    return money_thesis(value, currency)
 
 
 def _thesis_percent(value: float) -> str:
-    return f"{value * 100:.1f}".replace(".", ",") + " %"
+    return percent_es(value)
 
 
 def _pct_es(value: object) -> str:
@@ -860,7 +855,7 @@ class ThesisService:
         if required_growth is not None:
             criteria.append(
                 f"Los ingresos reales se desvian de forma persistente del "
-                f"{required_growth:.1%} anual que exige el reverse DCF."
+                f"{percent_es(required_growth)} anual que exige el reverse DCF."
             )
         moat = valuation.get("moat") or {}
         declining = [
@@ -1231,7 +1226,7 @@ class ThesisService:
         price = valuation.get("current_price")
         mos = valuation.get("margin_of_safety")
         price_txt = f"{price:.2f}" if price is not None else "N/D (sin precio de mercado)"
-        mos_txt = f"{mos:.1%}" if mos is not None else "N/D (requiere precio de mercado)"
+        mos_txt = percent_es(mos) if mos is not None else "N/D (requiere precio de mercado)"
 
         def fmt(v):
             return f"{v:.2f}" if v is not None else "N/D"
@@ -1512,7 +1507,7 @@ class ThesisService:
         reverse = valuation.get("reverse_dcf") or {}
         required_growth = reverse.get("required_revenue_growth")
         reverse_line = (
-            f"Crecimiento de ingresos requerido: {required_growth:.1%}"
+            f"Crecimiento de ingresos requerido: {percent_es(required_growth)}"
             if required_growth is not None
             else "DCF inverso no disponible (falta el precio de mercado o inputs de valoración)."
         )
@@ -1536,7 +1531,7 @@ class ThesisService:
         )
         probabilities_line = (
             "Probabilidades (modelo): "
-            + " · ".join(f"{name} {prob:.0%}" for name, prob in scenario_probabilities.items())
+            + " · ".join(f"{name} {percent_es(prob, 0)}" for name, prob in scenario_probabilities.items())
             if scenario_probabilities
             else "Probabilidades: pendiente (el modelo no las ha persistido)."
         )
