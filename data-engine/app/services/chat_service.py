@@ -569,11 +569,15 @@ class ChatService:
         Solo lo guardado (cantidad, coste medio, valor y fecha). Sin posiciones
         devuelve None y la pregunta sigue por la ruta de siempre.
         """
+        # TenantOwnedMixin no filtra solo: sin tenant valido no se lee ninguna cartera.
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return None
         rows = list(
             db.execute(
                 select(Position, Company)
                 .join(Company, Company.id == Position.company_id)
-                .where(Position.quantity > 0)
+                .where(Position.quantity > 0, Position.tenant_id == tenant_id)
             ).all()
         )
         if not rows:
@@ -586,21 +590,30 @@ class ChatService:
         rows.sort(key=lambda row: _value(row[0]), reverse=True)
         total = sum(_value(pos) for pos, _ in rows)
         as_of = max(pos.as_of for pos, _ in rows)
+        bases = {pos.base_currency or "EUR" for pos, _ in rows}
+        mixed = len(bases) > 1
         base = rows[0][0].base_currency or "EUR"
         lines = []
         sources = []
         for pos, comp in rows[:limit]:
-            weight = f" ({_fmt_number_es(_value(pos) / total * 100, 1)} %)" if total > 0 else ""
+            weight = (
+                f" ({_fmt_number_es(_value(pos) / total * 100, 1)} %)" if total > 0 and not mixed else ""
+            )
             lines.append(
                 f"- {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
                 f"coste medio {_fmt_number_es(float(pos.average_cost), 2)} {pos.currency}, "
-                f"valor {_fmt_number_es(_value(pos), 2)} {base}{weight}"
+                f"valor {_fmt_number_es(_value(pos), 2)} {pos.base_currency or 'EUR'}{weight}"
             )
             sources.append(self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of)))
         extra = f"\n(Se muestran las {limit} mayores de {len(rows)}.)" if len(rows) > limit else ""
+        total_text = (
+            "monedas base distintas, sin total"
+            if mixed
+            else f"valor total {_fmt_number_es(total, 2)} {base}"
+        )
         answer = (
-            f"Tu cartera guardada tiene {len(rows)} posiciones abiertas, valor total "
-            f"{_fmt_number_es(total, 2)} {base}, con datos a {_fmt_date_es(as_of.isoformat())}:\n"
+            f"Tu cartera guardada tiene {len(rows)} posiciones abiertas, {total_text}, "
+            f"con datos a {_fmt_date_es(as_of.isoformat())}:\n"
             + "\n".join(lines)
             + extra
             + "\n\nSon los datos guardados en la app, no una recomendación. "
