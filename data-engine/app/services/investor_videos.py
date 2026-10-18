@@ -12,13 +12,18 @@ import httpx
 _CHANNEL = re.compile(r"UC[A-Za-z0-9_-]{22}\Z")
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)\Z")
 _VIDEO = re.compile(r"[A-Za-z0-9_-]{11}\Z")
+_LETTER = re.compile(r"[\w\u00c0-\u024f]")
 _ATOM = "{http://www.w3.org/2005/Atom}"
 _YT = "{http://www.youtube.com/xml/schemas/2015}"
-# Canal de archivo de referencia de channels.ts, no canal personal de Buffett.
-# El nombre sale del RSS; no se atribuye su propiedad a CNBC sin prueba.
+# Canales confirmados en el directorio verificado de channels.ts
+# (VERIFIED_PICK 2026-10-11) o canal de archivo de referencia, nunca canal
+# personal inferido. El nombre sale del RSS; no se atribuye su propiedad sin prueba.
 CHANNELS: dict[str, tuple[str, str]] = {
     "buffett": ("UCyMGOTSE13Uf9Big_Ppj8Wg", "archive"),
+    "pabrai": ("UCw-OcYmKtk7ut-Ay7hIBaWg", "personal_confirmed"),
+    "terry-smith": ("UCEW0yRVs0CbqT9CrP8i3mSQ", "firm_confirmed"),
 }
+_KINDS = ("personal_confirmed", "firm_confirmed", "archive")
 _CACHE: dict[str, tuple[float, list[dict[str, str]]]] = {}
 _LOCK = Lock()
 TTL_SECONDS = 3600
@@ -26,7 +31,7 @@ MAX_BYTES = 256_000
 
 
 def parse_feed(content: bytes, channel_id: str, channel_kind: str) -> list[dict[str, str]]:
-    if not _CHANNEL.fullmatch(channel_id) or channel_kind not in ("personal_confirmed", "archive"):
+    if not _CHANNEL.fullmatch(channel_id) or channel_kind not in _KINDS:
         return []
     if len(content) > MAX_BYTES:
         return []
@@ -45,7 +50,13 @@ def parse_feed(content: bytes, channel_id: str, channel_kind: str) -> list[dict[
         root = ET.fromstring(text)
     except ET.ParseError:
         return []
-    if root.tag != _ATOM + "feed" or root.findtext(_YT + "channelId") != channel_id:
+    if root.tag != _ATOM + "feed":
+        return []
+    # YouTube sirve el channelId del feed a veces sin el prefijo "UC"
+    # (p. ej. "yMGOTSE..." para "UCyMGOTSE..."); las entradas siempre lo llevan
+    # y se verifican de forma exacta una a una mas abajo.
+    feed_channel = root.findtext(_YT + "channelId") or ""
+    if feed_channel != channel_id and channel_id != "UC" + feed_channel:
         return []
     name = (root.findtext(_ATOM + "title") or "").strip()
     if not name:
@@ -56,7 +67,9 @@ def parse_feed(content: bytes, channel_id: str, channel_kind: str) -> list[dict[
         vid = entry.findtext(_YT + "videoId") or ""
         title = (entry.findtext(_ATOM + "title") or "").strip()
         published = entry.findtext(_ATOM + "published") or ""
-        if not _VIDEO.fullmatch(vid) or not title or vid in seen or not _DATE.fullmatch(published):
+        # Titulos sin ninguna letra ni cifra (p. ej. shorts titulados solo con
+        # un emoji) no dicen nada al lector: se descartan, no se maquillan.
+        if not _VIDEO.fullmatch(vid) or not title or not _LETTER.search(title) or vid in seen or not _DATE.fullmatch(published):
             continue
         if entry.findtext(_YT + "channelId") != channel_id:
             continue
