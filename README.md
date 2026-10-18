@@ -123,10 +123,10 @@ npm run generate:openapi
 git diff --exit-code -- data-engine/openapi.json lib/research/openapi.generated.ts
 ```
 
-El CI ejecuta 11 jobs: calidad frontend, auth-store, calidad backend, evals de
-calidad (RAG, valoración, capas LLM e ingesta), drift OpenAPI, migraciones
-Postgres, smoke ARM64, auditoría supply-chain y e2e (API + navegador), más un
-workflow aparte de cobertura.
+El CI ejecuta 12 jobs: paridad de dependencias, calidad frontend, auth-store,
+calidad backend, evals de calidad (RAG, valoración, capas LLM e ingesta), drift
+OpenAPI, migraciones Postgres, smoke ARM64, auditoría supply-chain, e2e (API +
+navegador) y una puerta final agregada, más un workflow aparte de cobertura.
 
 ### Evals de calidad (FASE C)
 
@@ -176,12 +176,12 @@ app/(root)/          páginas: research, screener, watchlist, portfolio,
 components/          UI (shadcn/Radix + Tailwind oscuro)
 lib/actions/         server actions · lib/research/  cliente firmado
 data-engine/
-  app/api/routes/    30 routers bajo /api
+  app/api/routes/    51 routers bajo /api
   app/services/      ingesta, tesis, debate, insider, RAG, alertas…
   app/valuation/     motores + guardia point-in-time
   app/llm/           factory OpenCode Go + cliente Jev
-  alembic/versions/  migraciones 0001→0030 (lineales, con downgrade)
-  tests/             1000+ tests herméticos (1018 funciones test a 2026-09-23) · evals/  evals financieras
+  alembic/versions/  migraciones 0001→0060 (lineales, con downgrade)
+  tests/             4600+ tests herméticos (4681 funciones test a 2026-10-18) · evals/  evals financieras
 e2e/                 specs Playwright del flujo inversor
 docs/                PRODUCT_VISION, runbooks, privacidad
 ```
@@ -205,4 +205,4 @@ Ver [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) y la propia app en
 
 ## Licencia
 
-Copyright 2025 Nicolás Iglesias García. Todos los derechos reservados.
+Copyright 2025 Nicolás Iglesias García. Publicado bajo la licencia GNU AGPL-3.0; ver [LICENSE](LICENSE).
