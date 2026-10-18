@@ -42,7 +42,7 @@ def test_thesis_debate_sync_work_off_the_event_loop(monkeypatch):
                             or __import__("types").SimpleNamespace(id=None, ticker=ticker)),
     )
 
-    async def fake_debate(ticker, markdown):  # noqa: ARG001
+    async def fake_debate(ticker, markdown, **_kw):  # noqa: ARG001
         return {
             "ticker": ticker, "bull_case": "b", "bear_case": "s",
             "verdict": "hold", "verdict_rationale": "r", "llm_calls": 2,
