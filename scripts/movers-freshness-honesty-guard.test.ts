@@ -13,9 +13,9 @@ test('movers declara frescura por fila: fecha del precio + hora de registro, sin
     // (updated_at de MarketPrice, hora de observacion/registro) y la UI la
     // muestra junto a la fecha, siempre - no solo cuando la fecha difiere.
     assert.doesNotMatch(page, /Datos del \$\{movers\.as_of\}\./);
-    assert.match(page, /del \{row\.date\}/);
+    assert.match(page, /del \{formatMarketDate\(row\.date\)\}/);
     assert.match(page, /formatUserDateTime\(row\.registered_at/);
-    assert.match(page, /la hora en que se registró/);
+    assert.match(page, /Registro:.*formatUserDateTime/);
     assert.match(market, /MarketPrice\.updated_at/);
     assert.match(market, /"registered_at": registered\.isoformat\(\) if registered else None/);
     assert.match(actions, /registered_at\?: string \| null/);
