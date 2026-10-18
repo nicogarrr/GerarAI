@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -8,6 +10,16 @@ from typing import Any
 
 from app.core.config import get_settings
 from app.services.tracing import sanitize_metadata
+
+_ERROR_CLASS = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,79}$")
+
+
+def _safe_status_message(error: str | None) -> str | None:
+    """Only an exception class name may leave the process; free text may carry
+    prompts, keys or user data, so anything else collapses to a generic marker."""
+    if not error:
+        return None
+    return error if _ERROR_CLASS.match(error) else "error"
 
 
 @dataclass
@@ -74,7 +86,7 @@ class LangfuseTracer:
                         metadata=sanitize_metadata(handle.metadata),
                         output=_remote_output(handle.output),
                         level="ERROR" if handle.error else "DEFAULT",
-                        status_message=handle.error,
+                        status_message=_safe_status_message(handle.error),
                     )
                     remote_trace.end()
                     client.flush()
