@@ -264,9 +264,15 @@ def thesis_history(ticker: str, db: Session = Depends(get_db)) -> dict:
             select(ThesisVersion)
             .where(ThesisVersion.company_id == company.id)
             .order_by(desc(ThesisVersion.version))
-            .limit(50)
+            .limit(51)
         ).all()
     )
+    # La version 51 solo sirve de anterior para derivar el diff de la 50.
+    previous_by_id = {
+        version.id: versions[index + 1] if index + 1 < len(versions) else None
+        for index, version in enumerate(versions)
+    }
+    versions = versions[:50]
     diffs = {
         diff.to_version_id: diff
         for diff in db.scalars(
@@ -295,7 +301,7 @@ def thesis_history(ticker: str, db: Session = Depends(get_db)) -> dict:
                         "created_at": diff.created_at.isoformat(),
                     }
                     if diff
-                    else None
+                    else derived_thesis_diff(previous_by_id.get(version.id), version)
                 ),
             }
         )
@@ -311,6 +317,52 @@ def thesis_history(ticker: str, db: Session = Depends(get_db)) -> dict:
             coverage=Coverage.OK if versions else Coverage.UNAVAILABLE,
             note="Historial calculado desde versiones y diffs persistidos; sin actores inventados.",
         ),
+    }
+
+
+def _pct_change(old, new) -> float | None:
+    if old in (None, 0) or new is None:
+        return None
+    return (float(new) - float(old)) / abs(float(old)) * 100
+
+
+def derived_thesis_diff(previous, current) -> dict | None:
+    """Diff determinista entre dos versiones consecutivas (nada lo persiste hoy).
+
+    Solo compara campos guardados: calificacion, escenarios y puntuaciones. Sin
+    version anterior no hay diff (primera version)."""
+    if previous is None:
+        return None
+    parts: list[str] = []
+    rating_changed = previous.rating != current.rating
+    if rating_changed:
+        parts.append("cambia la calificación")
+    for label, old, new in (
+        ("bajista", previous.bear_value, current.bear_value),
+        ("base", previous.base_value, current.base_value),
+        ("alcista", previous.bull_value, current.bull_value),
+    ):
+        change = _pct_change(old, new)
+        if change is not None and abs(change) >= 0.5:
+            parts.append(f"escenario {label} {change:+.1f} %".replace(".", ","))
+    for label, old, new in (
+        ("confianza de datos", previous.data_confidence_score, current.data_confidence_score),
+        ("cobertura de fuentes", previous.source_coverage_score, current.source_coverage_score),
+        ("red team", previous.red_team_score, current.red_team_score),
+    ):
+        if old != new:
+            parts.append(f"{label} {old} → {new}")
+    summary = (
+        "Cambios frente a la versión anterior: " + "; ".join(parts) + "."
+        if parts
+        else "Sin cambios materiales (±0,5 %) en calificación, escenarios ni puntuaciones frente a la versión anterior."
+    )
+    return {
+        "change_summary": summary,
+        "affected_assumptions": [],
+        "rating_changed": rating_changed,
+        "created_at": current.created_at.isoformat(),
+        "derived": True,
     }
 
 
