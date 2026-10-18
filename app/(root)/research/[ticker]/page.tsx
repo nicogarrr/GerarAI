@@ -1336,22 +1336,21 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     if (chatPromise) {
       try {
         response = await chatPromise;
-      } catch (error) {
-        if (isBackendUnavailableError(error)) {
-          return <BackendOffline feature={`Chat de ${ticker}`} retryHref={`/research/${ticker}?view=chat`} />;
-        }
+      } catch {
+        // Chat caído o lento: se conservan la página y el campo (la pantalla de offline
+        // los tapaba); el aviso va dentro del panel.
         chatFailed = true;
       }
     }
     content = (
-      <div className="space-y-6">
+      <div className="space-y-6" id="chat-empresa" style={{ scrollMarginTop: '1rem' }}>
         <Panel title="Chat de la empresa con fuentes">
           {/* Asistente por intención (WorldStocks punto 4): atajos que lanzan
               una pregunta guiada por el MISMO contrato de evidencia
               determinista de abajo. No añaden respuestas nuevas ni texto
               generado: solo formulan la pregunta. */}
           <ChatIntentLinks ticker={ticker} />
-          <form className="flex flex-col gap-3 sm:flex-row" method="get"><input type="hidden" name="view" value="chat" /><Input name="chat" defaultValue={query.chat} placeholder={`Pregunta sobre ${ticker} citando fuentes`} minLength={3} required className="h-11 text-base sm:h-9 sm:text-sm" /><Button type="submit" className="min-h-[44px] sm:min-h-0"><Search className="mr-2 h-4 w-4" />Preguntar</Button></form>
+          <form action={`/research/${encodeURIComponent(ticker)}#chat-empresa`} className="flex flex-col gap-3 sm:flex-row" method="get"><input type="hidden" name="view" value="chat" /><Input name="chat" defaultValue={query.chat} placeholder={`Pregunta sobre ${ticker} citando fuentes`} minLength={3} required className="h-11 text-base sm:h-9 sm:text-sm" /><Button type="submit" className="min-h-[44px] sm:min-h-0"><Search className="mr-2 h-4 w-4" />Preguntar</Button></form>
         </Panel>
         {response ? (
           <Panel title="Respuesta">

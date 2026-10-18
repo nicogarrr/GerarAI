@@ -36,4 +36,14 @@ describe('chat de la ficha: asistente por intención', () => {
         assert.match(page, /<Input name="chat"/);
         assert.match(page, /<input type="hidden" name="view" value="chat" \/>/);
     });
+    it('al enviar, el navegador vuelve al panel del chat y los atajos también', () => {
+        assert.match(chatIntentHref('AAPL', CHAT_INTENTS[0]), /#chat-empresa$/);
+        assert.match(page, /id="chat-empresa"/);
+        assert.match(page, /action=\{`\/research\/\$\{encodeURIComponent\(ticker\)\}#chat-empresa`\}/);
+    });
+    it('un fallo del chat no tapa la página con BackendOffline: aviso dentro del panel y campo visible', () => {
+        const chatBlock = page.slice(page.indexOf('let chatFailed = false;'), page.indexOf('content = (', page.indexOf('let chatFailed = false;')));
+        assert.ok(!chatBlock.includes('BackendOffline'));
+        assert.match(chatBlock, /chatFailed = true/);
+    });
 });
