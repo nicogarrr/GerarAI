@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { CapitalFact, ShareCapital } from '@/lib/actions/share-capital.actions';
+import { formatCompact, formatNumber } from '@/lib/format';
 import { Panel } from '@/components/ui/panel';
 import { Stat } from '@/components/ui/stat';
 
-const compact = (value: number) => new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(value);
-const percent = (value: number | null) => value == null ? 'N/D' : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
+const compact = (value: number) => formatCompact(value);
+const percent = (value: number | null) => value == null ? 'N/D' : `${value > 0 ? '+' : ''}${formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 function Source({ fact }: { fact: CapitalFact }) {
   return <a href={fact.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-300">{fact.source} · {fact.date}{fact.reported_on ? ` · Presentado ${fact.reported_on}` : ''}</a>;
 }
