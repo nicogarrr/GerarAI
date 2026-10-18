@@ -128,7 +128,7 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                                     ) : null}
                                 </>
                             ) : (
-                                <span className="text-xs text-warn">No valorable</span>
+                                <span className="text-xs text-warn">No valorable: falta evidencia</span>
                             )}
                             {pending ? <span className="text-xs text-gray-500">{pending}</span> : null}
                         </>
