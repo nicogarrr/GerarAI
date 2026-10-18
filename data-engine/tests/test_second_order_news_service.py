@@ -438,3 +438,72 @@ def test_generated_display_title_is_not_treated_as_source_claim():
         result = service.analyze_second_order(db, event)
     assert "ASTS ITU filing submitted" in result["source_claim"]
     assert "Company update" not in result["source_claim"]
+
+
+def test_specific_indirect_candidates_are_unique_and_exclude_subject(monkeypatch):
+    engine = create_engine('sqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.info['tenant_id'] = 1
+        subject = Company(ticker='ASTS',name='AST SpaceMobile',exchange='NASDAQ',company_type='operating',valuation_model='unassigned',industry='Satellite Communications',factor_tags=['speculative','pre_fcf','Satellite Communications'])
+        peer = Company(ticker='PEER',name='Satellite peer',exchange='NASDAQ',company_type='operating',valuation_model='unassigned',industry='Satellite Communications',factor_tags=['Satellite Communications','Copper'])
+        noise = Company(ticker='BIO',name='Unrelated biotech',exchange='NASDAQ',company_type='operating',valuation_model='unassigned',industry='Biotechnology',factor_tags=['speculative','pre_fcf'])
+        db.add_all([subject,peer,noise]);db.flush()
+        event = NewsEvent(company_id=subject.id,title='Satellite news',summary='',source='test')
+        db.add(event);db.commit()
+        chain = [service.CausalStep(cause='Source claim',effect='Possible economic consequence')]
+        monkeypatch.setattr(service,'_fallback',lambda _:service.Extraction(themes=[service.Theme(exposure=exposure,direction='incierta',chain=chain) for exposure in ['speculative','pre_fcf','Satellite Communications','Copper','Satellite Communications']]))
+        monkeypatch.setattr(service,'_jev_marker',lambda _:dict(direction=None,confidence=None,backend=None))
+        result=service.analyze_second_order(db,event)
+        assert [row['ticker'] for row in result['candidates']]==['PEER']
+        assert all(row['status']=='hipótesis_no_verificada' and row['reason'] for row in result['candidates'])
+        assert result['source_verified'] is False
+        assert not db.new and not db.dirty
+        context=service._company_context(db,subject.id,1)
+        assert 'speculative' not in context and 'pre_fcf' not in context
+
+
+def test_generic_exposures_cannot_be_only_matching_reason():
+    for tag in ['speculative','PRE_FCF','pre-fcf','pre_revenue','growth','high_beta']:
+        assert service._specific_exposure(tag) is False
+    assert service._specific_exposure('Property & Casualty Insurance') is True
+    assert service._specific_exposure('Satellite Communications') is True
+
+
+def test_real_public_headlines_local_replay_preserves_indirect_hypotheses(monkeypatch):
+    # Actual public headlines, not asserted to be stored NewsEvent IDs or verified claims.
+    # https://www.streetinsider.com/Reuters/Honda+plans+highway+test+of+wireless+charging+for+moving+trucks/27144605.html
+    # https://electrek.co/2026/10/12/electric-trucks-meet-hydro-power-at-one-of-canadas-busiest-ports/
+    db = _company_db(_mk_company('GRID', industry='Electric Utilities'),
+                     _mk_company('OIL', industry='Oil & Gas'),
+                     _mk_company('BIO', industry='Biotechnology', tags=['speculative','pre_fcf']))
+    monkeypatch.setattr(service, '_jev_marker', lambda _:dict(direction=None,confidence=None,backend=None))
+    try:
+        for title, summary, source in [
+            ('Honda plans highway test of wireless charging for moving trucks',
+             'Honda developed technology that can wirelessly charge electric trucks while being driven.', 'Reuters via StreetInsider'),
+            ("Electric trucks meet hydro power at one of Canada's busiest ports", '', 'Electrek'),
+        ]:
+            event = NewsEvent(title=title,summary=summary,source=source)
+            db.add(event);db.commit()
+            result = service.analyze_second_order(db,event)
+            assert {row['ticker'] for row in result['candidates']} == {'GRID','OIL'}
+            assert all(row['status']=='hipótesis_no_verificada' for row in result['candidates'])
+            assert not db.new and not db.dirty
+    finally:
+        db.close()
+
+
+def test_duplicate_themes_do_not_consume_unique_candidate_limit(monkeypatch):
+    db = _company_db(*[_mk_company(f'CO{i:02}',industry='Electric Utilities') for i in range(15)])
+    try:
+        event = NewsEvent(title='Electric trucks',source='test')
+        db.add(event);db.commit()
+        theme=service.Theme(exposure='Electric Utilities',direction='incierta',chain=[service.CausalStep(cause='Source claim',effect='Possible effect')])
+        monkeypatch.setattr(service,'_fallback',lambda _:service.Extraction(themes=[theme,theme,theme]))
+        monkeypatch.setattr(service,'_jev_marker',lambda _:dict(direction=None,confidence=None,backend=None))
+        result=service.analyze_second_order(db,event)
+        tickers=[row['ticker'] for row in result['candidates']]
+        assert len(tickers)==len(set(tickers))==service.CANDIDATE_LIMIT==10
+    finally:
+        db.close()
