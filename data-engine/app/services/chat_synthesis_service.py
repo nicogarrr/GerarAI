@@ -449,6 +449,27 @@ _HISTORY_TURN_CHARS = 400
 _HISTORY_TOTAL_CHARS = 1600
 
 
+# Fragmentos de las respuestas deterministas con datos privados de cartera
+# (recuento, ranking de coste/valor, posicion por ticker, patrimonio): esos
+# turnos no viajan al generador libre.
+PRIVATE_PORTFOLIO_MARKERS = (
+    "posiciones abiertas",
+    "posición guardada",
+    "posicion guardada",
+    "cartera guardada",
+    "la posición con el",
+    "la posicion con el",
+    "valor de tus posiciones",
+    "datos guardados en la app",
+    "patrimonio neto",
+)
+
+
+def is_private_portfolio_turn(text: str) -> bool:
+    lowered = (text or "").lower()
+    return any(marker in lowered for marker in PRIVATE_PORTFOLIO_MARKERS)
+
+
 def _history_for_prompt(history: list[Any] | None) -> list[dict[str, str]]:
     """Últimos turnos con tope de tamaño para el generador libre.
 
@@ -463,7 +484,7 @@ def _history_for_prompt(history: list[Any] | None) -> list[dict[str, str]]:
         text = " ".join((getattr(turn, "content", "") or "").split())
         if role not in ("user", "assistant") or not text:
             continue
-        if role == "assistant" and "posiciones abiertas" in text:
+        if role == "assistant" and is_private_portfolio_turn(text):
             continue
         text = text[:_HISTORY_TURN_CHARS]
         if total + len(text) > _HISTORY_TOTAL_CHARS:

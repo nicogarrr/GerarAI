@@ -19,3 +19,17 @@ def test_history_total_is_capped_and_empty_is_empty():
     history = [ChatTurn(role="user", content="y" * 1000) for _ in range(8)]
     assert sum(len(t["content"]) for t in _history_for_prompt(history)) <= 1600
     assert _history_for_prompt(None) == []
+
+
+def test_ranking_and_ticker_position_answers_do_not_reach_the_general_llm():
+    history = [
+        ChatTurn(role="user", content="¿Cuál tiene el coste medio más alto?"),
+        ChatTurn(role="assistant", content="La posición con el coste medio más alto es ASTS: 61,20 USD."),
+        ChatTurn(role="assistant", content="Tu posición guardada en ASTS: 318 acciones, coste medio 55,10 USD, valor 16.000 EUR."),
+        ChatTurn(role="assistant", content="Patrimonio neto: 6.630,17 EUR (datos guardados en la app)."),
+        ChatTurn(role="user", content="¿Qué es el margen de seguridad?"),
+    ]
+    kept = _history_for_prompt(history)
+    assert [t["role"] for t in kept] == ["user", "user"]
+    joined = " ".join(t["content"] for t in kept)
+    assert "ASTS" not in joined and "61,20" not in joined and "6.630" not in joined
