@@ -622,7 +622,7 @@ class ChatSynthesisService:
                     "insufficient_data": insufficient,
                     "citation_verification": True,
                 }
-                await self._maybe_attach_debate(baseline, ticker, enable_debate)
+                await self._maybe_attach_debate(baseline, ticker, enable_debate, db=db)
                 return baseline
             except Exception as exc:
                 # The deterministic response is the safe product contract and fallback.
@@ -913,6 +913,7 @@ class ChatSynthesisService:
         baseline: ChatResponse,
         ticker: str | None,
         enable_debate: bool | None,
+        db: Any | None = None,
     ) -> None:
         """Enganche opcional del debate bull/bear. Nunca rompe el flujo."""
         if not ticker or not self._debate_enabled(enable_debate):
@@ -952,7 +953,7 @@ class ChatSynthesisService:
 
             baseline.llm_trace["thesis_debate"] = await debate_thesis(
                 ticker, baseline.answer, provider=self.provider,
-                skip_jev_gate=True,
+                skip_jev_gate=True, db=db,
             )
         except Exception:
             pass

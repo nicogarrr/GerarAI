@@ -390,6 +390,7 @@ async def debate_thesis_endpoint(ticker: str, db: Session = Depends(get_db)) -> 
         result = await debate_thesis(
             company.ticker,
             thesis.thesis_markdown or thesis.executive_summary or "",
+            db=db,
         )
     except Exception:  # noqa: BLE001 — sin provider LLM: veredicto determinista
         from app.services.thesis_debate_service import _deterministic_verdict

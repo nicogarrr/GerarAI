@@ -17,6 +17,7 @@ from typing import Any
 
 from app.llm import LLMRequest, LLMResponse, Message
 from app.llm.base import LLMProvider
+from app.services.budget import BudgetController, BudgetExceededError
 from app.services.jev_gates import (
     DEBATE_VERDICT_CRITERIA,
     DEBATE_VERDICT_INSTRUCTIONS,
@@ -86,6 +87,13 @@ def _resolve_provider(provider: LLMProvider | None) -> LLMProvider:
     return create_llm_provider()
 
 
+def _record_spend(budget: BudgetController, db: Any, resp: LLMResponse, workflow: str) -> None:
+    model = getattr(resp, "model", None) or "unknown"
+    usage = resp.usage
+    cost = budget.estimate_cost_eur(model, usage.input_tokens, usage.output_tokens)
+    budget.record(db, model, workflow, cost, usage.total_tokens)
+
+
 async def _complete_text(
     provider: LLMProvider,
     *,
@@ -95,7 +103,13 @@ async def _complete_text(
     max_tokens: int,
     temperature: float,
     calls: list[int] | None = None,
+    db: Any | None = None,
 ) -> tuple[str, LLMResponse | None]:
+    budget = BudgetController() if db is not None else None
+    # Cada llamada del debate gasta presupuesto del tenant: sin saldo no hay
+    # llamada (el llamador ya degrada a la salida determinista).
+    if budget is not None and not budget.can_spend(db, 0.02):
+        raise BudgetExceededError("LLM budget exhausted")
     request = LLMRequest(
         messages=[Message("system", system), Message("user", user)],
         task=task,
@@ -109,6 +123,8 @@ async def _complete_text(
         # llm_calls cuenta TODAS las llamadas reales, tambien reintento y rechazo.
         if calls is not None:
             calls[0] += 1
+        if budget is not None:
+            _record_spend(budget, db, _resp, f"thesis_debate.{task}")
 
     guarded = await complete_guarded(
         provider, request, source=f"thesis_debate.{task}", on_response=_tally
@@ -173,6 +189,7 @@ async def debate_thesis(
     portfolio_weight: float = 0.0,
     use_jev: bool = True,
     skip_jev_gate: bool = False,
+    db: Any | None = None,
 ) -> dict[str, Any]:
     """Debate bull -> bear -> veredicto. Nunca lanza excepcion.
 
@@ -239,6 +256,7 @@ async def debate_thesis(
             max_tokens=4000,
             temperature=0.3,
             calls=calls_box,
+            db=db,
         )
         model = model or resp.model
     except Exception:
@@ -257,6 +275,7 @@ async def debate_thesis(
             max_tokens=4000,
             temperature=0.3,
             calls=calls_box,
+            db=db,
         )
         model = model or resp.model
     except Exception:
@@ -296,6 +315,7 @@ async def debate_thesis(
                 max_tokens=2000,
                 temperature=0.1,
                 calls=calls_box,
+                db=db,
             )
             model = model or resp.model
             match = re.search(r"(bullish|bearish|neutral)", judge_text.lower())
@@ -351,6 +371,7 @@ async def risk_lenses(
     provider: LLMProvider | None = None,
     materiality_score: int = 0,
     portfolio_weight: float = 0.0,
+    db: Any | None = None,
 ) -> dict[str, Any]:
     """Tres lentes de riesgo sobre un analisis. Nunca lanza excepcion.
 
@@ -368,7 +389,12 @@ async def risk_lenses(
             temperature=0.2,
             max_tokens=4000,
         )
+        budget = BudgetController() if db is not None else None
+        if budget is not None and not budget.can_spend(db, 0.02):
+            raise BudgetExceededError("LLM budget exhausted")
         response = await llm.complete(request)
+        if budget is not None:
+            _record_spend(budget, db, response, "thesis_risk_lenses")
         text = (response.text or "").strip()
         if not text:
             raise ValueError("empty LLM response")

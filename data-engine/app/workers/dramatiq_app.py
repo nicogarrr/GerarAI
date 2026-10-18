@@ -850,7 +850,8 @@ def extract_knowledge_principles(
             )
         )
         principle_ids = [principle.id for principle in result.pop("principles")]
-        job.status = "completed"
+        # Un corte por presupuesto no es un exito completo: "partial".
+        job.status = "partial" if result.get("budget_stopped") else "completed"
         job.result = {**result, "principle_ids": principle_ids}
         job.completed_at = datetime.now(UTC)
         db.commit()

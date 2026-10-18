@@ -228,3 +228,15 @@ def test_estimate_cost_eur_scales_with_input_size():
     cheap = BudgetController.estimate_cost_eur("x", 100, 100)
     pricey = BudgetController.estimate_cost_eur("x", 100_000, 100)
     assert pricey > cheap * 10
+
+
+def test_knowledge_principles_budget_cut_is_reported_as_partial():
+    import inspect
+
+    from app.services.knowledge_library_service import KnowledgeLibraryService
+    from app.workers import dramatiq_app
+
+    service_source = inspect.getsource(KnowledgeLibraryService.extract_principle_batches)
+    assert "budget_stopped" in service_source and "batches_processed" in service_source
+    worker_source = inspect.getsource(dramatiq_app)
+    assert '"partial" if result.get("budget_stopped")' in worker_source
