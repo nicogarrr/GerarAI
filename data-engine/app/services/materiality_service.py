@@ -39,7 +39,11 @@ ASSUMPTIONS_BY_EVENT_TYPE = {
 }
 
 POSITIVE_TERMS = ["beat", "approval", "award", "buyback", "raise", "record", "accelerate"]
-NEGATIVE_TERMS = ["miss", "cut", "delay", "offering", "investigation", "default", "halt", "fraud"]
+NEGATIVE_TERMS = [
+    "miss", "cut", "delay", "offering", "investigation", "default", "halt", "fraud",
+    "priced for perfection", "overvalued", "downgrade", "valuation concern",
+    "valuation risk", "stretched valuation", "sell-off", "selloff", "plunge", "lawsuit",
+]
 CRITICAL_TERMS = ["bankruptcy", "fraud", "halt", "default"]
 
 def _fold(text: str) -> str:
@@ -133,7 +137,7 @@ class MaterialityService:
         if "dilution" in matched_types:
             materiality += 2
             reasons.append("dilution +2")
-        if any(word in lower_text for word in CRITICAL_TERMS):
+        if any(_has_term(lower_text, word) for word in CRITICAL_TERMS):
             materiality = max(materiality, 10)
             reasons.append("critical_term => 10")
         if company and ("pre_fcf" in company.factor_tags or "speculative" in company.factor_tags):
@@ -211,9 +215,14 @@ class MaterialityService:
         return sorted(set(assumptions))
 
     def _impact_direction(self, lower_text: str) -> str:
-        if any(word in lower_text for word in POSITIVE_TERMS):
+        # Palabra completa: "cut" no casa en "execute" ni "raise" en "praise".
+        positive = any(_has_term(lower_text, word) for word in POSITIVE_TERMS)
+        negative = any(_has_term(lower_text, word) for word in NEGATIVE_TERMS)
+        if positive and negative:
+            return "mixed"
+        if positive:
             return "positive"
-        if any(word in lower_text for word in NEGATIVE_TERMS):
+        if negative:
             return "negative"
         return "neutral"
 
