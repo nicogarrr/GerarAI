@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.llm.base import LLMProvider
 from app.llm.chat_provider import create_chat_llm_provider
 from app.models import (
+    CashBalance,
     Claim,
     Company,
     Document,
@@ -29,6 +30,7 @@ from app.services.claim_scope import live_claims
 from app.services.company_resolver import resolve_company
 from app.services.library_context import retrieve_library_context
 from app.services.memory_service import MemoryService, remember_note
+from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.source_hierarchy_service import source_tier_key
 
 # Los nombres son los que persiste la ingesta (financial_ingestion_service):
@@ -66,6 +68,12 @@ def _fmt_number_es(number: float, digits: int = 2) -> str:
     """1.234.567,89 al estilo es-ES (puntos de miles, coma decimal)."""
     text = f"{number:,.{digits}f}".rstrip("0").rstrip(".")
     return text.replace(",", "").replace(".", ",").replace("", ".")
+
+
+def _fmt_money_es(number: float, digits: int = 2) -> str:
+    """Importe con decimales fijos en es-ES: 7.933,60 (no se recortan ceros)."""
+    text = f"{number:,.{digits}f}"
+    return text.replace(",", " ").replace(".", ",").replace(" ", ".")
 
 
 def _fmt_value_es(value: float | None, unit: str | None) -> str:
@@ -230,6 +238,24 @@ _PORTFOLIO_SELF_RE = re.compile(
     r"|\bmy\s+(?:portfolio|positions|holdings)\b"
 )
 _ORDER_VERB_RE = re.compile(r"(?i)\b(compra|compro|comprar|vende|vendo|vender|ejecuta|buy|sell)\b")
+# Preguntas de cartera sin la formula "mi cartera": recuento, peso, valor o
+# patrimonio. Se responden con los datos guardados del tenant, nunca con una
+# orden ni con una recomendacion.
+_PORTFOLIO_QUERY_RE = re.compile(
+    r"(?i)\b(?:cu[aá]ntas\s+posiciones|posiciones\s+(?:abiertas\s+)?tengo|"
+    r"qu[eé]\s+posici[oó]n\s+pesa|patrimonio(?:\s+neto)?|"
+    r"valor\s+(?:total\s+)?de\s+(?:la|mi)\s+cartera|"
+    r"c[oó]mo\s+va\s+(?:la|mi)\s+cartera)\b"
+)
+# Pregunta por la posicion de un ticker concreto ("peso de ASTS",
+# "cuanto tengo en ASTS", "acciones de ASTS que tengo").
+_POSITION_QUERY_RE = re.compile(
+    r"(?i)\b(?:peso|posici[oó]n|acciones)\b[^.!?\n]{0,40}\b(?:cartera|tengo|mis)\b"
+    r"|\b(?:peso|posici[oó]n)\s+(?:de|en|que)\b"
+    r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+)?(?:tengo|vale|valen|tienen)\b"
+)
+# Cuando la misma frase pide ademas caja o patrimonio se adjunta ese bloque.
+_NET_WORTH_CUE_RE = re.compile(r"(?i)\b(?:patrimonio|caja|margen|neto)\b")
 
 
 class ChatService:
@@ -493,9 +519,21 @@ class ChatService:
                 context=context_echo,
             )
         if (
+            company is not None
+            and _POSITION_QUERY_RE.search(question or "")
+            and not _ORDER_VERB_RE.search(question or "")
+        ):
+            position_answer = self._position_answer(db, company, question or "")
+            if position_answer is not None:
+                position_answer.context = context_echo
+                return position_answer
+        if (
             company is None
             and not ticker
-            and _PORTFOLIO_SELF_RE.search(question or "")
+            and (
+                _PORTFOLIO_SELF_RE.search(question or "")
+                or _PORTFOLIO_QUERY_RE.search(question or "")
+            )
             and not _ORDER_VERB_RE.search(question or "")
         ):
             portfolio_answer = self._portfolio_overview(db)
@@ -609,7 +647,7 @@ class ChatService:
         total_text = (
             "monedas base distintas, sin total"
             if mixed
-            else f"valor total {_fmt_number_es(total, 2)} {base}"
+            else f"valor total {_fmt_money_es(total)} {base}"
         )
         answer = (
             f"Tu cartera guardada tiene {len(rows)} posiciones abiertas, {total_text}, "
@@ -619,6 +657,12 @@ class ChatService:
             + "\n\nSon los datos guardados en la app, no una recomendación. "
             "Pregunta por un ticker para ver su ficha y fuentes."
         )
+        cash_line = self._cash_line(
+            db, tenant_id, base if not mixed else None,
+            positions_total=None if mixed else total,
+        )
+        if cash_line:
+            answer += "\n\n" + cash_line
         return ChatResponse(
             answer=answer,
             sources=sources,
@@ -626,6 +670,155 @@ class ChatService:
             prompt_version="portfolio-overview-v1",
             confidence=0.9,
             llm_trace={"path": "portfolio_overview", "generated": False, "provider_calls": 0},
+        )
+
+    def _cash_line(
+        self,
+        db: Session,
+        tenant_id: int,
+        base: str | None,
+        *,
+        positions_total: float | None = None,
+    ) -> str | None:
+        """Bloque de caja/margen/neto leido de cash_balances del tenant.
+
+        Con ``base`` (monedas base homogeneas) convierte cada saldo con la
+        tabla FX point-in-time y da caja, deuda de margen y neto; sin tipo de
+        cambio para una divisa lo declara y no la suma. Con monedas base
+        distintas (``base=None``) solo lista los saldos por divisa, sin
+        inventar un total.
+        """
+        cash_rows = list(
+            db.scalars(
+                select(CashBalance).where(CashBalance.tenant_id == tenant_id)
+            ).all()
+        )
+        if not cash_rows:
+            return None
+        native: dict[str, float] = {}
+        for row in cash_rows:
+            native[row.currency] = native.get(row.currency, 0.0) + float(row.balance)
+        if base is None:
+            parts = [
+                f"{_fmt_money_es(amount)} {currency}"
+                for currency, amount in sorted(native.items())
+            ]
+            return (
+                "Caja guardada por divisa (sin sumar, monedas base distintas): "
+                + ", ".join(parts) + "."
+            )
+        table = PortfolioFXService().fx_table(
+            db,
+            currencies=set(native),
+            base_currency=base,
+            as_of_max=max((row.as_of for row in cash_rows), default=date.today()),
+        )
+        assets = 0.0
+        debt = 0.0
+        missing: list[str] = []
+        for currency, amount in sorted(native.items()):
+            as_of = max(
+                (row.as_of for row in cash_rows if row.currency == currency),
+                default=date.today(),
+            )
+            rate = PortfolioFXService.rate_from_table(
+                table, quote_currency=currency, base_currency=base, as_of=as_of,
+            )
+            if rate is None:
+                missing.append(currency)
+                continue
+            converted = amount * float(rate)
+            if converted >= 0:
+                assets += converted
+            else:
+                debt += -converted
+        line = ""
+        pieces: list[str] = []
+        if assets:
+            pieces.append(f"caja {_fmt_money_es(assets)} {base}")
+        if debt:
+            pieces.append(f"deuda de margen {_fmt_money_es(debt)} {base}")
+        if pieces:
+            line = "Además: " + " y ".join(pieces)
+            if positions_total is not None:
+                net = positions_total + assets - debt
+                line += f"; patrimonio neto {_fmt_money_es(net)} {base}"
+            line += "."
+        if missing:
+            detalle = ", ".join(f"{_fmt_money_es(native[c])} {c}" for c in missing)
+            line += (
+                f" Sin tipo de cambio guardado para {', '.join(missing)}"
+                f" ({detalle}): esa caja no entra en la suma."
+            )
+        return line.strip() or None
+
+    def _position_answer(self, db: Session, company: Company, question: str) -> ChatResponse | None:
+        """Posicion guardada de un ticker: cantidad, coste, valor y peso.
+
+        Determinista y sin recomendacion; sin posiciones del tenant devuelve
+        None y la pregunta sigue por la ruta de empresa.
+        """
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return None
+        rows = list(
+            db.execute(
+                select(Position, Company)
+                .join(Company, Company.id == Position.company_id)
+                .where(Position.quantity > 0, Position.tenant_id == tenant_id)
+            ).all()
+        )
+        if not rows:
+            return None
+
+        def _value(pos: Position) -> float:
+            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
+            return float(raw or 0)
+
+        found = [(pos, comp) for pos, comp in rows if comp.id == company.id]
+        if not found:
+            answer = (
+                f"No tienes ninguna posición guardada en {company.ticker}; "
+                f"tu cartera guardada tiene {len(rows)} posiciones abiertas en otros tickers. "
+                "Son los datos guardados en la app, no una recomendación."
+            )
+            return ChatResponse(
+                answer=answer,
+                sources=[],
+                model="deterministic",
+                prompt_version="portfolio-position-v1",
+                confidence=0.9,
+                llm_trace={"path": "portfolio_position", "generated": False, "provider_calls": 0},
+            )
+        pos, comp = found[0]
+        total = sum(_value(p) for p, _ in rows)
+        bases = {p.base_currency or "EUR" for p, _ in rows}
+        mixed = len(bases) > 1
+        if total > 0 and not mixed:
+            weight_text = f", un {_fmt_number_es(_value(pos) / total * 100, 1)} % del valor de tus posiciones"
+        else:
+            weight_text = " (sin peso: monedas base distintas)"
+        answer = (
+            f"Tu posición guardada en {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
+            f"coste medio {_fmt_money_es(float(pos.average_cost))} {pos.currency}, "
+            f"valor {_fmt_money_es(_value(pos))} {pos.base_currency or 'EUR'}{weight_text}, "
+            f"con datos a {_fmt_date_es(pos.as_of.isoformat())}."
+        )
+        if _NET_WORTH_CUE_RE.search(question):
+            cash_line = self._cash_line(
+                db, tenant_id, None if mixed else (pos.base_currency or "EUR"),
+                positions_total=None if mixed else total,
+            )
+            if cash_line:
+                answer += "\n\n" + cash_line
+        answer += "\n\nSon los datos guardados en la app, no una recomendación."
+        return ChatResponse(
+            answer=answer,
+            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of))],
+            model="deterministic",
+            prompt_version="portfolio-position-v1",
+            confidence=0.9,
+            llm_trace={"path": "portfolio_position", "generated": False, "provider_calls": 0},
         )
 
     def _deterministic_answer(

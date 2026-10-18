@@ -1,0 +1,146 @@
+"""Preguntas de cartera sin la formula "mi cartera" (recuento, peso, neto).
+
+Siguen la misma ruta determinista que "mi cartera" (#1188): datos guardados
+del tenant, sin LLM y sin recomendaciones.
+"""
+
+import asyncio
+from datetime import date
+from decimal import Decimal
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
+from app.models.entities import Base, CashBalance, Company, FXRate, Position
+from app.services.chat_service import ChatService
+
+
+@pytest.fixture
+def db():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.info["tenant_id"] = 1
+        yield session
+
+
+def _company(db, ticker, name):
+    comp = Company(ticker=ticker, name=name, exchange="NYSE", company_type="holding", valuation_model="unassigned")
+    db.add(comp)
+    db.flush()
+    return comp
+
+
+def _position(db, company, qty, cost, value, currency="USD"):
+    pos = Position(
+        tenant_id=1, company_id=company.id, quantity=Decimal(str(qty)),
+        average_cost=Decimal(str(cost)), market_value=Decimal(str(value)),
+        currency=currency, base_currency="EUR",
+        as_of=date(2026, 10, 16),
+    )
+    db.add(pos)
+    return pos
+
+
+def test_cuantas_posiciones_sin_mi_cartera(db):
+    a = _company(db, "AAA", "Alpha")
+    b = _company(db, "BBB", "Beta")
+    _position(db, a, 10, 5, 300)
+    _position(db, b, 2, 50, 100)
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Cuántas posiciones tengo y cuál pesa más?", "portfolio", None))
+    assert resp.model == "deterministic"
+    assert resp.llm_trace["provider_calls"] == 0
+    assert "2 posiciones" in resp.answer
+    # La mayor primero: responde tambien a "cual pesa mas".
+    assert resp.answer.index("AAA") < resp.answer.index("BBB")
+    assert "75 %" in resp.answer
+
+
+def test_patrimonio_neto_con_caja_y_margen(db):
+    a = _company(db, "AAA", "Alpha")
+    _position(db, a, 10, 5, 16237.91)
+    db.add(CashBalance(tenant_id=1, currency="EUR", balance=Decimal("7933.60"), as_of=date(2026, 10, 16)))
+    db.add(CashBalance(tenant_id=1, currency="USD", balance=Decimal("-17541.34"), as_of=date(2026, 10, 16)))
+    db.add(FXRate(tenant_id=1, base_currency="EUR", quote_currency="USD", rate=Decimal("1"), rate_date=date(2026, 10, 16)))
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Cuánto vale mi patrimonio neto?", "portfolio", None))
+    assert resp.llm_trace["provider_calls"] == 0
+    assert "caja 7.933,60 EUR" in resp.answer
+    assert "deuda de margen 17.541,34 EUR" in resp.answer
+    assert "patrimonio neto 6.630,17 EUR" in resp.answer
+    assert "no una recomendación" in resp.answer
+
+
+def test_peso_de_ticker_responde_con_la_posicion(db):
+    a = _company(db, "ASTS", "AST SpaceMobile")
+    b = _company(db, "BBB", "Beta")
+    _position(db, a, 100, 40, 4066)
+    _position(db, b, 2, 50, 12194)
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Qué peso tiene ASTS en mi cartera?", "portfolio", None))
+    assert resp.llm_trace["path"] == "portfolio_position"
+    assert "ASTS" in resp.answer
+    assert "25 %" in resp.answer
+    assert "100 acciones" in resp.answer
+    assert {s["type"] for s in resp.sources} == {"position"}
+
+
+def test_peso_y_patrimonio_en_la_misma_pregunta(db):
+    a = _company(db, "ASTS", "AST SpaceMobile")
+    _position(db, a, 100, 40, 4066)
+    db.add(CashBalance(tenant_id=1, currency="EUR", balance=Decimal("1000"), as_of=date(2026, 10, 16)))
+    db.commit()
+    resp = asyncio.run(ChatService().answer(
+        db, "¿Cuál es el peso de ASTS en mi cartera y cuánto vale mi patrimonio neto?", "portfolio", None,
+    ))
+    assert resp.llm_trace["path"] == "portfolio_position"
+    assert "100 %" in resp.answer
+    assert "patrimonio neto 5.066,00 EUR" in resp.answer
+
+
+def test_ticker_sin_posicion_lo_dice_sin_inventar(db):
+    a = _company(db, "ASTS", "AST SpaceMobile")
+    b = _company(db, "BBB", "Beta")
+    _position(db, b, 2, 50, 100)
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Qué peso tiene ASTS en mi cartera?", "portfolio", None))
+    assert resp.llm_trace["path"] == "portfolio_position"
+    assert "No tienes ninguna posición guardada en ASTS" in resp.answer
+    assert "1 posiciones" in resp.answer
+    assert resp.sources == []
+
+
+def test_divisa_sin_tipo_de_cambio_no_se_inventa_el_neto(db):
+    a = _company(db, "AAA", "Alpha")
+    _position(db, a, 10, 5, 300)
+    db.add(CashBalance(tenant_id=1, currency="USD", balance=Decimal("500"), as_of=date(2026, 10, 16)))
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Cuál es mi patrimonio neto?", "portfolio", None))
+    assert "Sin tipo de cambio guardado para USD" in resp.answer
+    assert "patrimonio neto" not in resp.answer
+
+
+def test_orden_sigue_fuera_de_la_ruta_determinista(db):
+    a = _company(db, "ASTS", "AST SpaceMobile")
+    _position(db, a, 100, 40, 4066)
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "Vende mi posición de ASTS", "portfolio", None))
+    assert resp.llm_trace.get("path") != "portfolio_position"
+
+
+def test_otro_tenant_no_aparece_en_peso_ni_neto(db):
+    a = _company(db, "ASTS", "AST SpaceMobile")
+    b = _company(db, "SECRET", "Other tenant co")
+    _position(db, a, 100, 40, 4066)
+    db.commit()
+    db.info["tenant_id"] = 2
+    db.add(Position(tenant_id=2, company_id=b.id, quantity=Decimal("9"), average_cost=Decimal("1"), market_value=Decimal("9999")))
+    db.add(CashBalance(tenant_id=2, currency="EUR", balance=Decimal("9999"), as_of=date(2026, 10, 16)))
+    db.commit()
+    db.info["tenant_id"] = 1
+    resp = asyncio.run(ChatService().answer(db, "peso de ASTS y patrimonio neto", "portfolio", None))
+    assert resp.llm_trace["path"] == "portfolio_position"
+    assert "9.999" not in resp.answer
+    assert "SECRET" not in resp.answer
