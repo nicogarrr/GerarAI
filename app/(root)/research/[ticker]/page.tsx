@@ -32,6 +32,7 @@ import { ChangeImpactCard } from '@/components/research/ChangeImpactCard';
 import { ChatIntentLinks } from '@/components/research/ChatIntentLinks';
 import { NextStepLink } from '@/components/research/NextStepLink';
 import { missingLayerAction, missingLayerLabel } from '@/lib/research/missing-layer-guidance';
+import { formulaDisplay } from '@/lib/research/formula-display';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { MoatPanel } from '@/components/research/MoatPanel';
 import { AstOrbitPanel } from '@/components/research/AstOrbitPanel';
@@ -365,8 +366,9 @@ function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
             <Badge className="shrink-0" variant="outline">{label(metric.status)}</Badge>
           </div>
           <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit)}</div>
-          <div className="mt-2 text-xs text-gray-500">{metric.period} · {metric.definition_version}</div>
-          <div className="mt-2 text-xs leading-5 text-gray-400">{metric.formula}</div>
+          <div className="mt-2 text-xs text-gray-500">{metric.period}</div>
+          <div className="mt-2 text-xs leading-5 text-gray-400">{formulaDisplay(metric.formula)}</div>
+          <details className="mt-1 text-xs text-gray-500"><summary className="cursor-pointer">Código de la definición</summary><code>{metric.formula} · {metric.definition_version}</code></details>
         </div>
       ))}
     </div>

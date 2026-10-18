@@ -12,6 +12,7 @@ const SOURCE_LABELS: Record<string, string> = {
   transcript: 'Transcripción',
   sec: 'SEC EDGAR',
   gdelt: 'GDELT',
+  calculated_metric: 'Métrica calculada',
 };
 
 /** Solo cambia la presentación; nunca modifica claves ni cifras de la fuente. */
