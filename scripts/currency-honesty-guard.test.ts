@@ -272,7 +272,7 @@ describe('screener: la columna Precio declara lo que no sabe', () => {
 });
 
 describe('ficha DCF del inicio: el precio con la divisa del listado', () => {
-    const src = readFileSync(join(root, 'components/PersonalizedOverview.tsx'), 'utf8');
+    const src = `${readFileSync(join(root, 'components/PersonalizedOverview.tsx'), 'utf8')}\n${readFileSync(join(root, 'lib/actions/home-overview.actions.ts'), 'utf8')}`;
 
     it('precio y valor justo nunca caen al USD por defecto de formatMoney', () => {
         assert.ok(!/formatMoney\(op\.price\)/.test(src), 'el precio se formatea con su divisa o sin símbolo');

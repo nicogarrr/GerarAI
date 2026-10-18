@@ -69,8 +69,8 @@ void test('la nota de alcance declara las candidatas probadas y las no evaluable
 });
 
 void test('el componente prueba con tope declarado y usa los textos del helper', () => {
-    const source = readFileSync(COMPONENT, 'utf8');
-    assert.match(source, /\.slice\(0, DCF_CANDIDATE_LIMIT\)/, 'el tope de candidatas es la constante declarada');
+    const source = `${readFileSync(COMPONENT, 'utf8')}\n${readFileSync('lib/actions/home-overview.actions.ts', 'utf8')}`;
+    assert.match(source, /candidateLimit: DCF_CANDIDATE_LIMIT[\s\S]*\.slice\(0, params\.candidateLimit\)/, 'el tope de candidatas es la constante declarada');
     assert.match(source, /upside > DCF_MIN_UPSIDE_PCT/, 'el umbral es la constante declarada');
     assert.match(source, /summarizeDcfProbe\(results\)/, 'el alcance se calcula de la sonda real');
     assert.match(source, /\{dcfScopeNote\(/, 'el encabezado declara el alcance real');
@@ -80,7 +80,7 @@ void test('el componente prueba con tope declarado y usa los textos del helper',
 });
 
 void test('un DCF fallido no cuenta como «sin potencial»', () => {
-    const source = readFileSync(COMPONENT, 'utf8');
+    const source = `${readFileSync(COMPONENT, 'utf8')}\n${readFileSync('lib/actions/home-overview.actions.ts', 'utf8')}`;
     assert.match(source, /evaluated: false, opportunity: null/, 'los fallos se marcan como no evaluados');
     assert.match(source, /evaluated: true,[\s\S]*?opportunity: upside > DCF_MIN_UPSIDE_PCT/, 'solo las evaluadas pueden dar oportunidad');
 });
