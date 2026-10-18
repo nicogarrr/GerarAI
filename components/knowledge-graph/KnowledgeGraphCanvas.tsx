@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input';
 import { t } from '@/lib/i18n/t';
 import {
     boundsFor,
+    graphNodeTypeLabel,
     buildScene,
     describeDetail,
     EDGE_COLOR,
@@ -533,7 +534,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                                             <g data-testid={`kg-node-${node.id}`} key={node.id} opacity={dim ? 0.18 : 1}>
                                                 {active ? <circle cx={node.x} cy={node.y} fill="none" r={node.radius + 6} stroke="#5eead4" strokeWidth={2} /> : null}
                                                 <circle
-                                                    aria-label={t('knowledgeGraph.canvas.nodeLabel', { label: node.label, type: node.type })}
+                                                    aria-label={t('knowledgeGraph.canvas.nodeLabel', { label: node.label, type: graphNodeTypeLabel(node.type) })}
                                                     className="cursor-pointer"
                                                     cx={node.x}
                                                     cy={node.y}
@@ -696,7 +697,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                                                 </button>
                                             </th>
                                             <td className="py-2">
-                                                <Badge variant="outline">{node.type}</Badge>
+                                                <Badge variant="outline">{graphNodeTypeLabel(node.type)}</Badge>
                                             </td>
                                             <td className="px-3 py-2 text-right text-gray-400">{node.degree}</td>
                                         </tr>

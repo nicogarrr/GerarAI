@@ -546,3 +546,13 @@ export function searchNodes(scene: Scene, query: string, limit = 8): SceneNode[]
   }
   return matches;
 }
+
+/** Display label only; persisted type keys and filters stay unchanged. */
+export function graphNodeTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    company: 'Empresa', principle: 'Principio', author: 'Autor',
+    decision: 'Decisión', decision_lesson: 'Lección', kpi: 'Indicador',
+    risk: 'Riesgo', concept: 'Concepto', case_study: 'Caso de estudio',
+  };
+  return labels[type.toLowerCase()] ?? type.replaceAll('_', ' ');
+}
