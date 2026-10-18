@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { RecordList } from '@/components/data/RecordViews';
 import TmePreviewForm from '@/components/taxes/TmePreviewForm';
@@ -382,6 +383,10 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                             {typeof file720.reason === 'string' && file720.reason
                                 ? humanizeTaxText(file720.reason)
                                 : 'El generador no ha producido fichero y no ha devuelto el motivo del bloqueo; revisa los registros excluidos y la revisión manual de arriba para saber qué falta.'}
+                            {' '}
+                            <Link className="inline-flex min-h-[44px] items-center text-teal-300 underline underline-offset-2 sm:min-h-0" href="/settings">
+                                Completar datos fiscales
+                            </Link>
                         </p>
                     )}
                 </div>
