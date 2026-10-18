@@ -35,3 +35,12 @@ describe('knowledge empty collections guard', () => {
     assert.ok(!page.includes('documentos en esta vista'), 'copy "en esta vista" eliminado');
   });
 });
+
+describe('knowledge stale document param guard', () => {
+  it('los fragmentos solo se piden si el documento existe en la biblioteca', () => {
+    const page = readFileSync('app/(root)/knowledge/page.tsx', 'utf8');
+    assert.match(page, /documents\.some\(\(document\) => document\.id === selectedDocumentId\)/);
+    assert.match(page, /if \(selectedExists\) \{[\s\S]*?getKnowledgeDocumentChunks\(selectedDocumentId\)/);
+    assert.ok(!page.includes('Promise.all([getKnowledgeLibrary(), getKnowledgeDocumentChunks(selectedDocumentId)])'), 'ya no se piden fragmentos a ciegas en paralelo');
+  });
+});

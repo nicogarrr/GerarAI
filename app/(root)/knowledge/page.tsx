@@ -141,18 +141,31 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
   const query = await searchParams;
   const activeTab = asTab(query.tab);
   const selectedDocumentId = Number(query.document) || null;
-  const fetchAll = () =>
-    Promise.all([getKnowledgeLibrary(), getKnowledgeDocumentChunks(selectedDocumentId)]);
-  let data: Awaited<ReturnType<typeof fetchAll>>;
+  let library: Awaited<ReturnType<typeof getKnowledgeLibrary>>;
   try {
-    data = await fetchAll();
+    library = await getKnowledgeLibrary();
   } catch (error) {
     if (isBackendUnavailableError(error)) {
       return <BackendOffline feature={t('knowledge.library')} retryHref="/knowledge" />;
     }
     throw error;
   }
-  const [{ collections, documents, principles, jobs }, chunks] = data;
+  const { collections, documents, principles, jobs } = library;
+  // Un ?document= que ya no existe (enlace viejo o documento borrado) no
+  // puede tumbar la página entera: los fragmentos solo se piden cuando el
+  // documento existe; si no, la biblioteca se pinta sin el explorador.
+  const selectedExists = selectedDocumentId !== null && documents.some((document) => document.id === selectedDocumentId);
+  let chunks: Awaited<ReturnType<typeof getKnowledgeDocumentChunks>> = [];
+  if (selectedExists) {
+    try {
+      chunks = await getKnowledgeDocumentChunks(selectedDocumentId);
+    } catch (error) {
+      if (isBackendUnavailableError(error)) {
+        return <BackendOffline feature={t('knowledge.library')} retryHref={`/knowledge?document=${selectedDocumentId}`} />;
+      }
+      throw error;
+    }
+  }
   const visiblePrinciples = query.status
     ? principles.filter((principle) => principle.status === query.status)
     : principles;
