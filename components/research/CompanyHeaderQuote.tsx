@@ -86,7 +86,7 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                         </div>
                     ))}
                 </dl>
-                {hasDatedMetrics ? <p className="mt-2 text-xs text-gray-500">{quote!.source} · Sesión regular del {quote!.metrics_session} · {quoteTime(quote!.metrics_timestamp)} (Madrid)</p> : null}
+                {hasDatedMetrics ? <p className="mt-2 text-xs text-gray-500">Sesión regular del {quote!.metrics_session} · {quoteTime(quote!.metrics_timestamp)} (Madrid)</p> : null}
             </div>
             <CompanyTechnicalWorkspace snapshot={snapshot} />
         </div>
