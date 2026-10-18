@@ -17,6 +17,7 @@ from app.models import (
     FinancialFact,
     MarketPrice,
     NewsEvent,
+    Position,
     ResearchSession,
     ThesisSection,
     ThesisVersion,
@@ -224,6 +225,13 @@ _COMPANY_CUE_RE = re.compile(
     r"acci[oó]n(?:es)?|cotiza\w*|precio|valoraci[oó]n|resultados|balance|"
     r"riesgos?|catalizadores?|noticias?|dividendos?|fundamentales|stock)\b"
 )
+_PORTFOLIO_SELF_RE = re.compile(
+    r"(?i)\b(?:mi|mis)\s+(?:cartera|posici[oó]n(?:es)?|inversi[oó]n(?:es)?|acciones|holdings)\b"
+    r"|\bmy\s+(?:portfolio|positions|holdings)\b"
+)
+_ORDER_VERB_RE = re.compile(r"(?i)\b(compra|compro|comprar|vende|vendo|vender|ejecuta|buy|sell)\b")
+
+
 class ChatService:
     def __init__(self, provider: LLMProvider | None = None) -> None:
         self.memory = MemoryService()
@@ -484,6 +492,16 @@ class ChatService:
                 llm_trace={"path": "memory_note"},
                 context=context_echo,
             )
+        if (
+            company is None
+            and not ticker
+            and _PORTFOLIO_SELF_RE.search(question or "")
+            and not _ORDER_VERB_RE.search(question or "")
+        ):
+            portfolio_answer = self._portfolio_overview(db)
+            if portfolio_answer is not None:
+                portfolio_answer.context = context_echo
+                return portfolio_answer
         if company is not None and not ticker:
             ticker = company.ticker
         # La abstencion financiera vive en el clasificador unificado de
@@ -544,6 +562,71 @@ class ChatService:
             )
         response.context = context_echo
         return response
+
+    def _portfolio_overview(self, db: Session, limit: int = 15) -> ChatResponse | None:
+        """Resumen de la cartera del usuario leido de la BD, sin LLM ni recomendaciones.
+
+        Solo lo guardado (cantidad, coste medio, valor y fecha). Sin posiciones
+        devuelve None y la pregunta sigue por la ruta de siempre.
+        """
+        # TenantOwnedMixin no filtra solo: sin tenant valido no se lee ninguna cartera.
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return None
+        rows = list(
+            db.execute(
+                select(Position, Company)
+                .join(Company, Company.id == Position.company_id)
+                .where(Position.quantity > 0, Position.tenant_id == tenant_id)
+            ).all()
+        )
+        if not rows:
+            return None
+
+        def _value(pos: Position) -> float:
+            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
+            return float(raw or 0)
+
+        rows.sort(key=lambda row: _value(row[0]), reverse=True)
+        total = sum(_value(pos) for pos, _ in rows)
+        as_of = max(pos.as_of for pos, _ in rows)
+        bases = {pos.base_currency or "EUR" for pos, _ in rows}
+        mixed = len(bases) > 1
+        base = rows[0][0].base_currency or "EUR"
+        lines = []
+        sources = []
+        for pos, comp in rows[:limit]:
+            weight = (
+                f" ({_fmt_number_es(_value(pos) / total * 100, 1)} %)" if total > 0 and not mixed else ""
+            )
+            lines.append(
+                f"- {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
+                f"coste medio {_fmt_number_es(float(pos.average_cost), 2)} {pos.currency}, "
+                f"valor {_fmt_number_es(_value(pos), 2)} {pos.base_currency or 'EUR'}{weight}"
+            )
+            sources.append(self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of)))
+        extra = f"\n(Se muestran las {limit} mayores de {len(rows)}.)" if len(rows) > limit else ""
+        total_text = (
+            "monedas base distintas, sin total"
+            if mixed
+            else f"valor total {_fmt_number_es(total, 2)} {base}"
+        )
+        answer = (
+            f"Tu cartera guardada tiene {len(rows)} posiciones abiertas, {total_text}, "
+            f"con datos a {_fmt_date_es(as_of.isoformat())}:\n"
+            + "\n".join(lines)
+            + extra
+            + "\n\nSon los datos guardados en la app, no una recomendación. "
+            "Pregunta por un ticker para ver su ficha y fuentes."
+        )
+        return ChatResponse(
+            answer=answer,
+            sources=sources,
+            model="deterministic",
+            prompt_version="portfolio-overview-v1",
+            confidence=0.9,
+            llm_trace={"path": "portfolio_overview", "generated": False, "provider_calls": 0},
+        )
 
     def _deterministic_answer(
         self, db: Session, question: str, scope: str, ticker: str | None
