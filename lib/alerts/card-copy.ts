@@ -21,14 +21,14 @@ export function alertCardCopy(alert: TriggeredAlertDelivery): { heading: string;
       heading: `${title}${suffix}`,
       summary: alert.alert_type === 'daily_digest'
         ? 'Resumen diario de tu cartera; abre el detalle para ver la cobertura de datos.'
-        : 'Alerta sin empresa asociada; consulta la regla y la fuente antes de actuar.',
+        : 'Alerta sin empresa asociada.',
       technical: `${alert.title}\n${alert.message}`,
     };
   }
   const summary = form
-    ? `Documento ${form} asociado a ${company}; revisa la fuente antes de cambiar la tesis.`
+    ? `Documento ${form} asociado a ${company}.`
     : alert.alert_type === 'tracked_news'
-      ? `Noticia sobre ${company}; revisa la fuente antes de sacar conclusiones.`
+      ? `Noticia sobre ${company}.`
       : alert.alert_type.includes('news')
         ? `Noticia marcada para revisión de la tesis de ${company}; el impacto aún debe verificarse.`
         : alertOwnText(alert, company);

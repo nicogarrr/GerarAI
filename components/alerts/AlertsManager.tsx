@@ -337,15 +337,10 @@ function AlertsManager() {
             </div>
 
             {telegram && !telegram.configured ? (
-                <div className="mb-4 rounded-lg border border-amber-900/60 bg-amber-950/20 p-4" role="note">
-                    <p className="flex items-center gap-2 text-sm font-semibold text-amber-200">
+                <div className="mb-4 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3" role="note">
+                    <p className="flex items-center gap-2 text-sm text-amber-200">
                         <Send aria-hidden="true" className="h-4 w-4" />
                         Telegram sin configurar: las alertas solo llegan en la app
-                    </p>
-                    <p className="mt-2 text-xs leading-5 text-amber-100/80">
-                        El canal Telegram no está activado en este servidor. Las reglas se evalúan igual y
-                        sus avisos aparecen aquí; el administrador puede activar Telegram desde la
-                        configuración del servidor.
                     </p>
                 </div>
             ) : null}
