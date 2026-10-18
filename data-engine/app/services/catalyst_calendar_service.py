@@ -37,9 +37,9 @@ from app.models.entities import Company, CorporateAction, Position
 from app.services.market_refresh_service import _us_listed
 
 SOURCE_NASDAQ = "Calendario público de NASDAQ"
-SOURCE_CAVAAI = "Accion corporativa registrada en GerarAI"
+SOURCE_CAVAAI = "Acción corporativa registrada en GerarAI"
 
-SOURCE_SEC_RULE = "Regla SEC (Form 10-Q/10-K) aplicada al ultimo informe en EDGAR"
+SOURCE_SEC_RULE = "Regla SEC (Form 10-Q/10-K) aplicada al último informe en EDGAR"
 
 logger = logging.getLogger(__name__)
 
@@ -151,13 +151,13 @@ def filing_deadline_event(submissions: dict[str, Any], ticker: str) -> dict[str,
     days = (days_q_k or _MAX_DEADLINES)[1 if form == "10-K" else 0]
     deadline = _next_business_day(next_period + timedelta(days=days))
     basis = (
-        f"{days} dias tras el cierre de periodo estimado ({next_period.isoformat()}) "
-        f"sobre el ultimo informe periodico (cierre {periods[-1].isoformat()})"
+        f"{days} días tras el cierre de periodo estimado ({next_period.isoformat()}) "
+        f"sobre el último informe periódico (cierre {periods[-1].isoformat()})"
     )
     if approx:
         basis += "; emisor de 52/53 semanas: fecha aproximada (hasta ~1 semana)"
     if days_q_k is None:
-        basis += "; categoria de filer no disponible: se usa el plazo maximo de la regla"
+        basis += "; categoria de filer no disponible: se usa el plazo máximo de la regla"
     else:
         basis += f"; categoria EDGAR: {submissions.get('category')}"
     return {
@@ -301,7 +301,7 @@ def build_catalysts(
             continue
         amount = row.get("amount")
         amount_txt = (
-            f"{_es_number(amount, 4)} por accion" if isinstance(amount, (int, float)) else None
+            f"{_es_number(amount, 4)} por acción" if isinstance(amount, (int, float)) else None
         )
         day = _parse_us_date(row.get("ex_date"))
         if day is None or not desde <= day <= hasta:
@@ -328,7 +328,7 @@ def build_catalysts(
             "ticker_change": "Cambio de ticker",
             "merger": "Fusion",
             "spin_off": "Escision",
-        }.get(kind, "Accion corporativa")
+        }.get(kind, "Acción corporativa")
         ratio = action.get("ratio")
         events.append(
             {

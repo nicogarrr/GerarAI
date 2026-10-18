@@ -44,6 +44,19 @@ from app.valuation.engines.base import MODEL_VERSION, margin_of_safety_reference
 from app.valuation.financial_snapshot import FinancialSnapshotBuilder
 from app.valuation.moat_framework import empty_moat_framework
 
+_HORA_ES = {
+    "time-pre-market": "antes de la apertura",
+    "time-after-hours": "tras el cierre",
+    "time-not-supplied": "hora no indicada",
+    "before-market": "antes de la apertura",
+    "after-market": "tras el cierre",
+}
+
+
+def _hora_es(value: object) -> str:
+    return _HORA_ES.get(str(value), str(value))
+
+
 logger = logging.getLogger(__name__)
 
 PROMPT_VERSION = "thesis-render-v5-number-formats"
@@ -433,7 +446,7 @@ class ThesisService:
                     savepoint.rollback()
             except Exception:  # noqa: BLE001 - never mask the original error
                 logger.warning(
-                    "No se pudo revertir el savepoint de la generacion de tesis: %s",
+                    "No se pudo revertir el savepoint de la generación de tesis: %s",
                     type(exc).__name__,
                 )
             raise
@@ -1258,7 +1271,7 @@ class ThesisService:
             "Las afirmaciones de las calls se guardan aparte y se verifican después contra lo reportado."
         ]
         if earnings.get("status") == "ok":
-            extra = f" {earnings['time']}" if earnings.get("time") else ""
+            extra = f" {_hora_es(earnings['time'])}" if earnings.get("time") else ""
             eps = earnings.get("eps_forecast")
             eps_txt = f", EPS estimado {eps}" if eps is not None else ""
             lines.append(f"Próximos resultados: {earnings.get('next_date')}{extra}{eps_txt}.")
@@ -1535,8 +1548,8 @@ class ThesisService:
         )
         catalysts_lines = "\n".join(
             f"- {item.get('label')}: {item.get('date')}"
-            + (f" {item.get('time')}" if item.get('time') else "")
-            + (f" (EPS forecast {item.get('eps_forecast')})" if item.get("eps_forecast") is not None else "")
+            + (f" {_hora_es(item.get('time'))}" if item.get('time') else "")
+            + (f" (EPS estimado {item.get('eps_forecast')})" if item.get("eps_forecast") is not None else "")
             for item in catalysts
         ) or "- Sin catalizadores con fecha conocida; pendiente del calendario de resultados."
         invalidation_lines = "\n".join(f"- {criterion}" for criterion in invalidation_criteria)

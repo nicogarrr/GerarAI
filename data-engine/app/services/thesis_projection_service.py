@@ -69,9 +69,9 @@ PUBLISHABLE_MIN_RATIO = 0.25
 PUBLISHABLE_MAX_RATIO = 4.0
 
 DISCLAIMER_ES = (
-    "Proyeccion del modelo a 5 ejercicios basada en hipotesis propias "
-    "(INFERIDO): no es un dato oficial ni una recomendacion de inversion. "
-    "Las decisiones de inversion son responsabilidad del usuario."
+    "Proyección del modelo a 5 ejercicios basada en hipotesis propias "
+    "(INFERIDO): no es un dato oficial ni una recomendación de inversión. "
+    "Las decisiones de inversión son responsabilidad del usuario."
 )
 
 # Facts cuya fuente puede ser oficial SI se verifica contra el documento
@@ -339,7 +339,7 @@ class ThesisProjectionService:
             assert_no_lookahead(
                 as_of=as_of,
                 data_date=_known_date(version.created_at),
-                label=f"asuncion de driver {company.ticker} {driver_key}",
+                label=f"asunción de driver {company.ticker} {driver_key}",
             )
             out[(driver_key, version.fiscal_year, version.scenario)] = {
                 "value": _num(version.value),
@@ -369,7 +369,7 @@ class ThesisProjectionService:
             assert_no_lookahead(
                 as_of=as_of,
                 data_date=_known_date(row.created_at),
-                label=f"asuncion de valoracion {company.ticker} {row.name}",
+                label=f"asunción de valoración {company.ticker} {row.name}",
             )
             out[(row.name, row.scenario, row.year)] = row  # type: ignore[index]
         return out
@@ -387,7 +387,7 @@ class ThesisProjectionService:
             source_type=stored.source_type,
             source_id=stored.source_id,
             as_of=as_of,
-            label=f"asuncion {company.ticker} {stored.name}",
+            label=f"asunción {company.ticker} {stored.name}",
         )
         # La url y la fecha verificadas viajan al contrato: afirmar la
         # oficialidad sin exponer su procedencia la haria inspeccionable.
@@ -395,7 +395,7 @@ class ThesisProjectionService:
             return RateAssumption(
                 _num(stored.value),
                 LABEL_OFICIAL,
-                f"asuncion de valoracion persistida (tipo {stored.source_type}, "
+                f"asunción de valoración persistida (tipo {stored.source_type}, "
                 f"documento verificado con url y fecha)",
                 source_url=verified.url,
                 source_date=verified.fecha,
@@ -403,7 +403,7 @@ class ThesisProjectionService:
         return RateAssumption(
             _num(stored.value),
             LABEL_INFERIDO,
-            f"asuncion de valoracion persistida (tipo {stored.source_type}, "
+            f"asunción de valoración persistida (tipo {stored.source_type}, "
             f"sin documento con url y fecha verificables)",
             source_url=verified.url,
             source_date=verified.fecha,
@@ -453,7 +453,7 @@ class ThesisProjectionService:
             return RateAssumption(
                 override["value"],
                 LABEL_INFERIDO,
-                f"asuncion de driver '{GROWTH_KEY}' {origen} ({override['source']})",
+                f"asunción de driver '{GROWTH_KEY}' {origen} ({override['source']})",
             )
         stored = val_assumptions.get((GROWTH_KEY, scenario, year))
         if stored is not None:
@@ -497,7 +497,7 @@ class ThesisProjectionService:
             return RateAssumption(
                 override["value"],
                 LABEL_INFERIDO,
-                f"asuncion de driver '{MARGIN_KEY}' {origen} ({override['source']})",
+                f"asunción de driver '{MARGIN_KEY}' {origen} ({override['source']})",
             )
         stored = val_assumptions.get((MARGIN_KEY, scenario, year))
         if stored is not None:
@@ -621,17 +621,17 @@ class ThesisProjectionService:
             target: float | None = None
             base: str | None = None
             if valuation_error is not None:
-                base = f"valoracion no disponible ({valuation_error})"
+                base = f"valoración no disponible ({valuation_error})"
             elif valuation is None or not publishable:
                 razones = ", ".join(str(b) for b in blockers) or "sin razones declaradas"
-                base = f"valoracion del motor no publicable (bloqueos: {razones})"
+                base = f"valoración del motor no publicable (bloqueos: {razones})"
             elif anchor_kind is None or anchor_base_ps in (None, 0):
-                base = "sin ancla por accion (FCF o ingresos por accion no disponibles)"
+                base = "sin ancla por acción (FCF o ingresos por acción no disponibles)"
             else:
                 scenario_value = _num(valuation.get(f"{scenario}_value"))
                 projected = projected_ps.get(scenario)
                 if scenario_value is None or projected is None:
-                    base = "sin valor del escenario o sin proyeccion del ancla"
+                    base = "sin valor del escenario o sin proyección del ancla"
                 elif price is None or price <= 0 or price_date is None:
                     base = (
                         "sin precio fechado para acotar el multiplo (evita contar el "
@@ -648,9 +648,9 @@ class ThesisProjectionService:
                     multiple = min(multiple, market_multiple)
                     target = projected * multiple
                     base = (
-                        f"multiplo implicito del modelo ({anchor_kind} por accion): "
-                        f"valor/accion actual del escenario / {anchor_kind} por accion "
-                        f"actual, aplicado al {anchor_kind} por accion proyectado"
+                        f"multiplo implicito del modelo ({anchor_kind} por acción): "
+                        f"valor/accion actual del escenario / {anchor_kind} por acción "
+                        f"actual, aplicado al {anchor_kind} por acción proyectado"
                     )
                     if capped:
                         base += (

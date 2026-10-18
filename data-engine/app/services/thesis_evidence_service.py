@@ -210,7 +210,7 @@ class ThesisEvidenceService:
         if not extracted:
             return _pending(
                 "SEC EDGAR companyfacts",
-                f"CIK {cik} sin metricas us-gaap aprovechables.",
+                f"CIK {cik} sin métricas us-gaap aprovechables.",
             )
         document = self._get_or_create_document(
             db,

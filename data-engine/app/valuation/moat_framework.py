@@ -86,7 +86,7 @@ CATEGORY_STATUS_LABELS = {
     INSUFFICIENT_EVIDENCE: (
         "hay evidencia de fuente primaria pero su peso no alcanza para puntuar"
     ),
-    NO_SOURCED_EVIDENCE: "ninguna afirmacion viva con evidencia vinculada",
+    NO_SOURCED_EVIDENCE: "ninguna afirmación viva con evidencia vinculada",
     ONLY_LOW_TIER_EVIDENCE: (
         "solo hay evidencia de fuentes sin fuente primaria identificada"
     ),
@@ -490,7 +490,7 @@ class MoatEvidence:
 REVIEW_CHECKLIST: dict[str, dict[str, list[str]]] = {
     "switching_costs": {
         "evidence_to_review": [
-            "Contratos y condiciones de renovacion",
+            "Contratos y condiciones de renovación",
             "Churn medido y su desglose por cohort",
             "Migraciones de clientes a la competencia",
         ]
@@ -522,24 +522,24 @@ REVIEW_CHECKLIST: dict[str, dict[str, list[str]]] = {
     "cost_advantage": {
         "evidence_to_review": [
             "Coste unitario frente a competidores identificados",
-            "Estructura de costes y su duracion",
+            "Estructura de costes y su duración",
         ]
     },
     "network_effects": {
         "evidence_to_review": [
             "Liquidez por lado del mercado",
-            "Metrica de doble efecto con historico",
+            "Métrica de doble efecto con historico",
         ]
     },
     "scale_economies": {
         "evidence_to_review": [
-            "Coste unitario por volumen y su evolucion",
+            "Coste unitario por volumen y su evolución",
             "Reparto de costes fijos con el crecimiento",
         ]
     },
     "distribution": {
         "evidence_to_review": [
-            "Canales de distribucion propios y su cuota",
+            "Canales de distribución propios y su cuota",
             "Base instalada y recurrencia de la red comercial",
         ]
     },
@@ -600,7 +600,7 @@ def empty_moat_framework(
         unevaluated=unevaluated,
         categories_total=len(MOAT_CATEGORIES),
         methodology=(
-            "Categorias sugeridas por tipo de empresa, sin evaluacion: ninguna "
+            "Categorias sugeridas por tipo de empresa, sin evaluación: ninguna "
             "tiene evidencia vinculada con fuente primaria."
         ),
         note=(

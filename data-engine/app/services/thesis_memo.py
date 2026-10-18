@@ -47,7 +47,7 @@ def build_memo_markdown(
     lines.append(f"# Memo de tesis — {company.ticker} ({company.name or company.ticker})")
     lines.append("")
     lines.append(
-        f"Version {thesis.version} · estado `{thesis.status}` · rating `{thesis.rating}` · "
+        f"Versión {thesis.version} · estado `{thesis.status}` · rating `{thesis.rating}` · "
         f"generada {thesis.created_at:%Y-%m-%d %H:%M} UTC · actualizada {thesis.updated_at:%Y-%m-%d %H:%M} UTC"
     )
     if stale:
@@ -63,7 +63,7 @@ def build_memo_markdown(
     lines.append(thesis.executive_summary or "_Pendiente._")
     lines.append("")
 
-    lines.append("## Valoracion y escenarios")
+    lines.append("## Valoración y escenarios")
     lines.append("| Escenario | Valor | Probabilidad |")
     lines.append("|---|---|---|")
     lines.append(f"| Bajista | {_money(thesis.bear_value)} | {probs.get('bear', 'pendiente')} |")
@@ -90,7 +90,7 @@ def build_memo_markdown(
         lines.append("_Pendiente._")
     lines.append("")
 
-    lines.append("## Criterios de invalidacion")
+    lines.append("## Criterios de invalidación")
     criteria = thesis.invalidation_criteria or []
     if criteria:
         for item in criteria:
@@ -103,7 +103,7 @@ def build_memo_markdown(
     lines.append(
         f"Confianza de datos {thesis.data_confidence_score}/100 · cobertura de fuentes "
         f"{thesis.source_coverage_score}/100 · red-team {thesis.red_team_score}/100 · "
-        f"riesgo de valoracion {thesis.valuation_risk_score}/100"
+        f"riesgo de valoración {thesis.valuation_risk_score}/100"
     )
     lines.append("")
 
@@ -123,11 +123,11 @@ def build_memo_markdown(
 
     lines.append("---")
     lines.append(
-        f"Generado {datetime.now(UTC):%Y-%m-%d %H:%M} UTC desde la version persistida "
+        f"Generado {datetime.now(UTC):%Y-%m-%d %H:%M} UTC desde la versión persistida "
         f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'})."
     )
     lines.append(
-        "Documento informativo de investigacion. NO es asesoramiento financiero "
-        "ni recomendacion de compra o venta."
+        "Documento informativo de investigación. NO es asesoramiento financiero "
+        "ni recomendación de compra o venta."
     )
     return "\n".join(lines) + "\n"
