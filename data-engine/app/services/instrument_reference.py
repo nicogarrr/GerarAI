@@ -189,6 +189,11 @@ def upsert_rows(
             for key, value in payload.items():
                 if key == "ticker_normalized":
                     continue
+                # Una ausencia en la fuente nunca borra un dato ya conocido:
+                # que esta ingesta no traiga FIGI/ISIN/sector no significa que
+                # el instrumento lo haya perdido.
+                if value is None:
+                    continue
                 if getattr(existing, key) != value:
                     setattr(existing, key, value)
                     changed = True

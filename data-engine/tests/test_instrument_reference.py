@@ -87,3 +87,39 @@ def test_unique_ticker_and_figi_index(db):
     assert get_by_ticker(db, "NOEXISTE") is None
     assert set(sibling_tickers(db, "FAKEOLD")) == {"FAKEOLD", "FAKENEW"}
     assert sibling_tickers(db, "NOEXISTE") == []
+
+
+def test_upsert_update_never_overwrites_known_value_with_none(db):
+    """Lista 11.4: una reingesta sin FIGI/ISIN no puede borrar el ya conocido."""
+    full = normalize_row(
+        {"symbol": "ACME", "name": "Acme", "sector": "Industrials", "isin": "US001",
+         "figi": "BBG000ACME1", "currency": "USD"},
+        as_of=AS_OF,
+    )
+    upsert_rows(db, [full], commit=True)
+
+    sparse = normalize_row(
+        {"symbol": "ACME", "name": "Acme Corp", "sector": "", "isin": "", "figi": "",
+         "currency": "USD"},
+        as_of=AS_OF,
+    )
+    result = upsert_rows(db, [sparse], commit=True)
+
+    row = db.scalar(select(InstrumentReference).where(InstrumentReference.ticker_normalized == "ACME"))
+    assert row.figi == "BBG000ACME1", "un None entrante nunca borra un FIGI conocido"
+    assert row.isin == "US001", "un None entrante nunca borra un ISIN conocido"
+    assert row.sector == "Industrials", "un None entrante nunca borra el sector conocido"
+    assert row.name == "Acme Corp", "los valores no nulos si actualizan"
+    assert result == {"inserted": 0, "updated": 1, "skipped": 0}
+
+
+def test_upsert_update_with_only_nulls_counts_no_change(db):
+    full = normalize_row(
+        {"symbol": "ACME", "name": "Acme", "sector": "Industrials", "isin": "US001",
+         "figi": "BBG000ACME1", "currency": "USD"},
+        as_of=AS_OF,
+    )
+    upsert_rows(db, [full], commit=True)
+    only_nulls = {"ticker_normalized": "ACME", "sector": None, "figi": None}
+    result = upsert_rows(db, [only_nulls], commit=True)
+    assert result == {"inserted": 0, "updated": 0, "skipped": 0}
