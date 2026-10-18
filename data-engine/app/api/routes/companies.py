@@ -873,7 +873,28 @@ def _expectation_payload(item) -> dict:
 def peer_comparison(
     ticker: str,
     limit: int = Query(default=8, ge=1, le=20),
-    refresh: bool = Query(default=False),
+    metrics: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    metric_names = [item.strip() for item in metrics.split(",") if item.strip()] if metrics else DEFAULT_PEER_METRICS
+    # GET solo lectura: nunca persiste. Recalcular y guardar metricas va por POST.
+    return PeerComparisonService().compare(
+        db,
+        company,
+        limit=limit,
+        metrics=metric_names,
+        refresh=False,
+    )
+
+
+@router.post("/{ticker}/peers/comparison/refresh")
+def refresh_peer_comparison(
+    ticker: str,
+    limit: int = Query(default=8, ge=1, le=20),
     metrics: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -887,7 +908,7 @@ def peer_comparison(
         company,
         limit=limit,
         metrics=metric_names,
-        refresh=refresh,
+        refresh=True,
     )
 
 
