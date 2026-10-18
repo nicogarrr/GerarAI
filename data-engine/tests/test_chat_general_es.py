@@ -119,7 +119,9 @@ def test_precio_mercado_conectado_como_fuente_con_ticker():
     price_sources = [s for s in response.sources if s["type"] == "market_price"]
     assert len(price_sources) == 1
     src = price_sources[0]
-    assert "52.34" in src["title"] and "2026-10-09" in src["title"] and "USD" in src["title"]
+    assert "$52.34" in src["title"] and "2026-10-09" in src["title"]
+    assert src["currency"] == "USD"
+    assert src["price"] == "52.340000"
     assert src["adjusted"] is False, "adj_close NULL = spot sin ajustar, etiquetado"
 
 

@@ -112,6 +112,19 @@ def _currency_display(currency: str) -> str:
     return "€" if currency == "EUR" else currency
 
 
+def _price_display(value: Decimal | int | float, currency: str | None) -> str:
+    # Preserve small quotes instead of rounding a real nonzero price to zero.
+    magnitude = abs(Decimal(str(value)))
+    digits = max(2, -magnitude.adjusted() + 3) if 0 < magnitude < 1 else 2
+    text = f"{value:,.{digits}f}"
+    if currency == "USD":
+        return f"${text}"
+    text = text.replace(",", "\x07").replace(".", ",").replace("\x07", ".")
+    if not currency or not currency.strip():
+        return f"{text} (divisa no declarada)"
+    return f"{text} {'€' if currency == 'EUR' else currency}"
+
+
 def _fmt_value_es(value: float | None, unit: str | None) -> str:
     """Cifra legible: -71,5 millones USD / 1,14 mil millones USD / 300 acciones."""
     if value is None:
@@ -1303,10 +1316,10 @@ class ChatService:
                 # de manana no es cotizacion actual.
                 adjusted = latest_price.adj_close is not None
                 value = latest_price.adj_close if adjusted else latest_price.close
-                kind = "cierre" if adjusted else "spot"
+                kind = "cierre ajustado" if adjusted else "spot"
                 price_line = (
                     f"{company.ticker} cotiza a "
-                    f"{_fmt_number_es(float(value))} {company.currency} "
+                    f"{_price_display(value, company.currency)} "
                     f"({kind} del {_fmt_date_es(latest_price.date.isoformat())}, "
                     f"fuente {latest_price.source})."
                 )
@@ -1314,7 +1327,7 @@ class ChatService:
                     self._source_entry(
                         "market_price",
                         latest_price.id,
-                        f"{company.ticker} {value} {company.currency} ({kind} {latest_price.date.isoformat()}, {latest_price.source})",
+                        f"{company.ticker} {_price_display(value, company.currency)} ({kind} {latest_price.date.isoformat()}, {latest_price.source})",
                         date=latest_price.date.isoformat(),
                         price=str(value),
                         currency=company.currency,
