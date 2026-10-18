@@ -284,7 +284,7 @@ function FactCard({ fact, ticker, staleness }: { fact: ResearchFact; ticker: str
       {audit ? <p className="mt-2 text-xs text-amber-300">{audit}</p> : null}
       {!audit && staleness ? <p className="mt-2 text-xs text-amber-300">{staleness}</p> : null}
       <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-gray-500">
-        <span>{fact.period}</span>
+        <span>{financialPeriod(fact.period)}</span>
         <span>·</span>
         <span>{label(fact.source_type)}</span>
       </div>
@@ -349,7 +349,7 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
           {facts.map((fact) => (
             <tr key={fact.id} className="text-gray-300">
               <th className="border-b border-gray-900 py-2 text-left text-sm font-medium" scope="row">{metricLabel(fact.metric)}</th>
-              <td className="border-b border-gray-900 py-2">{fact.period}</td>
+              <td className="border-b border-gray-900 py-2">{financialPeriod(fact.period)}</td>
               <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact) ? <span className="text-gray-400">N/D<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact)}</span></span> : <>{metricValue(fact.value, fact.unit)}{stalenessOf(fact) ? <span className="mt-1 block text-xs text-amber-300">{stalenessOf(fact)}</span> : null}</>}</td>
               <td className="border-b border-gray-900 py-2 text-right text-xs text-gray-500">{label(fact.source_type)}</td>
             </tr>

@@ -45,6 +45,14 @@ export function financialSegment(value: string): string {
 }
 
 const DEFINITIONS: Record<string, string> = {
+  'Gross Margin': 'Margen bruto',
+  'Operating Margin': 'Margen operativo',
+  'Net Margin': 'Margen neto',
+  'Total Assets': 'Activos totales',
+  'Total Debt': 'Deuda total',
+  'Total Equity': 'Patrimonio neto',
+  'Cash And Equivalents': 'Efectivo y equivalentes',
+
   'Reported consolidated or segment revenue.': 'Ingresos publicados, consolidados o por segmento.',
   'Diluted earnings per share reported for the period.': 'Beneficio diluido por acción publicado para el periodo.',
   'Operating cash flow less capital expenditure.': 'Flujo de caja operativo menos inversión de capital.',
