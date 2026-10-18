@@ -156,7 +156,7 @@ const costs = [
   {
     icon: FlaskConical,
     title: 'Modelos LLM: por uso',
-    text: 'Los modelos se consumen a través de OpenCode Go, Groq y Gemini. El coste se registra por modelo: si no se conoce, se dice «desconocido» en lugar de poner un 0.',
+    text: 'Los modelos se consumen a través de Groq y Gemini. El coste se registra por modelo: si no se conoce, se dice «desconocido» en lugar de poner un 0.',
   },
   {
     icon: BookOpen,
