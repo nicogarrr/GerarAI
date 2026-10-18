@@ -1,4 +1,4 @@
-import { researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
+import { NOT_VALUABLE, researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FileSearch } from 'lucide-react';
@@ -66,20 +66,6 @@ const RATING_LABELS: Record<string, string> = {
     insufficient_data: 'datos insuficientes',
 };
 
-const HEALTH_LABELS: Record<string, string> = {
-    healthy: 'capas presentes',
-    review_required: 'requiere revisión',
-    incomplete: 'incompleto',
-    empty: 'sin datos',
-};
-
-const HEALTH_TONES: Record<string, string> = {
-    healthy: 'text-gray-400',
-    review_required: 'text-warn',
-    incomplete: 'text-warn',
-    empty: 'text-gray-400',
-};
-
 type Dashboard = Awaited<ReturnType<typeof getResearchDashboard>>;
 type Company = Dashboard['companies'][number];
 type CompanySnapshot = Awaited<ReturnType<typeof getResearchCompanySnapshots>>['snapshots'][string];
@@ -102,6 +88,8 @@ function CompanyCard({ row }: { row: CompanyRow }) {
     const { company, snapshot, unreadable } = row;
     const health = snapshot?.research_health;
     const thesis = snapshot?.latest_thesis ?? null;
+    const pending = snapshot ? openReviewsLabel(snapshot.counts) : null;
+    const valuable = snapshot ? researchValuability(snapshot) !== NOT_VALUABLE : false;
 
     const sectorLine = sectorIndustryLine(company.sector, company.industry);
 
@@ -127,24 +115,24 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                         <span className="text-xs text-gray-500">Sin research generado</span>
                     ) : (
                         <>
-                            <span className={`text-xs font-semibold ${HEALTH_TONES[health?.status ?? 'empty'] ?? 'text-gray-400'}`}>
+                            <span className="text-xs font-semibold text-gray-400">
                                 Cobertura {formatNumber(health?.score)}/100
                             </span>
-                            <span className="text-xs text-warn">{researchValuability(snapshot)}</span>
-                            <Badge variant="outline">{HEALTH_LABELS[health?.status ?? ''] ?? 'estado sin dato'}</Badge>
-                            {health?.status === 'review_required' && openReviewsLabel(snapshot.counts) ? (
-                                <span className="text-xs text-gray-500">{openReviewsLabel(snapshot.counts)}</span>
-                            ) : null}
+                            {valuable ? (
+                                <>
+                                    {thesis && visibleThesisRating(thesis.rating, snapshot) ? <Badge>{ratingLabel(thesis.rating)}</Badge> : null}
+                                    {thesis ? (
+                                        <span className="text-xs text-gray-500">
+                                            v{formatNumber(thesis.version)} · {formatDate(thesis.created_at)}
+                                        </span>
+                                    ) : null}
+                                </>
+                            ) : (
+                                <span className="text-xs text-warn">No valorable: falta evidencia</span>
+                            )}
+                            {pending ? <span className="text-xs text-gray-500">{pending}</span> : null}
                         </>
                     )}
-                    {thesis ? (
-                        <>
-                            {snapshot && visibleThesisRating(thesis.rating, snapshot) ? <Badge>{ratingLabel(thesis.rating)}</Badge> : null}
-                            <span className="text-xs text-gray-500">
-                                v{formatNumber(thesis.version)} · {formatDate(thesis.created_at)}
-                            </span>
-                        </>
-                    ) : null}
                 </div>
             </Link>
         </li>

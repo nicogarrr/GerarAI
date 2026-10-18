@@ -1,3 +1,5 @@
+export const NOT_VALUABLE = 'No valorable / falta evidencia';
+
 /** Coverage counts stored layers. It never establishes valuation quality. */
 export function researchValuability(snapshot: {
   latest_thesis?: { status: string } | null;
@@ -9,7 +11,7 @@ export function researchValuability(snapshot: {
   const blocked = new Set(['insufficient_data', 'blocked', 'missing_mandatory_drivers', 'preview_only']);
   if (!thesis || !model || blocked.has(thesis.status) || blocked.has(model.status) ||
       blocked.has(snapshot.valuation_summary.status) || !model.publishable) {
-    return 'No valorable / falta evidencia';
+    return NOT_VALUABLE;
   }
   return 'Revisar tesis y supuestos';
 }
@@ -42,6 +44,6 @@ export function visibleThesisRating(
   snapshot: Parameters<typeof researchValuability>[0],
 ): string | null {
   if (!rating) return null;
-  if (VALUATION_VERDICTS.has(rating) && researchValuability(snapshot) === 'No valorable / falta evidencia') return null;
+  if (VALUATION_VERDICTS.has(rating) && researchValuability(snapshot) === NOT_VALUABLE) return null;
   return rating;
 }

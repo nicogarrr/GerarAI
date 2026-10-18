@@ -27,3 +27,9 @@ test('la tarjeta del índice usa el contador', () => {
     const page = readFileSync('app/(root)/research/page.tsx', 'utf8');
     assert.match(page, /openReviewsLabel\(snapshot\.counts\)/);
 });
+
+test('la tarjeta conserva el motivo no valorable y muestra pendientes aparte', () => {
+    const page = readFileSync('app/(root)/research/page.tsx', 'utf8');
+    assert.match(page, />No valorable: falta evidencia<\/span>/);
+    assert.match(page, /\{pending \? <span[^>]*>\{pending\}<\/span> : null\}/);
+});
