@@ -100,9 +100,9 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
     ("gross_profit",      ["GrossProfit"],                                                                          "USD"),
     ("operating_income",  ["OperatingIncomeLoss"],                                                                  "USD"),
-    ("income_before_tax", ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments"], "USD"),
+    ("income_before_tax", ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomesticAndForeign"], "USD"),
     ("income_tax_expense", ["IncomeTaxExpenseBenefit"],                                                             "USD"),
-    ("interest_expense",   ["InterestExpenseNonOperating", "InterestExpense"],                                      "USD"),
+    ("interest_expense",   ["InterestExpenseNonoperating", "InterestExpenseNonOperating", "InterestExpense", "InterestExpenseDebt", "InterestExpenseLongTermDebt", "InterestAndDebtExpense"],                                      "USD"),
     ("net_income",        ["NetIncomeLoss", "ProfitLoss"],                                                          "USD"),
     ("eps_diluted",       ["EarningsPerShareDiluted"],                                                              "USD/share"),
     # PROMEDIO ponderado de acciones (un denominador de duracion). El saldo
@@ -124,7 +124,7 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # LongTermDebt, asi que la deuda neta salia sin la parte corriente. El
     # ganador lo decide el `filed` mas reciente del MISMO periodo, de modo que el
     # orden solo desempata cuando el emisor nunca presenta el tag combinado.
-    ("total_debt",        ["DebtLongtermAndShorttermCombinedAmount", "LongTermDebt", "LongTermDebtNoncurrent"], "USD"),
+    ("total_debt",        ["DebtLongtermAndShorttermCombinedAmount", "LongTermDebt", "LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations"], "USD"),
     ("total_assets",      ["Assets"],                                                                               "USD"),
     ("total_liabilities", ["Liabilities"],                                                                          "USD"),
     # StockholdersEquity = patrimonio atribuible a la matriz; la variante
