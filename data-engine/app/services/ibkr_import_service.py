@@ -467,6 +467,7 @@ class IBKRImportService:
         max_statement_age_days: int = 5,
         trades_only: bool = False,
         only_existing_companies: bool = False,
+        include_cash_income: bool = False,
     ) -> dict:
         """Importa un Flex Query.
 
@@ -474,7 +475,10 @@ class IBKRImportService:
         acciones y se escriben como operaciones del libro (idempotente por trade id).
         No toca posiciones, caja, reconcile ni snapshots; con ``dry_run`` hace rollback.
         ``only_existing_companies=True`` omite (y lista) los simbolos sin Company, para no
-        crear emisores nuevos.
+        crear emisores nuevos. ``include_cash_income=True`` (solo con trades_only) importa
+        tambien dividendos, retenciones, intereses y comisiones (CashTransaction) por su id;
+        los depositos/retiradas y otros movimientos (cash_misc) se omiten porque alimentan
+        el flujo de caja de los snapshots.
 
         ``reconcile=True`` hace IBKR fuente de verdad: tras importar un extracto
         completo se eliminan las posiciones y saldos de caja que ya no vienen en el
@@ -563,11 +567,17 @@ class IBKRImportService:
         trades_already_present = 0
         non_stock_skipped = 0
         unknown_tickers: dict[str, int] = {}
-        for element in root.iter():
+        elements = list(root.iter())
+        if trades_only:
+            # Primero los Trade: crean los emisores a los que luego se atribuyen
+            # los dividendos (orden estable, el resto mantiene su orden).
+            elements.sort(key=lambda e: 0 if _tag_name(e) == "Trade" else 1)
+        cash_misc_skipped = 0
+        for element in elements:
             tag = _tag_name(element)
-            if trades_only and tag != "Trade":
+            if trades_only and tag != "Trade" and not (include_cash_income and tag == "CashTransaction"):
                 continue
-            if trades_only and (_attr(element, "assetCategory") or "STK").upper() != "STK":
+            if trades_only and tag == "Trade" and (_attr(element, "assetCategory") or "STK").upper() != "STK":
                 # Divisas (EUR.USD), opciones, etc.: no son compras de acciones del libro.
                 non_stock_skipped += 1
                 continue
@@ -757,6 +767,9 @@ class IBKRImportService:
                     action = "fee"
                 else:
                     action = "cash_misc"
+                if trades_only and action == "cash_misc":
+                    cash_misc_skipped += 1
+                    continue
                 external_id = _attr(element, "trxID", "transactionID", "id")
                 if external_id and external_id in existing_ids:
                     continue
@@ -841,6 +854,10 @@ class IBKRImportService:
                 "trades_imported": trades_imported,
                 "trades_already_present": trades_already_present,
                 "non_stock_skipped": non_stock_skipped,
+                "dividends_imported": dividends_imported,
+                "fees_imported": fees_imported,
+                "cash_transactions_imported": cash_transactions_imported,
+                "cash_misc_skipped": cash_misc_skipped,
                 "skipped_unknown_tickers": dict(sorted(unknown_tickers.items())),
                 "rows_skipped": rows_skipped,
                 "row_errors": row_errors,

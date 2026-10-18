@@ -40,6 +40,7 @@ async def backfill_trades(
     *,
     dry_run: bool = True,
     only_existing_companies: bool = True,
+    include_cash_income: bool = False,
     client: IBKRFlexClient | None = None,
 ) -> list[dict[str, Any]]:
     """Importa (o simula) los trades de ``from_date``..``to_date`` por tramos."""
@@ -53,6 +54,7 @@ async def backfill_trades(
             trades_only=True,
             dry_run=dry_run,
             only_existing_companies=only_existing_companies,
+            include_cash_income=include_cash_income,
         )
         results.append({"from": start.isoformat(), "to": end.isoformat(), **result})
     return results

@@ -95,3 +95,40 @@ def test_backfill_calls_client_per_range():
     assert len(out) == len(fake.calls) == 2
     assert fake.calls[0][0] == "20250101"
     assert _counts(db)[0] == 0
+
+
+CASH_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="test"><FlexStatements><FlexStatement accountId="U1">
+  <CashTransaction type="Dividends" transactionID="D1" symbol="NEWCO" amount="10" dateTime="2026-04-01" currency="USD"/>
+  <CashTransaction type="Withholding Tax" transactionID="W1" symbol="NEWCO" amount="-1.5" dateTime="2026-04-01" currency="USD"/>
+  <CashTransaction type="Broker Interest Received" transactionID="I1" amount="0.4" dateTime="2026-04-02" currency="EUR"/>
+  <CashTransaction type="Deposits &amp; Withdrawals" transactionID="X1" amount="500" dateTime="2026-04-03" currency="EUR"/>
+  <Trade assetCategory="STK" symbol="NEWCO" tradeID="T9" buySell="BUY" quantity="3" tradePrice="10" ibCommission="1" tradeDate="2026-03-03" currency="USD"/>
+</FlexStatement></FlexStatements></FlexQueryResponse>"""
+
+
+def test_cash_income_imports_dividends_withholding_interest_but_not_deposits():
+    db = _db()
+    r = IBKRImportService().import_flex_xml(
+        db, CASH_XML, trades_only=True, include_cash_income=True, only_existing_companies=False
+    )
+    assert r["trades_imported"] == 1
+    assert r["dividends_imported"] == 1
+    assert r["cash_transactions_imported"] == 2  # retencion + intereses
+    assert r["cash_misc_skipped"] == 1
+    actions = sorted(db.scalars(select(Transaction.action)).all())
+    assert actions == ["buy", "dividend", "interest", "withholding"]
+    # el dividendo queda atribuido a NEWCO aunque el Trade se procesa primero en el codigo
+    div = db.scalar(select(Transaction).where(Transaction.action == "dividend"))
+    assert div.company_id is not None
+    assert _counts(db)[1:3] == (0, 0)  # sin posiciones ni caja
+    again = IBKRImportService().import_flex_xml(
+        db, CASH_XML, trades_only=True, include_cash_income=True, only_existing_companies=False
+    )
+    assert again["dividends_imported"] == 0 and again["cash_transactions_imported"] == 0
+
+
+def test_cash_income_off_by_default():
+    db = _db()
+    r = IBKRImportService().import_flex_xml(db, CASH_XML, trades_only=True, only_existing_companies=False)
+    assert r["dividends_imported"] == 0 and r["cash_transactions_imported"] == 0
