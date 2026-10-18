@@ -38,43 +38,6 @@ type ContextEcho = {
  * "Viendo X"); el eco que devuelve el servidor (IDs resueltos y permisos
  * aplicados allí) manda sobre la etiqueta local. Solo lectura.
  */
-/** Selector de controles que el FAB no puede tapar en reposo: lo que el
- *  usuario podria querer pulsar justo debajo de la burbuja. */
-const FAB_INTERACTIVE_SELECTOR =
-    'a[href], button, input, select, textarea, summary, [role="button"], [role="link"], [contenteditable="true"]';
-
-/** ¿El FAB tapa un control interactivo en reposo? Se mira que hay justo
- *  debajo de su zona (centro y esquinas interiores) con elementsFromPoint,
- *  descartando el propio FAB y su icono. La zona se mide desde el computed
- *  style (bottom/right resuelven env(safe-area-inset-*) a px), igual que el
- *  chequeo de la leyenda: con el translate-y-24 del estado oculto el rect
- *  saldria de la zona y el estado oscilaria. */
-function fabCoversInteractive(fab: HTMLElement): boolean {
-    const styles = getComputedStyle(fab);
-    const bottom = parseFloat(styles.bottom) || 0;
-    const right = parseFloat(styles.right) || 0;
-    const width = parseFloat(styles.width) || 0;
-    const height = parseFloat(styles.height) || 0;
-    if (!width || !height) return false;
-    const zoneLeft = window.innerWidth - right - width;
-    const zoneTop = window.innerHeight - bottom - height;
-    const inset = 6;
-    const points: [number, number][] = [
-        [zoneLeft + width / 2, zoneTop + height / 2],
-        [zoneLeft + inset, zoneTop + inset],
-        [zoneLeft + width - inset, zoneTop + inset],
-        [zoneLeft + inset, zoneTop + height - inset],
-        [zoneLeft + width - inset, zoneTop + height - inset],
-    ];
-    return points.some(([x, y]) =>
-        document.elementsFromPoint(x, y).some((el) => {
-            if (el === fab || fab.contains(el)) return false;
-            const control = el.closest(FAB_INTERACTIVE_SELECTOR);
-            return control !== null && control !== fab && !fab.contains(control);
-        }),
-    );
-}
-
 export function GlobalBrain({ userId }: GlobalBrainProps) {
     const pathname = usePathname();
     const page = brainPageContext(pathname);
@@ -166,78 +129,6 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         };
     }, [isOpen]);
 
-    /**
-     * F339: a <md la burbuja fija (bottom-right) tapa la columna de porcentajes
-     * de la leyenda del donut de Distribución EN REPOSO: el solape importa con
-     * el scroll parado, no solo en movimiento. La burbuja se oculta (a) durante
-     * el scroll, reapareciendo ~600 ms tras parar, y (b) siempre que la leyenda
-     * intersecte su zona — incluido el reposo — hasta que deje de intersectarla.
-     * En desktop (md+) las clases md:* la mantienen siempre visible.
-     *
-     * La zona se mide desde el computed style del propio botón (bottom/right
-     * resuelven el env(safe-area-inset-*) de iPhone a px, y width/height dan el
-     * tamaño real) y no desde getBoundingClientRect: al ocultarse con
-     * translate-y-24 el rect saldría de la zona y la burbuja oscilaría. El
-     * chequeo corre al montar, en scroll, en resize y ante un MutationObserver
-     * acotado: las tabs de la cartera montan y desmontan la leyenda sin scroll
-     * ni resize, y el estado no puede quedar obsoleto tras un cambio de tab.
-     * La leyenda se re-consulta por id en cada chequeo y todo se limpia al
-     * desmontar.
-     */
-    const [fabScrollHidden, setFabScrollHidden] = useState(false);
-    const [fabLegendBlocked, setFabLegendBlocked] = useState(false);
-    const [fabControlsBlocked, setFabControlsBlocked] = useState(false);
-    const fabRef = useRef<HTMLButtonElement>(null);
-    useEffect(() => {
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        const checkLegendOverlap = () => {
-            const legend = document.getElementById('portfolio-allocation-legend');
-            const fab = fabRef.current;
-            // FAB-390: en reposo el FAB tampoco puede tapar CONTROLES del borde
-            // derecho en móvil (un botón o enlace bajo la burbuja no se puede
-            // pulsar). Con o sin leyenda: se oculta hasta que dejan de cruzar
-            // su zona. En md+ las clases md:* lo mantienen siempre visible.
-            setFabControlsBlocked(fab ? fabCoversInteractive(fab) : false);
-            if (!legend || !fab) {
-                setFabLegendBlocked(false);
-                return;
-            }
-            const styles = getComputedStyle(fab);
-            const bottom = parseFloat(styles.bottom) || 0;
-            const right = parseFloat(styles.right) || 0;
-            const width = parseFloat(styles.width) || 0;
-            const height = parseFloat(styles.height) || 0;
-            const zoneLeft = window.innerWidth - right - width - 8;
-            const zoneTop = window.innerHeight - bottom - height - 8;
-            const rect = legend.getBoundingClientRect();
-            setFabLegendBlocked(
-                rect.right > zoneLeft && rect.left < window.innerWidth - right + 8 &&
-                rect.bottom > zoneTop && rect.top < window.innerHeight - bottom + 8
-            );
-        };
-        const onScroll = () => {
-            setFabScrollHidden(true);
-            if (timer !== undefined) clearTimeout(timer);
-            timer = setTimeout(() => {
-                setFabScrollHidden(false);
-                checkLegendOverlap();
-            }, 600);
-            checkLegendOverlap();
-        };
-        checkLegendOverlap();
-        const observer = new MutationObserver(checkLegendOverlap);
-        observer.observe(document.body, { childList: true, subtree: true });
-        window.addEventListener('scroll', onScroll, { passive: true, capture: true });
-        window.addEventListener('resize', checkLegendOverlap, { passive: true });
-        return () => {
-            observer.disconnect();
-            window.removeEventListener('scroll', onScroll, { capture: true });
-            window.removeEventListener('resize', checkLegendOverlap);
-            if (timer !== undefined) clearTimeout(timer);
-        };
-    }, []);
-    const fabHidden = fabScrollHidden || fabLegendBlocked || fabControlsBlocked;
-
     async function handleSend() {
         if (!input.trim() || loading) return;
 
@@ -267,12 +158,11 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     if (!isOpen) {
         return (
             <Button
-                ref={fabRef}
                 onClick={() => setIsOpen(true)}
                 aria-label="Abrir el cerebro"
                 // `viewportFit: "cover"` + barra de inicio de iOS: sin el inset la
                 // burbuja queda bajo la barra en modo standalone.
-                className={`fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.5rem+env(safe-area-inset-right))] h-14 w-14 p-0 rounded-none shadow-none bg-transparent hover:bg-transparent text-white z-50 animate-in zoom-in duration-300 transition-all ${fabHidden ? 'translate-y-24 opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto' : ''}`}
+                className="hidden md:flex fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.5rem+env(safe-area-inset-right))] h-14 w-14 p-0 rounded-none shadow-none bg-transparent hover:bg-transparent text-white z-50"
             >
                 <BrainGlassesIcon className="h-14 w-14 shrink-0 object-contain" />
             </Button>
@@ -289,7 +179,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
             aria-busy={loading}
             className={`fixed z-50 flex flex-col border-indigo-500/30 bg-slate-950/95 backdrop-blur-md shadow-2xl transition-all duration-300 ${isMaximized
             ? 'top-4 bottom-4 left-4 right-4 w-auto h-auto'
-            : 'inset-x-2 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] top-20 md:inset-x-auto md:top-0 md:bottom-0 md:right-0 md:w-[420px] md:h-dvh md:rounded-none md:border-y-0 md:border-r-0'
+            : 'inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-20 md:inset-x-auto md:top-0 md:bottom-0 md:right-0 md:w-[420px] md:h-dvh md:rounded-none md:border-y-0 md:border-r-0'
             }`}
         >
             <CardHeader className="p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
