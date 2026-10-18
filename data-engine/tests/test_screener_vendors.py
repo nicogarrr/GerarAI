@@ -293,6 +293,7 @@ def test_finnhub_profile_normalization():
     profile = FinnhubScreenVendor().fetch_profile(client, "AAPL")
     assert profile == {
         "name": "Apple Inc",
+        "currency": None,
         "marketCap": pytest.approx(3000.5 * 1_000_000.0),
         "sector": "Technology",
         "exchange": "NASDAQ",

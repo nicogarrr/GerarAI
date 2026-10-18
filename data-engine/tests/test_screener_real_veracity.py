@@ -193,3 +193,13 @@ def test_as_of_reflects_oldest_carried_lkg_item():
     assert bucket["at_wall"] == first_at_wall, (
         "con datos LKG mezclados, el as_of no puede afirmar la frescura del ultimo refresh"
     )
+
+
+def test_finnhub_profile_preserves_currency_without_guessing():
+    client = _FakeClient({"/stock/profile2": _FakeResponse({
+        "ticker": "X", "name": "X Co", "currency": "EUR",
+    })})
+    profile = FinnhubScreenVendor().fetch_profile(client, "X")
+    assert profile["currency"] == "EUR"
+    absent = _FakeClient({"/stock/profile2": _FakeResponse({"ticker": "X"})})
+    assert FinnhubScreenVendor().fetch_profile(absent, "X")["currency"] is None
