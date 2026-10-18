@@ -95,10 +95,10 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
             </div>
           </div>
 
-          {/* Score Mínimo */}
+          {/* Puntuación mínima */}
           <div className="space-y-3">
             <Label className="text-sm font-medium text-gray-200">
-              Score Mínimo: {filters.minScore}
+              Puntuación mínima: {filters.minScore}
             </Label>
             <Slider
               disabled={disabled}
@@ -146,7 +146,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="score">Score General</SelectItem>
+                <SelectItem value="score">Puntuación general</SelectItem>
                 <SelectItem disabled={neutralSorts.includes('momentum')} value="momentum">
                   Momentum{neutralSorts.includes('momentum') ? ' (n/d en estos resultados)' : ''}
                 </SelectItem>

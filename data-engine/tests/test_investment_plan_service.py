@@ -150,3 +150,22 @@ def test_drift_excludes_cash_without_fx_rate_instead_of_guessing_parity(db):
     ]
     assert drift["cash_base"] == pytest.approx(500.0)
     assert drift["portfolio_value_base"] == pytest.approx(500.0)
+
+
+def test_drift_cash_uses_balance_date_like_portfolio_summary(db):
+    from app.models.entities import CashBalance, FXRate
+    from app.services.risk_service import RiskService
+    service = InvestmentPlanService()
+    _plan(service, db)
+    db.add(CashBalance(currency="USD", balance=Decimal("1000"), as_of=date(2026, 9, 20)))
+    db.add_all([
+        FXRate(base_currency="EUR", quote_currency="USD", rate=Decimal("0.90"), rate_date=date(2026, 9, 19), source="test"),
+        FXRate(base_currency="EUR", quote_currency="USD", rate=Decimal("0.95"), rate_date=date(2026, 9, 21), source="test"),
+    ])
+    db.commit()
+    drift = service.drift_analysis(db)
+    summary = RiskService().dashboard(db)
+    assert drift["cash_base"] == pytest.approx(summary["total_value"])
+    assert drift["cash_base"] == pytest.approx(900)
+    assert drift["base_currency"] == "EUR"
+    assert service.plan_metrics(db)["base_currency"] == "EUR"
