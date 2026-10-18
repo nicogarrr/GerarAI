@@ -89,13 +89,13 @@ export default async function PortfolioIntelligencePage({ searchParams }: { sear
     */}
     <Panel
       actions={<Link className="text-sm text-teal-300 hover:text-teal-200" href="/risk">Ver concentraciones</Link>}
-      description="El desglose por sector, país, divisa y factor, los pesos por posición y las alertas de concentración se calculan y se muestran solo en Exposiciones de cartera."
+      description="Pesos sobre el valor de las posiciones de renta variable, sin caja; Exposiciones de cartera calcula sobre el total con caja. El desglose por sector, país, divisa y factor, los pesos por posición y las alertas de concentración se calculan y se muestran solo en Exposiciones de cartera."
       title="Concentración de la cartera"
     >
       <div className="grid gap-3 text-sm sm:grid-cols-3">
-        <div className="flex justify-between gap-3"><span className="text-gray-400">Top 1</span><span className="text-gray-200">{pct(data.concentration.top_1)}</span></div>
-        <div className="flex justify-between gap-3"><span className="text-gray-400">Top 5</span><span className="text-gray-200">{pct(data.concentration.top_5)}</span></div>
-        <div className="flex justify-between gap-3"><span className="text-gray-400">Herfindahl</span><span className="text-gray-200">{formatNumber(data.concentration.herfindahl, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span></div>
+        <div className="flex justify-between gap-3"><span className="text-gray-400">Top 1 sobre renta variable</span><span className="text-gray-200">{pct(data.concentration.top_1)}</span></div>
+        <div className="flex justify-between gap-3"><span className="text-gray-400">Top 5 sobre renta variable</span><span className="text-gray-200">{pct(data.concentration.top_5)}</span></div>
+        <div className="flex justify-between gap-3"><span className="text-gray-400">Herfindahl (sobre renta variable)</span><span className="text-gray-200">{formatNumber(data.concentration.herfindahl, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span></div>
       </div>
       <p className="mt-4 border-t border-gray-800 pt-3 text-gray-500">{data.coverage.positions === 0 ? 'Sin posiciones que valorar todavía.' : `${data.coverage.positions_with_price_history}/${data.coverage.positions} posiciones con histórico de precios (${formatPercent(data.coverage.price_history_percent, { fromRatio: false, digits: 0 })})`}</p>
     </Panel>
