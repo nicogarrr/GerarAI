@@ -934,6 +934,7 @@ def _refetch_real_items(
                 "name": name,
                 "price": quote["price"],
                 "priceAsOf": quote.get("asOf"),
+                "priceTimestampKind": "daily_candle_open" if active.name == "yahoo" else "quote",
                 "priceDate": quote.get("asOfDate"),
                 "currency": quote.get("currency"),
                 "change": quote["change"],
