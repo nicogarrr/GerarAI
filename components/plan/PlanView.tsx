@@ -96,7 +96,7 @@ function planValue(value: unknown, currency?: string, weights = false): string {
     if (typeof value === 'number') return formatNumber(value);
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
     const text = String(value);
-    const cleanText = text.replace(/\besta\b/g, 'está').replace(/([+-]?\d+\.\d+) puntos/g, (_all, number) => `${formatNumber(Number(number), {maximumFractionDigits: 2})} puntos`);
+    const cleanText = text.replace(/\besta\b/g, 'está').replace(/([+-]?\d+\.\d+) puntos/g, (_all, number) => `${number.startsWith('+') ? '+' : ''}${formatNumber(Number(number), {maximumFractionDigits: 2})} puntos`);
     return ({ok: 'Completo', incomplete_fx: 'Faltan tipos de cambio', buy: 'Comprar', sell: 'Vender'} as Record<string, string>)[text] ?? etiquetaSector(cleanText.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja'));
 }
 const planMoney = (value: unknown, record: DataRecord) =>
