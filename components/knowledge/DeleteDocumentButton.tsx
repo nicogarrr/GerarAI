@@ -11,7 +11,7 @@ export function DeleteDocumentButton({ documentId, title, className }: { documen
     const [state, setState] = useState<'idle' | 'deleting' | 'error'>('idle');
 
     const handleDelete = async () => {
-        if (!window.confirm(`¿Eliminar «${title}»? Se borran también sus fragmentos y principios extraídos. Esta acción no se puede deshacer.`)) return;
+        if (!window.confirm(`¿Eliminar «${title}»? Se eliminan el documento, sus fragmentos y principios extraídos, también los ya aprobados. Los casos de estudio se conservan sin el enlace y el archivo original sigue en el almacén. Esta acción no se puede deshacer.`)) return;
         setState('deleting');
         const result = await deleteKnowledgeDocument(documentId);
         setState(result.success ? 'idle' : 'error');
