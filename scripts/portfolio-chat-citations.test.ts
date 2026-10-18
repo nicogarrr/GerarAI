@@ -59,3 +59,13 @@ test('Cerebro no repite la misma fuente ni la etiqueta de tipo si el título ya 
     assert.equal(citationKindLabelFor(result[0]), null);
     assert.equal(citationKindLabelFor({ locator: 'position:9', document: 'GOOGL' }), 'Posición');
 });
+
+test('B5: el mismo documento citado por varios fragmentos no se repite en Fuentes', () => {
+    const result = toPortfolioChatCitations([
+        { type: 'knowledge_chunk', id: 31, title: 'Numantia Patrimonio - Carta 2021', page_number: 4 },
+        { type: 'knowledge_chunk', id: 32, title: 'Numantia Patrimonio - Carta 2021', page_number: 4 },
+        { type: 'knowledge_chunk', id: 33, title: 'Numantia Patrimonio - Carta 2021', page_number: 9 },
+    ]);
+    assert.equal(result.length, 2);
+    assert.deepEqual(result.map((c) => c.page), [4, 9]);
+});

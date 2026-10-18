@@ -69,10 +69,20 @@ export interface PortfolioChatCitation extends ChatCitation {
 /** Keep backend sources visible without inventing links for internal records. */
 export function toPortfolioChatCitations(sources: ChatSource[] | undefined | null): PortfolioChatCitation[] {
     const seen = new Set<string>();
+    const seenDocuments = new Set<string>();
     const unique = (sources ?? []).filter((source) => {
         const key = `${source.type}:${String(source.id)}`;
         if (seen.has(key)) return false;
         seen.add(key);
+        // El mismo documento citado por varios fragmentos no se repite en
+        // «Fuentes»: una entrada por documento y página.
+        if (['document_chunk', 'rag_chunk', 'claim_evidence', 'knowledge_chunk'].includes(String(source.type))) {
+            const title = typeof source.title === 'string' ? source.title : '';
+            const page = typeof source.page_number === 'number' ? source.page_number : null;
+            const docKey = `${String(source.type)}:${title}:${String(page)}`;
+            if (seenDocuments.has(docKey)) return false;
+            seenDocuments.add(docKey);
+        }
         return true;
     });
     return unique.map((source) => {
