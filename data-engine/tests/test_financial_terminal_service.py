@@ -102,6 +102,34 @@ def test_duplicate_period_vendor_wins_when_no_filing(db):
     series = result["metrics"][0]["series"]
     assert len(series) == 1
     assert series[0]["id"] == new.id
+def test_fcf_missing_reason_points_at_capex(db):
+    """Hallazgo 7: hay CFO pero no capex -> el FCF no se deriva ni se
+    sustituye por cero; la tarjeta explica por que falta."""
+    company = _company(db)
+    _fact(db, company, metric="operating_cash_flow", period="FY2024", fiscal_year=2024, value=100)
+    result = FinancialTerminalService().build(db, company, metrics=["free_cash_flow"])
+    metric = result["metrics"][0]
+    assert metric["status"] == "missing"
+    assert metric["missing_reason"] is not None
+    assert "capex" in metric["missing_reason"]
+
+
+def test_capex_missing_reason_for_banks(db):
+    """JPM: los bancos no reportan capex desglosado en XBRL (companyfacts
+    no tiene ningun tag de capex para JPM, verificado 2026-10-18)."""
+    company = _company(db)
+    company.industry = "Banks - Diversified"
+    db.commit()
+    result = FinancialTerminalService().build(db, company, metrics=["capital_expenditure"])
+    metric = result["metrics"][0]
+    assert metric["status"] == "missing"
+    assert "bancos" in metric["missing_reason"].lower()
+
+
+def test_missing_metric_without_known_reason_stays_generic(db):
+    company = _company(db)
+    result = FinancialTerminalService().build(db, company, metrics=["revenue"])
+    assert result["metrics"][0]["missing_reason"] is None
 
 
 def test_years_window_excludes_older_facts(db):

@@ -179,6 +179,8 @@ export type FinancialTerminal = {
     canonical_formula: string | null;
     definition_version: string | null;
     status: string;
+    /** Por que falta la metrica, cuando el backend lo sabe decir sin inventar. */
+    missing_reason?: string | null;
     periods: number;
     segments: string[];
     series: Array<{
