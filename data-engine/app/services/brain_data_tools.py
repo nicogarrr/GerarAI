@@ -138,6 +138,42 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     return _response([head, *lines, total, *tail], sources, "portfolio_dividends")
 
 
+def _pct(value) -> str:
+    return _number(float(value) * 100) + " %"
+
+
+def _thesis_valuation_answer(db: Session, question: str, tenant: int) -> ChatResponse | None:
+    """Margen y escenarios de la tesis PUBLICADA de una empresa; solo lo guardado en la tesis."""
+    company = _company_in_question(db, question)
+    if company is None:
+        return None
+    published = db.scalar(select(ThesisVersion).where(
+        ThesisVersion.tenant_id == tenant, ThesisVersion.company_id == company.id, ThesisVersion.status == "published",
+    ).order_by(ThesisVersion.version.desc()).limit(1))
+    if published is None:
+        latest = db.scalar(select(ThesisVersion).where(
+            ThesisVersion.tenant_id == tenant, ThesisVersion.company_id == company.id,
+        ).order_by(ThesisVersion.version.desc()).limit(1))
+        if latest is None:
+            return _response([f"No hay ninguna tesis guardada de {company.ticker}."], [], "thesis_valuation")
+        return _response([f"{company.ticker} solo tiene una versión no publicada (v{latest.version}, {latest.status}); no la uso para dar el margen de seguridad."],
+                         [_source("thesis_version", latest.id, f"Tesis {company.ticker} v{latest.version}", _link(company, "thesis"))], "thesis_valuation")
+    ccy = company.currency
+    lines = [f"**Tesis de {company.ticker} · v{published.version} (publicada)**"]
+    if published.margin_of_safety is None:
+        lines.append("Margen de seguridad: pendiente en la tesis.")
+    else:
+        lines.append(f"Margen de seguridad de la tesis: {_pct(published.margin_of_safety)}.")
+    parts = [f"{label} {_number(value)} {ccy}" for label, value in (
+        ("bajista", published.bear_value), ("base", published.base_value), ("alcista", published.bull_value),
+        ("esperado", published.expected_value)) if value is not None]
+    if parts:
+        lines.append("Valores de la tesis: " + ", ".join(parts) + ".")
+    if published.current_price is not None:
+        lines.append(f"Precio usado al generar la tesis: {_number(published.current_price)} {ccy} (no es la cotización actual).")
+    return _response(lines, [_source("thesis_version", published.id, f"Tesis {company.ticker} v{published.version}", _link(company, "thesis"))], "thesis_valuation")
+
+
 def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     """None means this tool does not own the question; never guess user intent."""
     tenant = db.info.get("tenant_id")
@@ -147,6 +183,12 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     theses = bool(re.search(r"(?i)\btesis\b", question)) and bool(re.search(r"(?i)\b(?:tengo|mis|activas|vigentes)\b", question))
     comparison = bool(re.search(r"(?i)\bcompara\w*\b", question))
     valuation = bool(re.search(r"(?i)\b(?:precio|PER|cotiza\w*)\b", question)) and not re.search(r"(?i)\b(?:medio|coste|peso|posici[oó]n|tengo)\b", question)
+    thesis_valuation = bool(re.search(r"(?i)\btesis\b", question)) and bool(
+        re.search(r"(?i)\b(?:margen\s+de\s+seguridad|valor\s+esperado|escenarios?|valor\s+objetivo|precio\s+objetivo)\b", question))
+    if thesis_valuation and not re.search(r"(?i)\b(?:compra|comprar|vende|vender|ejecuta|buy|sell)\b", question):
+        answer = _thesis_valuation_answer(db, question, tenant)
+        if answer is not None:
+            return answer
     dividends = bool(re.search(r"(?i)\bdividend\w*|\bcobrar\w*", question))
     if not (news or theses or comparison or valuation or dividends):
         return None
