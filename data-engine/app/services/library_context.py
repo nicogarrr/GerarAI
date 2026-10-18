@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from app.models import KnowledgeChunk, KnowledgeDocument
 from app.services.rag import RAGIndex
 
-
 # Las cartas están en inglés: una pregunta en castellano se recupera también
 # con los términos de inversión equivalentes. Sin LLM ni coste.
 _ES_EN_TERMS: tuple[tuple[str, str], ...] = (
