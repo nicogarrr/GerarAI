@@ -227,3 +227,34 @@ def test_portfolio_dividends_this_year_only_own_open_positions(db):
 def test_dividend_question_without_company_or_portfolio_is_not_hijacked(db):
     from app.services.brain_data_tools import answer_data_question
     assert answer_data_question(db, "¿Qué es un dividendo?") is None
+
+
+def _thesis(db, comp, version, status, mos, tenant=1):
+    db.add(ThesisVersion(tenant_id=tenant, company_id=comp.id, version=version, status=status, thesis_markdown="x", executive_summary="x",
+                         current_price=Decimal("342.62"), bear_value=Decimal("60"), base_value=Decimal("120"), bull_value=Decimal("180"),
+                         expected_value=Decimal("120.4"), margin_of_safety=Decimal(mos)))
+
+
+def test_thesis_margin_uses_latest_published_version_only(db):
+    a = company(db, "AAPL")
+    _thesis(db, a, 10, "published", "0.10")
+    _thesis(db, a, 11, "published", "-0.649")
+    _thesis(db, a, 12, "draft", "0.5")
+    db.commit()
+    response = asyncio.run(ChatService().answer(db, "¿Cuánto margen de seguridad tiene Apple según mi tesis? AAPL", "portfolio", None))
+    assert "v11" in response.answer and "-64,90 %" in response.answer
+    assert "bajista 60,00 USD" in response.answer and "no es la cotización actual" in response.answer
+    assert "50,00" not in response.answer
+    assert response.sources[0]["url"] == "/research/AAPL?view=thesis"
+    assert response.llm_trace["provider_calls"] == 0
+
+
+def test_thesis_margin_draft_only_and_missing_are_honest(db):
+    a = company(db, "AAPL")
+    company(db, "MSFT")
+    _thesis(db, a, 1, "draft", "0.2")
+    db.commit()
+    draft = asyncio.run(ChatService().answer(db, "¿Qué margen de seguridad tiene AAPL según mi tesis?", "portfolio", None))
+    assert "no publicada" in draft.answer and "0,20" not in draft.answer
+    none = asyncio.run(ChatService().answer(db, "¿Qué margen de seguridad tiene MSFT según mi tesis?", "portfolio", None))
+    assert "No hay ninguna tesis guardada de MSFT" in none.answer
