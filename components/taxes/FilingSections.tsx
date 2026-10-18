@@ -175,7 +175,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
         ? dividendos.special_payment_tickers as string[]
         : [];
     const warnings: string[] = [
-        ...manualReview.map((item) => `${String(item.ticker ?? '')}: ${humanizeTaxText(String(item.reason ?? ''))}`),
+        ...manualReview.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
         ...(specialTickers.length > 0
             ? [`Pagos especiales fuera de los dividendos ordinarios (revisión manual): ${specialTickers.join(', ')}`]
             : []),
@@ -277,9 +277,9 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
     const file720Name = `modelo720-${typeof fiscalYear === 'number' ? String(fiscalYear) : 'ejercicio'}.720`;
     const warnings: string[] = [
         ...(missingIsin.length > 0 ? [`Sin ISIN (necesario para declarar el valor): ${missingIsin.join(', ')}`] : []),
-        ...foreignUnverified.map((item) => `${String(item.ticker ?? '')}: ${humanizeTaxText(String(item.reason ?? ''))}`),
-        ...shortPositions.map((item) => `${String(item.ticker ?? '')}: posición corta, no cuenta como bien en el 720`),
-        ...unvalued.map((item) => `${String(item.ticker ?? '')}: ${humanizeTaxText(String(item.reason ?? ''))}`),
+        ...foreignUnverified.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
+        ...shortPositions.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: posición corta, no cuenta como bien en el 720`),
+        ...unvalued.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
     ];
     return (
         <Section
@@ -358,7 +358,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-amber-200/80">
                                         {(file720.excluded as DataRecord[]).map((item, i) => (
                                             <li key={`${String(item.ticker ?? 'item')}-${i}`}>
-                                                {String(item.ticker ?? '')}: {humanizeTaxText(String(item.reason ?? ''))}
+                                                {humanizeTaxText(String(item.ticker ?? ''))}: {humanizeTaxText(String(item.reason ?? ''))}
                                             </li>
                                         ))}
                                     </ul>
@@ -370,7 +370,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-amber-200/80">
                                         {(file720.manual_review as DataRecord[]).map((item, i) => (
                                             <li key={`${String(item.ticker ?? 'item')}-${i}`}>
-                                                {String(item.ticker ?? '')}: {humanizeTaxText(String(item.reason ?? ''))}
+                                                {humanizeTaxText(String(item.ticker ?? ''))}: {humanizeTaxText(String(item.reason ?? ''))}
                                             </li>
                                         ))}
                                     </ul>

@@ -12,6 +12,14 @@ test('claves internas del declarante no llegan a pantalla', () => {
   assert.doesNotMatch(text, /tax_declarant|tenant|custody/);
 });
 
+test('plantilla del declarante sin sustituciones rotas ni ids de caja crudos', () => {
+  const raw = "Faltan datos identificativos del declarante: no se inventan. Guárdalos en la metadata del tenant bajo la clave 'tax_declarant' (nif, apellidos_nombre).";
+  const text = humanizeTaxText(raw);
+  assert.doesNotMatch(text, /la tus|la los|tenant|tax_declarant/);
+  assert.match(text, /Guárdalos en tus datos fiscales, en los datos del declarante/);
+  assert.equal(humanizeTaxText('cash-EUR'), 'caja EUR');
+});
+
 test('el cuerpo del cambio no repite el titular y las etiquetas van en español', () => {
   const out = changeSummaryText('Noticia material que requiere revisión de la tesis: Acme gana un contrato de 5 millones con la NASA. Acme gana un contrato de 5 millones con la NASA.');
   assert.equal(out.match(/Acme gana/g)?.length, 1);

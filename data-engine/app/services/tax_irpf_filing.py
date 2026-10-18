@@ -169,7 +169,9 @@ def build_casillas(dividends: list[dict], realized: list[dict], fiscal_year: int
             # la regla de los 2 meses rompe la proporcionalidad).
             proceeds_base = sale.get("proceeds_base")
             cost_base = sale.get("cost_base")
-            if gain_base is None or proceeds_base is None or cost_base is None:
+            # Venta sin compras que la cubran: el remanente se valora a coste
+            # cero, así que las casillas de ganancia no son fiables.
+            if gain_base is None or proceeds_base is None or cost_base is None or sale.get("over_sell"):
                 incomplete = True
             rows.append({
                 "ticker": bucket["ticker"],

@@ -435,3 +435,52 @@ def test_unattributed_dividend_with_fx_is_summed(db):
     db.commit()
     report = TaxReportService().compute_report(db, 2026)
     assert report["summary"]["unattributed_dividends_base"] == 22.5
+
+
+def test_same_day_sale_imported_before_buys_matches_the_buys(db):
+    """Caso ASTS/ZETA 9-oct: la venta tiene un id anterior a las compras del
+    mismo día. Sin hora de ejecución, las compras van antes: no hay over_sell
+    ni ganancia inventada."""
+    _eur_portfolio(db)
+    c = _company(db, "ZZZ")
+    _tx(db, c, date(2026, 10, 9), "sell", 10, 110)  # id menor: importada antes
+    _tx(db, c, date(2026, 10, 9), "buy", 4, 100)
+    _tx(db, c, date(2026, 10, 9), "buy", 6, 100)
+
+    report = TaxReportService().compute_report(db, 2026)
+    bucket = next(b for b in report["realized"] if b["ticker"] == "ZZZ")
+    assert bucket["over_sell"] is False
+    assert Decimal(str(bucket["gain_base"])) == Decimal("100")
+    assert report["summary"]["total_realized_gain_base"] == 100.0
+
+
+def test_same_day_execution_time_wins_over_import_order(db):
+    _eur_portfolio(db)
+    c = _company(db, "TTT")
+    _tx(db, c, date(2026, 5, 1), "buy", 10, 100)
+    for action, qty, price, stamp in (
+        ("sell", 10, 90, "20260601;100000"),
+        ("buy", 10, 95, "20260601;150000"),
+    ):
+        db.add(Transaction(
+            company_id=c.id, trade_date=date(2026, 6, 1), action=action,
+            quantity=Decimal(qty), price=Decimal(price), fees=Decimal("0"),
+            currency="EUR", raw_payload={"dateTime": stamp},
+        ))
+    db.commit()
+    # Con hora, la venta de las 10:00 casa con el lote de mayo (no con el de las 15:00).
+    report = TaxReportService().compute_report(db, 2026)
+    bucket = next(b for b in report["realized"] if b["ticker"] == "TTT")
+    assert bucket["over_sell"] is False
+    # La pérdida de 100 queda bloqueada por la recompra de las 15:00 (regla de los 2 meses).
+    assert Decimal(str(bucket["blocked_loss_native"])) == Decimal("100")
+
+
+def test_over_sell_makes_realized_total_unreliable_not_exact(db):
+    _eur_portfolio(db)
+    c = _company(db, "OVS")
+    _tx(db, c, date(2026, 3, 10), "sell", 5, 120)  # sin compras que la cubran
+    summary = TaxReportService().compute_report(db, 2026)["summary"]
+    assert summary["over_sell"] == ["OVS"]
+    assert summary["total_realized_gain_base"] is None
+    assert summary["net_taxable_base"] is None

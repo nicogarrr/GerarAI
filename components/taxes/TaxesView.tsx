@@ -151,7 +151,9 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
     const missingFx = Array.isArray(summary.missing_fx) && summary.missing_fx.length > 0;
     const ambiguousCash = summary.manual_review === true
         || (Array.isArray(summary.ambiguous_cash) && summary.ambiguous_cash.length > 0);
+    const overSold = Array.isArray(summary.over_sell) ? summary.over_sell.map(String) : [];
     const nullReason = [
+        overSold.length > 0 ? `ventas sin compras que las cubran: ${overSold.join(', ')}` : null,
         ambiguousCash ? 'revisión manual: fila de caja ambigua' : null,
         missingFx ? 'faltan tipos de cambio' : null,
     ].filter(Boolean).join(' y ');

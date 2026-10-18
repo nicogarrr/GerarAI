@@ -90,6 +90,28 @@ FISCAL_DISCLAIMER = (
 )
 
 DIVIDEND_ACTIONS = {"dividend", "div", "cash_dividend", "withholding"}
+def _execution_time(transaction) -> str:
+    """HHMMSS de la ejecución si el ledger la trae, si no cadena vacía."""
+    payload = transaction.raw_payload if isinstance(transaction.raw_payload, dict) else {}
+    raw = str(payload.get("dateTime") or "")
+    for sep in (";", " ", "T"):
+        if sep in raw:
+            digits = "".join(ch for ch in raw.split(sep, 1)[1] if ch.isdigit())
+            if len(digits) >= 4:
+                return digits[:6].ljust(6, "0")
+    return ""
+
+
+def _fifo_sort_key(transaction) -> tuple:
+    action = (transaction.action or "").lower()
+    return (
+        transaction.trade_date,
+        _execution_time(transaction),
+        0 if action in BUY_ACTIONS else 1,
+        transaction.id or 0,
+    )
+
+
 SELL_ACTIONS = {"sell", "sold"}
 BUY_ACTIONS = {"buy", "bot", "b"}
 
@@ -434,6 +456,11 @@ class TaxReportService:
             .join(Company, Transaction.company_id == Company.id)
             .order_by(Transaction.trade_date, Transaction.id)
         ).all()
+        # Orden FIFO dentro del mismo día: hora de ejecución si el ledger la
+        # trae (raw_payload.dateTime); sin hora, las compras van antes que las
+        # ventas. El id solo refleja el orden de importación: ordenar por él
+        # casaba ventas contra lotes aún vacíos (coste 0, ganancia inventada).
+        tx_rows = sorted(tx_rows, key=lambda row: _fifo_sort_key(row[0]))
 
         last_data_date = tx_rows[-1][0].trade_date if tx_rows else end
 
@@ -714,6 +741,10 @@ class TaxReportService:
         dividend_incomplete = any(b["missing_fx"] for b in dividends) or dividend_ambiguous
         realized_incomplete = any(b["missing_fx"] for b in realized)
         incomplete_fx = dividend_incomplete or realized_incomplete
+        # Ventas sin compras que las cubran: el remanente se valora a coste
+        # cero, así que la plusvalía total no es fiable. None, nunca una
+        # cifra parcial con pinta de exacta (misma regla que los demás totales).
+        realized_unreliable = realized_incomplete or any(b.get("over_sell") for b in realized)
 
         total_dividends = sum(
             (Decimal(str(b["dividends_base"] or 0)) for b in dividends), Decimal("0")
@@ -735,7 +766,7 @@ class TaxReportService:
             # a partial total would look authoritative and be wrong.
             "total_dividends_base": None if dividend_incomplete else _money(total_dividends),
             "total_withholding_base": None if dividend_incomplete else _money(total_withholding),
-            "total_realized_gain_base": None if realized_incomplete else _money(total_gain),
+            "total_realized_gain_base": None if realized_unreliable else _money(total_gain),
             "total_blocked_loss_base": None if realized_incomplete else _money(total_blocked),
             "wash_sale_rule": WASH_SALE_RULE_ID,
             "wash_sale_basis": WASH_SALE_BASIS,
@@ -743,7 +774,7 @@ class TaxReportService:
             "wash_sale_window_open": sorted(
                 b["ticker"] for b in realized if b["wash_sale_window_open"]
             ),
-            "net_taxable_base": None if (incomplete_fx or dividend_ambiguous) else _money(total_dividends + total_gain),
+            "net_taxable_base": None if (incomplete_fx or dividend_ambiguous or realized_unreliable) else _money(total_dividends + total_gain),
             "dividend_count": len(dividends),
             "unattributed_tickers": sorted(
                 b["ticker"] for b in dividends if b.get("unattributed")
