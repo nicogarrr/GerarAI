@@ -92,6 +92,7 @@ function listRoutes(dir: string, base: string): string[] {
 // ruta nueva que no esté en el catálogo ni aquí rompe el guard.
 const CATALOG_EXCEPTIONS: Record<string, string> = {
     '/security': 'menú del avatar (UserDropdown), no es destino de sección',
+    '/settings': 'menú del avatar (UserDropdown), no es destino de sección',
     '/search': 'página-herramienta del buscador global, se abre desde el header',
     // Subpáginas del módulo Inversores: las cubre su HubNav propio
     // (app/(root)/inversores/layout.tsx) y las migas las nombran vía

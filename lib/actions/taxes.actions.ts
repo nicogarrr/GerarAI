@@ -49,3 +49,32 @@ export async function previewTaxFiling(fiscalYear: number, tmePercent: number): 
         body: JSON.stringify({ tme_percent: tmePercent }),
     });
 }
+
+export type TaxDeclarant = {
+    nif: string;
+    apellidos_nombre: string;
+    numero_declaracion: string;
+    telefono: string;
+    filed_720_before: boolean | null;
+    custody: Record<string, string>;
+    partidas: string[];
+};
+
+export type TaxDeclarantInput = Partial<Omit<TaxDeclarant, 'partidas' | 'custody'>> & {
+    custody?: Record<string, string | null>;
+};
+
+/** GET /api/taxes/declarant — datos del declarante y partidas a las que asignar custodia */
+export async function getTaxDeclarant(): Promise<TaxDeclarant> {
+    await requireAuthenticatedUser();
+    return researchRequest<TaxDeclarant>('/api/taxes/declarant', { cache: 'no-store' });
+}
+
+/** PUT /api/taxes/declarant — guarda los datos que lee el Modelo 720 */
+export async function saveTaxDeclarant(input: TaxDeclarantInput): Promise<TaxDeclarant> {
+    await requireAuthenticatedUser();
+    return researchRequest<TaxDeclarant>('/api/taxes/declarant', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+    });
+}
