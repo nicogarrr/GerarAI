@@ -229,3 +229,7 @@ __all__.append("BottleneckDiscovery")
 from app.models.thesis_projection import ThesisProjectionYear as ThesisProjectionYear  # noqa: E402
 
 __all__.append("ThesisProjectionYear")
+
+from app.models.benchmark_price import BenchmarkPrice as BenchmarkPrice  # noqa: E402
+
+__all__.append("BenchmarkPrice")

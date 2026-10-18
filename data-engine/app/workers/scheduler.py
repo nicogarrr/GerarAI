@@ -14,6 +14,7 @@ from app.workers.dramatiq_app import (
     evaluate_alert_rules,
     freeze_propicks_snapshot,
     ingest_corporate_splits,
+    ingest_spy_daily,
     recompute_fundamental_metrics,
     reconcile_alert_analyses,
     reconcile_alert_deliveries,
@@ -387,6 +388,16 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         day=1,
         hour=22,
         minute=30,
+    )
+    # Serie diaria SPY para el "vs SPY" del track record ProPicks.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, ingest_spy_daily),
+        "cron",
+        job_id="spy_benchmark_daily",
+        day_of_week="mon-fri",
+        hour=22,
+        minute=40,
     )
     # Cierres oficiales de todo el universo (base de Movers/Mercado/watchlist).
     # 22:30 UTC: tras el cierre US tanto en EDT como en EST.
