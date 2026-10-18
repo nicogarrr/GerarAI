@@ -2,6 +2,8 @@
 import { frameworkTerm } from './framework-terms.ts';
 // @ts-expect-error TS5097: extensión explícita para node --experimental-strip-types (guards).
 import { metricLabel } from './metric-labels.ts';
+// @ts-expect-error explicit extension for node guards.
+import { thesisCodeLabel } from './thesis-code-label.ts';
 
 const es = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 });
 const esSmall = new Intl.NumberFormat('es-ES', { maximumSignificantDigits: 3 });
@@ -25,6 +27,8 @@ function shortNumber(raw: string): string {
 export function cleanThesisText(text: string | null | undefined): string {
     if (!text) return text ?? '';
     return text
+        .replace(/\bNone\b/g, 'N/D')
+        .replace(/\b(?:unassigned|preview_only|fact_anchored_sensitivity)\b/g, thesisCodeLabel)
         .replace(/(?<![\w/.@-])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![\w/-])/g, (token) => {
             const known = frameworkTerm(token) ?? metricLabel(token);
             return known.replaceAll('_', ' ');
@@ -32,4 +36,17 @@ export function cleanThesisText(text: string | null | undefined): string {
         .replace(/(?<![\w.])-?\d+\.\d{4,}(?![\d.]*\d\.)/g, (num) => shortNumber(num))
         .replace(/([?!])\.(?!\.)/g, '$1')
         .replace(/(?<!\.)\.{2}(?!\.)/g, '.');
+}
+
+/** Presentation of legacy memoranda only. Preserve URLs, citations and numbers. */
+export function cleanThesisMarkdown(text: string): string {
+    const withoutDuplicateNarrative = text.replace(/\n## 24\. Análisis narrativo INFERIDO[\s\S]*?(?=\n## (?!#)|$)/g, '');
+    return withoutDuplicateNarrative.split(/(```[\s\S]*?```|https?:\/\/[^\s<>]+?)(?=\s|$|>)/g).map(part => {
+        if (part.startsWith('http') || part.startsWith('```')) return part;
+        return part.replace(/\bNone\b/g, 'N/D')
+            .replace(/\b(?:unassigned|preview_only|fact_anchored_sensitivity)\b/g, thesisCodeLabel)
+            .replace(/median of latest annual FCF margins/g, 'Mediana de los últimos márgenes FCF anuales')
+            .replace(/annual revenue CAGR across available history/g, 'CAGR anual de ingresos del historial disponible')
+            .replace(/diluted share count CAGR across available history/g, 'CAGR de acciones diluidas del historial disponible');
+    }).join('');
 }

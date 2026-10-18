@@ -1,3 +1,4 @@
+import { cleanThesisMarkdown } from '@/lib/research/thesis-text';
 import { thesisCodeLabel } from '@/lib/research/thesis-code-label';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -72,13 +73,18 @@ export default function ThesisMarkdown({ content }: { content: string }) {
     <div className="min-w-0 max-w-full [overflow-wrap:anywhere] rounded-lg border border-gray-800 bg-black/20 p-4 text-sm leading-6 text-gray-300">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
         ...markdownComponents,
+        a: ({ node: _node, children, ...props }) => (
+          <a className="break-words text-teal-400 underline" target="_blank" rel="noopener noreferrer" {...props}>
+            {typeof children === 'string' && /^https?:\/\//.test(children) ? 'Fuente' : children}
+          </a>
+        ),
         code: ({ node: _node, className, children, ...props }) => (
           <code className={`rounded bg-gray-800 px-1 py-0.5 font-mono text-[0.85em] text-gray-200 ${className ?? ''}`} {...props}>
             {!className && typeof children === 'string' ? thesisCodeLabel(children) : children}
           </code>
         ),
       }}>
-        {content}
+        {cleanThesisMarkdown(content)}
       </ReactMarkdown>
     </div>
   );
