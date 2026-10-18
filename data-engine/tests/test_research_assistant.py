@@ -254,3 +254,56 @@ def test_thesis_style_question_lists_recent_sources(db):
             mode="explore", ticker="ASTS", question=question)))
         assert r.status == "answered", question
         assert r.citations
+
+
+def test_valuation_and_thesis_question_cites_draft_without_figures(db):
+    from decimal import Decimal
+
+    from app.models import ThesisVersion
+
+    tenant, _, company = setup(db)
+    db.add(ThesisVersion(
+        tenant_id=tenant.id, company_id=company.id, version=11, status="draft",
+        thesis_markdown="x", executive_summary="Borrador.", rating="watch",
+        base_value=Decimal("120.5"), margin_of_safety=Decimal("0.123"),
+    ))
+    db.commit()
+    r = AssistantResponse.model_validate(answer(db, AssistantRequest(
+        mode="explore", ticker="ASTS", question="¿Cómo va la valoración y la tesis?")))
+    assert r.status == "answered"
+    assert r.citations[0].kind == "thesis_record"
+    assert "borrador sin publicar" in r.answer and "v11" in r.answer
+    assert "120" not in r.answer and "12,3" not in r.answer
+
+
+def test_valuation_question_uses_published_thesis_figures_and_flags_newer_draft(db):
+    from decimal import Decimal
+
+    from app.models import ThesisVersion
+
+    tenant, _, company = setup(db)
+    db.add(ThesisVersion(
+        tenant_id=tenant.id, company_id=company.id, version=10, status="published",
+        thesis_markdown="x", executive_summary="Publicada.", rating="watch",
+        base_value=Decimal("120.5"), margin_of_safety=Decimal("0.123"),
+    ))
+    db.add(ThesisVersion(
+        tenant_id=tenant.id, company_id=company.id, version=11, status="draft",
+        thesis_markdown="x", executive_summary="Borrador.", rating="watch",
+        base_value=Decimal("999"), margin_of_safety=Decimal("0.5"),
+    ))
+    db.commit()
+    r = AssistantResponse.model_validate(answer(db, AssistantRequest(
+        mode="explore", ticker="ASTS", question="¿Cómo va la valoración y la tesis?")))
+    assert "base $120.50" in r.answer and "12,3 %" in r.answer and "v10 publicada" in r.answer
+    assert "borrador sin publicar" in r.answer
+    assert "999" not in r.answer and "50,0" not in r.answer
+
+
+def test_thesis_money_format_usd_en_us_other_es_es():
+    from decimal import Decimal
+
+    from app.services.research_assistant_service import _money
+
+    assert _money(Decimal("1234.5"), "USD") == "$1,234.50"
+    assert _money(Decimal("1234.5"), "EUR") == "1.234,50 EUR"

@@ -17,7 +17,7 @@ const SECTION_LABELS: Record<AssistantSectionKey, string> = {
 };
 const CITATION_LABELS: Record<AssistantCitationKind, string> = {
   news_event: 'Noticia atribuida', financial_fact: 'Dato financiero', document_chunk: 'Documento',
-  claim_evidence: 'Evidencia de afirmación', market_observation: 'Observación de mercado',
+  claim_evidence: 'Evidencia de afirmación', market_observation: 'Observación de mercado', thesis_record: 'Tesis guardada',
 };
 
 /**
