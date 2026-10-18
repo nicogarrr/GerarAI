@@ -1,0 +1,156 @@
+"""El memorando de la tesis se genera en español de UI, con tildes, sin
+placeholders de plantilla y con los números internos redondeados.
+
+Regresiones cubiertas:
+- la plantilla salía en inglés ("# ASTS Thesis v25", "## 1. Executive Summary");
+- la línea N/D llevaba el placeholder sin sustituir
+  "(dado X, inferimos Y) con fuente https.";
+- la base del tipo impositivo mostraba "clamped from -0.0060194747112082423"
+  con 16 decimales y nota interna en inglés.
+"""
+
+import re
+from decimal import Decimal
+
+from sqlalchemy import delete, select
+
+from app.core.database import SessionLocal, init_db
+from app.models import Company, FinancialFact, Position
+from app.services.long_term_model_service import LongTermModelService
+from app.services.thesis_service import ThesisService
+
+
+def _company() -> Company:
+    return Company(
+        ticker="T",
+        name="Test Co",
+        exchange="E",
+        currency="USD",
+        sector="Software",
+        industry="Application Software",
+        company_type="standard",
+        valuation_model="standard_dcf",
+        special_sources=[],
+        special_risks=[],
+        factor_tags=[],
+    )
+
+
+def test_render_markdown_en_espanol_sin_ingles_ni_claves_crudas():
+    markdown = ThesisService()._render_markdown(
+        _company(),
+        {},
+        {"passed": True, "source_coverage_score": 80, "unsupported_claims": 0},
+        {},
+        long_term_model={},
+        version=3,
+        hypothesis="Hipótesis de prueba.",
+        catalysts=[],
+        invalidation_criteria=["Un criterio."],
+        scenario_probabilities=None,
+    )
+    assert markdown.startswith("# Tesis de T — v3")
+    for header in (
+        "## 1. Resumen ejecutivo",
+        "## 2. Hipótesis",
+        "## 13. Valoración",
+        "## 14. DCF inverso",
+        "## 19. Auditoría de fuentes",
+        "## 20. Fuentes",
+        "## 21. Datos pendientes",
+        "## 22. Procedencia de los inputs",
+    ):
+        assert header in markdown
+    for english in (
+        "Executive Summary",
+        "Thesis v",
+        "Required revenue growth",
+        "Reverse DCF unavailable",
+        "Source Audit",
+        "Probabilities",
+        "Datos Pendientes",
+    ):
+        assert english not in markdown
+    assert "Superada: sí" in markdown
+    assert "Semilla maestra de la empresa" in markdown
+    assert "Probabilidades: pendiente" in markdown
+
+
+def test_pendings_nd_sin_placeholder_de_plantilla():
+    model = {
+        "assumptions": {
+            "terminal_growth": {
+                "value": 0.03,
+                "unit": "decimal",
+                "source_type": "model_policy",
+                "basis": "política de crecimiento terminal del marco de la empresa",
+                "source_fact_ids": [],
+                "confidence": 0.4,
+            },
+        },
+    }
+    text = ThesisService()._pendings_markdown({}, model, {})
+    assert "`terminal_growth`: N/D (supuesto sin base documentada)." in text
+    assert "(dado X, inferimos Y)" not in text
+    assert "con fuente https." not in text
+
+
+def _fact(db, company, metric: str, value: float, year: int) -> None:
+    db.add(
+        FinancialFact(
+            company_id=company.id,
+            metric=metric,
+            value=Decimal(str(value)),
+            unit="USD",
+            period=f"FY{year}",
+            fiscal_year=year,
+            fiscal_quarter="FY",
+            source_type="test_thesis_memo_es",
+            is_reported=True,
+            confidence=Decimal("0.95"),
+        )
+    )
+
+
+def test_tax_clamp_basis_redondeada_y_en_espanol():
+    init_db()
+    db = SessionLocal()
+    try:
+        company = Company(
+            ticker="TAXES",
+            name="Tax Clamp Test Co",
+            exchange="TEST",
+            currency="USD",
+            sector="Software",
+            industry="Application Software",
+            company_type="standard",
+            valuation_model="standard_dcf",
+            special_sources=[],
+            special_risks=[],
+            factor_tags=["quality"],
+        )
+        db.add(company)
+        db.flush()
+        db.add(Position(company_id=company.id, market_price=Decimal("50")))
+        for year in (2023, 2024, 2025):
+            _fact(db, company, "revenue", 100.0, year)
+            _fact(db, company, "income_before_tax", 100.0, year)
+            # Tipo efectivo negativo: el clamp a [0, 60 %] debe declararse
+            # redondeado y en español, nunca con el float crudo.
+            _fact(db, company, "income_tax_expense", -0.6019474711208242, year)
+        db.commit()
+
+        result = LongTermModelService().build(db, company, horizon=5, commit=False)
+        basis = result["assumptions"]["effective_tax_rate"]["basis"]
+        assert "acotado al rango [0 %, 60 %]" in basis
+        assert "clamped from" not in basis
+        assert "-0.60%" in basis
+        assert not re.search(r"\d\.\d{6,}", basis), basis
+    finally:
+        company = db.scalar(select(Company).where(Company.ticker == "TAXES"))
+        if company:
+            db.execute(delete(FinancialFact).where(FinancialFact.company_id == company.id))
+            db.execute(delete(Position).where(Position.company_id == company.id))
+            db.delete(company)
+            db.commit()
+        db.close()

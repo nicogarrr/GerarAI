@@ -24,7 +24,7 @@ def test_pendings_markdown_lists_missing_inputs_with_hints():
     assert "revenue_history_two_periods" in text
     assert "shares_diluted" in text
     # Dedup: shares_diluted aparece una sola vez.
-    assert text.count("**shares_diluted**") == 1
+    assert text.count("`shares_diluted`") == 1
     # Se pide, nunca se inventa.
     assert "nunca se inventan" in text
     assert "10-K" in text  # hint concreto del input conocido
@@ -59,7 +59,7 @@ def test_render_markdown_includes_pendings_section():
         version=1,
         evidence=None,
     )
-    assert "## 21. Datos Pendientes" in md
+    assert "## 21. Datos pendientes" in md
     assert "shares_diluted" in md
     assert "traceable_wacc" in md
 

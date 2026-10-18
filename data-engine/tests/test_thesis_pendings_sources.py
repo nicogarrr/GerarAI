@@ -69,12 +69,12 @@ FACT_SOURCES = {
 
 def test_pendings_without_resolved_sources_marks_everything_nd():
     text = ThesisService()._pendings_markdown({}, _model(), {})
-    assert "**satellites**: N/D" in text
-    assert "**net_margin**: N/D" in text
+    assert "`satellites`: N/D" in text
+    assert "`net_margin`: N/D" in text
 
 
 def test_pendings_with_resolved_sources_keeps_only_real_nd():
     text = ThesisService()._pendings_markdown({}, _model(), {}, FACT_SOURCES)
-    assert "**satellites**" not in text
-    assert "**net_margin**" not in text
-    assert "**terminal_growth**: N/D" in text
+    assert "`satellites`" not in text
+    assert "`net_margin`" not in text
+    assert "`terminal_growth`: N/D" in text

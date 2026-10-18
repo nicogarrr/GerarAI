@@ -169,7 +169,7 @@ def test_research_api_core_flow():
     thesis = client.post("/api/thesis/generate", json={"ticker": "ASTS", "force_new_version": True})
     assert thesis.status_code == 200
     assert thesis.json()["status"] in {"final", "draft_failed_audit", "insufficient_data", "draft"}
-    assert f"Thesis v{thesis.json()['version']}" in thesis.json()["thesis_markdown"]
+    assert f"Tesis de ASTS — v{thesis.json()['version']}" in thesis.json()["thesis_markdown"]
 
     chat = client.post("/api/chat", json={"question": "Que pasa con ASTS?", "ticker": "ASTS"})
     assert chat.status_code == 200
@@ -648,13 +648,13 @@ def test_fmp_refresh_normalizes_facts_and_valuation_uses_them(monkeypatch):
     thesis = client.post("/api/thesis/generate", json={"ticker": "MSFT", "force_new_version": True})
     assert thesis.status_code == 200
     thesis_payload = thesis.json()
-    assert "Valuation input source: `financial_facts`" in thesis_payload["thesis_markdown"]
+    assert "Fuente de los inputs de valoración: `financial_facts`" in thesis_payload["thesis_markdown"]
     assert "| revenue |" in thesis_payload["thesis_markdown"]
-    assert f"Thesis v{thesis_payload['version']}" in thesis_payload["thesis_markdown"]
+    assert f"Tesis de MSFT — v{thesis_payload['version']}" in thesis_payload["thesis_markdown"]
     assert thesis_payload["status"] == "draft"
     assert thesis_payload["data_confidence_score"] == 55
-    assert "Mandatory drivers missing:" in thesis_payload["thesis_markdown"]
-    assert "Mandatory drivers missing: none" not in thesis_payload["thesis_markdown"]
+    assert "Drivers obligatorios ausentes:" in thesis_payload["thesis_markdown"]
+    assert "Drivers obligatorios ausentes: ninguno" not in thesis_payload["thesis_markdown"]
 
 
 def test_fmp_refresh_402_returns_actionable_message(monkeypatch):

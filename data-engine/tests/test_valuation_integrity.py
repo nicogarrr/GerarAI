@@ -156,13 +156,13 @@ def test_thesis_version_appears_in_markdown_title():
     first = client.post("/api/thesis/generate", json={"ticker": "ASTS", "force_new_version": True})
     assert first.status_code == 200
     v1 = first.json()["version"]
-    assert f"Thesis v{v1}" in first.json()["thesis_markdown"]
+    assert f"Tesis de ASTS — v{v1}" in first.json()["thesis_markdown"]
 
     second = client.post("/api/thesis/generate", json={"ticker": "ASTS", "force_new_version": True})
     assert second.status_code == 200
     v2 = second.json()["version"]
     assert v2 == v1 + 1
-    assert f"Thesis v{v2}" in second.json()["thesis_markdown"]
+    assert f"Tesis de ASTS — v{v2}" in second.json()["thesis_markdown"]
     assert second.json()["status"] == "insufficient_data"
     assert second.json()["bear_value"] is None
     assert second.json()["expected_value"] is None
