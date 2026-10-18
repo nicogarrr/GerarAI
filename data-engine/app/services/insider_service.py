@@ -587,8 +587,14 @@ def _load_cik_map(client=None) -> dict[str, str]:
 
 
 def _cik_for_ticker(ticker: str, client=None) -> str | None:
-    """Resuelve el CIK via company_tickers.json (inyectable en tests)."""
-    return _load_cik_map(client=client).get(ticker.strip().upper())
+    """Resuelve el CIK via company_tickers.json (inyectable en tests).
+
+    Exacto primero; si no, comparación sin separadores de clase con match
+    único (BRK.B del master == BRK-B de EDGAR), nunca un CIK ambiguo.
+    """
+    from app.services.sec_ticker import match_cik
+
+    return match_cik(_load_cik_map(client=client).items(), ticker)
 
 
 # ---------------- Enganche minimo Telegram (nunca rompe) ----------------

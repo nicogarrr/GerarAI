@@ -14,6 +14,8 @@ Reglas:
 """
 from __future__ import annotations
 
+import re
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -62,6 +64,27 @@ def _reference_company_candidates(db: Session, normalized: str) -> list[str]:
     candidates.discard(normalized)
     return sorted(candidates)
 
+# Clase de acción US con el separador "otro": Yahoo/EDGAR nombran las
+# clases con guion (BRK-B) y el master/Finnhub con punto (BRK.B). Si el
+# usuario pide una variante, se prueba la otra SOLO contra filas existentes
+# del master: nunca crea identidad nueva, y el match exacto sigue ganando.
+_US_SHARE_CLASS_DASHED = re.compile(r"^([A-Z0-9]{1,5})-([AB])$")
+_US_SHARE_CLASS_DOTTED = re.compile(r"^([A-Z0-9]{1,5})\.([AB])$")
+
+
+def _share_class_variants(normalized: str) -> list[str]:
+    """Variantes de separador de clase US (BRK-B <-> BRK.B), o lista vacía."""
+    variants: list[str] = []
+    for pattern, separator in (
+        (_US_SHARE_CLASS_DASHED, "."),
+        (_US_SHARE_CLASS_DOTTED, "-"),
+    ):
+        match = pattern.fullmatch(normalized)
+        if match:
+            variants.append(f"{match.group(1)}{separator}{match.group(2)}")
+    return variants
+
+
 KNOWN_MARKET_SUFFIXES = frozenset({
     "MC",  # Bolsa de Madrid
     "L",   # London
@@ -104,6 +127,10 @@ def resolve_company(db: Session, ticker: str) -> Company | None:
         company = db.scalar(select(Company).where(Company.ticker == candidate))
         if company is not None:
             return company
+    for variant in _share_class_variants(normalized):
+        company = db.scalar(select(Company).where(Company.ticker == variant))
+        if company is not None:
+            return company
     if "." not in normalized:
         return None
     base, _, suffix = normalized.rpartition(".")
@@ -143,7 +170,13 @@ def resolve_companies(
     }
     alias_bases = {}  # ticker pedido -> ticker base candidato
     for ticker in normalized:
-        if ticker in exact or "." not in ticker:
+        if ticker in exact:
+            continue
+        variants = _share_class_variants(ticker)
+        if variants:
+            alias_bases[ticker] = variants[0]
+            continue
+        if "." not in ticker:
             continue
         base, _, suffix = ticker.rpartition(".")
         if base and suffix in KNOWN_MARKET_SUFFIXES:

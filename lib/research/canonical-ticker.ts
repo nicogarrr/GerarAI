@@ -12,6 +12,11 @@ export function canonicalRedirectTicker(requested: string, resolved: string | nu
     const req = requested.trim().toUpperCase();
     const res = (resolved ?? '').trim().toUpperCase();
     if (!res || res === req) return null;
+    // Clase de acción US con el separador de Yahoo/SEC (BRK-B): el master
+    // usa punto (BRK.B). Si lo resuelto es el MISMO ticker con el otro
+    // separador, la ficha canónica es la del master. Solo se prueba la
+    // variante contra lo resuelto: nunca se fabrica identidad.
+    if (/^[A-Z0-9]{1,5}-[AB]$/.test(req) && req.replace('-', '.') === res) return res;
     const dot = req.lastIndexOf('.');
     if (dot <= 0) return null;
     return req.slice(0, dot) === res ? res : null;

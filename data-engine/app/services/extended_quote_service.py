@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 
-from app.services.connectors.yahoo import YahooFinanceClient
+from app.services.connectors.yahoo import YahooFinanceClient, yahoo_chart_symbol
 
 SessionName = Literal["pre", "regular", "post", "cerrado"]
 SOURCE = "Yahoo Finance (no oficial), retraso posible"
@@ -191,10 +191,24 @@ def parse_extended_chart(ticker: str, node: dict[str, Any], now: int, daily_node
     # when minute bars omit zero-trade minutes or append a sub-minute print.
     # Never infer day extrema from incomplete candles. Require the metadata's
     # own regularMarketTime on this exchange session's date and coherent range.
-    session_date = datetime.fromtimestamp(bounds["regular"][0], tz).date()
+    bounds_session_date = datetime.fromtimestamp(bounds["regular"][0], tz).date()
+    session_date = bounds_session_date
+    # Weekend/holiday: currentTradingPeriod already names the NEXT session,
+    # but the candles and the metadata describe the LAST completed one
+    # (Yahoo serves Friday's bars with Monday's bounds). Without reframing,
+    # the previous close and the daily extrema stay N/D all weekend - the
+    # date checks ran against the wrong session. BME (SAN.MC, TRE.MC) hits
+    # this hard: its no-trade minutes come back null, so the candle audit
+    # can never publish extrema and the dated metadata is the only source.
+    future_bounds = bounds["regular"][0] > now
+    if future_bounds and regular_indices:
+        session_date = datetime.fromtimestamp(regular_indices[-1][0], tz).date()
     if result.regular_close_timestamp:
         result.regular_close_date = datetime.fromtimestamp(result.regular_close_timestamp, tz).date().isoformat()
-    if regular_time and bounds["regular"][0] <= regular_time <= now and datetime.fromtimestamp(regular_time, tz).date() == session_date:
+    meta_date = datetime.fromtimestamp(regular_time, tz).date() if regular_time else None
+    meta_live_session = regular_time is not None and bounds["regular"][0] <= regular_time <= now
+    meta_last_completed = regular_time is not None and future_bounds and regular_time <= now
+    if regular_time and meta_date == session_date and (meta_live_session or meta_last_completed):
         high = _number(meta.get("regularMarketDayHigh"))
         low = _number(meta.get("regularMarketDayLow"))
         if high is not None and low is not None and regular_price is not None and low <= regular_price <= high:
@@ -209,7 +223,7 @@ def parse_extended_chart(ticker: str, node: dict[str, Any], now: int, daily_node
         result.previous_close_date = datetime.fromtimestamp(result.previous_close_timestamp, tz).date().isoformat()
     if daily_node:
         daily_meta = daily_node.get("meta") or {}
-        if (daily_meta.get("symbol") == meta.get("symbol") == ticker
+        if (daily_meta.get("symbol") == meta.get("symbol") == yahoo_chart_symbol(ticker)
                 and daily_meta.get("currency") == meta.get("currency")
                 and daily_meta.get("exchangeTimezoneName") == timezone
                 and daily_meta.get("dataGranularity") == "1d"):
@@ -221,6 +235,8 @@ def parse_extended_chart(ticker: str, node: dict[str, Any], now: int, daily_node
                 close = _number(daily_closes[i]) if i < len(daily_closes) else None
                 if ts and ts <= now:
                     dated.append((ts, datetime.fromtimestamp(ts, tz).date(), close))
+            # "Cierre anterior": la vela diaria mas reciente ANTERIOR a la
+            # sesion mostrada cuyo cierre crudo coincide con previousClose.
             prior = [row for row in dated if row[1] < session_date]
             if prior:
                 _, day, close = max(prior, key=lambda row: row[0])
@@ -228,9 +244,14 @@ def parse_extended_chart(ticker: str, node: dict[str, Any], now: int, daily_node
                         and result.previous_close is not None
                         and math.isclose(close, result.previous_close, rel_tol=1e-6, abs_tol=1e-5)):
                     result.previous_close_date = day.isoformat()
-                # During an open session this is the last completed session,
-                # not today's intraday value relabelled as a close.
-                if result.regular_close is None and close is not None:
+            # "Cierre regular": la ultima sesion completada (anterior a la
+            # proxima sesion de los bounds, que en finde ya es la futura).
+            # Durante sesion abierta esto es ayer, nunca el valor intradia
+            # de hoy reetiquetado como cierre.
+            completed = [row for row in dated if row[1] < bounds_session_date]
+            if completed and result.regular_close is None:
+                _, day, close = max(completed, key=lambda row: row[0])
+                if close is not None:
                     result.regular_close, result.regular_close_date = close, day.isoformat()
             today = [row for row in dated if row[1] == session_date]
             daily_time = _epoch(daily_meta.get("regularMarketTime"))

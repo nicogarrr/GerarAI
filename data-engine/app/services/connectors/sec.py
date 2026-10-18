@@ -15,6 +15,7 @@ import httpx
 from app.core.config import get_settings
 from app.services.connectors import sec_edgar
 from app.services.connectors.base import ConnectorItem, ConnectorResult, retry_after_seconds
+from app.services.sec_ticker import match_cik
 
 logger = logging.getLogger(__name__)
 
@@ -231,10 +232,18 @@ class SECClient:
         if manifest_cik:
             return manifest_cik
         mapping = await self.ticker_map()
-        for item in mapping.values():
-            if item.get("ticker", "").upper() == ticker:
-                return str(item["cik_str"]).zfill(10)
-        return None
+        # EDGAR nombra las clases con guion (BRK-B) y el master con punto
+        # (BRK.B): el match exacto nunca casa para esos emisores. El
+        # fallback normalizado exige match único (fail closed).
+        cik = match_cik(
+            (
+                (str(item.get("ticker", "")), str(item["cik_str"]).zfill(10))
+                for item in mapping.values()
+                if isinstance(item, dict) and item.get("cik_str") is not None
+            ),
+            ticker,
+        )
+        return cik
 
     async def submissions(self, cik: str) -> dict:
         padded = str(cik).zfill(10)
