@@ -13,6 +13,12 @@ from app.services.connectors.fred import FREDClient
 _YAHOO_SUFFIX_BY_EXCHANGE = {
     "BME": ".MC",
     "BOLSA DE MADRID": ".MC",
+    # ASML cotiza en Euronext Amsterdam; en prod el exchange llega como
+    # «EURONEXT AMSTERDAM» o con la nomenclatura historica de Finnhub
+    # «NYSE EURONEXT - AMSTERDAM» (ver F156 en lib/exchangeName.ts). Yahoo
+    # usa el sufijo .AS (ASML.AS); sin el, beta/market cap quedan ausentes.
+    "EURONEXT AMSTERDAM": ".AS",
+    "NYSE EURONEXT - AMSTERDAM": ".AS",
 }
 
 
