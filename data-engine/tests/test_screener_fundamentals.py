@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
-from app.models import Company, FinancialFact, MarketPrice, Tenant
+from app.models import Company, CorporateAction, FinancialFact, MarketPrice, Tenant
 from app.services.screener_fundamentals import load_screener_ratios
 
 TODAY = date(2026, 9, 25)
@@ -25,7 +25,7 @@ def db():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(
         engine,
-        tables=[Tenant.__table__, Company.__table__, FinancialFact.__table__, MarketPrice.__table__],
+        tables=[Tenant.__table__, Company.__table__, FinancialFact.__table__, MarketPrice.__table__, CorporateAction.__table__],
     )
     with Session(engine) as session:
         yield session
