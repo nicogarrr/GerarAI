@@ -236,7 +236,7 @@ export function formatMarketCap(value: NumericInput, currency: string | null, fa
       maximumFractionDigits: 2,
     }).format(parsed);
   } catch {
-    return formatNumber(parsed, fallback);
+    return formatNumber(parsed, {}, fallback);
   }
 }
 
