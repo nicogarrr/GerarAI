@@ -305,7 +305,21 @@ const searchStocksOrThrow = async (query?: string): Promise<StockWithWatchlistSt
             }
         }
 
-        const ordered = onePerIssuer(exactSymbolFirst(results, trimmed));
+        // Ticker desnudo sin resultado exacto (ASTS): el search de Finnhub ordena
+        // por nombre y puede no devolverlo; el perfil por simbolo es exacto.
+        const bare = trimmed.toUpperCase();
+        if (/^[A-Z][A-Z0-9-]{0,5}$/.test(bare) && !results.some((r) => (r.symbol || '').toUpperCase() === bare)) {
+            try {
+                const profile = await getProfile(bare);
+                if (profile?.name) {
+                    results = [{ symbol: bare, displaySymbol: bare, description: profile.name, type: 'Common Stock' } as FinnhubSearchResult, ...results];
+                }
+            } catch {
+                // Fallback opcional.
+            }
+        }
+
+        const ordered = onePerIssuer(exactSymbolFirst(results, trimmed), trimmed);
         const mapped: StockWithWatchlistStatus[] = ordered
             .map((r) => {
                 const upper = (r.symbol || '').toUpperCase();

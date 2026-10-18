@@ -27,3 +27,31 @@ test('coincidencia exacta primero y orden estable', () => {
     ];
     assert.deepEqual(exactSymbolFirst(rows, 'sap').map((r: { symbol: string }) => r.symbol), ['SAP', 'SAP.TO', 'SAPR']);
 });
+
+test('KO: el ticker exacto US gana a los listados con sufijo del mismo emisor', () => {
+    const rows = [
+        { symbol: 'KO.MX', description: 'COCA-COLA CO/THE' },
+        { symbol: 'KO.VI', description: 'COCA-COLA CO/THE' },
+        { symbol: 'KOMATSU', description: 'KOMATSU LTD' },
+        { symbol: 'KO', description: 'COCA-COLA CO/THE' },
+    ];
+    const out = onePerIssuer(exactSymbolFirst(rows, 'KO'), 'KO').map((r: { symbol: string }) => r.symbol);
+    assert.deepEqual(out, ['KO', 'KOMATSU']);
+});
+
+test('ASTS: el ticker exacto se conserva primero aunque otros nombres coincidan', () => {
+    const rows = [
+        { symbol: 'ASTSF', description: 'ASTRA SPACE' },
+        { symbol: 'ASTS', description: 'AST SPACEMOBILE INC' },
+    ];
+    const out = onePerIssuer(exactSymbolFirst(rows, 'ASTS'), 'ASTS').map((r: { symbol: string }) => r.symbol);
+    assert.equal(out[0], 'ASTS');
+});
+
+test('sin ticker exacto el comportamiento previo no cambia', () => {
+    const rows = [
+        { symbol: 'ASML', description: 'ASML HOLDING NV-NY REG SHS' },
+        { symbol: 'ASML.AS', description: 'ASML HOLDING NV' },
+    ];
+    assert.deepEqual(onePerIssuer(rows, 'ASML HOLDING').map((r: { symbol: string }) => r.symbol), ['ASML.AS']);
+});

@@ -16,9 +16,25 @@ function firstNameToken(description: string | undefined): string {
         .split(/\s+/)[0] ?? '';
 }
 
-export function onePerIssuer<T extends SearchRow>(rows: T[]): T[] {
+export function onePerIssuer<T extends SearchRow>(rows: T[], query = ''): T[] {
     const suffixed = rows.filter((r) => r.symbol.includes('.'));
+    const q = query.trim().toUpperCase();
+    // Ticker exacto escrito por el usuario (KO, ASTS): gana el listado desnudo
+    // y se ocultan los listados con sufijo del mismo emisor (KO.MX, KO.VI).
+    const exactBare = q && !q.includes('.') ? rows.find((r) => r.symbol.toUpperCase() === q) : undefined;
+    const exactToken = exactBare ? firstNameToken(exactBare.description) : '';
     return rows.filter((row) => {
+        if (exactBare) {
+            if (row === exactBare) return true;
+            if (
+                row.symbol.includes('.') &&
+                row.symbol.toUpperCase().startsWith(`${q}.`) &&
+                exactToken &&
+                firstNameToken(row.description) === exactToken
+            ) {
+                return false;
+            }
+        }
         if (row.symbol.includes('.')) return true;
         const token = firstNameToken(row.description);
         if (!token) return true;
