@@ -6,6 +6,7 @@ import { Menu, X } from 'lucide-react';
 import { GerarAIWordmark } from '@/components/GerarAIWordmark';
 import NavItems from '@/components/NavItems';
 import SearchCommand from '@/components/SearchCommand';
+import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 
 /**
  * Navegacion movil: boton hamburger (>=44px) que abre un drawer con el MISMO
@@ -160,6 +161,9 @@ export default function MobileNav({ initialStocks }: { initialStocks?: StockWith
                                     if ((event.target as HTMLElement).closest('a[href]')) close();
                                 }}
                             >
+                                <button type="button" className="mb-3 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-teal-300 hover:bg-gray-800" onClick={() => { setOpen(false); window.dispatchEvent(new Event('gerarai:open-brain')); }}>
+                                    <BrainGlassesIcon className="h-5 w-5" />Cerebro
+                                </button>
                                 <NavItems />
                             </nav>
                         </aside>
