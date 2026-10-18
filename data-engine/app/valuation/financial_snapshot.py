@@ -9,6 +9,7 @@ balance-sheet instant).
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -169,6 +170,28 @@ def _compatible_instant(anchor: FinancialFact, candidate: FinancialFact) -> bool
     return True
 
 
+_PERIOD_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
+
+
+def _same_balance_instant(a: FinancialFact, b: FinancialFact) -> bool:
+    """Mismo cierre de balance aunque la fuente lo etiquete distinto.
+
+    «2025-12-31:FY» y «2025-12-31» son el mismo instante; «FY2025» frente a una
+    fecha sólo coincide si el año fiscal es el mismo y ambos son anuales. Nunca
+    se empareja un trimestre con otro cierre ni se adivina una fecha.
+    """
+    pa, pb = (a.period or "").upper(), (b.period or "").upper()
+    da, db_ = _PERIOD_DATE.match(pa), _PERIOD_DATE.match(pb)
+    if da and db_:
+        return da.group(1) == db_.group(1)
+    if not da and not db_:
+        return pa == pb
+    if a.fiscal_year is None or b.fiscal_year is None or a.fiscal_year != b.fiscal_year:
+        return False
+    annual = {"FY", "ANNUAL", ""}
+    return (a.fiscal_quarter or "FY").upper() in annual and (b.fiscal_quarter or "FY").upper() in annual
+
+
 def _pick_matching(
     candidates: list[FinancialFact],
     anchor: FinancialFact,
@@ -186,23 +209,42 @@ class FinancialSnapshotBuilder:
     """Assemble a coherent valuation snapshot from FinancialFact rows."""
 
     @staticmethod
-    def _derive_net_debt(snapshot: FinancialSnapshot, anchor: FinancialFact) -> None:
+    def _derive_net_debt(
+        snapshot: FinancialSnapshot,
+        anchor: FinancialFact,
+        debt_candidates: list[FinancialFact],
+        cash_candidates: list[FinancialFact],
+    ) -> None:
         """net_debt = total_debt - cash_and_equivalents when both are reported.
 
         Only when no net_debt fact exists, and only when both inputs are
-        persisted facts of the SAME instant period and currency. The result is a
-        transient ``derivado`` fact (never added to the session) and the ids of
-        its two sources are exposed in ``snapshot.derived``.
+        persisted facts of the SAME balance-sheet instant (compatible with the
+        anchor) and currency. Among the candidates the newest common instant
+        wins, so a newer debt without a matching cash never blocks an older
+        instant where both exist. The result is a transient ``derivado`` fact
+        (never added to the session) and the ids of its two sources are exposed
+        in ``snapshot.derived``.
         """
         if "net_debt" in snapshot.facts:
             return
-        debt = snapshot.facts.get("total_debt")
-        cash = snapshot.facts.get("cash_and_equivalents")
+        debt = cash = None
+        for d_fact in debt_candidates:
+            if not _compatible_instant(anchor, d_fact):
+                continue
+            c_fact = next(
+                (
+                    c
+                    for c in cash_candidates
+                    if _compatible_instant(anchor, c)
+                    and _same_balance_instant(d_fact, c)
+                    and (c.unit or "") == (d_fact.unit or "")
+                ),
+                None,
+            )
+            if c_fact is not None:
+                debt, cash = d_fact, c_fact
+                break
         if debt is None or cash is None:
-            return
-        if (debt.period or "").upper() != (cash.period or "").upper():
-            return
-        if (debt.unit or "") != (cash.unit or ""):
             return
         try:
             d, c = float(debt.value), float(cash.value)
@@ -297,7 +339,12 @@ class FinancialSnapshotBuilder:
                         f"with anchor {anchor.period}; excluded from snapshot."
                     )
 
-        self._derive_net_debt(snapshot, anchor)
+        self._derive_net_debt(
+            snapshot,
+            anchor,
+            _facts_for_metric(db, company.id, "total_debt"),
+            _facts_for_metric(db, company.id, "cash_and_equivalents"),
+        )
 
         missing: list[str] = []
         for metric in REQUIRED_FOR_DCF:

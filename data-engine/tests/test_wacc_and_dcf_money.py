@@ -163,6 +163,33 @@ def test_wacc_uses_market_equity_when_available(company_factory):
     )
 
 
+def test_wacc_without_reported_debt_is_the_cost_of_equity_and_says_so(company_factory):
+    """Deuda financiera reportada = 0: peso de deuda 0, sin coste de deuda inventado."""
+    db, company = company_factory
+    _wacc_facts(db, company, market_cap="10000", total_debt="0", interest_expense=None)
+    db.commit()
+
+    result = MetricCalculationService().calculate(db, company, "wacc", persist=False)
+
+    assert result.status == "ok"
+    trace = result.calculation_trace
+    assert trace["cost_of_debt_source"] == "no_reported_debt"
+    assert Decimal(trace["debt_weight"]) == 0
+    # Ke = 4% + 1,0 x 5% + 1% = 10%
+    assert result.value == Decimal("0.10000000")
+
+
+def test_wacc_with_debt_but_no_interest_stays_unavailable(company_factory):
+    db, company = company_factory
+    _wacc_facts(db, company, market_cap="10000", total_debt="3000", interest_expense=None)
+    db.commit()
+
+    result = MetricCalculationService().calculate(db, company, "wacc", persist=False)
+
+    assert result.status == "unavailable"
+    assert "cost_of_debt_or_interest_expense" in result.calculation_trace["missing_inputs"]
+
+
 # --------------------------------------------------------------------------
 # 2. Escalas de importes incompatibles
 # --------------------------------------------------------------------------
