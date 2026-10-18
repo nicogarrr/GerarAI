@@ -9,6 +9,7 @@ type MutationFormProps = Omit<ComponentPropsWithoutRef<'form'>, 'action'> & {
   action: (formData: FormData) => Promise<unknown>;
   successMessage?: string;
   resetOnSuccess?: boolean;
+  showSuccessInline?: boolean;
 };
 
 export function MutationForm({
@@ -16,10 +17,12 @@ export function MutationForm({
   children,
   successMessage = 'Operación completada',
   resetOnSuccess = false,
+  showSuccessInline = false,
   ...props
 }: MutationFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const lastFormData = useRef<FormData | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
@@ -27,11 +30,14 @@ export function MutationForm({
     if (isPending) return;
     lastFormData.current = formData;
     setError(null);
+    setSuccess(null);
     setIsPending(true);
     try {
-      await action(formData);
+      const result = await action(formData);
+      const message = result && typeof result === 'object' && 'message' in result && typeof result.message === 'string' ? result.message : successMessage;
       if (resetOnSuccess) formRef.current?.reset();
-      toast.success(successMessage);
+      toast.success(message);
+      if (showSuccessInline) setSuccess(message);
     } catch (err) {
       // Los redirects de Next forman parte de la navegación: re-lanzarlos.
       if (isNextRedirectError(err)) throw err;
@@ -66,6 +72,7 @@ export function MutationForm({
       <fieldset disabled={isPending} className="contents">
         {children}
       </fieldset>
+      {success ? <p className="mt-3 text-sm text-teal-300" role="status">{success}</p> : null}
       {error ? (
         <p className="mt-3 text-sm text-red-300" role="alert">
           {error}

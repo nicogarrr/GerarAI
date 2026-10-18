@@ -103,7 +103,7 @@ export default async function ResearchSourcesPage({
       </header>
 
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <MutationForm action={importResearchSource} className="rounded-lg border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Fuente importada">
+        <MutationForm action={importResearchSource} className="rounded-lg border border-gray-800 bg-surface-1 p-5" showSuccessInline resetOnSuccess successMessage="Fuente importada">
           <div className="mb-4 flex items-center gap-2">
             <UploadCloud aria-hidden="true" className="h-5 w-5 text-teal-300" />
             <h2 className="text-lg font-semibold text-gray-100">Importar fuente manual</h2>
@@ -112,6 +112,14 @@ export default async function ResearchSourcesPage({
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="ticker">Ticker</label>
               <Input id="ticker" name="ticker" placeholder="MSFT" required />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+              <label className="text-sm font-semibold text-gray-400" htmlFor="manual-source-type">Tipo de fuente</label>
+              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">
+                <option value="manual_upload">Texto aportado por el usuario</option>
+                <option value="manual_transcript">Transcripción</option>
+                <option value="company_ir">Relaciones con inversores</option>
+              </select>
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="period">Periodo</label>
@@ -143,7 +151,7 @@ export default async function ResearchSourcesPage({
         </MutationForm>
 
         <section className="grid gap-6">
-          <MutationForm action={importResearchDocumentFile} className="rounded-lg border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Documento importado">
+          <MutationForm action={importResearchDocumentFile} className="rounded-lg border border-gray-800 bg-surface-1 p-5" showSuccessInline resetOnSuccess successMessage="Documento importado">
             <div className="mb-4 flex items-center gap-2">
               <UploadCloud aria-hidden="true" className="h-5 w-5 text-teal-300" />
               <h2 className="text-lg font-semibold text-gray-100">Subir documento</h2>
@@ -176,7 +184,7 @@ export default async function ResearchSourcesPage({
             </div>
           </MutationForm>
 
-          <MutationForm action={importResearchDocumentUrl} className="rounded-lg border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="URL importada">
+          <MutationForm action={importResearchDocumentUrl} className="rounded-lg border border-gray-800 bg-surface-1 p-5" showSuccessInline resetOnSuccess successMessage="URL importada">
             <div className="mb-4 flex items-center gap-2">
               <FileText aria-hidden="true" className="h-5 w-5 text-teal-300" />
               <h2 className="text-lg font-semibold text-gray-100">Ingerir desde URL</h2>
