@@ -20,7 +20,16 @@ name: Restore drill
 on:
   push:
     branches: [main]
+  # En PR solo corre si toca lo que el drill ejerce: los scripts de
+  # backup/restore, la app que arranca contra la base restaurada y el lock
+  # con el que se instala el data-engine -- todo vive bajo data-engine/.
+  # Un PR de frontend o de docs no puede romper el restore y antes pagaba
+  # ~10 min de runner igualmente. En push a main y workflow_dispatch corre
+  # SIEMPRE, sin filtro: ahi la evidencia forense no se negocia.
   pull_request:
+    paths:
+      - "data-engine/**"
+      - ".github/workflows/restore-drill.yml"
   workflow_dispatch:
 
 permissions:

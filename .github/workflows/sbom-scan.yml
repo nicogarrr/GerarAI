@@ -44,7 +44,28 @@ name: SBOM + escaneo de seguridad de imagenes
 on:
   push:
     branches: [main]
+  # En PR solo corre si toca lo que puede mover el veredicto del escaneo:
+  # los 4 Dockerfiles, los .dockerignore (un secreto en el contexto se
+  # publica en la capa), los manifests de dependencias (las CVE salen de lo
+  # que fijan package-lock.json y uv.lock/requirements.txt, no del codigo
+  # fuente) y la politica de excepciones con su gate. Un PR de solo codigo
+  # no cambia la postura de CVE y antes construia 4 imagenes igualmente.
+  # En push a main y workflow_dispatch corre SIEMPRE, sin filtro.
   pull_request:
+    paths:
+      - "Dockerfile"
+      - "Dockerfile.dev"
+      - ".dockerignore"
+      - "package.json"
+      - "package-lock.json"
+      - "data-engine/Dockerfile"
+      - "data-engine/Dockerfile.prod"
+      - "data-engine/.dockerignore"
+      - "data-engine/pyproject.toml"
+      - "data-engine/uv.lock"
+      - "data-engine/requirements.txt"
+      - "scripts/security/**"
+      - ".github/workflows/sbom-scan.yml"
   workflow_dispatch:
 
 permissions:
