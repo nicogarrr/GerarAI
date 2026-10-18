@@ -4,13 +4,14 @@ export type ExtendedQuote = components['schemas']['ExtendedQuote'];
 const clock = (timestamp: number) => new Intl.DateTimeFormat('es-ES', {
     timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hour12: false,
 }).format(new Date(timestamp * 1000));
-const day = (date: string) => new Intl.DateTimeFormat('es-ES', {
-    timeZone: 'UTC', day: 'numeric', month: 'short',
-}).format(new Date(`${date}T12:00:00Z`));
+const datedClock = (timestamp: number) => new Intl.DateTimeFormat('es-ES', {
+    timeZone: 'Europe/Madrid', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZoneName: 'short',
+}).format(new Date(timestamp * 1000));
 
 export function extendedQuoteLabel(quote: ExtendedQuote | null): string {
     if (!quote?.source || !quote.timestamp || quote.price == null || quote.status === 'unavailable') return 'N/D';
-    const time = clock(quote.timestamp);
+    const time = datedClock(quote.timestamp);
     const priceSession = quote.price_session;
     if (!priceSession || priceSession === 'cerrado') return 'N/D';
     const sameSession = quote.session === priceSession;
@@ -20,11 +21,10 @@ export function extendedQuoteLabel(quote: ExtendedQuote | null): string {
     if (sameSession) {
         label = `${sessionLabel} · ${time}`;
     } else {
-        if (!quote.trading_date) return 'N/D';
-        const datedLabel = priceSession === 'post' ? 'Último post-cierre del'
-            : priceSession === 'pre' ? 'Último premercado del'
-            : quote.regular_close_timestamp === quote.timestamp ? 'Cierre del' : 'Último precio regular del';
-        label = `${datedLabel} ${day(quote.trading_date)} · ${time}`;
+        const datedLabel = priceSession === 'post' ? 'Último post-cierre'
+            : priceSession === 'pre' ? 'Último premercado'
+            : quote.regular_close_timestamp === quote.timestamp ? 'Cierre' : 'Último precio regular';
+        label = `${datedLabel} · ${time}`;
     }
     return quote.status === 'retrasado' ? `${label} · Retrasado` : label;
 }
