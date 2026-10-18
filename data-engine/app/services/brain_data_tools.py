@@ -203,6 +203,30 @@ def _thesis_valuation_answer(db: Session, question: str, tenant: int) -> ChatRes
     return _response(lines, [_source("thesis_version", published.id, f"Tesis {company.ticker} v{published.version}", _link(company, "thesis"))], "thesis_valuation")
 
 
+def dividend_ticker_without_records(db: Session, question: str) -> str | None:
+    """Ticker nombrado en una pregunta de dividendos sin ningun DividendRecord del tenant.
+
+    El chat lo sincroniza bajo demanda (proveedor gratuito) antes de responder, en
+    vez de decir «no tengo» de una empresa que nunca estuvo en cartera ni watchlist.
+    """
+    tenant = db.info.get("tenant_id")
+    if type(tenant) is not int or tenant <= 0:
+        return None
+    if not re.search(r"(?i)\bdividend\w*", question):
+        return None
+    if re.search(r"(?i)\bmi\s+cartera\b|\bmis\s+(?:posiciones|acciones|empresas)\b|\bcobrar\w*\b", question):
+        return None
+    if re.search(r"(?i)\b(?:compra|comprar|vende|vender|ejecuta|buy|sell)\b", question):
+        return None
+    company = _company_in_question(db, question)
+    if company is None:
+        return None
+    has_records = db.scalar(select(DividendRecord.id).where(
+        DividendRecord.company_id == company.id, DividendRecord.tenant_id == tenant,
+    ).limit(1))
+    return None if has_records is not None else company.ticker
+
+
 def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     """None means this tool does not own the question; never guess user intent."""
     tenant = db.info.get("tenant_id")

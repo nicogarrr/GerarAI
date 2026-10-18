@@ -21,6 +21,17 @@ def db():
         yield session
 
 
+@pytest.fixture(autouse=True)
+def _no_live_dividend_sync(monkeypatch):
+    """Los tests nunca llaman al proveedor: sin datos propios responde «no tengo»."""
+    from app.services.dividend_ingestion_service import DividendIngestionService
+
+    async def unavailable(self, db_, *, ticker):
+        return {"ticker": ticker, "status": "unavailable", "inserted": 0, "existing": 0}
+
+    monkeypatch.setattr(DividendIngestionService, "sync_company", unavailable)
+
+
 def company(db, ticker):
     row = Company(ticker=ticker, name=ticker + " Inc", currency="USD", exchange="NASDAQ", company_type="operating", valuation_model="unassigned")
     db.add(row)
@@ -290,3 +301,23 @@ def test_plan_question_without_plan_is_honest(db):
     response = asyncio.run(ChatService().answer(db, "Tengo 500 € este mes. Según mi plan, ¿qué compro?", "portfolio", None))
     assert "No tienes un plan de inversión guardado" in response.answer
     assert response.sources == []
+
+
+def test_company_without_records_is_synced_on_demand_before_answering(db, monkeypatch):
+    from app.services.dividend_ingestion_service import DividendIngestionService
+
+    ko = Company(ticker="KO", name="Coca-Cola Co", currency="USD", exchange="NYSE", company_type="operating", valuation_model="unassigned")
+    db.add(ko)
+    db.commit()
+    calls = []
+
+    async def fake_sync(self, db_, *, ticker):
+        calls.append(ticker)
+        _dividend(db_, ko, date.today() - timedelta(days=30), "0.51")
+        db_.commit()
+        return {"ticker": ticker, "status": "ok", "inserted": 1, "existing": 0}
+
+    monkeypatch.setattr(DividendIngestionService, "sync_company", fake_sync)
+    response = asyncio.run(ChatService().answer(db, "¿Qué dividendo paga Coca-Cola y cuándo es el próximo?", "portfolio", None))
+    assert calls == ["KO"]
+    assert "0,51 USD" in response.answer
