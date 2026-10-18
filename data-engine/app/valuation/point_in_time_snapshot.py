@@ -199,44 +199,14 @@ class PointInTimeSnapshotBuilder:
                 self.audit.dropped_future.append(verdict)
         return usable
 
-    def _has_usable_fact_silently(
-        self,
-        db: Session,
-        company_id: int,
-        metric: str,
-        published: dict[int, date | None],
-    ) -> bool:
-        """Existe algun hecho publicable de ``metric``, SIN tocar la auditoria.
-
-        El corte temprano por falta de revenue solo comprueba existencia
-        para no declarar ausente lo que esta presente (QA ASML); esos
-        hechos no son candidatos del snapshot y registrar sus verdicts
-        inflaria ``kept``/``dropped_future`` de celdas que nunca los
-        consideraron (el dataset de backtest los reclasificaba).
-        """
-        for fact in _facts_for_metric(db, company_id, metric):
-            if self.verdict(fact, published.get(fact.source_id)).usable:
-                return True
-        return False
-
     # ------------------------------------------------------------------ build
 
     def build(self, db: Session, company: Company) -> FinancialSnapshot:
         published = self._published_dates(db, company.id)
         revenue_candidates = self._candidates(db, company.id, "revenue", published)
         if not revenue_candidates:
-            # Misma honestidad que el builder actual: una entrada publicable
-            # pero sin ancla de revenue es «no utilizable», no «ausente»
-            # (QA datos ASML: shares_diluted existia y se declaraba ausente).
-            missing = ["revenue"]
-            if not self._has_usable_fact_silently(db, company.id, "shares_diluted", published):
-                missing.append("shares_diluted")
-            has_fcf = self._has_usable_fact_silently(db, company.id, "free_cash_flow", published)
-            has_margin = self._has_usable_fact_silently(db, company.id, "fcf_margin", published)
-            if not has_fcf and not has_margin:
-                missing.append("free_cash_flow_or_fcf_margin")
             return FinancialSnapshot(
-                missing_inputs=missing,
+                missing_inputs=["revenue", "shares_diluted", "free_cash_flow_or_fcf_margin"],
                 coherent=False,
                 warnings=[
                     f"sin hechos de revenue publicables en {self.as_of.isoformat()}"

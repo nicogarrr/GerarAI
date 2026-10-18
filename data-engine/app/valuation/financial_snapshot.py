@@ -112,18 +112,18 @@ def _missing_without_revenue_anchor(
     """Entradas genuinamente ausentes cuando falta el ancla de revenue.
 
     QA datos (ASML, 2026-10-18): el corte temprano declaraba ausentes
-    shares_diluted y FCF sin comprobarlo, y shares_diluted existia en DB
+    shares_diluted y FCF sin comprobarlo, y shares_diluted estaba guardado
     (la ficha mostraba «Acciones diluidas (media) 2025-12-31:FY 388,9 M
-    SEC»). Sin ancla de revenue no hay snapshot coherente, pero una entrada
-    presente es «no utilizable», no «ausente»: solo se reportan las que
-    faltan de verdad y las presentes quedan explicadas en warnings.
+    SEC»). Sin revenue no hay snapshot coherente, pero una entrada
+    presente no esta «ausente»: solo se reportan las que faltan de verdad
+    y las presentes quedan explicadas en warnings.
     """
     missing = ["revenue"]
     warnings: list[str] = []
     if _facts_for_metric(db, company_id, "shares_diluted"):
         warnings.append(
-            "shares_diluted existe en DB pero no es utilizable sin el ancla "
-            "de revenue; no se reporta como ausente."
+            "Hay acciones diluidas guardadas, pero no se usan porque falta "
+            "el revenue."
         )
     else:
         missing.append("shares_diluted")
@@ -131,8 +131,8 @@ def _missing_without_revenue_anchor(
     has_margin = bool(_facts_for_metric(db, company_id, "fcf_margin"))
     if has_fcf or has_margin:
         warnings.append(
-            "free_cash_flow/fcf_margin existe en DB pero no es utilizable sin "
-            "el ancla de revenue; no se reporta como ausente."
+            "Hay flujo de caja libre guardado, pero no se usa porque falta "
+            "el revenue."
         )
     else:
         missing.append("free_cash_flow_or_fcf_margin")

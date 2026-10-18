@@ -5,7 +5,9 @@ La vista ?view=sources declaraba «Faltan entradas: revenue, shares_diluted,
 free_cash_flow_or_fcf_margin» mientras ?view=financials mostraba «Acciones
 diluidas (media) 2025-12-31:FY 388,9 M SEC»: el corte temprano del snapshot
 declaraba las tres ausentes sin comprobarlo. Estos tests pinean la
-distincion: solo falta lo que falta de verdad.
+distincion: solo falta lo que falta de verdad. El builder point-in-time se
+cubria aqui tambien, pero #1227 lo elimina como codigo muerto, asi que la
+PR queda reducida al builder actual.
 """
 
 from __future__ import annotations
@@ -20,8 +22,6 @@ from sqlalchemy.pool import StaticPool
 from app.core.database import Base as CoreBase  # noqa: F401
 from app.models.entities import Base, Company, FinancialFact
 from app.valuation.financial_snapshot import FinancialSnapshotBuilder
-from app.valuation.point_in_time_snapshot import PointInTimeSnapshotBuilder
-from tests.backtest_fixtures import CUTOFF_MID, add_accounts, make_company, make_session
 
 
 @pytest.fixture()
@@ -58,7 +58,7 @@ def test_shares_present_without_revenue_is_not_reported_missing(db):
     snap = FinancialSnapshotBuilder().build(db, c)
     assert snap.missing_inputs == ["revenue", "free_cash_flow_or_fcf_margin"]
     assert not snap.coherent
-    assert any("shares_diluted" in w and "no es utilizable" in w for w in snap.warnings)
+    assert any("acciones diluidas guardadas" in w and "falta" in w for w in snap.warnings)
 
 
 def test_everything_absent_keeps_the_full_missing_list(db):
@@ -74,28 +74,4 @@ def test_fcf_present_without_revenue_is_not_reported_missing(db):
     snap = FinancialSnapshotBuilder().build(db, c)
     assert "free_cash_flow_or_fcf_margin" not in snap.missing_inputs
     assert "shares_diluted" in snap.missing_inputs
-    assert any("free_cash_flow" in w for w in snap.warnings)
-
-
-def test_pit_shares_present_without_revenue_is_not_missing():
-    """El builder point-in-time (backtests) aplica la misma distincion con
-    hechos publicables: shares presente no es ausente."""
-    session = make_session()
-    company = make_company(session)
-    add_accounts(session, company, facts={"shares_diluted": 388_900_000}, include_wacc=False)
-    session.commit()
-
-    snap = PointInTimeSnapshotBuilder(as_of=CUTOFF_MID).build(session, company)
-    assert "revenue" in snap.missing_inputs
-    assert "shares_diluted" not in snap.missing_inputs
-    assert "free_cash_flow_or_fcf_margin" in snap.missing_inputs
-
-
-def test_pit_everything_absent_keeps_the_full_missing_list():
-    session = make_session()
-    company = make_company(session)
-    session.commit()
-
-    snap = PointInTimeSnapshotBuilder(as_of=CUTOFF_MID).build(session, company)
-    assert snap.missing_inputs == ["revenue", "shares_diluted", "free_cash_flow_or_fcf_margin"]
-    assert any("sin hechos de revenue publicables" in w for w in snap.warnings)
+    assert any("flujo de caja libre guardado" in w for w in snap.warnings)
