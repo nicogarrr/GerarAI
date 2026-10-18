@@ -56,11 +56,6 @@
       "statements": 1281,
       "max_drop_points": 0.0
     },
-    "app/metrics": {
-      "coverage": 82.58,
-      "statements": 1757,
-      "max_drop_points": 0.0
-    },
     "app/models": {
       "coverage": 99.93,
       "statements": 1414,

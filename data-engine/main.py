@@ -18,7 +18,6 @@ from app.core.rate_limit import AuthFailureLimitMiddleware, enforce_rate_limit
 from app.core.raw_body import RawBodyMiddleware
 from app.llm.factory import validate_llm_configuration
 from app.llm.model_aliases import configure_model_aliases
-from app.metrics.latency import LatencyMetricsMiddleware
 from app.seed import apply_master_taxonomy_to_stubs, ensure_company_master
 
 try:  # preload optional probe modules during process startup, not in a request
@@ -154,7 +153,6 @@ app.add_middleware(
 # en un hilo daemon. Se autodesactiva con APP_ENV=test para no escribir en la BD
 # de la sesion de tests. El coste que se anade a cada request se mide y se expone
 # en `overhead_*`.
-app.add_middleware(LatencyMetricsMiddleware)
 app.add_middleware(AuthFailureLimitMiddleware)
 if get_settings().app_env.lower() != "test":
     from app.core.pool_probe import SlowRequestMiddleware

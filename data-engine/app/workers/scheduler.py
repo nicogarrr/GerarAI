@@ -5,7 +5,6 @@ from functools import partial
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 
-from app.metrics.precompute import refresh_backend_metrics
 from app.services.thesis_job_service import reconcile_thesis_dispatches
 from app.workers.dramatiq_app import (
     backfill_document_kpis,
@@ -345,20 +344,6 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         job_id="propicks_prices_daily",
         hour=21,
         minute=45,
-    )
-    # #E5: metricas de backend (latencia, cola, hit-rate de tesis y % de claims
-    # con evidencia) + poda de retencion. A diario y de madrugada: el hit-rate
-    # unite precios, tesis y benchmark, y recalcularlo en cada request es como
-    # se quema la base. Los endpoints solo LEEN estos snapshots. Va en la cola
-    # `default` (la de los workers del compose), asi que no hace falta tocar el
-    # compose ni anadir una cola nueva.
-    _register(
-        scheduler,
-        partial(enqueue_for_all_tenants, refresh_backend_metrics),
-        "cron",
-        job_id="backend_metrics_refresh",
-        hour=4,
-        minute=7,
     )
     return scheduler
 
