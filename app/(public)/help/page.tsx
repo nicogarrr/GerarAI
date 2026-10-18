@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   // Página pública: el centro de ayuda se lee sin iniciar sesión, aunque los
   // módulos que documenta (research, cartera, ProPicks) sí exijan cuenta.
   robots: { index: true, follow: true },
+  alternates: { canonical: '/help' },
 };
 
 // Forzar renderizado dinámico

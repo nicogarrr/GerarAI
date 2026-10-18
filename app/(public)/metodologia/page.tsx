@@ -34,6 +34,7 @@ export const metadata: Metadata = {
   description:
     'Fuentes de datos, motores de valoración, límites y costes de GerarAI: de dónde sale cada dato y qué no debes esperar de la plataforma.',
   robots: { index: true, follow: true },
+  alternates: { canonical: '/metodologia' },
 };
 
 const sources = [
