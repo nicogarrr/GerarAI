@@ -2692,7 +2692,7 @@
       "category": "insufficient_data",
       "ticker": "NEW",
       "as_of": "2024-12-31",
-      "note": "Sin datos suficientes: N/D: datos insuficientes a 2024-12-31 (revenue, shares_diluted, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
+      "note": "Sin datos suficientes: N/D: datos insuficientes a 2024-12-31 (revenue, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
       "applies_to": null,
       "expect_gate_failure": null,
       "expected": {
@@ -2737,7 +2737,7 @@
         "engine_key": null,
         "model_version": null,
         "degraded": true,
-        "degraded_reason": "N/D: datos insuficientes a 2024-12-31 (revenue, shares_diluted, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
+        "degraded_reason": "N/D: datos insuficientes a 2024-12-31 (revenue, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
         "source_coverage_score": 0,
         "n_claims": 1,
         "n_claims_with_evidence": 0,
@@ -2747,7 +2747,6 @@
         "unverifiable_inputs": [],
         "missing_inputs": [
           "revenue",
-          "shares_diluted",
           "free_cash_flow_or_fcf_margin",
           "deployment_curve_or_capacity_plan",
           "funding_plan",
@@ -2793,8 +2792,8 @@
             "fair_value": null
           }
         ],
-        "replay_hash": "6c6041d0cd6c3c86f3fc413ae15ba0b09200849b856c4c20a2dd7b0b375ae6bf",
-        "replay_hash_again": "6c6041d0cd6c3c86f3fc413ae15ba0b09200849b856c4c20a2dd7b0b375ae6bf"
+        "replay_hash": "3a4860513dd31c64015449a0647e196f06d935a1fa2b0b6270acc37a0a6c3ce1",
+        "replay_hash_again": "3a4860513dd31c64015449a0647e196f06d935a1fa2b0b6270acc37a0a6c3ce1"
       }
     },
     {
@@ -2802,7 +2801,7 @@
       "category": "insufficient_data",
       "ticker": "NEW",
       "as_of": "2025-06-30",
-      "note": "Sin datos suficientes: N/D: datos insuficientes a 2025-06-30 (revenue, shares_diluted, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
+      "note": "Sin datos suficientes: N/D: datos insuficientes a 2025-06-30 (revenue, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
       "applies_to": null,
       "expect_gate_failure": null,
       "expected": {
@@ -2847,7 +2846,7 @@
         "engine_key": null,
         "model_version": null,
         "degraded": true,
-        "degraded_reason": "N/D: datos insuficientes a 2025-06-30 (revenue, shares_diluted, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
+        "degraded_reason": "N/D: datos insuficientes a 2025-06-30 (revenue, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
         "source_coverage_score": 100,
         "n_claims": 1,
         "n_claims_with_evidence": 1,
@@ -2857,7 +2856,6 @@
         "unverifiable_inputs": [],
         "missing_inputs": [
           "revenue",
-          "shares_diluted",
           "free_cash_flow_or_fcf_margin",
           "deployment_curve_or_capacity_plan",
           "funding_plan",
@@ -2903,8 +2901,8 @@
             "fair_value": null
           }
         ],
-        "replay_hash": "e46113263a70eb070c4d19a9e542df49ba0717d1310076de6ccfca1d549f709a",
-        "replay_hash_again": "e46113263a70eb070c4d19a9e542df49ba0717d1310076de6ccfca1d549f709a"
+        "replay_hash": "ac89214d142415df153054ddb9f657842dde6066d76da18fc971ed3a65643cbd",
+        "replay_hash_again": "ac89214d142415df153054ddb9f657842dde6066d76da18fc971ed3a65643cbd"
       }
     },
     {
@@ -2912,7 +2910,7 @@
       "category": "insufficient_data",
       "ticker": "NEW",
       "as_of": "2026-06-30",
-      "note": "Sin datos suficientes: N/D: datos insuficientes a 2026-06-30 (revenue, shares_diluted, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
+      "note": "Sin datos suficientes: N/D: datos insuficientes a 2026-06-30 (revenue, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
       "applies_to": null,
       "expect_gate_failure": null,
       "expected": {
@@ -2957,7 +2955,7 @@
         "engine_key": null,
         "model_version": null,
         "degraded": true,
-        "degraded_reason": "N/D: datos insuficientes a 2026-06-30 (revenue, shares_diluted, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
+        "degraded_reason": "N/D: datos insuficientes a 2026-06-30 (revenue, free_cash_flow_or_fcf_margin, deployment_curve_or_capacity_plan, funding_plan, dilution_schedule)",
         "source_coverage_score": 100,
         "n_claims": 1,
         "n_claims_with_evidence": 1,
@@ -2967,7 +2965,6 @@
         "unverifiable_inputs": [],
         "missing_inputs": [
           "revenue",
-          "shares_diluted",
           "free_cash_flow_or_fcf_margin",
           "deployment_curve_or_capacity_plan",
           "funding_plan",
@@ -3013,8 +3010,8 @@
             "fair_value": null
           }
         ],
-        "replay_hash": "b860f8eca5189c57875a93910c53f84e9482e4c576c8e92f58ee1ca67779d079",
-        "replay_hash_again": "b860f8eca5189c57875a93910c53f84e9482e4c576c8e92f58ee1ca67779d079"
+        "replay_hash": "acc25a8e8262d770059a47013ed30081c2856ac5aca7ba10d601a1ee9b8525be",
+        "replay_hash_again": "acc25a8e8262d770059a47013ed30081c2856ac5aca7ba10d601a1ee9b8525be"
       }
     },
     {
