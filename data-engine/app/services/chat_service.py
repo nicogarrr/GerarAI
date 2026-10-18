@@ -49,6 +49,11 @@ KEY_FACT_METRICS = [
 # interna en ingles ("estado insufficient_data"); lo desconocido se omite.
 _THESIS_STATUS_ES = {
     "draft": "borrador",
+    "final": "final",
+    "published": "publicada",
+    "approved": "aprobada",
+    "changes_requested": "cambios solicitados",
+    "draft_failed_audit": "borrador (auditoría no superada)",
     "active": "activa",
     "review": "en revisión",
     "archived": "archivada",
@@ -57,8 +62,15 @@ _THESIS_STATUS_ES = {
 }
 _THESIS_RATING_ES = {
     "buy": "compra",
+    "overweight": "sobreponderar",
+    "outperform": "mejor que el mercado",
+    "accumulate": "acumular",
+    "add": "añadir",
     "hold": "mantener",
     "sell": "venta",
+    "underweight": "infraponderar",
+    "underperform": "peor que el mercado",
+    "exit": "salir",
     "watch": "seguimiento",
     "reduce": "reducir",
     "insufficient_data": "datos insuficientes",
