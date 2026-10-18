@@ -98,7 +98,7 @@ def _seed_multi_year_prices(
                 close=Decimal("10") + offset,
                 adj_close=Decimal("10") + offset,
                 volume=1_000 + offset,
-                source="seed",
+                source="yfinance",
             )
         )
     db.flush()
@@ -119,7 +119,7 @@ def test_movers_window_is_per_company_and_index_bounded(db: Session):
             close=Decimal("2000"),
             adj_close=Decimal("2000"),
             volume=9_000_000,
-            source="seed",
+            source="yfinance",
         )
     )
     db.commit()
@@ -174,7 +174,7 @@ def test_refresh_latest_price_query_returns_one_row_per_company(db: Session):
     db.add(
         MarketPrice(
             company_id=company.id, date=AS_OF, close=Decimal("250"),
-            adj_close=Decimal("250"), volume=1, source="seed",
+            adj_close=Decimal("250"), volume=1, source="yfinance",
         )
     )
     db.commit()

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const page = readFileSync('app/(root)/movers/page.tsx', 'utf8');
-const market = readFileSync('data-engine/app/api/routes/market.py', 'utf8');
+const market = readFileSync('data-engine/app/services/market_change.py', 'utf8');
 const actions = readFileSync('lib/actions/market.actions.ts', 'utf8');
 
 test('movers declara frescura por fila: fecha del precio + hora de registro, sin fecha global enganosa', () => {

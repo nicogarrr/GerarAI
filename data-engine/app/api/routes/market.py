@@ -15,12 +15,10 @@ from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import Company, MarketPrice
-from app.services import market_themes
+from app.services import market_change, market_themes
 from app.services.provenance import SourceKind, coverage_for_age, provenance
 
 router = APIRouter()
@@ -378,30 +376,7 @@ def market_indices() -> dict:
     }
 
 
-def _common_sessions(db: Session) -> tuple:
-    """(ultima sesion comun, sesion anterior) de market_prices.
-
-    Una fecha cuenta como sesion si es laborable y tiene cierres de al menos la
-    mitad de la MEDIANA de empresas por fecha en las ultimas 10 fechas
-    laborables. Con el maximo como referencia, una carga masiva puntual (1142
-    empresas un dia, ~60-120 los siguientes) dejaba como unica sesion valida
-    la de la carga y congelaba el ranking en una fecha vieja. Un cierre suelto
-    de fin de semana o de un solo ticker tampoco define la sesion."""
-    rows = db.execute(
-        select(MarketPrice.date, func.count(func.distinct(MarketPrice.company_id)))
-        .group_by(MarketPrice.date)
-        .order_by(MarketPrice.date.desc())
-        .limit(30)
-    ).all()
-    weekdays = [(day, count) for day, count in rows if day.weekday() < 5][:10]
-    if not weekdays:
-        return None, None
-    counts = sorted(count for _, count in weekdays)
-    mid = len(counts) // 2
-    median = counts[mid] if len(counts) % 2 else (counts[mid - 1] + counts[mid]) / 2
-    threshold = median / 2
-    sessions = [day for day, count in weekdays if count >= threshold]
-    return (sessions[0] if sessions else None), (sessions[1] if len(sessions) > 1 else None)
+_common_sessions = market_change.common_sessions
 
 
 @router.get("/movers")
@@ -409,24 +384,13 @@ def market_movers(
     db: Session = Depends(get_db),
     limit: int = Query(default=10, ge=1, le=25),
 ) -> dict:
-    """Gainers/losers/más activas calculados desde market_prices local.
+    """Gainers/losers/más activas desde market_prices (cierres datados).
 
-    Diseño frío-seguro: sin filas no hay KeyError ni 500 — se devuelve
-    universo vacío y la UI lo muestra como estado honesto. El cambio se
-    calcula entre los dos últimos cierres de cada compañía (nunca se asume
-    caché caliente ni fechas globales).
-    """
-    # Ventana POR COMPAÑÍA: los dos últimos cierres de cada una, sin suelo
-    # temporal global. Un corte global de N días expulsaba del universo a
-    # cualquier compañía con el último cierre más viejo que la ventana, y a
-    # otra con el último cierre dentro pero el anterior fuera le publicaba
-    # precio con variación null: dos resultados distintos del mismo hueco de
-    # datos. El contrato es "los dos últimos cierres de cada compañía".
-    # Coste acotado por índice (uq company_id+date): un max() por compañía en
-    # cada CTE y una lectura por clave; nunca un row_number sobre toda la
-    # historia.
-    latest_day = db.scalar(select(func.max(MarketPrice.date)))
-    if latest_day is None:
+    Sin filas devuelve universo vacío, nunca KeyError ni 500. El cambio sale de
+    `market_change.compute_session_changes`, la misma función que usan Mercado
+    y watchlist."""
+    movers, stale_excluded, session_day = market_change.compute_session_changes(db)
+    if not movers:
         return {
             "as_of": None,
             "universe": 0,
@@ -434,116 +398,11 @@ def market_movers(
             "losers": [],
             "most_active": [],
         }
-    latest_pairs = (
-        select(
-            MarketPrice.company_id.label("company_id"),
-            func.max(MarketPrice.date).label("last_date"),
-        )
-        .group_by(MarketPrice.company_id)
-        .cte("movers_latest")
-    )
-    previous_pairs = (
-        select(
-            MarketPrice.company_id.label("company_id"),
-            func.max(MarketPrice.date).label("prev_date"),
-        )
-        .join(
-            latest_pairs,
-            and_(
-                MarketPrice.company_id == latest_pairs.c.company_id,
-                MarketPrice.date < latest_pairs.c.last_date,
-            ),
-        )
-        .group_by(MarketPrice.company_id)
-        .cte("movers_previous")
-    )
-
-    def _rows_at(pair_cte, date_column) -> list:
-        return list(
-            db.execute(
-                select(
-                    MarketPrice.company_id,
-                    MarketPrice.date,
-                    MarketPrice.close,
-                    MarketPrice.volume,
-                    MarketPrice.updated_at,
-                    Company.ticker,
-                    Company.name,
-                    Company.sector,
-                    Company.currency,
-                )
-                .join(
-                    pair_cte,
-                    and_(
-                        MarketPrice.company_id == pair_cte.c.company_id,
-                        MarketPrice.date == date_column,
-                    ),
-                )
-                .join(Company, Company.id == MarketPrice.company_id)
-            ).all()
-        )
-
-    def _entry(day, close, volume, registered, ticker, name, sector, currency) -> dict:
-        return {
-            "ticker": ticker,
-            "name": name,
-            "sector": sector,
-            "currency": currency,
-            "price": float(close or 0),
-            # Volumen desconocido o 0 = None (la UI muestra N/D): una sesion
-            # negociada no tiene volumen 0, es un dato ausente de la fuente.
-            "volume": int(volume) if volume else None,
-            "date": day.isoformat() if day else None,
-            # Hora de observacion/registro (updated_at, tz-aware): dentro de
-            # la misma sesion conviven filas refrescadas a distinta hora y la
-            # fecha diaria sola no las distingue en el ranking.
-            "registered_at": registered.isoformat() if registered else None,
-        }
-
-    latest: dict[int, dict] = {}
-    for company_id, day, close, volume, registered, ticker, name, sector, currency in _rows_at(
-        latest_pairs, latest_pairs.c.last_date
-    ):
-        latest[company_id] = _entry(day, close, volume, registered, ticker, name, sector, currency)
-    previous: dict[int, dict] = {}
-    for company_id, day, close, volume, registered, ticker, name, sector, currency in _rows_at(
-        previous_pairs, previous_pairs.c.prev_date
-    ):
-        previous[company_id] = _entry(day, close, volume, registered, ticker, name, sector, currency)
-    # Sesion comun: los rankings comparan manzanas con manzanas. Una fila solo
-    # entra si su ultimo cierre es el de la ultima sesion comun Y su cierre
-    # previo es el de la sesion inmediatamente anterior; con otro hueco, el
-    # cambio seria de varios dias (o de una sesion vieja) presentado como el de
-    # hoy (F9/F10). Las demas siguen en el universo, fuera de los rankings.
-    session_day, prev_session_day = _common_sessions(db)
-    movers = []
-    stale_excluded = 0
-    for company_id, last in latest.items():
-        prev = previous.get(company_id)
-        base = float(prev["price"]) if prev else 0.0
-        current = session_day is not None and last["date"] == session_day.isoformat()
-        comparable = (
-            current
-            and prev is not None
-            and prev["date"] == (prev_session_day.isoformat() if prev_session_day else None)
-        )
-        # Sin cierre anterior no hay cambio medible: None (la UI muestra "—"),
-        # nunca un 0.0% que aparenta un dato que no existe.
-        change_pct = (
-            round((last["price"] - base) / base * 100, 2) if base and comparable else None
-        )
-        if not current:
-            stale_excluded += 1
-        movers.append({**last, "change_pct": change_pct, "current": current})
-    as_of = max(
-        (entry["date"] for entry in latest.values() if entry["date"]),
-        default=None,
-    )
+    as_of = max((m["date"] for m in movers if m["date"]), default=None)
     with_change = [m for m in movers if m["change_pct"] is not None]
     gainers = sorted(with_change, key=lambda m: m["change_pct"], reverse=True)[:limit]
     losers = sorted(with_change, key=lambda m: m["change_pct"])[:limit]
-    # "Mas activas" ordena por volumen REAL: las filas sin dato de volumen
-    # no pueden coronarse ni hundirse en el ranking por un 0 inventado.
+    # "Mas activas" ordena por volumen REAL: sin dato de volumen no hay ranking.
     with_volume = [m for m in movers if m["volume"] is not None and m["current"]]
     most_active = sorted(with_volume, key=lambda m: m["volume"], reverse=True)[:limit]
     return {
@@ -554,6 +413,37 @@ def market_movers(
         "gainers": gainers,
         "losers": losers,
         "most_active": most_active,
+    }
+
+
+@router.get("/changes")
+def market_changes(
+    tickers: str = Query(min_length=1, max_length=2000),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Variación diaria de tickers concretos con la misma fórmula que Movers.
+
+    Un ticker sin cierres comparables devuelve change_pct null (la UI muestra
+    N/D), nunca un valor de otra fuente."""
+    wanted = {t.strip().upper() for t in tickers.split(",") if t.strip()}
+    movers, _, session_day = market_change.compute_session_changes(db)
+    items = {
+        m["ticker"].upper(): {
+            "price": m["price"],
+            "change": round(m["price"] - m["previous_close"], 4)
+            if m["previous_close"] is not None
+            else None,
+            "change_pct": m["change_pct"],
+            "previous_close": m["previous_close"],
+            "date": m["date"],
+            "previous_date": m["previous_date"],
+        }
+        for m in movers
+        if m["ticker"].upper() in wanted
+    }
+    return {
+        "session_date": session_day.isoformat() if session_day else None,
+        "items": items,
     }
 
 

@@ -3,6 +3,7 @@ import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-anal
 import type { Metadata } from 'next';
 import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 import { getWatchlistState, getWatchlistEntryData } from '@/lib/actions/watchlist.actions';
+import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
@@ -59,13 +60,26 @@ export default async function WatchlistPage({
     const pageItems = watchlistItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
     // Cotizar solo la página visible, no toda la lista.
+    const datedChanges = await fetchDatedChanges(pageItems.map((item) => item.symbol));
     const watchlistStocks: WatchlistStock[] = await Promise.all(
         pageItems.map(async (item) => {
             try {
                 // Precio y divisa del LISTADO REAL (master), nunca del ticker
                 // desnudo: Finnhub free lo resuelve en la línea US (ADR en USD
                 // u otro emisor) y contradecía la ficha research (F253/F254).
-                const data = await getWatchlistEntryData(item.symbol);
+                const entry = await getWatchlistEntryData(item.symbol);
+                // Mismo cierre datado y mismo % que Movers y Mercado.
+                const dated = datedChanges[item.symbol.trim().toUpperCase()];
+                const data = dated
+                    ? {
+                          ...entry,
+                          price: dated.price,
+                          change: dated.change,
+                          changePercent: dated.changePercent,
+                          priceKind: 'close' as const,
+                          priceAsOf: dated.date,
+                      }
+                    : entry;
                 return {
                     symbol: data.symbol,
                     name: data.name,

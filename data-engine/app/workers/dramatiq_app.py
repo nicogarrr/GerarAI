@@ -1458,6 +1458,39 @@ def freeze_propicks_snapshot(
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000)
+def sync_official_closes(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Cierres diarios oficiales (yfinance) de todo el universo en market_prices."""
+    from app.services.market_close_sync import sync_official_closes as _sync
+
+    db = _session(tenant_id, user_id)
+    try:
+        lease = acquire_job_lease(
+            f"sync_official_closes:{tenant_id}",
+            ttl_seconds=3600,
+            redis_url=_lease_redis_url(),
+        )
+    except Exception:
+        db.close()
+        raise
+    if lease is None:
+        db.close()
+        return {"status": "skipped", "actor": "sync_official_closes", "reason": "lease_held"}
+    try:
+        return {"actor": "sync_official_closes", **_sync(db)}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("sync_official_closes", exc, tenant_id=tenant_id)
+    finally:
+        release_job_lease(
+            f"sync_official_closes:{tenant_id}", lease, redis_url=_lease_redis_url()
+        )
+        db.close()
+
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
 def refresh_sec_filings(
     tenant_id: int | None = None,

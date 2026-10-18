@@ -37,11 +37,13 @@ def _company(db: Session, ticker: str) -> Company:
     return company
 
 
-def _price(db: Session, company: Company, day: date, close: str, volume: int | None = 100) -> None:
+def _price(
+    db: Session, company: Company, day: date, close: str, volume: int | None = 100, source: str = "yfinance"
+) -> None:
     db.add(MarketPrice(
         company_id=company.id, date=day, open=Decimal(close),
         high=Decimal(close), low=Decimal(close), close=Decimal(close),
-        adj_close=Decimal(close), volume=volume, source="test",
+        adj_close=Decimal(close), volume=volume, source=source,
     ))
     db.flush()
 
@@ -207,3 +209,43 @@ def test_zero_volume_is_unknown_not_a_ranked_value(db: Session):
 
     assert out["most_active"] == []
     assert out["gainers"][0]["volume"] is None
+
+
+def test_changes_endpoint_uses_same_formula_as_movers(db: Session):
+    from app.api.routes.market import market_changes
+
+    aaa = _company(db, "AAA")
+    _price(db, aaa, date(2026, 9, 21), "100")
+    _price(db, aaa, date(2026, 9, 22), "100.45")
+    solo = _company(db, "SOLO")  # un unico cierre: sin variacion medible
+    _price(db, solo, date(2026, 9, 22), "50")
+
+    changes = market_changes("aaa, solo, nope", db)
+    movers = {m["ticker"]: m for m in market_movers(db, 25)["gainers"]}
+
+    assert changes["items"]["AAA"]["change_pct"] == movers["AAA"]["change_pct"] == 0.45
+    assert changes["items"]["AAA"]["previous_close"] == 100.0
+    assert changes["items"]["SOLO"]["change_pct"] is None
+    assert "NOPE" not in changes["items"]
+
+
+def test_spot_snapshots_are_not_official_closes(db: Session):
+    """Una foto spot (intradia/Finnhub) nunca es el cierre previo: AAPL daba
+    +0,45 % comparando contra una foto y +0,43 % contra el cierre oficial."""
+    from app.api.routes.market import market_changes
+
+    aapl = _company(db, "AAPL")
+    _price(db, aapl, date(2026, 10, 14), "340.00")
+    _price(db, aapl, date(2026, 10, 15), "342.00")
+    _price(db, aapl, date(2026, 10, 16), "343.46")
+    # Foto spot del 16 posterior a la barra oficial y foto intradia del 15:
+    # no pueden sustituir a los cierres oficiales.
+    snap = _company(db, "SNAP")
+    _price(db, snap, date(2026, 10, 15), "10", source="yahoo_finance_intraday")
+    _price(db, snap, date(2026, 10, 16), "12", source="Finnhub")
+
+    out = market_movers(db, 10)
+    tickers = [m["ticker"] for m in out["gainers"]]
+    assert "SNAP" not in tickers
+    assert out["gainers"][0]["change_pct"] == 0.43
+    assert market_changes("SNAP", db)["items"] == {}
