@@ -47,8 +47,8 @@ function Citation({ citation }: { citation: AssistantResponse['citations'][numbe
       <Badge variant="outline">{CITATION_LABELS[citation.kind] ?? 'Fuente sin clasificar'}</Badge>
       {url ? <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 break-all text-teal-300 underline underline-offset-2 hover:text-teal-200">{citation.source || 'Fuente sin nombre'}<ExternalLink aria-hidden className="h-3 w-3 shrink-0" /></a> : <span className="min-w-0 break-all text-gray-200">{citation.source || 'Fuente sin nombre'}</span>}
     </div>
-    <div className="mt-2 break-all">ID: {citation.id} · Fecha de referencia (as_of): {citation.as_of || t('signals.noDate')}</div>
-    {citation.excerpt ? <p className="mt-2 whitespace-pre-wrap break-words text-gray-300">{citation.excerpt}</p> : null}
+    <div className="mt-2 break-all">Fecha de referencia: {citation.as_of || t('signals.noDate')}</div>
+    {citation.excerpt ? <details className="mt-2"><summary className="cursor-pointer text-gray-500 hover:text-gray-300">Extracto original</summary><p className="mt-2 whitespace-pre-wrap break-words text-gray-300">{citation.excerpt}</p></details> : null}
   </li>;
 }
 
@@ -90,9 +90,11 @@ export default function ResearchAssistant({ initialMode = 'explore', initialTick
     setResult(null);
     try {
       const response = await askResearchAssistantAction({ mode, question: clean, ...(ticker.trim() ? { ticker: ticker.trim().toUpperCase() } : {}), ...(mode === 'guide' && reviewId && context?.ticker.toUpperCase() === ticker.trim().toUpperCase() && context.open_reviews.some((review) => review.id === reviewId) ? { review_id: reviewId } : {}) });
-      setResult(response);
+      setResult(response.status === 'insufficient_data'
+        ? { ...response, sections: response.sections.map((s) => (s.body?.trim() === 'Datos insuficientes' ? { ...s, body: '' } : s)) }
+        : response);
     } catch {
-      setError('No se pudo obtener la respuesta. Reintenta; no se ha modificado ningún ticket.');
+      setError('No se pudo obtener la respuesta. Reintenta; no se ha modificado nada.');
     } finally {
       setPending(false);
     }
@@ -100,7 +102,7 @@ export default function ResearchAssistant({ initialMode = 'explore', initialTick
 
   return <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
     <div className="min-w-0 space-y-5">
-      <Panel title="Pregunta" icon={Search} description="Dos modos, un mismo contrato de respuesta. Sin escritura en research ni tickets.">
+      <Panel title="Pregunta" icon={Search}>
         <form onSubmit={submit} className="space-y-4">
           <fieldset className="flex flex-wrap gap-2" disabled={pending}>
             <legend className="mb-2 text-sm text-gray-300">Modo</legend>
@@ -120,11 +122,10 @@ export default function ResearchAssistant({ initialMode = 'explore', initialTick
       </Panel>
       <section aria-live="polite" aria-busy={pending}>
         {error ? <p role="alert" className="rounded-xl border border-amber-800 bg-amber-950/20 p-4 text-sm text-amber-200">{error}</p> : null}
-        {result ? <Panel title="Respuesta" icon={LockKeyhole} description={`Modo ${result.mode === 'guide' ? 'guía' : 'explorar'} · Sin escritura${result.review_id !== null ? ` · Ticket #${result.review_id} (solo contexto)` : ''}`}>
-          <Badge variant="outline" className="mb-4">Sin escritura · ningún ticket modificado</Badge>
+        {result ? <Panel title="Respuesta" icon={LockKeyhole} description={`Modo ${result.mode === 'guide' ? 'guía' : 'explorar'} · Sin escritura: solo lectura, no modifica nada`}>
           {result.status === 'insufficient_data' ? <div role="status" className="mb-4 rounded-lg border border-amber-800 bg-amber-950/20 p-3 text-sm text-amber-200"><strong>Datos insuficientes</strong><p className="mt-1">La evidencia disponible no permite una conclusión confirmada.</p></div> : null}
           <p className="whitespace-pre-wrap break-words text-sm leading-7 text-gray-200">{result.answer?.trim() ? result.answer : emptyAnswerCopy(result.status)}</p>
-          {result.sections.length ? <div className="mt-5 space-y-2">{result.sections.map((section, index) => <details key={`${section.key}-${index}`} className="rounded-lg border border-gray-700/50 bg-black/20" open={section.key === 'conclusion' && result.status === 'answered'}><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-semibold text-gray-200">{SECTION_LABELS[section.key] ?? 'Sección sin clasificar'}</summary><div className="border-t border-gray-800 px-3 py-3"><p className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-300">{section.body?.trim() ? section.body : emptySectionCopy(result.status)}</p>{section.citation_ids.length ? <p className="mt-2 break-words text-xs text-gray-500">Citas: {section.citation_ids.join(', ')}</p> : <p className="mt-2 text-xs text-gray-500">Sin citas para esta sección</p>}</div></details>)}</div> : <p className="mt-4 text-sm text-gray-500">Sin secciones adicionales</p>}
+          {result.sections.length ? <div className="mt-5 space-y-2">{result.sections.map((section, index) => <details key={`${section.key}-${index}`} className="rounded-lg border border-gray-700/50 bg-black/20" open={section.key === 'conclusion' && result.status === 'answered'}><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-semibold text-gray-200">{SECTION_LABELS[section.key] ?? 'Sección sin clasificar'}</summary><div className="border-t border-gray-800 px-3 py-3"><p className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-300">{section.body?.trim() ? section.body : emptySectionCopy(result.status)}</p>{section.citation_ids.length ? <p className="mt-2 break-words text-xs text-gray-500">Citas: {section.citation_ids.length}</p> : <p className="mt-2 text-xs text-gray-500">Sin citas para esta sección</p>}</div></details>)}</div> : <p className="mt-4 text-sm text-gray-500">Sin secciones adicionales</p>}
           {result.missing_data.length || result.status === 'insufficient_data' ? <div className="mt-5 rounded-lg border border-amber-800/60 p-3"><h3 className="text-sm font-semibold text-amber-200">Datos que faltan</h3>{result.missing_data.length ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-300">{result.missing_data.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="mt-2 text-sm text-gray-400">Sin datos sobre qué información falta.</p>}</div> : null}
           {result.suggested_next_steps.length ? <div className="mt-5"><h3 className="text-sm font-semibold text-gray-200">Próximos pasos sugeridos</h3><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-400">{result.suggested_next_steps.map((item, index) => <li key={index}>{item}</li>)}</ul></div> : null}
           <div className="mt-5 border-t border-gray-800 pt-4"><h3 className="text-sm font-semibold text-gray-200">Citas y fuentes ({result.citations.length})</h3>{result.citations.length ? <ul className="mt-3 grid min-w-0 gap-2">{result.citations.map((citation, index) => <Citation key={`${citation.id}-${index}`} citation={citation} />)}</ul> : <p className="mt-2 text-sm text-gray-500">Sin datos de fuentes.</p>}</div>
@@ -132,9 +133,9 @@ export default function ResearchAssistant({ initialMode = 'explore', initialTick
       </section>
     </div>
     <aside className="min-w-0 space-y-4 lg:pt-0">
-      <Panel title="Contexto de guía" description="Datos de apoyo, no una aceptación de tickets.">
-        {mode === 'explore' ? <p className="text-sm text-gray-500">Selecciona Guía de empresa para ver revisiones y noticias disponibles.</p> : !ticker.trim() ? <p className="text-sm text-gray-500">Sin datos. Introduce un ticker.</p> : contextError ? <p className="text-sm text-amber-200">No se pudo cargar el contexto opcional. Puedes preguntar sin anclar un ticket.</p> : !context ? <p className="text-sm text-gray-500">Cargando contexto…</p> : <div className="space-y-5 text-sm">
-          <div><label htmlFor="assistant-review" className="block font-semibold text-gray-200">Ticket abierto (opcional)</label><select id="assistant-review" value={context.open_reviews.some((review) => review.id === reviewId) ? reviewId : ''} onChange={(event) => { setReviewId(event.target.value ? Number(event.target.value) : undefined); setResult(null); }} className="mt-2 min-h-11 w-full rounded-lg border border-gray-700 bg-surface-0 px-2 text-gray-200"><option value="">Sin ticket anclado</option>{context.open_reviews.map((review) => <option key={review.id} value={review.id}>#{review.id} · {review.summary}</option>)}</select><p className="mt-1 text-xs text-gray-500">La pregunta no acepta ni cierra la revisión.</p></div>
+      <Panel title="Contexto de guía">
+        {mode === 'explore' ? <p className="text-sm text-gray-500">Selecciona Guía de empresa para ver revisiones y noticias disponibles.</p> : !ticker.trim() ? <p className="text-sm text-gray-500">Sin datos. Introduce un ticker.</p> : contextError ? <p className="text-sm text-amber-200">No se pudo cargar el contexto opcional. Puedes preguntar sin anclar una revisión.</p> : !context ? <p className="text-sm text-gray-500">Cargando contexto…</p> : <div className="space-y-5 text-sm">
+          <div><label htmlFor="assistant-review" className="block font-semibold text-gray-200">Revisión abierta (opcional)</label><select id="assistant-review" value={context.open_reviews.some((review) => review.id === reviewId) ? reviewId : ''} onChange={(event) => { setReviewId(event.target.value ? Number(event.target.value) : undefined); setResult(null); }} className="mt-2 min-h-11 w-full rounded-lg border border-gray-700 bg-surface-0 px-2 text-gray-200"><option value="">Sin revisión anclada</option>{context.open_reviews.map((review) => <option key={review.id} value={review.id}>#{review.id} · {review.summary}</option>)}</select><p className="mt-1 text-xs text-gray-500">La pregunta no acepta ni cierra la revisión.</p></div>
           <div><h3 className="font-semibold text-gray-200">Últimas noticias atribuidas</h3>{context.latest_news.length ? <ul className="mt-2 space-y-2">{context.latest_news.map((news) => <li key={news.id} className="rounded-lg border border-gray-800 p-2"><Badge variant="outline">Noticia atribuida</Badge><p className="mt-1 break-words text-gray-300">{safeAssistantSourceUrl(news.source_url) ? <a href={safeAssistantSourceUrl(news.source_url)!} target="_blank" rel="noopener noreferrer" className="text-teal-300 underline">{news.title}</a> : news.title}</p><p className="mt-1 text-xs text-gray-500">{news.source || 'Fuente sin datos'} · {news.date_source === 'gdelt_first_seen' ? 'Detectada' : news.date_source === 'ingested_at_fallback' ? 'Incorporada' : news.date_source === 'source' ? 'Publicada' : 'Fecha registrada'}: {news.date ? formatUserDateTime(news.date) : t('signals.noDate')}</p></li>)}</ul> : <p className="mt-2 text-gray-500">Sin datos de noticias.</p>}</div>
           {context.missing_data.length ? <div><h3 className="font-semibold text-gray-200">Datos que faltan en el contexto</h3><ul className="mt-2 list-disc pl-5 text-gray-400">{context.missing_data.map((item, index) => <li key={index}>{item}</li>)}</ul></div> : null}
         </div>}
