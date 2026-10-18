@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { TrendingDown, TrendingUp, Activity } from 'lucide-react';
 
 import { getMarketMovers, type MarketMover } from '@/lib/actions/market.actions';
-import { NA, formatCompact, formatPercent, formatPrice, formatUserDateTime } from '@/lib/format';
+import { NA, formatCompact, formatNumber, formatPercent, formatPrice, formatUserDateTime, isValidCurrencyCode } from '@/lib/format';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { TickerContextBadges } from '@/components/common/TickerContextBadges';
@@ -23,10 +23,6 @@ function formatPct(value: number | null): string {
   if (value == null) return NA;
   // signDisplay: 'always' imprime el + en es-ES sin concatenarlo a mano
   return formatPercent(value, { fromRatio: false, digits: 2, signDisplay: 'always' });
-}
-
-function safeCurrency(currency: string | null | undefined): string {
-  return currency && /^[A-Z]{3}$/.test(currency) ? currency : 'USD';
 }
 
 type TickerSets = { portfolioTickers: ReadonlySet<string>; watchlistTickers: ReadonlySet<string> };
@@ -64,7 +60,8 @@ function MoversTable({ rows, caption, tickerSets, showVolume = false }: { rows: 
                 />
               </th>
               <td className="py-3 px-2 text-right text-gray-300">
-                <span className="whitespace-nowrap">{formatPrice(row.price, safeCurrency(row.currency))}</span>
+                {/* Sin divisa valida el precio se muestra sin simbolo, nunca como USD inventado (regla de lib/format). */}
+                  <span className="whitespace-nowrap">{isValidCurrencyCode(row.currency) ? formatPrice(row.price, row.currency) : formatNumber(row.price)}</span>
                 {row.date ? (
                   <div className="ml-auto max-w-[7.5rem] text-xs text-gray-500">
                     <span className="whitespace-nowrap">del {row.date}</span>
