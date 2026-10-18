@@ -410,6 +410,20 @@ export async function getKnowledgeDocuments() {
 export type KnowledgeDocumentDetail = KnowledgeDocument & { chunk_count: number };
 
 /** Un documento por id. `null` si no existe (404); cualquier otro error se propaga. */
+export type DeleteDocumentResult = { success: true } | { success: false; message: string };
+
+/** Borra un documento de conocimiento (y sus fragmentos) tras confirmación en la UI. */
+export async function deleteKnowledgeDocument(documentId: number): Promise<DeleteDocumentResult> {
+  try {
+    await requestJson(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`, { method: 'DELETE' });
+    revalidatePath('/knowledge');
+    return { success: true };
+  } catch (error) {
+    console.error('deleteKnowledgeDocument error:', error);
+    return { success: false, message: error instanceof Error ? error.message : 'No se pudo eliminar el documento.' };
+  }
+}
+
 export async function getKnowledgeDocument(documentId: number): Promise<KnowledgeDocumentDetail | null> {
   try {
     return await requestJson<KnowledgeDocumentDetail>(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`);
