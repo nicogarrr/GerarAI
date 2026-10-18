@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
