@@ -131,7 +131,7 @@ export const CLIENT_ONLY_PKGS = [
  * toda la app (`lucide-react` esta en la mayoria de los 72 ficheros con
  * `'use client'`), que es exactamente como un guard se vuelve ignorado.
  */
-export const SERVER_SAFE_PKGS = ['lucide-react', 'clsx', 'tailwind-merge', 'class-variance-authority', 'qrcode.react', 'zod', 'openapi-fetch'];
+export const SERVER_SAFE_PKGS = ['lucide-react', 'clsx', 'tailwind-merge', 'class-variance-authority', 'qrcode.react', 'zod'];
 
 export function isClientOnlyPkg(spec) {
   if (SERVER_SAFE_PKGS.some((p) => spec === p || spec.startsWith(p))) return false;
