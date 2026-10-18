@@ -444,6 +444,11 @@ def _history_is_portfolio(history: list[ChatTurn] | None) -> bool:
     return False
 
 
+_PAGE_CONTENT_RE = re.compile(
+    r"(?i)\b(?:en|de|sobre)\s+(?:esta|la\s+presente)\s+(?:p[aá]gina|pantalla|secci[oó]n)\b"
+    r"|\b(?:esta|la)\s+(?:p[aá]gina|pantalla)\b[^.?!\n]{0,40}\b(?:hay|muestra|tiene|dice)\b"
+    r"|\bqu[eé]\s+(?:hay|veo)\s+(?:aqu[ií]|en\s+pantalla)\b"
+)
 _NET_WORTH_CUE_RE = re.compile(r"(?i)\b(?:patrimonio|caja|margen|neto)\b")
 
 
@@ -695,6 +700,27 @@ class ChatService:
         company = self._resolve_company(db, question, scope, ticker)
         if company is None and page_context is not None:
             company = page_context.company
+        # Pregunta sobre el contenido de la página sin empresa: el cerebro solo
+        # recibe el nombre de la sección, no sus datos. Lo dice, sin inventar
+        # cifras ni citar fuentes ajenas.
+        if (
+            page_context is not None
+            and company is None
+            and not ticker
+            and _PAGE_CONTENT_RE.search(question or "")
+        ):
+            return ChatResponse(
+                answer=(
+                    f"No tengo los datos de esta página ({page_context.label}): solo veo el nombre de la sección, "
+                    "no su contenido. Dime qué quieres saber y lo busco en la biblioteca o en tu cartera."
+                ),
+                sources=[],
+                model="deterministic",
+                prompt_version="page-content-unavailable-v1",
+                confidence=0.9,
+                llm_trace={"path": "page_content_unavailable", "generated": False, "provider_calls": 0},
+                context=context_echo,
+            )
         # Memoria SOLO ante "recuerda ..." explicito; respuesta visible, sin LLM.
         note = remember_note(question)
         if note is not None:
