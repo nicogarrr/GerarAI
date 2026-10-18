@@ -247,6 +247,42 @@ const FACTORES: Record<string, string> = {
   uranium: 'Uranio',
 };
 
+/** Tipos de empresa simples con etiqueta propia (no son factores). */
+const TIPOS_EMPRESA: Record<string, string> = {
+  operating_company: 'empresa operativa',
+  research_candidate: 'candidato de análisis',
+  fund: 'fondo',
+  etf: 'ETF',
+  trust: 'trust',
+};
+
+/** Etiqueta ES del tipo de empresa de la ficha.
+ * QA 23: el tipo compuesto «space_telecom_pre_fcf» se pintaba crudo
+ * («space telecom pre fcf»). Se descompone en tokens de factores
+ * conocidos (primero las claves de dos tokens: pre_fcf, small_cap...);
+ * un token desconocido devuelve el tipo tal cual, nunca una etiqueta
+ * inventada. */
+export function companyTypeLabel(value: string): string {
+  const exact = TIPOS_EMPRESA[value.toLowerCase()];
+  if (exact) return exact;
+  const tokens = value.toLowerCase().split('_');
+  const labels: string[] = [];
+  let i = 0;
+  while (i < tokens.length) {
+    const pair = tokens.slice(i, i + 2).join('_');
+    if (i + 1 < tokens.length && FACTORES[pair]) {
+      labels.push(FACTORES[pair]);
+      i += 2;
+    } else if (FACTORES[tokens[i]]) {
+      labels.push(FACTORES[tokens[i]]);
+      i += 1;
+    } else {
+      return value;
+    }
+  }
+  return labels.join(' · ');
+}
+
 export function etiquetaFactor(value: string): string {
   const known = FACTORES[value.toLowerCase()];
   if (known) return known;
