@@ -3763,40 +3763,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/sources/evidence-suggestions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Evidence Suggestions */
-        get: operations["evidence_suggestions_api_sources_evidence_suggestions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sources/evidence-suggestions/{suggestion_id}/action": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Action Evidence Suggestion */
-        post: operations["action_evidence_suggestion_api_sources_evidence_suggestions__suggestion_id__action_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/sources/kpi-candidates": {
         parameters: {
             query?: never;
@@ -3825,23 +3791,6 @@ export interface paths {
         put?: never;
         /** Action Kpi Candidate */
         post: operations["action_kpi_candidate_api_sources_kpi_candidates__candidate_id__action_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sources/tiers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Source Tiers */
-        get: operations["source_tiers_api_sources_tiers_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5570,56 +5519,6 @@ export interface components {
             source: string;
             /** Year */
             year?: number | null;
-        };
-        /** EvidenceSuggestionAction */
-        EvidenceSuggestionAction: {
-            /**
-             * Action
-             * @enum {string}
-             */
-            action: "accept" | "reject";
-            /** Claim Id */
-            claim_id?: number | null;
-        };
-        /** EvidenceSuggestionOut */
-        EvidenceSuggestionOut: {
-            /** Company Id */
-            company_id: number | null;
-            /** Confidence */
-            confidence: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Document Chunk Id */
-            document_chunk_id: number | null;
-            /** Document Id */
-            document_id: number | null;
-            /** Id */
-            id: number;
-            /** Metadata */
-            metadata_: {
-                [key: string]: unknown;
-            };
-            /** Model */
-            model: string | null;
-            /** Prompt Version */
-            prompt_version: string;
-            /** Quote */
-            quote: string | null;
-            /** Rationale */
-            rationale: string;
-            /** Relation */
-            relation: string;
-            /** Statement */
-            statement: string;
-            /** Status */
-            status: string;
-            /** Suggested Claim Id */
-            suggested_claim_id: number | null;
-            /** Suggestion Type */
-            suggestion_type: string;
         };
         /** ExtendedQuote */
         ExtendedQuote: {
@@ -16914,93 +16813,6 @@ export interface operations {
             };
         };
     };
-    evidence_suggestions_api_sources_evidence_suggestions_get: {
-        parameters: {
-            query?: {
-                ticker?: string | null;
-                status?: string | null;
-                document_id?: number | null;
-                limit?: number;
-            };
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EvidenceSuggestionOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    action_evidence_suggestion_api_sources_evidence_suggestions__suggestion_id__action_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path: {
-                suggestion_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EvidenceSuggestionAction"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EvidenceSuggestionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     kpi_candidates_api_sources_kpi_candidates_get: {
         parameters: {
             query?: {
@@ -17075,46 +16887,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KPIExtractionCandidateOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    source_tiers_api_sources_tiers_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
                 };
             };
             /** @description Validation Error */
