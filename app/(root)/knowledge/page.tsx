@@ -27,6 +27,7 @@ import {
   uploadKnowledgeDocument,
 } from '@/lib/actions/research-tools.actions';
 import BackendOffline from '@/components/system/BackendOffline';
+import { DeleteCollectionButton } from '@/components/knowledge/DeleteCollectionButton';
 import { DeleteDocumentButton } from '@/components/knowledge/DeleteDocumentButton';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatDate, formatNumber, formatPercent, NA } from '@/lib/format';
@@ -253,7 +254,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
 
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-4">
         <h2 className="mb-3 font-semibold text-gray-100">Colecciones</h2>
-        {collections.length ? <ul className="grid gap-2 sm:grid-cols-2">{collections.map((collection) => { const count = documents.filter(document => document.collection_id === collection.id).length; return <li key={collection.id} className="rounded-lg border border-gray-800 p-3 text-sm"><span className="font-medium text-gray-200">{collection.name}</span><span className="ml-2 text-xs text-gray-500">· {count} {count === 1 ? 'documento' : 'documentos'} en esta vista</span></li>; })}</ul> : <p className="text-sm text-gray-500">Sin colecciones.</p>}
+        {collections.length ? <ul className="grid gap-2 sm:grid-cols-2">{collections.map((collection) => { const count = documents.filter(document => document.collection_id === collection.id).length; return <li key={collection.id} className="flex items-center justify-between gap-2 rounded-lg border border-gray-800 p-3 text-sm"><span><span className="font-medium text-gray-200">{collection.name}</span><span className="ml-2 text-xs text-gray-500">· {count} {count === 1 ? 'documento' : 'documentos'} en esta vista</span></span>{count === 0 ? <DeleteCollectionButton collectionId={collection.id} name={collection.name} /> : null}</li>; })}</ul> : <p className="text-sm text-gray-500">Sin colecciones.</p>}
       </section>
 
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">

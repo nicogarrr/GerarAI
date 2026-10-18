@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel, Field, HttpUrl, TypeAdapter, ValidationError
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -307,6 +307,26 @@ def delete_document(document_id: int, db: Session = Depends(get_db)) -> Response
     if document is None:
         raise HTTPException(status_code=404, detail="Knowledge document not found")
     KnowledgeLibraryService.delete_document(db, document)
+    return Response(status_code=204)
+
+
+@router.delete("/collections/{collection_id}", status_code=204)
+def delete_collection(collection_id: int, db: Session = Depends(get_db)) -> Response:
+    # Mismo aislamiento que delete_document: db.get va con el filtro de
+    # tenant de la sesion; una coleccion de otro tenant responde 404.
+    collection = db.get(KnowledgeCollection, collection_id)
+    if collection is None:
+        raise HTTPException(status_code=404, detail="Knowledge collection not found")
+    documents = db.scalar(
+        select(func.count())
+        .select_from(KnowledgeDocument)
+        .where(KnowledgeDocument.collection_id == collection.id)
+    )
+    if documents:
+        # 409 fijo: solo se borran colecciones vacias. Con documentos hay
+        # que borrar antes cada documento desde la propia biblioteca.
+        raise HTTPException(status_code=409, detail="Knowledge collection is not empty")
+    KnowledgeLibraryService.delete_collection(db, collection)
     return Response(status_code=204)
 
 

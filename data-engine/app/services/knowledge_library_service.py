@@ -770,6 +770,18 @@ class KnowledgeLibraryService:
         return {"chunks_deleted": int(chunks), "principles_deleted": int(principles)}
 
     @staticmethod
+    def delete_collection(db: Session, collection: KnowledgeCollection) -> dict[str, int]:
+        """Borra una coleccion VACIA de conocimiento.
+
+        La ruta rechaza con 409 las colecciones que aun tienen documentos,
+        asi que aqui solo cae la fila; los filtros de tenant de la sesion
+        se aplican a la sentencia. Devuelve contadores para logs y tests.
+        """
+        db.delete(collection)
+        db.commit()
+        return {"collections": 1}
+
+    @staticmethod
     def _delete_vector_points(db: Session, document: KnowledgeDocument) -> None:
         """Mejor esfuerzo: quita los puntos Qdrant del documento.
 
