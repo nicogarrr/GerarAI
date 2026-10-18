@@ -115,7 +115,7 @@ The long-term engine is therefore the quantitative spine of the thesis, not a se
 
 ## LLM Routing
 
-GerarAI uses a single LLM provider: OpenCode Go (see docs/AI_PROVIDER_STRATEGY.md). The default model is deepseek-v4-flash; task-level model overrides go through OPENCODE_GO_MODEL or the task override map and never select another provider. There is no OpenRouter/OpenAI/Anthropic/Gemini adapter in the application configuration.
+GerarAI uses a single LLM provider: OpenCode Go (see docs/AI_PROVIDER_STRATEGY.md). The default model is deepseek-v4.1-flash-free (opencode_go_model en data-engine/app/core/config.py); task-level model overrides go through OPENCODE_GO_MODEL or the task override map and never select another provider. There is no OpenRouter/OpenAI/Anthropic/Gemini adapter in the application configuration.
 
 Company chat keeps the deterministic context contract, then performs source-aware JSON synthesis, verifies citation IDs, calculates confidence / insufficient-data state and falls back safely when validation fails.
 

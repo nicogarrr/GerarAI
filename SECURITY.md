@@ -1,4 +1,4 @@
-# Política de seguridad — CavaAI
+# Política de seguridad — GerarAI
 
 ## Canal de reporte
 

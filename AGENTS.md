@@ -1,4 +1,4 @@
-# CavaAI: guia para agentes
+# GerarAI: guia para agentes
 
 Este archivo sustituye al bloque generico `nextjs-agent-rules` que genera `next dev`.
 Es intencional: no lo restaures ni lo borres en limpiezas. Si `next dev` lo regenera,

@@ -16,7 +16,7 @@ fuentes no obliga a abstenerse de toda consulta empresarial.
 - Cada cantidad empresarial necesita su propio aproximador local. Una frase de
   incertidumbre no legitima otra cifra exacta. Fechas se distinguen por contexto,
   no por coincidir numéricamente con un año. Rangos y unidades se mantienen juntos.
-- El prompt identifica CavaAI como aplicación financiera, no de vinos o café.
+- El prompt identifica GerarAI como aplicación financiera, no de vinos o café.
 - Charla segura y campos de plantillas no se rechazan por mencionar inversiones.
   Los campos no permiten esconder cifras ni referencias financieras falsas.
 - La ruta general no recibe cartera, memorias privadas ni documentos. Las órdenes
