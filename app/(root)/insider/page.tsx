@@ -9,7 +9,7 @@ import {
     type InsiderSignalsResult,
 } from '@/lib/actions/insider.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
-import { isAppError } from '@/lib/types/errors';
+import { isAppError, isAuthError } from '@/lib/types/errors';
 import { getPortfolioSummary } from '@/lib/actions/portfolio.actions';
 import { getWatchlist } from '@/lib/actions/watchlist.actions';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -29,9 +29,11 @@ type PageProps = {
 };
 
 /** Un 4xx (ticker sin CIK, sin filings) es "no hay datos de este ticker", no
- *  el motor caído: se deja que la vista muestre su estado vacío. */
+ *  el motor caído: se deja que la vista muestre su estado vacío. Excepción:
+ *  401/403 no es "sin datos", es sesión caducada o acceso denegado - se
+ *  propaga (isAuthError) en vez de tragarlo como ticker desconocido. */
 function isUnknownTicker(error: unknown): boolean {
-    return isAppError(error) && error.statusCode >= 400 && error.statusCode < 500;
+    return isAppError(error) && error.statusCode >= 400 && error.statusCode < 500 && !isAuthError(error);
 }
 
 export default async function InsiderPage({ searchParams }: PageProps) {

@@ -5,7 +5,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { getModelo720File, getModelo720Thresholds, getTaxHoldings, getTaxReport, type TaxRecord } from '@/lib/actions/taxes.actions';
 import { USER_TZ } from '@/lib/format';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
-import { isAppError } from '@/lib/types/errors';
+import { isAppError, isAuthError } from '@/lib/types/errors';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -36,9 +36,11 @@ function read<T>(promise: Promise<T>, fallback: T): Promise<Read<T>> {
  * Un 4xx NO es el motor caído: es "este recurso no existe todavía" (por
  * ejemplo, no hay reporte fiscal para el ejercicio pedido). Se traduce al
  * estado vacío de la vista; el 5xx y el fetch fallido sí son BackendOffline.
+ * Excepción: 401/403 no es "sin datos", es sesión caducada o acceso
+ * denegado - se propaga (isAuthError), nunca se pinta como vacío.
  */
 function isNotGeneratedYet(error: unknown): boolean {
-    return isAppError(error) && error.statusCode >= 400 && error.statusCode < 500;
+    return isAppError(error) && error.statusCode >= 400 && error.statusCode < 500 && !isAuthError(error);
 }
 
 function asFiscalYear(raw: string | undefined): number {
@@ -62,6 +64,13 @@ export default async function TaxesPage({ searchParams }: PageProps) {
     ]);
     const { error: holdingsError } = holdingsRead;
     const { error: reportError } = reportRead;
+    // Un 401/403 no es "sin datos para este ejercicio": la sesión caducó o
+    // el acceso cambió. Se propaga en vez de pintar el estado vacío de la
+    // vista (holdings = [] / report = null) como si no hubiera nada.
+    const authError = [holdingsRead, reportRead, thresholdsRead, fileRead].find(
+        (r) => r.error && isAuthError(r.error),
+    )?.error;
+    if (authError) throw authError;
     // Los bloques del 720 son accesorios y no tumban la página, pero un
     // 4xx ("sin datos para este ejercicio") no es lo mismo que un 5xx o un
     // fallo de red ("indisponible"): el segundo se muestra como tal para no
