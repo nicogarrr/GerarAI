@@ -3,12 +3,13 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { CornerDownLeft, Loader2, Search, TrendingUp } from "lucide-react";
+import { CornerDownLeft, Loader2, Search, Terminal, TrendingUp } from "lucide-react";
 import { searchStocksWithStatus, getPopularStocks } from "@/lib/actions/finnhub.actions";
 import { loadPopularStocks } from "@/lib/popular-stocks-loader";
 import { showErrorToast } from "@/lib/toast";
 import { isNextRedirectError } from "@/lib/types/errors";
 import { flattenNavItems, ROUTE_CATALOG } from "@/lib/constants";
+import { parseTickerCommand } from "@/lib/research/ticker-commands";
 import { etiquetaTipoInstrumento } from "@/lib/labels";
 
 export default function SearchCommand({ renderAs = 'button', label = 'Añadir acción', initialStocks }: SearchCommandProps) {
@@ -43,6 +44,16 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
     const displayStocks = useMemo(() => {
         return isSearchMode ? stocks : (stocks?.slice(0, 10) || []);
     }, [isSearchMode, stocks]);
+
+    // Comandos de ficha tipo terminal: "ASTS FA" / "ASTS N"... Con codigo
+    // exacto el comando ES el primer resultado (Enter lo abre, regla #1518);
+    // con prefijo parcial se muestran como sugerencias bajo las acciones.
+    const commandQuery = useMemo(() => parseTickerCommand(searchTerm), [searchTerm]);
+    // Par {ticker, comando} estable para el render: permite narrow de TS en
+    // los callbacks JSX sin aserciones no nulas.
+    const exactCommand = commandQuery?.exact
+        ? { ticker: commandQuery.ticker, command: commandQuery.exact }
+        : null;
 
     // Atajos: Ctrl/Cmd+K y "/". "/" solo cuando el foco no esta en un campo de
     // texto, para no secuestrar la escritura.
@@ -107,7 +118,11 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     setSearchError(true);
                 } else {
                     setStocks(result.stocks);
-                    setSelectedValue(result.stocks[0] ? `stock:${result.stocks[0].symbol}` : "");
+                    // Con un comando exacto tecleado ("ASTS FA") el comando es
+                    // el primer resultado: no pisar la seleccion con un stock.
+                    if (!parseTickerCommand(query.trim())?.exact) {
+                        setSelectedValue(result.stocks[0] ? `stock:${result.stocks[0].symbol}` : "");
+                    }
                 }
             }
         } catch (error: unknown) {
@@ -300,7 +315,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
             )}
             <CommandDialog
                 open={open}
-                commandProps={{shouldFilter:false, value:selectedValue || (displayStocks[0] ? `stock:${displayStocks[0].symbol}` : undefined), onValueChange:setSelectedValue}}
+                commandProps={{shouldFilter:false, value:selectedValue || (exactCommand ? `cmd:${exactCommand.command.code}` : displayStocks[0] ? `stock:${displayStocks[0].symbol}` : undefined), onValueChange:setSelectedValue}}
                 onOpenChange={setOpen}
                 onCloseAutoFocus={(event) => {
                     event.preventDefault();
@@ -316,13 +331,34 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     <CommandInput
                         value={searchTerm}
                         onValueChange={setSearchTerm}
-                        placeholder="Buscar acciones..."
+                        placeholder="Buscar acciones o comando «ASTS FA»..."
                         aria-label="Buscar acciones o secciones"
                         className="search-input"
                     />
                     {loading && <Loader2 aria-hidden="true" className="search-loader" />}
                 </div>
                 <CommandList className="search-list">
+                    {/* El comando exacto NO depende del proveedor de busqueda:
+                        se muestra aunque Finnhub este cargando o haya fallado,
+                        porque es una ruta local de la app. */}
+                    {exactCommand ? (
+                        <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading="Comando">
+                                    <CommandItem
+                                        key={exactCommand.command.code}
+                                        value={`cmd:${exactCommand.command.code}`}
+                                        onSelect={() => go(exactCommand.command.href(exactCommand.ticker))}
+                                        onMouseEnter={() => router.prefetch(exactCommand.command.href(exactCommand.ticker).split('#')[0])}
+                                        className="search-item-link min-h-11 w-full text-left aria-selected:bg-teal-950/60 aria-selected:ring-1 aria-selected:ring-inset aria-selected:ring-teal-700"
+                                    >
+                                        <Terminal aria-hidden="true" className="h-4 w-4 text-teal-400" />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="search-item-name truncate font-mono">{exactCommand.ticker} {exactCommand.command.code}</div>
+                                            <div className="text-sm text-gray-500">{exactCommand.command.label}</div>
+                                        </div>
+                                        <CornerDownLeft aria-hidden="true" className="h-3.5 w-3.5 text-gray-600" />
+                                    </CommandItem>
+                        </CommandGroup>
+                    ) : null}
                     {loading ? (
                         <CommandEmpty className="search-list-empty">Cargando acciones...</CommandEmpty>
                     ) : searchError ? (
@@ -354,6 +390,25 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                                     ))}
                                 </CommandGroup>
                             )}
+                            {commandQuery && !commandQuery.exact ? (
+                                <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading={`Comandos de ${commandQuery.ticker}`}>
+                                    {commandQuery.matches.map((cmd) => (
+                                        <CommandItem
+                                            key={cmd.code}
+                                            value={`cmd:${cmd.code}`}
+                                            onSelect={() => go(cmd.href(commandQuery.ticker))}
+                                            onMouseEnter={() => router.prefetch(cmd.href(commandQuery.ticker).split('#')[0])}
+                                            className="search-item-link min-h-11 w-full text-left aria-selected:bg-teal-950/60 aria-selected:ring-1 aria-selected:ring-inset aria-selected:ring-teal-700"
+                                        >
+                                            <Terminal aria-hidden="true" className="h-4 w-4 text-gray-500" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="search-item-name truncate font-mono">{commandQuery.ticker} {cmd.code}</div>
+                                                <div className="text-sm text-gray-500">{cmd.label}</div>
+                                            </div>
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            ) : null}
                             {/* Secciones navegables: el buscador deja de ser solo
                                 un buscador de tickers y cubre los destinos que no
                                 caben en el menu. Se renderizan TAMBIEN al escribir:

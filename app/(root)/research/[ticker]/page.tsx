@@ -1499,7 +1499,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             const listing = listingStatus(company.exchange, headerMarket?.quote?.priceAsOf ?? null, new Date());
             return listing.stale ? <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200" role="status">{listing.message}</p> : null;
           })()}
-          {headerMarket ? <CompanyHeaderQuote snapshot={headerMarket} /> : null}
+          {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
+          {headerMarket ? <div id="grafico" className="scroll-mt-6"><CompanyHeaderQuote snapshot={headerMarket} /></div> : null}
           <ChangesSinceVisit ticker={ticker} />
           <div className="flex flex-col gap-3 border-t border-gray-900 pt-4">
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><Target className="h-4 w-4" />{holdingBadge}</span><GuideBrainButton ticker={ticker} /><Link className="inline-flex min-h-[44px] items-center gap-1 text-gray-400 transition hover:text-teal-300 sm:min-h-0" href={`/research/${encodeURIComponent(ticker)}?view=changes`}><History className="h-4 w-4" />Qué ha cambiado{recentChangeCount ? <span aria-hidden="true" className="rounded-full bg-gray-800 px-1.5 text-xs font-semibold text-gray-300">{recentChangeCount}</span> : null}</Link></div>
@@ -1510,7 +1511,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" href={`/insider?ticker=${encodeURIComponent(ticker)}`}>Insiders</Link>
                 <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" href={`/corporate-actions?ticker=${encodeURIComponent(ticker)}`}>Dividendos y splits</Link>
               </div>
-              <div className="w-full sm:w-auto sm:min-w-0 sm:flex-1"><QuickAlertButton ticker={ticker} currency={company.currency} /></div>
+              {/* Ancla del comando ALERT del buscador (`ASTS ALERT` -> #alerta). */}
+              <div id="alerta" className="w-full scroll-mt-6 sm:w-auto sm:min-w-0 sm:flex-1"><QuickAlertButton ticker={ticker} currency={company.currency} /></div>
               <FollowButton symbol={ticker} company={company.name} isFollowed={isFollowed} stateUnknown={watchlistUnknown} />
             </div>
           </div>
