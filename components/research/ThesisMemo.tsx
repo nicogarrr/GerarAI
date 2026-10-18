@@ -1,3 +1,4 @@
+import { frameworkTerm } from '@/lib/research/framework-terms';
 import { thesisMoney, thesisEps } from '@/lib/research/thesis-number-format';
 import { thesisScenarioDisplay } from '@/lib/research/listed-share-values';
 import { formatGeneratedDate, formatPercent, isValidCurrencyCode, marginOfSafetyDisplay, NA } from '@/lib/format';
@@ -40,6 +41,7 @@ const STATUS_LABELS: Record<string, string> = {
   published: 'publicada',
   rejected: 'rechazada',
   stale: 'desactualizada',
+  draft_failed_audit: 'borrador (auditoría no superada)',
 };
 
 function enumLabel(map: Record<string, string>, value: string | null | undefined): string {
@@ -219,7 +221,7 @@ export default function ThesisMemo({
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-300">
             {thesis.missing_inputs.map((item) => (
-              <li key={item}>{item}</li>
+              <li key={item}>{frameworkTerm(item) ?? metricLabel(item)}</li>
             ))}
           </ul>
         </section>

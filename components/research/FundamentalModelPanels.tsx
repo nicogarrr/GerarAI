@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { modelConditionState } from '@/lib/research/coverage-state';
-import { formatCompact, formatNumber, formatPercent, NA } from '@/lib/format';
+import { formatCompact, formatMarketDate, formatNumber, formatPercent, NA } from '@/lib/format';
+import { etiquetaTipoEvento } from '@/lib/labels';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { frameworkLabel, frameworkTerm } from '@/lib/research/framework-terms';
 import { expectationMetricLabel, reviewStatusLabel } from '@/lib/research/expectation-labels';
@@ -332,8 +333,8 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
           <div className="space-y-2 text-sm">
             {model.timeline.slice(0, 4).map((event, index) => (
               <div key={`${event.date}-${event.title}-${index}`} className="rounded-md border border-gray-800 p-2">
-                <div className="flex justify-between gap-3"><span className="font-medium text-gray-300">{event.title}</span><span className="text-xs text-gray-500">{event.date?.slice(0, 10) ?? 's/d'}</span></div>
-                <div className="mt-1 text-xs text-gray-500">{event.type} · {event.source} · impacto {translate(IMPACT_LABELS, event.thesis_impact, event.thesis_impact)}</div>
+                <div className="flex justify-between gap-3"><span className="font-medium text-gray-300">{event.title}</span><span className="text-xs text-gray-500">{event.date ? formatMarketDate(event.date.slice(0, 10)) : 's/d'}</span></div>
+                <div className="mt-1 text-xs text-gray-500">{etiquetaTipoEvento(event.type)} · {event.source} · impacto {translate(IMPACT_LABELS, event.thesis_impact, event.thesis_impact)}</div>
               </div>
             ))}
             {!model.timeline.length ? <div className="text-sm text-gray-500">No hay eventos históricos almacenados.</div> : null}
