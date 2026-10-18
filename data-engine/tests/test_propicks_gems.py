@@ -43,7 +43,7 @@ def test_find_gems_end_to_end_reads_shared_data():
     from datetime import date, timedelta
     from decimal import Decimal
 
-    from app.models import InsiderTransaction, MarketPrice
+    from app.models import MarketPrice
     from app.services.propicks_funnel_service import run_funnel
     from app.services.propicks_gems_service import find_gems
     from tests.test_propicks_funnel import _company, _db, _fact, _five_good_years, _full_metrics

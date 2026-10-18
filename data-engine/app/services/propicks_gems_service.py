@@ -3,8 +3,9 @@
 Starts from companies that pass the quality funnel and adds value, balance
 sheet and insider evidence. Every datum carries its source and date; anything
 missing is left out of the score and the reason list, never imputed.
-13F smart money is not used: manager_holdings is keyed by CUSIP and tickers
-are never inferred, so there is no honest join yet.
+13F smart money joins manager_holdings to companies only through the CUSIP
+map in instrument_references; a CUSIP without a ticker row is skipped, never
+guessed. 13F is quarterly, long-only and up to 45 days late.
 """
 
 from __future__ import annotations
@@ -177,7 +178,7 @@ def _smart_money(
     ).all():
         key = (h.report_date, h.cusip, h.manager_id)
         shares[key] = shares.get(key, 0.0) + float(h.shares or 0)
-    adding: dict[str, int] = {t: 0 for t in cusip_ticker.values()}
+    adding: dict[str, int] = dict.fromkeys(cusip_ticker.values(), 0)
     for (d, cusip, mid), sh in shares.items():
         if d != latest or sh <= 0:
             continue
