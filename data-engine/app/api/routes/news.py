@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models import Company, NewsEvent
 from app.schemas import ManualNewsRequest, ManualNewsResponse, NewsIngestRequest, NewsIngestResponse
-from app.services.news_headline_translation import display_translation, original_headline, translate_headline
+from app.services.news_headline_translation import (
+    display_summary_translation,
+    display_translation,
+    original_headline,
+    translate_headline,
+    translate_summary,
+)
 from app.services.news_service import NewsService
 from app.services.public_headline_translation import translate_external_headline
 from app.services.second_order_news_service import analyze_second_order
@@ -131,6 +137,10 @@ def news_events(
                 "title": event.title,
                 "original_headline": original_headline(event),
                 "headline_translation": display_translation(event),
+                # Resumen/cuerpo ingerido con su traduccion cacheada (Nico:
+                # traducir cada noticia desde la ficha y el feed).
+                "summary": event.summary,
+                "summary_translation": display_summary_translation(event),
                 "source": event.source,
                 "url": event.url,
                 "event_type": "legal_solicitation" if solicitation else event.event_type,
@@ -171,6 +181,16 @@ def second_order_hypotheses(
 async def translate_news_headline(event_id: int, db: Session = Depends(get_db)) -> dict:
     try:
         return await translate_headline(db, event_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Tenant context required") from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="News event not found") from exc
+
+
+@router.post("/{event_id}/translation/summary")
+async def translate_news_summary(event_id: int, db: Session = Depends(get_db)) -> dict:
+    try:
+        return await translate_summary(db, event_id)
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail="Tenant context required") from exc
     except LookupError as exc:
