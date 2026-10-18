@@ -86,6 +86,7 @@ import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
+import { dedupeNewsEvents } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import CitationsList from '@/components/chat/CitationsList';
 import FollowButton from '@/components/screener/FollowButton';
@@ -805,9 +806,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const newsEntry = (await newsPromise).find((entry) => entry.key === 'overview-news');
     const overviewNewsError = !newsEntry || !newsEntry.ok;
     const overviewNews: Awaited<ReturnType<typeof getResearchNews>> = newsEntry && newsEntry.ok
-      ? newsEntry.value
-          .slice()
-          .sort((a, b) => (b.materiality_score ?? 0) - (a.materiality_score ?? 0))
+      ? dedupeNewsEvents(
+          newsEntry.value
+            .slice()
+            .sort((a, b) => (b.materiality_score ?? 0) - (a.materiality_score ?? 0)),
+        )
           .slice(0, 5)
           .sort((a, b) => b.date.localeCompare(a.date))
       : [];

@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { newsDisplayTitle, untokenizeHeadline } from '../lib/news-display.ts';
+import { dedupeNewsEvents, newsDisplayTitle, untokenizeHeadline } from '../lib/news-display.ts';
 
 const page = (readFileSync('app/(root)/research/news/page.tsx', 'utf8') + readFileSync('components/research/NewsEventsFlow.tsx', 'utf8') + readFileSync('components/research/NewsHeadline.tsx', 'utf8'));
 
@@ -43,4 +43,14 @@ test('F19: titulares tokenizados por la fuente se pintan con la puntuación pega
     assert.equal(untokenizeHeadline('Apple presenta resultados (récord) en EE. UU.'), 'Apple presenta resultados (récord) en EE. UU.');
     // no toca decimales ni miles
     assert.equal(untokenizeHeadline('El PIB crece 1,5 % y 2.5 puntos'), 'El PIB crece 1,5 % y 2.5 puntos');
+});
+
+test('noticias repetidas se deduplican por título normalizado o URL', () => {
+  const out = dedupeNewsEvents([
+    { title: 'Launch Delays Could Change The Case For AST SpaceMobile Stock', url: 'https://a.com/x?utm=1' },
+    { title: 'Launch delays could change the case for AST SpaceMobile stock!', url: 'https://b.com/y' },
+    { title: 'Otro titular', url: 'https://www.a.com/x/' },
+    { title: 'Distinta', url: null },
+  ]);
+  assert.deepEqual(out.map((e) => e.title), ['Launch Delays Could Change The Case For AST SpaceMobile Stock', 'Distinta']);
 });

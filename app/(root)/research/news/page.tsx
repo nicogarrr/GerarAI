@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/ui/page-header';
 import { Textarea } from '@/components/ui/textarea';
 import { MutationForm } from '@/components/forms/MutationForm';
+import { dedupeNewsEvents } from '@/lib/news-display';
 import { analyzeManualNews, getResearchNews, ingestResearchNewsFeed } from '@/lib/actions/research.actions';
 import { NewsEventsFlow } from '@/components/research/NewsEventsFlow';
 import { NEWS_PAGE_SIZE } from '@/lib/news-paging';
@@ -36,7 +37,7 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
     getTickerContext(),
   ]);
   const hasMore = fetched.length > NEWS_PAGE_SIZE;
-  const events = fetched.slice(0, NEWS_PAGE_SIZE);
+  const events = dedupeNewsEvents(fetched.slice(0, NEWS_PAGE_SIZE));
 
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">

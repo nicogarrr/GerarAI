@@ -47,3 +47,39 @@ function stripTickerPrefix(
     if (!trimmed.toUpperCase().startsWith(`${normalizedTicker} `)) return title;
     return trimmed.slice(normalizedTicker.length + 1);
 }
+
+/** Claves de deduplicación de una noticia: título normalizado (sin mayúsculas,
+ *  tildes ni puntuación) y URL sin parámetros. */
+export function newsDedupeKeys(event: { title?: string | null; url?: string | null }): string[] {
+    const keys: string[] = [];
+    const title = (event.title ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+    if (title) keys.push(`t:${title}`);
+    if (event.url) {
+        try {
+            const parsed = new URL(event.url);
+            keys.push(`u:${parsed.hostname.replace(/^www\./, '')}${parsed.pathname.replace(/\/+$/, '')}`);
+        } catch {
+            keys.push(`u:${event.url.trim()}`);
+        }
+    }
+    return keys;
+}
+
+/** Quita noticias repetidas (mismo título normalizado o misma URL), conservando
+ *  la primera aparición: el orden de entrada decide cuál sobrevive. */
+export function dedupeNewsEvents<T extends { title?: string | null; url?: string | null }>(events: T[]): T[] {
+    const seen = new Set<string>();
+    const out: T[] = [];
+    for (const event of events) {
+        const keys = newsDedupeKeys(event);
+        if (keys.some((key) => seen.has(key))) continue;
+        keys.forEach((key) => seen.add(key));
+        out.push(event);
+    }
+    return out;
+}
