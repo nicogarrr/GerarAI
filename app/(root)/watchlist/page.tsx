@@ -69,7 +69,7 @@ export default async function WatchlistPage({
                 // u otro emisor) y contradecía la ficha research (F253/F254).
                 const entry = await getWatchlistEntryData(item.symbol);
                 // Mismo cierre datado y mismo % que Movers y Mercado.
-                const dated = datedChanges[item.symbol.trim().toUpperCase()];
+                const dated = entry.priceKind === 'live' ? undefined : datedChanges[item.symbol.trim().toUpperCase()];
                 const data = dated
                     ? {
                           ...entry,

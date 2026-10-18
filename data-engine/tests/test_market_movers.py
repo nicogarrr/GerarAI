@@ -249,3 +249,20 @@ def test_spot_snapshots_are_not_official_closes(db: Session):
     assert "SNAP" not in tickers
     assert out["gainers"][0]["change_pct"] == 0.43
     assert market_changes("SNAP", db)["items"] == {}
+
+
+def test_changes_flat_close_is_zero_not_missing_and_eur_listing(db: Session):
+    """AENA (EUR, .MC): cierres oficiales 25,70 y 25,70 son 0,00 %, un dato.
+    La ficha mostraba -0,08 % contra una cotizacion que no era el cierre."""
+    from app.api.routes.market import market_changes
+
+    aena = _company(db, "AENA")
+    aena.exchange = "BME"
+    aena.currency = "EUR"
+    _price(db, aena, date(2026, 10, 15), "25.70")
+    _price(db, aena, date(2026, 10, 16), "25.70")
+
+    item = market_changes("AENA", db)["items"]["AENA"]
+    assert item["change_pct"] == 0.0
+    assert item["price"] == 25.7 and item["previous_close"] == 25.7
+    assert item["date"] == "2026-10-16" and item["previous_date"] == "2026-10-15"
