@@ -139,6 +139,8 @@ export type WatchlistEntryData = {
     // se pinta como cotización actual.
     priceKind: 'live' | 'close' | null;
     priceAsOf: string | null;
+    /** true = cotiza fuera de EE. UU.: capitalización y PER no se piden a Finnhub (serían del ADR u homónimo). */
+    metricsNotApplicable: boolean;
 };
 
 export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEntryData> {
@@ -157,10 +159,12 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         peRatio: null,
         priceKind: null,
         priceAsOf: null,
+        metricsNotApplicable: false,
     };
     if (!quoteSymbol) return base;
 
     const usListing = quoteSymbol === normalized;
+    base.metricsNotApplicable = !usListing;
     const [quote, light] = await Promise.all([
         getStockQuote(quoteSymbol),
         // La línea US es el listado real: sus métricas Finnhub son de ESTE
@@ -204,5 +208,6 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         peRatio,
         priceKind,
         priceAsOf,
+        metricsNotApplicable: !usListing,
     };
 }

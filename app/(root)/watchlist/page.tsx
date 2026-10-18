@@ -36,6 +36,7 @@ interface WatchlistStock {
     peRatio: number | null;
     priceKind: 'live' | 'close' | null;
     priceAsOf: string | null;
+    metricsNotApplicable: boolean;
     addedAt: Date;
 }
 
@@ -70,6 +71,7 @@ export default async function WatchlistPage({
                     changePercent: data.changePercent,
                     priceKind: data.priceKind,
                     priceAsOf: data.priceAsOf,
+                    metricsNotApplicable: data.metricsNotApplicable,
                     currency: data.currency,
                     marketCap: data.marketCap,
                     peRatio: data.peRatio,
@@ -85,6 +87,7 @@ export default async function WatchlistPage({
                     changePercent: null,
                     priceKind: null,
                     priceAsOf: null,
+                    metricsNotApplicable: false,
                     currency: null,
                     marketCap: null,
                     peRatio: null,
@@ -196,18 +199,18 @@ export default async function WatchlistPage({
                                         <dt className="text-[11px] text-gray-500">Precio</dt>
                                         <dd className="truncate font-mono text-sm font-medium text-gray-200">{formatPriceCell(stock.price, stock.currency)}</dd>
                                         {stock.priceKind === 'close' ? (
-                                            <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${stock.priceAsOf}` : 'Fecha desconocida'}</dd>
+                                            <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${stock.priceAsOf}` : 'Cierre sin fecha de la fuente'}</dd>
                                         ) : null}
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Market Cap</dt>
-                                        <dd className="truncate font-mono text-sm text-gray-400">
+                                        <dd className="truncate font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
                                             {stock.marketCap !== null ? formatMarketCapUsd(stock.marketCap) : NA}
                                         </dd>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">PER (TTM)</dt>
-                                        <dd className="truncate font-mono text-sm text-gray-300">{formatPeRatio(stock.peRatio)}</dd>
+                                        <dd className="truncate font-mono text-sm text-gray-300" title={stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>{formatPeRatio(stock.peRatio)}</dd>
                                     </div>
                                 </dl>
                                 <div className="mt-3 flex items-center gap-2">
@@ -273,7 +276,7 @@ export default async function WatchlistPage({
                                         <TableCell className="text-right font-mono font-medium text-gray-200">
                                             {formatPriceCell(stock.price, stock.currency)}
                                             {stock.priceKind === 'close' ? (
-                                                <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? `Cierre ${stock.priceAsOf}` : 'Fecha desconocida'}</div>
+                                                <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? `Cierre ${stock.priceAsOf}` : 'Cierre sin fecha de la fuente'}</div>
                                             ) : null}
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -288,7 +291,7 @@ export default async function WatchlistPage({
                                                 </div>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono text-gray-400">
+                                        <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
                                             {stock.marketCap !== null ? formatMarketCapUsd(stock.marketCap) : NA}
                                         </TableCell>
                                         <TableCell className="text-right">
