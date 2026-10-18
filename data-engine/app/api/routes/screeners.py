@@ -400,12 +400,14 @@ class FinnhubScreenVendor:
                 client, "/quote", symbol, timeout=_REAL_REQUEST_TIMEOUT_SECONDS
             )
         if raw and raw.get("c") and raw["c"] > 0:
+            # Nulos honestos: un campo ausente en Finnhub es None (sin dato),
+            # nunca 0.0 - un cero inventado se mostraria como "+0.00%" real.
             return {
                 "price": float(raw["c"]),
-                "change": float(raw.get("d") or 0.0),
-                "changePercent": float(raw.get("dp") or 0.0),
-                "volume": float(raw.get("v") or 0.0),
-                "prevClose": float(raw.get("pc") or 0.0),
+                "change": float(raw["d"]) if raw.get("d") is not None else None,
+                "changePercent": float(raw["dp"]) if raw.get("dp") is not None else None,
+                "volume": float(raw["v"]) if raw.get("v") is not None else None,
+                "prevClose": float(raw["pc"]) if raw.get("pc") is not None else None,
                 "asOf": raw.get("t"),
             }
         return None
@@ -419,9 +421,11 @@ class FinnhubScreenVendor:
             timeout=_REAL_REQUEST_TIMEOUT_SECONDS,
         )
         if raw and raw.get("ticker"):
+            market_cap = raw.get("marketCapitalization")
             return {
                 "name": raw.get("name") or symbol,
-                "marketCap": float(raw.get("marketCapitalization") or 0.0) * 1_000_000.0,
+                # None cuando Finnhub no lo reporta: 0.0 seria un dato inventado.
+                "marketCap": float(market_cap) * 1_000_000.0 if market_cap else None,
                 "sector": raw.get("finnhubIndustry") or None,
                 "exchange": raw.get("exchange") or "US",
             }
@@ -479,17 +483,18 @@ class YahooScreenVendor:
             ]
             timestamps = result.get("timestamp") or []
             meta = result.get("meta") or {}
-            last, previous = closes[-1], (
-                closes[-2] if len(closes) >= 2
-                else meta.get("chartPreviousClose") or closes[-1]
-            )
-            change = last - previous
+            last = closes[-1]
+            previous = closes[-2] if len(closes) >= 2 else meta.get("chartPreviousClose")
+            # Sin cierre previo real no hay cambio computable: None, nunca 0.0.
+            change = (last - previous) if previous else None
             return {
                 "price": float(last),
-                "change": float(change),
-                "changePercent": float(change / previous * 100) if previous else 0.0,
-                "volume": float(volumes[-1]) if volumes else 0.0,
-                "prevClose": float(previous),
+                "change": float(change) if change is not None else None,
+                "changePercent": (
+                    float(change / previous * 100) if change is not None else None
+                ),
+                "volume": float(volumes[-1]) if volumes else None,
+                "prevClose": float(previous) if previous else None,
                 "asOf": timestamps[-1] if timestamps else None,
             }
         except (KeyError, IndexError, TypeError, ValueError):
@@ -513,7 +518,7 @@ def resolve_profile_vendor(active: ScreenQuoteVendor) -> ScreenQuoteVendor:
     Si el vendor de quotes no puede dar perfil real (Yahoo), el perfil se
     pide a Finnhub: 35 llamadas cacheadas 6h, muy por debajo del free tier.
     Sin key de Finnhub configurada se conserva el comportamiento anterior
-    (fallbacks del universo/DB y marketCap 0 honesto → "sin datos" en UI).
+    (fallbacks del universo/DB y marketCap None → "sin datos" en UI).
     """
     if active.supports_profiles:
         return active
@@ -598,6 +603,8 @@ def _real_response_payload(
     market_cap: float | None,
     sector: str | None,
     limit: int,
+    *,
+    as_of: float | None = None,
 ) -> dict:
     filtered = [
         item
@@ -612,7 +619,7 @@ def _real_response_payload(
     limited = [dict(item) for item in filtered[: max(1, min(limit, 200))]]
     return {
         "source": SCREEN_VENDORS[vendor].source_label,
-        "as_of": time.time(),
+        "as_of": as_of if as_of is not None else time.time(),
         "count": len(limited),
         "screener": limited,
     }
@@ -654,8 +661,15 @@ def _store_real_items(
             ]
         else:
             merged = list(items)
+        # at_wall alimenta el as_of de la respuesta: si el merge conserva
+        # items del LKG anterior, el as_of refleja el dato mas viejo servido,
+        # nunca una frescura que el proveedor no confirmo.
+        at_wall = time.time()
+        carried = set(previous) - set(fresh)
+        if carried and bucket.get("at_wall"):
+            at_wall = min(at_wall, float(bucket["at_wall"]))
         bucket.update(
-            {"at": time.monotonic(), "items": merged, "vendor": vendor}
+            {"at": time.monotonic(), "at_wall": at_wall, "items": merged, "vendor": vendor}
         )
         # Las respuestas cacheadas DE ESTE TENANT se invalidan para recomputar
         # con el nuevo universo; el resto conserva su LKG intacto.
@@ -731,14 +745,16 @@ def real_time_screener(
         bucket = _real_items_cache.get(tenant_id) or {}
         cached_items = bucket.get("items", [])
         cached_vendor = bucket.get("vendor")
+        items_at_wall = float(bucket.get("at_wall") or 0.0) or None
         has_lkg = bool(cached_items) and (
             cached_vendor is None or cached_vendor == vendor.name
         )
     if cached and now - float(cached.get("at", 0.0)) < _QUOTE_TTL:
+        # El as_of guardado es el de la captura real de los datos; reescribirlo
+        # con time.time() al servir LKG stale afirmaba una frescura falsa.
         payload = {
             **cached["payload"],
             "screener": [dict(item) for item in cached["payload"]["screener"]],
-            "as_of": time.time(),
         }
         if not _real_items_are_fresh(vendor.name, now, tenant_id):
             _schedule_real_refresh(vendor.name, tenant_id)
@@ -758,10 +774,12 @@ def real_time_screener(
             except Exception:  # noqa: BLE001 — el background seguirá intentando
                 pass
             with _real_cache_lock:
-                items = list((_real_items_cache.get(tenant_id) or {}).get("items", []))
+                bucket = _real_items_cache.get(tenant_id) or {}
+                items = list(bucket.get("items", []))
+                items_at_wall = float(bucket.get("at_wall") or 0.0) or items_at_wall
 
     payload = _real_response_payload(
-        items, vendor.name, marketCapMoreThan, sector, limit
+        items, vendor.name, marketCapMoreThan, sector, limit, as_of=items_at_wall
     )
     if items:
         with _real_cache_lock:
@@ -899,7 +917,9 @@ def _refetch_real_items(
                 "price": quote["price"],
                 "change": quote["change"],
                 "changePercent": quote["changePercent"],
-                "marketCap": profile["marketCap"] if profile else 0.0,
+                # None sin perfil real: la UI muestra N/D; un 0.0 inventado
+                # falseaba ademas los filtros marketCapMoreThan y el orden.
+                "marketCap": (profile or {}).get("marketCap"),
                 "volume": quote["volume"],
                 "prevClose": quote["prevClose"],
                 "sector": sector_value,
