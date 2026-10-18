@@ -12,6 +12,10 @@ import { thesisMoney } from '@/lib/research/thesis-number-format';
 import { cleanThesisText } from '@/lib/research/thesis-text';
 import { isValidCurrencyCode } from '@/lib/format';
 import PrintButton from '@/components/research/PrintButton';
+import { PROVENANCE_GROUPS, provenanceBasisEs, provenanceGroup } from '@/lib/research/provenance-groups';
+import { isVerifiedOficial, provenanceUrls } from '@/lib/research/provenance-item';
+import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
+import { metricLabel } from '@/lib/research/metric-labels';
 import { publicEditorial } from '@/lib/public-fonts';
 
 export const dynamic = 'force-dynamic';
@@ -66,6 +70,13 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   const currency = company?.currency ?? null;
   const latest = workspace?.thesis ?? null;
   const published = workspace ? await readLatestPublished(ticker) : null;
+  // Fuentes por cifra: /versions no las trae; /latest si. Solo se muestran
+  // cuando la publicada ES la ultima version: la procedencia de un borrador
+  // mas nuevo no describe este documento y afirmarlo seria inventarlo.
+  const provenance =
+    published && latest && latest.id === published.id
+      ? (latest.inputs_provenance ?? null)
+      : null;
 
   const encoded = encodeURIComponent(ticker);
   const name = company?.name ?? ticker;
@@ -176,6 +187,52 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                   : ''}
               </p>
             </section>
+
+            {provenance && provenance.length > 0 ? (
+              <section>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Procedencia de las cifras</h2>
+                <div className="mt-4 space-y-4">
+                  {PROVENANCE_GROUPS.map((group) => {
+                    const rows = provenance.filter(
+                      (item) => provenanceGroup(item.label as string | undefined, isVerifiedOficial(item)) === group.key,
+                    );
+                    if (rows.length === 0) return null;
+                    return (
+                      <div key={group.key}>
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{group.title}</h3>
+                        <dl className="mt-1 divide-y divide-gray-800/70">
+                          {rows.map((item) => {
+                            const urls = provenanceUrls(item);
+                            const basis = provenanceBasisEs(item.base_inferencia ?? item.method);
+                            return (
+                              <div key={item.key} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2 text-sm">
+                                <dt className="text-gray-300">{capitalizeLabel(metricLabel(item.key))}</dt>
+                                <dd className="ml-auto font-medium tabular-nums text-gray-100">{formatProvenanceValue(item.value, item.unit)}</dd>
+                                <dd className="basis-full text-xs text-gray-500">
+                                  {basis ?? 'Base no documentada'}
+                                  {urls.map((url, index) => (
+                                    <a
+                                      key={url}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      aria-label={`Fuente ${index + 1}`}
+                                      className="ml-1 text-teal-400 underline print:text-gray-700 print:no-underline"
+                                    >
+                                      [{index + 1}]
+                                    </a>
+                                  ))}
+                                </dd>
+                              </div>
+                            );
+                          })}
+                        </dl>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
 
             {(published.narrative_sections ?? []).map((section) => (
               <section key={section.titulo}>

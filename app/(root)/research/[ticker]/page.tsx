@@ -1173,7 +1173,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <div className="min-w-0 max-w-full space-y-6 [overflow-wrap:anywhere]">
         <div className="flex flex-wrap items-center gap-3">
           <ThesisGenerateButton ticker={ticker} />
-          <ThesisApproveButton ticker={ticker} disabled={data.history.length === 0} />
+          <ThesisApproveButton ticker={ticker} disabled={data.history.length === 0} latestStatus={data.thesis?.status ?? null} latestVersion={data.thesis?.version ?? null} />
           <ThesisExportMenu
             hasPublished={data.historyDetail.history.some((entry) => entry.status === 'published')}
             latestDraftVersion={data.historyDetail.history.filter((entry) => entry.status !== 'published').map((entry) => entry.version).reduce((a, b) => Math.max(a, b), 0) || null}

@@ -3,6 +3,7 @@ import { thesisMoney, thesisEps } from '@/lib/research/thesis-number-format';
 import { thesisScenarioDisplay } from '@/lib/research/listed-share-values';
 import { formatGeneratedDate, formatPercent, isValidCurrencyCode, marginOfSafetyDisplay, NA } from '@/lib/format';
 import { PROVENANCE_GROUPS, provenanceBasisEs, provenanceGroup } from '@/lib/research/provenance-groups';
+import { isVerifiedOficial, provenanceUrls } from '@/lib/research/provenance-item';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { cleanThesisText } from '@/lib/research/thesis-text';
@@ -48,28 +49,6 @@ const STATUS_LABELS: Record<string, string> = {
 function enumLabel(map: Record<string, string>, value: string | null | undefined): string {
   if (value === null || value === undefined || value === '') return NA;
   return map[value] ?? value.replaceAll('_', ' ');
-}
-
-type ProvenanceItem = NonNullable<ResearchThesis['inputs_provenance']>[number];
-
-/** Fail-closed: solo es OFICIAL lo que llega marcado OFICIAL con TODAS sus
- *  fuentes oficiales, https y con fecha. Todo lo demás (payload legacy, sin
- *  origen, etiquetas derivado/supuesto/estimación) se muestra como INFERIDO. */
-function isVerifiedOficial(item: ProvenanceItem): boolean {
-  const fuentes = item.fuentes ?? [];
-  return (
-    item.origen === 'OFICIAL' &&
-    fuentes.length > 0 &&
-    fuentes.every((f) => f.oficial && !!f.fecha && !!f.url && /^https:\/\//.test(f.url))
-  );
-}
-
-/** Enlaces https de la fuente: documentos citados del dato o URLs de la inferencia. */
-function provenanceUrls(item: ProvenanceItem): string[] {
-  const cited = (item.fuentes ?? []).map((f) => f.url);
-  return Array.from(new Set([...cited, ...(item.urls_inferencia ?? [])].filter(
-    (url): url is string => typeof url === 'string' && /^https:\/\//.test(url),
-  )));
 }
 
 /**

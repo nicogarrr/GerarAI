@@ -127,6 +127,9 @@ export interface ThesisApproval {
     actor: string;
     approved_at: string;
     telegram_auto_approval: string;
+    /** Resultado real del indexado en la Biblioteca (RAG) tras la decision.
+     *  null en backends antiguos; la UI solo afirma lo que llega. */
+    knowledge_sync?: { status: 'indexed' | 'unchanged' | 'removed' | 'none' | 'failed'; document_id: number | null } | null;
 }
 
 /**
