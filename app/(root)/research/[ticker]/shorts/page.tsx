@@ -18,7 +18,7 @@ export default async function ShortsPage({ params, searchParams }: { params: Pro
   const pages = Math.max(1, Math.ceil(rows.length / 10));
   const page = Math.min(pages, Math.max(1, Number.parseInt(query.page ?? '1', 10) || 1));
   return <main id="content" tabIndex={-1} className="mx-auto flex max-w-4xl flex-col gap-6">
-    <PageHeader title={`Cortos públicos · ${ticker}`} back={<Link className="text-teal-300" href={`/research/${encodeURIComponent(ticker)}`}>Volver a la empresa</Link>}
+    <PageHeader title={`Cortos públicos · ${ticker}`} back={<Link className="inline-flex min-h-[44px] items-center text-teal-300 sm:min-h-0" href={`/research/${encodeURIComponent(ticker)}`}>Volver a la empresa</Link>}
       actions={<MutationForm action={refreshPublicShorts.bind(null, ticker)} successMessage="Consulta terminada"><Button type="submit">Actualizar fuente</Button></MutationForm>} />
     <Panel title={data?.source ?? 'Sin datos'}>
       {!result ? <p>No se pudo leer la consulta almacenada. No es un recuento de cero posiciones.</p> : <>
