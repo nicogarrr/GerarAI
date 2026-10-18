@@ -140,12 +140,12 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                         ) : (
                             <RefreshCw aria-hidden="true" className="h-4 w-4" />
                         )}
-                        {t('propicks.regenerate')}
+                        Actualizar selección
                     </Button>
                     {lastGenerated && (
                         <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
                             <Clock aria-hidden="true" className="h-3 w-3" />
-                            Último run (datos): {formatLastGenerated(lastGenerated)}
+                            Datos: {formatLastGenerated(lastGenerated)}
                         </div>
                     )}
                 </Card>
@@ -163,7 +163,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-teal-400 border-teal-400">
-                                Top {formatNumber(picks.length, { maximumFractionDigits: 0 })}
+                                {picks.length > 0 ? `Top ${formatNumber(picks.length, { maximumFractionDigits: 0 })}` : 'Sin selección'}
                             </Badge>
                         </div>
                         {loading && (
@@ -214,11 +214,11 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                         </p>
                         <p className="text-sm text-gray-500 mt-2">
                             {!lastGenerated &&
-                                'El embudo todavía no ha publicado un run completado. Pulsa «Reintentar» para volver a intentarlo.'}
+                                'El embudo todavía no ha publicado un run completado. Pulsa «Actualizar selección» para consultar de nuevo.'}
                             {lastGenerated && passedCount === 0 &&
-                                `El último run (datos del ${formatLastGenerated(lastGenerated)}) no produjo candidatos aptos en el embudo. No es cuestión de filtros: el motor no encontró oportunidades que superaran sus propios criterios.`}
+                                `La selección del ${formatLastGenerated(lastGenerated)} no contiene candidatos que superen los criterios del embudo.`}
                             {lastGenerated && passedCount !== 0 &&
-                                `Ningún pick del último run (datos del ${formatLastGenerated(lastGenerated)}) cumple los filtros actuales (score ≥ ${appliedFilters.minScore}${appliedFilters.sector !== 'all' ? `, sector ${etiquetaSector(appliedFilters.sector)}` : ''}). Prueba a bajar el score mínimo o cambiar de sector.`}
+                                `Ninguna acción de la selección del ${formatLastGenerated(lastGenerated)} cumple los filtros actuales (score ≥ ${appliedFilters.minScore}${appliedFilters.sector !== 'all' ? `, sector ${etiquetaSector(appliedFilters.sector)}` : ''}). Prueba a bajar el score mínimo o cambiar de sector.`}
                         </p>
                         <Button
                             onClick={handleRefresh}
