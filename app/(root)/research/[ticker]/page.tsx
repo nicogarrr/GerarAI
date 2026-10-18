@@ -1360,7 +1360,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               determinista de abajo. No añaden respuestas nuevas ni texto
               generado: solo formulan la pregunta. */}
           <ChatIntentLinks ticker={ticker} />
-          <form action={`/research/${encodeURIComponent(ticker)}#chat-empresa`} className="flex flex-col gap-3 sm:flex-row" method="get"><input type="hidden" name="view" value="chat" /><Input name="chat" defaultValue={query.chat} placeholder={`Pregunta sobre ${ticker} citando fuentes`} minLength={3} required className="h-11 text-base sm:h-9 sm:text-sm" /><Button type="submit" className="min-h-[44px] sm:min-h-0"><Search className="mr-2 h-4 w-4" />Preguntar</Button></form>
         </Panel>
         {response ? (
           <Panel title="Respuesta">
@@ -1373,6 +1372,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         ) : (
           <EmptyState title="Haz una pregunta para recuperar el contrato de evidencia determinista y la síntesis con fuentes." />
         )}
+        {/* El campo queda fijo abajo mientras se lee la respuesta: la cabecera
+            de la ficha ya ocupa una pantalla y la respuesta puede ser larga, y
+            el input quedaba fuera de vista (y=1780 en un viewport de 713px). */}
+        <div className="sticky bottom-0 z-20 rounded-lg border border-gray-700 bg-surface-0/95 p-3 backdrop-blur-sm">
+          <form action={`/research/${encodeURIComponent(ticker)}#chat-empresa`} className="flex flex-col gap-3 sm:flex-row" method="get"><input type="hidden" name="view" value="chat" /><Input name="chat" defaultValue={query.chat} placeholder={`Pregunta sobre ${ticker} citando fuentes`} minLength={3} required className="h-11 text-base sm:h-9 sm:text-sm" /><Button type="submit" className="min-h-[44px] sm:min-h-0"><Search className="mr-2 h-4 w-4" />Preguntar</Button></form>
+        </div>
       </div>
     );
   }
