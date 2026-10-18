@@ -94,7 +94,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
     return (
         <div className="grid gap-6">
             <RecordDetail
-                title={t('plan.title')}
+                title="Objetivo y asignación"
                 description="Objetivo a largo plazo, aportación mensual y asignación objetivo"
                 icon={<Target className="h-5 w-5 text-teal-400" />}
                 record={initialPlan}
@@ -103,7 +103,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 maxKeys={20}
                 emptyMessage={t('plan.empty')}
                 emptyAction={<PlanSetupDialog />}
-                actions={<PlanSetupDialog triggerLabel="Editar plan" initial={initialPlan} />}
+                actions={initialPlan?.plan_exists === true ? <PlanSetupDialog triggerLabel="Editar plan" initial={initialPlan} /> : undefined}
             />
 
             <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
@@ -115,7 +115,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                                 Posiciones del plan
                             </CardTitle>
                             <CardDescription className="mt-0.5 text-sm text-gray-500">
-                                Tickers con objetivo o peso actual: saltan a su ficha de research
+                                Empresas con objetivo o peso actual
                             </CardDescription>
                         </div>
                     </div>
@@ -142,14 +142,14 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
             </Card>
 
             <RecordDetail
-                title="Análisis de Drift"
+                title="Desviación de la cartera"
                 description="Desviación de la cartera actual frente a la asignación objetivo"
                 icon={<PiggyBank className="h-5 w-5 text-teal-400" />}
                 record={initialDrift}
                 fetchRecord={getPlanDrift}
                 columnLabels={DRIFT_LABELS}
                 maxKeys={24}
-                emptyMessage="Sin análisis de drift disponible."
+                emptyMessage="Sin datos de desviación disponibles."
             />
 
             <RecordList

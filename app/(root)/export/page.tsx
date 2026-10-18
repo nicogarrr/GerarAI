@@ -7,7 +7,7 @@ export const revalidate = 0;
 
 export const metadata: Metadata = {
     title: 'Exportación',
-    description: 'Descarga el journal de decisiones de inversión en CSV o JSON, o tus tesis en un vault de Obsidian (.zip).',
+    description: 'Descarga tu diario de decisiones en CSV o JSON, o tus tesis para Obsidian (.zip).',
 };
 
 export default async function ExportPage() {

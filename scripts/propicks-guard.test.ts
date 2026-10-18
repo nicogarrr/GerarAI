@@ -180,9 +180,9 @@ describe('propicks-guard', () => {
         it('UI en español con reintento', () => {
             const content = readSource('components/proPicks/EnhancedProPicksContent.tsx');
             const tabs = readSource('components/proPicks/ProPicksTabs.tsx');
-            assert.ok(content.includes('Reintentar'));
+            assert.ok(content.includes('Actualizar selección'));
             assert.ok(tabs.includes('Reintentar'));
-        assert.ok(!content.includes('Regenerar Picks') || content.includes('Reintentar'));
+        assert.ok(!content.includes('Regenerar Picks') || content.includes('Actualizar selección'));
     });
 });
 
@@ -389,7 +389,7 @@ describe('F49: la fecha de ProPicks es la del run real, no la de carga', () => {
             'sin run completado el estado vacío debe decirlo',
         );
         assert.ok(
-            content.includes('no produjo candidatos aptos'),
+            content.includes('no contiene candidatos que superen los criterios del embudo'),
             'run con passedCount=0: la culpa no es de los filtros',
         );
         assert.ok(
