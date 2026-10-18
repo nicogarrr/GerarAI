@@ -1,3 +1,8 @@
+// Ruta relativa con extensión .ts a propósito (no '@/...'): redact.ts es un
+// módulo puro y este archivo se importa desde tests con node --test
+// (--experimental-strip-types), que no resuelve alias ni añade extensiones.
+// @ts-expect-error TS5097
+import { redactSecretsInText } from '../upstream/redact.ts';
 /**
  * Tipos centralizados para manejo de errores
  * Reemplaza el uso de 'any' en catch blocks
@@ -158,6 +163,18 @@ export function getErrorMessage(error: unknown): string {
   }
   
   return 'An unknown error occurred';
+}
+
+/**
+ * Variante para texto que va AL CLIENTE: igual que getErrorMessage pero con
+ * credenciales redactadas. Los errores de fetch/httpx llevan la URL completa
+ * del proveedor (?token=, ?apikey=...) en el message, y un DSN lleva la
+ * password en el userinfo: sin esta capa la clave del servidor llegaba al
+ * navegador. El detalle completo queda en el log del servidor
+ * (console.error), nunca en la respuesta.
+ */
+export function getSafeErrorMessage(error: unknown): string {
+  return redactSecretsInText(getErrorMessage(error));
 }
 
 

@@ -1,6 +1,7 @@
 'use server';
 
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { getSafeErrorMessage } from '@/lib/types/errors';
 import { getCandles } from '@/lib/actions/finnhub.actions';
 
 /* ================================================================== */
@@ -299,6 +300,6 @@ export async function runWalkForwardBacktest(
         };
     } catch (error) {
         console.error('Error ejecutando backtest walk-forward:', error);
-        return { error: error instanceof Error ? error.message : String(error) };
+        return { error: getSafeErrorMessage(error) };
     }
 }
