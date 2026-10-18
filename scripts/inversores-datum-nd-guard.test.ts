@@ -18,12 +18,14 @@ test('la lista vacía y las acciones sin dato tampoco pintan el código crudo', 
     assert.doesNotMatch(portfolio, />SIN_DATOS\{/);
 });
 
-test('el peso se deriva de valor/total solo con ambos datos, etiquetado INFERIDO', () => {
+test('el peso se deriva de valor/total solo con ambos datos y NO pinta «INFERIDO»', () => {
     assert.match(portfolio, /function derivedWeight\(/);
     assert.match(portfolio, /\(100 \* value\) \/ totalValue/);
-    assert.match(portfolio, /label: "INFERIDO"/);
     assert.match(portfolio, /totalValue > 0/);
-    assert.match(portfolio, /<Datum datum=\{weight\} kind="percent" \/>/);
+    // La etiqueta interna sigue existiendo (puerta de la barra) pero la UI la
+    // oculta: decisión de Nico (16-oct), la app no marca «inferido».
+    assert.match(portfolio, /hideLabel=\{weight !== row\.weight_pct\}/);
+    assert.match(portfolio, /hideLabel \? "" : `\$\{datum\.label\} · `/);
 });
 
 test('las comparaciones con la etiqueta del backend (SIN_DATOS) se conservan', () => {

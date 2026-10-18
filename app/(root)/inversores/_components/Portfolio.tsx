@@ -25,9 +25,13 @@ const ACTIONS: Record<string, string> = {
 export function Datum({
   datum,
   kind = "number",
+  hideLabel = false,
 }: {
   datum: InvestorDatum;
   kind?: "number" | "usd" | "percent";
+  /** Oculta el rótulo del dato (OFICIAL/INFERIDO) conservando fecha y fuente:
+   *  decisión de Nico (16-oct): la app no marca «inferido» en UI. */
+  hideLabel?: boolean;
 }) {
   // Fail closed even if a malformed payload claims OFICIAL without a dated source.
   const available =
@@ -50,9 +54,9 @@ export function Datum({
       <span className="font-medium text-gray-100">{text}</span>
       {available ? (
         <span
-          className={`text-xs ${datum.label === "INFERIDO" ? "text-amber-300" : "text-gray-500"}`}
+          className={`text-xs ${datum.label === "INFERIDO" && !hideLabel ? "text-amber-300" : "text-gray-500"}`}
         >
-          {datum.label} · {periodLabel(datum.as_of)}
+          {hideLabel ? "" : `${datum.label} · `}{periodLabel(datum.as_of)}
           {datum.source_url ? (
             <>
               {" "}
@@ -75,8 +79,10 @@ export function Datum({
 
 /** Peso en cartera: si el backend no lo trae (SIN_DATOS) pero el valor de
  *  la posición y el total de la cartera sí son datos, se calcula
- *  valor / total — dos cifras declaradas, nada inventado — y se etiqueta
- *  INFERIDO con la fecha y fuente del total. Sin total fiable queda N/D. */
+ *  valor / total — dos cifras declaradas, nada inventado — con la fecha y
+ *  fuente del total. Sin total fiable queda N/D. La etiqueta interna queda
+ *  INFERIDO (puerta de la barra de distribución) pero NO se pinta en UI:
+ *  decisión de Nico (16-oct), la app no marca «inferido». */
 function derivedWeight(
   row: InvestorPortfolio["positions"][number],
   total: InvestorDatum,
@@ -202,7 +208,11 @@ export function Portfolio({
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-gray-500">Peso en cartera</p>
-                  <Datum datum={weight} kind="percent" />
+                  <Datum
+                    datum={weight}
+                    kind="percent"
+                    hideLabel={weight !== row.weight_pct}
+                  />
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-gray-500">Acciones</p>
