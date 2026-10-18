@@ -12,5 +12,5 @@ test('tickers reales pasan y rutas de la app no', () => {
 
 test('la ficha da 404 normal antes de pedir datos', () => {
     const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-    assert.match(page, /if \(!looksLikeTicker\(rawTicker\)\) notFound\(\);/);
+    assert.match(page, /assertTickerShape\(rawTicker\);/);
 });

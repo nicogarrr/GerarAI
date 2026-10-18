@@ -107,8 +107,7 @@ import {
 } from '@/lib/research/parallel-fetch';
 import type { ResearchSettled } from '@/lib/research/parallel-fetch';
 import { withResearchTelemetry } from '@/lib/research/fetch-telemetry';
-import { notFound } from 'next/navigation';
-import { looksLikeTicker } from '@/lib/research/ticker-shape';
+import { assertTickerShape } from '@/lib/research/assert-ticker-shape';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -691,7 +690,7 @@ function launchViewData(
 
 export default async function ResearchCompanyPage({ params, searchParams }: PageProps) {
   const [{ ticker: rawTicker }, query] = await Promise.all([params, searchParams]);
-  if (!looksLikeTicker(rawTicker)) notFound();
+  assertTickerShape(rawTicker);
   const ticker = rawTicker.trim().toUpperCase();
   const activeView = asView(query.view);
   //
