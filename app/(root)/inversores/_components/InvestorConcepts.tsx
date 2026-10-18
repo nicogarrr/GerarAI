@@ -24,7 +24,7 @@ export function InvestorConcepts({ slug }: { slug: string }) {
       </div>
       {concepts.length === 0 ? (
         <p className="text-sm text-gray-500">
-          N/D · Sin conceptos documentados para este inversor
+          Sin conceptos documentados para este inversor
         </p>
       ) : (
         <ul className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">

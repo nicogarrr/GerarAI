@@ -199,6 +199,13 @@ export const moatGlossaryKey: Record<string, GlossaryKey> = {
   ecosystem_lock_in: 'moat_ecosystem',
   capital_intensity_barrier: 'moat_capital_barrier',
   process_advantage: 'moat_process_advantage',
+  // Claves cortas que persiste moat_service (MOAT_CATEGORIES del backend).
+  brand: 'moat_brand',
+  scale: 'moat_scale_economies',
+  regulation: 'moat_regulation',
+  data: 'moat_data',
+  ecosystem: 'moat_ecosystem',
+  capital_barrier: 'moat_capital_barrier',
 };
 
 /** Etiqueta en español para una clave de moat del backend; fallback legible si llega una clave desconocida. */

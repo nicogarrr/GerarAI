@@ -50,7 +50,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { exchangeDisplayName } from '@/lib/exchangeName';
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
-import { companyTypeLabel, etiquetaTierFuente, sectorIndustryLine } from '@/lib/labels';
+import { companyTypeLabel, etiquetaTierFuente, etiquetaValor, sectorIndustryLine } from '@/lib/labels';
 import { cleanThesisText } from '@/lib/research/thesis-text';
 import { Button } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
@@ -241,7 +241,7 @@ export async function generateMetadata({ params }: Pick<PageProps, 'params'>): P
 
 function label(value: string | null | undefined): string {
   if (value === null || value === undefined || value === '') return NA;
-  return STATUS_LABELS[value] ?? RATING_LABELS[value] ?? value.replaceAll('_', ' ');
+  return STATUS_LABELS[value] ?? RATING_LABELS[value] ?? etiquetaValor(value);
 }
 
 /**
@@ -1263,7 +1263,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             return (
               <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={item.type}>
                 <div className="flex justify-between gap-3"><MoatTerm type={item.type} /><Badge>{item.strength}/100</Badge></div>
-                <p className="mt-3 text-sm text-gray-400">{label(item.status)} · {label(item.trend)} · persistencia {item.persistence}</p>
+                <p className="mt-3 text-sm text-gray-400">{label(item.status)} · {label(item.trend)} · persistencia {label(item.persistence)}</p>
                 {definition ? <p className="mt-2 text-xs leading-5 text-gray-500">{definition}</p> : null}
                 <p className="mt-2 text-xs text-gray-500">{item.supporting_claim_ids.length} afirmaciones a favor · {item.contradicting_claim_ids.length} en contra</p>
               </div>
