@@ -256,7 +256,9 @@ def read_esef_snapshot(ticker: str) -> dict[str, Any] | None:
         manifest = json.loads(manifest_path.read_text())
     except (OSError, ValueError):
         return None
-    normalized = ticker.upper().removesuffix(".MC")
+    # Sufijos de bolsa con snapshot ESEF reviewed: .MC (BME/ES) y .AS
+    # (Euronext Amsterdam/NL, ASML).
+    normalized = ticker.upper().removesuffix(".MC").removesuffix(".AS")
     for lei, info in manifest.get("issuers", {}).items():
         if str(info.get("ticker", "")).upper() == normalized:
             snap_path = base / "snapshots" / f"{lei}.json"
