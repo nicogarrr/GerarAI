@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { BellPlus, Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { createAlert, type AlertType } from '@/lib/actions/alerts.actions';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
@@ -101,47 +102,58 @@ export default function QuickAlertButton({ ticker, currency = 'USD' }: { ticker:
     }
   };
 
-  // El selector de tipo cubre la creación rápida; "Ver alertas" abre /alerts
+  // Botón campana compacto alineado con los enlaces de la ficha; el formulario
+  // vive en un popover para no descolocar la fila. "Ver alertas" abre /alerts
   // (href exacto que espera el e2e) para tipos avanzados o edición.
   const deepLink = '/alerts';
 
   return (
-    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-      <Select value={type} onValueChange={(value: AlertType) => setType(value)}>
-        <SelectTrigger
-          aria-label="Tipo de alerta"
-          className="h-11 w-full bg-surface-1 text-base sm:h-8 sm:w-48 sm:text-xs"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent className="bg-gray-900 border-gray-600">
-          {ALERT_TYPES.map((item) => (
-            <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {meta.needsValue ? (
-        <Input
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          // type="text" (no "number"): Chrome rechaza la coma decimal en
-          // inputs numéricos y parseLocalizedNumber ya tolera "8,5" es-ES.
-          type="text"
-          inputMode="decimal"
-          placeholder={meta.needsValue && type !== 'price_change' ? `${meta.valuePlaceholder} ${symbol}` : meta.valuePlaceholder}
-          aria-label={type === 'price_change' ? 'Variación objetivo en porcentaje' : `Precio objetivo en ${currency}`}
-          className="h-11 w-full bg-surface-1 text-base sm:h-8 sm:w-44 sm:text-xs"
-        />
-      ) : null}
-      <div className="flex w-full gap-2 sm:w-auto">
-        <Button size="sm" variant="outline" onClick={onCreate} disabled={busy || !hydrated} aria-busy={busy} className="min-h-[44px] flex-1 gap-1.5 px-4 text-sm sm:min-h-0 sm:h-8 sm:flex-none sm:text-xs">
-          {busy ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin sm:h-3.5 sm:w-3.5" /> : <BellPlus aria-hidden="true" className="h-4 w-4 sm:h-3.5 sm:w-3.5" />}
-          + Alerta
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" aria-label="Alerta de precio" className="min-h-[44px] gap-1.5 px-3 text-sm sm:min-h-0 sm:h-8 sm:text-xs">
+          <BellPlus aria-hidden="true" className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+          Alerta de precio
         </Button>
-        <Button size="sm" variant="ghost" asChild className="min-h-[44px] flex-1 px-4 text-sm text-gray-300 sm:min-h-0 sm:h-8 sm:flex-none sm:text-xs">
-          <Link href={deepLink}>Ver alertas</Link>
-        </Button>
-      </div>
-    </div>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 border-gray-700 bg-gray-900">
+        <div className="flex flex-col gap-3">
+          <Select value={type} onValueChange={(value: AlertType) => setType(value)}>
+            <SelectTrigger
+              aria-label="Tipo de alerta"
+              className="h-11 w-full bg-surface-1 text-base sm:h-9 sm:text-sm"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-900 border-gray-600">
+              {ALERT_TYPES.map((item) => (
+                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {meta.needsValue ? (
+            <Input
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              // type="text" (no "number"): Chrome rechaza la coma decimal en
+              // inputs numéricos y parseLocalizedNumber ya tolera "8,5" es-ES.
+              type="text"
+              inputMode="decimal"
+              placeholder={meta.needsValue && type !== 'price_change' ? `${meta.valuePlaceholder} ${symbol}` : meta.valuePlaceholder}
+              aria-label={type === 'price_change' ? 'Variación objetivo en porcentaje' : `Precio objetivo en ${currency}`}
+              className="h-11 w-full bg-surface-1 text-base sm:h-9 sm:text-sm"
+            />
+          ) : null}
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={onCreate} disabled={busy || !hydrated} aria-busy={busy} className="min-h-[44px] flex-1 gap-1.5 px-4 text-sm sm:min-h-0 sm:h-9">
+              {busy ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <BellPlus aria-hidden="true" className="h-4 w-4" />}
+              + Alerta
+            </Button>
+            <Button size="sm" variant="ghost" asChild className="min-h-[44px] px-4 text-sm text-gray-300 sm:min-h-0 sm:h-9">
+              <Link href={deepLink}>Ver alertas</Link>
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
