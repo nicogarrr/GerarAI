@@ -1,6 +1,6 @@
 """Actor Dramatiq de ingesta del RAG de conocimiento.
 
-Modulo propio (como thesis_backtest_actors) para no tocar dramatiq_app.py mas
+Modulo propio para no tocar dramatiq_app.py mas
 de una linea. Registrado con ``import app.workers.knowledge_rag_actors`` en
 dramatiq_app.py: sin ese import el actor se despacha pero nadie lo consume.
 
