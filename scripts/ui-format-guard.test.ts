@@ -25,11 +25,11 @@ describe('formato numérico es-ES', () => {
     assert.equal(formatCompact(4869930000000), '4.869,93 mil M');
   });
 
-  it('formatMarketCapUsd: dólares con formato español, solo presentación', () => {
-    assert.equal(formatMarketCapUsd(4869930000000), '4.869,93 mil M\u00a0US$');
-    assert.equal(formatMarketCapUsd(404010000000), '404,01 mil M\u00a0US$');
-    assert.equal(formatMarketCapUsd(9447000000), '9,45 mil M\u00a0US$');
-    assert.equal(formatMarketCapUsd(9447000), '9,45 M\u00a0US$');
+  it('formatMarketCapUsd: dólares en escala inglesa (M/B/T), solo presentación', () => {
+    assert.equal(formatMarketCapUsd(4869930000000), '$4.87T');
+    assert.equal(formatMarketCapUsd(404010000000), '$404.01B');
+    assert.equal(formatMarketCapUsd(9447000000), '$9.45B');
+    assert.equal(formatMarketCapUsd(9447000), '$9.45M');
     assert.equal(formatMarketCapUsd(null), 'N/D');
     assert.equal(formatMarketCapUsd('abc'), 'N/D');
   });

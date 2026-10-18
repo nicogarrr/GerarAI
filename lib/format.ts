@@ -190,17 +190,25 @@ export function formatCompact(
 }
 
 /**
- * Capitalización bursátil en dólares con formato español: "4,87 billones"
- * no existe en es-ES corto, así que se usa la escala fija de formatCompact
- * ("404,01 mil M US$"). Es solo presentación (sin conversión de divisa): el
- * llamante garantiza que `value` ya está en USD (la watchlist solo la rellena
- * para el listado US con métricas Finnhub, que van en USD). No usar para
- * volúmenes ni cantidades de acciones: no son dólares.
+ * Capitalización bursátil en dólares, escala inglesa: "$4.87T", "$404.01B".
+ * Decisión de Nico (oct 2026): los importes en USD van en escala inglesa
+ * (M/B/T), la que usa cualquier fuente de mercado anglosajona, y no en la
+ * española ("404,01 mil M US$"). Es solo presentación (sin conversión de
+ * divisa): el llamante garantiza que `value` ya está en USD (la watchlist
+ * solo la rellena para el listado US con métricas Finnhub, que van en USD).
+ * No usar para volúmenes ni cantidades de acciones: no son dólares.
  */
 export function formatMarketCapUsd(value: NumericInput, fallback: string = NA): string {
   const parsed = toFinite(value);
   if (parsed === null) return fallback;
-  return `${formatCompact(parsed)}\u00a0US$`;
+  const abs = Math.abs(parsed);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: abs >= 1e6 ? 'compact' : 'standard',
+    maximumFractionDigits: abs >= 1e6 ? 2 : abs >= 100 ? 0 : 2,
+    minimumFractionDigits: abs >= 1e6 ? 2 : abs >= 100 ? 0 : 2,
+  }).format(parsed);
 }
 
 /**
