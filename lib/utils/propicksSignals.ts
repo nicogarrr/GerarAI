@@ -18,6 +18,7 @@
 
 import { getInsiderSignals } from '@/lib/actions/insider.actions';
 import { formatNumber } from '@/lib/format';
+import { plural } from '@/lib/utils/plural';
 
 export interface SignalOverlay {
     factor: 'revisiones' | 'insider' | 'shortInterest' | 'regimen';
@@ -69,10 +70,6 @@ function fmtSigned(n: number): string {
         maximumFractionDigits: 1,
         signDisplay: 'always',
     });
-}
-
-function plural(count: number, singular: string, pluralForm: string): string {
-    return `${formatNumber(count, { maximumFractionDigits: 0 })} ${count === 1 ? singular : pluralForm}`;
 }
 
 /** Día YYYY-MM-DD de un ISO, o null si inválido. */
