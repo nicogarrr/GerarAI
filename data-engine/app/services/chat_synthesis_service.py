@@ -295,7 +295,8 @@ def _general_quantity_context(text: str) -> bool:
     return bool(_FIN_SCOPE_RE.search(re.sub(r"[$€£%]", "", text)) or _MONEY_NEAR_RE.search(text))
 
 
-_INVESTOR_NAMES = r"(?:buffett|munger|graham|marks|klarman|lynch|fisher|templeton)"
+_INVESTOR_NAME_LIST = ("buffett", "munger", "graham", "marks", "klarman", "lynch", "fisher", "templeton")
+_INVESTOR_NAMES = r"(?:" + "|".join(_INVESTOR_NAME_LIST) + r")"
 _REPORTING_VERBS = (
     r"(?:dicho|dijo|dice|exige|exigia|insiste|insistia|recomienda|aconseja|considera|consideraba|"
     r"prefiere|defiende|ensena|explica|afirma|reiterado|reitera|enfatiza|enfatizado|enfatizo|subraya|"
@@ -330,6 +331,7 @@ def _reports_named_investor_opinion(text: str) -> bool:
 def _inferred_general_text_valid(
     text: str, *, allow_placeholders: bool = False, quantitative: bool = True,
     allow_named_attribution: bool = False,
+    allowed_investors: frozenset[str] = frozenset(),
 ) -> bool:
     """Prosa natural: no atribuciones/citas falsas, cifras aproximadas locales.
 
@@ -379,8 +381,22 @@ def _inferred_general_text_valid(
     attribution = re.sub(r"(?i)seg[uú]n (?:la [eé]poca|normativa contable)\b", "", attribution)
     if not allow_named_attribution and re.search(r"(?i)\bseg[uú]n\b", attribution):
         return False
-    if not allow_named_attribution and _reports_named_investor_opinion(attribution):
-        return False
+    if _reports_named_investor_opinion(attribution):
+        if not allow_named_attribution:
+            return False
+        # Atribuir a un inversor concreto exige un fragmento DE ESE autor en
+        # el contexto: con doctrina de otros (p. ej. cartas de un fondo) no
+        # se puede poner la opinion en boca de Buffett.
+        plain = "".join(
+            c for c in unicodedata.normalize("NFKD", attribution.lower())
+            if not unicodedata.combining(c)
+        )
+        named = {
+            name for name in _INVESTOR_NAME_LIST
+            if re.search(rf"\b{name}\b", plain)
+        }
+        if not named <= allowed_investors:
+            return False
     # Aproximar no convierte una cifra contable con decimales en estimacion.
     if re.search(r"\d[\d.,]*[.,]\d{2}(?!\d)", text):
         return False
@@ -699,6 +715,16 @@ class ChatSynthesisService:
         # año, fragmento): el frontend pliega citas de TODAS las rutas con el
         # mismo contrato. El prompt recibe la vista recortada; la respuesta
         # devuelve la fuente completa y plegable.
+        def _plain(text: str) -> str:
+            return "".join(
+                c for c in unicodedata.normalize("NFKD", (text or "").lower())
+                if not unicodedata.combining(c)
+            )
+
+        def _author_key(author: object) -> str:
+            # Apellido o nombre completo normalizado, para cotejar autorias.
+            return _plain(str(author or "")).strip()
+
         doctrine_sources = [
             {
                 "type": "knowledge_chunk",
@@ -714,7 +740,28 @@ class ChatSynthesisService:
             }
             for source in baseline.sources
             if source.get("type") == "knowledge_chunk" and source.get("text")
-        ][:3]
+        ]
+        # Si la pregunta nombra a un inversor ("segun Buffett") solo sirven
+        # fragmentos DE ese autor: citar cartas de otros fondos como fuente de
+        # "Buffett" es una atribucion falsa.
+        question_plain = _plain(question)
+        asked_investors = {
+            name for name in _INVESTOR_NAME_LIST
+            if re.search(rf"\b{name}\b", question_plain)
+        }
+        if asked_investors:
+            doctrine_sources = [
+                source for source in doctrine_sources
+                if any(name in _author_key(source.get("author")) for name in asked_investors)
+            ]
+        doctrine_sources = doctrine_sources[:3]
+        # Autores con fragmento propio en contexto: solo a ellos se puede
+        # atribuir una opinion en la respuesta.
+        allowed_investors = frozenset(
+            name
+            for name in _INVESTOR_NAME_LIST
+            if any(name in _author_key(source.get("author")) for source in doctrine_sources)
+        )
         doctrine = [
             {
                 "author": source.get("author"),
@@ -785,6 +832,7 @@ class ChatSynthesisService:
                     resp.text.strip(), allow_placeholders=scope == "ordinary",
                     quantitative=scope != "ordinary" or _general_quantity_context(resp.text),
                     allow_named_attribution=bool(doctrine),
+                    allowed_investors=allowed_investors,
                 ):
                     raise ValueError("Ungrounded general output")
 
@@ -806,14 +854,28 @@ class ChatSynthesisService:
             allow_placeholders=scope == "ordinary",
             quantitative=scope != "ordinary" or _general_quantity_context(text),
             allow_named_attribution=bool(doctrine),
+            allowed_investors=allowed_investors,
         ):
             return self._general_fallback(baseline, reason="ungrounded")
+        # Fuentes visibles: SOLO la doctrina que la respuesta usa de verdad
+        # (autor o titulo mencionado). Antes se adjuntaban siempre las top-3,
+        # usadas o no ("Hola" salia con "Fuentes" de cartas de fondos).
+        answer_plain = _plain(text)
+        def _author_cited(author: object) -> bool:
+            tokens = [t for t in _author_key(author).split() if len(t) >= 4]
+            return bool(tokens) and any(t in answer_plain for t in tokens)
+
+        used_sources = [
+            source for source in doctrine_sources
+            if _author_cited(source.get("author"))
+            or (_plain(str(source.get("title") or "")) and _plain(str(source.get("title") or "")) in answer_plain)
+        ]
         return ChatResponse(
             answer=text,
             # La doctrina consultada viaja como fuente visible y plegable
-            # (esquema unificado); sin doctrina la prosa no se presenta
+            # (esquema unificado); sin doctrina usada la prosa no se presenta
             # como respaldada.
-            sources=doctrine_sources,
+            sources=used_sources,
             proposed_actions=[],
             model=guarded.response.model,
             prompt_version=GENERAL_PROMPT_VERSION,
@@ -828,13 +890,17 @@ class ChatSynthesisService:
 
     @staticmethod
     def _general_fallback(baseline: ChatResponse, *, reason: str) -> ChatResponse:
-        """Degradado honesto en espanol: nunca texto crudo del proveedor."""
+        """Degradado honesto en espanol: nunca texto crudo del proveedor.
+
+        Sin fuentes adjuntas: el degradado no uso ninguna y ensenarlas
+        sugeriria un respaldo que no existe.
+        """
         return ChatResponse(
             answer=(
                 "No puedo responderte con fuentes ahora mismo; "
                 "prueba de nuevo en un momento o dame un ticker para ir a datos concretos."
             ),
-            sources=baseline.sources,
+            sources=[],
             proposed_actions=baseline.proposed_actions,
             model="fallback",
             prompt_version=GENERAL_PROMPT_VERSION,

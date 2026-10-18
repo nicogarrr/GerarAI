@@ -34,5 +34,17 @@ def test_general_text_without_attribution_is_accepted(text):
 
 
 @pytest.mark.parametrize("text", REJECT[:3])
-def test_attribution_allowed_when_doctrine_is_in_context(text):
-    assert _inferred_general_text_valid(text, allow_named_attribution=True)
+def test_attribution_allowed_when_doctrine_of_that_author_is_in_context(text):
+    # Doctrina DEL autor nombrado (su apellido sirve): la atribucion es valida.
+    assert _inferred_general_text_valid(
+        text, allow_named_attribution=True, allowed_investors=frozenset({"buffett"}),
+    )
+
+
+@pytest.mark.parametrize("text", REJECT[:3])
+def test_attribution_rejected_when_doctrine_is_from_another_author(text):
+    # Doctrina de OTRO autor (p. ej. cartas de un fondo): "segun Buffett"
+    # sigue siendo una atribucion sin fuente de ese autor.
+    assert not _inferred_general_text_valid(
+        text, allow_named_attribution=True, allowed_investors=frozenset({"marks"}),
+    )

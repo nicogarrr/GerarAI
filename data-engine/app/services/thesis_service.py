@@ -673,7 +673,7 @@ class ThesisService:
                         claim_id=claim.id,
                         document_id=int(source_id),
                         evidence_type="supports",
-                        summary=f"Generated from {source_type} source.",
+                        summary=f"Generado desde la fuente {source_type}.",
                         confidence=claim.confidence,
                         source_tier=classify_source(source_type).key,
                         metadata_={"automatic": True, "generator": PROMPT_VERSION},
