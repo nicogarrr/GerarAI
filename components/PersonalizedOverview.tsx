@@ -3,7 +3,6 @@
 import { formatCompact, formatUserDateTime, formatMarketDate, formatMoney, formatNumber, formatPercent, isValidCurrencyCode, NA } from '@/lib/format';
 import {
     DCF_CANDIDATE_LIMIT,
-    DCF_MIN_UPSIDE_PCT,
     dcfEmptyNote,
     dcfScopeNote,
     summarizeDcfProbe,
@@ -17,9 +16,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Activity, ArrowRight, BellRing, Eye, Gem, Minus, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { PortfolioValueBreakdown } from '@/components/portfolio/PortfolioValueBreakdown';
 import { getPortfolioSummary, type PortfolioHolding, type PortfolioSummary } from '@/lib/actions/portfolio.actions';
-import { getWatchlistState, getWatchlistEntryData } from '@/lib/actions/watchlist.actions';
+import { getHomeWatchlistPreview, getHomeOpportunities } from '@/lib/actions/home-overview.actions';
 import { sectionError } from '@/lib/section-error';
-import { getScreenerStocksReal, getFairValue } from '@/lib/actions/screener.actions';
 import {
     getRecentTriggeredAlerts,
     getUserAlerts,
@@ -228,11 +226,11 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
             setWatchlistLoading(true);
             setWatchlistError(null);
             const result = await settle(
-                getWatchlistState().then(({ items, unavailable }) => {
-                    if (unavailable) throw new Error('No se pudo cargar la watchlist');
-                    return items;
+                getHomeWatchlistPreview(WATCHLIST_PREVIEW_LIMIT).then((preview) => {
+                    if (preview.unavailable) throw new Error('No se pudo cargar la watchlist');
+                    return preview;
                 }),
-                [] as Awaited<ReturnType<typeof getWatchlistState>>['items'],
+                { unavailable: false, total: 0, items: [] as WatchlistItem[] },
             );
             if (!active) return;
             if (result.error) {
@@ -242,28 +240,8 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                 setWatchlistError(result.error);
                 return;
             }
-            setWatchlistTotal(result.data.length);
-            const items = await Promise.all(
-                result.data.slice(0, WATCHLIST_PREVIEW_LIMIT).map(async (item): Promise<WatchlistItem> => {
-                    try {
-                        // Precio y divisa del LISTADO REAL (master), nunca del
-                        // ticker desnudo: Finnhub free lo resuelve en la línea US
-                        // (ADR en USD u otro emisor) y contradecía research (F253/F254).
-                        const data = await getWatchlistEntryData(item.symbol);
-                        return {
-                            symbol: data.symbol,
-                            name: data.name,
-                            price: data.price,
-                            currency: data.currency,
-                            changePercent: data.changePercent,
-                            priceKind: data.priceKind,
-                            priceAsOf: data.priceAsOf,
-                        };
-                    } catch {
-                        return { symbol: item.symbol, name: item.symbol, price: null, currency: null, changePercent: null, priceKind: null, priceAsOf: null };
-                    }
-                }),
-            );
+            setWatchlistTotal(result.data.total);
+            const items = result.data.items;
             if (!active) return;
             setWatchlist(items);
             setWatchlistLoading(false);
@@ -281,46 +259,25 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
         const load = async () => {
             setOpportunitiesLoading(true);
             setOpportunitiesError(null);
-            const screenerResult = await settle(
-                getScreenerStocksReal({ marketCapMoreThan: MIN_MARKET_CAP, limit: 10 }),
-                [] as Awaited<ReturnType<typeof getScreenerStocksReal>>,
+            const probe = await settle(
+                getHomeOpportunities({
+                    marketCapMoreThan: MIN_MARKET_CAP,
+                    limit: 10,
+                    candidateLimit: DCF_CANDIDATE_LIMIT,
+                }),
+                [] as Awaited<ReturnType<typeof getHomeOpportunities>>,
             );
             if (!active) return;
-            if (screenerResult.error) {
+            if (probe.error) {
                 setOpportunities([]);
                 setDcfScope(null);
                 setOpportunitiesLoading(false);
-                setOpportunitiesError(screenerResult.error);
+                setOpportunitiesError(probe.error);
                 return;
             }
-            // Los candidatos sólo dependen del screener; sus cálculos de DCF y
-            // quote sí se lanzan en paralelo por símbolo.
-            // F65: se prueban solo las primeras candidatas y se cuenta cuántas
-            // se pudieron evaluar; un DCF fallido no equivale a «sin potencial».
-            const candidates = (screenerResult.data?.map((s) => s.symbol) ?? []).slice(0, DCF_CANDIDATE_LIMIT);
-            const results = await Promise.all(candidates.map(async (sym: string) => {
-                try {
-                    // Precio y divisa del LISTADO REAL (master), igual que la
-                    // watchlist de este mismo inicio: getStockQuote con el ticker
-                    // desnudo resolvía en la línea US (ADR u homónimo) y además
-                    // no traía divisa, así que el importe salía en «US$» sin que
-                    // nadie lo verificara.
-                    const [fairValue, listing] = await Promise.all([getFairValue(sym), getWatchlistEntryData(sym)]);
-                    const currentPrice = listing.price ?? 0;
-                    if (fairValue && currentPrice > 0) {
-                        const upside = ((fairValue - currentPrice) / currentPrice) * 100;
-                        return {
-                            evaluated: true,
-                            opportunity: upside > DCF_MIN_UPSIDE_PCT
-                                ? { symbol: sym, name: sym, price: currentPrice, currency: listing.currency, fairValue, upside }
-                                : null,
-                        };
-                    }
-                    return { evaluated: false, opportunity: null };
-                } catch {
-                    return { evaluated: false, opportunity: null };
-                }
-            }));
+            // F65: se prueban solo las primeras candidatas y se cuenta cuantas
+            // se pudieron evaluar; un DCF fallido no equivale a "sin potencial".
+            const results = probe.data;
             if (!active) return;
             // La lista completa se conserva en el estado para poder DECLARAR
             // cuántas fichas se recorta por el tope de la mirada.

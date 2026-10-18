@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const page = readFileSync('app/(root)/watchlist/page.tsx', 'utf8');
-const overview = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
+const overview = `${readFileSync('components/PersonalizedOverview.tsx', 'utf8')}\n${readFileSync('lib/actions/home-overview.actions.ts', 'utf8')}`;
 const action = readFileSync('lib/actions/watchlist.actions.ts', 'utf8');
 
 for (const [name, src] of [['watchlist page', page], ['inicio overview', overview]] as const) {

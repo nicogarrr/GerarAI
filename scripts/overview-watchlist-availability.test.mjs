@@ -2,11 +2,13 @@ import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-const source = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
+const component = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
+const action = readFileSync('lib/actions/home-overview.actions.ts', 'utf8');
+const source = `${component}\n${action}`;
 
 test('inicio preserves watchlist availability instead of silently returning an empty list', () => {
-    assert.match(source, /getWatchlistState\(\)\.then\(\(\{ items, unavailable \}\) =>/);
-    assert.match(source, /if \(unavailable\) throw new Error\('No se pudo cargar la watchlist'\)/);
+    assert.match(source, /const \{ items, unavailable \} = await getWatchlistState\(\)/);
+    assert.match(source, /if \(preview\.unavailable\) throw new Error\('No se pudo cargar la watchlist'\)/);
     assert.doesNotMatch(source, /\bgetWatchlist\(/);
     assert.match(source, /setWatchlistError\(result\.error\)/);
 });
