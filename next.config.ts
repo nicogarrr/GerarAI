@@ -57,6 +57,15 @@ const nextConfig: NextConfig = {
     // Docker needs standalone output; Vercel packages Next.js itself.
     ...(process.env.VERCEL ? {} : { output: 'standalone' as const }),
     
+    // CSP: en producción sin 'unsafe-eval' (ningún código de la app usa
+    // eval/new Function - verificado con grep en app/, components/, lib/,
+    // hooks/). En desarrollo se mantiene porque webpack/turbopack usan
+    // sourcemaps basados en eval para HMR. 'unsafe-inline' en script-src NO
+    // se puede quitar con headers estáticos: Next inyecta scripts inline de
+    // bootstrap/RSC; quitarlo exige CSP con nonce vía middleware (trabajo
+    // aparte) o la app no hidrata. 'unsafe-inline' en style-src lo necesitan
+    // los estilos inline de React/Tailwind.
+
     // Headers for better caching and security
     async headers() {
         return [
@@ -89,7 +98,9 @@ const nextConfig: NextConfig = {
                     },
                     {
                         key: 'Content-Security-Policy',
-                        value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-src https://www.youtube-nocookie.com https://www.youtube.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+                        value: process.env.NODE_ENV === 'production'
+                            ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-src https://www.youtube-nocookie.com https://www.youtube.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+                            : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-src https://www.youtube-nocookie.com https://www.youtube.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
                     },
                 ],
             },
