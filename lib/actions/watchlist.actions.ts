@@ -11,6 +11,7 @@ import { getResearchCompanyBasics } from '@/lib/actions/market-workspace.actions
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { hasPriorClose } from '@/lib/market/session-change';
 import { sessionDateEt } from '@/lib/market/quote-freshness';
+import type { ExtendedQuote } from '@/lib/market/extended-quote';
 
 // Helper para obtener userId (researchRequest añade la identidad firmada
 // vía researchIdentityHeaders usando el usuario autenticado).
@@ -242,4 +243,50 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         priceAsOf,
         metricsNotApplicable: !usListing,
     };
+}
+
+// ---- Monitor denso (F: watchlist monitor) ----
+// Datos propios/trazables del backend research: minimo 52 semanas desde
+// market_prices, proximo resultado via NASDAQ publico (mismo conector que
+// /api/calendar/earnings) y comparacion con la ultima tesis publicada.
+// Cualquier pieza sin dato llega a null: la UI pinta N/D, nunca inventa.
+export type WatchlistMonitorItem = {
+    low_52w: number | null;
+    low_52w_date: string | null;
+    low_52w_sessions: number;
+    last_close: number | null;
+    last_close_date: string | null;
+    fair_value: number | null;
+    fair_value_thesis_version: number | null;
+    valuation_side: 'infravalorada' | 'sobrevalorada' | null;
+    currency: string | null;
+    next_earnings_date: string | null;
+    next_earnings_source: string | null;
+};
+
+export async function getWatchlistMonitor(
+    symbols: string[],
+): Promise<{ items: Record<string, WatchlistMonitorItem>; earningsStatus: string }> {
+    const wanted = symbols.map((s) => s.trim().toUpperCase()).filter(Boolean);
+    if (wanted.length === 0) return { items: {}, earningsStatus: 'skipped' };
+    try {
+        const data = await researchRequest<{
+            items: Record<string, WatchlistMonitorItem>;
+            earnings_status: string;
+        }>(`/api/watchlist/monitor?tickers=${encodeURIComponent(wanted.join(','))}`);
+        return { items: data?.items ?? {}, earningsStatus: data?.earnings_status ?? 'unavailable' };
+    } catch {
+        return { items: {}, earningsStatus: 'unavailable' };
+    }
+}
+
+// Pre/post-mercado (Yahoo via backend propio, cache 60s por ticker).
+export async function getExtendedQuote(symbol: string): Promise<ExtendedQuote | null> {
+    try {
+        return await researchRequest<ExtendedQuote>(
+            `/api/companies/${encodeURIComponent(symbol.trim().toUpperCase())}/extended-quote`,
+        );
+    } catch {
+        return null;
+    }
 }
