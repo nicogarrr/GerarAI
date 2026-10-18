@@ -28,3 +28,8 @@ test('las tres acciones de importación y el botón usan el rechazo', () => {
   const button = readFileSync('components/portfolio/ImportIBKRButton.tsx', 'utf8');
   assert.match(button, /result\.message/);
 });
+
+test('un 403 con motivo (importación Flex no habilitada) se muestra, no el error genérico', () => {
+  const result = importRejection(new Http('La importación Flex no está habilitada para esta cuenta.', 403));
+  assert.equal(result?.message, 'La importación Flex no está habilitada para esta cuenta.');
+});

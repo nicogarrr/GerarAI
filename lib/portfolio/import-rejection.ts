@@ -2,10 +2,10 @@
  * Un Server Action que lanza un error en producción llega al cliente como un
  * 500 con el mensaje borrado («No se pudo completar la operación»). El backend
  * rechaza los ficheros de importación con un 4xx y un motivo en español
- * (cabecera ausente, cuenta distinta, IBKR sin configurar...): ese motivo se
+ * (cabecera ausente, cuenta distinta, IBKR sin configurar, importación no habilitada...): ese motivo se
  * devuelve como resultado, no como excepción, para que el usuario lo lea.
  */
-const REJECTED_STATUS = new Set([400, 409, 413, 422, 503]);
+const REJECTED_STATUS = new Set([400, 403, 409, 413, 422, 503]);
 
 export type ImportRejection = {
     status: 'rejected';
