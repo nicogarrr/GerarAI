@@ -1,7 +1,14 @@
+/** Provider diagnostics stay in stored job errors, never in product copy. */
+export function extractionFailureText(error: string | null): string {
+  if (/timeout|timed out|tiempo de espera/i.test(error ?? '')) return 'La extracción tardó demasiado. Vuelve a intentarlo.';
+  if (/quota|rate.?limit|429|credit|crédito/i.test(error ?? '')) return 'El servicio de extracción no está disponible ahora. Inténtalo más tarde.';
+  return 'No se pudo completar la extracción. Vuelve a intentarlo.';
+}
+
 /** Count only recorded result IDs; an absent result is not zero. */
 export function extractionResultText(job: { status: string; result: Record<string, unknown>; error: string | null } | undefined): string | null {
   if (!job) return null;
-  if (job.status === 'failed') return job.error || 'No se pudo completar la extracción.';
+  if (job.status === 'failed') return extractionFailureText(job.error);
   if (job.status !== 'completed' && job.status !== 'partial') return null;
   const ids = job.result.principle_ids;
   const count = Array.isArray(ids) ? ids.length : null;
@@ -26,9 +33,7 @@ export function noPrinciplesText(
   );
   if (!latest) return 'Aún no hay principios extraídos.';
   if (latest.status === 'failed') {
-    return latest.error
-      ? `La última extracción falló: ${latest.error}`
-      : 'La última extracción falló.';
+    return extractionFailureText(latest.error);
   }
   const ids = latest.result.principle_ids;
   const count = Array.isArray(ids) ? ids.length : null;
