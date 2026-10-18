@@ -128,3 +128,36 @@ def test_dcf_revenue_base_prefers_fy_marked_over_stray_quarter():
         assert model["current_snapshot"]["metrics"]["revenue"]["value"] == 416_160_000_000
     finally:
         db.close()
+
+
+def test_shares_cagr_degrades_to_none_when_split_missing():
+    """Sin CorporateAction para el split, el CAGR de acciones debe salir
+    N/D (None), nunca el numero enganoso (+11,8 % en el caso AAPL)."""
+    db = _setup()
+    try:
+        company = _company(db)
+        for year, revenue, fcf, shares in [
+            (2016, 215_600_000_000, 53_000_000_000, 5_500_000_000),
+            (2024, 391_000_000_000, 108_800_000_000, 15_400_000_000),
+            (2025, 416_160_000_000, 110_000_000_000, 15_100_000_000),
+        ]:
+            _fact(db, company, "revenue", revenue, year)
+            _fact(db, company, "free_cash_flow", fcf, year)
+            _fact(db, company, "shares_diluted", shares, year)
+        db.commit()  # sin CorporateAction: el split 4:1 no esta en BD
+
+        model = LongTermModelService().build(db, company)
+        assert model["assumptions"]["shares_cagr"]["value"] is None
+
+        # Con el split registrado, el mismo historial da el CAGR real (negativo):
+        db.add(CorporateAction(
+            company_id=company.id, action_type="split",
+            effective_date=date(2020, 8, 31), ratio=Decimal("4"),
+            description="4:1", source="test",
+        ))
+        db.commit()
+        model = LongTermModelService().build(db, company)
+        cagr = model["assumptions"]["shares_cagr"]["value"]
+        assert cagr is not None and cagr < 0
+    finally:
+        db.close()

@@ -282,6 +282,23 @@ class _SplitAdjustedFact:
         return getattr(self.fact, name)
 
 
+def _has_unexplained_share_jump(series: list[dict[str, Any]]) -> bool:
+    """Salto entre anos consecutivos incompatible con emision/recompra
+    organica: tipico de un split (o reverse split) sin CorporateAction
+    registrado. Los recuentos de acciones no cambian ~2x en un ano por
+    gestion de capital; los splits comunes son 2:1...20:1 (y su inverso).
+    Sin el split en BD el CAGR seria un numero enganoso: se degrada a N/D.
+    """
+    values = [item["value"] for item in series if item.get("value")]
+    for previous, current in zip(values, values[1:]):
+        if previous <= 0:
+            continue
+        ratio = current / previous
+        if ratio >= 1.8 or ratio <= 1 / 1.8:
+            return True
+    return False
+
+
 def _adjust_share_facts(
     facts: list[FinancialFact], splits: list[CorporateAction]
 ) -> list[Any]:
@@ -1029,7 +1046,9 @@ class LongTermModelService:
             )
 
         shares_series = self._series(fact_cache, "shares_diluted", years)
-        shares_cagr = self._cagr(shares_series)
+        shares_cagr = (
+            None if _has_unexplained_share_jump(shares_series) else self._cagr(shares_series)
+        )
         shares_ids = [fact_id for item in shares_series for fact_id in item["fact_ids"]]
         wacc_metric = db.scalar(
             select(CalculatedMetric)
@@ -1835,7 +1854,9 @@ class LongTermModelService:
     ) -> dict[str, Any]:
         metrics: dict[str, Any] = {}
         shares = self._series(fact_cache, "shares_diluted", years)
-        metrics["share_count_cagr"] = self._metric_value(self._cagr(shares), "decimal", [fact_id for item in shares for fact_id in item["fact_ids"]], "diluted shares CAGR")
+        metrics["share_count_cagr"] = self._metric_value(
+            None if _has_unexplained_share_jump(shares) else self._cagr(shares),
+            "decimal", [fact_id for item in shares for fact_id in item["fact_ids"]], "diluted shares CAGR")
         for metric, label in (("common_stock_repurchased", "buyback_to_revenue"), ("dividends_paid", "dividend_to_revenue")):
             values: list[float] = []
             ids: list[int] = []
@@ -1876,7 +1897,10 @@ class LongTermModelService:
         margin_change = None
         if len(margin_by_year) >= 2:
             margin_change = margin_by_year[max(margin_by_year)] - margin_by_year[min(margin_by_year)]
-        shares_cagr = self._cagr(self._series(fact_cache, "shares_diluted", years))
+        _shares_series_qg = self._series(fact_cache, "shares_diluted", years)
+        shares_cagr = (
+            None if _has_unexplained_share_jump(_shares_series_qg) else self._cagr(_shares_series_qg)
+        )
         if growth is None:
             quality = "unknown"
         elif margin_change is not None and (shares_cagr is None or shares_cagr <= 0) and margin_change >= -0.01:
