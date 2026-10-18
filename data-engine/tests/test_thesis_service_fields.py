@@ -53,9 +53,9 @@ def test_hypothesis_below_base_with_reverse_dcf():
     text = service._hypothesis(_company(), valuation)
     assert "150.00" in text and "200.00" in text
     # MoS = base/price - 1: se nombra explicitamente, sin distancia precio/base.
-    assert "margen de seguridad del 25%" in text
+    assert "margen de seguridad del 25,0 %" in text
     assert "por debajo" not in text
-    assert "8.2% anual" in text
+    assert "8,2 % anual" in text
     assert "Apple" in text
 
 
@@ -67,7 +67,7 @@ def test_hypothesis_above_base_without_growth():
         "margin_of_safety": -0.25,
     }
     text = service._hypothesis(_company(), valuation)
-    assert "margen de seguridad del -25%" in text
+    assert "margen de seguridad del -25,0 %" in text
     assert "por encima" not in text
     assert "reverse DCF" not in text
 
@@ -82,8 +82,8 @@ def test_hypothesis_no_false_price_base_distance():
         "margin_of_safety": -0.68,
     }
     text = service._hypothesis(_company(), valuation)
-    assert "margen de seguridad del -68%" in text
-    assert "68% por encima" not in text
+    assert "margen de seguridad del -68,0 %" in text
+    assert "68,0 % por encima" not in text
     assert "215%" not in text
 
 
@@ -314,7 +314,7 @@ def test_card_summary_is_readable_spanish_hypothesis():
     hypothesis = service._hypothesis(_company(), valuation)
     summary = service._card_summary(_company(), valuation, hypothesis)
     assert summary == hypothesis
-    assert "margen de seguridad del -68%" in summary
+    assert "margen de seguridad del -68,0 %" in summary
     assert "bucket" not in summary  # la jerga de motor no va a la tarjeta
 
 
@@ -406,3 +406,24 @@ def test_fingerprint_cambia_con_render_version(monkeypatch):
         monkeypatch.setattr(thesis_service, "PROMPT_VERSION", "thesis-render-v2")
         fp_v2 = service._input_fingerprint(db, company, {}, {}, [])
         assert fp_v3 != fp_v2
+
+
+def test_hypothesis_has_currency_cents_and_tenth_percent():
+    service = ThesisService()
+    text = service._hypothesis(_company(), {
+        "current_price": 343.46, "base_value": 120.55,
+        "margin_of_safety": -0.649,
+        "currency": "USD",
+    })
+    assert "$343.46" in text and "$120.55" in text
+    assert "-64,9 %" in text
+
+
+def test_margin_claim_is_percent_not_decimal():
+    from decimal import Decimal
+
+    from app.models import FinancialFact
+    from app.services.thesis_service import _metric_claim_statement
+
+    fact = FinancialFact(metric="fcf_margin", value=Decimal("0.237"), unit="decimal", period="2026")
+    assert "23,7 %" in _metric_claim_statement("AAPL", "fcf_margin", fact)

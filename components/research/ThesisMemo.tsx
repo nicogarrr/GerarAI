@@ -1,5 +1,6 @@
+import { thesisMoney, thesisEps } from '@/lib/research/thesis-number-format';
 import { thesisScenarioDisplay } from '@/lib/research/listed-share-values';
-import { formatGeneratedDate, formatMoney, formatPercent, isValidCurrencyCode, marginOfSafetyDisplay, NA } from '@/lib/format';
+import { formatGeneratedDate, formatPercent, isValidCurrencyCode, marginOfSafetyDisplay, NA } from '@/lib/format';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { GlossaryTerm } from '@/components/GlossaryTerm';
@@ -72,7 +73,7 @@ function money(
   const parsed = typeof value === 'string' ? Number(value) : value;
   if (parsed === null || parsed === undefined || Number.isNaN(parsed)) return NA;
   if (!isValidCurrencyCode(currency)) return NA;
-  return formatMoney(parsed, currency, { maximumFractionDigits: 2 });
+  return thesisMoney(parsed, currency);
 }
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
@@ -377,7 +378,7 @@ export default function ThesisMemo({
                     </span>
                   ) : null}
                   {catalyst.eps_forecast !== undefined ? (
-                    <span className="text-gray-500">· EPS est. {catalyst.eps_forecast}</span>
+                    <span className="text-gray-500">· EPS est. {thesisEps(catalyst.eps_forecast)}</span>
                   ) : null}
                 </li>
               ))}
