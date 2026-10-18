@@ -6,6 +6,7 @@ import { getCandles, getProfile, getStockQuote } from '@/lib/actions/finnhub.act
 import { datedQuoteMetrics } from '@/lib/market/quote-metrics';
 import { marketHistoryStatus } from '@/lib/market/history-status';
 import { sessionDateEt } from '@/lib/market/quote-freshness';
+import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { normalizeChartCandles } from '@/lib/market/normalize-chart';
 import { e2eMarketFixture, isE2EMarketFixtureEnabled } from '@/lib/e2e-market-fixture';
@@ -111,12 +112,15 @@ export async function getCompanyMarketSnapshot(ticker: string): Promise<CompanyM
     const quoteUsable = typeof livePrice === 'number' && livePrice > 0 && quoteKind !== null;
     const quoteLive = quoteUsable && quoteKind === 'live';
     const lastClose = history.at(-1) ?? null;
-    const price = quoteUsable ? livePrice : lastClose?.close ?? null;
+    // Fuera de sesión, precio, cambio y % salen del mismo cierre oficial datado
+    // que Movers, Mercado y watchlist; en sesión manda la cotización en vivo.
+    const dated = quoteLive ? undefined : (await fetchDatedChanges([normalized]))[normalized];
+    const price = dated ? dated.price : quoteUsable ? livePrice : lastClose?.close ?? null;
     // La variación del proveedor describe ESA cotización (misma fuente y
     // payload, en vivo o en cierre fechado); sin cotización usable NO se
     // mezcla con el cierre de vela.
-    const change = quoteUsable ? quote?.d ?? null : null;
-    const changePercent = quoteUsable ? quote?.dp ?? null : null;
+    const change = dated ? dated.change : quoteUsable ? quote?.d ?? null : null;
+    const changePercent = dated ? dated.changePercent : quoteUsable ? quote?.dp ?? null : null;
     // Fecha del cierre: SOLO del timestamp de la propia cotización
     // (Finnhub). El fallback Yahoo no trae fecha de vela: NO se le atribuye
     // la de otra serie (la de getCandles podria no ser la del c) - queda
@@ -125,7 +129,9 @@ export async function getCompanyMarketSnapshot(ticker: string): Promise<CompanyM
     // con su propia vela, que es el mismo dato que se muestra.
     const priceAsOf = quoteLive
         ? null
-        : quoteUsable
+        : dated
+          ? dated.date
+          : quoteUsable
           ? quote?.t
             ? sessionDateEt(quote.t)
             : null
@@ -146,7 +152,7 @@ export async function getCompanyMarketSnapshot(ticker: string): Promise<CompanyM
             open: metrics.open,
             high: metrics.high,
             low: metrics.low,
-            previousClose: metrics.previousClose,
+            previousClose: dated ? dated.previousClose : metrics.previousClose,
             metricsSource: metrics.source,
             metricsSession: metrics.timestamp ? sessionDateEt(metrics.timestamp) : null,
             priceAsOf,

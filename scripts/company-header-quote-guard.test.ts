@@ -104,8 +104,8 @@ test('el precio de cierre se rotula con fecha y lleva gráfico técnico', () => 
     // Sin cotización usable (fallback a vela) no se mezcla la variación del
     // proveedor con ese cierre (F358: la variación solo acompaña a SU
     // cotización, en vivo o en cierre fechado validado).
-    assert.match(actions, /const change = quoteUsable \? quote\?\.d \?\? null : null;/);
-    assert.match(actions, /const priceAsOf = quoteLive[\s\S]{0,200}lastClose\?\.date \?\? null;/);
+    assert.match(actions, /const change = dated \? dated\.change : quoteUsable \? quote\?\.d \?\? null : null;/);
+    assert.match(actions, /const priceAsOf = quoteLive[\s\S]{0,300}lastClose\?\.date \?\? null;/);
     // Rótulo «Cierre del …» y rango de fechas del sparkline.
     assert.match(component, /extendedQuoteLabel\(quote\)/);
     assert.match(component, /CompanyTechnicalWorkspace snapshot=\{snapshot\}/);
