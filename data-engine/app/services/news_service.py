@@ -13,7 +13,7 @@ from app.services.review_alert_service import ReviewAlertService
 from app.services.source_hierarchy_service import classify_source
 from app.services.text_clip import clip_words
 from app.services.thesis_graph_service import ThesisGraphService
-from app.services.ticker_news_lane import is_law_firm_solicitation
+from app.services.ticker_news_lane import is_competitor_only, is_law_firm_solicitation
 
 _NAME_NOISE = {"inc", "corp", "corporation", "co", "company", "ltd", "plc", "sa", "nv", "ag", "the", "group", "holdings", "holding", "limited", "sme", "s.a."}
 
@@ -452,6 +452,16 @@ class NewsService:
                 parts.insert(0, item.ticker)
             text = " ".join(part for part in parts if part)
             company = self._company_for_item(db, text, item.ticker) if detect_company else None
+            # Noticia de un competidor etiquetada con el ticker del feed (RKLB
+            # bajo ASTS): sin cita de la empresa no se vincula a ella.
+            if (
+                company is not None
+                and item.ticker
+                and is_competitor_only(
+                    company, f"{item.title or ''} {item.text or ''}", _ticker_evidence_level
+                )
+            ):
+                continue
             if self._is_duplicate(
                 db, company, text, item.url,
                 title_is_identity=item.headline_from_source or not item.url,

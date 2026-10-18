@@ -50,7 +50,7 @@ VERIFIED_ALIASES: dict[str, tuple[str, ...]] = {
 # si el texto nombra al competidor Y no cita a la empresa; nada de terminos de
 # sector. Lista verificada a mano, ampliable por caso.
 COMPETITOR_ONLY_TERMS: dict[str, tuple[str, ...]] = {
-    "ASTS": ("Rocket Lab",),
+    "ASTS": ("Rocket Lab", "RKLB"),
 }
 _NAME_NOISE = frozenset({
     "inc", "corp", "corporation", "co", "company", "ltd", "plc", "sa", "nv", "ag",
@@ -142,7 +142,7 @@ def google_feed_url(company, *, lang: str = "en") -> str:
     )
 
 
-def _is_competitor_only(company, text: str, evidence_level) -> bool:
+def is_competitor_only(company, text: str, evidence_level) -> bool:
     terms = COMPETITOR_ONLY_TERMS.get((getattr(company, "ticker", "") or "").upper(), ())
     if not terms or not any(
         re.search(rf"(?<![\w]){re.escape(term)}(?![\w])", text, flags=re.IGNORECASE) for term in terms
@@ -187,7 +187,7 @@ def label_yahoo(result: ConnectorResult, company=None, evidence_level=None) -> C
         and not (
             company is not None
             and evidence_level is not None
-            and _is_competitor_only(company, f"{item.title} {item.summary}", evidence_level)
+            and is_competitor_only(company, f"{item.title} {item.summary}", evidence_level)
         )
     ]
     return result

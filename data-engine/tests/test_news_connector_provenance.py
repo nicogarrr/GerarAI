@@ -66,3 +66,24 @@ def test_duplicate_rss_url_is_not_relabeled_gdelt(db):
     assert second.skipped_duplicates == 1
     event = db.scalars(select(NewsEvent)).one()
     assert (event.metadata_ or {}).get("connector") != "gdelt"
+
+
+def test_competitor_news_under_feed_ticker_is_not_linked(db):
+    db.add(Company(ticker="ASTS", name="AST SpaceMobile", exchange="NASDAQ", currency="USD",
+                   company_type="holding", valuation_model="unassigned"))
+    db.commit()
+    resp = NewsService().ingest_news_items(
+        db,
+        [
+            NewsFeedItem(title="Rocket Lab wins new Neutron launch contract", text=None,
+                         ticker="ASTS", url="https://x.example/rklb", source="rss",
+                         published_at=datetime(2026, 9, 24, 8, tzinfo=UTC)),
+            NewsFeedItem(title="AST SpaceMobile and Rocket Lab sign launch deal", text=None,
+                         ticker="ASTS", url="https://x.example/both", source="rss",
+                         published_at=datetime(2026, 9, 24, 8, tzinfo=UTC)),
+        ],
+        default_source="feed",
+    )
+    db.commit()
+    assert resp.created == 1
+    assert db.scalars(select(NewsEvent)).one().url == "https://x.example/both"

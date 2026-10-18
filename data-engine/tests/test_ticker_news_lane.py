@@ -234,3 +234,12 @@ def test_law_firm_solicitation_is_detected_but_real_news_is_not():
     )
     assert not is_law_firm_solicitation("AST SpaceMobile launches BlueBird 6 satellite")
     assert not is_law_firm_solicitation("AST SpaceMobile signs contract with AT&T")
+
+def test_impact_direction_whole_words_and_valuation_phrases():
+    from app.services.materiality_service import MaterialityService
+
+    direction = MaterialityService()._impact_direction
+    assert direction("ast spacemobile: priced for perfection?") == "negative"
+    assert direction("analysts praise the execution plan") == "neutral"
+    assert direction("record revenue but valuation concern grows") == "mixed"
+    assert direction("beats estimates, record quarter") == "positive"
