@@ -21,10 +21,10 @@ test('no timestamp, price, or provider means N/D', () => {
         assert.equal(extendedQuoteLabel(q), 'N/D');
     }
 });
-test('visible-only 60s refresh and no stale/error or undated metric fallback', () => {
+test('visible-only 5min refresh and no stale/error or undated metric fallback', () => {
     const ui = readFileSync('components/research/CompanyHeaderQuote.tsx', 'utf8');
     assert.match(ui, /document.visibilityState !== 'visible'/);
-    assert.match(ui, /setInterval\([\s\S]*60000\)/);
+    assert.match(ui, /setInterval\([\s\S]*300_000\)/);
     assert.match(ui, /setQuote\(null\); \/\/ No stale-on-error/);
     assert.match(ui, /previous_close_timestamp \|\| quote\?\.previous_close_date \? quote.previous_close : null/);
     assert.doesNotMatch(ui, /snapshot.quote|Precio de fecha desconocida/);
