@@ -41,7 +41,7 @@ export function InvestorLetters({
         </p>
       ) : letters.length === 0 ? (
         <p className="text-sm text-gray-500">
-          SIN_DATOS · Sin cartas indexadas de este autor
+          N/D · Sin cartas indexadas de este autor
         </p>
       ) : (
         <ul className="divide-y divide-gray-800">

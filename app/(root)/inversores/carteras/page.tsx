@@ -75,7 +75,7 @@ export default async function PortfoliosPage({ searchParams }: PageProps) {
                                     </span>
                                 </span>
                             ) : (
-                                <span className="text-sm text-gray-500">{investor.has_13f ? 'SIN_DATOS · 13F sin sincronizar' : 'Participaciones públicas · ver ficha'}</span>
+                                <span className="text-sm text-gray-500">{investor.has_13f ? 'N/D · 13F sin sincronizar' : 'Participaciones públicas · ver ficha'}</span>
                             )}
                         </Link>
                     </li>

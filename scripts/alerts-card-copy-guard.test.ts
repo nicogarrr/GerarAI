@@ -38,7 +38,7 @@ test('source and detail controls exist on both surfaces', () => {
   for (const path of ['components/PersonalizedOverview.tsx', 'components/alerts/AlertsManager.tsx']) {
     const view = readFileSync(path, 'utf8');
     assert.match(view, /alertCardCopy\(item\)/);
-    assert.match(view, /Detalle técnico/);
+    assert.match(view, /Ver aviso original/);
     assert.match(view, /item.sourceUrl/);
   }
 });

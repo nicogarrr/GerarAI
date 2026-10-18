@@ -155,7 +155,7 @@ export type InvestorPortfolio = {
   coverage?: string;
   as_of: string | null;
   total_value_usd: InvestorDatum;
-  limitations: string;
+  limitations: string | string[];
   note: string | null;
   positions: {
     issuer: string;

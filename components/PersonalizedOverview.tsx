@@ -468,7 +468,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     </div>
                                     <p className="mt-2 text-sm break-words font-semibold text-gray-100">{copy.heading}</p>
                                     <p className="mt-1 text-sm break-words text-gray-300">{copy.summary}</p>
-                                    <details className="relative z-10 mt-2 break-words text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">Detalle técnico</summary><p className="whitespace-pre-wrap">{copy.technical}</p></details>
+                                    <details className="relative z-10 mt-2 break-words text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">Ver aviso original</summary><p className="whitespace-pre-wrap">{copy.technical}</p></details>
                                     {(item.ticker || item.sourceUrl) && (
                                         <span className="mt-2 inline-flex flex-wrap gap-3">
                                             {item.ticker && (
