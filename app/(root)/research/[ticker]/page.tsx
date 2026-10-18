@@ -709,6 +709,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   const [{ ticker: rawTicker }, query] = await Promise.all([params, searchParams]);
   assertTickerShape(rawTicker);
   const ticker = rawTicker.trim().toUpperCase();
+  if (rawTicker !== ticker) {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (typeof value === 'string') search.set(key, value);
+    }
+    redirect(`/research/${encodeURIComponent(ticker)}${search.size ? `?${search.toString()}` : ''}`);
+  }
   const activeView = asView(query.view);
   //
   // D2a: la ficha era una cadena de `await` secuenciales. Estas lecturas NO
