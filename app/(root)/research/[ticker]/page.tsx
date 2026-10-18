@@ -1146,6 +1146,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               thesis={data.thesis}
               ticker={ticker}
               currency={company.currency}
+              modelBlocked={snapshot?.model_summary ? !snapshot.model_summary.publishable : false}
               debateBody={
                 data.sections.find((section) => section.section_key === 'thesis_debate')?.body ?? null
               }

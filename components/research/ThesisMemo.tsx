@@ -148,6 +148,7 @@ export default function ThesisMemo({
   ticker,
   currency,
   debateBody,
+  modelBlocked = false,
 }: {
   thesis: ResearchThesis;
   /** Ticker para el debate bull/bear (bloque interactivo de abajo). */
@@ -157,7 +158,10 @@ export default function ThesisMemo({
   currency?: string | null;
   /** Cuerpo persistido de la seccion thesis_debate (veredicto previo). */
   debateBody?: string | null;
+  /** Modelo fundamental no publicable: la tesis no muestra cifras de valoración. */
+  modelBlocked?: boolean;
 }) {
+  const hideFigures = modelBlocked || (thesis.status !== 'published' && thesis.status !== 'approved');
   const probabilities = thesis.scenario_probabilities ?? {};
   // F394: cada tesis se muestra con SU base persistida; sin evidencia no se escala.
   const scenarios = thesisScenarioDisplay(
@@ -332,6 +336,11 @@ export default function ThesisMemo({
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
           Escenarios y valoración
         </h3>
+        {hideFigures ? (
+          <p className="text-sm text-gray-400">
+            Sin cifras de valoración: {modelBlocked ? 'el modelo está bloqueado' : 'la tesis es un borrador'}.
+          </p>
+        ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
           <ScenarioCell label="Precio" value={thesis.current_price} currency={currency} />
           <ScenarioCell label={`Bear${scenarios.label}`} value={scenarios.values.bear} currency={currency} probability={probabilities['bear']} glossaryKey="bear" />
@@ -350,7 +359,8 @@ export default function ThesisMemo({
             {scenarios.values.expected != null ? <div className="mt-0.5 text-xs text-gray-500">sobre valor esperado</div> : null}
           </div>
         </div>
-        <ScenarioAssumptions />
+        )}
+        {hideFigures ? null : <ScenarioAssumptions />}
       </section>
 
       <section>
