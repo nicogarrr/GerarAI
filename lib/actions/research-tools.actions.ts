@@ -424,6 +424,18 @@ export async function deleteKnowledgeDocument(documentId: number): Promise<Delet
   }
 }
 
+/** Borra una colección VACÍA de conocimiento tras confirmación en la UI. El backend responde 409 si aún tiene documentos. */
+export async function deleteKnowledgeCollection(collectionId: number): Promise<DeleteDocumentResult> {
+  try {
+    await requestJson(`/api/knowledge/collections/${assertPositiveInt(collectionId, 'collectionId')}`, { method: 'DELETE' });
+    revalidatePath('/knowledge');
+    return { success: true };
+  } catch (error) {
+    console.error('deleteKnowledgeCollection error:', error);
+    return { success: false, message: error instanceof Error ? error.message : 'No se pudo eliminar la colección.' };
+  }
+}
+
 export async function getKnowledgeDocument(documentId: number): Promise<KnowledgeDocumentDetail | null> {
   try {
     return await requestJson<KnowledgeDocumentDetail>(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`);

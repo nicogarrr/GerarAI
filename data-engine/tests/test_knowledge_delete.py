@@ -12,6 +12,7 @@ from app.models import (
     InvestmentCaseStudy,
     InvestmentPrinciple,
     KnowledgeChunk,
+    KnowledgeCollection,
     KnowledgeDocument,
     Tenant,
 )
@@ -161,4 +162,69 @@ def test_delete_document_cross_tenant_devuelve_404(monkeypatch):
     ).all() == []
     db.delete(db.get(Tenant, tenant_row_id))
     db.commit()
+    db.close()
+
+
+def test_delete_collection_vacia_y_aislamiento(monkeypatch):
+    init_db()
+    seed()
+    secret = "tenant-test-secret-with-at-least-32-characters"
+    monkeypatch.setattr(
+        auth_module,
+        "get_settings",
+        lambda: auth_settings(strict=True, secret=secret, app_env="local"),
+    )
+    suffix = uuid4().hex[:8]
+    tenant_a = f"tenant-a-col-{suffix}"
+    tenant_b = f"tenant-b-col-{suffix}"
+    client = TestClient(main.app)
+
+    db = SessionLocal()
+    tenant_row = Tenant(external_id=tenant_a, name="Tenant A col")
+    db.add(tenant_row)
+    db.flush()
+    db.info["tenant_id"] = tenant_row.id
+    empty = KnowledgeCollection(
+        name=f"Vacia {suffix}", slug=f"vacia-{suffix}",
+        description="", collection_type="custom",
+    )
+    with_docs = KnowledgeCollection(
+        name=f"Con docs {suffix}", slug=f"con-docs-{suffix}",
+        description="", collection_type="custom",
+    )
+    db.add_all([empty, with_docs])
+    db.flush()
+    document = _document(f"Doc en coleccion {suffix}")
+    document.collection_id = with_docs.id
+    db.add(document)
+    db.commit()
+    empty_id, with_docs_id = empty.id, with_docs.id
+    db.close()
+
+    unauthenticated = client.delete(f"/api/knowledge/collections/{empty_id}")
+    assert unauthenticated.status_code == 401
+
+    cross_tenant = signed_request(
+        client, secret, tenant_b, f"user-b-{suffix}", "DELETE",
+        f"/api/knowledge/collections/{empty_id}",
+    )
+    assert cross_tenant.status_code == 404
+
+    # Con documentos: la coleccion NO se borra (409 fijo, sin filtrar internos).
+    not_empty = signed_request(
+        client, secret, tenant_a, f"user-a-{suffix}", "DELETE",
+        f"/api/knowledge/collections/{with_docs_id}",
+    )
+    assert not_empty.status_code == 409
+
+    own = signed_request(
+        client, secret, tenant_a, f"user-a-{suffix}", "DELETE",
+        f"/api/knowledge/collections/{empty_id}",
+    )
+    assert own.status_code == 204
+
+    db = SessionLocal()
+    db.info["tenant_id"] = tenant_row.id
+    assert db.get(KnowledgeCollection, empty_id) is None
+    assert db.get(KnowledgeCollection, with_docs_id) is not None
     db.close()
