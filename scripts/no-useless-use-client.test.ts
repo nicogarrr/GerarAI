@@ -115,6 +115,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/knowledge/ExtractionRefresh.tsx': 'useRouter, useEffect, browser:window, browser:document',
   'components/layout/BottomNav.tsx': 'usePathname, jsx-onClick, browser:window',
   'components/layout/Breadcrumbs.tsx': 'usePathname',
+  'components/layout/IntentLink.tsx': 'useState, jsx-onClick',
   'components/layout/SectionNav.tsx': 'usePathname',
   'components/layout/Sidebar.tsx': 'usePathname, useState, browser:document, jsx-onClick',
   'components/media/YouTubeEmbed.tsx': 'useState, jsx-onClick',
