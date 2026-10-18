@@ -200,3 +200,21 @@ def test_yahoo_drops_competitor_only_headlines_but_keeps_company_mentions():
     ]
     # Sin empresa (compatibilidad) no se filtra por competidor.
     assert len(label_yahoo(ConnectorResult(source="rss", items=list(items))).items) == 3
+
+
+def test_yahoo_drops_headline_whose_only_company_mention_is_a_ticker_prefix():
+    class _Co:
+        ticker = "NVDA"
+        name = "NVIDIA Corporation"
+
+    fastenal = _item(
+        "NVDA Data Centers, Aerospace, and Machined Parts: This Company's Earnings Just Made the Bull Case for U.S. Industrials",
+        "NVDA Data Centers, Aerospace, and Machined Parts: Fastenal's results signal a strong industrial recovery.",
+    )
+    real = _item("NVDA Nvidia unveils new data center chip", "NVDA Nvidia unveils a new chip for data centers.")
+    plain = _item("Nvidia shares rise after earnings", "Nvidia beat estimates.")
+    other_ticker_news = _item("Chipmakers rally on AI demand", "Sector move.")
+    out = label_yahoo(
+        ConnectorResult(source="rss", items=[fastenal, real, plain, other_ticker_news]), _Co, _ticker_evidence_level
+    )
+    assert [i.title for i in out.items] == [real.title, plain.title, other_ticker_news.title]
