@@ -23,6 +23,8 @@ describe('ajustes', () => {
     }
     assert.match(form, /filed_720_before/);
     assert.match(form, /custody/);
+    assert.match(form, /custody_entities/);
+    assert.match(form, /first_acquisition_dates/);
     assert.match(form, /saveTaxDeclarant/);
   });
   it('el menú del avatar enlaza a /settings y el enlace antiguo redirige', () => {

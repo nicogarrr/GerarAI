@@ -112,6 +112,8 @@ class DeclarantInput(BaseModel):
     telefono: str | None = None
     filed_720_before: bool | None = None
     custody: dict[str, str | None] | None = None
+    custody_entities: dict[str, dict[str, str | None] | None] | None = None
+    first_acquisition_dates: dict[str, str | None] | None = None
 
 
 @router.get("/declarant")

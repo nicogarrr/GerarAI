@@ -48,11 +48,11 @@ def test_write_merges_and_keeps_foreign_keys(db):
     tenant.metadata_ = {"tax_declarant": {"custody_entities": {"X": {"name": "B"}}}, "otra": 1}
     db.commit()
     out = svc.write(db, {
-        "nif": "12345678a", "apellidos_nombre": "GARCIA, NICO",
+        "nif": "abc12345", "apellidos_nombre": "GARCIA, NICO",
         "numero_declaracion": "7202025000001", "filed_720_before": False,
         "custody": {"us0378331005": "ie", "CASH:usd": "IE"},
     })
-    assert out["nif"] == "12345678A"
+    assert out["nif"] == "ABC12345"
     assert out["custody"] == {"US0378331005": "IE", "cash:USD": "IE"}
     stored = db.get(Tenant, tenant.id).metadata_
     assert stored["otra"] == 1
@@ -84,3 +84,49 @@ def test_requires_tenant_context(db):
     db.info.pop("tenant_id")
     with pytest.raises(PermissionError):
         svc.read(db)
+
+
+ENTITY = {
+    "name": "BROKER DE PRUEBA SA", "nif": "tst000", "street": "CALLE PRUEBA 1",
+    "city": "DUBLIN", "zip": "D01", "country": "ie",
+}
+
+
+def test_entity_and_first_date_saved_and_read(db):
+    svc.write(db, {"custody": {"US0378331005": "IE"}})
+    out = svc.write(db, {
+        "custody_entities": {"us0378331005": ENTITY},
+        "first_acquisition_dates": {"US0378331005": "2023-01-15"},
+    })
+    stored = db.get(Tenant, db.info["tenant_id"]).metadata_["tax_declarant"]
+    assert stored["first_acquisition_dates"] == {"US0378331005": "20230115"}
+    assert stored["custody_entities"]["US0378331005"]["country"] == "IE"
+    assert stored["custody_entities"]["US0378331005"]["nif"] == "TST000"
+    assert out["first_acquisition_dates"] == {"US0378331005": "2023-01-15"}
+    assert out["custody_entities"]["US0378331005"]["name"] == "BROKER DE PRUEBA SA"
+
+
+def test_entity_and_date_can_be_removed(db):
+    svc.write(db, {"custody_entities": {"cash:USD": ENTITY}, "first_acquisition_dates": {"US0378331005": "2023-01-15"}})
+    out = svc.write(db, {"custody_entities": {"cash:USD": None}, "first_acquisition_dates": {"US0378331005": ""}})
+    assert out["custody_entities"] == {} and out["first_acquisition_dates"] == {}
+
+
+@pytest.mark.parametrize("payload", [
+    {"custody_entities": {"US0378331005": {**ENTITY, "street": ""}}},
+    {"custody_entities": {"US0378331005": {**ENTITY, "country": "IRL"}}},
+    {"custody_entities": {"NOEXISTE": ENTITY}},
+    {"first_acquisition_dates": {"US0378331005": "15/01/2023"}},
+    {"first_acquisition_dates": {"US0378331005": "2999-01-01"}},
+    {"first_acquisition_dates": {"cash:USD": "2023-01-15"}},
+])
+def test_invalid_entity_or_date_rejected(db, payload):
+    with pytest.raises(ValueError):
+        svc.write(db, payload)
+    assert (db.get(Tenant, db.info["tenant_id"]).metadata_ or {}).get("tax_declarant") is None
+
+
+def test_entity_country_must_match_custody(db):
+    svc.write(db, {"custody": {"US0378331005": "US"}})
+    with pytest.raises(ValueError):
+        svc.write(db, {"custody_entities": {"US0378331005": ENTITY}})
