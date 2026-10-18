@@ -21,6 +21,7 @@ interface PlanViewProps {
 const PLAN_LABELS: Record<string, string> = {
     plan_exists: 'Plan configurado',
     id: 'Identificador',
+    base_currency: 'Divisa base',
     monthly_contribution: 'Aportación mensual',
     start_date: 'Fecha de inicio',
     horizon_years: 'Horizonte (años)',
@@ -123,7 +124,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 record={initialPlan}
                 fetchRecord={getPlan}
                 columnLabels={PLAN_LABELS}
-                hiddenKeys={['id', 'base_currency']}
+                hiddenKeys={['id']}
                 formatColumns={{...PLAN_FORMAT, ...DETAIL_FORMAT}}
                 maxKeys={20}
                 emptyMessage={t('plan.empty')}
