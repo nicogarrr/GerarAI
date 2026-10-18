@@ -256,6 +256,7 @@ def test_thesis_margin_draft_only_and_missing_are_honest(db):
     db.commit()
     draft = asyncio.run(ChatService().answer(db, "¿Qué margen de seguridad tiene AAPL según mi tesis?", "portfolio", None))
     assert "no publicada" in draft.answer and "0,20" not in draft.answer
+    assert "Publica la tesis" in draft.answer
     none = asyncio.run(ChatService().answer(db, "¿Qué margen de seguridad tiene MSFT según mi tesis?", "portfolio", None))
     assert "No hay ninguna tesis guardada de MSFT" in none.answer
 
