@@ -1,4 +1,5 @@
 import { getNews } from '@/lib/actions/finnhub.actions';
+import { newsSummaryToShow } from '@/lib/news-summary';
 import { newsBadge } from '@/lib/newsBadge';
 import { formatMarketDateTime } from '@/lib/format';
 import Image from 'next/image';
@@ -93,9 +94,11 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                         <h3 className="text-white text-sm sm:text-base font-semibold mb-2 line-clamp-2 group-hover:text-[#0FEDBE] transition-colors break-words">
                                             {article.headline}
                                         </h3>
-                                        <p className="text-gray-400 text-sm mb-2 line-clamp-2 break-words">
-                                            {article.summary}
-                                        </p>
+                                        {newsSummaryToShow(article.headline, article.summary) && (
+                                            <p className="text-gray-400 text-sm mb-2 line-clamp-2 break-words">
+                                                {newsSummaryToShow(article.headline, article.summary)}
+                                            </p>
+                                        )}
                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                                             {article.source && (
                                                 <span className="font-medium text-[#0FEDBE]">
