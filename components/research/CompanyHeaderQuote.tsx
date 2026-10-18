@@ -18,6 +18,9 @@ function headerMoney(value: number | null | undefined, currency: string): string
 /** One timestamped Yahoo payload supplies the price and all header metrics. */
 export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapshot }) {
     const [quote, setQuote] = useState<ExtendedQuote | null>(null);
+    // false hasta que la primera lectura termina (con precio o sin él): antes
+    // de eso no hay «N/D» que declarar, solo una carga en curso.
+    const [settled, setSettled] = useState(false);
     // Resolve the actual listing, never a naked non-US ticker's US namesake.
     const symbol = quoteSymbolFor({ exchange: snapshot.exchange ?? undefined, currency: snapshot.currency ?? undefined }, snapshot.ticker);
     const recoverListing = !symbol;
@@ -29,6 +32,7 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
         let activeSession = true;
         const controller = new AbortController();
         setQuote(null);
+        setSettled(false);
         const refresh = async (initial = false) => {
             // The first read always runs: a tab opened in the background (or a
             // headless browser) must not stay on N/D forever. Only the polling
@@ -43,9 +47,15 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                 });
                 const value = response.ok ? await response.json() as ExtendedQuote : null;
                 activeSession = value?.session === 'regular' || value?.session === 'pre' || value?.session === 'post';
-                if (!disposed) setQuote(value?.status !== 'unavailable' ? value : null);
+                if (!disposed) {
+                    setQuote(value?.status !== 'unavailable' ? value : null);
+                    setSettled(true);
+                }
             } catch {
-                if (!disposed) setQuote(null); // No stale-on-error price.
+                if (!disposed) {
+                    setQuote(null); // No stale-on-error price.
+                    setSettled(true);
+                }
             } finally { inFlight = false; }
         };
         void refresh(true);
@@ -70,13 +80,19 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
     const signBase = quote?.change ?? quote?.change_percent ?? 0;
     // «Cierre regular» repite «Cierre anterior» cuando ambos son el mismo dato: se muestra una sola vez.
     const duplicatedClose = quote?.regular_close != null && quote.regular_close === quote.previous_close;
+    const loading = !settled;
     const hasDatedMetrics = !!quote?.metrics_timestamp && !!quote.metrics_session;
     return (
         <div className="flex w-full flex-col gap-4" data-testid="company-header-quote">
             <div>
-                <p className="text-[11px] uppercase tracking-wide text-gray-500">{showPrice ? label : NA}</p>
-                <div className="text-4xl font-semibold tracking-tight text-gray-100 sm:text-5xl">
-                    {showPrice ? headerMoney(quote!.price, currency) : NA}
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">{showPrice ? label : loading ? '\u00a0' : NA}</p>
+                <div className="text-4xl font-semibold tracking-tight text-gray-100 sm:text-5xl" aria-busy={loading || undefined}>
+                    {showPrice ? headerMoney(quote!.price, currency) : loading ? (
+                        <>
+                            <span className="sr-only">Cargando precio…</span>
+                            <span aria-hidden="true" className="inline-block h-10 w-44 animate-pulse rounded bg-gray-800 align-middle sm:h-12" />
+                        </>
+                    ) : NA}
                 </div>
                 {showPrice && quote && quote.session !== 'cerrado' && (quote.change != null || quote.change_percent != null) ? (
                     <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${signBase > 0 ? 'bg-emerald-500/10 text-emerald-300' : signBase < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
@@ -88,7 +104,7 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                 ) : null}
                 {duplicatedClose ? null : (
                     <p className="mt-2 text-xs text-gray-500">
-                        Cierre regular: {showPrice && quote?.regular_close != null && (quote.regular_close_timestamp || quote.regular_close_date) ? `${headerMoney(quote.regular_close, currency)} · ${quote.regular_close_timestamp ? `${quoteDate(quote.regular_close_timestamp)} · ${quoteTime(quote.regular_close_timestamp)}` : quoteSessionDate(quote.regular_close_date)}` : NA}
+                        Cierre regular: {loading ? <span aria-hidden="true" className="inline-block h-3 w-24 animate-pulse rounded bg-gray-800 align-middle" /> : showPrice && quote?.regular_close != null && (quote.regular_close_timestamp || quote.regular_close_date) ? `${headerMoney(quote.regular_close, currency)} · ${quote.regular_close_timestamp ? `${quoteDate(quote.regular_close_timestamp)} · ${quoteTime(quote.regular_close_timestamp)}` : quoteSessionDate(quote.regular_close_date)}` : NA}
                     </p>
                 )}
                 {showPrice ? <p className="mt-1 text-xs text-gray-500">{quote!.source} · {quoteTime(quote!.timestamp)} (Madrid)</p> : null}
@@ -103,7 +119,7 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                     ].map(([metricLabel, value]) => (
                         <div className="min-w-0 py-3 sm:px-3 sm:first:pl-0" key={String(metricLabel)}>
                             <dt className="text-xs text-gray-500">{metricLabel}</dt>
-                            <dd className="mt-1 break-words text-sm font-medium text-gray-200">{value == null || !isValidCurrencyCode(currency) ? NA : headerMoney(value as number, currency)}</dd>
+                            <dd className="mt-1 break-words text-sm font-medium text-gray-200">{loading ? <span aria-hidden="true" className="inline-block h-4 w-16 animate-pulse rounded bg-gray-800 align-middle" /> : value == null || !isValidCurrencyCode(currency) ? NA : headerMoney(value as number, currency)}</dd>
                             {metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <p className="break-words text-[11px] text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp)} · ${quoteTime(quote.previous_close_timestamp)}` : quoteSessionDate(quote.previous_close_date)}</p> : null}
                         </div>
                     ))}
