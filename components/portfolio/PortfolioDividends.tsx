@@ -98,7 +98,7 @@ export default function PortfolioDividends({ projection }: { projection: Portfol
     );
     const fiscalYears = Object.entries(projection.fiscal_by_year);
     const coverageLists: Array<{ label: string; tickers: string[] }> = [
-        { label: 'Sin dividendos declarados ingeridos', tickers: projection.coverage.sin_datos },
+        { label: 'Sin dividendos declarados registrados', tickers: projection.coverage.sin_datos },
         { label: 'Sin tipo de cambio', tickers: projection.coverage.fx_missing },
         { label: 'Retención de origen sin verificar', tickers: projection.coverage.unknown_source_withholding },
     ].filter((entry) => entry.tickers.length > 0);
@@ -117,7 +117,7 @@ export default function PortfolioDividends({ projection }: { projection: Portfol
             {projection.positions.length === 0 && projection.declared_future.length === 0 ? (
                 <Panel title="Proyección de dividendos">
                     <p className="text-sm text-gray-400">
-                        Sin datos: ninguna posición de la cartera tiene dividendos declarados ingeridos.
+                        Sin datos: ninguna posición de la cartera tiene dividendos declarados registrados.
                     </p>
                 </Panel>
             ) : (
@@ -136,7 +136,7 @@ export default function PortfolioDividends({ projection }: { projection: Portfol
                     >
                         {activeMonths.length === 0 ? (
                             <p className="text-sm text-gray-400">
-                                Ningún pago proyectado en los próximos {projection.horizon_months} meses con los datos ingeridos.
+                                Ningún pago proyectado en los próximos {projection.horizon_months} meses con los datos registrados.
                             </p>
                         ) : (
                             <div className="overflow-x-auto" role="region" aria-label="Proyección mes a mes" tabIndex={0}>

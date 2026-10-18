@@ -13,8 +13,9 @@ const LIMITATION_LABELS: Record<string, string> = {
 };
 
 /** Traduce cada límite sin ocultar advertencias nuevas del proveedor. */
-export function ownershipLimitations(value: string): string {
-  let text = value;
+export function ownershipLimitations(value: string | string[] | null | undefined): string {
+  if (!value) return '';
+  let text = (Array.isArray(value) ? value.join('. ') : value).replace(/\bSIN_DATOS\b/g, 'N/D');
   for (const [original, translated] of Object.entries(LIMITATION_LABELS)) {
     text = text.replaceAll(original, translated);
   }

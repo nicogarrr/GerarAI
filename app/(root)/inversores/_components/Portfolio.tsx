@@ -2,9 +2,9 @@ import type {
   InvestorDatum,
   InvestorPortfolio,
 } from "@/lib/actions/investors.actions";
+import { ownershipLimitations } from "@/lib/research/ownership-display";
 import { formatMarketCapUsd, formatNumber, formatPercent, NA } from "@/lib/format";
 import { Pagination, paginate } from "./Pagination";
-import { ownershipLimitations } from "@/lib/research/ownership-display";
 import { periodLabel } from "./format";
 
 const ACTIONS: Record<string, string> = {

@@ -9,6 +9,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { RecordDetail, formatRecordValue, type DataRecord } from '@/components/data/RecordViews';
 import { etiquetaFactor, etiquetaSector, etiquetaSeveridad } from '@/lib/labels';
 import { formatDate, formatUserDateTime, formatMoney, formatNumber, formatPercent, NA } from '@/lib/format';
+import { sourceDisplay } from '@/lib/research/source-display';
 import { getRiskDashboard } from '@/lib/actions/risk.actions';
 
 interface RiskDashboardViewProps {
@@ -181,7 +182,8 @@ function humanizeRiskDashboard(dashboard: DataRecord | null): DataRecord | null 
             display[label] = typeof value === 'string' && value ? formatUserDateTime(value) : NA;
         } else if (key === 'provenance') {
             if (isRecord(value)) {
-                const source = typeof value.source === 'string' ? value.source : 'Fuente interna';
+                const rawSource = typeof value.source === 'string' ? value.source : null;
+                const source = rawSource === null ? 'Fuente interna' : rawSource === 'CavaAI Postgres' ? 'Base de datos de GerarAI' : sourceDisplay(rawSource);
                 const fetched = typeof value.fetched_at === 'string' && value.fetched_at
                     ? ` · ${formatUserDateTime(value.fetched_at)}`
                     : '';
