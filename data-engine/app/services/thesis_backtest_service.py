@@ -133,7 +133,7 @@ def pit_replay_scope(
         original_builder = engines_base.FinancialSnapshotBuilder
         original_price = valuation_service._position_price
 
-        def _pit_price(_db: Session, _company_id: int, **_kw) -> float | None:
+        def _pit_price(_db: Session, _company_id: int, *_a, **_kw) -> float | None:
             return price
 
         engines_base.FinancialSnapshotBuilder = _pit_builder_factory(builder)

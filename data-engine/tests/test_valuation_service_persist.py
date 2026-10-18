@@ -7,7 +7,7 @@ values instead of fabricating them. _position_price must prefer the stored
 position price over stale market closes and never invent a price.
 """
 
-from datetime import date
+from datetime import UTC, date
 from decimal import Decimal
 
 import pytest
@@ -190,3 +190,39 @@ def test_price_as_of_none_without_price(db):
     from app.services.valuation_service import _position_price_as_of
     company = _company(db)
     assert _position_price_as_of(db, company.id) is None
+
+
+def test_position_price_respects_as_of_cutoff(db):
+    company = _company(db)
+    db.add(MarketPrice(company_id=company.id, date=date(2025, 1, 10), close=Decimal("10")))
+    db.add(MarketPrice(company_id=company.id, date=date(2025, 6, 10), close=Decimal("20")))
+    db.add(Position(company_id=company.id, quantity=Decimal("1"), market_price=Decimal("99")))
+    db.commit()
+
+    # Sin cutoff se mantiene la precedencia vigente (posicion primero).
+    assert _position_price(db, company.id) == 99.0
+    # Con cutoff: ni el mark de la posicion (precio de hoy) ni cierres posteriores.
+    assert _position_price(db, company.id, date(2025, 3, 1)) == 10.0
+    assert _position_price(db, company.id, date(2025, 6, 10)) == 20.0
+    assert _position_price(db, company.id, date(2024, 12, 31)) is None
+
+
+def test_traceable_wacc_ignores_metric_created_after_cutoff(db):
+    from datetime import datetime
+
+    from app.models.entities import CalculatedMetric
+    from app.valuation.engines.base import traceable_wacc
+
+    company = _company(db)
+    db.add(
+        CalculatedMetric(
+            company_id=company.id, metric="wacc", value=Decimal("0.09"), period="2025",
+            fiscal_year=2025, status="ok", formula="f",
+            created_at=datetime(2025, 6, 1, tzinfo=UTC),
+        )
+    )
+    db.commit()
+
+    assert traceable_wacc(db, company) == pytest.approx(0.09)
+    assert traceable_wacc(db, company, as_of=date(2025, 6, 1)) == pytest.approx(0.09)
+    assert traceable_wacc(db, company, as_of=date(2025, 5, 31)) is None

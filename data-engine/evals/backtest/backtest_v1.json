@@ -3103,17 +3103,17 @@
           },
           {
             "as_of": "2024-12-31",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           },
           {
             "as_of": "2025-06-30",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           },
           {
             "as_of": "2026-06-30",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           }
         ],
@@ -3123,16 +3123,16 @@
     },
     {
       "id": "grp_2024-12-31",
-      "category": "lookahead_trap_period_leak",
+      "category": "insufficient_data",
       "ticker": "GRP",
       "as_of": "2024-12-31",
-      "note": "Un periodo posterior llego a la valoracion: celda rechazada y contada.",
+      "note": "Sin datos suficientes: N/D: datos insuficientes a 2024-12-31 (consistent_segment_periods)",
       "applies_to": null,
       "expect_gate_failure": null,
       "expected": {
         "as_of": "2024-12-31",
         "evidence_cutoff": "2024-12-31",
-        "status": "rejected_lookahead"
+        "status": "insufficient_data"
       },
       "frozen_facts": {
         "segment_retail_operating_metric": [
@@ -3169,27 +3169,27 @@
         "as_of": "2024-12-31",
         "evidence_cutoff": "2024-12-31",
         "as_of_source": "explicit",
-        "status": "rejected_lookahead",
+        "status": "insufficient_data",
         "fair_value": null,
         "bear_value": null,
         "base_value": null,
         "bull_value": null,
         "current_price": 9.957,
         "upside": null,
-        "engine_key": "holding_company",
-        "model_version": "valuation-engines-v2",
+        "engine_key": null,
+        "model_version": null,
         "degraded": true,
-        "degraded_reason": "look-ahead rechazado por el guard publico: valuation segment_retail 2999-12-31 dated 2999-12-31 is after as_of 2024-12-31; using it would introduce look-ahead bias",
+        "degraded_reason": "N/D: datos insuficientes a 2024-12-31 (consistent_segment_periods)",
         "source_coverage_score": 0,
         "n_claims": 1,
         "n_claims_with_evidence": 0,
         "debate_verdict": "neutral",
-        "lookahead_violations": [
-          "valuation segment_retail 2999-12-31 dated 2999-12-31 is after as_of 2024-12-31; using it would introduce look-ahead bias"
-        ],
+        "lookahead_violations": [],
         "excluded_future_inputs": [],
         "unverifiable_inputs": [],
-        "missing_inputs": [],
+        "missing_inputs": [
+          "consistent_segment_periods"
+        ],
         "used_periods": [],
         "engine_trace_periods": [],
         "lookahead_violations_detail": [],
@@ -3216,36 +3216,36 @@
           },
           {
             "as_of": "2024-12-31",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           },
           {
             "as_of": "2025-06-30",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           },
           {
             "as_of": "2026-06-30",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           }
         ],
-        "replay_hash": "8d5ab74c742ff612f069c11bdfa604f7c4b9f8e8c46e7aca1d93896d46d8fb75",
-        "replay_hash_again": "8d5ab74c742ff612f069c11bdfa604f7c4b9f8e8c46e7aca1d93896d46d8fb75"
+        "replay_hash": "c2a40351f882c4231affaab9ec7f4cc9e889561ddea47cc8e78804412111342a",
+        "replay_hash_again": "c2a40351f882c4231affaab9ec7f4cc9e889561ddea47cc8e78804412111342a"
       }
     },
     {
       "id": "grp_2025-06-30",
-      "category": "lookahead_trap_period_leak",
+      "category": "insufficient_data",
       "ticker": "GRP",
       "as_of": "2025-06-30",
-      "note": "Un periodo posterior llego a la valoracion: celda rechazada y contada.",
+      "note": "Sin datos suficientes: N/D: datos insuficientes a 2025-06-30 (consistent_segment_periods)",
       "applies_to": null,
       "expect_gate_failure": null,
       "expected": {
         "as_of": "2025-06-30",
         "evidence_cutoff": "2025-06-30",
-        "status": "rejected_lookahead"
+        "status": "insufficient_data"
       },
       "frozen_facts": {
         "segment_retail_operating_metric": [
@@ -3282,27 +3282,27 @@
         "as_of": "2025-06-30",
         "evidence_cutoff": "2025-06-30",
         "as_of_source": "explicit",
-        "status": "rejected_lookahead",
+        "status": "insufficient_data",
         "fair_value": null,
         "bear_value": null,
         "base_value": null,
         "bull_value": null,
         "current_price": 11.1383,
         "upside": null,
-        "engine_key": "holding_company",
-        "model_version": "valuation-engines-v2",
+        "engine_key": null,
+        "model_version": null,
         "degraded": true,
-        "degraded_reason": "look-ahead rechazado por el guard publico: valuation segment_retail 2999-12-31 dated 2999-12-31 is after as_of 2025-06-30; using it would introduce look-ahead bias",
+        "degraded_reason": "N/D: datos insuficientes a 2025-06-30 (consistent_segment_periods)",
         "source_coverage_score": 100,
         "n_claims": 1,
         "n_claims_with_evidence": 1,
         "debate_verdict": "neutral",
-        "lookahead_violations": [
-          "valuation segment_retail 2999-12-31 dated 2999-12-31 is after as_of 2025-06-30; using it would introduce look-ahead bias"
-        ],
+        "lookahead_violations": [],
         "excluded_future_inputs": [],
         "unverifiable_inputs": [],
-        "missing_inputs": [],
+        "missing_inputs": [
+          "consistent_segment_periods"
+        ],
         "used_periods": [],
         "engine_trace_periods": [],
         "lookahead_violations_detail": [],
@@ -3329,36 +3329,36 @@
           },
           {
             "as_of": "2024-12-31",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           },
           {
             "as_of": "2025-06-30",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           },
           {
             "as_of": "2026-06-30",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           }
         ],
-        "replay_hash": "4591afdd2df701640d63b9774cf4f9b8141c2154bc8594557cebc696271e0f02",
-        "replay_hash_again": "4591afdd2df701640d63b9774cf4f9b8141c2154bc8594557cebc696271e0f02"
+        "replay_hash": "bb158ae13fba0e1a6bbe5fadbca9dd311724ea8ad7ada1de40b122e2d0fb87a3",
+        "replay_hash_again": "bb158ae13fba0e1a6bbe5fadbca9dd311724ea8ad7ada1de40b122e2d0fb87a3"
       }
     },
     {
       "id": "grp_2026-06-30",
-      "category": "lookahead_trap_period_leak",
+      "category": "insufficient_data",
       "ticker": "GRP",
       "as_of": "2026-06-30",
-      "note": "Un periodo posterior llego a la valoracion: celda rechazada y contada.",
+      "note": "Sin datos suficientes: N/D: datos insuficientes a 2026-06-30 (consistent_segment_periods)",
       "applies_to": null,
       "expect_gate_failure": null,
       "expected": {
         "as_of": "2026-06-30",
         "evidence_cutoff": "2026-06-30",
-        "status": "rejected_lookahead"
+        "status": "insufficient_data"
       },
       "frozen_facts": {
         "segment_retail_operating_metric": [
@@ -3395,27 +3395,27 @@
         "as_of": "2026-06-30",
         "evidence_cutoff": "2026-06-30",
         "as_of_source": "explicit",
-        "status": "rejected_lookahead",
+        "status": "insufficient_data",
         "fair_value": null,
         "bear_value": null,
         "base_value": null,
         "bull_value": null,
         "current_price": 13.548,
         "upside": null,
-        "engine_key": "holding_company",
-        "model_version": "valuation-engines-v2",
+        "engine_key": null,
+        "model_version": null,
         "degraded": true,
-        "degraded_reason": "look-ahead rechazado por el guard publico: valuation segment_retail 2999-12-31 dated 2999-12-31 is after as_of 2026-06-30; using it would introduce look-ahead bias",
+        "degraded_reason": "N/D: datos insuficientes a 2026-06-30 (consistent_segment_periods)",
         "source_coverage_score": 100,
         "n_claims": 1,
         "n_claims_with_evidence": 1,
         "debate_verdict": "neutral",
-        "lookahead_violations": [
-          "valuation segment_retail 2999-12-31 dated 2999-12-31 is after as_of 2026-06-30; using it would introduce look-ahead bias"
-        ],
+        "lookahead_violations": [],
         "excluded_future_inputs": [],
         "unverifiable_inputs": [],
-        "missing_inputs": [],
+        "missing_inputs": [
+          "consistent_segment_periods"
+        ],
         "used_periods": [],
         "engine_trace_periods": [],
         "lookahead_violations_detail": [],
@@ -3442,22 +3442,22 @@
           },
           {
             "as_of": "2024-12-31",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           },
           {
             "as_of": "2025-06-30",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           },
           {
             "as_of": "2026-06-30",
-            "status": "rejected_lookahead",
+            "status": "insufficient_data",
             "fair_value": null
           }
         ],
-        "replay_hash": "dfc6ba712fa31d0dd86c784523393022a822cba82f29d133191bf387bc265acd",
-        "replay_hash_again": "dfc6ba712fa31d0dd86c784523393022a822cba82f29d133191bf387bc265acd"
+        "replay_hash": "07335e2779c3b7bb74e9c52ce37cdb0f969e867ba45c6dd058ca493aab9d7312",
+        "replay_hash_again": "07335e2779c3b7bb74e9c52ce37cdb0f969e867ba45c6dd058ca493aab9d7312"
       }
     },
     {

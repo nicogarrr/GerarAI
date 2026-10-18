@@ -52,7 +52,7 @@ class _EngineReturning:
     def __init__(self, result: dict) -> None:
         self.result = result
 
-    def build_context(self, db, company, current_price):
+    def build_context(self, db, company, current_price, as_of=None):
         return object()
 
     def value(self, context) -> dict:
@@ -64,7 +64,7 @@ def _value_company(monkeypatch, result: dict, **kwargs) -> dict:
     company = SimpleNamespace(id=1, ticker="PIT")
     monkeypatch.setattr(valuation_service, "resolve", lambda _company: engine)
     monkeypatch.setattr(valuation_service, "resolve_engine_key", lambda _company: "test")
-    monkeypatch.setattr(valuation_service, "_position_price", lambda _db, _company_id: 100.0)
+    monkeypatch.setattr(valuation_service, "_position_price", lambda _db, _company_id, _as_of=None: 100.0)
     monkeypatch.setattr(valuation_service, "_free_data_trace", lambda _db, _company: None)
     monkeypatch.setattr(MoatService, "assess", lambda *_args, **_kwargs: {})
     return valuation_service.ValuationService().value_company(object(), company, **kwargs)

@@ -153,7 +153,7 @@ class StandardDCFEngine(ValuationEngine):
         margin, margin_clamped = clamp_fcf_margin(margin, ceiling=0.50)
 
         wacc, wacc_source, terminal, terminal_source, dropped_inferred = resolve_rates(
-            context.db, company
+            context.db, company, as_of=context.as_of
         )
 
         net_debt = snapshot.value("net_debt")

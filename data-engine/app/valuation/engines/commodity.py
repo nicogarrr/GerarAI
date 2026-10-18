@@ -91,6 +91,30 @@ class CommodityCycleEngine(ValuationEngine):
             return result
 
         assert volume_fact and cost_fact and price_fact and tax_fact and multiple_fact and shares
+
+        def _period_key(fact: FinancialFact):
+            return fact.fiscal_year if fact.fiscal_year is not None else fact.period
+
+        # Cada hecho se elige por separado ("el ultimo"): volumen y coste de
+        # periodos distintos dan un margen que nunca existio. El precio spot es
+        # por definicion de hoy; el realizado debe ser del mismo periodo.
+        flow_facts = [volume_fact, cost_fact]
+        if price_fact.metric == "realized_commodity_price":
+            flow_facts.append(price_fact)
+        if len({_period_key(fact) for fact in flow_facts}) > 1:
+            result = insufficient_result(
+                ticker=company.ticker,
+                model_type=company.valuation_model,
+                engine_key=self.key,
+                current_price=current_price,
+                missing_inputs=["consistent_period_volume_cost_price"],
+                reason="Commodity volume, unit cost and realized price come from different periods.",
+                snapshot=snapshot,
+            )
+            result["moat"] = empty_moat_framework(
+                company.company_type, company.factor_tags or [], company.special_risks or []
+            )
+            return result
         if not 0 <= float(tax_fact.value) < 1 or float(multiple_fact.value) <= 0:
             result = insufficient_result(
                 ticker=company.ticker,

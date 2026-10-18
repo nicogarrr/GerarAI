@@ -64,7 +64,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
                 # documentados en vez de NO VALUATION. Nunca final.
                 # Sin acciones no hay matematica por-accion posible.
                 return self._indicative_partial(
-                    company, snapshot, current_price, context.db
+                    company, snapshot, current_price, context.db, context.as_of
                 )
             result = insufficient_result(
                 ticker=company.ticker,
@@ -168,7 +168,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
         # El margen no positivo ya fue rechazado, nunca se eleva a +1%.
         # Solo se limita el extremo alto para los escenarios especulativos.
         margin = min(margin, 0.40)
-        wacc, wacc_source, terminal, terminal_source, dropped_inferred = resolve_rates(context.db, company)
+        wacc, wacc_source, terminal, terminal_source, dropped_inferred = resolve_rates(context.db, company, as_of=context.as_of)
         net_debt = snapshot.value("net_debt")
         if net_debt is None:
             # El puente de equity es EV - net_debt. Heredarlo como 0.0 no dice
@@ -450,7 +450,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
         )
         return result
 
-    def _indicative_partial(self, company, snapshot, current_price: float, db=None) -> dict:
+    def _indicative_partial(self, company, snapshot, current_price: float, db=None, as_of=None) -> dict:
         """Rango indicativo cuando hay precio + acciones sin snapshot coherente.
 
         Supuestos documentados (nunca facts): revenue floor $1 si no hay
@@ -538,7 +538,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
             growth = default_growth(company)
         growth = max(min(growth, 0.60), -0.15)
         assumed_margin_base = float(inferred.value) if inferred is not None else 0.15
-        wacc, wacc_source, terminal, terminal_source, dropped_inferred = resolve_rates(db, company)
+        wacc, wacc_source, terminal, terminal_source, dropped_inferred = resolve_rates(db, company, as_of=as_of)
         net_debt = snapshot.value("net_debt")
         net_debt_missing = net_debt is None
         # El puente de equity sigue siendo EV - net_debt. Sin el dato, el

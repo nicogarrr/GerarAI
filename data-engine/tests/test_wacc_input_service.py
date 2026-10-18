@@ -292,3 +292,30 @@ def test_yahoo_symbol_keeps_us_and_already_suffixed_tickers():
     assert WaccInputService._yahoo_symbol(us) == "AAPL"
     assert WaccInputService._yahoo_symbol(already) == "TEF.MC"
     assert WaccInputService._yahoo_symbol(unknown) == "XYZ"
+
+
+def test_non_usd_company_does_not_get_us_treasury_risk_free(db, monkeypatch):
+    _patch_no_yfinance(monkeypatch)
+    _patch_fred(monkeypatch, _StubFred(configured=True))
+    company = _company(db)
+    company.currency = "EUR"
+    db.commit()
+    result = _run(WaccInputService().refresh(db, company))
+
+    assert result["risk_free_unavailable_for_currency"] == "EUR"
+    assert "risk_free_rate" in result["missing"]
+    assert (
+        db.scalar(
+            select(FinancialFact).where(
+                FinancialFact.company_id == company.id,
+                FinancialFact.metric == "risk_free_rate",
+            )
+        )
+        is None
+    )
+    fred_doc = db.scalar(
+        select(Document).where(
+            Document.company_id == company.id, Document.source_type == "FRED"
+        )
+    )
+    assert fred_doc is None
