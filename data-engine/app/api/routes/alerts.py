@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.models import AlertRule, Company, NewsEvent, ResearchAlert
+from app.models import AlertDelivery, AlertRule, Company, NewsEvent, ResearchAlert
 from app.models.entities import InsiderFiling, InsiderTransaction
 from app.schemas import (
     AlertRuleOut,
@@ -242,6 +242,18 @@ def list_alerts(
             for tx, filing in rows
             if tx.tenant_id == filing.tenant_id
         }
+    # Delivery rows are authoritative; metadata is only a legacy mirror and
+    # may be absent (in-app creators) or stale (retries/backfill).
+    delivery_rows = db.scalars(select(AlertDelivery).where(
+        AlertDelivery.alert_id.in_([alert.id for alert in alerts]),
+    )).all() if alerts else []
+    deliveries = {}
+    for row in delivery_rows:
+        deliveries.setdefault((row.tenant_id, row.alert_id), {})[row.channel] = {
+            "status": row.status,
+            "attempted_at": row.updated_at.isoformat() if row.updated_at else None,
+            "error": row.last_error,
+        }
     result: list[ResearchAlertOut] = []
     for alert in alerts:
         out = ResearchAlertOut.model_validate(alert)
@@ -249,6 +261,8 @@ def list_alerts(
         out.ticker = company.ticker if company else None
         out.company_name = company.name if company else None
         metadata = alert.metadata_ or {}
+        actual = deliveries.get((alert.tenant_id, alert.id), {})
+        out.metadata = {**metadata, "deliveries": {**(metadata.get("deliveries") or {}), **actual}}
         if company is None and alert.alert_type.startswith("insider_"):
             fingerprint = metadata.get("tx_fingerprint")
             issuer = (
@@ -263,6 +277,13 @@ def list_alerts(
         out.source_url = _safe_http_url(metadata.get("source_url")) or (
             _safe_http_url(event.url) if event else None
         )
+        if event and company and alert.alert_type in ("tracked_news", "news_material_update"):
+            # Use the same legacy-identity gate as News. Feed ticker labels
+            # are not evidence that Novo headlines describe NVIDIA.
+            from app.api.routes.news import _is_off_topic
+
+            if _is_off_topic(event, company):
+                continue
         if event:
             # Document type only from a specific form token in the source
             # headline, never from an arbitrary model summary or SEC domain.

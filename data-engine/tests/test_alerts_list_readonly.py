@@ -404,3 +404,41 @@ def test_orphan_insider_never_borrows_identity_from_another_tenant(db):
     ) if row.id == alert.id)
     assert out.ticker is None
     assert out.company_name is None
+
+
+@pytest.mark.parametrize('legacy', [{}, {'deliveries': {'in_app': {'status': 'failed'}}}])
+def test_deliveries_read_authoritative_rows_without_mutating_legacy_metadata(db, legacy):
+    from app.models import AlertDelivery
+    alerts = _seed(db)
+    alert = alerts['open']
+    alert.metadata_ = legacy
+    db.add(AlertDelivery(alert_id=alert.id, tenant_id=alert.tenant_id,
+                         channel='in_app', status='delivered', attempts=1))
+    db.commit()
+    result = list_alerts(ticker=None, status=None, include_snoozed=True, limit=100, db=db)
+    out = next(row for row in result if row.id == alert.id)
+    assert out.metadata['deliveries']['in_app']['status'] == 'delivered'
+    assert alert.metadata_ == legacy
+    assert 'telegram' not in out.metadata['deliveries']
+    assert not db.dirty
+
+
+def test_legacy_novo_headline_is_not_presented_as_nvidia_alert(db):
+    from app.models import NewsEvent
+    company = Company(ticker='NVDA', name='NVIDIA Corp', exchange='NASDAQ', currency='USD',
+                      company_type='standard', valuation_model='standard_dcf')
+    db.add(company)
+    db.flush()
+    for i, title in enumerate(['Novo Trades at Less Than 12 Times Earnings', 'NVIDIA unveils new chip']):
+        event = NewsEvent(company_id=company.id, title=f'NVDA {title}', summary=title,
+                          source='Yahoo', date=datetime.now(UTC), metadata_={'source_headline': title})
+        db.add(event)
+        db.flush()
+        db.add(ResearchAlert(company_id=company.id, alert_type='news_material_update',
+                            severity='high', title=title, message='m', channels=['in_app'],
+                            fingerprint=f'issuer-{i}', status='open', metadata_={'news_event_id': event.id}))
+    db.commit()
+    out = list_alerts(ticker=None, status=None, include_snoozed=True, limit=100, db=db)
+    assert [row.title for row in out] == ['NVIDIA unveils new chip']
+    assert db.query(ResearchAlert).count() == 2  # No destructive cleanup from a GET.
+    assert not db.dirty
