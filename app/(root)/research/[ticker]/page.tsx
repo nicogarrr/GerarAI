@@ -541,6 +541,45 @@ function isEsefIssuer(ticker: string): boolean {
   return ESEF_MARKET_SUFFIXES.has(ticker.slice(idx + 1).toUpperCase());
 }
 
+// QA 18: los tickers canonicos europeos se guardan SIN sufijo (AENA, no
+// AENA.MC: resolve_company quita el sufijo conocido), asi que el sufijo
+// solo no basta y un emisor espanol veia los botones FMP (plan free, solo
+// US) y SEC. El mercado declarado en la ficha es la senal estable.
+// Mercados regulados UE/EEE cuyos emisores reportan via ESEF; Suiza y UK
+// quedan fuera, como en ESEF_MARKET_SUFFIXES.
+const ESEF_EXCHANGE_PATTERNS = [
+  /BME|BOLSA DE MADRID/i,
+  /EURONEXT/i, // cubre la nomenclatura historica «NYSE EURONEXT - ...» de Finnhub
+  /XETRA|FRANKFURT|DEUTSCHE B.O.RSE/i,
+  /BORSA ITALIANA|MILAN/i,
+  /WIENER|VIENNA/i,
+  /HELSINKI/i,
+  /STOCKHOLM/i,
+  /COPENHAGEN|COPENHAGUE/i,
+  /OSLO/i,
+  /LISBON|LISBOA/i,
+  /ATHENS|ATENAS/i,
+  /DUBLIN/i,
+  /WARSAW|VARSOVIA/i,
+  /PRAGUE|PRAGA/i,
+  /BUDAPEST/i,
+  /BRATISLAVA/i,
+  /LJUBLJANA/i,
+  /LUXEMBOURG/i,
+];
+
+function isEsefIssuerProfile(ticker: string, exchange: string | null | undefined): boolean {
+  if (isEsefIssuer(ticker)) return true;
+  const value = exchange?.trim();
+  if (!value) return false;
+  return ESEF_EXCHANGE_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+/** FMP plan free solo cubre mercado US: ni sufijo de mercado ni emisor ESEF. */
+function fmpCovers(ticker: string, exchange: string | null | undefined): boolean {
+  return !ticker.includes('.') && !isEsefIssuerProfile(ticker, exchange);
+}
+
 /**
  * Lo que devuelve cada workspace. Derivado de las acciones con `typeof`: si el
  * contrato del backend cambia, el tipo de aquí cambia con él y el `tsc` lo
@@ -1171,11 +1210,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <div className="space-y-6">
         <div className="flex flex-wrap gap-3">
           {/* FMP plan free solo cubre mercado US (402 en el resto): el boton
-              solo se ofrece en tickers sin sufijo de mercado (B30). */}
-          {!ticker.includes('.') ? (
+              solo se ofrece cuando el emisor entra en esa cobertura (B30).
+              La decision usa el perfil (mercado declarado), no solo el
+              sufijo del ticker: los europeos canonicos no lo llevan (AENA). */}
+          {fmpCovers(ticker, company.exchange) ? (
             <MutationForm action={refreshCompanyFinancials.bind(null, ticker)} successMessage="Financieros actualizados (FMP)"><Button type="submit" variant="outline">Refrescar financieros (FMP)</Button></MutationForm>
           ) : null}
-          {isEsefIssuer(ticker) ? (
+          {isEsefIssuerProfile(ticker, company.exchange) ? (
             <MutationForm action={refreshCompanyFinancialsESEF.bind(null, ticker)} successMessage="Financieros ESEF refrescados"><Button type="submit" variant="outline">Refrescar ESEF</Button></MutationForm>
           ) : (
             <MutationForm action={refreshCompanyFinancialsSEC.bind(null, ticker)} successMessage="Financieros SEC refrescados"><Button type="submit" variant="outline">Refrescar SEC</Button></MutationForm>
@@ -1184,9 +1225,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </div>
         <Panel title="Métricas calculadas trazables"><MetricsGrid metrics={data.calculatedMetrics} /></Panel>
         <Panel title="Hechos financieros canónicos"><FactTable ticker={ticker} facts={data.facts} refreshLabel={
-            !ticker.includes('.')
+            fmpCovers(ticker, company.exchange)
               ? 'Refrescar financieros (FMP)'
-              : isEsefIssuer(ticker)
+              : isEsefIssuerProfile(ticker, company.exchange)
                 ? 'Refrescar ESEF'
                 : 'Refrescar SEC'
           } /></Panel>
