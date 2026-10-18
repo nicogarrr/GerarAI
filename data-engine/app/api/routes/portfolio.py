@@ -1101,13 +1101,13 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
     manual = [item["ticker"] for item in positions_out if item["price_veracity"] == "MANUAL/NO OFICIAL"]
     unverified = [item["ticker"] for item in positions_out if item["price_veracity"] == "NO VERIFICADA"]
     assumptions = [
-        "Precios: ultima sincronizacion de cada posicion (ver price_source y price_as_of). OFICIAL solo con procedencia conocida (ibkr_flex, market_refresh)."
+        "Precios: última sincronización de cada posición, con su fuente y fecha en cada fila. OFICIAL solo con procedencia conocida (IBKR Flex o refresco de mercado)."
         + (f" MANUAL/NO OFICIAL en: {', '.join(manual)}." if manual else "")
         + (f" NO VERIFICADA en: {', '.join(unverified)}." if unverified else ""),
-        "Valores intrinsecos y probabilidades: solo tesis PUBLICADAS y modelos publicables (INFERIDO; los borradores nunca son vigencia).",
+        "Valores intrínsecos y probabilidades: solo tesis publicadas y modelos publicables; los borradores nunca cuentan.",
         "HIPÓTESIS etiquetada (INFERENCIA, no objetivo del modelo): los intrínsecos son valores presentes descontados; el CAGR supone convergencia del precio al intrínseco en el horizonte del modelo vigente (5 años sin modelo).",
-        "Escenarios: 'scenarios' son CONTRIBUCIONES ponderadas del subset cubierto (suma peso x CAGR), NUNCA la rentabilidad total de la cartera; 'coverage' es la fraccion de cartera usada y 'covered_only' normaliza por ESA cobertura por escenario. 'horizon_scope' mixed etiqueta horizontes de convergencia mezclados (proxy anual ponderado, no CAGR buy-and-hold de cartera). Nunca esperado de cartera completa con huecos.",
-        "'expected_cagr' es la media ponderada por probabilidad de los CAGR por escenario (esperado DEL CAGR, NO el CAGR del valor esperado: no coinciden por no linealidad). Solo se emite con masa completa (==1) y sin entradas invalidas descartadas; el parcial va en 'partial_expected_cagr' y 'probability_mass' indica la masa usada."
+        "Escenarios: son contribuciones ponderadas del subset valorado (peso x CAGR), nunca la rentabilidad total de la cartera. La cobertura es la fracción de cartera usada. Si los horizontes de convergencia se mezclan, es un proxy anual ponderado, no un CAGR de comprar y mantener. Nunca se da un esperado de cartera completa con huecos.",
+        "El esperado del CAGR es la media de los CAGR por escenario ponderada por probabilidad (no es el CAGR del valor esperado: no coinciden). Solo se da con probabilidad total del 100 % y sin entradas invalidas descartadas; con menos, solo se muestra el parcial y la probabilidad usada."
         + (" Probabilidades invalidas (fuera de [0, 1] o no finitas) descartadas en alguna posicion." if any_invalid_probs else ""),
         (
             f"Cobertura de cartera N/D: {len(fx_excluded)} posicion(es) sin conversion a moneda base; "
@@ -1115,7 +1115,7 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
             if fx_excluded
             else f"Cobertura con tesis publicada: {covered_weight:.1%} de la cartera; el resto se lista en excluded."
         ),
-        "El esperado de cartera TOTAL ('portfolio.expected_cagr') solo se emite cuando cubre el 100% de la cartera valorada y no hay posiciones sin conversion; con cobertura parcial es N/D y las contribuciones por posicion llevan scope.",
+        "El esperado de la cartera total solo se da cuando cubre el 100 % de la cartera valorada y no hay posiciones sin conversión; con cobertura parcial es N/D y se muestran las contribuciones por posición.",
     ]
     return {
         "as_of": dates[-1],

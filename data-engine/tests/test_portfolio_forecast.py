@@ -394,6 +394,11 @@ def test_forecast_fx_missing_makes_total_coverage_nd(db_session):
     assert [item["ticker"] for item in result["excluded"]] == ["BBB"]
     assert result["excluded"][0]["weight"] is None
     assert any("subset valorado" in a for a in result["assumptions"])
+    # La UI muestra estos textos: sin nombres de campo internos.
+    raw = ("price_source", "price_as_of", "'scenarios'", "'coverage'", "covered_only", "horizon_scope",
+           "expected_cagr", "probability_mass", "partial_expected_cagr", "scope.")
+    for text in result["assumptions"]:
+        assert not any(name in text for name in raw), text
 
 
 def test_forecast_legacy_basis_is_never_assumed(db_session):
