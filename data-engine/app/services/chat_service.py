@@ -382,7 +382,7 @@ _CAPABILITIES_RE = re.compile(
     r")\s*[?!.]*\s*$"
 )
 _CAPABILITIES_ANSWER = (
-    "Soy el asistente de GerarAI. Puedo contarte qué posiciones tienes "
+    "Soy el Cerebro de GerarAI. Puedo contarte qué posiciones tienes "
     "guardadas, cuánto pesa cada una y cuánto vale tu cartera, incluida la "
     "caja y la deuda de margen. Puedo responder sobre una empresa concreta "
     "con los datos guardados: precio, cifras financieras, tesis, noticias y "
@@ -694,11 +694,20 @@ class ChatService:
                 llm_trace={"path": "small_talk"},
                 context=context_echo,
             )
+        from app.services.brain_data_tools import answer_data_question
+
+        data_answer = answer_data_question(db, question)
+        if data_answer is not None:
+            data_answer.context = context_echo
+            return data_answer
         # Routing por compania RESUELTA del texto, no solo por el parametro
         # ticker: "precio de ASTS" sin campo ticker va igualmente por la
         # ruta estructurada con validacion financiera.
         company = self._resolve_company(db, question, scope, ticker)
-        if company is None and page_context is not None:
+        if company is None and page_context is not None and (
+            _PAGE_CONTENT_RE.search(question or "") or _COMPANY_CUE_RE.search(question or "")
+            or re.search(r"(?i)\b(?:evidencia|fuentes?|documentos?|riesgos?)\b", question or "")
+        ):
             company = page_context.company
         # Pregunta sobre el contenido de la página sin empresa: el cerebro solo
         # recibe el nombre de la sección, no sus datos. Lo dice, sin inventar
@@ -882,7 +891,7 @@ class ChatService:
                 f"coste medio {_fmt_number_es(float(pos.average_cost), 2)} {pos.currency}, "
                 f"valor {_fmt_number_es(_value(pos), 2)} {pos.base_currency or 'EUR'}{weight}"
             )
-            sources.append(self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of)))
+            sources.append(self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of)))
         extra = f"\n(Se muestran las {limit} mayores de {len(rows)}.)" if len(rows) > limit else ""
         total_text = (
             "monedas base distintas, sin total"
@@ -971,7 +980,7 @@ class ChatService:
             answer += f" Le sigue {nxt.ticker} con {_fmt_number_es(keyfn(rows[1]), 2)} {cur}."
         return ChatResponse(
             answer=answer,
-            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of))],
+            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))],
             model="deterministic",
             prompt_version="portfolio-ranking-v1",
             confidence=0.9,
@@ -1118,7 +1127,7 @@ class ChatService:
                 answer += "\n\n" + cash_line
         return ChatResponse(
             answer=answer,
-            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of))],
+            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))],
             model="deterministic",
             prompt_version="portfolio-position-v1",
             confidence=0.9,

@@ -71,7 +71,9 @@ export function toPortfolioChatCitations(sources: ChatSource[] | undefined | nul
     return (sources ?? []).map((source) => {
         const existing = toChatCitations([source])[0];
         let url: string | null = null;
-        if (typeof source.url === 'string') {
+        if (typeof source.url === 'string' && (source.url === '/portfolio' || /^\/research\/[A-Za-z0-9.%_-]+(?:\?view=(?:financials|thesis|news))?$/.test(source.url))) {
+            url = source.url;
+        } else if (typeof source.url === 'string') {
             try {
                 const parsed = new URL(source.url);
                 if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && !parsed.username && !parsed.password) url = parsed.href;
