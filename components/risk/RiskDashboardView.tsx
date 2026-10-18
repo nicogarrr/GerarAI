@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Briefcase, Gauge } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RecordDetail, formatRecordValue, type DataRecord } from '@/components/data/RecordViews';
 import { etiquetaFactor, etiquetaSector, etiquetaSeveridad } from '@/lib/labels';
@@ -267,7 +267,6 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
         <div className="grid gap-6">
             <RecordDetail
                 title="Exposiciones de cartera"
-                description="Estructura de la cartera: pesos, concentración (top 1 y top 5) y exposición por sector y factor. La volatilidad, el drawdown y el VaR de la cartera están en Inteligencia de cartera."
                 icon={<Gauge className="h-5 w-5 text-teal-400" aria-hidden="true" />}
                 record={humanizeRiskDashboard(headlineRecord(dashboard))}
                 fetchRecord={refreshDashboard}
@@ -284,9 +283,6 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                             <CardTitle className="text-lg font-semibold text-gray-100">
                                 Alertas de concentración y liquidez
                             </CardTitle>
-                            <CardDescription className="mt-0.5 text-sm text-gray-500">
-                                Reglas de peso y saldo; cada alerta explica el umbral que la dispara
-                            </CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -321,9 +317,6 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                             <CardTitle className="text-lg font-semibold text-gray-100">
                                 Exposición por posición
                             </CardTitle>
-                            <CardDescription className="mt-0.5 text-sm text-gray-500">
-                                Cada holding enlaza a su ficha de research
-                            </CardDescription>
                         </div>
                     </div>
                     <Link
