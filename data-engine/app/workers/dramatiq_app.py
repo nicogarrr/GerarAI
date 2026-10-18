@@ -1827,7 +1827,7 @@ def refresh_ticker_news(
             def _fetch(company, lane, url):
                 result = _run(service.poll_rss(url, ticker=company.ticker, max_items=30))
                 if lane == "yahoo":
-                    return label_yahoo(result)
+                    return label_yahoo(result, company, _ticker_evidence_level)
                 return label_google(result, company, _ticker_evidence_level)
 
             outcome = sweep(
