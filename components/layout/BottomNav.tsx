@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { MOBILE_TAB_ITEMS, isNavItemActive } from '@/lib/constants';
 
 /**
@@ -16,6 +17,10 @@ export default function BottomNav() {
             aria-label="Navegación inferior"
             className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-800 bg-gray-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
         >
+            <button type="button" onClick={() => window.dispatchEvent(new Event('gerarai:open-brain'))}
+                aria-label="Abrir el cerebro" className="flex min-h-11 w-full items-center justify-center gap-2 border-b border-gray-800 text-sm font-medium text-teal-300">
+                <BrainGlassesIcon className="h-6 w-6" />Cerebro
+            </button>
             <ul className="mx-auto grid max-w-md grid-cols-5">
                 {MOBILE_TAB_ITEMS.map((item) => {
                     const active = isNavItemActive(pathname, item.href);

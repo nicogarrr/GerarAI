@@ -24,7 +24,7 @@ describe('barra inferior móvil', () => {
     it('el layout autenticado la monta y deja hueco bajo el contenido', () => {
         const layout = readFileSync('app/(root)/layout.tsx', 'utf8');
         assert.match(layout, /<BottomNav \/>/);
-        assert.match(layout, /pb-24/);
+        assert.ok(layout.includes("pb-[calc(7.5rem+env(safe-area-inset-bottom))]"));
     });
     it('solo se ve en móvil (md:hidden)', () => {
         assert.match(readFileSync('components/layout/BottomNav.tsx', 'utf8'), /md:hidden/);
