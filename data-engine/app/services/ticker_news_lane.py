@@ -113,12 +113,38 @@ def _is_competitor_only(company, text: str, evidence_level) -> bool:
     return not company_mentioned(company, text, evidence_level)
 
 
+def _only_ticker_prefix_mention(company, title: str, summary: str) -> bool:
+    """El titular solo nombra a la empresa por un ticker pegado delante.
+
+    El feed de Yahoo de NVDA trajo "NVDA Data Centers, Aerospace...: ... Fastenal's
+    results ...": el ticker es una etiqueta anadida y el articulo trata de otra
+    empresa. Se descarta SOLO si el titular empieza por "TICKER " y, quitada esa
+    etiqueta, ni el titular ni el resumen citan el ticker, el nombre (palabras
+    distintivas de 4+ letras) ni un alias verificado. Un articulo sobre la empresa
+    siempre se nombra en su texto, asi que no se pierde prensa legitima.
+    """
+    ticker = (getattr(company, "ticker", "") or "").upper()
+    if not ticker or not re.match(rf"^{re.escape(ticker)}\s+\S", (title or "").strip()):
+        return False
+    prefix = re.compile(rf"^\s*{re.escape(ticker)}\s+")
+    rest = f"{prefix.sub('', title or '', count=1)} {prefix.sub('', summary or '', count=1)}"
+    terms = [ticker, *VERIFIED_ALIASES.get(ticker, ())]
+    terms += [
+        w for w in re.split(r"\W+", getattr(company, "name", "") or "")
+        if len(w) >= 4 and w.lower() not in _NAME_NOISE
+    ]
+    return not any(
+        re.search(rf"(?<![\w]){re.escape(term)}(?![\w])", rest, flags=re.IGNORECASE) for term in terms
+    )
+
+
 def label_yahoo(result: ConnectorResult, company=None, evidence_level=None) -> ConnectorResult:
     """Fuente legible y estable: el titulo del feed es 'Yahoo! Finance: X News'."""
     result.items = [
         dataclasses.replace(item, source="Yahoo Finance")
         for item in result.items
         if not is_data_page_headline(item.title)
+        and not (company is not None and _only_ticker_prefix_mention(company, item.title, item.summary or ""))
         and not (
             company is not None
             and evidence_level is not None
