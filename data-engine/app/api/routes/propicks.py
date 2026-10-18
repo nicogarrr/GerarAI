@@ -166,6 +166,8 @@ def list_gems(
     return [
         GemOut(ticker=g.ticker, name=g.name, score=g.score, market_cap=g.market_cap, reasons=g.reasons)
         for g in find_gems(db, results, limit=limit)
+    ]
+
 
 @router.post("/snapshots", status_code=201)
 def freeze_snapshot(db: Session = Depends(get_db)) -> dict:
