@@ -235,3 +235,22 @@ def test_general_question_lists_recent_sources_instead_of_no_data(db):
     specific = AssistantResponse.model_validate(answer(db, AssistantRequest(
         mode="explore", ticker="ASTS", question="¿Qué pasó con el propulsor xenón?")))
     assert specific.status == "insufficient_data"
+
+
+def test_thesis_style_question_lists_recent_sources(db):
+    from app.models.entities import DocumentChunk
+
+    tenant, _, company = setup(db)
+    filing = Document(tenant_id=tenant.id, company_id=company.id, title="Annual report",
+                      source_type="company_ir", source_url="https://example.com/ar",
+                      published_at=datetime(2026, 9, 24, tzinfo=UTC))
+    db.add(filing)
+    db.flush()
+    db.add(DocumentChunk(tenant_id=tenant.id, document_id=filing.id, chunk_index=0,
+                         text="Quarterly revenue grew.", token_count=4))
+    db.commit()
+    for question in ("¿Qué dice la tesis?", "Cuéntame las últimas novedades", "análisis reciente"):
+        r = AssistantResponse.model_validate(answer(db, AssistantRequest(
+            mode="explore", ticker="ASTS", question=question)))
+        assert r.status == "answered", question
+        assert r.citations

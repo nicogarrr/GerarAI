@@ -133,6 +133,20 @@ _ES_EN: dict[str, frozenset[str]] = {
     "inversion": frozenset({"investment", "capex"}),
     "inversiones": frozenset({"investment", "investments", "capex"}),
     "espectro": frozenset({"spectrum"}),
+    "gastos": frozenset({"expenses", "expense", "costs"}),
+    "costes": frozenset({"costs", "cost"}),
+    "costos": frozenset({"costs", "cost"}),
+    "flujo": frozenset({"flow", "cash"}),
+    "producto": frozenset({"product", "products"}),
+    "productos": frozenset({"product", "products"}),
+    "clientes": frozenset({"customers", "customer"}),
+    "demanda": frozenset({"demand"}),
+    "recompra": frozenset({"repurchase", "buyback"}),
+    "recompras": frozenset({"repurchase", "repurchases", "buyback"}),
+    "patentes": frozenset({"patent", "patents"}),
+    "regulacion": frozenset({"regulation", "regulatory"}),
+    "aranceles": frozenset({"tariffs", "tariff"}),
+    "cadena": frozenset({"supply", "chain"}),
 }
 
 
@@ -142,6 +156,9 @@ _GENERAL = frozenset({
     "sabemos", "saber", "sabe", "falta", "faltan", "contradicciones", "contradiccion",
     "resumen", "resume", "resumir", "tenemos", "evidencia", "evidencias", "fuentes",
     "datos", "informacion", "empresa", "general", "principal", "principales", "situacion",
+    "tesis", "novedades", "novedad", "reciente", "recientes", "ultimas", "ultimos", "ultima",
+    "ultimo", "noticias", "analisis", "pasa", "pasado", "ocurrido", "cuentame", "hablame",
+    "explica", "explicame", "cuenta", "acerca", "tema", "temas", "tengo", "hay", "ahora",
 })
 
 
