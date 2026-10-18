@@ -95,7 +95,11 @@ export async function getHomeOpportunities(params: {
         marketCapMoreThan: params.marketCapMoreThan,
         limit: params.limit,
     });
-    const candidates = screener.map((s) => s.symbol).slice(0, params.candidateLimit);
+    // Se prueban primero las candidatas con fundamentales persistidos (sin ellos
+    // el DCF no es calculable); orden estable dentro de cada grupo.
+    const withFundamentals = screener.filter((row) => row.has_fundamentals).map((row) => row.symbol);
+    const withoutFundamentals = screener.filter((row) => !row.has_fundamentals).map((row) => row.symbol);
+    const candidates = [...withFundamentals, ...withoutFundamentals].slice(0, params.candidateLimit);
     return mapPool(candidates, SERVER_CONCURRENCY, async (sym): Promise<HomeOpportunityProbe> => {
         try {
             // Precio y divisa del LISTADO REAL (master): getStockQuote con el

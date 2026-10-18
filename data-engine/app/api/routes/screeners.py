@@ -927,7 +927,7 @@ def _refetch_real_items(
                 "sector": sector_value,
                 "exchange": profile["exchange"] if profile else "US",
                 "type": "ETF" if symbol.upper() in _ETF_SYMBOLS else "Stock",
-                **ratios.get(symbol, {"pe": None, "pb": None, "roe": None}),
+                **ratios.get(symbol, {"pe": None, "pb": None, "roe": None, "has_fundamentals": False}),
                 "beta": None,
             }
         )

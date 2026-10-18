@@ -84,3 +84,12 @@ void test('un DCF fallido no cuenta como «sin potencial»', () => {
     assert.match(source, /evaluated: false, opportunity: null/, 'los fallos se marcan como no evaluados');
     assert.match(source, /evaluated: true,[\s\S]*?opportunity: upside > DCF_MIN_UPSIDE_PCT/, 'solo las evaluadas pueden dar oportunidad');
 });
+
+void test('las candidatas con fundamentales persistidos se prueban primero', () => {
+    // QA inicio DCF: sin fundamentales persistidos el DCF no es calculable y
+    // la tarjeta quedaba «0 de 6 calculables». La sonda prioriza las filas del
+    // screener con has_fundamentals y el contador declara las no evaluables.
+    const source = readFileSync('lib/actions/home-overview.actions.ts', 'utf8');
+    assert.match(source, /screener\.filter\(\(row\) => row\.has_fundamentals\)/, 'se separan las candidatas con fundamentales');
+    assert.match(source, /\[\.\.\.withFundamentals, \.\.\.withoutFundamentals\]\.slice\(0, params\.candidateLimit\)/, 'las con fundamentales entran antes en la sonda');
+});
