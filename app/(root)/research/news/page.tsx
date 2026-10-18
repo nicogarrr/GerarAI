@@ -25,18 +25,19 @@ async function submitIngestFeed(formData: FormData): Promise<void> {
   await ingestResearchNewsFeed(formData);
 }
 
-type PageProps = { searchParams: Promise<{ lane?: string; pagina?: string }> };
+type PageProps = { searchParams: Promise<{ lane?: string; pagina?: string; ticker?: string }> };
 
 export const metadata: Metadata = { title: 'Noticias' };
 
 export default async function ResearchNewsPage({ searchParams }: PageProps) {
   const query = await searchParams;
   const lane = query.lane === 'macro' || query.lane === 'empresa' ? query.lane : null;
+  const ticker = query.ticker?.trim().toUpperCase() || null;
   const parsed = Number.parseInt(query.pagina ?? '1', 10);
   const page = Number.isFinite(parsed) ? Math.min(Math.max(1, parsed), 1000) : 1;
   // Se pide uno de más para saber si hay página siguiente sin contar toda la tabla.
   const [fetched, tickerContext] = await Promise.all([
-    getResearchNews(lane, (page - 1) * NEWS_PAGE_SIZE, NEWS_PAGE_SIZE + 1),
+    getResearchNews(lane, (page - 1) * NEWS_PAGE_SIZE, NEWS_PAGE_SIZE + 1, ticker),
     getTickerContext(),
   ]);
   const hasMore = fetched.length > NEWS_PAGE_SIZE;
@@ -47,9 +48,9 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
       <PageHeader
         back={
           <Button asChild size="sm" variant="ghost">
-            <Link href="/research">
+            <Link href={ticker ? `/research/${encodeURIComponent(ticker)}` : '/research'}>
               <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-              Research
+              {ticker ? `Volver a ${ticker}` : 'Research'}
             </Link>
           </Button>
         }
@@ -60,9 +61,10 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
       <NewsEventsFlow
         events={events}
         hasMore={hasMore}
-        key={`${lane ?? 'todas'}-${page}`}
+        key={`${lane ?? 'todas'}-${ticker ?? 'todos'}-${page}`}
         lane={lane}
         page={page}
+        ticker={ticker}
         portfolioTickers={tickerContext.portfolioTickers}
         watchlistTickers={tickerContext.watchlistTickers}
       />

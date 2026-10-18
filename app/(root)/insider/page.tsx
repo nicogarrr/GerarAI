@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { Users } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, Users } from 'lucide-react';
 import InsiderSignalsView from '@/components/insider/InsiderSignalsView';
 import BackendOffline from '@/components/system/BackendOffline';
 import {
@@ -66,6 +67,15 @@ export default async function InsiderPage({ searchParams }: PageProps) {
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 overflow-x-clip">
+            {ticker ? (
+                <Link
+                    className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-200"
+                    href={`/research/${encodeURIComponent(ticker)}`}
+                >
+                    <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+                    Volver a {ticker}
+                </Link>
+            ) : null}
             <header className="flex flex-col gap-3 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <p className="text-sm font-semibold uppercase text-teal-300">Insider</p>

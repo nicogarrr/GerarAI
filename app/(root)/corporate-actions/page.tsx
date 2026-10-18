@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { Building2 } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, Building2 } from 'lucide-react';
 import CorporateActionsView from '@/components/corporate-actions/CorporateActionsView';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getCorporateActions, getCorporateActionsSyncStatus, type CorporateActionRecord } from '@/lib/actions/corporate-actions.actions';
@@ -16,7 +17,11 @@ export const metadata: Metadata = {
         'Dividendos, splits, spin-offs y fusiones: revisa los eventos pendientes y aplícalos a tu cartera.',
 };
 
-export default async function CorporateActionsPage() {
+type PageProps = { searchParams: Promise<{ ticker?: string }> };
+
+export default async function CorporateActionsPage({ searchParams }: PageProps) {
+    const { ticker: rawTicker } = await searchParams;
+    const ticker = rawTicker?.trim().toUpperCase() || null;
     let actions: CorporateActionRecord[];
     try {
         actions = await getCorporateActions();
@@ -30,12 +35,25 @@ export default async function CorporateActionsPage() {
         throw error;
     }
 
+    const visibleCount = ticker
+        ? actions.filter((action) => String(action.ticker ?? '').toUpperCase() === ticker).length
+        : actions.length;
+
     const emptyMessage = actions.length === 0
         ? corporateActionsEmptyMessage(await getCorporateActionsSyncStatus())
         : undefined;
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex max-w-6xl flex-col gap-6">
+            {ticker ? (
+                <Link
+                    className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-200"
+                    href={`/research/${encodeURIComponent(ticker)}`}
+                >
+                    <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+                    Volver a {ticker}
+                </Link>
+            ) : null}
             <header className="flex flex-col gap-3 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <p className="text-sm font-semibold uppercase text-teal-300">Eventos corporativos</p>
@@ -46,11 +64,11 @@ export default async function CorporateActionsPage() {
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
                     <Building2 className="h-4 w-4 text-teal-300" />
-                    {formatNumber(actions.length, { maximumFractionDigits: 0 })} eventos
+                    {formatNumber(visibleCount, { maximumFractionDigits: 0 })} eventos
                 </div>
             </header>
 
-            <CorporateActionsView emptyMessage={emptyMessage} initialActions={actions} />
+            <CorporateActionsView emptyMessage={emptyMessage} initialActions={actions} ticker={ticker} />
         </main>
     );
 }

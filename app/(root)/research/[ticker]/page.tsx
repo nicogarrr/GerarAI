@@ -948,6 +948,14 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </Panel>
         </div>
         <Panel collapsible="mobile"
+          actions={
+            <Link
+              className="text-sm text-teal-300 hover:text-teal-200"
+              href={`/research/news?ticker=${encodeURIComponent(ticker)}`}
+            >
+              Ver todas
+            </Link>
+          }
           description="Las 5 noticias de mayor materialidad entre las 25 más recientes de esta empresa, con fuente y fecha."
           title="Últimas noticias"
         >
@@ -1461,7 +1469,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           <div className="flex flex-col gap-3 border-t border-gray-900 pt-4">
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><Target className="h-4 w-4" />{holdingBadge}</span><Link className="inline-flex items-center gap-1 text-teal-300 transition hover:text-teal-200" href={`/research/assistant?mode=guide&ticker=${encodeURIComponent(ticker)}`}><BookOpen className="h-4 w-4" />Guía de investigación</Link><Link className="inline-flex items-center gap-1 text-gray-400 transition hover:text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=changes`}><History className="h-4 w-4" />Qué ha cambiado{recentChangeCount ? <span aria-hidden="true" className="rounded-full bg-gray-800 px-1.5 text-xs font-semibold text-gray-300">{recentChangeCount}</span> : null}</Link></div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <Link className="text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}/shorts`}>Cortos públicos</Link>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <Link className="text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}/shorts`}>Cortos públicos</Link>
+                <Link className="text-sm text-teal-300" href={`/research/news?ticker=${encodeURIComponent(ticker)}`}>Noticias</Link>
+                <Link className="text-sm text-teal-300" href={`/insider?ticker=${encodeURIComponent(ticker)}`}>Insiders</Link>
+                <Link className="text-sm text-teal-300" href={`/corporate-actions?ticker=${encodeURIComponent(ticker)}`}>Dividendos y splits</Link>
+              </div>
               <div className="w-full sm:w-auto sm:min-w-0 sm:flex-1"><QuickAlertButton ticker={ticker} currency={company.currency} /></div>
               <FollowButton symbol={ticker} company={company.name} isFollowed={isFollowed} stateUnknown={watchlistUnknown} />
             </div>
