@@ -218,3 +218,19 @@ def test_yahoo_drops_headline_whose_only_company_mention_is_a_ticker_prefix():
         ConnectorResult(source="rss", items=[fastenal, real, plain, other_ticker_news]), _Co, _ticker_evidence_level
     )
     assert [i.title for i in out.items] == [real.title, plain.title, other_ticker_news.title]
+
+
+def test_law_firm_solicitation_is_detected_but_real_news_is_not():
+    from app.services.ticker_news_lane import is_law_firm_solicitation
+
+    assert is_law_firm_solicitation(
+        "ASTS Investors: Rosen Law Firm Encourages AST SpaceMobile Investors to Secure Counsel"
+    )
+    assert is_law_firm_solicitation(
+        "Lead Plaintiff Deadline Approaching in AST SpaceMobile Class Action"
+    )
+    assert is_law_firm_solicitation(
+        "Pomerantz Law Firms Investigates Claims On Behalf of Investors of AST SpaceMobile"
+    )
+    assert not is_law_firm_solicitation("AST SpaceMobile launches BlueBird 6 satellite")
+    assert not is_law_firm_solicitation("AST SpaceMobile signs contract with AT&T")

@@ -13,6 +13,7 @@ from app.services.review_alert_service import ReviewAlertService
 from app.services.source_hierarchy_service import classify_source
 from app.services.text_clip import clip_words
 from app.services.thesis_graph_service import ThesisGraphService
+from app.services.ticker_news_lane import is_law_firm_solicitation
 
 _NAME_NOISE = {"inc", "corp", "corporation", "co", "company", "ltd", "plc", "sa", "nv", "ag", "the", "group", "holdings", "holding", "limited", "sme", "s.a."}
 
@@ -437,6 +438,9 @@ class NewsService:
         skipped_duplicates = 0
 
         for item in items:
+            # Captacion de demandantes de despachos: no es un hecho de la empresa.
+            if is_law_firm_solicitation(item.title, item.text):
+                continue
             # F175: el ticker solo prefija el texto si el título no lo trae ya;
             # si no, el titular guardado salía «COST COST 8-K».
             parts = [item.title, item.text]
