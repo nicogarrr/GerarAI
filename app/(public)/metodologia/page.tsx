@@ -156,7 +156,7 @@ const costs = [
   {
     icon: FlaskConical,
     title: 'Modelos LLM: por uso',
-    text: 'Los modelos de lenguaje se consumen a través de los proveedores configurados (Groq y Gemini). El coste se registra por modelo: si no se conoce, se dice «desconocido» en lugar de poner un 0.',
+    text: 'Los modelos de lenguaje usan OpenCode Go como proveedor principal; el chat tiene como respaldo Groq y Gemini cuando están configurados, en su capa gratuita. El coste se registra por modelo: si no se conoce, se dice «desconocido» en lugar de poner un 0.',
   },
   {
     icon: BookOpen,
