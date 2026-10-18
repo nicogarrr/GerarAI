@@ -56,7 +56,7 @@ export default async function CalendarPage() {
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
                     <CalendarDays aria-hidden="true" className="h-4 w-4 text-teal-300" />
-                    {formatNumber(calendar.count, { maximumFractionDigits: 0 })} eventos
+                    {formatNumber(calendar.count, { maximumFractionDigits: 0 })} {calendar.count === 1 ? 'evento' : 'eventos'}
                 </div>
             </header>
 
@@ -82,7 +82,7 @@ export default async function CalendarPage() {
                 <ol className="flex flex-col gap-4">
                     {groups.map(([day, events]) => (
                         <li key={day} className="rounded-lg border border-gray-800 bg-surface-1 p-4">
-                            <h2 className="text-sm font-semibold capitalize text-gray-200">
+                            <h2 className="text-sm font-semibold text-gray-200 first-letter:uppercase">
                                 {formatMarketDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}
                             </h2>
                             <ul className="mt-3 flex flex-col gap-2">
