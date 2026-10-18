@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { getLatestThesisJob, getThesisJobStatus, startThesisJob, type ThesisJobStatus } from '@/lib/actions/thesis-jobs.actions';
 
 const PHASE_LABELS: Record<string, string> = {
+    refresh_sec: 'Actualizando financieros SEC',
     collect_evidence: 'Recopilando evidencia (SEC, noticias, filings)',
     build_fundamental_model: 'Construyendo modelo fundamental',
     run_valuation: 'Ejecutando valoración determinista',
@@ -143,7 +144,7 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
         }
     };
 
-    const phaseLabel = job?.current_phase ? PHASE_LABELS[job.current_phase] ?? job.current_phase : null;
+    const phaseLabel = job?.current_phase ? PHASE_LABELS[job.current_phase] ?? 'Análisis en curso' : null;
     const doneCount = job?.phases.filter((p) => p.status === 'succeeded').length ?? 0;
 
     return (
