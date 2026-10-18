@@ -46,8 +46,8 @@ export function ShareCapitalPanel({ data }: { data: ShareCapital }) {
     </Panel>}
     <Panel title="Historial">
       <div role="group" aria-label="Tipo de historial" className="mb-4 flex gap-4 text-sm">
-        <button aria-pressed={tab === 'balances'} className={tab === 'balances' ? 'text-teal-300' : 'text-gray-400'} onClick={() => { setTab('balances'); setPage(1); }}>Saldos</button>
-        <button aria-pressed={tab === 'flows'} className={tab === 'flows' ? 'text-teal-300' : 'text-gray-400'} onClick={() => { setTab('flows'); setPage(1); }}>Emisiones y recompras anuales</button>
+        <button aria-pressed={tab === 'balances'} className={`inline-flex min-h-[44px] items-center sm:min-h-0 ${tab === 'balances' ? 'text-teal-300' : 'text-gray-400'}`} onClick={() => { setTab('balances'); setPage(1); }}>Saldos</button>
+        <button aria-pressed={tab === 'flows'} className={`inline-flex min-h-[44px] items-center sm:min-h-0 ${tab === 'flows' ? 'text-teal-300' : 'text-gray-400'}`} onClick={() => { setTab('flows'); setPage(1); }}>Emisiones y recompras anuales</button>
       </div>
       {!count ? <p className="text-sm text-gray-400">No hay {tab === 'balances' ? 'saldos de acciones' : 'flujos anuales'} con fuente verificable.</p> : <>
         <Pager page={page} pages={pages} onChange={setPage} />

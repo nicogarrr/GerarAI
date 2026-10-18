@@ -817,7 +817,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     return (
       <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-[1600px] space-y-6">
-          <Link className="inline-flex items-center text-sm text-gray-500 hover:text-gray-200" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
+          <Link className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
           <EmptyState
             description={state.description}
             icon={ShieldAlert}
@@ -1487,7 +1487,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   return (
     <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1600px]">
-        <Link className="mb-5 inline-flex items-center text-sm text-gray-500 hover:text-gray-200" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
+        <Link className="mb-5 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
         <header className="mb-6 flex flex-col gap-4 border-b border-gray-800 pb-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <div className="min-w-0">
@@ -1502,13 +1502,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           {headerMarket ? <CompanyHeaderQuote snapshot={headerMarket} /> : null}
           <ChangesSinceVisit ticker={ticker} />
           <div className="flex flex-col gap-3 border-t border-gray-900 pt-4">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><Target className="h-4 w-4" />{holdingBadge}</span><GuideBrainButton ticker={ticker} /><Link className="inline-flex items-center gap-1 text-gray-400 transition hover:text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=changes`}><History className="h-4 w-4" />Qué ha cambiado{recentChangeCount ? <span aria-hidden="true" className="rounded-full bg-gray-800 px-1.5 text-xs font-semibold text-gray-300">{recentChangeCount}</span> : null}</Link></div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><Target className="h-4 w-4" />{holdingBadge}</span><GuideBrainButton ticker={ticker} /><Link className="inline-flex min-h-[44px] items-center gap-1 text-gray-400 transition hover:text-teal-300 sm:min-h-0" href={`/research/${encodeURIComponent(ticker)}?view=changes`}><History className="h-4 w-4" />Qué ha cambiado{recentChangeCount ? <span aria-hidden="true" className="rounded-full bg-gray-800 px-1.5 text-xs font-semibold text-gray-300">{recentChangeCount}</span> : null}</Link></div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <Link className="text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}/shorts`}>Cortos públicos</Link>
-                <Link className="text-sm text-teal-300" href={`/research/news?ticker=${encodeURIComponent(ticker)}`}>Noticias</Link>
-                <Link className="text-sm text-teal-300" href={`/insider?ticker=${encodeURIComponent(ticker)}`}>Insiders</Link>
-                <Link className="text-sm text-teal-300" href={`/corporate-actions?ticker=${encodeURIComponent(ticker)}`}>Dividendos y splits</Link>
+                <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" href={`/research/${encodeURIComponent(ticker)}/shorts`}>Cortos públicos</Link>
+                <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" href={`/research/news?ticker=${encodeURIComponent(ticker)}`}>Noticias</Link>
+                <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" href={`/insider?ticker=${encodeURIComponent(ticker)}`}>Insiders</Link>
+                <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" href={`/corporate-actions?ticker=${encodeURIComponent(ticker)}`}>Dividendos y splits</Link>
               </div>
               <div className="w-full sm:w-auto sm:min-w-0 sm:flex-1"><QuickAlertButton ticker={ticker} currency={company.currency} /></div>
               <FollowButton symbol={ticker} company={company.name} isFollowed={isFollowed} stateUnknown={watchlistUnknown} />

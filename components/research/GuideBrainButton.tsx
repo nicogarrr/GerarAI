@@ -11,7 +11,7 @@ export function GuideBrainButton({ ticker }: { ticker: string }) {
         <button
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('gerarai:open-brain', { detail: { ticker } }))}
-            className="inline-flex items-center gap-1 text-teal-300 transition hover:text-teal-200"
+            className="inline-flex min-h-[44px] items-center gap-1 text-teal-300 transition hover:text-teal-200 sm:min-h-0"
         >
             <BookOpen className="h-4 w-4" />Guía de investigación
         </button>
