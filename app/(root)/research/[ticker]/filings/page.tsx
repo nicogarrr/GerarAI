@@ -69,7 +69,7 @@ export default async function FilingsYoyPage({ params, searchParams }: {
               <td className="pr-3">{fig.previous ? <>{money(fig.previous.value, fig.unit, fig.metric, fig.outflow)} {sourceLink(fig.previous.source.url)}</> : 'N/D'}</td>
               <td className={fig.highlight ? 'font-semibold text-amber-300' : 'text-gray-300'}>
                 {fig.change_pct == null ? 'N/D' : `${Number(fig.change_pct) > 0 ? '+' : ''}${formatNumber(Number(fig.change_pct), { maximumFractionDigits: 1 })} %`}
-                {' '}<span className="text-xs text-gray-500">{fig.change_pct == null ? 'SIN_DATOS' : 'DERIVADO'}</span>
+                {' '}<span className="text-xs text-gray-500">{fig.change_pct == null ? 'N/D' : 'calculado'}</span>
               </td></tr>)}</tbody></table></div>
             : <p className="text-gray-400">Sin cifras guardadas para ambos periodos.</p>}
         </Panel>
@@ -79,7 +79,7 @@ export default async function FilingsYoyPage({ params, searchParams }: {
             <p className="my-2 text-xs text-gray-500">{data.text.label}</p>
             <div className="space-y-4">{data.text.sections.map((section) => <section key={section.section}>
               <h3 className="font-medium text-gray-200">{section.label}</h3>
-              {section.status !== 'changed' ? <p className="text-sm text-gray-400">{section.status === 'unchanged' ? 'Sin cambios en el texto identificado.' : section.reason ?? 'SIN_DATOS'}</p>
+              {section.status !== 'changed' ? <p className="text-sm text-gray-400">{section.status === 'unchanged' ? 'Sin cambios en el texto identificado.' : section.reason ?? 'Sin datos de esta sección.'}</p>
                 : <details className="mt-1" open={section.changes.length <= 3}><summary className="cursor-pointer text-sm text-gray-400">{section.change_count ?? section.changes.length} cambios{section.truncated ? ' (se muestran los primeros 20)' : ''}</summary>
                   <ul className="mt-2 space-y-3">{section.changes.map((change, i) => <li className="rounded border border-gray-800 p-3 text-sm" key={i}>
                     <Badge variant="outline">{KIND[change.kind]}</Badge>

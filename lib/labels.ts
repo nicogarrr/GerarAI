@@ -338,3 +338,46 @@ export function openReviewsLabel(
     if (alerts > 0) parts.push(`${alerts} ${alerts === 1 ? 'alerta abierta' : 'alertas abiertas'}`);
     return parts.length ? parts.join(' · ') : null;
 }
+
+/** Mapa central de valores que el backend persiste como códigos (persistencia,
+ *  tendencia y estado del foso, tipo de fuente, tier). Los cargadores de texto
+ *  de usuario pasan por `etiquetaValor`; un código desconocido se muestra con
+ *  guiones bajos convertidos en espacios, nunca inventado. */
+const VALORES_BACKEND: Record<string, string> = {
+  unproven: 'no probada',
+  proven: 'probada',
+  uncertain: 'incierta',
+  improving: 'mejorando',
+  deteriorating: 'deteriorándose',
+  strengthening: 'reforzándose',
+  weakening: 'debilitándose',
+  moderate: 'moderada',
+  durable: 'duradera',
+  insufficient_evidence: 'evidencia insuficiente',
+  insufficient_data: 'datos insuficientes',
+  primary_official: 'oficial primaria',
+  wacc_policy: 'política de WACC',
+  model_policy: 'política del modelo',
+  calculated_metric: 'métrica calculada',
+  financial_facts: 'datos financieros',
+  historical_case: 'caso histórico',
+  inferred_input: 'dato inferido',
+  manual_transcript: 'transcripción manual',
+  manual_upload: 'subida manual',
+  sec_filing: 'informe SEC',
+  earnings_call: 'llamada de resultados',
+  investor_relations: 'relación con inversores',
+  transcript: 'transcripción',
+  yfinance: 'Yahoo Finance',
+  user: 'usuario',
+  chat: 'chat',
+  url: 'enlace',
+  brand: 'marca',
+  capital_barrier: 'barrera de capital',
+};
+
+/** Etiqueta ES de un código del backend: primero tiers de fuente y el mapa
+ *  central; si no está, el código con espacios en vez de guiones bajos. */
+export function etiquetaValor(value: string): string {
+  return TIERS_FUENTE[value] ?? VALORES_BACKEND[value] ?? value.replaceAll('_', ' ');
+}

@@ -31,7 +31,7 @@ export function ShareCapitalPanel({ data }: { data: ShareCapital }) {
   return <>
     <div className="grid gap-3 sm:grid-cols-2">
       <Stat label="Acciones en circulación" value={latest ? compact(latest.value) : 'N/D'} hint={latest ? <Source fact={latest} /> : 'Sin saldo de acciones con fuente verificable'} />
-      <Stat label="Cambio neto entre balances" value={percent(latest?.net_change_pct ?? null)} hint={latest?.net_change_pct != null ? `DERIVADO · ${latest.previous_date} → ${latest.date}` : latest?.split_between_dates ? 'Split entre fechas · no comparable' : latest?.abrupt_jump ? 'Salto brusco · posible split no registrado · no comparable' : 'Sin dos balances comparables'} />
+      <Stat label="Cambio neto entre balances" value={percent(latest?.net_change_pct ?? null)} hint={latest?.net_change_pct != null ? `Calculado · ${latest.previous_date} → ${latest.date}` : latest?.split_between_dates ? 'Split entre fechas · no comparable' : latest?.abrupt_jump ? 'Salto brusco · posible split no registrado · no comparable' : 'Sin dos balances comparables'} />
     </div>
     <p className="text-xs text-gray-400">Saldos sin ajustar por splits. El cambio neto no identifica emisiones ni recompras.</p>
     {data.series.length > 1 && <Panel title="Evolución de acciones · OFICIAL">
@@ -49,7 +49,7 @@ export function ShareCapitalPanel({ data }: { data: ShareCapital }) {
         <button aria-pressed={tab === 'balances'} className={tab === 'balances' ? 'text-teal-300' : 'text-gray-400'} onClick={() => { setTab('balances'); setPage(1); }}>Saldos</button>
         <button aria-pressed={tab === 'flows'} className={tab === 'flows' ? 'text-teal-300' : 'text-gray-400'} onClick={() => { setTab('flows'); setPage(1); }}>Emisiones y recompras anuales</button>
       </div>
-      {!count ? <p className="text-sm text-gray-400">N/D · No hay {tab === 'balances' ? 'saldos de acciones' : 'flujos anuales'} con fuente verificable.</p> : <>
+      {!count ? <p className="text-sm text-gray-400">No hay {tab === 'balances' ? 'saldos de acciones' : 'flujos anuales'} con fuente verificable.</p> : <>
         <Pager page={page} pages={pages} onChange={setPage} />
         <div className="my-4 overflow-x-auto">
           {tab === 'balances' ? <table className="w-full text-left text-sm"><thead><tr className="text-gray-400"><th className="p-2">Fecha / fuente</th><th className="p-2">Acciones</th><th className="p-2">Cambio neto · DERIVADO</th></tr></thead>

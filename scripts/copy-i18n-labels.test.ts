@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { sectorIndustryLine, etiquetaFactor, etiquetaSector, etiquetaSeveridad, etiquetaTierFuente, etiquetaTipoEvento, etiquetaTipoInstrumento } from '../lib/labels.ts';
+import { sectorIndustryLine, etiquetaValor, etiquetaFactor, etiquetaSector, etiquetaSeveridad, etiquetaTierFuente, etiquetaTipoEvento, etiquetaTipoInstrumento } from '../lib/labels.ts';
 
 void test('sectores de la cabecera de exposición se traducen (F208)', () => {
     assert.equal(etiquetaSector('Communication Services'), 'Servicios de comunicación');
@@ -74,4 +74,21 @@ test('industrias conocidas se traducen en la línea de sector del índice', () =
   assert.equal(sectorIndustryLine('Communication Services', 'Communications'), 'Servicios de comunicación · Comunicaciones');
   assert.equal(sectorIndustryLine('Industrials', 'Professional Services'), 'Industriales · Servicios profesionales');
   assert.equal(sectorIndustryLine('Industrials', 'Electrical Equipment'), 'Industriales · Equipamiento eléctrico');
+});
+
+test('etiquetaValor traduce códigos del backend y no deja guiones bajos', () => {
+  assert.equal(etiquetaValor('unproven'), 'no probada');
+  assert.equal(etiquetaValor('uncertain'), 'incierta');
+  assert.equal(etiquetaValor('tier_1_regulatory'), 'Regulatoria · T1');
+  assert.equal(etiquetaValor('tier_unknown'), 'Fuente sin clasificar');
+  assert.equal(etiquetaValor('primary_official'), 'oficial primaria');
+  assert.equal(etiquetaValor('wacc_policy'), 'política de WACC');
+  assert.equal(etiquetaValor('algo_nuevo'), 'algo nuevo');
+});
+
+
+test('la lista de auditorías conserva la referencia a su versión de tesis', () => {
+  const source = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+  assert.ok(source.includes("tesis {audit.thesis_version_id ?? 'desconocida'}"));
+  assert.ok(source.includes('<SourceAuditDetail audit={audit} ticker={ticker} />'));
 });
