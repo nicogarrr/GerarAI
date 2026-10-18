@@ -87,3 +87,24 @@ export function toPortfolioChatCitations(sources: ChatSource[] | undefined | nul
         };
     });
 }
+
+const CITATION_KIND_LABELS: Record<string, string> = {
+    thesis_version: 'Tesis',
+    thesis_section: 'Sección de tesis',
+    financial_fact: 'Dato financiero',
+    claim: 'Afirmación',
+    claim_evidence: 'Evidencia',
+    document_chunk: 'Documento',
+    rag_chunk: 'Documento',
+    memory_item: 'Nota guardada',
+    portfolio: 'Cartera',
+};
+
+/**
+ * Etiqueta legible del tipo de fuente. El localizador interno
+ * (`financial_fact:123`) es un ID técnico y no se muestra al usuario.
+ */
+export function citationKindLabel(locator: string): string {
+    const kind = locator.split(':', 1)[0] ?? '';
+    return CITATION_KIND_LABELS[kind] ?? 'Fuente';
+}

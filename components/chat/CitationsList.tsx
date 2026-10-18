@@ -1,7 +1,7 @@
 import { FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatNumber } from '@/lib/format';
-import type { ChatCitation } from '@/lib/chat/citations';
+import { citationKindLabel, type ChatCitation } from '@/lib/chat/citations';
 
 interface CitationsListProps {
     citations: ChatCitation[];
@@ -66,7 +66,7 @@ export default function CitationsList({ citations, sources }: CitationsListProps
                             <Badge variant="outline">p. {citation.page}</Badge>
                         ) : null}
                         <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[11px] text-gray-500">
-                            {citation.locator}
+                            {citationKindLabel(citation.locator)}
                         </code>
                     </li>
                 ))}
