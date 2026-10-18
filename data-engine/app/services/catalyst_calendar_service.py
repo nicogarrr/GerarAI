@@ -36,7 +36,7 @@ from sqlalchemy.orm import Session
 from app.models.entities import Company, CorporateAction, Position
 from app.services.market_refresh_service import _us_listed
 
-SOURCE_NASDAQ = "Calendario publico de NASDAQ"
+SOURCE_NASDAQ = "Calendario público de NASDAQ"
 SOURCE_CAVAAI = "Accion corporativa registrada en GerarAI"
 
 SOURCE_SEC_RULE = "Regla SEC (Form 10-Q/10-K) aplicada al ultimo informe en EDGAR"
