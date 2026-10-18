@@ -48,7 +48,7 @@ def test_creators_record_in_app_delivery():
 
     for name in ("asts_spacex_signal", "filing_intelligence", "jev_availability", "review_alert_service"):
         src = pathlib.Path(f"app/services/{name}.py").read_text()
-        assert "record_in_app_delivery(db, alert)" in src, name
+        assert "record_in_app_delivery(db, alert)" in src or "record_in_app_delivery(tenant_db, alert)" in src, name
 
 
 def test_backfill_migration_is_safe_for_postgres():

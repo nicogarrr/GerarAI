@@ -20,7 +20,7 @@ def test_margin_same_period_not_gross_and_stores_no_dump():
             db.add(FinancialFact(tenant_id=1, company_id=company.id, metric=metric, value=Decimal(value), unit="USD", period=period, fiscal_year=int(period[:4]), source_type="SEC", is_reported=True))
         db.flush()
         response = metric_question_answer(db, "¿Cuál es el margen FCF de Apple?", company)
-        assert "25,00 %" in response.answer
+        assert "25,00 %" in response.answer and "($25.00) / ingresos ($100.00)" in response.answer
         assert len(response.sources) == 2
         assert all(source["url"] for source in response.sources)
         stores = metric_question_answer(db, "¿Cuántas tiendas físicas tiene Apple?", company)

@@ -58,11 +58,11 @@ class SafeFormula:
 
     def __init__(self, expression: str) -> None:
         if len(expression) > 1000:
-            raise ValueError("Formula exceeds 1000 characters")
+            raise ValueError("La fórmula supera los 1000 caracteres")
         try:
             self.tree = ast.parse(expression, mode="eval")
         except SyntaxError as exc:
-            raise ValueError("Invalid formula syntax") from exc
+            raise ValueError("Sintaxis de fórmula no válida") from exc
         self.expression = expression
         self.names: set[str] = set()
         self._validate(self.tree)
@@ -72,29 +72,29 @@ class SafeFormula:
             self._validate(node.body)
         elif isinstance(node, ast.Constant):
             if not isinstance(node.value, (int, float)) or isinstance(node.value, bool):
-                raise ValueError("Only numeric constants are allowed")
+                raise ValueError("Solo se admiten constantes numéricas")
         elif isinstance(node, ast.Name):
             if not KEY_RE.fullmatch(node.id):
-                raise ValueError(f"Invalid metric name: {node.id}")
+                raise ValueError(f"Nombre de métrica no válido: {node.id}")
             self.names.add(node.id)
         elif isinstance(node, ast.BinOp):
             if type(node.op) not in self.BINARY:
-                raise ValueError("Formula operator is not allowed")
+                raise ValueError("Operador de fórmula no permitido")
             self._validate(node.left)
             self._validate(node.right)
         elif isinstance(node, ast.UnaryOp):
             if type(node.op) not in self.UNARY:
-                raise ValueError("Formula unary operator is not allowed")
+                raise ValueError("Operador unario de fórmula no permitido")
             self._validate(node.operand)
         elif isinstance(node, ast.Call):
             if not isinstance(node.func, ast.Name) or node.func.id not in self.FUNCTIONS:
-                raise ValueError("Only min, max and abs functions are allowed")
+                raise ValueError("Solo se admiten las funciones min, max y abs")
             if node.keywords:
-                raise ValueError("Formula keyword arguments are not allowed")
+                raise ValueError("La fórmula no admite argumentos con nombre")
             for argument in node.args:
                 self._validate(argument)
         else:
-            raise ValueError(f"Formula element {type(node).__name__} is not allowed")
+            raise ValueError(f"Elemento de fórmula {type(node).__name__} no permitido")
 
     def evaluate(self, values: dict[str, Decimal]) -> Decimal:
         missing = self.names - values.keys()
@@ -103,10 +103,10 @@ class SafeFormula:
         try:
             result = self._evaluate(self.tree.body, values)
             if not result.is_finite():
-                raise ValueError("Formula result is not finite")
+                raise ValueError("El resultado de la fórmula no es finito")
             return result
         except (DivisionByZero, InvalidOperation, ZeroDivisionError) as exc:
-            raise ValueError("Formula cannot be evaluated for these values") from exc
+            raise ValueError("No se puede evaluar la fórmula con estos valores") from exc
 
     def _evaluate(self, node: ast.AST, values: dict[str, Decimal]) -> Decimal:
         if isinstance(node, ast.Constant):
@@ -117,14 +117,14 @@ class SafeFormula:
             left = self._evaluate(node.left, values)
             right = self._evaluate(node.right, values)
             if isinstance(node.op, ast.Pow) and abs(right) > 10:
-                raise ValueError("Formula exponent exceeds safe limit")
+                raise ValueError("El exponente de la fórmula supera el límite seguro")
             return self.BINARY[type(node.op)](left, right)
         if isinstance(node, ast.UnaryOp):
             return self.UNARY[type(node.op)](self._evaluate(node.operand, values))
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             arguments = [self._evaluate(argument, values) for argument in node.args]
             return self.FUNCTIONS[node.func.id](*arguments)
-        raise ValueError("Invalid formula node")
+        raise ValueError("Elemento de fórmula no válido")
 
 
 @dataclass
@@ -153,7 +153,7 @@ class CustomMetricService:
             raise ValueError("metric_key must be lower-case snake_case")
         parsed = SafeFormula(formula)
         if metric_key in parsed.names:
-            raise ValueError("Custom metric cannot reference itself")
+            raise ValueError("Una métrica personalizada no puede referirse a sí misma")
         previous = db.scalar(
             select(CustomMetricDefinition)
             .where(CustomMetricDefinition.metric_key == metric_key)
@@ -201,7 +201,7 @@ class ScreenerService:
         alerts_enabled: bool,
     ) -> SavedScreen:
         if not criteria:
-            raise ValueError("A screen requires at least one criterion")
+            raise ValueError("El filtro necesita al menos un criterio")
         normalized = [self._criterion(item) for item in criteria]
         if ranking_formula:
             SafeFormula(ranking_formula)
@@ -570,7 +570,7 @@ class ScreenerService:
         raw_right = item.get("right", item.get("value"))
         right = str(raw_right).strip()
         if not left or not right or operator_key not in COMPARATORS:
-            raise ValueError("Each criterion needs left, operator and right")
+            raise ValueError("Cada criterio necesita valor izquierdo, operador y valor derecho")
         SafeFormula(left)
         SafeFormula(right)
         return {"left": left, "operator": operator_key, "right": right}

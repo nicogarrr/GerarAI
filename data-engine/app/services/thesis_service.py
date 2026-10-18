@@ -623,11 +623,6 @@ class ThesisService:
             thesis_markdown += f"\n### {section['titulo']}\n"
             thesis_markdown += "\n\n".join(section["parrafos"]) + "\n"
 
-        thesis_markdown += "\n\n## 24. Análisis narrativo INFERIDO\n"
-        for section in narrative_sections:
-            thesis_markdown += f"\n### {section['titulo']}\n"
-            thesis_markdown += "\n\n".join(section["parrafos"]) + "\n"
-
         def _dec(value) -> Decimal | None:
             return None if value is None else Decimal(str(value))
 

@@ -152,6 +152,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/NewsHeadline.tsx': 'useState, useRef, useEffect, browser:new IntersectionObserver, browser:IntersectionObserver',
   'components/research/NewsSecondOrder.tsx': 'useState, jsx-onToggle',
   'components/research/NextStepLink.tsx': 'jsx-onClick, browser:window',
+  'components/research/PrintButton.tsx': 'jsx-onClick, browser:window',
   'components/research/QuickAlertButton.tsx': 'useSyncExternalStore, useState, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/select.tsx',
   'components/research/ResearchAssistant.tsx': 'useState, useEffect, jsx-onSubmit, jsx-onChange, importa cliente: components/ui/panel.tsx',
   'components/research/CompanyChatForm.tsx': 'useFormStatus',
@@ -166,6 +167,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/risk/RiskDashboardView.tsx': 'useState, useEffect, importa cliente: components/data/RecordViews.tsx',
   'components/screener/FollowButton.tsx': 'useState, jsx-onClick, libreria cliente: sonner',
   'components/screeners/FilterFields.tsx': 'useState, jsx-onChange',
+  'components/screeners/ScreenBreadcrumbName.tsx': 'useEffect, browser:window',
   'components/screeners/SubmitButton.tsx': 'useFormStatus',
   'components/SearchCommand.tsx': 'useRouter, useState, useRef, browser:HTMLElement, browser:document, useEffect, browser:window, jsx-onClick, jsx-onOpenChange, jsx-onCloseAutoFocus, jsx-onValueChange, jsx-onSelect, jsx-onMouseEnter, jsx-onFocus, importa cliente: components/ui/command.tsx',
   'components/security/TwoFactorSettings.tsx': 'useState, browser:navigator, jsx-onSubmit, jsx-onClick, libreria cliente: sonner, libreria cliente: react-hook-form',
@@ -188,6 +190,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/watchlist/WatchlistRemoveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
   'components/work-products/WorkProductButton.tsx': 'useState, jsx-onOpenChange, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/label.tsx, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/select.tsx',
   'hooks/useOnlineStatus.ts': 'useSyncExternalStore, browser:window, browser:navigator',
+  'lib/utils/scroll-anchor.ts': 'browser:window, browser:cancelAnimationFrame, browser:requestAnimationFrame, browser:document',
 };
 
 const audit = auditRepo(root, ['components', 'app', 'hooks', 'lib']);

@@ -356,6 +356,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                   <option value="sector_report">Informe sectorial</option>
                   <option value="personal_note">Nota personal</option>
                   <option value="third_party_thesis">Tesis de terceros</option>
+                  <option value="own_thesis">Tesis propia</option>
                   <option value="historical_case">Caso histórico</option>
                   <option value="personal_postmortem">Postmortem personal</option>
                 </select>

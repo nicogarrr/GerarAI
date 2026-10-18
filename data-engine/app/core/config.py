@@ -370,6 +370,14 @@ class Settings(BaseSettings):
     # la lista por defecto lo excluye para que el respaldo nunca reciba
     # un nivel que rechazaria. Env: OPENCODE_GO_REASONING_EFFORT_MODELS.
     opencode_go_reasoning_effort_models: str = "space-bunny-free,deepseek-v4.1-flash-free"
+    # Nivel de razonamiento SOLO para el chat interactivo (cadena
+    # create_chat_llm_provider). Con "max" el bridge tarda ~26 s o mas y el
+    # chat (presupuesto total corto, carrera a los 2 s) casi siempre acababa
+    # en los respaldos Groq/Gemini, dejando la generacion del primario
+    # cancelada a medias (BrokenPipe en el bridge). "low" hace al primario
+    # competitivo en la carrera; "max" iguala al resto de llamadas.
+    # Env: OPENCODE_GO_CHAT_REASONING_EFFORT.
+    opencode_go_chat_reasoning_effort: str | None = "low"
 
     # Cascada gratuita (LLM_PROVIDER=cascade): Gemini AI Studio -> OpenRouter :free
     # -> OpenCode, solo los que tengan clave. Env: GEMINI_API_KEY / OPENROUTER_API_KEY.
@@ -410,11 +418,23 @@ class Settings(BaseSettings):
     llm_enabled: bool = True
     # CavaAI intentionally uses one provider for every task.
     llm_provider: str = "opencode-go"
-    llm_timeout_seconds: float = Field(default=30.0, gt=0)
-    llm_max_retries: int = Field(default=2, ge=0, le=5)
-    # Tope TOTAL por llamada (reintentos incluidos). Sin tope, 3 intentos de 30 s
-    # retenian la sesion de BD del llamador ~90 s y agotaban el pool (15).
-    llm_total_timeout_seconds: float = Field(default=45.0, gt=0)
+    # Llamadas largas (extraccion de documentos/principios, tesis, KPIs): el
+    # bridge OpenCode con reasoning=max tarda ~26 s o mas por lote; con 30 s
+    # se cortaba ~30 % de las peticiones y el bridge escribia sobre un socket
+    # cerrado (BrokenPipe). 120 s por intento con 1 reintento.
+    llm_timeout_seconds: float = Field(default=120.0, gt=0)
+    llm_max_retries: int = Field(default=1, ge=0, le=5)
+    # Tope TOTAL por llamada (reintentos incluidos): 2 intentos de 120 s mas
+    # el backoff. Ojo con el pool de BD: una llamada request-scope que retenga
+    # sesion durante el LLM puede agotarlo, asi que el chat interactivo NO
+    # usa este tope sino chat_total_timeout_seconds (cadena corta con
+    # respaldos); el resto de llamadas largas vive en workers/segundo plano.
+    llm_total_timeout_seconds: float = Field(default=250.0, gt=0)
+    # Presupuesto total del chat interactivo (carrera primario/respaldos en
+    # ChatFallbackProvider). Corto a proposito: la respuesta al usuario no
+    # puede esperar una generacion larga; el primario compite con reasoning
+    # reducido (opencode_go_chat_reasoning_effort).
+    chat_total_timeout_seconds: float = Field(default=45.0, gt=0)
     # Modelos con razonamiento oculto: gastan tokens de salida pensando y con un
     # max_tokens bajo devuelven "no assistant message". Suelo de salida para ellos.
     llm_hidden_reasoning_models: str = "longcat-2.5-preview-free"

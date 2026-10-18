@@ -258,12 +258,12 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                             {!lastGenerated &&
                                 'El embudo todavía no ha publicado un run completado. Pulsa «Generar selección ahora» para ejecutarlo con las empresas disponibles.'}
                             {lastGenerated && passedCount === 0 &&
-                                `La selección del ${formatLastGenerated(lastGenerated)} no contiene candidatos que superen los criterios del embudo.`}
+                                `La selección del ${formatLastGenerated(lastGenerated)} no contiene candidatos que superen los criterios del embudo. Si el espacio de trabajo es nuevo o los datos se recargaron después, ejecuta la selección de nuevo para evaluar las empresas con los datos de mercado actuales.`}
                             {lastGenerated && passedCount !== 0 &&
                                 `Ninguna acción de la selección del ${formatLastGenerated(lastGenerated)} cumple los filtros actuales (puntuación ≥ ${appliedFilters.minScore}${appliedFilters.sector !== 'all' ? `, sector ${etiquetaSector(appliedFilters.sector)}` : ''}). Prueba a bajar la puntuación mínima o cambiar de sector.`}
                         </p>
                         <Button
-                            onClick={lastGenerated ? handleRefresh : handleGenerateRun}
+                            onClick={lastGenerated && passedCount !== 0 ? handleRefresh : handleGenerateRun}
                             disabled={loading}
                             aria-busy={loading}
                             className="mt-4 h-11 w-full gap-2 bg-teal-600 text-white hover:bg-teal-700 sm:w-auto"

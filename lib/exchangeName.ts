@@ -28,7 +28,7 @@ const EXCHANGE_ALIASES: Array<[RegExp, string]> = [
 
 export function exchangeDisplayName(raw: string | null | undefined): string | null {
     const value = raw?.trim();
-    if (!value || value.toUpperCase() === 'UNKNOWN' || value.toUpperCase() === 'UNKNOWN_EXCHANGE') {
+    if (!value || value.toUpperCase() === 'UNKNOWN' || value.toUpperCase() === 'UNKNOWN_EXCHANGE' || /^[A-Z]$/i.test(value)) {
         return null;
     }
     // NYSE MKT/American antes que NYSE a secas (orden de la tabla).

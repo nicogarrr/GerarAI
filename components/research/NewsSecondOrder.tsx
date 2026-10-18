@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 type Candidate = {
   ticker: string;
@@ -24,7 +24,11 @@ const GROUPS = [
 ] as const;
 const PER_GROUP = 8;
 
-export function NewsSecondOrder({ eventId }: { eventId: number }) {
+/**
+ * Único desplegable por fila de noticia: el contexto de la fuente (children,
+ * server-rendered) y los efectos de segundo orden (carga perezosa al abrir).
+ */
+export function NewsSecondOrder({ eventId, summary, children }: { eventId: number; summary: string; children?: ReactNode }) {
   const [load, setLoad] = useState<Load>({ state: 'idle' });
 
   async function fetchOnce() {
@@ -41,7 +45,8 @@ export function NewsSecondOrder({ eventId }: { eventId: number }) {
 
   return (
     <details className="mt-2 text-xs text-gray-400" onToggle={(event) => { if ((event.currentTarget as HTMLDetailsElement).open) void fetchOnce(); }}>
-      <summary className="min-h-10 cursor-pointer py-2 text-teal-300">Efectos de segundo orden</summary>
+      <summary className="min-h-10 cursor-pointer py-2 text-teal-300">{summary}</summary>
+      {children}
       {load.state === 'loading' ? <p className="mt-1" role="status">Calculando…</p> : null}
       {load.state === 'error' ? <p className="mt-1">No disponible ahora. Vuelve a abrir para reintentar.</p> : null}
       {load.state === 'ready' && load.data.status === 'sin_datos' ? <p className="mt-1">Sin empresas del universo expuestas a esta noticia.</p> : null}

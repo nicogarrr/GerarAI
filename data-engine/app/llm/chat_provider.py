@@ -264,7 +264,15 @@ def _gemini_backup(settings: Settings, client: httpx.AsyncClient | None) -> Open
 
 def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
     settings = settings or get_settings()
-    primary = create_llm_provider(settings, client=client)
+    # Chat interactivo: presupuesto corto propio (chat_total_timeout_seconds,
+    # no el tope de llamadas largas) y primario con reasoning reducido para
+    # que compita en la carrera en vez de perderla siempre y quedar cancelado
+    # a medias en el bridge (BrokenPipe).
+    primary = create_llm_provider(
+        settings,
+        client=client,
+        reasoning_effort=settings.opencode_go_chat_reasoning_effort,
+    )
     if not settings.groq_chat_fallback_enabled or primary.name == "disabled":
         return primary
     if primary.name != "opencode-go":
@@ -272,7 +280,7 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
     backup = _groq_backup(settings, client)
     assert backup is not None  # el flag de arriba lo garantiza
     backup2 = _gemini_backup(settings, client)
-    return ChatFallbackProvider(primary, backup, total=settings.llm_total_timeout_seconds, backup2=backup2)
+    return ChatFallbackProvider(primary, backup, total=settings.chat_total_timeout_seconds, backup2=backup2)
 
 
 def create_background_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
@@ -284,7 +292,11 @@ def create_background_llm_provider(settings: Settings | None = None, *, client: 
     el primario solo ya es el comportamiento anterior.
     """
     settings = settings or get_settings()
-    primary = create_llm_provider(settings, client=client)
+    # max_retries=0 en el primario: el reintento UNICO de la llamada larga lo
+    # hace SequentialFallbackProvider ante error transitorio. Con reintentos
+    # internos ademas, un bridge caido costaria 2x(120+120) s por lote antes
+    # de llegar a Groq/Gemini.
+    primary = create_llm_provider(settings, client=client, max_retries=0)
     if primary.name == "disabled":
         return primary
     try:

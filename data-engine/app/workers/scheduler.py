@@ -12,6 +12,8 @@ from app.workers.dramatiq_app import (
     dispatch_insider_alerts,
     dispatch_tracked_news_alerts,
     evaluate_alert_rules,
+    freeze_propicks_snapshot,
+    recompute_fundamental_metrics,
     reconcile_alert_analyses,
     reconcile_alert_deliveries,
     refresh_asts_catalog,
@@ -203,6 +205,17 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         job_id="kpi_backfill",
         minutes=5,
     )
+    # Cobertura de ratios derivados (roe/margenes/roic/wacc) para todo el
+    # universo con hechos: sin este barrido los CalculatedMetric solo se
+    # escribian on-demand y los screeners fundamentales no tenian datos.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, recompute_fundamental_metrics),
+        "cron",
+        job_id="fundamental_metrics_recompute",
+        hour=3,
+        minute=40,
+    )
     _register(
         scheduler,
         partial(enqueue_for_all_tenants, refresh_sec_filings),
@@ -349,6 +362,16 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         job_id="propicks_prices_daily",
         hour=21,
         minute=45,
+    )
+    # Snapshot mensual congelado del embudo (dia 1, tras los precios del cierre).
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, freeze_propicks_snapshot),
+        "cron",
+        job_id="propicks_snapshot_monthly",
+        day=1,
+        hour=22,
+        minute=30,
     )
     return scheduler
 

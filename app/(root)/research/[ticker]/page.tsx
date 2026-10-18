@@ -709,6 +709,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   const [{ ticker: rawTicker }, query] = await Promise.all([params, searchParams]);
   assertTickerShape(rawTicker);
   const ticker = rawTicker.trim().toUpperCase();
+  if (rawTicker !== ticker) {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (typeof value === 'string') search.set(key, value);
+    }
+    redirect(`/research/${encodeURIComponent(ticker)}${search.size ? `?${search.toString()}` : ''}`);
+  }
   const activeView = asView(query.view);
   //
   // D2a: la ficha era una cadena de `await` secuenciales. Estas lecturas NO
@@ -930,7 +937,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               />
             )}
           </Panel>
-          <Panel collapsible="mobile" title="Modelo fundamental a largo plazo">
+          {snapshot.model_summary ? <Panel collapsible="mobile" title="Modelo fundamental a largo plazo">
             {snapshot.model_summary ? (
               <div className="space-y-3 text-sm text-gray-300">
                 <div className="flex flex-wrap gap-2">
@@ -946,7 +953,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 title="Sin modelo persistido. Genéralo de forma explícita desde el grupo Modelo."
               />
             )}
-          </Panel>
+          </Panel> : null}
         </div>
         <Panel collapsible="mobile"
           actions={

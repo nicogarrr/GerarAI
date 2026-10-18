@@ -158,7 +158,16 @@ def list_alerts(
     db: Session = Depends(get_db),
 ) -> list[ResearchAlertOut]:
     now = datetime.now(UTC)
-    statement = select(ResearchAlert)
+    # Product feed is not an operations console. Filter BEFORE limit so an
+    # operational alert cannot consume a user-visible slot. Keep stored rows.
+    # Legacy TypeSafe incidents predate the explicit audience marker.
+    statement = select(ResearchAlert).where(
+        ResearchAlert.alert_type != "typesafe_credit_exhausted",
+        or_(
+            ResearchAlert.metadata_["audience"].as_string().is_(None),
+            ResearchAlert.metadata_["audience"].as_string() != "internal_ops",
+        ),
+    )
     if ticker:
         # F313: mismo criterio de identidad que /api/alerts/rules (que sí
         # usa resolve_company): el alias europeo SAN.MC resuelve SAN; el

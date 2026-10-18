@@ -41,6 +41,9 @@ CAPITAL_FLOW_METRICS = frozenset({
 })
 CAPITAL_PROVENANCE_METRICS = CAPITAL_FLOW_METRICS | {"shares_outstanding"}
 
+# Formularios cuya portada declara acciones en circulacion (dei).
+SHARES_OUTSTANDING_FORMS = frozenset({"10-K", "10-K/A", "10-Q", "10-Q/A", "20-F", "40-F"})
+
 # Which provider wins when the same (metric, fiscal year) exists more than once.
 # A regulator filing the number itself beats a vendor's restatement of it, and
 # a vendor beats a manually typed value, which beats an unattributed row.
@@ -139,8 +142,8 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("capital_expenditure", ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"],          "USD"),
     ("depreciation_amortization", ["DepreciationDepletionAndAmortization", "DepreciationAmortizationAndAccretionNet",
                                    "Depreciation", "DepreciationAndAmortization"],                                                                  "USD"),
-    ("common_stock_repurchased", ["PaymentsForRepurchaseOfCommonStock"], "USD"),
-    ("common_stock_issued", ["ProceedsFromIssuanceOfCommonStock"], "USD"),
+    ("common_stock_repurchased", ["PaymentsForRepurchaseOfCommonStock", "StockRepurchasedDuringPeriodValue"], "USD"),
+    ("common_stock_issued", ["ProceedsFromIssuanceOfCommonStock", "StockIssuedDuringPeriodValueNewIssues"], "USD"),
     ("shares_repurchased", ["StockRepurchasedDuringPeriodShares"], "shares"),
     ("stock_based_compensation", ["ShareBasedCompensation"], "USD"),
     ("dividends_paid",    ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"],                                "USD"),
@@ -1280,6 +1283,73 @@ class FinancialIngestionService:
                             "filed": entry.get("filed"), "concept": entry.get("_concept"),
                         }
                     facts_imported += 1
+
+        # --- dei:EntityCommonStockSharesOutstanding (portada 10-K/10-Q) ---
+        # El saldo de acciones en circulacion lo reporta todo emisor SEC en la
+        # PORTADA del filing (namespace dei), no necesariamente como hecho
+        # us-gaap: sin esta pasada empresas con todo reportado (caso real UNH)
+        # salian N/D en dilucion. Son instantes de portada: su `end` es la
+        # fecha "as of" de la portada, NO el cierre fiscal - por eso NO pasan
+        # el anclaje anual (su mes nunca es el del cierre) y se guardan con
+        # fiscal_year/fiscal_quarter NULL y sufijo :DEI (re-autorizados en cada
+        # refresh por la regla fiscal_quarter IS NULL de _replace_sec_data).
+        # Multi-clase (META, GOOGL, BRK.B, ASTS): la SEC no consolida las
+        # clases en companyfacts (van por dimension); esas clases entran por
+        # el carril per-clase, no por aqui.
+        dei = facts_data.get("facts", {}).get("dei", {}) or {}
+        ecso_entries = (
+            dei.get("EntityCommonStockSharesOutstanding", {})
+            .get("units", {})
+            .get("shares", [])
+        )
+        ecso_by_end: dict[str, dict[str, Any]] = {}
+        for entry in ecso_entries:
+            if entry.get("form") not in SHARES_OUTSTANDING_FORMS:
+                continue
+            if as_of is not None and not _published_by(entry, as_of):
+                continue
+            end = str(entry.get("end") or "")
+            if not end:
+                continue
+            current = ecso_by_end.get(end)
+            if current is None or str(entry.get("filed") or "") > str(
+                current.get("filed") or ""
+            ):
+                ecso_by_end[end] = entry
+        for end in sorted(ecso_by_end, reverse=True):
+            entry = ecso_by_end[end]
+            val = _decimal(entry.get("val"))
+            if val is None or val <= 0:
+                continue
+            period = f"{end}:DEI"
+            # El concepto us-gaap ya informo este mismo saldo con el mismo
+            # `end` (mismo filing): no duplicar la fila.
+            existing = annual_by_metric.get("shares_outstanding", {})
+            if end in existing:
+                continue
+            db.add(
+                FinancialFact(
+                    company_id=company.id,
+                    metric="shares_outstanding",
+                    value=val,
+                    unit="shares",
+                    period=period,
+                    fiscal_year=None,
+                    fiscal_quarter=None,
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=True,
+                    confidence=Decimal("0.95"),
+                )
+            )
+            concept_usage.setdefault("shares_outstanding", {})[period] = (
+                "dei:EntityCommonStockSharesOutstanding"
+            )
+            capital_provenance.setdefault("shares_outstanding", {})[period] = {
+                "filed": entry.get("filed"),
+                "concept": "dei:EntityCommonStockSharesOutstanding",
+            }
+            facts_imported += 1
 
         if concept_usage:
             existing_meta = dict(document.metadata_ or {})

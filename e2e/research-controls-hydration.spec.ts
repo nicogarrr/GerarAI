@@ -28,12 +28,17 @@ test('research controls cannot accept input before their client handlers exist',
   try {
     await page.goto('/research/MSFT?view=thesis', { waitUntil: 'commit' });
     const history = page.getByRole('button', { name: 'Historial de versiones y aprobaciones', includeHidden: true });
-    const alert = page.getByRole('button', { name: '+ Alerta', exact: true });
+    const trigger = page.getByRole('button', { name: 'Alerta de precio' });
     await expect(history).toBeDisabled();
-    await expect(alert).toBeDisabled();
+    // El formulario de alerta vive en un popover (Radix): antes de hidratar
+    // el botón campana no abre nada y "+ Alerta" queda inaccesible.
+    await trigger.click();
+    await expect(page.getByRole('button', { name: '+ Alerta', exact: true })).toBeHidden();
     release();
     await page.waitForLoadState('load', { timeout: 60_000 });
     await expect(history).toBeEnabled();
+    await trigger.click();
+    const alert = page.getByRole('button', { name: '+ Alerta', exact: true });
     await expect(alert).toBeEnabled();
     if ((page.viewportSize()?.width ?? 1440) < 768) {
       await history.click();

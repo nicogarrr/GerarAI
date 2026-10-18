@@ -76,7 +76,9 @@ test.describe("mobile flujo screener→watchlist→tesis→alerta solo con toque
     await expect(page).toHaveURL(/\/research\/[^/]+$/);
     await expectNoPageOverflow(page, "research");
 
-    // 5. Crear alerta con toques: rellenar objetivo y tocar "+ Alerta".
+    // 5. Crear alerta con toques: abrir el popover de la campana,
+    // rellenar objetivo y tocar "+ Alerta".
+    await page.getByRole("button", { name: "Alerta de precio" }).tap();
     const targetInput = page.getByPlaceholder("Precio objetivo $");
     await expect(targetInput).toBeVisible();
     await targetInput.tap();

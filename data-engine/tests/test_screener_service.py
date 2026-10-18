@@ -146,7 +146,7 @@ def test_custom_metric_screen_reports_quality_and_alerts_only_new_matches():
 
 
 def test_formula_engine_rejects_code_execution_constructs():
-    with pytest.raises(ValueError, match="allowed"):
+    with pytest.raises(ValueError, match="admiten|permitido"):
         SafeFormula("__import__('os').system('whoami')")
 
 

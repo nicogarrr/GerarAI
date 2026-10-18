@@ -88,6 +88,13 @@ function money(
   return thesisMoney(parsed, currency);
 }
 
+function NarrativeText({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s<>]+)/g);
+  return <>{parts.map((part, index) => /^https?:\/\//.test(part)
+    ? <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">Fuente</a>
+    : <span key={index}>{cleanThesisText(part)}</span>)}</>;
+}
+
 function ScoreBar({ label, value }: { label: string; value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   const tone =
@@ -260,7 +267,7 @@ export default function ThesisMemo({
                       const basis = provenanceBasisEs(item.base_inferencia ?? item.method);
                       return (
                         <div key={item.key} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2 text-sm">
-                          <dt className="text-gray-300">{capitalizeLabel(metricLabel(item.key))}</dt>
+                          <dt className="text-gray-300">{capitalizeLabel(metricLabel(item.key))}{item.key === 'fcf_margin' ? (item.label === 'derivado' ? ' normalizado' : item.label === 'dato' ? ' reportado' : '') : ''}</dt>
                           <dd className="ml-auto font-medium tabular-nums text-gray-100">{formatProvenanceValue(item.value, item.unit)}</dd>
                           <dd className="basis-full text-xs text-gray-500">
                             {basis ?? 'Base no documentada'}
@@ -305,7 +312,7 @@ export default function ThesisMemo({
               <h4 className="text-sm font-semibold text-gray-200">{section.titulo === 'Lo que cambio' ? 'Lo que cambió' : section.titulo}</h4>
               {section.parrafos.map((parrafo, pIndex) => (
                 <p key={pIndex} className="text-sm leading-6 text-gray-300">
-                  {cleanThesisText(parrafo)}
+                  <NarrativeText text={parrafo} />
                 </p>
               ))}
             </div>

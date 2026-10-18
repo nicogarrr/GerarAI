@@ -53,10 +53,10 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
               <div className="flex flex-wrap gap-2 md:ml-auto">
                 <Badge variant="outline">{row.matched ? t('screener.match') : t('screener.noMatch')}</Badge>
                 {newMatches.has(row.company_id) ? <Badge>{t('screener.newMatch')}</Badge> : null}
-                <Badge variant="outline">
+                {result.ranking_formula ? <Badge variant="outline">
                   {t('screener.rank')}{' '}
                   {formatScreenRank(row.rank_value, result.ranking_formula)}
-                </Badge>
+                </Badge> : null}
                 <Badge variant="outline">
                   {t('screener.coverage')}{' '}
                   {formatPercent(row.coverage_percent, { fromRatio: false, digits: 0 })}
@@ -73,11 +73,11 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
             ) : null}
             <div className="mt-3 grid gap-2 md:grid-cols-2">
               {row.criteria.map((criterion, index) => (
-                <div className="rounded-md border border-gray-800 p-3 text-xs" key={index}>
+                <div className="flex flex-wrap items-baseline gap-2 rounded-md border border-gray-800 p-3 text-xs" key={index}>
                   <span className={criterion.passed ? 'text-teal-300' : 'text-red-300'}>
                     {criterion.passed ? 'CUMPLE' : 'NO CUMPLE'}
                   </span>
-                  <span className="ml-2 text-gray-300">
+                  <span className="text-gray-300">
                     {criterion.left} {criterion.operator} {criterion.right}
                   </span>
                 </div>
