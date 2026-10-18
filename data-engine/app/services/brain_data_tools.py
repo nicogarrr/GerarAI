@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Company, DividendRecord, MarketPrice, NewsEvent, Position, ThesisVersion
 from app.schemas import ChatResponse
+from app.services.investment_plan_service import InvestmentPlanService
+from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.screener_fundamentals import load_screener_ratios
 
 
@@ -138,6 +140,33 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     return _response([head, *lines, total, *tail], sources, "portfolio_dividends")
 
 
+def _plan_answer(db: Session) -> ChatResponse:
+    """Plan de inversion guardado y su desviacion actual; solo las cifras del plan, sin ordenes."""
+    drift = InvestmentPlanService().drift_analysis(db)
+    sources = [_source("investment_plan", "plan", "Plan de inversión", "/plan")]
+    if not drift.get("plan_exists"):
+        return _response(["No tienes un plan de inversión guardado."], [], "investment_plan")
+    cur = PortfolioFXService().base_currency(db)
+    lines = [f"Tu plan guardado marca una aportación de {_number(drift['next_contribution'])} {cur} al mes."]
+    if drift.get("suggestions_blocked"):
+        lines.append("No calculo desviaciones ni importes: faltan tipos de cambio de alguna posición o saldo.")
+        return _response(lines, sources, "investment_plan")
+    below = [d for d in drift["deviations"] if d["current_pct"] < d["target_pct"] - d["band_pct"]]
+    if below:
+        lines.append("Objetivos por debajo de su banda según tu plan:")
+        by_label = {x["label"]: x for x in drift["suggestions"] if x["direction"] == "buy"}
+        for d in sorted(below, key=lambda d: d["deviation_pct"]):
+            amount = by_label.get(d["label"], {}).get("amount_base")
+            extra = f", hueco de {_number(amount)} {cur} para llegar al objetivo" if amount is not None else ""
+            lines.append(f"- {d['label']}: {_number(d['current_pct'])} % actual frente a {_number(d['target_pct'])} % objetivo{extra}.")
+    elif drift["deviations"]:
+        lines.append("Ningún objetivo del plan está por debajo de su banda.")
+    else:
+        lines.append("El plan no tiene objetivos de asignación guardados.")
+    lines.append(f"Valor de la cartera usado: {_number(drift['portfolio_value_base'])} {cur}. Son las cifras de tu plan, no una orden ni una recomendación nueva.")
+    return _response(lines, sources, "investment_plan")
+
+
 def _pct(value) -> str:
     return _number(float(value) * 100) + " %"
 
@@ -183,6 +212,9 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     theses = bool(re.search(r"(?i)\btesis\b", question)) and bool(re.search(r"(?i)\b(?:tengo|mis|activas|vigentes)\b", question))
     comparison = bool(re.search(r"(?i)\bcompara\w*\b", question))
     valuation = bool(re.search(r"(?i)\b(?:precio|PER|cotiza\w*)\b", question)) and not re.search(r"(?i)\b(?:medio|coste|peso|posici[oó]n|tengo)\b", question)
+    plan = bool(re.search(r"(?i)\b(?:mi|el|tu)\s+plan\b|\bplan\s+de\s+(?:inversi[oó]n|aportaci\w+)", question))
+    if plan and not re.search(r"(?i)\b(?:compra|comprar|vende|vender|ejecuta|buy|sell)\b", question):
+        return _plan_answer(db)
     thesis_valuation = bool(re.search(r"(?i)\btesis\b", question)) and bool(
         re.search(r"(?i)\b(?:margen\s+de\s+seguridad|valor\s+esperado|escenarios?|valor\s+objetivo|precio\s+objetivo)\b", question))
     if thesis_valuation and not re.search(r"(?i)\b(?:compra|comprar|vende|vender|ejecuta|buy|sell)\b", question):
