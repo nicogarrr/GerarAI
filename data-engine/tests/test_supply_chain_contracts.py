@@ -331,7 +331,10 @@ def test_triggers_concurrency_y_timeouts():
     assert triggers["push"]["branches"] == ["main"]
     assert "pull_request" in triggers
     assert "workflow_dispatch" in triggers
-    assert workflow["concurrency"]["cancel-in-progress"] is True
+    # La evidencia publicada (SBOMs e informes de escaneo) no se cancela en
+    # push: cancel solo en pull_request, mismo criterio que coverage.yml y
+    # llm-evals.yml (FIX-3.6).
+    assert workflow["concurrency"]["cancel-in-progress"] == "${{ github.event_name == 'pull_request' }}"
     for job in ("build", "sbom", "scan"):
         timeout = _job(job)["timeout-minutes"]
         assert 20 <= timeout <= 60, f"{job}: {timeout} min no es realista para 4 imagenes"
