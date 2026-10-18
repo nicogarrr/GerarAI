@@ -12,6 +12,13 @@ from app.llm.errors import ProviderHTTPError
 BODY = '{"error":{"message":"OpenCode\'s free tier can only be used from within OpenCode"}}'
 
 
+IP_BLOCK_BODY = (
+    '{"type": "error", "error": {"type": "RuntimeError", "message": "serve error: {\\"name\\": \\"APIError\\", '
+    '\\"data\\": {\\"message\\": \\"OpenCode\'s free models aren\'t available from your current network '
+    'because we\'ve detected abusive traffic from this IP address.\\"}}"}}'
+)
+
+
 @pytest.fixture(autouse=True)
 def _clean():
     base._free_tier_breaker.clear()
@@ -74,3 +81,14 @@ def test_other_502_and_5xx_keep_ordinary_retries(monkeypatch):
     with pytest.raises(ProviderHTTPError):
         _post(p)
     assert len(calls) == 3 and not base._free_tier_breaker
+
+
+def test_ip_block_502_is_not_retried_and_opens_breaker():
+    calls = []
+    p = _provider(lambda r: (calls.append(1), httpx.Response(502, text=IP_BLOCK_BODY))[1])
+    with pytest.raises(ProviderHTTPError):
+        _post(p)
+    assert len(calls) == 1 and ("opencode-go", "m") in base._free_tier_breaker
+    with pytest.raises(ProviderHTTPError):
+        _post(p)
+    assert len(calls) == 1
