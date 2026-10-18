@@ -26,6 +26,7 @@ import {
   uploadKnowledgeDocument,
 } from '@/lib/actions/research-tools.actions';
 import BackendOffline from '@/components/system/BackendOffline';
+import { DeleteDocumentButton } from '@/components/knowledge/DeleteDocumentButton';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatDate, formatNumber, formatPercent, NA } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
@@ -271,7 +272,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                   <td className="py-3 text-gray-400">{documentTypeLabel(document.document_type)}</td>
                   <td className="py-3 text-gray-500">{parserLabel(document.metadata.parser)}</td>
                   <td className="py-3"><Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge></td>
-                  <td className="py-3"><div className="flex justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm></div>{extractionResultText(job) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}</td>
+                  <td className="py-3"><div className="flex justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm><DeleteDocumentButton documentId={document.id} title={document.title} /></div>{extractionResultText(job) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}</td>
                 </tr>
                 );
               })}
@@ -298,6 +299,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                   <MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada">
                     <Button className="h-11 w-full" disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button>
                   </MutationForm>
+                  <DeleteDocumentButton className="h-11 w-full" documentId={document.id} title={document.title} />
                 </div>
               </article>
             );
