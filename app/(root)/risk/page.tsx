@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Gauge } from 'lucide-react';
 import RiskDashboardView from '@/components/risk/RiskDashboardView';
 import BackendOffline from '@/components/system/BackendOffline';
 import { MethodologyDisclosure } from '@/components/ui/methodology-disclosure';
@@ -57,10 +56,6 @@ export default async function RiskPage() {
                             rendimiento medidos, <Link className="text-teal-300 hover:text-teal-200" href="/portfolio/intelligence">Inteligencia de cartera</Link>.
                         </p>
                     </MethodologyDisclosure>
-                </div>
-                <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
-                    <Gauge className="h-4 w-4 text-teal-300" />
-                    Exposiciones
                 </div>
             </header>
 
