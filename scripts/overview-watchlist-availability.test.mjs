@@ -10,3 +10,11 @@ test('inicio preserves watchlist availability instead of silently returning an e
     assert.doesNotMatch(source, /\bgetWatchlist\(/);
     assert.match(source, /setWatchlistError\(result\.error\)/);
 });
+
+test('inicio watchlist etiqueta los cierres con su fecha, como /watchlist', () => {
+    assert.match(source, /priceKind: data\.priceKind/);
+    assert.match(source, /priceAsOf: data\.priceAsOf/);
+    assert.match(source, /stock\.priceKind === 'close'/);
+    assert.match(source, /formatMarketDate\(stock\.priceAsOf\)/);
+    assert.match(source, /'Cierre sin fecha de la fuente'/);
+});
