@@ -285,6 +285,13 @@ def test_yahoo_symbol_adds_mc_suffix_for_spanish_exchanges():
     assert WaccInputService._yahoo_symbol(bolsa) == "SAN.MC"
 
 
+def test_yahoo_symbol_adds_as_suffix_for_euronext_amsterdam():
+    asml = Company(ticker="ASML", exchange="EURONEXT AMSTERDAM")
+    finnhub = Company(ticker="ASML", exchange="NYSE EURONEXT - AMSTERDAM")
+    assert WaccInputService._yahoo_symbol(asml) == "ASML.AS"
+    assert WaccInputService._yahoo_symbol(finnhub) == "ASML.AS"
+
+
 def test_yahoo_symbol_keeps_us_and_already_suffixed_tickers():
     us = Company(ticker="AAPL", exchange="NASDAQ NMS - GLOBAL MARKET")
     already = Company(ticker="TEF.MC", exchange="BME")
