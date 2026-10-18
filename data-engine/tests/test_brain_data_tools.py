@@ -320,4 +320,4 @@ def test_company_without_records_is_synced_on_demand_before_answering(db, monkey
     monkeypatch.setattr(DividendIngestionService, "sync_company", fake_sync)
     response = asyncio.run(ChatService().answer(db, "¿Qué dividendo paga Coca-Cola y cuándo es el próximo?", "portfolio", None))
     assert calls == ["KO"]
-    assert "0,51 USD" in response.answer
+    assert "$0.51" in response.answer

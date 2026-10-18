@@ -40,9 +40,13 @@ def metric_question_answer(db: Session, question: str, company: Company | None) 
             fcf, revenue = pair["free_cash_flow"], pair["revenue"]
             def num(value):
                 return f"{float(value):,.2f}".replace(",", "\x07").replace(".", ",").replace("\x07", ".")
+
+            def money(value, unit):
+                # USD en-US ($25.00); otras unidades es-ES con su código.
+                return f"${float(value):,.2f}" if unit == "USD" else f"{num(value)} {unit}"
             answer = (f"El margen FCF de {company.ticker} es {num(fcf.value / revenue.value * 100)} % "
                       f"en el periodo {fcf.period}. Se calcula como flujo de caja libre "
-                      f"({num(fcf.value)} {fcf.unit}) / ingresos ({num(revenue.value)} {revenue.unit}) × 100.")
+                      f"({money(fcf.value, fcf.unit)}) / ingresos ({money(revenue.value, revenue.unit)}) × 100.")
             for fact, title in [(fcf, "Flujo de caja libre"), (revenue, "Ingresos")]:
                 document = db.scalar(select(Document).where(Document.id == fact.source_id, Document.tenant_id == tenant)) if fact.source_id else None
                 url = document.source_url if document and document.source_url else f"/research/{quote(company.ticker, safe='')}?view=financials"
