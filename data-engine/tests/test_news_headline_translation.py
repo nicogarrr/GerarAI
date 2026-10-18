@@ -67,7 +67,7 @@ async def test_translates_caches_and_preserves_source(db):
 
 
 @sync_test
-@pytest.mark.parametrize("title",["Apple reports earnings","La empresa anuncia resultados","8-K presentado ante la SEC"])
+@pytest.mark.parametrize("title",["La empresa anuncia resultados","8-K presentado ante la SEC"])
 async def test_latin_titles_skip_without_call(db,title):
     row=event(db,title);p=Provider()
     assert (await translate_headline(db,row.id,provider=p))["status"]=="not_needed"
@@ -126,7 +126,7 @@ def test_get_reads_cache_only_no_provider_and_original_preserved(db,monkeypatch)
     row.metadata_={**row.metadata_,"headline_translation":{"fingerprint":fingerprint(row.title),"status":"translated","text":"La empresa anuncia resultados 2026","target_language":"es","machine_translation":True}}
     db.commit()
     def boom(): raise AssertionError("GET must never call LLM")
-    monkeypatch.setattr(service,"create_llm_provider",boom)
+    monkeypatch.setattr("app.services.public_headline_translation.free_provider",boom)
     output=news_events(db,limit=10,offset=0,lane=None)
     assert output[0]["title"]==row.title
     assert output[0]["original_headline"]==row.title
@@ -184,3 +184,11 @@ async def test_translation_preserves_valid_signed_currency_percentage(db):
 async def test_translation_separated_sign_fails_closed(db, sign, space):
     row=event(db,f"Η εταιρεία FCF {sign}{space}12 USD 2026")
     assert (await translate_headline(db,row.id,provider=Provider("La empresa FCF 12 USD 2026")))["status"]=="unavailable"
+
+@sync_test
+async def test_english_headline_translates_with_cache(db):
+    row=event(db,"Apple reports earnings 2026")
+    p=Provider("Apple anuncia resultados 2026")
+    assert (await translate_headline(db,row.id,provider=p))["status"]=="translated"
+    assert (await translate_headline(db,row.id,provider=p))["status"]=="translated"
+    assert p.calls==1 and row.title=="Apple reports earnings 2026"

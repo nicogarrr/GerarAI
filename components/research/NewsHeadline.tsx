@@ -23,7 +23,7 @@ export function NewsHeadline({ event }: { event: ResearchNewsEvent }) {
   const [translated, setTranslated] = useState<string | null>(event.headline_translation?.text ?? null);
   const [attempted, setAttempted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const needsTranslation = event.headline_from_source !== false && nonLatin.test(original);
+  const needsTranslation = event.headline_from_source !== false && (nonLatin.test(original) || /\b(the|with|says|shares|stocks|earnings|reports|raises|falls|after|amid|outlook|growth|investors|market|billion|million|revenue|warns|cuts|for|and|as|to|in)\b/i.test(original));
   useEffect(() => {
     if (!needsTranslation || translated || !ref.current) return;
     let active = true;

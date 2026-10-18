@@ -1,6 +1,7 @@
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,7 @@ from app.models import Company, NewsEvent
 from app.schemas import ManualNewsRequest, ManualNewsResponse, NewsIngestRequest, NewsIngestResponse
 from app.services.news_headline_translation import display_translation, original_headline, translate_headline
 from app.services.news_service import NewsService
+from app.services.public_headline_translation import translate_external_headline
 from app.services.second_order_news_service import analyze_second_order
 from app.services.ticker_news_lane import (
     _only_ticker_prefix_mention,
@@ -17,6 +19,14 @@ from app.services.ticker_news_lane import (
 )
 
 router = APIRouter()
+
+class ExternalHeadlineRequest(BaseModel):
+    headline: str = Field(min_length=3, max_length=500)
+
+@router.post("/translate-headline")
+async def translate_external(payload: ExternalHeadlineRequest, db: Session = Depends(get_db)) -> dict:
+    return await translate_external_headline(db, payload.headline)
+
 
 _SCAN_CHUNK = 200
 _SCAN_LIMIT = 2000
