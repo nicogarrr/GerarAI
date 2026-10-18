@@ -878,18 +878,21 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const per = await getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: 'No se pudo consultar el PER' }));
     content = (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
           <Stat label="Cobertura" value={healthText(snapshot.research_health.score, listingStatus(company.exchange, headerMarket?.quote?.priceAsOf ?? null, new Date()))} />
           <Stat label="Hechos" value={snapshot.counts.facts} />
           <Stat label="Afirmaciones" value={snapshot.counts.claims} />
           <Stat label="Documentos" value={snapshot.counts.documents} />
           <Stat label="PER (TTM)" value={per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA} hint={per.note} />
         </div>
-        <p className="text-xs leading-5 text-gray-500">
-          Cobertura = 20 por capa (documentos, hechos, tesis, modelo) +10 métricas
-          +10 afirmaciones. Sin tesis se limita a 59; sin afirmaciones,
-          a 69. Mide presencia de capas, no fiabilidad ni publicabilidad.
-        </p>
+        <details className="text-xs leading-5 text-gray-500">
+          <summary className="cursor-pointer select-none py-1 hover:text-gray-300">Cómo se calcula la cobertura</summary>
+          <p className="mt-1">
+            20 por capa (documentos, hechos, tesis, modelo) +10 métricas
+            +10 afirmaciones. Sin tesis se limita a 59; sin afirmaciones,
+            a 69. Mide presencia de capas, no fiabilidad ni publicabilidad.
+          </p>
+        </details>
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
           {researchValuability(snapshot)}
         </p>
@@ -1050,12 +1053,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           density="compact"
           title="Por dónde seguir"
         >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
             {[
               ['Modelo a largo plazo', 'model'],
               ['Oportunidad de mercado', 'market-opportunity'],
               ['Comparables', 'peers'],
               ['Documentos y fuentes', 'documents'],
+              ...(ticker === 'ASTS' ? [['Satélites AST', 'satellites']] : []),
             ].map(([nextLabel, nextView]) => (
               <NextStepLink href={`/research/${encodeURIComponent(ticker)}?view=${nextView}`} key={nextView}>
                 {nextLabel}
@@ -1063,7 +1067,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             ))}
           </div>
         </Panel>
-        {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><p className="text-sm text-gray-400">Elementos orbitales de CelesTrak y evolución del semieje mayor.</p><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
         {/* Price chart lives once in the company header, across all views. */}
       </div>
     );
