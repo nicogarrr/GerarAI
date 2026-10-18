@@ -15,7 +15,7 @@ import { getTaxHoldings, getTaxReport, regenerateTaxReport } from '@/lib/actions
 import { FilingSection, Modelo720Section } from '@/components/taxes/FilingSections';
 import { recordDetailKey } from '@/components/taxes/record-detail-key';
 import { reportForYear, type ReportOverride } from '@/lib/taxes/report-state';
-import { formatUserDateTime, formatMoney, formatNumber, NA, USER_TZ } from '@/lib/format';
+import { formatUserDateTime, formatMoney, formatNumber, isValidCurrencyCode, NA, USER_TZ } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { showErrorToast } from '@/lib/toast';
 import { toast } from 'sonner';
@@ -117,11 +117,14 @@ function formatInconsistentCashRows(value: unknown): string {
         const ticker = typeof row.ticker === 'string' && row.ticker ? row.ticker : NA;
         const date = typeof row.date === 'string' && row.date ? row.date : NA;
         const action = typeof row.action === 'string' && row.action ? row.action : NA;
-        const currency = typeof row.currency === 'string' && /^[A-Za-z]{3}$/.test(row.currency) ? row.currency.toUpperCase() : 'EUR';
-        const amount = row.amount === null || row.amount === undefined
-            ? NA
+        // Una divisa ausente o rara NUNCA se sustituye (regla de lib/format):
+        // sin divisa válida el importe se omite, no se etiqueta como EUR.
+        const code = typeof row.currency === 'string' ? row.currency.trim().toUpperCase() : '';
+        const currency = isValidCurrencyCode(code) ? code : null;
+        const amount = row.amount === null || row.amount === undefined || currency === null
+            ? null
             : `${formatMoney(row.amount as number | string, currency)} (candidato)`;
-        return `${ticker} · ${date} · ${action} · ${amount}`;
+        return [ticker, date, action, amount].filter((part) => part !== null).join(' · ');
     }).join(' | ');
 }
 

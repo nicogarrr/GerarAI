@@ -20,10 +20,13 @@ test('ambiguous_cash se pinta como lista de tickers; inconsistent_cash_rows como
     // El importe de una fila ambigua se declara candidato, nunca pago medido.
     assert.match(view, /\(candidato\)/);
     assert.match(view, /'Ninguna'/);
+    // Divisa ausente o no válida: el importe se omite, nunca se asume EUR.
+    assert.match(view, /isValidCurrencyCode\(code\) \? code : null/);
+    assert.doesNotMatch(view, /test\(row\.currency\) \? row\.currency\.toUpperCase\(\) : 'EUR'/);
 });
 
 test('la cantidad de las posiciones fiscales usa formato es-ES', () => {
     assert.match(view, /\['quantity', \(value: unknown\) => formatNumber\(/);
     assert.match(view, /maximumFractionDigits: 6/);
-    assert.match(view, /formatNumber, NA, USER_TZ/);
+    assert.match(view, /formatNumber, isValidCurrencyCode, NA, USER_TZ/);
 });
