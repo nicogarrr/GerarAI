@@ -89,9 +89,9 @@ def test_full_thesis_renders_every_section(db):
     assert "Version 2 · estado `published` · rating `buy`" in memo
     assert "La base instalada monetiza servicios a doble digito." in memo
     # Valuation table: money formatting + probabilities.
-    assert "| Bear | $150.00 | 20 |" in memo
+    assert "| Bajista | $150.00 | 20 |" in memo
     assert "| Base | $220.00 | 55 |" in memo
-    assert "| Bull | $300.00 | 25 |" in memo
+    assert "| Alcista | $300.00 | 25 |" in memo
     assert "Precio actual: $200.00 · Valor esperado: $235.00 · Margen de seguridad: 15.0%" in memo
     # Catalysts: dict form renders title + date; string form renders verbatim.
     assert "- Resultados Q4 (2026-10-30)" in memo
@@ -122,7 +122,7 @@ def test_sparse_thesis_marks_everything_pendiente_never_fabricates(db):
     db.commit()
     memo = build_memo_markdown(db, company, thesis)
 
-    assert "| Bear | pendiente | pendiente |" in memo
+    assert "| Bajista | pendiente | pendiente |" in memo
     assert "Margen de seguridad: pendiente" in memo
     assert memo.count("_Pendiente._") >= 3  # hipotesis, resumen, catalizadores, invalidacion
     assert "## Fuentes" not in memo  # no persisted evidence: section omitted, not invented

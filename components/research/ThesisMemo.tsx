@@ -2,6 +2,7 @@ import { thesisScenarioDisplay } from '@/lib/research/listed-share-values';
 import { formatGeneratedDate, formatMoney, formatPercent, isValidCurrencyCode, marginOfSafetyDisplay, NA } from '@/lib/format';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
 import { metricLabel } from '@/lib/research/metric-labels';
+import { cleanThesisText } from '@/lib/research/thesis-text';
 import { GlossaryTerm } from '@/components/GlossaryTerm';
 import ScenarioAssumptions from '@/components/research/ScenarioAssumptions';
 import ThesisHumanInputForm from '@/components/research/ThesisHumanInputForm';
@@ -293,7 +294,7 @@ export default function ThesisMemo({
 
       {ticker ? <ThesisHumanInputForm ticker={ticker} /> : null}
 
-      <p className="text-sm leading-6 text-gray-300">{thesis.executive_summary}</p>
+      <p className="text-sm leading-6 text-gray-300">{cleanThesisText(thesis.executive_summary)}</p>
 
       {thesis.narrative_sections && thesis.narrative_sections.length > 0 ? (
         <section
@@ -308,7 +309,7 @@ export default function ThesisMemo({
               <h4 className="text-sm font-semibold text-gray-200">{section.titulo}</h4>
               {section.parrafos.map((parrafo, pIndex) => (
                 <p key={pIndex} className="text-sm leading-6 text-gray-300">
-                  {parrafo}
+                  {cleanThesisText(parrafo)}
                 </p>
               ))}
             </div>
@@ -319,7 +320,7 @@ export default function ThesisMemo({
       <section className="rounded-lg border border-teal-900/60 bg-teal-950/10 p-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-teal-300">Hipótesis</h3>
         <p className="mt-2 text-sm leading-6 text-gray-200">
-          {thesis.hypothesis ??
+          {cleanThesisText(thesis.hypothesis) ||
             'Pendiente: esta versión es anterior a los campos profesionales. Genera una nueva versión para registrar la hipótesis.'}
         </p>
       </section>
