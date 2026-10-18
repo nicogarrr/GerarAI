@@ -67,8 +67,11 @@ const RISK_LABELS: Record<string, string> = {
     total_value: 'Valor total',
     equity_value: 'Valor en renta variable',
     cash: 'Caja',
-    top_1_weight: 'Peso de la mayor posición (sobre el total con caja)',
-    top_5_weight: 'Peso de las 5 mayores (sobre el total con caja)',
+    top_1_weight: 'Peso de la mayor posición',
+    top_5_weight: 'Peso de las 5 mayores',
+    weight_basis: 'Base de los pesos',
+    cash_assets_base: 'Caja a favor',
+    margin_debt_base: 'Deuda de margen',
     sector_exposure: 'Exposición por sector',
     factor_exposure: 'Exposición por factor',
     status: 'Estado',
@@ -135,6 +138,12 @@ function humanizeRiskDashboard(dashboard: DataRecord | null): DataRecord | null 
                 : formatMoney(value as number | string, baseCurrency);
         } else if (key === 'top_1_weight' || key === 'top_5_weight') {
             display[label] = typeof value === 'number' ? formatPercent(value, { fromRatio: true, digits: 1 }) : NA;
+        } else if (key === 'weight_basis') {
+            display[label] = value === 'gross_equity'
+                ? 'Valor bruto de las posiciones (la caja es negativa)'
+                : 'Total con caja';
+        } else if (key === 'cash_assets_base' || key === 'margin_debt_base') {
+            display[label] = typeof value === 'number' ? formatMoney(value, baseCurrency) : NA;
         } else if (key === 'cash' || key === 'cash_native') {
             display[label] = currencyRecord(value);
         } else if (key === 'sector_exposure') {
@@ -146,9 +155,11 @@ function humanizeRiskDashboard(dashboard: DataRecord | null): DataRecord | null 
         } else if (key === 'status') {
             display[label] = RISK_STATUS_LABELS[String(value)] ?? String(value);
         } else if (key === 'missing_fx') {
-            display[label] = Array.isArray(value) && value.length > 0
-                ? value.map((item) => (isRecord(item) ? String(item.ticker ?? item.currency ?? '?') : String(item))).join(', ')
-                : 'Ninguno';
+            // Sin faltas no se pinta la fila: "Sin tipo de cambio para: Ninguno" confundia.
+            if (!Array.isArray(value) || value.length === 0) continue;
+            display[label] = value
+                .map((item) => (isRecord(item) ? String(item.ticker ?? item.quote_currency ?? item.currency ?? '?') : String(item)))
+                .join(', ');
         } else if (key === 'data_as_of') {
             display[label] = typeof value === 'string' && value ? formatUserDateTime(value) : NA;
         } else if (key === 'provenance') {

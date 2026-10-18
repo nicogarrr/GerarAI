@@ -13,6 +13,11 @@ def calculate_portfolio_risk(positions: list[dict], cash: list[dict]) -> dict:
     equity_value = sum(_to_float(position["market_value"]) for position in positions)
     cash_by_currency = {item["currency"]: _to_float(item["balance"]) for item in cash}
     total_value = equity_value + sum(cash_by_currency.values())
+    # Con caja neta negativa (margen) el total es menor que la cartera y los pesos
+    # superaban el 100 % (173 %). Entonces se pesa sobre el valor bruto de las
+    # posiciones, que es la base de la tabla de Cartera.
+    gross_basis = sum(cash_by_currency.values()) < 0 and equity_value > 0
+    weight_base = equity_value if gross_basis else total_value
 
     sector_exposure = defaultdict(float)
     factor_exposure = defaultdict(float)
@@ -21,7 +26,7 @@ def calculate_portfolio_risk(positions: list[dict], cash: list[dict]) -> dict:
 
     for position in positions:
         value = _to_float(position["market_value"])
-        weight = value / total_value if total_value else 0
+        weight = value / weight_base if weight_base else 0
         sector_exposure[position["sector"]] += weight
         for tag in position.get("factor_tags", []):
             factor_exposure[tag] += weight
@@ -66,6 +71,7 @@ def calculate_portfolio_risk(positions: list[dict], cash: list[dict]) -> dict:
 
     return {
         "total_value": total_value,
+        "weight_basis": "gross_equity" if gross_basis else "total_with_cash",
         "equity_value": equity_value,
         "cash": cash_by_currency,
         "top_1_weight": top_1,
