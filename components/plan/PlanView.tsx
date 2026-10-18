@@ -80,13 +80,19 @@ const FIELD_LABELS: Record<string, string> = {
 };
 function planValue(value: unknown, currency?: string, weights = false): string {
     if (value == null) return NA;
-    if (Array.isArray(value)) return value.length ? value.map(item => planValue(item, currency, weights)).join(' · ') : NA;
-    if (typeof value === 'object') return Object.entries(value).map(([key, item]) => {
+    if (Array.isArray(value)) return value.length ? value.map(item => planValue(item, currency, weights)).join('\n\n') : NA;
+    if (typeof value === 'object') {
+        const record = value as DataRecord;
+        const heading = typeof record.kind === 'string' && typeof record.label === 'string'
+            ? `${PLAN_KIND[record.kind] ?? record.kind}: ${etiquetaSector(record.label)}` : null;
+        const lines = Object.entries(value).filter(([key]) => !heading || (key !== 'kind' && key !== 'label')).map(([key, item]) => {
         const text = (weights || key.endsWith('_pct') || key.startsWith('ticker:') || key.startsWith('asset_class:')) ? formatPercent(item as number, { fromRatio: false, digits: 2 })
             : key === 'amount_base' ? (currency ? formatMoney(item as number, currency) : NA)
             : key === 'kind' ? PLAN_KIND[String(item)] ?? String(item) : planValue(item, currency);
         return `${FIELD_LABELS[key] ?? etiquetaSector(key.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja').replaceAll('_', ' '))}: ${text}`;
-    }).join('\n');
+    });
+        return [heading, ...lines].filter(Boolean).join('\n');
+    }
     if (typeof value === 'number') return formatNumber(value);
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
     const text = String(value);
