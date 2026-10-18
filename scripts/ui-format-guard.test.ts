@@ -22,14 +22,14 @@ describe('formato numérico es-ES', () => {
     assert.equal(formatCompact(1200000), '1,2 M');
     assert.equal(formatCompact(-2500000000), '-2,5 mil M');
     // El volumen/cantidades siguen en es-ES: formatCompact no pone dólares.
-    assert.equal(formatCompact(4869930000000), '4869,93 mil M');
+    assert.equal(formatCompact(4869930000000), '4.869,93 mil M');
   });
 
-  it('formatMarketCapUsd: dólares en inglés compacto, solo presentación', () => {
-    assert.equal(formatMarketCapUsd(4869930000000), '$4.87T');
-    assert.equal(formatMarketCapUsd(416160000000), '$416.16B');
-    assert.equal(formatMarketCapUsd(9447000000), '$9.45B');
-    assert.equal(formatMarketCapUsd(9447000), '$9.45M');
+  it('formatMarketCapUsd: dólares con formato español, solo presentación', () => {
+    assert.equal(formatMarketCapUsd(4869930000000), '4.869,93 mil M\u00a0US$');
+    assert.equal(formatMarketCapUsd(404010000000), '404,01 mil M\u00a0US$');
+    assert.equal(formatMarketCapUsd(9447000000), '9,45 mil M\u00a0US$');
+    assert.equal(formatMarketCapUsd(9447000), '9,45 M\u00a0US$');
     assert.equal(formatMarketCapUsd(null), 'N/D');
     assert.equal(formatMarketCapUsd('abc'), 'N/D');
   });
@@ -43,7 +43,9 @@ describe('formato numérico es-ES', () => {
   it('usa coma decimal en números, porcentajes e importes', () => {
     assert.equal(formatNumber(-0.8), '-0,8');
     assert.equal(formatPercent(-0.008, { digits: 2 }), '-0,80\u00a0%');
-    assert.equal(formatMoney(1234.5), '1234,50\u00a0US$');
+    assert.equal(formatMoney(1234.5), '1.234,50\u00a0US$');
+    assert.equal(formatMoney(3127.58, 'EUR'), '3.127,58\u00a0€');
+    assert.equal(formatMoney(1477.2, 'EUR'), '1.477,20\u00a0€');
   });
 });
 

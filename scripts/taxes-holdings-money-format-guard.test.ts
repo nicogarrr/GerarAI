@@ -13,7 +13,7 @@ import { TAX_HOLDING_MONEY_COLUMNS, formatHoldingCell, formatHoldingMoney } from
 
 void test('comportamiento: importes es-ES con divisa de la fila', () => {
     // es-ES agrupa millares a partir de 5 cifras (CLDR minimumGroupingDigits=2)
-    assert.equal(formatHoldingMoney(3589.265983, 'EUR'), '3589,27 €');
+    assert.equal(formatHoldingMoney(3589.265983, 'EUR'), '3.589,27 €');
     assert.equal(formatHoldingMoney(123456.789, 'EUR'), '123.456,79 €');
     assert.equal(formatHoldingMoney(-92.927388, 'EUR'), '-92,93 €');
     assert.equal(formatHoldingMoney('2159.73', 'USD'), '$2,159.73');
@@ -42,10 +42,10 @@ void test('B9: base de coste 0 con cantidad > 0 es N/D (no coste real), y la plu
     assert.equal(formatHoldingCell('cost_basis', 0, sinCoste), 'N/D');
     assert.equal(formatHoldingCell('unrealized_pnl', 1500, sinCoste), 'N/D');
     // el valor de mercado no depende de la base
-    assert.equal(formatHoldingCell('market_value', 1500, sinCoste), '1500,00\u00a0€');
+    assert.equal(formatHoldingCell('market_value', 1500, sinCoste), '1.500,00\u00a0€');
     // con coste real todo se pinta
     const conCoste = { quantity: 10, cost_basis: 1000, currency: 'EUR' };
-    assert.equal(formatHoldingCell('cost_basis', 1000, conCoste), '1000,00\u00a0€');
+    assert.equal(formatHoldingCell('cost_basis', 1000, conCoste), '1.000,00\u00a0€');
     assert.equal(formatHoldingCell('unrealized_pnl', 500, conCoste), '500,00\u00a0€');
     // cantidad 0 con coste 0: no se afirma ausencia
     assert.equal(formatHoldingCell('cost_basis', 0, { quantity: 0, cost_basis: 0 }), '0,00\u00a0€');
