@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.models import Company, DividendRecord, MarketPrice, NewsEvent, Position, ThesisVersion
 from app.schemas import ChatResponse
 from app.services.investment_plan_service import InvestmentPlanService
+from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.screener_fundamentals import load_screener_ratios
 
 
@@ -145,7 +146,8 @@ def _plan_answer(db: Session) -> ChatResponse:
     sources = [_source("investment_plan", "plan", "Plan de inversión", "/plan")]
     if not drift.get("plan_exists"):
         return _response(["No tienes un plan de inversión guardado."], [], "investment_plan")
-    lines = [f"Tu plan guardado marca una aportación de {_number(drift['next_contribution'])} al mes."]
+    cur = PortfolioFXService().base_currency(db)
+    lines = [f"Tu plan guardado marca una aportación de {_number(drift['next_contribution'])} {cur} al mes."]
     if drift.get("suggestions_blocked"):
         lines.append("No calculo desviaciones ni importes: faltan tipos de cambio de alguna posición o saldo.")
         return _response(lines, sources, "investment_plan")
@@ -155,13 +157,13 @@ def _plan_answer(db: Session) -> ChatResponse:
         by_label = {x["label"]: x for x in drift["suggestions"] if x["direction"] == "buy"}
         for d in sorted(below, key=lambda d: d["deviation_pct"]):
             amount = by_label.get(d["label"], {}).get("amount_base")
-            extra = f", hueco de {_number(amount)} para llegar al objetivo" if amount is not None else ""
+            extra = f", hueco de {_number(amount)} {cur} para llegar al objetivo" if amount is not None else ""
             lines.append(f"- {d['label']}: {_number(d['current_pct'])} % actual frente a {_number(d['target_pct'])} % objetivo{extra}.")
     elif drift["deviations"]:
         lines.append("Ningún objetivo del plan está por debajo de su banda.")
     else:
         lines.append("El plan no tiene objetivos de asignación guardados.")
-    lines.append(f"Valor de la cartera usado: {_number(drift['portfolio_value_base'])}. Son las cifras de tu plan, no una orden ni una recomendación nueva.")
+    lines.append(f"Valor de la cartera usado: {_number(drift['portfolio_value_base'])} {cur}. Son las cifras de tu plan, no una orden ni una recomendación nueva.")
     return _response(lines, sources, "investment_plan")
 
 
