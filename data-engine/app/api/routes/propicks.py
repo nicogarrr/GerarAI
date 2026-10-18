@@ -167,3 +167,25 @@ def list_gems(
         GemOut(ticker=g.ticker, name=g.name, score=g.score, market_cap=g.market_cap, reasons=g.reasons)
         for g in find_gems(db, results, limit=limit)
     ]
+
+
+@router.post("/snapshots", status_code=201)
+def freeze_snapshot(db: Session = Depends(get_db)) -> dict:
+    """Congela el snapshot del mes (idempotente: el primero del mes gana)."""
+    from app.services.propicks_snapshot_service import freeze_monthly_snapshot
+
+    row = freeze_monthly_snapshot(db)
+    if row is None:
+        raise HTTPException(status_code=409, detail="ninguna empresa pasa el embudo: no se congela un mes vacio")
+    return {"month": row.month, "as_of": row.as_of, "passed_count": row.passed_count}
+
+
+@router.get("/snapshots")
+def list_snapshots(db: Session = Depends(get_db)) -> list[dict]:
+    from app.models.propick_snapshot import PropickSnapshot
+
+    rows = db.scalars(select(PropickSnapshot).order_by(PropickSnapshot.month.desc())).all()
+    return [
+        {"month": r.month, "as_of": r.as_of, "passed_count": r.passed_count, "picks": len(r.payload.get("picks", []))}
+        for r in rows
+    ]
