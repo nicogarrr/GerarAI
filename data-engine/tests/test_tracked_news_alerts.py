@@ -197,3 +197,10 @@ def test_actual_feed_ingestion_preserves_headline_before_alert_gate(db, monkeypa
     alert = db.scalar(select(ResearchAlert))
     assert alert.metadata_["source_url"] == "https://publisher.example/yes"
     assert "Company update" not in alert.title
+
+
+def test_headline_of_other_company_under_tracked_ticker_makes_no_alert(db):
+    t1, _, a, _ = _setup(db)
+    _news(db, t1, a, "Novo Nordisk filing shows new obesity data", "https://publisher.example/novo")
+    db.info["tenant_id"] = t1.id
+    assert evaluate(db, now=NOW)["created"] == 0
