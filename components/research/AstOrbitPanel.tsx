@@ -22,7 +22,7 @@ function SourceObjects({ objects }: { objects: AstOrbitObject[] }) {
 function CatalogReading({ analysis }: { analysis: AstsAnalysis | null }) {
   const reading = analysis?.status === 'disponible' ? analysis.analysis : null;
   if (!analysis || !reading) {
-    return <Panel title="Lectura del catálogo"><p className="text-sm text-gray-400">Sin datos frescos del catálogo.</p></Panel>;
+    return <Panel title="Lectura del catálogo"><p className="text-sm text-gray-400">{analysis ? 'Sin datos frescos del catálogo.' : 'Lectura no disponible ahora. Recarga en unos segundos.'}</p></Panel>;
   }
   const interpretation = reading.llm_interpretation;
   return <Panel title="Lectura del catálogo">
