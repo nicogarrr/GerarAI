@@ -49,6 +49,8 @@ export interface InsiderFilingTransaction {
     role?: string | null;
     officer_title?: string | null;
     code?: string | null;
+    /** Derivado (opciones) vs acciones; explica tramos M duplicados. */
+    is_derivative?: boolean | null;
     shares?: number | null;
     price?: number | null;
     value?: number | null;
@@ -121,6 +123,8 @@ export interface InsiderFeedTransaction {
     price?: number | null;
     value?: number | null;
     date?: string | null;
+    /** Tramos Form 4 agregados en esta fila (mismo filing + insider + codigo). */
+    tranches?: number;
     accession_number: string;
     source_url?: string | null;
 }
@@ -155,6 +159,8 @@ export interface InsiderFeedResult {
     };
     clusters: InsiderFeedSignal[];
     c_suite_buys: InsiderFeedSignal[];
+    /** Compras codigo P de mas de $1M (detectadas, no siempre presentes). */
+    big_buys?: InsiderFeedSignal[];
     transactions: InsiderFeedTransaction[];
 }
 

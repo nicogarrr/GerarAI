@@ -15,7 +15,7 @@ import { formatRecordValue, type DataRecord } from '@/components/data/RecordView
 import type { InsiderFilingsResult, InsiderSignalsResult } from '@/lib/actions/insider.actions';
 import { loadMoreInsiderFilings } from '@/lib/actions/insider.actions';
 import type { InsiderFilingEntry } from '@/lib/actions/insider.actions';
-import { insiderName, insiderRole, sideLabel } from '@/lib/insider/format';
+import { insiderCodeLabel, insiderName, insiderRole } from '@/lib/insider/format';
 import { analyzedCountCopy, degradedCopy, persistedSourceCopy, durableReadCopy } from '@/lib/insider-status-copy';
 
 interface InsiderSignalsViewProps {
@@ -414,11 +414,16 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                     <span className="font-semibold text-gray-100">{insiderName(tx.insider)}</span>
                                                     <span className="text-gray-400">{insiderRole(tx.role, tx.officer_title)}</span>
                                                     <span className={tx.code === 'P' ? 'text-teal-300' : tx.code === 'S' ? 'text-red-400' : 'text-gray-400'}>
-                                                        {tx.code === 'P' ? sideLabel('compra') : tx.code === 'S' ? sideLabel('venta') : `Código ${tx.code ?? '—'}`}
+                                                        {insiderCodeLabel(tx.code)}
+                                                        {tx.is_derivative ? ' · derivado' : ''}
                                                     </span>
                                                     <span className="tabular-nums text-gray-300">{formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 })} acc.</span>
-                                                    <span className="tabular-nums text-gray-300">{moneyText(tx.price ?? null)}</span>
-                                                    <span className="tabular-nums text-gray-100">{moneyText(tx.value ?? null)}</span>
+                                                    {tx.price !== null && tx.price !== undefined ? (
+                                                        <span className="tabular-nums text-gray-300">{moneyText(tx.price)}</span>
+                                                    ) : null}
+                                                    {tx.value !== null && tx.value !== undefined && !(tx.value === 0 && tx.code !== 'P' && tx.code !== 'S') ? (
+                                                        <span className="tabular-nums text-gray-100">{moneyText(tx.value)}</span>
+                                                    ) : null}
                                                 </li>
                                             ))}
                                         </ul>

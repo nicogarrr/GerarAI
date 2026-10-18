@@ -52,6 +52,48 @@ def _tx_dict(row: InsiderTransaction, filing: InsiderFiling, line: int) -> dict[
     }
 
 
+def _group_tranches(items: list[dict]) -> list[dict]:
+    """Agrupa los tramos de una misma operacion (mismo filing + insider + codigo).
+
+    Un Form 4 suele desglosar una venta en decenas de tramos a distintos
+    precios (mismo accession, una fila por tramo): mostrados sueltos la tabla
+    es ruido puro (cientos de filas para decenas de operaciones). Se agregan:
+    acciones sumadas, precio medio ponderado (importe / acciones), importe
+    total. ``tranches`` cuenta los tramos que componen la fila.
+    """
+    groups: dict[tuple, dict] = {}
+    order: list[tuple] = []
+    for tx in items:
+        key = (tx.get("accession_number"), tx.get("insider"), tx.get("type"))
+        group = groups.get(key)
+        if group is None:
+            group = dict(tx)
+            group["tranches"] = 0
+            group["_shares_sum"] = 0.0
+            group["_value_sum"] = 0.0
+            groups[key] = group
+            order.append(key)
+        group["tranches"] += 1
+        if tx.get("shares") is not None:
+            group["_shares_sum"] += float(tx["shares"])
+        if tx.get("value") is not None:
+            group["_value_sum"] += float(tx["value"])
+    grouped: list[dict] = []
+    for key in order:
+        group = groups[key]
+        shares = group.pop("_shares_sum")
+        value = group.pop("_value_sum")
+        if shares:
+            group["shares"] = shares
+            if value:
+                group["price"] = value / shares
+        if value:
+            group["value"] = value
+        grouped.append(group)
+    grouped.sort(key=lambda t: (str(t.get("date") or ""), str(t.get("accession_number") or "")), reverse=True)
+    return grouped
+
+
 def build_feed(
     db: Session,
     *,
@@ -85,11 +127,13 @@ def build_feed(
     signals = insider_service.detect_signals(txs)
     clusters = [s for s in signals if s["signal"] == "cluster_buy"]
     c_suite = [s for s in signals if s["signal"] == "c_suite_buy"]
+    big_buys = [s for s in signals if s["signal"] == "big_buy"]
     c_suite.sort(key=lambda s: str(s.get("date") or ""), reverse=True)
     clusters.sort(key=lambda s: str(s.get("window_start") or ""), reverse=True)
+    big_buys.sort(key=lambda s: float(s.get("value") or 0), reverse=True)
 
     code = SIDES.get(side)
-    shown = [t for t in txs if code is None or t["type"] == code]
+    shown = _group_tranches([t for t in txs if code is None or t["type"] == code])
 
     buys = [t for t in txs if t["type"] == "P"]
     sells = [t for t in txs if t["type"] == "S"]
@@ -120,6 +164,7 @@ def build_feed(
         },
         "clusters": clusters[:10],
         "c_suite_buys": c_suite[:20],
+        "big_buys": big_buys[:10],
         "count": len(shown),
         "transactions": [
             {
@@ -135,6 +180,7 @@ def build_feed(
                 "value": t["value"],
                 "date": t["date"],
                 "multi_reporter": t["multi_reporter"],
+                "tranches": t["tranches"],
                 "accession_number": t["accession_number"],
                 "source_url": t["source_url"],
             }
