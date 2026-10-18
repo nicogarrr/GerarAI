@@ -7,6 +7,7 @@ from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from statistics import fmean, mean, pstdev
+from types import SimpleNamespace
 from typing import Any
 
 from sqlalchemy import select
@@ -144,6 +145,10 @@ class PortfolioIntelligenceService:
             )
             for price in all_prices:
                 price_series.setdefault(price.company_id, []).append(price)
+            price_series = {
+                company_id: self._fill_trailing_spot(series)
+                for company_id, series in price_series.items()
+            }
         returns = {
             company_id: self._returns(series)
             for company_id, series in price_series.items()
@@ -295,6 +300,11 @@ class PortfolioIntelligenceService:
                 ),
                 "portfolio_snapshots": len(snapshots),
                 "partial_trading_day": partial_day,
+                "spot_tail_positions": sorted(
+                    company.ticker
+                    for _, company in rows
+                    if any(isinstance(row, SimpleNamespace) for row in price_series.get(company.id, []))
+                ),
                 "snapshot_returns": len(snapshot_returns),
                 "snapshot_pricing_complete": sum(
                     snapshot.pricing_coverage == Decimal("1") for snapshot in snapshots
@@ -369,6 +379,28 @@ class PortfolioIntelligenceService:
             if (current.metadata_ or {}).get("ambiguous_external_flows"):
                 return False
         return snapshots[0].pricing_coverage == Decimal("1")
+
+    @staticmethod
+    def _fill_trailing_spot(series: list[Any]) -> list[Any]:
+        """Las filas finales sin adj_close (precio spot de Finnhub / Yahoo intradia)
+        usan `close`: tras el ultimo cierre ajustado no hay ajuste posterior que
+        aplicar. Solo se rellena la COLA; un hueco interior sigue sin valor (no se
+        inventa un precio ajustado entre dos cierres ajustados). Sin esto, con
+        14 filas spot al final, total_return, atribucion y retornos diarios
+        salian None en las 8 posiciones."""
+        last_valid = -1
+        for index, row in enumerate(series):
+            if row.adj_close and row.adj_close > 0:
+                last_valid = index
+        if last_valid < 0 or last_valid == len(series) - 1:
+            return series
+        filled = list(series[: last_valid + 1])
+        for row in series[last_valid + 1 :]:
+            if row.close and row.close > 0:
+                filled.append(SimpleNamespace(date=row.date, close=row.close, adj_close=row.close, source=row.source))
+            else:
+                filled.append(row)
+        return filled
 
     @staticmethod
     def _returns(series: list[MarketPrice]) -> dict[date, float]:
