@@ -306,7 +306,7 @@ def thesis_history(ticker: str, db: Session = Depends(get_db)) -> dict:
         "history": items,
         "data_as_of": latest_at,
         "provenance": provenance(
-            "CavaAI Postgres",
+            "Base de datos de GerarAI",
             SourceKind.INTERNAL,
             coverage=Coverage.OK if versions else Coverage.UNAVAILABLE,
             note="Historial calculado desde versiones y diffs persistidos; sin actores inventados.",
@@ -512,7 +512,7 @@ def approve_thesis(ticker: str, payload: ThesisApproveRequest, db: Session = Dep
         "approved_at": thesis.updated_at.isoformat(),
         "telegram_auto_approval": "future",
         "provenance": provenance(
-            "CavaAI Postgres",
+            "Base de datos de GerarAI",
             SourceKind.INTERNAL,
             coverage=Coverage.OK,
             note="Transicion de estado manual; sin aprobacion automatica por Telegram.",

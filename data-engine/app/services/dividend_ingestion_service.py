@@ -202,7 +202,7 @@ class DividendIngestionService(ProviderIngestionService):
                 "positions_missing_base_value": sorted(missing_base_value),
             },
             "provenance": provenance(
-                "Yahoo Finance/FMP dividends via CavaAI Postgres",
+                "Yahoo Finance/FMP dividends via la base de datos de GerarAI",
                 SourceKind.UNOFFICIAL,
                 coverage=(
                     Coverage.OK
