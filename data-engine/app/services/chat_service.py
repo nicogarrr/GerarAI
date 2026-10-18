@@ -699,6 +699,7 @@ class ChatService:
                 question=question,
                 baseline=baseline,
                 db=db,
+                history=history,
             )
         response.context = context_echo
         return response
@@ -801,11 +802,30 @@ class ChatService:
             if not rows:
                 return None
             keyfn = lambda row: float(row[0].average_cost)  # noqa: E731
+            currency_of = lambda row: row[0].currency or "EUR"  # noqa: E731
         else:
             keyfn = lambda row: _value(row[0])  # noqa: E731
+            currency_of = (  # noqa: E731
+                lambda row: (row[0].base_currency or "EUR")
+                if row[0].market_value_base is not None
+                else (row[0].currency or "EUR")
+            )
+        currencies = sorted({currency_of(row) for row in rows})
+        if len(currencies) > 1:
+            return ChatResponse(
+                answer=(
+                    f"No puedo ordenarlas por {label}: tus posiciones están en monedas distintas "
+                    f"({', '.join(currencies)}) y no se pueden comparar sin convertirlas."
+                ),
+                sources=[],
+                model="deterministic",
+                prompt_version="portfolio-ranking-v1",
+                confidence=0.9,
+                llm_trace={"path": "portfolio_ranking", "generated": False, "provider_calls": 0, "mixed_currency": True},
+            )
         rows.sort(key=keyfn, reverse=highest)
         pos, comp = rows[0]
-        cur = pos.currency if key_name == "cost" else (pos.base_currency or "EUR")
+        cur = currencies[0]
         amount = _fmt_number_es(keyfn(rows[0]), 2)
         word = "más alto" if highest else "más bajo"
         answer = f"La posición con el {label} {word} es {comp.ticker}: {amount} {cur}."
@@ -928,8 +948,7 @@ class ChatService:
         if not found:
             answer = (
                 f"No tienes ninguna posición guardada en {company.ticker}; "
-                f"tu cartera guardada tiene {len(rows)} posiciones abiertas en otros tickers. "
-                "Son los datos guardados en la app, no una recomendación."
+                f"tu cartera guardada tiene {len(rows)} posiciones abiertas en otros tickers."
             )
             return ChatResponse(
                 answer=answer,
@@ -960,7 +979,6 @@ class ChatService:
             )
             if cash_line:
                 answer += "\n\n" + cash_line
-        answer += "\n\nSon los datos guardados en la app, no una recomendación."
         return ChatResponse(
             answer=answer,
             sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", as_of=str(pos.as_of))],

@@ -444,6 +444,36 @@ def _inferred_general_text_valid(
     return True
 
 
+_HISTORY_TURNS = 4
+_HISTORY_TURN_CHARS = 400
+_HISTORY_TOTAL_CHARS = 1600
+
+
+def _history_for_prompt(history: list[Any] | None) -> list[dict[str, str]]:
+    """Últimos turnos con tope de tamaño para el generador libre.
+
+    Las respuestas con datos de cartera guardados (posiciones, costes) no
+    viajan: el generador libre no ve contexto privado. Se conserva el hilo
+    con el resto de turnos, del más reciente hacia atrás.
+    """
+    kept: list[dict[str, str]] = []
+    total = 0
+    for turn in reversed((history or [])[-_HISTORY_TURNS:]):
+        role = getattr(turn, "role", None)
+        text = " ".join((getattr(turn, "content", "") or "").split())
+        if role not in ("user", "assistant") or not text:
+            continue
+        if role == "assistant" and "posiciones abiertas" in text:
+            continue
+        text = text[:_HISTORY_TURN_CHARS]
+        if total + len(text) > _HISTORY_TOTAL_CHARS:
+            break
+        total += len(text)
+        kept.append({"role": role, "content": text})
+    kept.reverse()
+    return kept
+
+
 class ChatSynthesisService:
     def __init__(self, provider: LLMProvider, tracer: LangfuseTracer | None = None) -> None:
         self.provider = provider
@@ -655,6 +685,7 @@ class ChatSynthesisService:
         question: str,
         baseline: ChatResponse,
         db: Session | None = None,
+        history: list[Any] | None = None,
     ) -> ChatResponse:
         """Respuesta natural en espanol para preguntas sin ticker.
 
@@ -739,6 +770,11 @@ class ChatSynthesisService:
                             # Sin contexto privado (cartera/memorias/fuentes):
                             # el generador libre solo ve la pregunta.
                             "question": question,
+                            "conversation": _history_for_prompt(history) or None,
+                            "conversation_note": (
+                                "Turnos previos de esta conversación, solo para entender la pregunta actual; "
+                                "no son fuentes ni datos verificados."
+                            ) if history else None,
                             "scope": scope,
                             "reviewed_at_utc": datetime.now(UTC).date().isoformat(),
                             "sources_available": bool(doctrine),
