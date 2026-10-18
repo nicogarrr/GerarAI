@@ -179,7 +179,9 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
             ? quote.c
             : null;
     const priceKind = price !== null ? quote?.kind ?? null : null;
-    const priceAsOf = priceKind === 'close' && quote?.t ? sessionDateEt(quote.t) : null;
+    const priceAsOf = priceKind === 'close'
+        ? quote?.closeDate ?? (quote?.t ? sessionDateEt(quote.t) : null)
+        : null;
     const metrics = light?.metrics?.metric ?? {};
     const marketCapM = typeof metrics.marketCapitalization === 'number' ? metrics.marketCapitalization : null;
     const peRatio = typeof metrics.peTTM === 'number' && Number.isFinite(metrics.peTTM) ? metrics.peTTM : null;

@@ -76,3 +76,12 @@ test('F358 real: sanitizeFinnhubQuote rechaza la cache de ayer y acepta la fresc
     // Ceros de simbolo invalido -> miss.
     assert.equal(sanitizeFinnhubQuote({ c: 0, pc: 0, t: t('2026-09-30T14:50:00Z') }, nowMs), null);
 });
+
+test('Yahoo exact candle date survives mapping without borrowing another series', () => {
+    const mapped = mapBackendYahooQuote({ c: 19.75, cd: '2026-10-16', ct: 1792134000 });
+    assert.equal(mapped?.closeDate, '2026-10-16');
+    assert.equal(mapped?.t, null);
+    for (const cd of [undefined, '2026-02-30', 'garbage', '2026-10-16T00:00:00Z']) {
+        assert.equal(mapBackendYahooQuote({ c: 19.75, cd })?.closeDate, null);
+    }
+});
