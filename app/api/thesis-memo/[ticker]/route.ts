@@ -1,3 +1,4 @@
+import { withAuthErrors } from '@/lib/auth/route-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 
@@ -5,11 +6,14 @@ const BACKEND_URL = process.env.FMP_BACKEND_URL;
 
 // Proxy firmado del memo Markdown: el navegador no puede firmar la identidad
 // research, asi que la descarga pasa por este route handler server-side.
-export async function GET(
+async function getHandler(
   _request: NextRequest,
   { params }: { params: Promise<{ ticker: string }> },
 ) {
   const { ticker } = await params;
+  if (!/^[A-Za-z0-9.^=-]{1,15}$/.test(ticker)) {
+    return NextResponse.json({ error: 'Ticker no valido' }, { status: 400 });
+  }
   if (!BACKEND_URL) {
     return NextResponse.json({ error: 'Backend no configurado' }, { status: 503 });
   }
@@ -36,3 +40,5 @@ export async function GET(
     },
   });
 }
+
+export const GET = withAuthErrors(getHandler);

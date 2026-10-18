@@ -1,8 +1,9 @@
+import { withAuthErrors } from '@/lib/auth/route-auth';
 import { NextResponse } from 'next/server';
 import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 
-export async function POST(_request: Request, { params }: { params: Promise<{ eventId: string }> }) {
+async function postHandler(_request: Request, { params }: { params: Promise<{ eventId: string }> }) {
   await requireAuthenticatedUser();
   const { eventId } = await params;
   if (!/^[1-9]\d*$/.test(eventId) || !Number.isSafeInteger(Number(eventId))) return NextResponse.json({status:'unavailable'}, {status:400});
@@ -18,3 +19,5 @@ export async function POST(_request: Request, { params }: { params: Promise<{ ev
     return NextResponse.json({status:'unavailable'}, {status:502});
   }
 }
+
+export const POST = withAuthErrors(postHandler);
