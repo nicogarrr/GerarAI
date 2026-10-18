@@ -321,6 +321,8 @@ def test_ingest_market_persists_dated_sourced_price_and_market_cap(db):
     assert cap.value == Decimal("2900000000")
     assert cap.source_type == "Finnhub"
     assert cap.confidence == Decimal("0.75")
+    # Fechado con la sesion del proveedor (viernes), no con el dia de ingesta.
+    assert cap.period == "2026-09-25"
 
     # Placeholder name (== ticker) and empty exchange get filled from profile.
     assert company.name == "Apple Inc."
@@ -596,3 +598,18 @@ def test_collect_earnings_error_no_expone_detalle_interno(db):
     assert "Calendario inaccesible (RuntimeError)" in text
     assert "_fetch_day_pooled" not in text
     assert "earnings_calendar.py" not in text
+
+
+def test_ingest_market_sin_timestamp_no_escribe_market_cap(db):
+    company = _company(db)
+    service = ThesisEvidenceService()
+    _stub_market(service, quote={"c": 190.5}, profile={"marketCapitalization": 2900.0})
+    service._ingest_market(db, company)
+    db.commit()
+
+    assert db.scalar(
+        select(func.count()).select_from(FinancialFact).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == "market_cap",
+        )
+    ) == 0
