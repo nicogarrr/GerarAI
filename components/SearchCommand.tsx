@@ -17,6 +17,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
     const [searchTerm, setSearchTerm] = useState("")
     const [loading, setLoading] = useState(false)
     const [searchError, setSearchError] = useState(false)
+    const [selectedValue, setSelectedValue] = useState("")
     // Populares: si no llegan por props (el shell ya no las bloquea en el
     // primer byte), se cargan perezosamente al abrir el buscador. La cache
     // es COMPARTIDA a nivel de modulo (loadPopularStocks): las instancias
@@ -106,6 +107,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     setSearchError(true);
                 } else {
                     setStocks(result.stocks);
+                    setSelectedValue(result.stocks[0] ? `stock:${result.stocks[0].symbol}` : "");
                 }
             }
         } catch (error: unknown) {
@@ -298,6 +300,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
             )}
             <CommandDialog
                 open={open}
+                commandProps={{shouldFilter:false, value:selectedValue || (displayStocks[0] ? `stock:${displayStocks[0].symbol}` : undefined), onValueChange:setSelectedValue}}
                 onOpenChange={setOpen}
                 onCloseAutoFocus={(event) => {
                     event.preventDefault();
@@ -328,19 +331,42 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                         </div>
                     ) : (
                         <>
+                            {displayStocks?.length === 0 ? (
+                                <div className="search-list-indicator">
+                                    {isSearchMode ? 'Sin resultados' : 'No hay acciones disponibles'}
+                                </div>
+                            ) : (
+                                <CommandGroup heading={isSearchMode ? `Resultados de búsqueda (${displayStocks.length})` : 'Acciones populares'}>
+                                    {displayStocks.map(stock => (
+                                        <CommandItem
+                                            key={stock.symbol}
+                                            value={`stock:${stock.symbol}`}
+                                            onSelect={() => handleSelectStock(stock.symbol)}
+                                            onMouseEnter={() => handlePrefetchStock(stock.symbol)}
+                                            className="search-item-link min-h-11 w-full text-left"
+                                        >
+                                            <TrendingUp aria-hidden="true" className="h-4 w-4 text-gray-500" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="search-item-name truncate" title={stock.name}>{stock.name}</div>
+                                                <div className="text-sm text-gray-500">{stock.symbol} | {stock.exchange} | {etiquetaTipoInstrumento(stock.type)}</div>
+                                            </div>
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            )}
                             {/* Secciones navegables: el buscador deja de ser solo
                                 un buscador de tickers y cubre los destinos que no
                                 caben en el menu. Se renderizan TAMBIEN al escribir:
                                 antes desaparecian con el primer caracter y cmdk no
                                 podia filtrarlas, asi que "ir a Temas" por teclado
                                 era imposible. */}
-                            {ROUTE_CATALOG.filter((section) => section.items.length > 1).map((section) => (
+                            {ROUTE_CATALOG.filter((section) => section.items.length > 1 && flattenNavItems([section]).some(item => !isSearchMode || item.label.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase()))).map((section) => (
                                 <CommandGroup
                                     key={section.title}
                                     heading={section.title}
                                     className="[&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-gray-500"
                                 >
-                                    {flattenNavItems([section]).map((item) => (
+                                    {flattenNavItems([section]).filter(item => !isSearchMode || item.label.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase())).map((item) => (
                                         <CommandItem
                                             key={item.href}
                                             value={`ir ${item.label}`}
@@ -356,39 +382,6 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                                 </CommandGroup>
                             ))}
 
-                            {displayStocks?.length === 0 ? (
-                                <div className="search-list-indicator">
-                                    {isSearchMode ? 'Sin resultados' : 'No hay acciones disponibles'}
-                                </div>
-                            ) : (
-                                <ul className="search-results">
-                                    <li className="search-count">
-                                        {isSearchMode ? 'Resultados de búsqueda' : 'Acciones populares'}
-                                        {` `}({displayStocks?.length || 0})
-                                    </li>
-                                    {displayStocks?.map((stock, index) => (
-                                        <li key={`${stock.symbol}-${index}`} className="search-item">
-                                            <button
-                                                onClick={() => handleSelectStock(stock.symbol)}
-                                                onMouseEnter={() => handlePrefetchStock(stock.symbol)}
-                                                onFocus={() => handlePrefetchStock(stock.symbol)}
-                                                title={`${stock.name} (${stock.symbol})`}
-                                                className="search-item-link w-full text-left"
-                                            >
-                                                <TrendingUp aria-hidden="true" className="h-4 w-4 text-gray-500" />
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="search-item-name truncate" title={stock.name}>
-                                                        {stock.name}
-                                                    </div>
-                                                    <div className="text-sm text-gray-500">
-                                                        {stock.symbol} | {stock.exchange} | {etiquetaTipoInstrumento(stock.type)}
-                                                    </div>
-                                                </div>
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
                         </>
                     )}
                 </CommandList>

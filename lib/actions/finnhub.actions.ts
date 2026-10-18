@@ -357,6 +357,11 @@ export type SearchStocksResult =
  *  tragaba y volvía como []. Aquí el fallo de proveedor/red es `error` y la
  *  UI lo dice en vez de mentir. */
 export const searchStocksWithStatus = cache(async (query?: string): Promise<SearchStocksResult> => {
+    await requireAuthenticatedUser();
+    // Unsupported search input is an empty query result, not provider failure.
+    if (typeof query === 'string' && (query.length > 120 || /[<>\x00-\x1f]/.test(query))) {
+        return { status: 'ok', stocks: [] };
+    }
     try {
         return { status: 'ok', stocks: await searchStocksOrThrow(query) };
     } catch (err) {
