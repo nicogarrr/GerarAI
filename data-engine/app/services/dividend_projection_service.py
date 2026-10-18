@@ -312,7 +312,7 @@ class DividendProjectionService:
                     "covered_tickers": [],
                     "excluded_tickers": excluded,
                     "note": "Sin datos: todas las posiciones con dividendo proyectado "
-                            "este ano carecen de fx o de retencion verificada (N/D, no cero).",
+                            "este año carecen de tipo de cambio o de retención verificada (N/D, no cero).",
                 }
                 continue
             if not fiscal_ok or year_gross <= 0:
@@ -367,8 +367,8 @@ class DividendProjectionService:
             net = year_gross - irpf_total - source_total + deduction_total
             note = "Escenario condicionado (ver `fiscal_conditions`); no es el neto final."
             if excluded:
-                note = ("Subconjunto cubierto: hay posiciones excluidas sin fx o sin "
-                        "retencion verificada (sin datos, no cero). " + note)
+                note = ("Subconjunto cubierto: hay posiciones excluidas sin tipo de cambio o sin "
+                        "retención verificada (sin datos, no cero). " + note)
             fiscal_years[year] = {
                 "gross_base": float(year_gross),
                 "irpf_scenario": float(irpf_total),

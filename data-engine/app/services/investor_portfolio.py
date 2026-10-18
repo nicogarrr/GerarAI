@@ -324,7 +324,7 @@ def _portfolio_13f(db: Session, slug: str) -> dict[str, Any]:
             as_of=report,
             source_form="13F-HR",
             source_url=r.filing_url,
-            note=("Opcion (put/call): importe nocional, no posicion en acciones." if r.put_call else ""),
+            note=("Opción (put/call): importe nocional, no posición en acciones." if r.put_call else ""),
         )
         for r in rows
     ]

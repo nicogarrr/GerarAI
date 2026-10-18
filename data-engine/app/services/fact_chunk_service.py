@@ -84,7 +84,7 @@ def _format_value(value: Decimal, unit: str) -> str:
     if unit_clean in _RATIO_UNITS:
         return f"{_es_number(number * 100)} %"
     if unit_clean.endswith("/share") or unit_clean.endswith("/xbrli:shares"):
-        return f"{_es_number(number)} {unit_clean.split('/')[0]}/accion"
+        return f"{_es_number(number)} {unit_clean.split('/')[0]}/acción"
     absolute = abs(number)
     if absolute >= 1e9:
         return f"{_es_number(number / 1e9)} mil M {unit_clean}"

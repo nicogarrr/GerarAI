@@ -895,7 +895,7 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
         "portfolio": None,
         "positions": [],
         "excluded": [],
-        "assumptions": ["Sin posiciones: no hay prevision que calcular."],
+        "assumptions": ["Sin posiciones: no hay previsión que calcular."],
     }
     if not rows:
         return empty
@@ -910,7 +910,7 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
                     "name": company.name,
                     "weight": None,
                     "currency": position.currency,
-                    "reason": "Sin valor en moneda base (conversion N/D): no se suma a la cartera.",
+                    "reason": "Sin valor en moneda base (conversión N/D): no se suma a la cartera.",
                 }
             )
             continue
@@ -926,7 +926,7 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
     if not valued:
         out = dict(empty)
         out["excluded"] = fx_excluded
-        out["assumptions"] = ["Ninguna posicion tiene valor en moneda base: agregados N/D."]
+        out["assumptions"] = ["Ninguna posición tiene valor en moneda base: agregados N/D."]
         return out
 
     base_currency = base_currencies.pop() if base_currencies else valued[0][0].base_currency
@@ -953,13 +953,13 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
         }
         if thesis is None:
             suffix = " (hay borrador sin publicar)" if company.id in draft_only else ""
-            excluded_out.append({**base_info, "reason": f"Sin tesis publicada vigente{suffix}: excluida de la prevision."})
+            excluded_out.append({**base_info, "reason": f"Sin tesis publicada vigente{suffix}: excluida de la previsión."})
             continue
         intrinsic, basis_label = _intrinsic_for_comparison(thesis, position, company)
         if intrinsic is None:
             reason = {
-                "adr_without_listed_values": "ADR sin valores por accion cotizada: comparacion con el precio no verificada (N/D).",
-                "currency_mismatch": "Moneda de la posicion distinta de la moneda de cotizacion de la compania: comparacion sin conversion verificada (N/D).",
+                "adr_without_listed_values": "ADR sin valores por acción cotizada: comparación con el precio no verificada (N/D).",
+                "currency_mismatch": "Moneda de la posición distinta de la moneda de cotización de la compañía: comparación sin conversión verificada (N/D).",
             }.get(basis_label, "Base de valoración no verificada (tesis sin value_per_share_basis del motor): comparación con el precio N/D, nunca asumida.")
             excluded_out.append({**base_info, "reason": reason})
             continue
@@ -1107,13 +1107,13 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
         "Valores intrínsecos y probabilidades: solo tesis publicadas y modelos publicables; los borradores nunca cuentan.",
         "HIPÓTESIS etiquetada (INFERENCIA, no objetivo del modelo): los intrínsecos son valores presentes descontados; el CAGR supone convergencia del precio al intrínseco en el horizonte del modelo vigente (5 años sin modelo).",
         "Escenarios: son contribuciones ponderadas del subset valorado (peso x CAGR), nunca la rentabilidad total de la cartera. La cobertura es la fracción de cartera usada. Si los horizontes de convergencia se mezclan, es un proxy anual ponderado, no un CAGR de comprar y mantener. Nunca se da un esperado de cartera completa con huecos.",
-        "El esperado del CAGR es la media de los CAGR por escenario ponderada por probabilidad (no es el CAGR del valor esperado: no coinciden). Solo se da con probabilidad total del 100 % y sin entradas invalidas descartadas; con menos, solo se muestra el parcial y la probabilidad usada."
-        + (" Probabilidades invalidas (fuera de [0, 1] o no finitas) descartadas en alguna posicion." if any_invalid_probs else ""),
+        "El esperado del CAGR es la media de los CAGR por escenario ponderada por probabilidad (no es el CAGR del valor esperado: no coinciden). Solo se da con probabilidad total del 100 % y sin entradas inválidas descartadas; con menos, solo se muestra el parcial y la probabilidad usada."
+        + (" Probabilidades inválidas (fuera de [0, 1] o no finitas) descartadas en alguna posición." if any_invalid_probs else ""),
         (
-            f"Cobertura de cartera N/D: {len(fx_excluded)} posicion(es) sin conversion a moneda base; "
+            f"Cobertura de cartera N/D: {len(fx_excluded)} posición(es) sin conversión a moneda base; "
             "pesos y agregados cubiertos usan SOLO el subset valorado, nunca la cartera completa."
             if fx_excluded
-            else f"Cobertura con tesis publicada: {covered_weight:.1%} de la cartera; el resto se lista en excluded."
+            else f"Cobertura con tesis publicada: {covered_weight * 100:.1f}% de la cartera; el resto se lista en las excluidas.".replace(".", ",", 1)
         ),
         "El esperado de la cartera total solo se da cuando cubre el 100 % de la cartera valorada y no hay posiciones sin conversión; con cobertura parcial es N/D y se muestran las contribuciones por posición.",
     ]

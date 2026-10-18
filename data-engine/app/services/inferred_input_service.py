@@ -86,9 +86,9 @@ def validate(key: str, value: float | Decimal | None, base: str | None, urls: li
     if not (low < number <= high):
         problems.append("valor fuera de rango")
     if len((base or "").strip()) < MIN_BASE_CHARS:
-        problems.append("base explicita ausente o demasiado corta")
+        problems.append("base explícita ausente o demasiado corta")
     if not urls or not all(is_valid_https_url(u) for u in urls):
-        problems.append("falta al menos una URL https valida, o hay URLs invalidas o con credenciales")
+        problems.append("falta al menos una URL https válida, o hay URLs inválidas o con credenciales")
     if len(urls) > MAX_URLS:
         problems.append("demasiadas URLs")
     return problems

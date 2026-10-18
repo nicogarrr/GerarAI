@@ -3,6 +3,7 @@ import type {
   PortfolioForecastExcluded,
 } from '@/lib/actions/portfolio.actions';
 import Link from 'next/link';
+import { formatMarketDate } from '@/lib/format';
 import { Panel } from '@/components/ui/panel';
 
 const SCENARIO_LABELS: Record<string, string> = {
@@ -192,7 +193,7 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
                         : 'N/D'}
                   </td>
                   <td className="py-2 text-xs text-gray-500">
-                    Precio {item.price_source} · <Veracity value={item.price_veracity} /> · {item.price_as_of} · tesis v{item.thesis_version} ({item.thesis_status})
+                    Precio {item.price_source} · <Veracity value={item.price_veracity} /> · {formatMarketDate(item.price_as_of)} · tesis v{item.thesis_version} ({item.thesis_status})
                     {item.model_version !== null ? ` · modelo v${item.model_version}` : ''} · {item.horizon_years} años
                   </td>
                 </tr>

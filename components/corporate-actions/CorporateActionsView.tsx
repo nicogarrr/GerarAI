@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { RecordList, researchHrefFor, type DataRecord, type ReplaceRecord } from '@/components/data/RecordViews';
 import { applyCorporateAction, getCorporateActions } from '@/lib/actions/corporate-actions.actions';
 import { showErrorToast } from '@/lib/toast';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatMoney, formatMarketDate } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { toast } from 'sonner';
 
@@ -101,6 +101,10 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
                     typeof value === 'string'
                         ? CORPORATE_ACTION_TYPE_LABELS[value] ?? value
                         : String(value ?? '—'),
+                effective_date: (value) => formatMarketDate(value as string | null),
+                description: (value, record) => record.action_type === 'dividend' && typeof record.amount_per_share === 'number' && typeof record.currency === 'string'
+                    ? `Dividendo de ${formatMoney(record.amount_per_share, record.currency)} por acción${record.pay_date ? ` · pago ${formatMarketDate(record.pay_date as string)}` : ''} · fuente ${record.source ?? 'N/D'}`
+                    : String(value ?? 'N/D'),
                 ratio: (value) => formatNumber(value as number | string | null, { maximumFractionDigits: 4 }),
             }}
             emptyMessage={emptyMessage ?? (ticker ? `Sin eventos pendientes de ${ticker}.` : 'Sin eventos pendientes.')}

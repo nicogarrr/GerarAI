@@ -44,6 +44,8 @@ def test_declared_dividends_of_open_positions_listed_with_source_and_dates(db):
     assert "0.53 USD por acción" in first["description"] and "fuente yahoo_finance" in first["description"]
     assert f"pago {(today + timedelta(days=24)).isoformat()}" in first["description"]
     assert first["applied"] is None
+    assert first["amount_per_share"] == 0.53 and first["currency"] == "USD"
+    assert first["pay_date"] == (today + timedelta(days=24)).isoformat()
 
 
 def test_no_dividends_means_no_rows(db):
