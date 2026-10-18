@@ -34,6 +34,7 @@ const CORPORATE_ACTION_TYPE_LABELS: Record<string, string> = {
     ticker_change: 'Cambio de ticker',
     merger: 'Fusión',
     spin_off: 'Spin-off',
+    dividend: 'Dividendo',
 };
 
 function recordActionId(record: DataRecord): number {
@@ -97,6 +98,11 @@ export default function CorporateActionsView({ initialActions }: CorporateAction
             linkColumns={{ ticker: (record) => researchHrefFor(record) }}
             rowActions={(record, _index, replace) => {
                 const actionId = recordActionId(record);
+                // Dividendo declarado del proveedor: solo informativo, el cobro
+                // se registra a mano en la cartera.
+                if (record.action_type === 'dividend') {
+                    return <span className="text-xs text-gray-500">Declarado</span>;
+                }
                 if (isApplied(record)) {
                     return (
                         <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">

@@ -1195,6 +1195,25 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000)
+def sync_portfolio_dividends(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
+    """Ingesta diaria de dividendos declarados de las posiciones abiertas (Yahoo, FMP de respaldo)."""
+    from app.services.async_bridge import run_from_any_context
+    from app.services.dividend_ingestion_service import DividendIngestionService
+
+    db = _session(tenant_id, user_id)
+    try:
+        result = run_from_any_context(DividendIngestionService().sync_portfolio(db))
+        return {"actor": "sync_portfolio_dividends", "status": "ok",
+                "companies": result["companies"], "synced": result["synced"],
+                "unavailable": result["unavailable"]}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("sync_portfolio_dividends", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
 @dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name="prices")
 def refresh_portfolio_prices_intraday(
     tenant_id: int | None = None,

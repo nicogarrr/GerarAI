@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated
 
@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
-from app.models import Company
+from app.models import Company, DividendRecord, Position
 from app.services.async_bridge import run_from_any_context
 from app.services.corporate_actions_service import CorporateActionService
 from app.services.split_ingestion_service import SplitIngestionService
@@ -48,6 +48,49 @@ def _payload(
         # Empresa fuera de cartera (sin posicion ni operaciones): nada que ajustar.
         "no_position": (not action.applied) and not has_holding,
     }
+
+
+def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
+    """Dividendos DECLARADOS (ingestados del proveedor) de posiciones abiertas.
+
+    Solo lectura: no se aplican al libro (el cobro se registra a mano). Cada
+    fila lleva fuente y fechas reales del registro; nada proyectado.
+    """
+    since = date.today() - timedelta(days=days)
+    rows = db.execute(
+        select(DividendRecord, Company)
+        .join(Company, Company.id == DividendRecord.company_id)
+        .where(
+            DividendRecord.ex_date >= since,
+            DividendRecord.company_id.in_(
+                select(Position.company_id).where(Position.quantity > 0)
+            ),
+        )
+        .order_by(DividendRecord.ex_date.desc(), Company.ticker)
+    ).all()
+    out = []
+    for record, company in rows:
+        pay = f" · pago {record.pay_date.isoformat()}" if record.pay_date else ""
+        out.append(
+            {
+                "id": None,
+                "ticker": company.ticker,
+                "action_type": "dividend",
+                "effective_date": record.ex_date.isoformat(),
+                "ratio": None,
+                "description": (
+                    f"Dividendo de {record.amount.normalize():f} {record.currency} por acción"
+                    f"{pay} · fuente {record.source}"
+                ),
+                "applied": None,
+                "applied_at": None,
+                "historical": False,
+                "no_position": False,
+                "declared": True,
+                "source": record.source,
+            }
+        )
+    return out
 
 
 @router.post("/splits/sync")
@@ -86,7 +129,7 @@ def list_actions(
     )
     firsts = service.first_trade_dates(db, company_ids)
     held = service.companies_with_holding(db, company_ids)
-    return [
+    payload = [
         _payload(
             action,
             tickers.get(action.company_id),
@@ -95,6 +138,7 @@ def list_actions(
         )
         for action in actions
     ]
+    return payload + _declared_dividends(db)
 
 
 @router.post("", status_code=201)
