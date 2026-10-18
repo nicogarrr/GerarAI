@@ -44,6 +44,8 @@ export const METRIC_LABELS: Record<string, string> = {
     free_cash_flow: 'Flujo de caja libre',
     dividends_paid: 'Dividendos pagados',
     common_stock_repurchased: 'Recompra de acciones propias',
+    capex_to_revenue: 'Capex sobre ingresos',
+    shares_cagr: 'Crecimiento de acciones (CAGR)',
     fcf_margin: 'Margen FCF',
     gross_margin: 'Margen bruto',
     operating_margin: 'Margen operativo',

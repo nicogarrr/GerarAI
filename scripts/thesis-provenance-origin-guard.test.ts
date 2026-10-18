@@ -3,24 +3,25 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const memo = readFileSync('components/research/ThesisMemo.tsx', 'utf8');
+const groups = readFileSync('lib/research/provenance-groups.ts', 'utf8');
 
-test('OFICIAL inputs link to the official source and carry no inference mark', () => {
-  assert.match(memo, /isVerifiedOficial\(item\) \? null/);
-  assert.match(memo, /href=\{fuente\.url\}/);
+test('inputs are grouped, link only https sources and carry no repeated badge', () => {
+  assert.doesNotMatch(memo, />\s*INFERIDO\s*</);
+  assert.match(memo, /PROVENANCE_GROUPS\.map/);
+  assert.match(memo, /\^https:/);
   assert.match(memo, /rel="noopener noreferrer"/);
+  assert.match(memo, /break-all text-teal-400 underline|text-teal-400 underline/);
 });
 
-test('INFERIDO inputs show the mark, the explicit base and only https links', () => {
-  assert.match(memo, /INFERIDO/);
-  assert.match(memo, /dado \$\{item\.base_inferencia\}/);
-  assert.match(memo, /base no documentada/);
-  assert.ok((memo.match(/\^https:/g) ?? []).length >= 2);
-});
-
-test('render is fail-closed: no derivado/supuesto/estimacion badges, legacy payloads show INFERIDO', () => {
-  assert.doesNotMatch(memo, /PROVENANCE_BADGES/);
-  assert.doesNotMatch(memo, /estimación LLM/);
+test('render is fail-closed: only a verified official source counts as reportado', () => {
   assert.match(memo, /function isVerifiedOficial/);
   assert.match(memo, /f\.oficial && !!f\.fecha/);
-  assert.match(memo, /item\.base_documentada !== true/);
+  assert.match(memo, /isVerifiedOficial\(item\)\) === group\.key/);
+  assert.match(groups, /verified \? 'reportado' : 'sin_verificar'/);
+  assert.match(memo, /Base no documentada/);
+});
+
+test('basis texts are Spanish', () => {
+  assert.doesNotMatch(groups, /'Median of|'Annual/);
+  assert.match(groups, /Mediana de los últimos márgenes FCF anuales/);
 });

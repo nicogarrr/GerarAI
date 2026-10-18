@@ -2,6 +2,7 @@ import { frameworkTerm } from '@/lib/research/framework-terms';
 import { thesisMoney, thesisEps } from '@/lib/research/thesis-number-format';
 import { thesisScenarioDisplay } from '@/lib/research/listed-share-values';
 import { formatGeneratedDate, formatPercent, isValidCurrencyCode, marginOfSafetyDisplay, NA } from '@/lib/format';
+import { PROVENANCE_GROUPS, provenanceBasisEs, provenanceGroup } from '@/lib/research/provenance-groups';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { cleanThesisText } from '@/lib/research/thesis-text';
@@ -61,6 +62,14 @@ function isVerifiedOficial(item: ProvenanceItem): boolean {
     fuentes.length > 0 &&
     fuentes.every((f) => f.oficial && !!f.fecha && !!f.url && /^https:\/\//.test(f.url))
   );
+}
+
+/** Enlaces https de la fuente: documentos citados del dato o URLs de la inferencia. */
+function provenanceUrls(item: ProvenanceItem): string[] {
+  const cited = (item.fuentes ?? []).map((f) => f.url);
+  return Array.from(new Set([...cited, ...(item.urls_inferencia ?? [])].filter(
+    (url): url is string => typeof url === 'string' && /^https:\/\//.test(url),
+  )));
 }
 
 /**
@@ -232,62 +241,42 @@ export default function ThesisMemo({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
             Procedencia de los inputs
           </h3>
-          <div className="mt-2 divide-y divide-gray-800/70">
-            {thesis.inputs_provenance.map((item) => {
+          <div className="mt-3 space-y-4">
+            {PROVENANCE_GROUPS.map((group) => {
+              const rows = (thesis.inputs_provenance ?? []).filter(
+                (item) => provenanceGroup(item.label as string | undefined, isVerifiedOficial(item)) === group.key,
+              );
+              if (rows.length === 0) return null;
               return (
-                <div key={item.key} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2 text-sm">
-                  {isVerifiedOficial(item) ? null : (
-                    <span
-                      className="rounded-full border border-amber-800 bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-300"
-                    >
-                      INFERIDO
-                    </span>
-                  )}
-                  <span className="order-1 text-gray-300">{capitalizeLabel(metricLabel(item.key))}</span>
-                  <span className="order-2 min-w-0 max-w-full ml-auto font-medium tabular-nums text-gray-100">{formatProvenanceValue(item.value, item.unit)}</span>
-                  {isVerifiedOficial(item) ? (
-                    <span className="order-3 min-w-0 max-w-full basis-full text-xs text-gray-500">
-                      ·{' '}
-                      {(item.fuentes ?? []).map((fuente, index) => (
-                        <span key={fuente.fact_id}>
-                          {index > 0 ? ', ' : ''}
-                          {fuente.url && /^https:\/\//.test(fuente.url) ? (
-                            <a
-                              href={fuente.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="break-all text-teal-400 underline"
-                            >
-                              {fuente.titulo ?? 'Fuente oficial'}
-                            </a>
-                          ) : (
-                            (fuente.titulo ?? 'Fuente oficial')
-                          )}
-                          {fuente.fecha ? ` (${fuente.fecha})` : ''}
-                        </span>
-                      ))}
-                    </span>
-                  ) : (
-                    <span className="order-3 min-w-0 max-w-full basis-full text-xs text-amber-400/90">
-                      · INFERIDO:{' '}
-                      {item.base_documentada !== true || !item.base_inferencia
-                        ? 'base no documentada'
-                        : `dado ${item.base_inferencia}`}
-                      {(item.urls_inferencia ?? []).map((url, index) =>
-                        /^https:\/\//.test(url) ? (
-                          <a
-                            key={url}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="ml-1 text-amber-300 underline"
-                          >
-                            [{index + 1}]
-                          </a>
-                        ) : null,
-                      )}
-                    </span>
-                  )}
+                <div key={group.key}>
+                  <h4 className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{group.title}</h4>
+                  <dl className="mt-1 divide-y divide-gray-800/70">
+                    {rows.map((item) => {
+                      const urls = provenanceUrls(item);
+                      const basis = provenanceBasisEs(item.base_inferencia ?? item.method);
+                      return (
+                        <div key={item.key} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2 text-sm">
+                          <dt className="text-gray-300">{capitalizeLabel(metricLabel(item.key))}</dt>
+                          <dd className="ml-auto font-medium tabular-nums text-gray-100">{formatProvenanceValue(item.value, item.unit)}</dd>
+                          <dd className="basis-full text-xs text-gray-500">
+                            {basis ?? 'Base no documentada'}
+                            {urls.map((url, index) => (
+                              <a
+                                key={url}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Fuente ${index + 1}`}
+                                className="ml-1 text-teal-400 underline"
+                              >
+                                [{index + 1}]
+                              </a>
+                            ))}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
                 </div>
               );
             })}

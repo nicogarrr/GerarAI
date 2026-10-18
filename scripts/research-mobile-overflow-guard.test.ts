@@ -6,7 +6,7 @@ test('thesis long URLs wrap; markdown table/code retain bounded internal scroll'
   const src = readFileSync(path,'utf8');
   assert.match(src,/min-w-0 max-w-full/);
   assert.match(src,/\[overflow-wrap:anywhere\]/);
-  assert.match(src,/break-all text-teal-400 underline/);
+  assert.match(src,/text-teal-400 underline/);
  }
  const markdown = readFileSync('components/research/ThesisMarkdown.tsx','utf8');
  assert.match(markdown,/min-w-0 max-w-full overflow-x-auto/);

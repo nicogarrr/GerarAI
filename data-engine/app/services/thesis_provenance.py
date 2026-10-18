@@ -27,6 +27,9 @@ OFFICIAL_HOSTS = frozenset(
     {"www.sec.gov", "sec.gov", "www.itu.int", "itu.int", "www.fcc.gov", "fcc.gov"}
 )
 OFFICIAL_DOC_SOURCE_TYPE = "primary_official"
+# XBRL de la SEC (companyfacts / archivos presentados): la propia SEC es la
+# fuente; solo cuenta con host oficial, URL https y fecha, como el resto.
+OFFICIAL_DOC_SOURCE_TYPES = frozenset({OFFICIAL_DOC_SOURCE_TYPE, "SEC"})
 # Unica lectura directa de un hecho reportado: linea de driver_model con
 # status sourced (valor = FinancialFact.value de UN fact). Las assumptions
 # (medianas de ratios, clamps, politica, overrides, LLM) son siempre calculo o
@@ -142,7 +145,7 @@ def inputs_provenance_from_snapshot(snapshot: dict[str, Any] | None) -> list[dic
 def _is_official_source(src: dict[str, Any] | None) -> bool:
     """Fuente verificable: documento primary_official, host oficial, con URL
     http(s) y fecha. Sin cualquiera de ellos no se presenta como oficial."""
-    if not src or src.get("source_type") != OFFICIAL_DOC_SOURCE_TYPE:
+    if not src or src.get("source_type") not in OFFICIAL_DOC_SOURCE_TYPES:
         return False
     url = src.get("url") or ""
     if not url.startswith("https://") or not src.get("date"):

@@ -165,3 +165,13 @@ def test_latest_inputs_provenance_readback():
     items = latest_inputs_provenance(db, company.id)
     # Sin base documentada (ni URL) no se muestra INFERIDO: se omite y queda N/D.
     assert {item["key"] for item in items} == set()
+
+
+def test_sec_xbrl_source_with_official_host_counts_as_official():
+    from app.services.thesis_provenance import _is_official_source
+
+    src = {"source_type": "SEC", "url": "https://www.sec.gov/Archives/edgar/data/1/x.htm", "date": "2026-02-01"}
+    assert _is_official_source(src)
+    assert not _is_official_source({**src, "url": "https://example.com/x"})
+    assert not _is_official_source({**src, "date": None})
+    assert not _is_official_source({**src, "source_type": "FMP"})
