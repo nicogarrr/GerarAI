@@ -1,5 +1,6 @@
 'use server';
 
+import { exactSymbolFirst, onePerIssuer } from '@/lib/market/search-results';
 import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
 import type { PopularStocksResult } from '@/lib/popular-stocks-loader';
@@ -304,7 +305,8 @@ const searchStocksOrThrow = async (query?: string): Promise<StockWithWatchlistSt
             }
         }
 
-        const mapped: StockWithWatchlistStatus[] = results
+        const ordered = onePerIssuer(exactSymbolFirst(results, trimmed));
+        const mapped: StockWithWatchlistStatus[] = ordered
             .map((r) => {
                 const upper = (r.symbol || '').toUpperCase();
                 const name = r.description || upper;
