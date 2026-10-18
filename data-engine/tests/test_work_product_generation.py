@@ -111,3 +111,76 @@ def test_valuation_memo_filters_to_its_metric_set(db, company):
     db.commit()
     result = WorkProductService().generate(db, product_type="valuation_memo", company=company)
     assert set(result["sections"]["metrics"]) == {"revenue"}
+
+
+def test_markdown_is_a_readable_spanish_document(db, company):
+    """QA /research: el entregable se renderiza como documento legible en
+    español (secciones, cifras formateadas, fuentes), nunca JSON ni reprs."""
+    db.add(FinancialFact(
+        company_id=company.id, metric="revenue", value=Decimal("394000000000"),
+        unit="USD", period="2025-09-30:FY", fiscal_year=2025, source_type="SEC", is_reported=True,
+    ))
+    db.add(MarketPrice(
+        company_id=company.id, date=date(2026, 9, 22),
+        open=Decimal("10"), high=Decimal("11"), low=Decimal("9"),
+        close=Decimal("232.15"), adj_close=Decimal("232.15"), source="finnhub",
+    ))
+    db.commit()
+    md = WorkProductService().generate(db, product_type="one_page_memo", company=company)["markdown"]
+    assert md.startswith("# Memo de una página · WPX")
+    assert "Datos a fecha de: 2026-10-18" in md or "Datos a fecha de:" in md
+    assert "## Empresa" in md and "## Precio de mercado" in md and "## Fuentes" in md
+    assert "**Ingresos**: $394B" in md
+    assert "**Cierre**: $232.15" in md
+    assert "_Sin datos._" in md  # tesis ausente declarada, no repr vacío
+    assert "Decimal(" not in md and "{'" not in md
+    assert "Data as of" not in md and "Source manifest" not in md
+
+
+def test_markdown_translates_manifest_warnings(db, company):
+    md = WorkProductService().generate(db, product_type="one_page_memo", company=company)["markdown"]
+    assert "## Avisos" in md
+    assert "No había fuentes canónicas disponibles." in md
+    assert "No canonical sources were available" not in md
+
+
+def test_usd_uses_english_scale(db, company):
+    """Regla de Nico: USD verificado en inglés ($343.46, $5.16T, $394B)."""
+    from app.services.work_product_service import _format_usd
+
+    assert _format_usd(Decimal("343.46")) == "$343.46"
+    assert _format_usd(Decimal("5160000000000")) == "$5.16T"
+    assert _format_usd(Decimal("394000000000")) == "$394B"
+    assert _format_usd(Decimal("404010000000")) == "$404.01B"
+    assert _format_usd(Decimal("2500000")) == "$2.5M"
+    assert _format_usd(Decimal("-1200000000")) == "-$1.2B"
+    assert _format_usd(Decimal("95")) == "$95"
+
+
+def test_non_usd_issuer_keeps_its_currency(db):
+    """Emisores no USD conservan su divisa en formato es-ES."""
+    c = Company(
+        ticker="EUX", name="EUX", exchange="XMAD", currency="EUR",
+        sector="S", industry="I", company_type="operating",
+        valuation_model="standard_dcf", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(c)
+    db.flush()
+    db.add(FinancialFact(
+        company_id=c.id, metric="revenue", value=Decimal("394000000000"),
+        unit="EUR", period="2025-12-31:FY", fiscal_year=2025, source_type="ESEF", is_reported=True,
+    ))
+    db.commit()
+    md = WorkProductService().generate(db, product_type="one_page_memo", company=c)["markdown"]
+    assert "**Ingresos**: 394.000.000.000 EUR" in md
+    assert "$" not in md
+
+
+def test_margin_of_safety_is_a_spanish_percent():
+    """Porcentajes es-ES con coma."""
+    from app.services.work_product_service import _format_pct, _render_payload
+
+    assert _format_pct(Decimal("0.255")) == "25,5 %"
+    lines: list[str] = []
+    _render_payload({"margin_of_safety": Decimal("0.255")}, lines, "USD")
+    assert lines == ["- **Margen de seguridad**: 25,5 %"]
