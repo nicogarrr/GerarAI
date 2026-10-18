@@ -211,22 +211,23 @@ def _table(rows: list[tuple[str, str, str, str]]) -> str:
     )
 
 
+# Acciones realistas (precio implicito 40-250 USD): la escala del valor se infiere de value/shares.
 # latest period base (acc1): AAPL up, BAC flat, GOOG new
 TABLE_ACC1 = _table([
-    ("APPLE INC", "037833100", "75000000", "300000000"),
-    ("BANK OF AMERICA CORP", "060505104", "40000000", "1000000000"),
+    ("APPLE INC", "037833100", "75000000", "300000"),
+    ("BANK OF AMERICA CORP", "060505104", "40000000", "1000000"),
     ("ALPHABET INC", "02079K305", "9000000", "50000"),
 ])
 # latest period amendment (acc2, filed later): supersedes acc1, AAPL value restated
 TABLE_ACC2 = _table([
-    ("APPLE INC", "037833100", "75000001", "300000000"),
-    ("BANK OF AMERICA CORP", "060505104", "40000000", "1000000000"),
+    ("APPLE INC", "037833100", "75000001", "300000"),
+    ("BANK OF AMERICA CORP", "060505104", "40000000", "1000000"),
     ("ALPHABET INC", "02079K305", "9000000", "50000"),
 ])
 # previous period (acc3): AAPL smaller, BAC flat, MSFT closed since
 TABLE_ACC3 = _table([
-    ("APPLE INC", "037833100", "60000000", "250000000"),
-    ("BANK OF AMERICA CORP", "060505104", "40000000", "1000000000"),
+    ("APPLE INC", "037833100", "60000000", "250000"),
+    ("BANK OF AMERICA CORP", "060505104", "40000000", "1000000"),
     ("MICROSOFT CORP", "594918104", "10000", "100"),
 ])
 
@@ -286,8 +287,8 @@ def test_changes_compute_quarter_over_quarter(db):
 
     by_cusip = {c["cusip"]: c for c in result["changes"]}
     assert by_cusip["037833100"]["change"] == "increased"
-    assert by_cusip["037833100"]["shares_latest"] == 300000000.0
-    assert by_cusip["037833100"]["shares_previous"] == 250000000.0
+    assert by_cusip["037833100"]["shares_latest"] == 300000.0
+    assert by_cusip["037833100"]["shares_previous"] == 250000.0
     # restated value comes from the amendment, not the base filing
     assert by_cusip["037833100"]["value_usd_thousands_latest"] == 75000001.0
     assert by_cusip["060505104"]["change"] == "unchanged"
@@ -507,3 +508,84 @@ def test_information_table_url_handles_styled_primary_document_and_hyphenated_na
             "0001345471", "0001345471-26-000035", "xslForm13F_X02/primary_doc.xml", client=client
         )
     assert url is not None and url.endswith("/Q22026-tfmlp-info-table.xml")
+
+
+# --- Escala del valor 13F (heuristica por filing) ---------------------------------
+# Filas reales guardadas (BD de produccion, 2026-06-30): Baupost, Duquesne y AKO
+# declaran el valor en miles aunque el periodo sea posterior a 2022-12-31; Berkshire
+# (MULTI_ROWS, Apple 200237120 / 692000 acciones = ~289 USD) declara en dolares.
+_THOUSANDS_FILERS = {
+    "baupost": [("023135106", "892310", "3743854"), ("28176E108", "493140", "1275154"),
+                ("76131D103", "597208", "8080112")],
+    "duquesne": [("632307104", "864923", "3186306"), ("00287Y109", "120000", "900000"),
+                 ("594918104", "90000", "250000")],
+    "ako": [("H01301128", "651941", "9683004"), ("G0176J109", "200000", "2000000"),
+            ("N070592100", "150000", "1500000")],
+}
+
+
+def _rows_for(name: str) -> list[dict]:
+    return form13f.aggregate_rows(
+        [
+            {"cusip": c, "title_of_class": "COM", "put_call": "", "value_usd_thousands": v,
+             "ssh_prnamt": s, "ssh_prnamt_type": "SH"}
+            for c, v, s in _THOUSANDS_FILERS[name]
+        ]
+    )
+
+
+@pytest.mark.parametrize("name", ["baupost", "duquesne", "ako"])
+def test_infer_value_scale_detects_filers_that_still_report_in_thousands(name):
+    info = form13f.infer_value_scale(_rows_for(name), "2026-06-30")
+    assert info["scale"] == form13f.SCALE_THOUSANDS
+    assert float(info["median_implied_price"]) < 1
+    scaled = form13f.apply_value_scale(_rows_for(name), info["scale"])
+    first = _THOUSANDS_FILERS[name][0]
+    assert next(r for r in scaled if r["cusip"] == first[0])["value_usd_thousands"] == str(int(first[1]) * 1000)
+
+
+def test_infer_value_scale_keeps_berkshire_in_dollars_as_control():
+    rows = form13f.aggregate_rows(form13f.parse_information_table(
+        '<informationTable xmlns="http://www.sec.gov/edgar/document/thirteenf/informationtable">'
+        + "".join(MULTI_ROWS) + "</informationTable>"
+    ))
+    # Solo 2 claves (Apple, BofA): sin filas suficientes no se decide y no se escala.
+    info = form13f.infer_value_scale(rows, "2026-06-30")
+    assert info["scale"] == form13f.SCALE_DOLLARS and info["reason"] == "insufficient_rows"
+    assert form13f.apply_value_scale(rows, info["scale"]) is rows
+    many = [{"cusip": str(i), "title_of_class": "COM", "put_call": "", "value_usd_thousands": "3000000000",
+             "ssh_prnamt": "10000000", "ssh_prnamt_type": "SH"} for i in range(5)]
+    assert form13f.infer_value_scale(many, "2026-06-30")["scale"] == form13f.SCALE_DOLLARS
+
+
+def test_infer_value_scale_does_not_touch_legacy_periods_or_option_rows():
+    legacy = form13f.infer_value_scale(_rows_for("baupost"), "2020-06-30")
+    assert legacy["scale"] is None and legacy["reason"] == "legacy_period"
+    options_only = [{"cusip": str(i), "title_of_class": "COM", "put_call": "Call", "value_usd_thousands": "5",
+                     "ssh_prnamt": "1000", "ssh_prnamt_type": "SH"} for i in range(5)]
+    assert form13f.infer_value_scale(options_only, "2026-06-30")["reason"] == "insufficient_rows"
+
+
+def test_sync_scales_a_thousands_filing_and_stores_which_scale_was_used(db):
+    global MULTI_ROWS
+    original = MULTI_ROWS
+    try:
+        MULTI_ROWS = [_info_row(c, v, s, "ISSUER") for c, v, s in _THOUSANDS_FILERS["baupost"]]
+        total_raw = sum(int(v) for _, v, _ in _THOUSANDS_FILERS["baupost"])
+        client = _multi_client(_primary_doc(str(total_raw), 3))
+        result = ManagerHoldingIngestionService(client).sync_manager(db, cik=CIK)
+    finally:
+        MULTI_ROWS = original
+    check = result["verification"][0]
+    assert check["status"] == "ok"  # el total declarado (en miles) x1000 cuadra con lo guardado
+    assert check["value_scale"]["scale"] == form13f.SCALE_THOUSANDS
+    rows = db.scalars(select(ManagerHolding)).all()
+    assert {r.value_scale for r in rows} == {form13f.SCALE_THOUSANDS}
+    assert sum(float(r.value_usd_thousands) for r in rows) == float(total_raw * 1000)
+
+
+def test_sync_of_a_dollar_filing_stores_raw_values_and_flags_the_scale(db):
+    total = 200237120 + 3 * 1000 + 40000000
+    result = ManagerHoldingIngestionService(_multi_client(_primary_doc(str(total), 5))).sync_manager(db, cik=CIK)
+    assert result["verification"][0]["value_scale"]["scale"] == form13f.SCALE_DOLLARS
+    assert {r.value_scale for r in db.scalars(select(ManagerHolding)).all()} == {form13f.SCALE_DOLLARS}

@@ -85,12 +85,14 @@ def _date(value: Any) -> date | None:
         return None
 
 
-def _verify_totals(summary: dict | None, raw_rows: list[dict], merged: list[dict]) -> dict:
+def _verify_totals(
+    summary: dict | None, raw_rows: list[dict], merged: list[dict], factor: int = 1
+) -> dict:
     """Compara lo guardado con lo que el propio filing declara (tableValueTotal/EntryTotal)."""
     stored = sum((_decimal(r.get("value_usd_thousands")) or Decimal(0) for r in merged), Decimal(0))
     if summary is None or summary["table_value_total"] is None:
         return {"status": "unverified", "stored_value_total": str(stored)}
-    declared = summary["table_value_total"]
+    declared = summary["table_value_total"] * factor
     entries = summary["table_entry_total"]
     ok = stored == declared and (entries is None or entries == len(raw_rows))
     return {
@@ -222,8 +224,11 @@ class ManagerHoldingIngestionService:
                 )
             }
             merged = form13f.aggregate_rows(rows)
-            check = _verify_totals(summary, rows, merged)
-            verification.append({"accession": accession, **check})
+            scale_info = form13f.infer_value_scale(merged, filing["report_date"])
+            merged = form13f.apply_value_scale(merged, scale_info["scale"])
+            factor = 1000 if scale_info["scale"] == form13f.SCALE_THOUSANDS else 1
+            check = _verify_totals(summary, rows, merged, factor)
+            verification.append({"accession": accession, **check, "value_scale": scale_info})
             if check["status"] == "mismatch":
                 errors.append({"accession": accession, "error": "totals_mismatch"})
             for row in merged:
@@ -243,6 +248,7 @@ class ManagerHoldingIngestionService:
                         title_of_class=title,
                         cusip=cusip,
                         value_usd_thousands=_decimal(row.get("value_usd_thousands")),
+                        value_scale=scale_info["scale"],
                         shares=_decimal(row.get("ssh_prnamt")),
                         share_type=(row.get("ssh_prnamt_type") or "SH").strip(),
                         put_call=put_call,

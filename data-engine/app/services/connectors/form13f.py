@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree as ET
 
@@ -193,6 +194,65 @@ def aggregate_rows(rows: list[dict]) -> list[dict]:
             if name not in summed and not current.get(name) and value:
                 current[name] = value
     return list(merged.values())
+
+
+# --- Escala del valor (heuristica, por filing) --------------------------------
+# Desde el 2022-12-31 el 13F declara el valor en dolares, pero algunos gestores
+# (verificado contra EDGAR: Baupost 0001061768-26-000010, tableValueTotal 5415853
+# para una cartera de ~5.4 mil millones) siguen declarando en miles. La columna
+# conserva el valor tal cual vino del filing; esta regla detecta la escala SOLO por el
+# precio implicito (valor / acciones) de las filas de acciones ordinarias:
+#   mediana < 1 USD por accion  =>  el filing esta en miles y se multiplica x1000.
+# Es una heuristica, no un dato del filing: se guarda en value_scale cual se uso.
+DOLLAR_VALUE_FROM = date(2022, 12, 31)
+THOUSANDS_MEDIAN_PRICE_CEILING = Decimal("1")
+MIN_PRICED_ROWS = 3
+SCALE_DOLLARS = "dollars_raw"
+SCALE_THOUSANDS = "thousands_x1000"
+
+
+def infer_value_scale(rows: list[dict], report_date: str | date | None) -> dict:
+    """Escala del valor de un filing: {'scale', 'median_implied_price', 'priced_rows'}.
+
+    Solo se evalua para periodos >= 2022-12-31. Con menos de MIN_PRICED_ROWS filas
+    de acciones (SH, sin opciones, valor y acciones > 0) no se decide: se deja el valor
+    crudo (SCALE_DOLLARS) y se marca 'insufficient_rows'.
+    """
+    if isinstance(report_date, str):
+        try:
+            report_date = date.fromisoformat(report_date)
+        except ValueError:
+            report_date = None
+    if report_date is None or report_date < DOLLAR_VALUE_FROM:
+        return {"scale": None, "median_implied_price": None, "priced_rows": 0, "reason": "legacy_period"}
+    prices: list[Decimal] = []
+    for row in rows:
+        if (row.get("ssh_prnamt_type") or "SH").strip().upper() != "SH" or (row.get("put_call") or "").strip():
+            continue
+        value, shares = _dec(row.get("value_usd_thousands")), _dec(row.get("ssh_prnamt"))
+        if value is None or shares is None or value <= 0 or shares <= 0:
+            continue
+        prices.append(value / shares)
+    if len(prices) < MIN_PRICED_ROWS:
+        return {"scale": SCALE_DOLLARS, "median_implied_price": None, "priced_rows": len(prices),
+                "reason": "insufficient_rows"}
+    prices.sort()
+    mid = len(prices) // 2
+    median = prices[mid] if len(prices) % 2 else (prices[mid - 1] + prices[mid]) / 2
+    scale = SCALE_THOUSANDS if median < THOUSANDS_MEDIAN_PRICE_CEILING else SCALE_DOLLARS
+    return {"scale": scale, "median_implied_price": str(round(median, 4)), "priced_rows": len(prices),
+            "reason": "median_implied_price"}
+
+
+def apply_value_scale(rows: list[dict], scale: str | None) -> list[dict]:
+    """Copia de las filas con el valor llevado a dolares si la escala es miles."""
+    if scale != SCALE_THOUSANDS:
+        return rows
+    out = []
+    for row in rows:
+        value = _dec(row.get("value_usd_thousands"))
+        out.append({**row, "value_usd_thousands": str(value * 1000) if value is not None else None})
+    return out
 
 
 def parse_primary_summary(xml_text: str) -> dict:

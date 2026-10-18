@@ -2326,6 +2326,9 @@ class ManagerHolding(TenantOwnedMixin, Base, TimestampMixin):
     value_usd_thousands: Mapped[Decimal | None] = mapped_column(
         Numeric(20, 2), nullable=True
     )
+    # Escala usada al guardar el valor (heuristica por filing, ver form13f.infer_value_scale):
+    # "dollars_raw", "thousands_x1000" o NULL (fila anterior a este campo / periodo legacy).
+    value_scale: Mapped[str | None] = mapped_column(String(24), nullable=True)
     shares: Mapped[Decimal | None] = mapped_column(Numeric(24, 4), nullable=True)
     share_type: Mapped[str] = mapped_column(String(10), default="SH")
     put_call: Mapped[str] = mapped_column(String(10), default="")
