@@ -1994,14 +1994,15 @@ class FinancialIngestionService:
             if tenant_id is not None
             else FinancialFact.tenant_id.is_(None)
         )
-        db.execute(
-            delete(FinancialFact).where(
-                FinancialFact.company_id == company.id,
-                FinancialFact.metric == metric,
-                FinancialFact.period == period,
-                FinancialFact.is_reported.is_(False),
-                tenant_filter,
-            )
+        # delete_financial_facts: un DELETE crudo revienta con FK NO ACTION en
+        # Postgres si el hecho ya esta referenciado (ver fact_deletion.py).
+        delete_financial_facts(
+            db,
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == metric,
+            FinancialFact.period == period,
+            FinancialFact.is_reported.is_(False),
+            tenant_filter,
         )
 
     def _add_facts(

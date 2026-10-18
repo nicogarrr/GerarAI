@@ -44,6 +44,7 @@ from app.services.connectors import earnings_calendar as earnings_calendar_conne
 from app.services.connectors import sec_edgar as sec_edgar_connector
 from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.ir import IRConnector
+from app.services.fact_deletion import delete_financial_facts
 
 # Metrica -> (tags us-gaap por preferencia, unidad). Nunca se suman
 # tags. Gana el tag con el dato mas reciente: un tag preferido puede
@@ -731,12 +732,12 @@ class ThesisEvidenceService:
             if tenant_id is not None
             else FinancialFact.tenant_id.is_(None)
         )
-        for fact in db.scalars(
-            select(FinancialFact).where(
-                FinancialFact.company_id == company.id,
-                FinancialFact.source_type == source_type,
-                tenant_filter,
-            )
-        ).all():
-            db.delete(fact)
+        # delete_financial_facts desvincula las referencias entrantes (FK NO
+        # ACTION en Postgres) y respeta los hechos con correccion humana.
+        delete_financial_facts(
+            db,
+            FinancialFact.company_id == company.id,
+            FinancialFact.source_type == source_type,
+            tenant_filter,
+        )
         db.flush()

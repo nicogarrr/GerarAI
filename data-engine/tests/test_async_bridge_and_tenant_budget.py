@@ -240,3 +240,19 @@ def test_knowledge_principles_budget_cut_is_reported_as_partial():
     assert "budget_stopped" in service_source and "batches_processed" in service_source
     worker_source = inspect.getsource(dramatiq_app)
     assert '"partial" if result.get("budget_stopped")' in worker_source
+
+
+def test_derived_fact_and_evidence_replacement_use_fk_safe_delete():
+    import inspect
+
+    from app.services.financial_ingestion_service import FinancialIngestionService
+    from app.services.thesis_evidence_service import ThesisEvidenceService
+
+    for method in (
+        FinancialIngestionService._drop_stale_derived
+        if hasattr(FinancialIngestionService, "_drop_stale_derived")
+        else None,
+        ThesisEvidenceService._replace_facts,
+    ):
+        if method is not None:
+            assert "delete_financial_facts" in inspect.getsource(method)

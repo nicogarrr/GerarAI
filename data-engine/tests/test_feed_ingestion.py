@@ -220,3 +220,12 @@ def test_actor_dependency_failure_returns_structured_error(monkeypatch):
     assert result["status"] == "error"
     assert result["actor"] == "refresh_news"
     assert result["error"]["type"] == "ImportError"
+
+
+def test_review_theses_is_scheduled_once_not_inside_daily_research():
+    import inspect
+
+    from app.workers import dramatiq_app
+
+    source = inspect.getsource(dramatiq_app.run_daily_research.fn)
+    assert "review_theses)" not in source.split("jobs: list", 1)[1].split("]", 1)[0]
