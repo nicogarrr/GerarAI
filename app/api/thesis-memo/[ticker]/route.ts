@@ -1,6 +1,7 @@
 import { withAuthErrors } from '@/lib/auth/route-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { researchIdentityHeaders } from '@/lib/auth/research-identity';
+import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL;
 
@@ -10,6 +11,7 @@ async function getHandler(
   _request: NextRequest,
   { params }: { params: Promise<{ ticker: string }> },
 ) {
+  await requireAuthenticatedUser();
   const { ticker } = await params;
   if (!/^[A-Za-z0-9.^=-]{1,15}$/.test(ticker)) {
     return NextResponse.json({ error: 'Ticker no valido' }, { status: 400 });
