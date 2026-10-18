@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { BookOpen, Check, FileSearch, Library, Sparkles, UploadCloud, X } from 'lucide-react';
 
 import { MutationForm } from '@/components/forms/MutationForm';
+import { KnowledgeDeleteButton } from '@/components/knowledge/KnowledgeDeleteButton';
 import { FileUploadInput } from '@/components/forms/FileUploadInput';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -228,7 +229,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                   <td className="py-3 text-gray-400">{document.document_type}</td>
                   <td className="py-3 text-gray-500">{String(document.metadata.parser ?? 'desconocido')}</td>
                   <td className="py-3"><Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge></td>
-                  <td className="py-3"><div className="flex justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm></div>{job?.status === 'failed' ? <div className="mt-1 max-w-xs text-right text-xs text-red-300">{job.error}</div> : null}</td>
+                  <td className="py-3"><div className="flex justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm><KnowledgeDeleteButton documentId={document.id} title={document.title} /></div>{job?.status === 'failed' ? <div className="mt-1 max-w-xs text-right text-xs text-red-300">{job.error}</div> : null}</td>
                 </tr>
                 );
               })}
@@ -255,6 +256,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                   <MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada">
                     <Button className="h-11 w-full" disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button>
                   </MutationForm>
+                  <KnowledgeDeleteButton documentId={document.id} title={document.title} />
                 </div>
               </article>
             );

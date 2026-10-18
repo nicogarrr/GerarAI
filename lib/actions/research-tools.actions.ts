@@ -440,6 +440,11 @@ export async function uploadKnowledgeDocument(formData: FormData) {
   revalidatePath('/knowledge');
 }
 
+export async function deleteKnowledgeDocument(documentId: number) {
+  await requestJson(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`, { method: 'DELETE' });
+  revalidatePath('/knowledge');
+}
+
 export async function extractKnowledgePrinciples(documentId: number) {
   await requestJson(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}/extract-principles`, { method: 'POST' });
   revalidatePath('/knowledge');
