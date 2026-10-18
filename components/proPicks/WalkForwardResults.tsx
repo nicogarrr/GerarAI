@@ -62,6 +62,9 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
                     {formatNumber(result.picksPorMes, { maximumFractionDigits: 0 })} picks por mes, selección
                     mensual solo con datos anteriores a cada corte.
                 </p>
+                <p className="mt-2 text-xs text-amber-400">
+                    Mide una estrategia de momentum sobre 30 megacaps actuales. No mide la selección de calidad y valor de ProPicks.
+                </p>
                 {first && last && (
                     <p className="mt-2 text-xs text-gray-500">
                         Período: {/* asOf es un instante UTC (fin de mes 23:59:59Z): en la zona del mercado sigue siendo ese dia; en la del usuario saltaba al dia siguiente. */}
@@ -135,6 +138,10 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
                     <li>Señal: momentum 12-1M (se excluye el último mes) sobre un universo líquido de 30 valores; {formatNumber(result.picksPorMes, { maximumFractionDigits: 0 })} picks equiponderados.</li>
                     <li>Costes aplicados: 15 pb por pata de rotación. Rotación media mensual: {formatPercent(result.turnover, { fromRatio: false, digits: 0 })}.</li>
                     <li>Benchmark: SPY buy & hold en el mismo periodo.</li>
+                    <li>Sesgo de supervivencia: las 30 empresas son megacaps de hoy, elegidas con conocimiento actual; las que cayeron o salieron del índice no están.</li>
+                    <li>Muestra corta: {formatNumber(result.months, { maximumFractionDigits: 0 })} meses. Sharpe, Sortino y la diferencia con SPY no son distinguibles del azar con tan pocos datos.</li>
+                    <li>Precios de cierre del proveedor sin dividendos explícitos; sin impuestos ni deslizamiento más allá de los costes indicados.</li>
+                    <li>La selección de ProPicks (calidad, valor, insiders, 13F) se congela cada mes en un snapshot point-in-time; ese historial es la base de un backtest futuro sin sesgo de anticipación, y todavía no hay meses suficientes.</li>
                     <li>Resultados pasados simulados no garantizan rendimientos futuros. Esto no es asesoramiento financiero.</li>
                 </ul>
             </MethodologyDisclosure>
