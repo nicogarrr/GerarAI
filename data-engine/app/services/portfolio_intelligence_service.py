@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.models import CashBalance, Company, FinancialFact, MarketPrice, Position, Transaction
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.portfolio_ledger_service import BUY_ACTIONS, SELL_ACTIONS
+from app.services.portfolio_reconstruction_service import PortfolioReconstructionService
 from app.services.portfolio_snapshot_service import PortfolioSnapshotService
 from app.services.tax_report_service import (
     cash_amount,
@@ -155,12 +156,21 @@ class PortfolioIntelligenceService:
             if snapshot.daily_return is not None
         }
         snapshot_exact = self._snapshot_history_is_exact(snapshots)
-        portfolio_returns = snapshot_returns if snapshot_exact else indicative_returns
+        reconstruction = PortfolioReconstructionService().build(db, start=cutoff, rows=rows)
+        use_reconstruction = not snapshot_exact and reconstruction.usable
+        if snapshot_exact:
+            portfolio_returns = snapshot_returns
+        elif use_reconstruction:
+            portfolio_returns = reconstruction.returns
+        else:
+            portfolio_returns = indicative_returns
         partial_day = self._partial_trading_day(price_series, snapshots, datetime.now(UTC))
         twr = self._compound(list(portfolio_returns.values()))
+        # Una ventana reconstruida corta no se anualiza: extrapolar 8 sesiones a un
+        # ano daria una cifra sin sentido.
         annualized_return = (
             (1 + twr) ** (252 / len(portfolio_returns)) - 1
-            if portfolio_returns and twr > -1
+            if portfolio_returns and twr > -1 and not (use_reconstruction and len(portfolio_returns) < 60)
             else None
         )
         volatility = (
@@ -231,9 +241,24 @@ class PortfolioIntelligenceService:
                 "twr_method": (
                     "daily_portfolio_snapshots"
                     if snapshot_exact
-                    else "static_current_weight_estimate"
+                    else (
+                        "ledger_reconstruction_positions_only"
+                        if use_reconstruction
+                        else "static_current_weight_estimate"
+                    )
                 ),
                 "twr_is_exact": snapshot_exact,
+                "twr_period": (
+                    {
+                        "start": reconstruction.series[0]["date"],
+                        "end": reconstruction.series[-1]["date"],
+                        "sessions": len(reconstruction.returns),
+                    }
+                    if use_reconstruction
+                    else None
+                ),
+                "reconstruction": reconstruction.as_dict(),
+                "valuation_history": reconstruction.series if use_reconstruction else [],
             },
             "risk": {
                 "max_drawdown": drawdown["max_drawdown"],
