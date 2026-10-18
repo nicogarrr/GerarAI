@@ -2,7 +2,7 @@ import type {
   InvestorDatum,
   InvestorPortfolio,
 } from "@/lib/actions/investors.actions";
-import { formatMarketCapUsd, formatNumber, formatPercent } from "@/lib/format";
+import { formatMarketCapUsd, formatNumber, formatPercent, NA } from "@/lib/format";
 import { Pagination, paginate } from "./Pagination";
 import { periodLabel } from "./format";
 
@@ -16,7 +16,7 @@ const ACTIONS: Record<string, string> = {
   donacion: "Donación",
   alta: "Alta",
   otro: "Otro",
-  sin_datos: "SIN_DATOS",
+  sin_datos: "Sin datos",
   concesion: "Concesión",
   ejercicio: "Ejercicio",
   retencion: "Retención",
@@ -36,8 +36,10 @@ export function Datum({
     datum.label !== "SIN_DATOS" &&
     datum.as_of &&
     (datum.label !== "OFICIAL" || datum.source_url);
+  // El código interno SIN_DATOS nunca se pinta crudo: la convención de la
+  // app para un dato ausente es «N/D».
   const text = !available
-    ? "SIN_DATOS"
+    ? NA
     : kind === "usd"
       ? formatMarketCapUsd(datum.value)
       : kind === "percent"
@@ -71,6 +73,41 @@ export function Datum({
   );
 }
 
+/** Peso en cartera: si el backend no lo trae (SIN_DATOS) pero el valor de
+ *  la posición y el total de la cartera sí son datos, se calcula
+ *  valor / total — dos cifras declaradas, nada inventado — y se etiqueta
+ *  INFERIDO con la fecha y fuente del total. Sin total fiable queda N/D. */
+function derivedWeight(
+  row: InvestorPortfolio["positions"][number],
+  total: InvestorDatum,
+): InvestorDatum {
+  const declared = row.weight_pct;
+  if (
+    declared.value !== null &&
+    Number.isFinite(declared.value) &&
+    declared.label !== "SIN_DATOS"
+  ) {
+    return declared;
+  }
+  const value = row.value_usd.value;
+  const totalValue = total.value;
+  if (
+    value !== null &&
+    Number.isFinite(value) &&
+    totalValue !== null &&
+    Number.isFinite(totalValue) &&
+    totalValue > 0
+  ) {
+    return {
+      value: (100 * value) / totalValue,
+      label: "INFERIDO",
+      as_of: total.as_of,
+      source_url: total.source_url,
+    };
+  }
+  return declared;
+}
+
 export function Portfolio({
   portfolio,
   view,
@@ -102,7 +139,8 @@ export function Portfolio({
       ) : null}
       {paged.items.length === 0 ? (
         <p className="text-sm text-gray-500">
-          SIN_DATOS{view === "cambios" ? " · Sin movimientos documentados" : ""}
+          {NA}
+          {view === "cambios" ? " · Sin movimientos documentados" : ""}
         </p>
       ) : view === "cambios" ? (
         <ul className="divide-y divide-gray-800">
@@ -141,7 +179,9 @@ export function Portfolio({
         </ul>
       ) : (
         <ul className="divide-y divide-gray-800">
-          {positions.items.map((row, index) => (
+          {positions.items.map((row, index) => {
+            const weight = derivedWeight(row, portfolio.total_value_usd);
+            return (
             <li
               className="flex flex-col gap-3 py-4"
               key={`${row.cusip}-${row.title_of_class}-${index}`}
@@ -162,7 +202,7 @@ export function Portfolio({
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-gray-500">Peso en cartera</p>
-                  <Datum datum={row.weight_pct} kind="percent" />
+                  <Datum datum={weight} kind="percent" />
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-gray-500">Acciones</p>
@@ -176,9 +216,9 @@ export function Portfolio({
                 </div>
               </div>
               {view === "distribucion" &&
-              row.weight_pct.value !== null &&
-              Number.isFinite(row.weight_pct.value) &&
-              row.weight_pct.label !== "SIN_DATOS" ? (
+              weight.value !== null &&
+              Number.isFinite(weight.value) &&
+              weight.label !== "SIN_DATOS" ? (
                 <div
                   aria-hidden="true"
                   className="h-1.5 overflow-hidden rounded-full bg-gray-900"
@@ -186,7 +226,7 @@ export function Portfolio({
                   <div
                     className="h-full rounded-full bg-lime-300/70"
                     style={{
-                      width: `${Math.min(100, Math.max(0, row.weight_pct.value))}%`,
+                      width: `${Math.min(100, Math.max(0, weight.value))}%`,
                     }}
                   />
                 </div>
@@ -195,7 +235,8 @@ export function Portfolio({
                 <p className="text-xs text-gray-500">{row.note}</p>
               ) : null}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       <Pagination
