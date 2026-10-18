@@ -36,7 +36,7 @@ def test_value_company_fails_closed_on_future_trace_period(monkeypatch) -> None:
     company = SimpleNamespace(id=1, ticker="PIT")
     monkeypatch.setattr(valuation_service, "resolve", lambda _company: engine)
     monkeypatch.setattr(valuation_service, "resolve_engine_key", lambda _company: "test")
-    monkeypatch.setattr(valuation_service, "_position_price", lambda _db, _company_id: 100.0)
+    monkeypatch.setattr(valuation_service, "_position_price", lambda _db, _company_id, _as_of=None: 100.0)
     monkeypatch.setattr(valuation_service, "_free_data_trace", lambda _db, _company: None)
     monkeypatch.setattr(MoatService, "assess", lambda *_args, **_kwargs: {})
 
@@ -59,7 +59,7 @@ def test_value_company_accepts_trace_period_on_or_before_as_of(monkeypatch) -> N
     company = SimpleNamespace(id=1, ticker="PIT")
     monkeypatch.setattr(valuation_service, "resolve", lambda _company: engine)
     monkeypatch.setattr(valuation_service, "resolve_engine_key", lambda _company: "test")
-    monkeypatch.setattr(valuation_service, "_position_price", lambda _db, _company_id: 100.0)
+    monkeypatch.setattr(valuation_service, "_position_price", lambda _db, _company_id, _as_of=None: 100.0)
     monkeypatch.setattr(valuation_service, "_free_data_trace", lambda _db, _company: None)
     monkeypatch.setattr(MoatService, "assess", lambda *_args, **_kwargs: {})
 
