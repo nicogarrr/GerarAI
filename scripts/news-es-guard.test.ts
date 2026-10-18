@@ -26,6 +26,7 @@ test('la ficha traduce sector e industria y colapsa duplicados', () => {
     assert.equal(sectorIndustryLine('Information Technology', 'Technology'), 'Tecnología');
     assert.equal(sectorIndustryLine('Health Care', 'Pharmaceuticals'), 'Salud · Pharmaceuticals');
     assert.equal(sectorIndustryLine('Financials', 'Unknown'), 'Servicios financieros');
+    assert.equal(sectorIndustryLine('Communication Services', 'Telecommunication'), 'Servicios de comunicación · Telecomunicaciones');
 });
 
 test('los mensajes red-team del backend son españoles (red de regresión)', () => {

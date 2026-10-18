@@ -26,6 +26,29 @@ export const SECTORES: Record<string, string> = {
   Unknown: 'Sin clasificar',
 };
 
+/** Industrias que llegan en inglés (Finnhub/Yahoo) y se leen mezcladas con el
+ *  sector ES. Solo se traduce lo conocido; lo demás se muestra tal cual. */
+export const INDUSTRIAS: Record<string, string> = {
+  Telecommunication: 'Telecomunicaciones',
+  Telecommunications: 'Telecomunicaciones',
+  'Telecom Services': 'Telecomunicaciones',
+  Semiconductors: 'Semiconductores',
+  Software: 'Software',
+  Biotechnology: 'Biotecnología',
+  Banking: 'Banca',
+  Banks: 'Banca',
+  Insurance: 'Seguros',
+  Retail: 'Distribución minorista',
+  Beverages: 'Bebidas',
+  Media: 'Medios',
+  Utilities: 'Servicios públicos',
+  'Aerospace & Defense': 'Aeroespacial y defensa',
+  'Oil & Gas': 'Petróleo y gas',
+  'Real Estate': 'Inmobiliario',
+  Automobiles: 'Automoción',
+  'Consumer Electronics': 'Electrónica de consumo',
+};
+
 /** Etiqueta ES de un sector; si el backend manda uno desconocido, se muestra tal cual. */
 export function etiquetaSector(value: string): string {
   return SECTORES[value] ?? value;
@@ -161,7 +184,7 @@ const cleanSectorPart = (value: unknown): string | null => {
 export function sectorIndustryLine(sector: unknown, industry: unknown): string {
     const parts = [cleanSectorPart(sector), cleanSectorPart(industry)]
         .filter((p): p is string => p !== null)
-        .map(etiquetaSector);
+        .map((part) => INDUSTRIAS[part] ?? etiquetaSector(part));
     const unique = parts.filter((part, index) => parts.indexOf(part) === index);
     return unique.length ? unique.join(' · ') : 'Sector sin dato';
 }
