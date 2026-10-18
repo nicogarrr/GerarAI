@@ -16,6 +16,7 @@ navegador, de ahi las cabeceras por defecto.
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import date, timedelta
 from typing import Any
 
@@ -43,7 +44,7 @@ _MIN_DAY_BUDGET_S = 0.5
 # (tests) la cache queda fuera para que cada test controle su red.
 _DAY_CACHE_TTL_S = 900.0
 _day_cache: dict[tuple[str, date], tuple[float, list[dict[str, Any]]]] = {}
-_day_inflight: dict[tuple[str, date], asyncio.Task[list[dict[str, Any]] | None]] = {}
+_day_inflight: dict[tuple[int, str, date], asyncio.Task[list[dict[str, Any]] | None]] = {}
 
 # Pool HTTP compartido. Antes cada dia abria un AsyncClient nuevo (TLS nueva
 # por consulta); el pool reutiliza conexiones entre dias y entre rangos.
@@ -188,16 +189,19 @@ async def _fetch_day_pooled(
     key = (kind, day)
     loop = asyncio.get_running_loop()
     hit = _day_cache.get(key)
-    if hit is not None and loop.time() - hit[0] < _DAY_CACHE_TTL_S:
+    if hit is not None and time.monotonic() - hit[0] < _DAY_CACHE_TTL_S:
         return hit[1]
-    task = _day_inflight.get(key)
+    # El singleflight es por event loop: una Task creada en otro loop no se
+    # puede esperar desde este ("attached to a different loop").
+    flight_key = (id(loop), kind, day)
+    task = _day_inflight.get(flight_key)
     if task is None:
         task = asyncio.ensure_future(fetch_day(day, None))
-        _day_inflight[key] = task
-        task.add_done_callback(lambda _t: _day_inflight.pop(key, None))
+        _day_inflight[flight_key] = task
+        task.add_done_callback(lambda _t: _day_inflight.pop(flight_key, None))
     events = await task
     if events is not None:
-        _day_cache[key] = (loop.time(), events)
+        _day_cache[key] = (time.monotonic(), events)
     return events
 
 
