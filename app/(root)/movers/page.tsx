@@ -103,16 +103,14 @@ export default async function MoversPage() {
         <p className="text-sm font-semibold uppercase text-teal-300">Mercado</p>
         <h1 className="mt-1 text-3xl font-bold text-gray-100">Movers</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
-          Subidas, bajadas y más activas calculadas con los precios registrados en tu base de datos
-          (último cierre frente al anterior).
-          {movers.as_of
-            ? ` El precio más reciente registrado es del ${movers.as_of}; cada fila declara la fecha de su precio y la hora en que se registró.`
-            : ' Aún no hay precios registrados.'}
           {movers.session_date
-            ? ` Los rankings usan solo la sesión del ${movers.session_date} frente a la sesión anterior.`
-            : ''}
+            ? `Subidas, bajadas y más activas de la sesión del ${movers.session_date} frente a la anterior.`
+            : 'Subidas, bajadas y más activas con los precios registrados.'}
+          {movers.as_of
+            ? ' Cada fila declara la fecha de su precio y la hora en que se registró.'
+            : ' Aún no hay precios registrados.'}
           {movers.excluded_not_comparable
-            ? ` ${movers.excluded_not_comparable} ${movers.excluded_not_comparable === 1 ? 'valor queda' : 'valores quedan'} fuera por no tener cierre en esa sesión (datos antiguos).`
+            ? ` ${movers.excluded_not_comparable} ${movers.excluded_not_comparable === 1 ? 'valor queda' : 'valores quedan'} fuera por no tener cierre en esa sesión.`
             : ''}
         </p>
       </header>
