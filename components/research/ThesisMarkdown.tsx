@@ -1,3 +1,4 @@
+import { thesisCodeLabel } from '@/lib/research/thesis-code-label';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -69,7 +70,14 @@ export const markdownComponents: Components = {
 export default function ThesisMarkdown({ content }: { content: string }) {
   return (
     <div className="min-w-0 max-w-full [overflow-wrap:anywhere] rounded-lg border border-gray-800 bg-black/20 p-4 text-sm leading-6 text-gray-300">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+        ...markdownComponents,
+        code: ({ node: _node, className, children, ...props }) => (
+          <code className={`rounded bg-gray-800 px-1 py-0.5 font-mono text-[0.85em] text-gray-200 ${className ?? ''}`} {...props}>
+            {!className && typeof children === 'string' ? thesisCodeLabel(children) : children}
+          </code>
+        ),
+      }}>
         {content}
       </ReactMarkdown>
     </div>
