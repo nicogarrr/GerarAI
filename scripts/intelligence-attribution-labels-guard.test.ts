@@ -15,7 +15,7 @@ test('F282: el catálogo cerrado de componentes tiene etiqueta ES', () => {
         buybacks: 'Recompras',
         dilution: 'Dilución',
         fx: 'Divisa',
-        sizing: 'Tamaño de posición',
+        sizing: 'Contribución ponderada',
     };
     for (const [key, label] of Object.entries(esperadas)) {
         assert.equal(etiquetaComponenteAtribucion(key), label, key);
@@ -38,4 +38,10 @@ test('F333: las tablas anchas de inteligencia llevan affordance de scroll y cont
     const wrappers = page.match(/scroll-affordance-x mt-4 overflow-x-auto \[contain:layout_paint\]/g) ?? [];
     assert.equal(wrappers.length, 3);
     assert.doesNotMatch(page, /className="mt-4 overflow-x-auto"/);
+});
+
+test('sizing names the actual weighted-return calculation, never the position weight',()=>{
+    const backend=readFileSync('data-engine/app/services/portfolio_intelligence_service.py','utf8');
+    assert.match(backend, /"sizing":\s*\(\s*total_return \* weights.get\(company.id, 0\)/);
+    assert.notEqual(etiquetaComponenteAtribucion('sizing'), 'Tamaño de posición');
 });
