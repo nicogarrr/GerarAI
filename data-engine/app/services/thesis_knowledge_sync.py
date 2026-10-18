@@ -81,28 +81,34 @@ def sync_thesis_knowledge(
     thesis: ThesisVersion,
     *,
     published: bool,
-) -> None:
+) -> dict:
     """Mantiene la Biblioteca al dia con la decision de aprobacion.
 
     ``published=True`` (aprobar): sustituye el documento automatico anterior
     por el memo de ESTA version. ``published=False`` (rechazar): retira el
     documento automatico. Nunca lanza.
+
+    Devuelve el resultado para que la UI pueda contarlo sin inventar:
+    ``{"status": "indexed"|"unchanged"|"removed"|"none"|"failed",
+       "document_id": int | None}``.
     """
     try:
-        _sync(db, company, thesis, published=published)
+        return _sync(db, company, thesis, published=published)
     except Exception:
         logger.exception(
             "knowledge sync fallo para la tesis %s (%s)", thesis.id, company.ticker
         )
+        return {"status": "failed", "document_id": None}
 
 
-def _sync(db: Session, company: Company, thesis: ThesisVersion, *, published: bool) -> None:
+def _sync(db: Session, company: Company, thesis: ThesisVersion, *, published: bool) -> dict:
     service = KnowledgeLibraryService()
     existing = _auto_documents(db, company.ticker)
     current = next(
         (doc for doc in existing if (doc.metadata_ or {}).get("thesis_version_id") == thesis.id),
         None,
     )
+    removed_this_version = False
     for document in existing:
         if published:
             # Aprobar sustituye cualquier version auto-indexada anterior.
@@ -112,10 +118,18 @@ def _sync(db: Session, company: Company, thesis: ThesisVersion, *, published: bo
             # Rechazar solo retira ESTA version: una version publicada mas
             # antigua sigue vigente y conserva su documento.
             continue
+        if (document.metadata_ or {}).get("thesis_version_id") == thesis.id:
+            removed_this_version = True
         service.delete_document(db, document)
-    if not published or current is not None:
-        # Rechazo: ya se retiro. Aprobacion de la misma version: idempotente.
-        return
+    if not published:
+        # Rechazo: retirado si existia; "none" si no habia nada que retirar.
+        return {
+            "status": "removed" if removed_this_version else "none",
+            "document_id": None,
+        }
+    if current is not None:
+        # Aprobacion de la misma version: idempotente, ya estaba indexada.
+        return {"status": "unchanged", "document_id": current.id}
     collection = _ensure_collection(db, service)
     markdown = build_memo_markdown(db, company, thesis)
     result = service.ingest_bytes(
@@ -137,3 +151,7 @@ def _sync(db: Session, company: Company, thesis: ThesisVersion, *, published: bo
         "tesis %s v%s indexada como conocimiento (doc %s, estado %s)",
         company.ticker, thesis.version, document_id, result.get("status"),
     )
+    return {
+        "status": "indexed",
+        "document_id": document_id if isinstance(document_id, int) else None,
+    }
