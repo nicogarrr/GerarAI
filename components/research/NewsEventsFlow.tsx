@@ -10,33 +10,42 @@ import { NewsSecondOrder } from '@/components/research/NewsSecondOrder';
 import { etiquetaDireccionImpacto, etiquetaTemaMacro, etiquetaTierFuente, etiquetaTipoEvento } from "@/lib/labels";
 
 const CARRILES = [
-  { key: null, label: 'Todas', href: '/research/news' },
-  { key: 'empresa', label: 'Empresas', href: '/research/news?lane=empresa' },
-  { key: 'macro', label: 'Macro', href: '/research/news?lane=macro' },
+  { key: null, label: 'Todas' },
+  { key: 'empresa', label: 'Empresas' },
+  { key: 'macro', label: 'Macro' },
 ] as const;
+
+function carrilHref(lane: NewsLane, ticker?: string | null): string {
+  const query = new URLSearchParams();
+  if (lane) query.set('lane', lane);
+  if (ticker) query.set('ticker', ticker);
+  const text = query.toString();
+  return text ? `/research/news?${text}` : '/research/news';
+}
 
 const PAGER_LINK = 'rounded-lg border border-gray-800 px-3 py-1.5 text-sm text-gray-300 hover:border-gray-700';
 const PAGER_OFF = 'rounded-lg border border-gray-900 px-3 py-1.5 text-sm text-gray-700';
 
-function newsPageHref(lane: NewsLane, page: number): string {
+function newsPageHref(lane: NewsLane, page: number, ticker?: string | null): string {
   const query = new URLSearchParams();
   if (lane) query.set('lane', lane);
+  if (ticker) query.set('ticker', ticker);
   if (page > 1) query.set('pagina', String(page));
   const text = query.toString();
   return text ? `/research/news?${text}` : '/research/news';
 }
 
-function NewsPager({label,lane,page,hasMore}:{label:string;lane:NewsLane;page:number;hasMore:boolean}){
+function NewsPager({label,lane,page,hasMore,ticker}:{label:string;lane:NewsLane;page:number;hasMore:boolean;ticker?:string|null}){
  return (
         <nav aria-label={label} className="mt-4 flex items-center justify-between gap-4">
           {page > 1 ? (
-            <Link className={PAGER_LINK} href={newsPageHref(lane, page - 1)} rel="prev">Anterior</Link>
+            <Link className={PAGER_LINK} href={newsPageHref(lane, page - 1, ticker)} rel="prev">Anterior</Link>
           ) : (
             <span aria-disabled="true" className={PAGER_OFF}>Anterior</span>
           )}
           <span className="text-sm text-gray-500">Página {page}</span>
           {hasMore ? (
-            <Link className={PAGER_LINK} href={newsPageHref(lane, page + 1)} rel="next">Siguiente</Link>
+            <Link className={PAGER_LINK} href={newsPageHref(lane, page + 1, ticker)} rel="next">Siguiente</Link>
           ) : (
             <span aria-disabled="true" className={PAGER_OFF}>Siguiente</span>
           )}
@@ -64,6 +73,7 @@ export function NewsEventsFlow({
   hasMore,
   lane,
   page,
+  ticker,
   portfolioTickers,
   watchlistTickers,
 }: {
@@ -71,6 +81,7 @@ export function NewsEventsFlow({
   hasMore: boolean;
   lane: NewsLane;
   page: number;
+  ticker?: string | null;
   portfolioTickers: string[];
   watchlistTickers: string[];
 }) {
@@ -82,7 +93,7 @@ export function NewsEventsFlow({
           <AlertTriangle aria-hidden="true" className="h-5 w-5 text-teal-300" />
           <h2 className="text-lg font-semibold text-gray-100">Flujo de eventos</h2>
         </div>
-        <NewsPager label="Paginación" lane={lane} page={page} hasMore={hasMore} />
+        <NewsPager label="Paginación" lane={lane} page={page} hasMore={hasMore} ticker={ticker} />
         <nav aria-label="Filtrar por carril" className="mb-4 flex flex-wrap items-center gap-2 text-xs">
           {CARRILES.map((option) => {
             const active = lane === option.key;
@@ -94,7 +105,7 @@ export function NewsEventsFlow({
                     ? 'border-teal-500 bg-teal-950/60 font-semibold text-teal-300'
                     : 'border-gray-800 text-gray-400 hover:text-gray-200'
                 }`}
-                href={option.href}
+                href={carrilHref(option.key, ticker)}
                 key={option.label}
               >
                 {option.label}

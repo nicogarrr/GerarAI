@@ -19,7 +19,8 @@ test('el flujo de noticias pagina dentro de la pagina, sin scroll infinito', () 
 
 test('la pagina pide al servidor la ventana de ?pagina y un evento extra para saber si hay siguiente', () => {
   assert.match(page, /pagina\?: string/);
-  assert.match(page, /getResearchNews\(lane, \(page - 1\) \* NEWS_PAGE_SIZE, NEWS_PAGE_SIZE \+ 1\)/);
+  assert.match(page, /ticker\?: string/);
+  assert.match(page, /getResearchNews\(lane, \(page - 1\) \* NEWS_PAGE_SIZE, NEWS_PAGE_SIZE \+ 1, ticker\)/);
   assert.match(page, /fetched\.length > NEWS_PAGE_SIZE/);
   assert.doesNotMatch(page, /events\.filter\(/);
 });

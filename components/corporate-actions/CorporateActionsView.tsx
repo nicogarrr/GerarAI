@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 interface CorporateActionsViewProps {
     initialActions: DataRecord[];
     emptyMessage?: string;
+    ticker?: string | null;
 }
 
 /** Etiquetas visibles de esas columnas. Sin este mapa el usuario leía
@@ -51,8 +52,15 @@ function isApplied(record: DataRecord): boolean {
     return typeof record.applied_at === 'string' && record.applied_at !== '';
 }
 
-export default function CorporateActionsView({ initialActions, emptyMessage }: CorporateActionsViewProps) {
+export default function CorporateActionsView({ initialActions, emptyMessage, ticker }: CorporateActionsViewProps) {
     const [applyingId, setApplyingId] = useState<number | null>(null);
+
+    // Filtro por empresa al llegar desde la ficha (?ticker=): se aplica a la
+    // lista inicial Y a cada refetch, o la tabla volveria a mostrar todas las
+    // empresas tras aplicar una accion.
+    const matchesTicker = (record: DataRecord): boolean =>
+        !ticker || String(record.ticker ?? '').toUpperCase() === ticker;
+    const visibleActions = initialActions.filter(matchesTicker);
 
     const handleApply = async (record: DataRecord, replace: ReplaceRecord) => {
         const actionId = recordActionId(record);
@@ -81,8 +89,8 @@ export default function CorporateActionsView({ initialActions, emptyMessage }: C
             title="Acciones Corporativas"
             description="Dividendos, splits, spin-offs y fusiones pendientes de aplicar a la cartera"
             icon={<Building2 className="h-5 w-5 text-teal-400" />}
-            records={initialActions}
-            fetchRecords={getCorporateActions}
+            records={visibleActions}
+            fetchRecords={async () => (await getCorporateActions()).filter(matchesTicker)}
             // Columnas que sí sirve GET /api/corporate-actions
             // (corporate_actions._payload). `status` no está en ese payload:
             // la columna se pintaba siempre a «—».
@@ -95,7 +103,7 @@ export default function CorporateActionsView({ initialActions, emptyMessage }: C
                         : String(value ?? '—'),
                 ratio: (value) => formatNumber(value as number | string | null, { maximumFractionDigits: 4 }),
             }}
-            emptyMessage={emptyMessage ?? 'Sin eventos pendientes.'}
+            emptyMessage={emptyMessage ?? (ticker ? `Sin eventos pendientes de ${ticker}.` : 'Sin eventos pendientes.')}
             linkColumns={{ ticker: (record) => researchHrefFor(record) }}
             rowActions={(record, _index, replace) => {
                 const actionId = recordActionId(record);
