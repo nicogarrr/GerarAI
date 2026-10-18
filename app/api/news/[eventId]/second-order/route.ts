@@ -12,7 +12,7 @@ async function getHandler(_request: Request, { params }: { params: Promise<{ eve
   try {
     const data = await researchRequest<unknown>(`/api/news/${eventId}/second-order?use_llm=true`, {
       cache: 'no-store',
-      timeoutMs: 45_000,
+      timeoutMs: 55_000,
     });
     return NextResponse.json(data);
   } catch {

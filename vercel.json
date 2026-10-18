@@ -27,6 +27,9 @@
     "app/api/thesis/**": {
       "maxDuration": 60
     },
+    "app/api/news/**/second-order/route.ts": {
+      "maxDuration": 60
+    },
     "app/**/page.tsx": {
       "maxDuration": 10
     },
