@@ -173,7 +173,7 @@ export default async function WatchlistPage({
                             <article key={stock.symbol} className="min-w-0 rounded-xl border border-gray-700/60 bg-gray-900/60 p-4">
                                 <div className="flex min-w-0 items-center gap-3">
                                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gray-800 text-sm font-bold text-gray-300" aria-hidden="true">
-                                        {stock.symbol.slice(0, 2)}
+                                        <Eye aria-hidden="true" className="h-5 w-5" />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <Link
@@ -182,9 +182,7 @@ export default async function WatchlistPage({
                                         >
                                             {stock.symbol}
                                         </Link>
-                                        <p className="truncate text-xs text-gray-500" title={stock.name}>
-                                            {stock.name}
-                                        </p><TrackedAnalysisStatus analysis={stock.analysis} />
+                                        {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} />
                                         {stock.price === null ? (
                                             <Badge variant="outline" className="mt-1 border-gray-700 text-gray-400">
                                                 sin datos
@@ -209,7 +207,7 @@ export default async function WatchlistPage({
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Market Cap</dt>
                                         <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCapUsd(stock.marketCap) : NA}
+                                            {stock.marketCap !== null ? formatMarketCapUsd(stock.marketCap) : NA}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
                                         </dd>
                                     </div>
                                     <div className="min-w-0">
@@ -252,7 +250,7 @@ export default async function WatchlistPage({
                                         <TableCell>
                                             <Link href={`/research/${stock.symbol}`} className="group flex items-center gap-3">
                                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-800 font-bold text-gray-300 transition-colors group-hover:bg-gray-700" aria-hidden="true">
-                                                    {stock.symbol.slice(0, 2)}
+                                                    <Eye aria-hidden="true" className="h-5 w-5" />
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2 font-bold text-gray-200 transition-colors group-hover:text-blue-400">
@@ -263,9 +261,7 @@ export default async function WatchlistPage({
                                                             </Badge>
                                                         ) : null}
                                                     </div>
-                                                    <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>
-                                                        {stock.name}
-                                                    </div><TrackedAnalysisStatus analysis={stock.analysis} />
+                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} />
                                                 </div>
                                             </Link>
                                             <details className="relative ml-2 inline-block align-middle">
@@ -295,7 +291,7 @@ export default async function WatchlistPage({
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCapUsd(stock.marketCap) : NA}
+                                            {stock.marketCap !== null ? formatMarketCapUsd(stock.marketCap) : NA}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {stock.peRatio !== null && stock.peRatio !== undefined && Number.isFinite(stock.peRatio) ? (
