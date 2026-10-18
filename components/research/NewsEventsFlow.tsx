@@ -6,6 +6,7 @@ import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import type { NewsLane } from '@/lib/news-paging';
 import { formatPercent, formatTimeAgo, formatUserDateTime, NA } from '@/lib/format';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
+import { NewsSummary } from './NewsSummary';
 import { NewsSecondOrder } from '@/components/research/NewsSecondOrder';
 import { etiquetaDireccionImpacto, etiquetaTemaMacro, etiquetaTierFuente, etiquetaTipoEvento } from "@/lib/labels";
 
@@ -202,6 +203,7 @@ export function NewsEventsFlow({
                 <span className="ml-auto"><MaterialityIndicator score={event.materiality_score} /></span>
               </div>
               <div className="mt-2 text-sm text-gray-200"><NewsHeadline event={event} /></div>
+              <NewsSummary event={event} />
               <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
                 <span className="min-w-0 break-words">{event.source || NA}</span>
                 <span aria-hidden="true">·</span>
@@ -260,6 +262,7 @@ export function NewsEventsFlow({
                   </td>
                   <td className="max-w-[420px] px-3 py-2.5 text-gray-300">
                     <NewsHeadline event={event} />
+                    <NewsSummary event={event} />
                     <div className="mt-1 text-xs text-gray-500">{event.source || NA}</div>
                   </td>
                   <td className="px-3 py-2.5 text-center">

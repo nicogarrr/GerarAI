@@ -1160,6 +1160,9 @@ export async function importResearchDocumentUrl(formData: FormData) {
 export type ResearchNewsEvent = {
   original_headline?: string;
   headline_translation?: {text: string; target_language: string; machine_translation: boolean} | null;
+  /** Resumen/cuerpo ingerido y su traducción cacheada (misma procedencia que el titular). */
+  summary?: string;
+  summary_translation?: {text: string; target_language: string; machine_translation: boolean} | null;
   id: number;
   ticker: string | null;
   date: string;
