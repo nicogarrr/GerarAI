@@ -7,6 +7,7 @@ import ScenarioAssumptions from '@/components/research/ScenarioAssumptions';
 import ThesisHumanInputForm from '@/components/research/ThesisHumanInputForm';
 import ThesisDebatePanel from '@/components/research/ThesisDebatePanel';
 import ThesisAudioPlayer from '@/components/research/ThesisAudioPlayer';
+import ThesisMarkdown from '@/components/research/ThesisMarkdown';
 import { Badge } from '@/components/ui/badge';
 import type { ResearchThesis } from '@/lib/actions/research.actions';
 import type { GlossaryKey } from '@/lib/glossary';
@@ -423,9 +424,7 @@ export default function ThesisMemo({
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
           Memorando completo
         </h3>
-        <div className="whitespace-pre-wrap rounded-lg border border-gray-800 bg-black/20 p-4 text-sm leading-6 text-gray-400">
-          {thesis.thesis_markdown}
-        </div>
+        <ThesisMarkdown content={thesis.thesis_markdown} />
       </section>
 
       {/* Audio básico al final (WorldStocks punto 6): el resumen, la narrativa,
