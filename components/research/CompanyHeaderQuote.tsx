@@ -25,6 +25,8 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
     useEffect(() => {
         let disposed = false;
         let inFlight = false;
+        let lastRead = 0;
+        let activeSession = true;
         const controller = new AbortController();
         setQuote(null);
         const refresh = async (initial = false) => {
@@ -32,19 +34,27 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
             // headless browser) must not stay on N/D forever. Only the polling
             // pauses while hidden.
             if (!requestTicker || (!initial && document.visibilityState !== 'visible') || inFlight) return;
+            if (!initial && Date.now() - lastRead < 300_000) return;
+            lastRead = Date.now();
             inFlight = true;
             try {
                 const response = await fetch(`/api/companies/${encodeURIComponent(requestTicker)}/extended-quote${recoverListing ? '?resolveListing=1' : ''}`, {
                     cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]),
                 });
                 const value = response.ok ? await response.json() as ExtendedQuote : null;
+                activeSession = value?.session === 'regular' || value?.session === 'pre' || value?.session === 'post';
                 if (!disposed) setQuote(value?.status !== 'unavailable' ? value : null);
             } catch {
                 if (!disposed) setQuote(null); // No stale-on-error price.
             } finally { inFlight = false; }
         };
         void refresh(true);
-        const interval = window.setInterval(() => { void refresh(); }, 60000);
+        // Closed sessions need a low-frequency recovery read: no exchange
+        // calendar is supplied by the API, so never guess opening hours or
+        // freeze a tab forever after a weekend/error.
+        const interval = window.setInterval(() => {
+            if (activeSession || Date.now() - lastRead >= 1_800_000) void refresh();
+        }, 300_000);
         const onVisibility = () => { if (document.visibilityState === 'visible') void refresh(); };
         document.addEventListener('visibilitychange', onVisibility);
         return () => {
