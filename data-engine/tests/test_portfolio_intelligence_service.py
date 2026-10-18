@@ -93,7 +93,7 @@ def test_base_currency_fallback_uses_native_value(db):
     assert result["exposures"]["currencies"] == {"EUR": 1.0}
 
 
-def test_attribution_with_spot_null_adj_close_at_end_does_not_raise(db):
+def test_attribution_with_spot_null_adj_close_at_end_uses_close_and_declares_it(db):
     """Historica ajustada al inicio + fila spot (adj_close NULL) al final.
 
     El ratio de extremos exige AMBOS ajustados: sin la guarda, dividir por el
@@ -119,4 +119,6 @@ def test_attribution_with_spot_null_adj_close_at_end_does_not_raise(db):
 
     positions = result["attribution"]["positions"]
     assert len(positions) == 1
-    assert positions[0]["total_return"] is None
+    # La cola spot usa `close` (aproximacion declarada en coverage): 11 / 9.5 - 1.
+    assert positions[0]["total_return"] == pytest.approx(11 / 9.5 - 1)
+    assert result["coverage"]["spot_tail_positions"] == ["DDD"]

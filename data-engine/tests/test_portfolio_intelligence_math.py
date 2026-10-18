@@ -182,3 +182,19 @@ def test_attribution_facts_are_limited_to_the_price_window():
     assert S._series_change(shares) == 2.2
     assert round(S._series_change(window), 3) == 0.067
     assert S._series_change(S._window_facts(shares, 2025, 2026)) is None
+
+
+def test_trailing_spot_rows_use_close_but_interior_gaps_stay_empty():
+    from decimal import Decimal as D
+    from types import SimpleNamespace as N
+
+    from app.services.portfolio_intelligence_service import PortfolioIntelligenceService as S
+
+    def row(day, close, adj):
+        return N(date=date(2026, 1, day), close=D(close), adj_close=adj if adj is None else D(adj), source="t")
+
+    series = [row(1, "10", "10"), row(2, "11", None), row(3, "12", "12"), row(4, "13", None), row(5, "14", None)]
+    filled = S._fill_trailing_spot(series)
+    assert [r.adj_close for r in filled] == [D("10"), None, D("12"), D("13"), D("14")]
+    assert S._returns(filled) == {date(2026, 1, 4): pytest.approx(13 / 12 - 1), date(2026, 1, 5): pytest.approx(14 / 13 - 1)}
+    assert S._fill_trailing_spot([row(1, "10", None)])[0].adj_close is None
