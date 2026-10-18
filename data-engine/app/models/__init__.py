@@ -210,6 +210,14 @@ from app.models.paper_trading import PaperTrade as PaperTrade  # noqa: E402
 
 __all__.append("PaperTrade")
 
+from app.models.propick_snapshot import PropickSnapshot as PropickSnapshot  # noqa: E402
+
+__all__.append("PropickSnapshot")
+
+from app.models.propick_review import PropickReview as PropickReview  # noqa: E402
+
+__all__.append("PropickReview")
+
 from app.models.bottleneck import BottleneckSignal as BottleneckSignal  # noqa: E402
 
 __all__.append("BottleneckSignal")

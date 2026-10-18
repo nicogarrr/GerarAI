@@ -64,6 +64,8 @@ class Gem:
     score: float
     market_cap: float
     reasons: list[dict] = field(default_factory=list)
+    price: float | None = None
+    price_date: date | None = None
 
 
 def _clip(x: float) -> float:
@@ -250,6 +252,8 @@ def find_gems(
             )
         )
         if gem:
+            gem.price = float(price.close)
+            gem.price_date = price.date
             gems.append(gem)
     gems.sort(key=lambda g: (-g.score, g.ticker))
     return gems[:limit]
