@@ -75,18 +75,18 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                 )}
                 {showPrice ? <p className="mt-1 text-xs text-gray-500">{quote!.source} · {quoteTime(quote!.timestamp)} (Madrid)</p> : null}
             </div>
-            <div className="overflow-x-auto">
-                <dl className="grid grid-cols-2 divide-x divide-gray-800 border-y border-gray-800 sm:grid-cols-4" data-testid="company-metric-strip">
+            <div className="min-w-0 max-w-full">
+                <dl className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800" data-testid="company-metric-strip">
                     {[
                         ['Apertura', hasDatedMetrics ? quote!.open : null],
                         ['Máximo', hasDatedMetrics ? quote!.high : null],
                         ['Mínimo', hasDatedMetrics ? quote!.low : null],
                         ['Cierre anterior', quote?.previous_close_timestamp || quote?.previous_close_date ? quote.previous_close : null],
                     ].map(([metricLabel, value]) => (
-                        <div className="min-w-0 px-2 py-3 first:pl-0 sm:px-3" key={String(metricLabel)}>
+                        <div className="min-w-0 py-3 sm:px-3 sm:first:pl-0" key={String(metricLabel)}>
                             <dt className="text-xs text-gray-500">{metricLabel}</dt>
-                            <dd className="mt-1 text-sm font-medium text-gray-200">{value == null || !isValidCurrencyCode(currency) ? NA : formatMoney(value as number, currency)}</dd>
-                            {metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <p className="text-[11px] text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp)} · ${quoteTime(quote.previous_close_timestamp)}` : quoteSessionDate(quote.previous_close_date)}</p> : null}
+                            <dd className="mt-1 break-words text-sm font-medium text-gray-200">{value == null || !isValidCurrencyCode(currency) ? NA : formatMoney(value as number, currency)}</dd>
+                            {metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <p className="break-words text-[11px] text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp)} · ${quoteTime(quote.previous_close_timestamp)}` : quoteSessionDate(quote.previous_close_date)}</p> : null}
                         </div>
                     ))}
                 </dl>
