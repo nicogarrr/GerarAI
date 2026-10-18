@@ -28,6 +28,12 @@ test('hub inversores: sin ningún 13F ofrece la misma acción de sincronizar', (
   assert.ok(page.includes('.every((investor) => !investor.report_date)'), 'solo cuando NINGÚN inversor tiene 13F');
 });
 
+test('ficha de inversor: con 13F sin sincronizar ofrece la acción en vez de «N/D · 0 posiciones»', () => {
+  const page = read('app/(root)/inversores/[slug]/page.tsx');
+  assert.ok(page.includes('SyncPortfoliosButton'), 'la ficha reutiliza el botón de sincronización');
+  assert.ok(page.includes('investor.has_13f && portfolio.positions.length === 0'), 'solo cuando el inversor tiene 13F y no hay posiciones');
+});
+
 test('la acción de sincronización llama a la ruta async que encola el actor', () => {
   assert.ok(read('lib/actions/investors.actions.ts').includes('/api/ownership/managers/sync-async'));
   const route = read('data-engine/app/api/routes/ownership.py');
