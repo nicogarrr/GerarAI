@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
+from math import isfinite
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -38,6 +40,209 @@ WORK_PRODUCT_TYPES = {
 COMPANY_REQUIRED = WORK_PRODUCT_TYPES - {"portfolio_review", "risk_report"}
 
 
+# QA /research «Generar entregable»: el diálogo volcaba el JSON crudo
+# (snake_case, inglés) y el markdown del backend metía str(payload) con
+# reprs de Python. El documento que lee el usuario se genera aquí en
+# español: secciones con nombre, cifras formateadas y fuentes.
+_PRODUCT_LABELS = {
+    "one_page_memo": "Memo de una página",
+    "full_thesis": "Tesis completa",
+    "earnings_review": "Revisión de resultados",
+    "valuation_memo": "Memo de valoración",
+    "capital_allocation_analysis": "Análisis de asignación de capital",
+    "comparables": "Comparables",
+    "portfolio_review": "Revisión de cartera",
+    "risk_report": "Informe de riesgo",
+}
+_SECTION_LABELS = {
+    "company": "Empresa",
+    "investment_summary": "Resumen de inversión",
+    "market_price": "Precio de mercado",
+    "metrics": "Métricas",
+    "risks": "Riesgos",
+    "risks_and_open_questions": "Riesgos y preguntas abiertas",
+    "thesis": "Tesis",
+    "financial_facts": "Datos financieros",
+    "calculated_metrics": "Métricas calculadas",
+    "peer_comparison": "Comparación con comparables",
+    "portfolio_intelligence": "Panorama de cartera",
+    "portfolio_risk": "Riesgo de cartera",
+}
+_KEY_LABELS = {
+    "ticker": "Ticker",
+    "name": "Nombre",
+    "sector": "Sector",
+    "industry": "Industria",
+    "company_type": "Tipo de empresa",
+    "version": "Versión",
+    "status": "Estado",
+    "rating": "Calificación",
+    "executive_summary": "Resumen ejecutivo",
+    "current_price": "Precio actual",
+    "bear_value": "Valor bajista",
+    "base_value": "Valor base",
+    "bull_value": "Valor optimista",
+    "expected_value": "Valor esperado",
+    "margin_of_safety": "Margen de seguridad",
+    "close": "Cierre",
+    "date": "Fecha",
+    "source": "Fuente",
+    "kind": "Tipo",
+    "statement": "Afirmación",
+    "title": "Título",
+    "severity": "Severidad",
+    "confidence": "Confianza",
+    "value": "Valor",
+    "unit": "Unidad",
+    "period": "Periodo",
+}
+_METRIC_LABELS = {
+    "revenue": "Ingresos",
+    "net_income": "Beneficio neto",
+    "total_equity": "Patrimonio neto",
+    "eps": "BPA",
+    "eps_diluted": "BPA diluido",
+    "shares_diluted": "Acciones diluidas",
+    "free_cash_flow": "Flujo de caja libre",
+    "fcf_margin": "Margen de FCF",
+    "net_debt": "Deuda neta",
+    "total_debt": "Deuda total",
+    "cash_and_equivalents": "Efectivo y equivalentes",
+    "interest_coverage": "Cobertura de intereses",
+    "current_ratio": "Ratio de liquidez",
+    "wacc": "WACC",
+    "roic": "ROIC",
+    "incremental_roic": "ROIC incremental",
+    "capital_expenditure": "Inversión de capital",
+    "owner_earnings": "Beneficios del propietario",
+    "stock_based_compensation": "Compensación en acciones",
+    "dividends": "Dividendos",
+    "buybacks": "Recompras",
+}
+_STATUS_LABELS = {
+    "missing": "sin datos",
+    "ok": "correcto",
+    "high": "alta",
+    "medium": "media",
+    "low": "baja",
+    "draft": "borrador",
+    "published": "publicada",
+    "contradicted": "contradicha",
+    "stale": "desactualizada",
+    "uncertain": "incierta",
+    "unverified": "sin verificar",
+    "operating": "operativa",
+    "holding": "holding",
+    "unassigned": "sin clasificar",
+    "bank": "banco",
+    "insurance": "aseguradora",
+}
+# Avisos del manifiesto (el JSON los expone en inglés y los tests lo pinean;
+# la traducción es solo para el documento legible).
+_WARNING_LABELS = {
+    "No canonical sources were available": "No había fuentes canónicas disponibles.",
+    "Data date is unavailable": "La fecha de los datos no está disponible.",
+}
+_OBSERVATION_KEYS = {"value", "unit", "period", "confidence", "citation"}
+
+
+def _label(key: str) -> str:
+    if key in _KEY_LABELS:
+        return _KEY_LABELS[key]
+    return key.replace("_", " ").capitalize()
+
+
+def _format(value: Any) -> str:
+    """Cifra o texto legible en español; nunca reprs de Python."""
+    if value is None:
+        return "sin datos"
+    if isinstance(value, bool):
+        return "sí" if value else "no"
+    if isinstance(value, Decimal):
+        text = (
+            f"{value:,.4f}".rstrip("0").rstrip(".")
+            if value != int(value)
+            else f"{int(value):,}"
+        )
+        return text.replace(",", "\0").replace(".", ",").replace("\0", ".")
+    if isinstance(value, int):
+        return f"{value:,}".replace(",", ".")
+    if isinstance(value, float):
+        if not isfinite(value):
+            return "sin datos"
+        text = f"{value:,.4f}".rstrip("0").rstrip(".")
+        return text.replace(",", "\0").replace(".", ",").replace("\0", ".")
+    if isinstance(value, (date, datetime)):
+        return value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+    text = str(value)
+    return _STATUS_LABELS.get(text, text)
+
+
+def _render_observation(name: str, obs: dict[str, Any], lines: list[str]) -> None:
+    value = obs.get("value")
+    unit = obs.get("unit") or ""
+    extras = [
+        extra
+        for extra in (
+            obs.get("period"),
+            _STATUS_LABELS.get(str(obs.get("confidence")), _format(obs.get("confidence"))),
+        )
+        if extra
+    ]
+    suffix = f" ({', '.join(_format(extra) for extra in extras)})" if extras else ""
+    label = _METRIC_LABELS.get(name, _label(name))
+    lines.append(f"- **{label}**: {_format(value)} {unit}{suffix}".rstrip())
+
+
+def _render_payload(payload: Any, lines: list[str]) -> None:
+    """Renderiza un payload arbitrario como markdown legible (recursivo)."""
+    if isinstance(payload, dict):
+        if payload.get("status") == "missing" and len(payload) == 1:
+            lines.append("_Sin datos._")
+            return
+        for key, value in payload.items():
+            if key == "citation" or value is None:
+                continue
+            if key == "markdown" and isinstance(value, str):
+                lines.extend(("", value))
+            elif isinstance(value, dict):
+                if set(value) <= _OBSERVATION_KEYS:
+                    _render_observation(key, value, lines)
+                else:
+                    lines.append(f"- **{_label(key)}**:")
+                    nested: list[str] = []
+                    _render_payload(value, nested)
+                    lines.extend(f"  {line}" if line else line for line in nested)
+            elif isinstance(value, list):
+                lines.append(f"- **{_label(key)}**:")
+                nested = []
+                _render_payload(value, nested)
+                lines.extend(f"  {line}" if line else line for line in nested)
+            else:
+                lines.append(f"- **{_label(key)}**: {_format(value)}")
+    elif isinstance(payload, list):
+        if not payload:
+            lines.append("_Sin datos._")
+            return
+        for item in payload:
+            if isinstance(item, dict) and set(item) <= _OBSERVATION_KEYS:
+                _render_observation("valor", item, lines)
+            elif isinstance(item, dict):
+                pairs = [
+                    f"**{_label(k)}**: {_format(v)}"
+                    for k, v in item.items()
+                    if k != "citation" and v is not None and not isinstance(v, (dict, list))
+                ]
+                lines.append("- " + ", ".join(pairs))
+                for k, v in item.items():
+                    if isinstance(v, (dict, list)) and k != "citation":
+                        _render_payload(v, lines)
+            else:
+                lines.append(f"- {_format(item)}")
+    else:
+        lines.append(_format(payload))
+
+
 class WorkProductService:
     def generate(
         self,
@@ -61,17 +266,17 @@ class WorkProductService:
                 )
             }
             sources, data_as_of = self._portfolio_manifest(db)
-            title = "Portfolio Review"
+            title = _PRODUCT_LABELS["portfolio_review"]
         elif product_type == "risk_report" and company is None:
             sections = {"portfolio_risk": RiskService().dashboard(db)}
             sources, data_as_of = self._portfolio_manifest(db)
-            title = "Portfolio Risk Report"
+            title = f"{_PRODUCT_LABELS['risk_report']} de cartera"
         else:
             assert company is not None
             context = self._context(db, company, years)
             sections = self._sections(db, company, product_type, context)
             sources, data_as_of = context["sources"], context["data_as_of"]
-            title = f"{product_type.replace('_', ' ').title()} · {company.ticker}"
+            title = f"{_PRODUCT_LABELS[product_type]} · {company.ticker}"
 
         manifest = {
             "generated_at": datetime.now(UTC),
@@ -412,13 +617,28 @@ class WorkProductService:
     def _markdown(
         self, title: str, sections: dict[str, Any], manifest: dict[str, Any]
     ) -> str:
-        lines = [f"# {title}", "", f"Data as of: {manifest['data_as_of'] or 'unknown'}"]
+        data_as_of = manifest["data_as_of"]
+        lines = [
+            f"# {title}",
+            "",
+            f"Datos a fecha de: {_format(data_as_of) if data_as_of else 'fecha no disponible'}",
+        ]
+        warnings = manifest.get("warnings") or []
+        if warnings:
+            lines.extend(("", "## Avisos", ""))
+            lines.extend(
+                f"- {_WARNING_LABELS.get(warning, warning)}" for warning in warnings
+            )
         for name, payload in sections.items():
-            lines.extend(("", f"## {name.replace('_', ' ').title()}", ""))
-            lines.append(str(payload))
-        lines.extend(("", "## Source manifest", ""))
-        lines.extend(
-            f"- [{source['citation']}] {source['title']}"
-            for source in manifest["sources"]
-        )
+            lines.extend(("", f"## {_SECTION_LABELS.get(name, _label(name))}", ""))
+            _render_payload(payload, lines)
+        lines.extend(("", "## Fuentes", ""))
+        sources = manifest["sources"]
+        if sources:
+            lines.extend(
+                f"- [{source['citation']}] {source['title']}"
+                for source in sources
+            )
+        else:
+            lines.append("_Sin fuentes canónicas._")
         return "\n".join(lines)

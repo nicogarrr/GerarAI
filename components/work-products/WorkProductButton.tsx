@@ -26,6 +26,7 @@ import {
     type WorkProductType,
 } from '@/lib/actions/work-products.actions';
 import { showErrorToast } from '@/lib/toast';
+import ThesisMarkdown from '@/components/research/ThesisMarkdown';
 import { toast } from 'sonner';
 
 const PRODUCT_TYPES: Array<{ value: WorkProductType; label: string }> = [
@@ -124,17 +125,24 @@ export default function WorkProductButton() {
                         />
                     </div>
 
-                    <Button onClick={handleGenerate} disabled={loading} aria-busy={loading} className="w-full gap-2 bg-teal-600 hover:bg-teal-700">
+                    {/* QA /research: el texto no puede desaparecer mientras
+                        genera (quedaba una barra teal vacía): color explícito
+                        y etiqueta siempre presente junto al spinner. */}
+                    <Button onClick={handleGenerate} disabled={loading} aria-busy={loading} className="w-full gap-2 bg-teal-600 text-white hover:bg-teal-700">
                         {loading && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
-                        {loading ? 'Generando...' : 'Generar documento'}
+                        <span>{loading ? 'Generando...' : 'Generar documento'}</span>
                     </Button>
 
                     {result && (
                         <div>
                             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Resultado</p>
-                            <pre className="max-h-64 overflow-auto rounded-lg border border-gray-700/50 bg-gray-900/50 p-3 text-xs text-gray-400">
-                                {JSON.stringify(result, null, 2)}
-                            </pre>
+                            <div className="max-h-96 overflow-auto rounded-lg border border-gray-700/50 bg-gray-900/50 p-4 text-sm text-gray-300">
+                                {typeof result.markdown === 'string' && result.markdown.trim() ? (
+                                    <ThesisMarkdown content={result.markdown} />
+                                ) : (
+                                    <p className="text-gray-500">El entregable no trajo contenido.</p>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

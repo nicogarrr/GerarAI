@@ -111,3 +111,34 @@ def test_valuation_memo_filters_to_its_metric_set(db, company):
     db.commit()
     result = WorkProductService().generate(db, product_type="valuation_memo", company=company)
     assert set(result["sections"]["metrics"]) == {"revenue"}
+
+
+def test_markdown_is_a_readable_spanish_document(db, company):
+    """QA /research: el entregable se renderiza como documento legible en
+    español (secciones, cifras formateadas, fuentes), nunca JSON ni reprs."""
+    db.add(FinancialFact(
+        company_id=company.id, metric="revenue", value=Decimal("394000000000"),
+        unit="USD", period="2025-09-30:FY", fiscal_year=2025, source_type="SEC", is_reported=True,
+    ))
+    db.add(MarketPrice(
+        company_id=company.id, date=date(2026, 9, 22),
+        open=Decimal("10"), high=Decimal("11"), low=Decimal("9"),
+        close=Decimal("232.15"), adj_close=Decimal("232.15"), source="finnhub",
+    ))
+    db.commit()
+    md = WorkProductService().generate(db, product_type="one_page_memo", company=company)["markdown"]
+    assert md.startswith("# Memo de una página · WPX")
+    assert "Datos a fecha de: 2026-10-18" in md or "Datos a fecha de:" in md
+    assert "## Empresa" in md and "## Precio de mercado" in md and "## Fuentes" in md
+    assert "**Ingresos**: 394.000.000.000 USD" in md
+    assert "**Cierre**: 232,15" in md
+    assert "_Sin datos._" in md  # tesis ausente declarada, no repr vacío
+    assert "Decimal(" not in md and "{'" not in md
+    assert "Data as of" not in md and "Source manifest" not in md
+
+
+def test_markdown_translates_manifest_warnings(db, company):
+    md = WorkProductService().generate(db, product_type="one_page_memo", company=company)["markdown"]
+    assert "## Avisos" in md
+    assert "No había fuentes canónicas disponibles." in md
+    assert "No canonical sources were available" not in md

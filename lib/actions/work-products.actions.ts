@@ -20,7 +20,21 @@ export interface WorkProductInput {
     years: number;
 }
 
-export type WorkProductRecord = Record<string, unknown>;
+/** Respuesta de /api/work-products/generate. `markdown` es el documento
+ *  legible en español que renderiza el diálogo (QA /research). */
+export type WorkProductRecord = {
+    product_type?: string;
+    title?: string;
+    ticker?: string | null;
+    markdown?: string;
+    manifest?: {
+        data_as_of?: string | null;
+        source_count?: number;
+        warnings?: string[];
+        sources?: Array<{ citation: string; title: string }>;
+    };
+    [key: string]: unknown;
+};
 
 /** POST /api/work-products/generate — genera un work product (memo, tesis, review...) */
 export async function generateWorkProduct(input: WorkProductInput): Promise<WorkProductRecord> {
