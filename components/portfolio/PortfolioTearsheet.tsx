@@ -30,7 +30,7 @@ export default function PortfolioTearsheet({ tearsheet }: Props) {
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-gray-400">
-                        No hay al menos dos retornos válidos para calcular Sharpe, caída máxima o porcentaje de días positivos. Las fotos guardadas pueden tener precios o caja de fechas distintas; sincronizar no garantiza una serie completa. No se fabrican valoraciones históricas.
+                        No hay retornos suficientes para calcular Sharpe, caída máxima o porcentaje de días positivos.
                     </p>
                 </CardContent>
             </Card>
