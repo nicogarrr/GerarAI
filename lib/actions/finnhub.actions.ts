@@ -251,7 +251,7 @@ function exchangeFromDisplaySymbol(displaySymbol?: string): string | undefined {
     const idx = displaySymbol.lastIndexOf('.');
     if (idx < 0) return 'US';
     const suffix = displaySymbol.slice(idx + 1).toUpperCase();
-    return EXCHANGE_LABEL_BY_SUFFIX[suffix] ?? suffix;
+    return EXCHANGE_LABEL_BY_SUFFIX[suffix];
 }
 
 const searchStocksOrThrow = async (query?: string): Promise<StockWithWatchlistStatus[]> => {    await requireAuthenticatedUser();
