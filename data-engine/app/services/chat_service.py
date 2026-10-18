@@ -169,7 +169,10 @@ def _prune_sources(
 
     Se conserva una fuente si alguna seccion la cita (lista de citas o
     referencia inline ``[tipo:id]`` en el cuerpo), si es el precio mostrado
-    en la prosa o si es una noticia cuyo titular aparece en la respuesta.
+    en la prosa, si es una noticia cuyo titular aparece en la respuesta o si
+    es la evidencia de una afirmacion que si se conserva (la cadena de
+    veracidad afirmacion -> evidencia no se puede cortar: sin la evidencia
+    la afirmacion mostrada parece respaldarse en nada).
     El resto (recuperadas "por si acaso") no se adjunta: ensenarlas sugiere
     un respaldo que la respuesta no tiene. Ademas se deduplican por tipo y
     titulo normalizado (cuatro chunks del mismo documento son una fuente).
@@ -183,10 +186,16 @@ def _prune_sources(
     answer_plain = " ".join((answer or "").lower().split())
     kept: list[dict] = []
     seen: set[tuple[str, str]] = set()
+    kept_claim_ids: set = set()
     for source in sources:
         kind = str(source.get("type"))
         key = f"{kind}:{source.get('id')}"
         keep = key in cited
+        if not keep and kind == "claim_evidence":
+            # Las evidencias siguen a su afirmacion en `sources`; si la
+            # afirmacion se conserva, su evidencia tambien (va citada por
+            # transitividad: la respuesta muestra la afirmacion).
+            keep = source.get("claim_id") in kept_claim_ids
         if not keep and kind == "market_price":
             keep = True
         if not keep and kind == "news_event":
@@ -198,6 +207,8 @@ def _prune_sources(
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
+        if kind == "claim":
+            kept_claim_ids.add(source.get("id"))
         kept.append(source)
     return kept
 
