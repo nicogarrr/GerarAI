@@ -2415,6 +2415,7 @@ export interface paths {
          * @description Eventos por pagina (scroll infinito). ``lane`` filtra en SQL:
          *     ``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT.
          *     ``ticker`` limita a los eventos de esa empresa (ficha de accion).
+         *     Las filas etiquetadas con un ticker que no citan a la empresa se omiten.
          */
         get: operations["news_events_api_news_get"];
         put?: never;
