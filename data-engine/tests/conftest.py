@@ -56,8 +56,9 @@ def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001
             pass
 
 # Importing main no debe filtrar secretos locales al proceso de test. La API
-# legacy (routers/) fue retirada, pero los módulos de servicio (modules/) que
-# quedan pueden llamar load_dotenv() en import time. Tests must stay hermetic:
+# legacy (routers/) y los módulos de servicio (modules/) fueron retirados;
+# los servicios de app/ pueden llamar load_dotenv() en import time.
+# Tests must stay hermetic:
 # Settings(_env_file=None) must observe no secrets.
 _TEST_ISOLATED_ENV_VARS = (
     "RESEARCH_AUTH_SECRET",
