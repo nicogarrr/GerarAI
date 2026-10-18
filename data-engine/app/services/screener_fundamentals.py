@@ -16,6 +16,11 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Company, FinancialFact, MarketPrice
+from app.services.split_adjustment import (
+    cumulative_split_factor_after,
+    period_end_date,
+    split_events_by_company,
+)
 
 _METRICS = {"eps_diluted", "total_equity", "shares_diluted", "net_income"}
 # QA inicio DCF: la tarjeta de oportunidades del inicio prueba candidatas del
@@ -95,6 +100,7 @@ def load_screener_ratios(
     for row in prices:
         if row.company_id not in latest_price and row.source.lower() not in {"seed", "mock", "test"} and row.close and row.close > 0:
             latest_price[row.company_id] = row
+    splits_by_company = split_events_by_company(db, ids)
     by_company: dict[int, dict[tuple[int, str], FinancialFact]] = {}
     for fact in facts:
         # La ingesta SEC/ESEF guarda el periodo como "<end>:FY" (p.ej.
@@ -165,8 +171,22 @@ def load_screener_ratios(
         for year in years:
             eps = facts_for_company.get((year, "eps_diluted"))
             if eps and eps.value and eps.value > 0 and _unit_currency(eps.unit) == currency:
-                metrics["pe"] = _ratio(close / eps.value)
-                provenance["facts"]["pe"] = {"id": eps.id, "source": eps.source_type, "year": year}
+                # El precio es de HOY: si hubo split tras el cierre del
+                # ejercicio del EPS, el EPS se expresa en acciones actuales
+                # (reportado / factor acumulado) o el PER sale inflado por
+                # el factor del split.
+                split_factor = cumulative_split_factor_after(
+                    splits_by_company.get(company.id, []),
+                    period_end_date(eps.period),
+                )
+                metrics["pe"] = _ratio(close / (eps.value / split_factor))
+                pe_prov: dict = {"id": eps.id, "source": eps.source_type, "year": year}
+                if split_factor != 1:
+                    pe_prov["split_factor"] = format(split_factor.normalize(), "f")
+                    pe_prov["calculation"] = (
+                        "close / (eps_diluted / cumulative_split_factor)"
+                    )
+                provenance["facts"]["pe"] = pe_prov
                 break
         equity_shares = pair("total_equity", "shares_diluted")
         if equity_shares:

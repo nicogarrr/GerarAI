@@ -117,9 +117,25 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
     ).scalar_one_or_none()
     per = None
     if price_row is not None and eps_row is not None:
-        per = float(price_row.close) / float(eps_row.value)
-        sources.append(f"PER: cierre {price_row.date.isoformat()} / "
-                       f"{eps_row.metric} FY{eps_row.fiscal_year} ({eps_row.source_type})")
+        from app.services.split_adjustment import (
+            cumulative_split_factor_after,
+            period_end_date,
+            split_events_by_company,
+        )
+
+        # El cierre es de hoy: EPS en acciones actuales o el PER sale
+        # inflado por el factor de cualquier split posterior al ejercicio.
+        split_factor = cumulative_split_factor_after(
+            split_events_by_company(db, [company.id]).get(company.id, []),
+            period_end_date(eps_row.period),
+        )
+        per = float(price_row.close) / (float(eps_row.value) / float(split_factor))
+        source = (f"PER: cierre {price_row.date.isoformat()} / "
+                  f"{eps_row.metric} FY{eps_row.fiscal_year} ({eps_row.source_type})")
+        if split_factor != 1:
+            source += (", EPS ajustado por split acumulado x"
+                  f"{format(split_factor.normalize(), "f")}")
+        sources.append(source)
 
     return {"market_cap": market_cap, "per": per,
             "currency": company.currency, "sources": sources}
