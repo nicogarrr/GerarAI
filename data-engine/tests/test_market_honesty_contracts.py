@@ -194,3 +194,21 @@ def test_index_change_percent_is_never_a_fabricated_zero():
     # Un unico cierre tampoco: ya no hay con que comparar.
     assert _index_quote([7800.0]) is None
 
+
+
+def test_index_timestamp_tracks_last_valid_close_not_trailing_null():
+    import httpx
+
+    from app.api.routes.market import _fetch_index
+
+    payload = {"chart": {"result": [{
+        "timestamp": [10, 20, 30],
+        "indicators": {"quote": [{"close": [100, 101, None]}]},
+    }]}}
+    with httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(200, json=payload)
+    )) as client:
+        quote = _fetch_index(client, "^GSPC")
+    assert quote is not None
+    assert quote["price"] == 101
+    assert quote["priceAsOf"] == 20

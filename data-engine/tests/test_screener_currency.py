@@ -14,6 +14,6 @@ def test_real_rows_keep_provider_currency_and_leave_unknown_empty(monkeypatch):
         "price": 100, "currency": "EUR" if symbol == "AAA" else None,
         "change": None, "changePercent": None, "volume": None, "prevClose": None,
     })
-    monkeypatch.setattr(screeners, "_safe_fetch_profile", lambda *args: None)
+    monkeypatch.setattr(screeners, "_safe_fetch_profile", lambda *args: {"name": "Company", "sector": "Technology", "currency": "USD", "exchange": "US", "marketCap": None})
     items = screeners._refetch_real_items(vendor="yahoo")
     assert {item["symbol"]: item["currency"] for item in items} == {"AAA": "EUR", "BBB": None}

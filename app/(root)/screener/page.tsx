@@ -1,3 +1,4 @@
+import { quoteObserved } from '@/lib/market/quote-observed';
 import type { Metadata } from 'next';
 import { getMarketIndicesResult } from '@/lib/actions/market.actions';
 import { getSavedScreenerEngines, getScreenerStocksReal } from '@/lib/actions/screener.actions';
@@ -49,7 +50,9 @@ function screenerMarketCap(value: number): string {
 
 // Solo el proveedor confirma la divisa, nunca se infiere del ticker.
 function screenerPrice(price: number, currency: string | null | undefined): string {
-  return isValidCurrencyCode(currency)
+  return currency === 'USD'
+    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)
+    : isValidCurrencyCode(currency)
     ? formatPrice(price, currency)
     : formatNumber(price, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -227,7 +230,11 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
                           <span className="text-xs text-gray-500 md:hidden">Precio</span>
-                          <span className="font-semibold text-gray-200">{screenerPrice(r.price, r.currency)}</span>
+                          <div className="text-right">
+                            <span className="font-semibold text-gray-200">{screenerPrice(r.price, r.currency)}</span>
+                            {!isValidCurrencyCode(r.currency) ? <div className="text-[10px] text-gray-500">Divisa N/D: proveedor sin divisa</div> : null}
+                            <div className="text-[10px] text-gray-500">{quoteObserved(r.priceAsOf)}</div>
+                          </div>
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
                           <span className="text-xs text-gray-500 md:hidden">Cambio sesión</span>
@@ -286,7 +293,10 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                   {validIndices.map((i) => (
                     <div key={i.symbol} className="flex min-w-0 items-center justify-between gap-3">
                       <span className="min-w-0 flex-1 truncate text-gray-300">{i.name}</span>
-                      <span className="shrink-0 font-semibold text-gray-100">{formatIndexValue(i)}</span>
+                      <div className="text-right">
+                        <span className="font-semibold text-gray-100">{formatIndexValue(i)}{i.unit === 'index' ? ' ptos.' : ''}</span>
+                        <div className="text-[10px] text-gray-500">{quoteObserved(i.priceAsOf)}</div>
+                      </div>
                     </div>
                   ))}
                   {validIndices.length === 0 && <p className="text-sm text-gray-500">Sin datos de índices</p>}

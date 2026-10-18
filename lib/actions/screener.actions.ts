@@ -226,6 +226,8 @@ export type RealScreenerFilters = {
 };
 
 export type RealScreenerRow = {
+  /** Vendor quote time in epoch seconds, never response retrieval time. */
+  priceAsOf?: number | null;
   symbol: string;
   currency?: string | null;
   name: string;

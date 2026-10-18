@@ -378,3 +378,15 @@ def test_fetch_wrappers_dispatch_per_vendor_with_isolated_caches():
     assert _fetch_profile(finnhub_profile, "AAPL")["name"] == "Apple"
     assert _fetch_profile(finnhub_profile, "AAPL", vendor="yahoo") is None
     assert set(screeners._real_profile_cache) == {"finnhub:AAPL"}
+
+
+def test_yahoo_quote_time_matches_last_valid_close():
+    client = _FakeClient({"chart": _FakeResponse({"chart": {"result": [{
+        "timestamp": [10, 20, 30],
+        "meta": {},
+        "indicators": {"quote": [{"close": [148.0, 150.0, None]}]},
+    }]}})})
+    quote = YahooScreenVendor().fetch_quote(client, "AAPL")
+    assert quote is not None
+    assert quote["price"] == 150.0
+    assert quote["asOf"] == 20

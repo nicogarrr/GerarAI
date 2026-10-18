@@ -195,11 +195,15 @@ def test_as_of_reflects_oldest_carried_lkg_item():
     )
 
 
-def test_finnhub_profile_preserves_currency_without_guessing():
+def test_finnhub_profile_currency_is_not_quote_currency():
     client = _FakeClient({"/stock/profile2": _FakeResponse({
         "ticker": "X", "name": "X Co", "currency": "EUR",
     })})
     profile = FinnhubScreenVendor().fetch_profile(client, "X")
+    # profile2.currency is financial-statement currency, never a quote fallback.
     assert profile["currency"] == "EUR"
+    import inspect
+    from app.api.routes.screeners import _refetch_real_items
+    assert '"currency": quote.get("currency"),' in inspect.getsource(_refetch_real_items)
     absent = _FakeClient({"/stock/profile2": _FakeResponse({"ticker": "X"})})
     assert FinnhubScreenVendor().fetch_profile(absent, "X")["currency"] is None

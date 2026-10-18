@@ -470,11 +470,9 @@ class YahooScreenVendor:
         try:
             payload = resp.json()
             result = payload["chart"]["result"][0]
-            closes = [
-                value
-                for value in result["indicators"]["quote"][0]["close"]
-                if value is not None
-            ]
+            raw_closes = result["indicators"]["quote"][0]["close"]
+            valid_closes = [(i, value) for i, value in enumerate(raw_closes) if value is not None]
+            closes = [value for _, value in valid_closes]
             if not closes or closes[-1] <= 0:
                 return None
             volumes = [
@@ -497,7 +495,7 @@ class YahooScreenVendor:
                 ),
                 "volume": float(volumes[-1]) if volumes else None,
                 "prevClose": float(previous) if previous else None,
-                "asOf": timestamps[-1] if timestamps else None,
+                "asOf": timestamps[valid_closes[-1][0]] if valid_closes[-1][0] < len(timestamps) else None,
             }
         except (KeyError, IndexError, TypeError, ValueError):
             return None
@@ -917,7 +915,8 @@ def _refetch_real_items(
                 "symbol": symbol,
                 "name": name,
                 "price": quote["price"],
-                "currency": quote.get("currency") or (profile or {}).get("currency"),
+                "priceAsOf": quote.get("asOf"),
+                "currency": quote.get("currency"),
                 "change": quote["change"],
                 "changePercent": quote["changePercent"],
                 # None sin perfil real: la UI muestra N/D; un 0.0 inventado
