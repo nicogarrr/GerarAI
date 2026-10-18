@@ -8,7 +8,7 @@ import {
   getInvestorPortfolio,
 } from "@/lib/actions/investors.actions";
 import { isBackendUnavailableError } from "@/lib/backend-offline";
-import { getKnowledgeDocuments } from "@/lib/actions/research-tools.actions";
+import { getKnowledgeLetters } from "@/lib/actions/research-tools.actions";
 import { Portfolio } from "../_components/Portfolio";
 import { InvestorLetters } from "../_components/InvestorLetters";
 import { InvestorConcepts } from "../_components/InvestorConcepts";
@@ -55,14 +55,14 @@ export default async function InvestorPage({
 
   let investor: Awaited<ReturnType<typeof getInvestor>>;
   let portfolio: Awaited<ReturnType<typeof getInvestorPortfolio>>;
-  let documents: Awaited<ReturnType<typeof getKnowledgeDocuments>> = [];
+  let documents: Awaited<ReturnType<typeof getKnowledgeLetters>> = [];
   let lettersUnavailable = false;
   try {
     investor = await getInvestor(slug);
     if (!investor) notFound();
     portfolio = await getInvestorPortfolio(slug);
     try {
-      documents = await getKnowledgeDocuments();
+      documents = await getKnowledgeLetters();
     } catch (error) {
       if (!isBackendUnavailableError(error)) throw error;
       lettersUnavailable = true;

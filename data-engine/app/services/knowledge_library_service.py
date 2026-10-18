@@ -714,15 +714,20 @@ class KnowledgeLibraryService:
 
     @staticmethod
     def list_documents(
-        db: Session, *, collection_id: int | None = None, limit: int = 200
+        db: Session, *, collection_id: int | None = None, limit: int = 200,
+        offset: int = 0, document_type: str | None = None, status: str | None = None,
     ) -> list[dict]:
         statement = (
             select(KnowledgeDocument)
-            .order_by(desc(KnowledgeDocument.created_at))
-            .limit(limit)
+            .order_by(desc(KnowledgeDocument.created_at), desc(KnowledgeDocument.id))
+            .limit(limit).offset(offset)
         )
         if collection_id is not None:
             statement = statement.where(KnowledgeDocument.collection_id == collection_id)
+        if document_type is not None:
+            statement = statement.where(KnowledgeDocument.document_type == document_type)
+        if status is not None:
+            statement = statement.where(KnowledgeDocument.status == status)
         return [
             KnowledgeLibraryService.document_dict(document)
             for document in db.scalars(statement).all()
