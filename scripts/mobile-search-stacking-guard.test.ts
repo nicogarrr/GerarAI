@@ -20,7 +20,11 @@ test('F356: la paleta de busqueda se apila por encima del drawer movil', () => {
 });
 
 test('F356: la cadena overlayClassName existe (SearchCommand -> CommandDialog -> DialogContent -> DialogOverlay)', () => {
-    assert.match(command, /overlayClassName,[\s\S]{0,200}overlayClassName\?: string/);
+    // Dos aserciones independientes: la ventana de 200 chars entre destructure
+    // y tipo se rompio al crecer el bloque de props (onCloseAutoFocus), sin
+    // que la cadena dejara de existir.
+    assert.match(command, /overlayClassName,\n/);
+    assert.match(command, /overlayClassName\?: string/);
     assert.match(command, /overlayClassName=\{overlayClassName\}/);
     assert.match(dialog, /overlayClassName\?: string/);
     assert.match(dialog, /<DialogOverlay className=\{overlayClassName\} \/>/);
