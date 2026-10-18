@@ -246,6 +246,41 @@ def test_digest_without_text_is_insufficient_not_invented(db) -> None:
     assert entry["status"] == "insufficient_data" and entry["items"] == []
 
 
+def test_digest_derives_filed_at_from_filing_name(db) -> None:
+    """QA 10: sin published_at, la fecha sale del nombre del filing."""
+    doc = _filing(
+        db,
+        company=db.info["held"],
+        number=7,
+        url="https://www.sec.gov/Archives/edgar/data/19617/000095010326013842/jpm-20261013.htm",
+    )
+    doc.published_at = None
+    db.commit()
+    entry = eight_k_digest(db)["items"][0]
+    assert entry["filed_at"] == "2026-10-13"
+
+
+def test_digest_without_any_date_keeps_none_not_invented(db) -> None:
+    doc = _filing(db, company=db.info["held"], number=8)
+    doc.published_at = None
+    db.commit()
+    entry = eight_k_digest(db)["items"][0]
+    assert entry["filed_at"] is None
+
+
+def test_digest_rejects_invalid_filename_dates(db) -> None:
+    doc = _filing(
+        db,
+        company=db.info["held"],
+        number=9,
+        url="https://www.sec.gov/Archives/edgar/data/1/9/x-20260230.htm",
+    )
+    doc.published_at = None
+    db.commit()
+    entry = eight_k_digest(db)["items"][0]
+    assert entry["filed_at"] is None
+
+
 def test_digest_paginates_and_other_tenant_is_invisible(db) -> None:
     for n in range(1, 6):
         _filing(db, company=db.info["held"], number=n)
