@@ -134,3 +134,26 @@ def test_general_geography_uses_model_with_company_page_context(db, monkeypatch)
         page=ChatPageContext(path="/research/AAPL", label="Apple", ticker="AAPL"),
     ))
     assert "Canberra" in response.answer
+
+
+def test_general_clock_calls_model_with_real_clock_not_a_refusal():
+    import json
+    from app.llm import LLMResponse, Message, Usage
+    from app.schemas import ChatResponse
+    from app.services.chat_synthesis_service import ChatSynthesisService
+    class Provider:
+        def __init__(self):
+            self.requests = []
+        async def complete(self, request):
+            self.requests.append(request)
+            clock = json.loads(request.messages[-1].content)["current_time_context"]
+            return LLMResponse(message=Message("assistant", f"En Tokio son las {clock['local_time'][11:16]}."),
+                               usage=Usage(input_tokens=10, output_tokens=10, total_tokens=20),
+                               model="stub", provider="stub", request_id="clock-test")
+    provider = Provider()
+    response = asyncio.run(ChatSynthesisService(provider).synthesize_general(
+        question="¿Qué hora es en Tokio?", baseline=ChatResponse(answer="", sources=[]),
+    ))
+    assert provider.requests
+    assert response.answer.startswith("En Tokio son las")
+    assert response.model == "stub"
