@@ -972,3 +972,10 @@ export async function getPortfolioDataQuality(userId: string): Promise<Portfolio
             () => researchRequest<PortfolioDataQuality>('/api/portfolio/data-quality', { fast: true }), 15);
     } catch { return null; }
 }
+
+/** Sincroniza los dividendos de las posiciones del tenant y relee las lecturas cacheadas. */
+export async function syncPortfolioDividends(userId: string): Promise<void> {
+    const canonicalUserId = await resolveUserId(userId);
+    await researchRequest('/api/portfolio/dividends/sync', { method: 'POST' });
+    invalidatePortfolioReads(canonicalUserId);
+}
