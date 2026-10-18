@@ -36,7 +36,7 @@ describe('knowledge upload form guard (F142)', () => {
     const typesBlock = backend.match(/KNOWLEDGE_DOCUMENT_TYPES = \{([^}]*)\}/);
     assert.ok(typesBlock, 'KNOWLEDGE_DOCUMENT_TYPES localizado');
     const backendTypes = [...typesBlock[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]).sort();
-    assert.equal(backendTypes.length, 9, 'el backend sigue declarando 9 tipos');
+    assert.deepEqual(backendTypes, ['article', 'book', 'fund_letter', 'historical_case', 'own_thesis', 'paper', 'personal_note', 'personal_postmortem', 'sector_report', 'third_party_thesis']);
     for (const t of backendTypes) {
       assert.ok(page.includes(`value="${t}"`), `option ${t} presente`);
     }
