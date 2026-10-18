@@ -438,3 +438,10 @@ def test_sync_form4_bezos_official_sale_and_no_invented_positions():
 def test_sync_form4_bezos_rejects_trump_filer():
     # El Form 4 de Trump firmado por otro CIK no se guarda bajo bezos.
     assert sync_form4(_db(), "bezos", fetch=lambda url: FORM4, filings=[FILING]) == 0
+
+
+def test_visible_coverage_notes_do_not_carry_the_internal_code():
+    out = investor_portfolio(_db(), "trump")
+    assert out is not None
+    assert "SIN_DATOS" not in out["limitations"]
+    assert "N/D" in out["limitations"]
