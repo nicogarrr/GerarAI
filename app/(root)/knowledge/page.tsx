@@ -1,3 +1,6 @@
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { markdownComponents } from '@/components/research/ThesisMarkdown';
 import { LibraryChat } from '../inversores/_components/LibraryChat';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -86,6 +89,41 @@ const STATUS_LABELS: Record<string, string> = {
 function label(value: string | null | undefined): string {
   if (!value) return NA;
   return STATUS_LABELS[value] ?? value.replaceAll('_', ' ');
+}
+
+/** Mismo vocabulario que el select de subida (KNOWLEDGE_DOCUMENT_TYPES del
+ *  backend): la tabla y las tarjetas pintan la etiqueta, no la clave. */
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  book: 'Libro',
+  fund_letter: 'Carta de fondo',
+  article: 'Artículo',
+  paper: 'Paper / estudio',
+  sector_report: 'Informe sectorial',
+  personal_note: 'Nota personal',
+  third_party_thesis: 'Tesis de terceros',
+  historical_case: 'Caso histórico',
+  personal_postmortem: 'Postmortem personal',
+};
+
+function documentTypeLabel(value: string | null | undefined): string {
+  if (!value) return NA;
+  return DOCUMENT_TYPE_LABELS[value] ?? value.replaceAll('_', ' ');
+}
+
+/** Nombres internos del parser de ingesta (document_ingestion_service.py) en
+ *  español: lo que importa es el formato del archivo, no la librería. */
+const PARSER_LABELS: Record<string, string> = {
+  native_text: 'Texto',
+  native_html: 'HTML',
+  pypdf: 'PDF',
+  python_docx: 'Word',
+  openpyxl: 'Excel',
+};
+
+function parserLabel(value: unknown): string {
+  if (value === null || value === undefined || value === '') return 'desconocido';
+  const key = String(value);
+  return PARSER_LABELS[key] ?? key.replaceAll('_', ' ');
 }
 
 function statusTone(status: string) {
@@ -225,8 +263,8 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                 <tr className="border-b border-gray-900" key={document.id}>
                   <th className="py-3 text-left text-sm font-normal" scope="row"><div className="font-medium text-gray-200">{document.title}</div><div className="text-xs text-gray-500">{document.author ?? 'Autor desconocido'} · {formatDate(document.publication_date, undefined, NA)}</div></th>
                   <td className="py-3 text-gray-400">{document.collection_id ? collectionNames.get(document.collection_id) : 'Sin colección'}</td>
-                  <td className="py-3 text-gray-400">{document.document_type}</td>
-                  <td className="py-3 text-gray-500">{String(document.metadata.parser ?? 'desconocido')}</td>
+                  <td className="py-3 text-gray-400">{documentTypeLabel(document.document_type)}</td>
+                  <td className="py-3 text-gray-500">{parserLabel(document.metadata.parser)}</td>
                   <td className="py-3"><Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge></td>
                   <td className="py-3"><div className="flex justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm></div>{job?.status === 'failed' ? <div className="mt-1 max-w-xs text-right text-xs text-red-300">{job.error}</div> : null}</td>
                 </tr>
@@ -245,10 +283,10 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                 <div className="mt-1 text-xs text-gray-500">{document.author ?? 'Autor desconocido'} · {formatDate(document.publication_date, undefined, NA)}</div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{document.collection_id ? collectionNames.get(document.collection_id) : 'Sin colección'}</Badge>
-                  <Badge variant="outline">{document.document_type}</Badge>
+                  <Badge variant="outline">{documentTypeLabel(document.document_type)}</Badge>
                   <Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge>
                 </div>
-                <div className="mt-2 text-xs text-gray-500">Extractor: {String(document.metadata.parser ?? 'desconocido')}</div>
+                <div className="mt-2 text-xs text-gray-500">Extractor: {parserLabel(document.metadata.parser)}</div>
                 {job?.status === 'failed' ? <div className="mt-2 text-xs text-red-300">{job.error}</div> : null}
                 <div className="mt-4 grid grid-cols-1 gap-2">
                   <Button asChild className="h-11 w-full" size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button>
@@ -266,7 +304,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         <section className="min-w-0 rounded-xl border border-teal-900/50 bg-surface-1 p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-teal-300">Explorador de fragmentos</p><h2 className="text-lg font-semibold text-gray-100">{selectedDocument.title}</h2></div><Button asChild size="sm" variant="ghost"><Link href="/knowledge">Cerrar</Link></Button></div>
           <div className="grid max-h-[620px] gap-3 overflow-y-auto pr-2">
-            {chunks.map((chunk) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={chunk.id}><div className="mb-2 flex justify-between text-xs text-gray-500"><span>Fragmento {formatNumber(Number(chunk.chunk_index) + 1, { maximumFractionDigits: 0 })}</span><span>página {chunk.page_number === null || chunk.page_number === undefined ? NA : formatNumber(chunk.page_number, { maximumFractionDigits: 0 })} · {formatNumber(chunk.token_count, { maximumFractionDigits: 0 })} tokens</span></div><p className="whitespace-pre-wrap text-sm leading-6 text-gray-300">{chunk.content}</p></article>)}
+            {chunks.map((chunk) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={chunk.id}><div className="mb-2 flex justify-between text-xs text-gray-500"><span>Fragmento {formatNumber(Number(chunk.chunk_index) + 1, { maximumFractionDigits: 0 })}</span><span>página {chunk.page_number === null || chunk.page_number === undefined ? NA : formatNumber(chunk.page_number, { maximumFractionDigits: 0 })} · {formatNumber(chunk.token_count, { maximumFractionDigits: 0 })} tokens</span></div><div className="text-sm leading-6 text-gray-300"><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{chunk.content}</ReactMarkdown></div></article>)}
             {!chunks.length ? <p className="text-sm text-gray-500">Este documento no tiene fragmentos.</p> : null}
           </div>
         </section>
