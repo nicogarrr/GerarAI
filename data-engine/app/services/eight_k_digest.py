@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
@@ -189,13 +190,30 @@ def eight_k_digest(db: Session, *, page: int = 1, page_size: int = 10) -> dict[s
         Document.metadata_["form"].as_string() == "8-K",
     ).order_by(desc(Document.published_at).nullslast(), desc(Document.id)).limit(MAX_SCAN)).all()
     entries: list[dict[str, Any]] = []
+    seen: dict[tuple[int, str], dict[str, Any]] = {}
     for document in documents:
         if document.company_id is None or not official_document(document):
             continue
         company = db.get(Company, document.company_id)
         if company is None:
             continue
+        parsed_url = urlsplit(document.source_url or "")
+        # Query y fragmento no identifican otro formulario SEC. Nunca por ticker:
+        # dos 8-K distintos de una empresa deben seguir siendo dos entradas.
+        identity = (company.id, f"{parsed_url.hostname}{parsed_url.path}")
         chunks = _load_chunks(db, document)
+        previous = seen.get(identity)
+        if previous is not None:
+            if chunks and previous["status"] == "insufficient_data":
+                items = summarize_items(chunks)
+                if items and is_material(items):
+                    previous.update(status="ready", items=items[:MAX_ITEMS_PER_FILING],
+                                    document_id=document.id,
+                                    source_url=document.source_url,
+                                    filed_at=document.published_at.date().isoformat()
+                                    if document.published_at else previous["filed_at"])
+                    previous.pop("reason", None)
+            continue
         base = {
             "document_id": document.id, "ticker": company.ticker, "company": company.name,
             "filed_at": document.published_at.date().isoformat() if document.published_at else None,
@@ -204,15 +222,21 @@ def eight_k_digest(db: Session, *, page: int = 1, page_size: int = 10) -> dict[s
             "filing_intelligence": (document.metadata_ or {}).get(KEY),
         }
         if not chunks:
-            entries.append({**base, "status": "insufficient_data", "items": [],
-                            "reason": "Sin texto completo disponible; revisa el documento oficial."})
+            entry = {**base, "status": "insufficient_data", "items": [],
+                     "reason": "Sin texto completo disponible; revisa el documento oficial."}
+            entries.append(entry)
+            seen[identity] = entry
             continue
         items = summarize_items(chunks)
         if not items:
-            entries.append({**base, "status": "insufficient_data", "items": [],
-                            "reason": "No se identificaron apartados legibles en el 8-K."})
+            entry = {**base, "status": "insufficient_data", "items": [],
+                     "reason": "No se identificaron apartados legibles en el 8-K."}
+            entries.append(entry)
+            seen[identity] = entry
         elif is_material(items):
-            entries.append({**base, "status": "ready", "items": items[:MAX_ITEMS_PER_FILING]})
+            entry = {**base, "status": "ready", "items": items[:MAX_ITEMS_PER_FILING]}
+            entries.append(entry)
+            seen[identity] = entry
     start = (page - 1) * page_size
     return {"status": "ready" if entries else "insufficient_data",
             "reason": None if entries else "Sin 8-K relevantes de tus compañías.",

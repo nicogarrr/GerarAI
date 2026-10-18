@@ -270,3 +270,22 @@ def test_digest_no_tracked_companies(db) -> None:
     db.query(Position).delete()
     db.commit()
     assert eight_k_digest(db)["status"] == "insufficient_data"
+
+
+def test_digest_deduplicates_exact_sec_document_not_company(db) -> None:
+    first = _filing(db, company=db.info["held"], number=2, text="")
+    _filing(db, company=db.info["held"], number=3, url=first.source_url + "?output=1#section")
+    _filing(db, company=db.info["held"], number=4)
+    result = eight_k_digest(db)
+    assert result["total"] == 2
+    assert {item["filed_at"] for item in result["items"]} == {"2026-10-03", "2026-10-04"}
+
+
+def test_digest_duplicate_empty_copy_does_not_hide_available_text(db) -> None:
+    first = _filing(db, company=db.info["held"], number=2)
+    _filing(db, company=db.info["held"], number=3, text="", url=first.source_url)
+    result = eight_k_digest(db)
+    assert result["total"] == 1
+    assert result["items"][0]["status"] == "ready"
+    assert result["items"][0]["items"][0]["excerpts"]
+    assert result["items"][0]["document_id"] == first.id

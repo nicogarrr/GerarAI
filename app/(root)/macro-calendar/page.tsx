@@ -119,7 +119,7 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                                 <div className="flex flex-wrap items-center gap-3">
                                     <Link href={`/research/${encodeURIComponent(entry.ticker)}`} className="text-base font-semibold text-gray-100 hover:text-teal-300">{entry.ticker}</Link>
                                     <span className="text-sm text-gray-400">{entry.company}</span>
-                                    <span className="text-sm text-gray-500">{formatMarketDate(entry.filed_at)}</span>
+                                    <span className="text-sm text-gray-500">{entry.filed_at ? formatMarketDate(entry.filed_at) : 'Fecha no disponible'}</span>
                                     {entry.matching.map((m) => (
                                         <span key={m} className="rounded bg-gray-800 px-1.5 py-0.5 text-[11px] uppercase text-gray-300">{m}</span>
                                     ))}
