@@ -135,6 +135,9 @@ def _manager(db: Session, inv: Investor) -> FundManager | None:
 
 
 def list_investors(db: Session) -> dict[str, Any]:
+    from app.services.investor_autosync import maybe_autosync_holdings
+
+    maybe_autosync_holdings(db)
     out: list[dict[str, Any]] = []
     for inv in INVESTORS:
         item = _entry(inv)
