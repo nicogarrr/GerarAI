@@ -83,3 +83,34 @@ export function dedupeNewsEvents<T extends { title?: string | null; url?: string
     }
     return out;
 }
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Sufijo « - Fuente» pegado al titular por el proveedor (p.ej.
+ * «... - Reuters»): la fuente ya se pinta en su propio campo, así que al
+ * PINTAR se recorta solo cuando coincide con ella. El texto guardado no
+ * se toca (procedencia).
+ */
+export function stripSourceSuffix(title: string, source: string | null | undefined): string {
+    const src = source?.trim();
+    if (!src) return title;
+    const suffix = new RegExp(`\\s*[-–—]\\s*${escapeRegExp(src)}\\.?\\s*$`, 'i');
+    return title.replace(suffix, '').trim();
+}
+
+/**
+ * Ticker pegado delante del titular («ASTS: ...», «ASTS - ...», «(ASTS) ...»):
+ * la tarjeta ya muestra el ticker en su insignia, así que al pintar se quita
+ * el duplicado. Solo con separador explícito o paréntesis: un titular real
+ * que empiece por una palabra igual al ticker sin separador se respeta.
+ */
+export function stripLeadingTicker(title: string, ticker: string | null | undefined): string {
+    const t = ticker?.trim().toUpperCase();
+    if (!t) return title;
+    const parenthesized = new RegExp(`^\\(${escapeRegExp(t)}\\)\\s+`, 'i');
+    const separated = new RegExp(`^${escapeRegExp(t)}\\s*[:·—–-]\\s+`, 'i');
+    return title.replace(parenthesized, '').replace(separated, '').trim();
+}
