@@ -51,7 +51,7 @@ describe('vídeos de inversores', () => {
         assert.match(embed, /title=\{title\}/);
         assert.match(embed, /isYouTubeVideoId\(videoId\)/);
         const block = readFileSync('app/(root)/inversores/_components/InvestorVideos.tsx', 'utf8');
-        assert.match(block, /Sin datos/);
+        assert.match(block, /No hay vídeos verificados/);
         assert.match(block, /Fuente:/);
         assert.match(block, /video\.channel_kind === 'archive'/);
         assert.match(block, /Archivo, fuente no confirmada/);
