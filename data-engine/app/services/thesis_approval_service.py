@@ -217,6 +217,17 @@ def apply_approval_decision(
         )
     db.commit()
     db.refresh(thesis)
+    # La tesis publicada pasa a ser conocimiento consultable (Biblioteca/RAG);
+    # rechazarla o publicar otra version retira la anterior. Nunca rompe la
+    # aprobacion: el sync captura y loguea sus propios fallos.
+    from app.models import Company
+    from app.services.thesis_knowledge_sync import sync_thesis_knowledge
+
+    company = db.get(Company, thesis.company_id)
+    if company is not None:
+        sync_thesis_knowledge(
+            db, company, thesis, published=decision == DECISION_APPROVE
+        )
     return thesis
 
 

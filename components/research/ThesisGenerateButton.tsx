@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { scrollToIdWhenReady } from '@/lib/utils/scroll-anchor';
 import { BrainCircuit, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getLatestThesisJob, getThesisJobStatus, startThesisJob, type ThesisJobStatus } from '@/lib/actions/thesis-jobs.actions';
@@ -30,6 +32,7 @@ const MAX_POLLS = 600;
 
 export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }: { ticker: string; label?: string }) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [job, setJob] = useState<ThesisJobStatus | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [recovering, setRecovering] = useState(true);
@@ -95,8 +98,10 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
                 const next = await getThesisJobStatus(jobId);
                 if (disposed) return;
                 setJob(next);
+                // Sin router.refresh() automatico: re-renderizaba la ruta
+                // entera (14k px) y el lector perdia su sitio ("reinicio").
+                // La nueva version se ofrece con una accion explicita.
                 if (next.status === 'succeeded' || next.status === 'failed') {
-                    router.refresh();
                     return;
                 }
             } catch {
@@ -170,6 +175,24 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
                 <p className="text-sm text-teal-300">
                     Tesis v{job.result?.version} generada
                     {job.result?.status && THESIS_STATUS_LABELS[job.result.status] ? ` (${THESIS_STATUS_LABELS[job.result.status]})` : ''}.
+                    {' '}
+                    <Link
+                        href={`/research/${encodeURIComponent(ticker)}?view=thesis`}
+                        onClick={(event) => {
+                            const view = searchParams.get('view');
+                            if (view === 'thesis' || view === 'tesis') {
+                                // Ya estamos en la vista: refresco anclado a la
+                                // tesis en vez de navegacion (que no haria nada
+                                // al ser la misma URL).
+                                event.preventDefault();
+                                router.refresh();
+                                scrollToIdWhenReady('tesis-actual');
+                            }
+                        }}
+                        className="font-medium underline decoration-teal-700 underline-offset-4 hover:text-teal-200"
+                    >
+                        Ver tesis v{job.result?.version}
+                    </Link>
                 </p>
             ) : null}
             {job?.status === 'failed' ? (

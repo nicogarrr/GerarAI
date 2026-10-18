@@ -6,6 +6,7 @@ import { CheckCheck, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { approveThesis } from '@/lib/actions/thesis-jobs.actions';
 import { showErrorToast } from '@/lib/toast';
+import { preserveScrollPosition } from '@/lib/utils/scroll-anchor';
 import { isNextRedirectError } from '@/lib/types/errors';
 import { toast } from 'sonner';
 
@@ -35,7 +36,8 @@ export default function ThesisApproveButton({
                     : `Tesis v${result.version} rechazada`,
             );
             // F391: sin refresh el memo y el historial siguen mostrando el estado anterior.
-            router.refresh();
+            // El ancla de scroll se conserva: el lector no pierde su sitio.
+            preserveScrollPosition(() => router.refresh());
         } catch (exc) {
             if (isNextRedirectError(exc)) throw exc;
             showErrorToast(exc, { onRetry: () => decide(decision) });

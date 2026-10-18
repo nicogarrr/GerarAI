@@ -1616,6 +1616,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/investors/holders/{ticker}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holders By Ticker Route
+         * @description Gestores revisados que declaran el ticker en su último 13F (vista inversa).
+         */
+        get: operations["holders_by_ticker_route_api_investors_holders__ticker__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/investors/most-bought": {
         parameters: {
             query?: never;
@@ -4246,6 +4266,10 @@ export interface paths {
         /**
          * Thesis Memo
          * @description Memo Markdown descargable de la ultima tesis persistida.
+         *
+         *     Con ``published=1`` la version es la ultima PUBLICADA (regla vigente: un
+         *     borrador no enseña cifras ni margen); sin el parametro se conserva el
+         *     comportamiento historico (ultima version, sea cual sea su estado).
          */
         get: operations["thesis_memo_api_thesis__ticker__memo_md_get"];
         put?: never;
@@ -4721,6 +4745,11 @@ export interface components {
         };
         /** BottleneckSignalOut */
         BottleneckSignalOut: {
+            /**
+             * Evidence
+             * @default []
+             */
+            evidence: components["schemas"]["DiscoveryEvidenceOut"][];
             /** Evidence Ids */
             evidence_ids: string[];
             /** First Seen */
@@ -11303,6 +11332,48 @@ export interface operations {
             };
         };
     };
+    holders_by_ticker_route_api_investors_holders__ticker__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     most_bought_route_api_investors_most_bought_get: {
         parameters: {
             query?: never;
@@ -12056,6 +12127,9 @@ export interface operations {
             query?: {
                 collection_id?: number | null;
                 limit?: number;
+                offset?: number;
+                document_type?: string | null;
+                status?: string | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -17897,7 +17971,9 @@ export interface operations {
     };
     thesis_memo_api_thesis__ticker__memo_md_get: {
         parameters: {
-            query?: never;
+            query?: {
+                published?: boolean;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;

@@ -367,10 +367,37 @@ def derived_thesis_diff(previous, current) -> dict | None:
 
 
 @router.get("/{ticker}/memo.md", response_class=PlainTextResponse)
-def thesis_memo(ticker: str, db: Session = Depends(get_db)) -> PlainTextResponse:
-    """Memo Markdown descargable de la ultima tesis persistida."""
+def thesis_memo(
+    ticker: str,
+    published: bool = Query(False),
+    db: Session = Depends(get_db),
+) -> PlainTextResponse:
+    """Memo Markdown descargable de la ultima tesis persistida.
+
+    Con ``published=1`` la version es la ultima PUBLICADA (regla vigente: un
+    borrador no enseña cifras ni margen); sin el parametro se conserva el
+    comportamiento historico (ultima version, sea cual sea su estado).
+    """
     service = ThesisService()
-    thesis = service.latest(db, ticker)
+    if published:
+        company = resolve_company(db, ticker)
+        thesis = (
+            db.scalar(
+                select(ThesisVersion)
+                .where(
+                    ThesisVersion.company_id == company.id,
+                    ThesisVersion.status == "published",
+                )
+                .order_by(desc(ThesisVersion.version))
+                .limit(1)
+            )
+            if company
+            else None
+        )
+        if thesis is None:
+            raise HTTPException(status_code=404, detail="No published thesis for ticker")
+    else:
+        thesis = service.latest(db, ticker)
     if not thesis:
         raise HTTPException(status_code=404, detail="No thesis for ticker")
     company = resolve_company(db, ticker)

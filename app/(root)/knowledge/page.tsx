@@ -105,6 +105,7 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   sector_report: 'Informe sectorial',
   personal_note: 'Nota personal',
   third_party_thesis: 'Tesis de terceros',
+  own_thesis: 'Tesis propia',
   historical_case: 'Caso histórico',
   personal_postmortem: 'Postmortem personal',
 };
