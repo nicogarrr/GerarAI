@@ -1,3 +1,4 @@
+import { ExtractionRefresh } from '@/components/knowledge/ExtractionRefresh';
 import { extractionResultText, hasDefaultCollections } from '@/lib/knowledge/job-feedback';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -166,6 +167,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
 
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6 overflow-x-clip">
+      <ExtractionRefresh active={activeJobs.length > 0} />
       <LibraryChat scope="library" />
       <header className="flex flex-col gap-4 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
