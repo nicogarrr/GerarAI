@@ -29,6 +29,7 @@ from app.services.long_term_model_service import LongTermModelService
 from app.services.number_format import format_compact_es
 from app.services.source_auditor import SourceAuditor
 from app.services.source_hierarchy_service import classify_source
+from app.services.text_clip import clip_words
 from app.services.thesis_context import retrieve_thesis_context
 from app.services.thesis_narrative_llm import evidence_sections
 from app.services.thesis_news_narrative import prepare_news_narrative, sin_datos
@@ -899,8 +900,7 @@ class ThesisService:
             text = headline or title
             if not text:
                 continue
-            if len(text) > 140:
-                text = text[:137].rstrip() + "..."
+            text = clip_words(text, 140, ellipsis="...")
             source = str(item.get("source") or "").strip()
             date_label = self._news_date_label(item)
             attribution = ", ".join(part for part in (source, date_label) if part)
