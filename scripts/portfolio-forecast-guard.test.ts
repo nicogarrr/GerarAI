@@ -64,12 +64,20 @@ async function renderForecast(payload: PortfolioForecast): Promise<string> {
             `${dir}/panel.mjs`,
             compile('components/ui/panel.tsx').replaceAll('@/lib/utils', './utils.mjs'),
         );
+        // El componente usa next/link para navegación SPA; fuera de Next se
+        // monta con un stub que renderiza un <a> plano (mismo destino).
+        writeFileSync(
+            `${dir}/next-link.mjs`,
+            `import { createElement } from 'react';
+export default function Link({ href, children, ...rest }) { return createElement('a', { href, ...rest }, children); }
+`,
+        );
         writeFileSync(
             `${dir}/forecast.mjs`,
             compile('components/portfolio/PortfolioForecast.tsx').replaceAll(
                 '@/components/ui/panel',
                 './panel.mjs',
-            ),
+            ).replaceAll("'next/link'", "'./next-link.mjs'"),
         );
         const mod = await import(`${process.cwd()}/${dir}/forecast.mjs`);
         return renderToStaticMarkup(createElement(mod.default, { forecast: payload }));
