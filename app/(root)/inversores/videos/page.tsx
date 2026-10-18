@@ -81,7 +81,7 @@ export default async function VideosPage({
         </section>
       ) : (
         <div className="rounded-xl border border-gray-800 p-5 text-sm text-gray-400">
-          <p>{inversor ? "No encontramos ese inversor en el catálogo. Elige uno de la lista para ver sus vídeos disponibles." : "Elige un inversor de la lista para consultar sus vídeos verificados. También puedes explorar los canales de inversión."}</p>
+          <p>{inversor ? "Inversor no encontrado." : "Selecciona un inversor."}</p>
           {inversor ? <Link href="/inversores/videos" className="mt-2 inline-flex min-h-11 items-center text-teal-300">Volver a la lista de inversores</Link> : null}
         </div>
       )}
