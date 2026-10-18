@@ -1345,8 +1345,8 @@ class ThesisService:
             "con cita), **derivado** (fórmula documentada + inputs), "
             "**estimacion_llm** (método + confianza) o **supuesto** (justificación).",
             "",
-            "| input | etiqueta | valor | método |",
-            "|---|---|---|---|",
+            "| input | etiqueta | valor | método | cita |",
+            "|---|---|---|---|---|",
         ]
         for item in items:
             value = item.get("value")
