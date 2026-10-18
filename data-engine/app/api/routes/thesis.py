@@ -355,7 +355,7 @@ def derived_thesis_diff(previous, current) -> dict | None:
     summary = (
         "Cambios frente a la versión anterior: " + "; ".join(parts) + "."
         if parts
-        else "Sin cambios en calificación, escenarios ni puntuaciones frente a la versión anterior."
+        else "Sin cambios materiales (±0,5 %) en calificación, escenarios ni puntuaciones frente a la versión anterior."
     )
     return {
         "change_summary": summary,

@@ -20,8 +20,15 @@ def test_first_version_has_no_diff():
 def test_identical_scores_say_so_explicitly():
     d = derived_thesis_diff(_v(), _v())
     assert d["rating_changed"] is False
-    assert d["change_summary"].startswith("Sin cambios")
+    assert d["change_summary"].startswith("Sin cambios materiales (±0,5 %)")
     assert d["derived"] is True
+
+
+def test_sub_threshold_move_declares_the_criterion():
+    """base_value +0,3 % no se lista: la frase declara el umbral en vez de afirmar ausencia total."""
+    d = derived_thesis_diff(_v(), _v(base_value=200.6))
+    assert d["change_summary"].startswith("Sin cambios materiales (±0,5 %)")
+    assert d["rating_changed"] is False
 
 
 def test_changes_are_listed_in_spanish():
