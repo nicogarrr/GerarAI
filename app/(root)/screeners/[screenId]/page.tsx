@@ -4,8 +4,9 @@ import { ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { runSavedScreen } from '@/lib/actions/research-tools.actions';
-import { formatNumber, formatPercent, NA } from '@/lib/format';
+import { formatNumber, formatPercent } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
+import { formatScreenRank } from '@/lib/screener-results';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -33,7 +34,7 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
         </p>
       </header>
       <section className="grid gap-3">
-        {result.results.map((row) => (
+        {result.results.filter(row => row.matched).map((row) => (
           <article
             className={`rounded-xl border p-4 ${row.matched ? 'border-teal-900/70 bg-teal-950/10' : 'border-gray-800 bg-surface-1'}`}
             key={row.company_id}
@@ -50,7 +51,7 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
                 {newMatches.has(row.company_id) ? <Badge>{t('screener.newMatch')}</Badge> : null}
                 <Badge variant="outline">
                   {t('screener.rank')}{' '}
-                  {typeof row.rank_value === 'number' ? formatNumber(row.rank_value) : NA}
+                  {formatScreenRank(row.rank_value, result.ranking_formula)}
                 </Badge>
                 <Badge variant="outline">
                   {t('screener.coverage')}{' '}
