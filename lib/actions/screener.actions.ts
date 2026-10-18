@@ -228,6 +228,7 @@ export type RealScreenerFilters = {
 export type RealScreenerRow = {
   /** Vendor quote time in epoch seconds, never response retrieval time. */
   priceAsOf?: number | null;
+  priceTimestampKind?: 'daily_candle_open' | 'quote';
   /** Día de mercado (YYYY-MM-DD) de la vela diaria que publica el precio: es un cierre. */
   priceDate?: string | null;
   symbol: string;

@@ -230,7 +230,7 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                           <div className="text-right">
                             <span className="font-semibold text-gray-200">{screenerPrice(r.price, r.currency)}</span>
                             {!isValidCurrencyCode(r.currency) ? <div className="text-[10px] text-gray-500">Divisa N/D: proveedor sin divisa</div> : null}
-                            <div className="text-[10px] text-gray-500">{r.priceDate ? `Cierre ${formatMarketDate(r.priceDate)}` : quoteObserved(r.priceAsOf)}</div>
+                            <div className="text-[10px] text-gray-500">{r.priceDate ? `Cierre ${formatMarketDate(r.priceDate)}` : quoteObserved(r.priceAsOf, r.priceTimestampKind)}</div>
                           </div>
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
