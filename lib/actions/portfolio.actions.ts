@@ -9,6 +9,7 @@ import { requestCache } from '@/lib/cache/requestCache';
 import { AuthorizationError, ValidationError } from '@/lib/types/errors';
 import { sumCashByCurrency } from '@/lib/portfolio-cash';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
+import { importRejection } from '@/lib/portfolio/import-rejection';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -651,6 +652,8 @@ export type IBKRImportResult = {
     row_errors?: string[];
     duplicate_trades?: number;
     identity_warning?: string | null;
+    /** Motivo del rechazo (status 'rejected'), en español. */
+    message?: string;
     portfolio_snapshot_id: number | null;
 };
 
@@ -660,9 +663,16 @@ export type IBKRImportResult = {
  */
 export async function importFromIBKR(userId: string): Promise<IBKRImportResult> {
     const canonicalUserId = await resolveUserId(userId);
-    const result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr', {
-        method: 'POST',
-    });
+    let result: IBKRImportResult;
+    try {
+        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr', {
+            method: 'POST',
+        });
+    } catch (error) {
+        const rejected = importRejection(error);
+        if (rejected) return rejected;
+        throw error;
+    }
     invalidatePortfolioReads(canonicalUserId);
     return result;
 }
@@ -672,10 +682,17 @@ export async function importFromIBKR(userId: string): Promise<IBKRImportResult> 
  */
 export async function importIBKRXml(userId: string, xml: string): Promise<IBKRImportResult> {
     const canonicalUserId = await resolveUserId(userId);
-    const result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr/xml', {
-        method: 'POST',
-        body: jsonBody({ xml }),
-    });
+    let result: IBKRImportResult;
+    try {
+        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr/xml', {
+            method: 'POST',
+            body: jsonBody({ xml }),
+        });
+    } catch (error) {
+        const rejected = importRejection(error);
+        if (rejected) return rejected;
+        throw error;
+    }
     invalidatePortfolioReads(canonicalUserId);
     return result;
 }
@@ -685,10 +702,17 @@ export async function importIBKRXml(userId: string, xml: string): Promise<IBKRIm
  */
 export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRImportResult> {
     const canonicalUserId = await resolveUserId(userId);
-    const result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr/csv', {
-        method: 'POST',
-        body: jsonBody({ csv }),
-    });
+    let result: IBKRImportResult;
+    try {
+        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr/csv', {
+            method: 'POST',
+            body: jsonBody({ csv }),
+        });
+    } catch (error) {
+        const rejected = importRejection(error);
+        if (rejected) return rejected;
+        throw error;
+    }
     invalidatePortfolioReads(canonicalUserId);
     return result;
 }
