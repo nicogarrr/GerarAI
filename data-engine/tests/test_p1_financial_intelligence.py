@@ -174,7 +174,10 @@ def test_financial_terminal_portfolio_intelligence_and_management_scorecard():
         assert portfolio["concentration"]["top_1"] == 1
         assert portfolio["exposures"]["sectors"] == {"Technology": 1.0}
         assert portfolio["exposures"]["currencies"] == {"USD": 1.0}
-        assert portfolio["attribution"]["positions"][0]["components"]["buybacks"] > 0
+        # La ventana de precios es de 30 dias (ano fiscal 2026 como mucho):
+        # los facts anuales 2024-2025 quedan fuera, asi que no se atribuye una
+        # recompra de varios anos a un retorno de un mes.
+        assert portfolio["attribution"]["positions"][0]["components"]["buybacks"] == 0
 
         snapshot_service = PortfolioSnapshotService()
         ledger.update_market_price(
