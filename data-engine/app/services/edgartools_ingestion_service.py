@@ -120,6 +120,17 @@ def _replace_own_facts(db: Session, company: Company, document: Document) -> Non
     )
 
 
+def _pad_cik(value: Any) -> str | None:
+    """CIK a 10 digitos, o None si no hay CIK.
+
+    ``"".zfill(10)`` devuelve "0000000000" (truthy): un CIK vacio se convertia
+    en un CIK fabricado que saltaba el lookup por ticker, generaba URLs SEC
+    falsas y llegaba a la respuesta como si fuera real.
+    """
+    text = str(value or "").strip()
+    return text.zfill(10) if text else None
+
+
 def _fetch_live_entity_facts(cik_or_ticker: str) -> tuple[Any | None, str | None]:
     """``(entity_facts, cik)`` live via edgartools (solo dev con red).
 
@@ -130,7 +141,7 @@ def _fetch_live_entity_facts(cik_or_ticker: str) -> tuple[Any | None, str | None
 
     client.throttle_sync()
     edgar_company = EdgarCompany(cik_or_ticker)
-    cik = str(getattr(edgar_company, "cik", "") or "").strip().zfill(10) or None
+    cik = _pad_cik(getattr(edgar_company, "cik", ""))
     return edgar_company.get_facts(), cik
 
 
@@ -178,7 +189,7 @@ def refresh_from_edgartools(
 
     transport = "live"
     synced_at: str | None = None
-    cik = str(getattr(company, "cik", "") or "").strip().zfill(10) or None
+    cik = _pad_cik(getattr(company, "cik", ""))
     facts_payload = companyfacts
     subs_payload = submissions
     anchors = annual_anchors
@@ -379,7 +390,7 @@ def refresh_form4_from_edgartools(
     wanted = ticker.strip().upper()
     if not force and not is_enabled():
         return _disabled(wanted)
-    resolved = (cik or "").strip().zfill(10) or client.manifest_cik(wanted, snapshot_root)
+    resolved = _pad_cik(cik) or client.manifest_cik(wanted, snapshot_root)
     if not resolved and submissions is None:
         return {
             "ticker": wanted, "status": "unavailable",
