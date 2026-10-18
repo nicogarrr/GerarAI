@@ -14,16 +14,17 @@ test("cabecera de la ficha con precio, variación y gráfico técnico (desktop)"
   await page.goto("/research/MSFT");
 
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
-  await expect(header(page).getByText("336,56 US$")).toBeVisible();
+  await expect(header(page).getByText("$336.56")).toBeVisible();
   await expect(header(page).getByText("+2,34")).toBeVisible();
   await expect(header(page).getByRole("img", { name: /Evolución del precio/ })).toBeVisible();
   await expect(header(page).getByTestId("technical-reading")).toBeVisible();
   await expect(header(page).getByRole("tab", { name: "Completo", exact: true })).toHaveAttribute("aria-selected", "true");
   const strip = header(page).getByTestId('company-metric-strip');
   await expect(strip).toBeVisible();
-  await expect(strip.getByText('334,20 US$', { exact: true })).toBeVisible();
+  await expect(strip.getByText('$334.20', { exact: true })).toBeVisible();
   await expect(strip.getByText('N/D', { exact: true })).toBeVisible();
-  await expect(header(page).getByText('Fixture local · Sesión regular del 2026-09-09 · 17:00 (Madrid)')).toBeVisible();
+  await expect(header(page).getByText('Fixture local · 17:00 (Madrid)', { exact: true })).toBeVisible();
+  await expect(header(page).getByText('Sesión regular del 2026-09-09 · 17:00 (Madrid)', { exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/header-quote-desktop.png" });
 });
 
@@ -32,7 +33,7 @@ test("cabecera de la ficha con precio, variación y gráfico técnico (móvil)",
   await page.goto("/research/MSFT");
 
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
-  await expect(header(page).getByText("336,56 US$")).toBeVisible();
+  await expect(header(page).getByText("$336.56")).toBeVisible();
   await expect(header(page).getByText("+0,70 %")).toBeVisible();
   await expect(header(page).getByRole("img", { name: /Evolución del precio/ })).toBeVisible();
   await page.screenshot({ path: "test-results/header-quote-mobile.png" });
@@ -42,7 +43,7 @@ test("otras vistas también llevan la cotización en cabecera", async ({ page })
   await page.goto("/research/MSFT?view=thesis");
 
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
-  await expect(header(page).getByText("336,56 US$")).toBeVisible();
+  await expect(header(page).getByText("$336.56")).toBeVisible();
 });
 
 

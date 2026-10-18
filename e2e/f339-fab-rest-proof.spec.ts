@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { seedMarketPrices } from "./fixtures/market-prices";
 
-// Prueba F339: a 390px el FAB del chat no debe tapar la leyenda del donut EN
-// REPOSO. Stack e2e estándar del repo (webServer de playwright.config.ts).
+// F339: a 390px la acción Cerebro vive en BottomNav; el FAB desktop
+// queda oculto y no puede tapar la leyenda del donut.
 test.use({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
@@ -38,7 +38,7 @@ function signedHeaders(method: string, path: string, body: Buffer) {
   };
 }
 
-test("F339: el FAB queda oculto en reposo mientras la leyenda cruza su zona", async ({ page, request }) => {
+test("F339: móvil usa acción inline y nunca superpone el FAB a la leyenda", async ({ page, request }) => {
 
   // Semilla: 6 posiciones para que el donut tenga leyenda real.
   const seeds = [
@@ -88,67 +88,18 @@ test("F339: el FAB queda oculto en reposo mientras la leyenda cruza su zona", as
   await page.goto("/portfolio");
   const legend = page.locator("#portfolio-allocation-legend");
   await expect(legend).toBeVisible({ timeout: 60_000 });
-  const fab = page.locator('button[aria-label="Abrir el cerebro"]');
-  await expect(fab).toBeVisible();
-
-  // A chart loaded dynamically can shift the legend after the first scroll.
-  // Position the real legend and require a two-sided rectangle intersection,
-  // not merely a bottom beyond the viewport (which also matches off-screen).
-  await expect.poll(async () => page.evaluate(async () => {
-    const legend = document.getElementById("portfolio-allocation-legend")!;
-    const rect = legend.getBoundingClientRect();
-    window.scrollTo(0, Math.max(0, window.scrollY + rect.top - (window.innerHeight - 140)));
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    const actual = legend.getBoundingClientRect();
-    return actual.top < window.innerHeight - 24 && actual.bottom > window.innerHeight - 88 &&
-      actual.left < window.innerWidth - 24 && actual.right > window.innerWidth - 88;
-  })).toBe(true);
-  // Rest, not the transient scroll-hiding state, is the behavior under test.
-  await page.waitForTimeout(1200);
-  await expect.poll(async () => fab.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
-  await page.screenshot({ path: "test-results/f339-rest-fab-hidden.png" });
-
-  // Saca la leyenda de la zona: el FAB reaparece en reposo.
-  await page.evaluate(() => {
-    const el = document.getElementById("portfolio-allocation-legend")!;
-    const rect = el.getBoundingClientRect();
-    window.scrollTo(0, window.scrollY + rect.top - 220);
-  });
-  await page.waitForTimeout(1200);
-  await expect.poll(async () => fab.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
-  await page.screenshot({ path: "test-results/f339-rest-fab-visible.png" });
-
-  // Cambio de tab sin scroll ni resize: al desmontar la leyenda el FAB no
-  // puede quedar oculto para siempre; al volver y remontarla en la zona, el
-  // MutationObserver re-ejecuta el chequeo y vuelve a ocultarlo.
-  await page.getByRole("tab", { name: "Posiciones" }).click();
-  await page.waitForTimeout(800);
-  await expect.poll(async () => fab.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
-  await page.screenshot({ path: "test-results/f339-tab-switch-unblocked.png" });
-  await page.getByRole("tab", { name: "Resumen" }).click();
+  // Mobile uses the inline BottomNav action, not a floating button.
+  // The desktop FAB must remain absent while the legend is in view or at rest.
+  const fab = page.locator('button[aria-label="Abrir el cerebro"].fixed');
+  const brainAction = page.getByRole('navigation', { name: 'Navegación inferior' }).getByRole('button', { name: 'Abrir el cerebro', exact: true });
+  await expect(fab).toBeHidden();
+  await expect(brainAction).toBeVisible();
+  await legend.scrollIntoViewIfNeeded();
+  await expect(fab).toBeHidden();
+  await page.screenshot({ path: "test-results/f339-mobile-inline-brain.png" });
+  await page.getByRole("tab", { name: "Posiciones", exact: true }).click();
+  await expect(fab).toBeHidden();
+  await page.getByRole("tab", { name: "Resumen", exact: true }).click();
   await expect(legend).toBeVisible();
-  await page.evaluate(() => {
-    const el = document.getElementById("portfolio-allocation-legend")!;
-    const rect = el.getBoundingClientRect();
-    window.scrollTo(0, Math.max(0, window.scrollY + rect.top - (window.innerHeight - 140)));
-  });
-  await page.waitForTimeout(1200);
-  await expect.poll(async () => fab.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
-  await page.screenshot({ path: "test-results/f339-tab-switch-reblocked.png" });
-
-  // Safe-area: simula inset inferior de iPhone (34px) subiendo el FAB a
-  // bottom=58px; la zona medida por computed style debe cubrir la franja
-  // H-114..H-96 que una constante de 96px no vería.
-  await fab.evaluate((el) => { el.style.bottom = "58px"; });
-  await page.evaluate(() => window.dispatchEvent(new Event("resize")));
-  await page.evaluate(() => {
-    const el = document.getElementById("portfolio-allocation-legend")!;
-    const rect = el.getBoundingClientRect();
-    // Leyenda a ~104px del borde inferior: fuera de una banda de 96, dentro
-    // de la zona real (58+56=114px).
-    window.scrollTo(0, window.scrollY + rect.bottom - (window.innerHeight - 104));
-  });
-  await page.waitForTimeout(1200);
-  await expect.poll(async () => fab.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
-  await page.screenshot({ path: "test-results/f339-safe-area-hidden.png" });
+  await expect(fab).toBeHidden();
 });
