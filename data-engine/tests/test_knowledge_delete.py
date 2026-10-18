@@ -1,0 +1,164 @@
+"""DELETE /api/knowledge/documents/{id}: cascada y aislamiento de tenant."""
+from uuid import uuid4
+
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+
+import main
+from app.core import auth as auth_module
+from app.core.database import Base, SessionLocal, init_db
+from app.models import (
+    InvestmentCaseStudy,
+    InvestmentPrinciple,
+    KnowledgeChunk,
+    KnowledgeDocument,
+    Tenant,
+)
+from app.seed import seed
+from app.services.knowledge_library_service import KnowledgeLibraryService
+from tests.auth_helpers import auth_settings, signed_request
+
+
+def _document(title: str) -> KnowledgeDocument:
+    return KnowledgeDocument(
+        title=title,
+        document_type="personal_note",
+        language="en",
+        status="ready",
+        checksum=uuid4().hex,
+        metadata_={"parser": "native_text"},
+    )
+
+
+def test_delete_document_cascada_fragmentos_principios_y_casos():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        tenant = Tenant(external_id=f"delete-test-{uuid4().hex[:8]}", name="Delete")
+        db.add(tenant)
+        db.flush()
+        db.info["tenant_id"] = tenant.id
+
+        kept = _document("Se queda")
+        gone = _document("Se borra")
+        db.add_all([kept, gone])
+        db.flush()
+        db.add_all([
+            KnowledgeChunk(knowledge_document_id=kept.id, chunk_index=0, content="kept chunk"),
+            KnowledgeChunk(knowledge_document_id=gone.id, chunk_index=0, content="gone chunk 0"),
+            KnowledgeChunk(knowledge_document_id=gone.id, chunk_index=1, content="gone chunk 1"),
+        ])
+        db.flush()
+        kept_chunk = db.scalar(
+            select(KnowledgeChunk).where(KnowledgeChunk.knowledge_document_id == kept.id)
+        )
+        gone_chunk = db.scalar(
+            select(KnowledgeChunk).where(KnowledgeChunk.knowledge_document_id == gone.id)
+        )
+        db.add(
+            InvestmentPrinciple(
+                knowledge_document_id=gone.id,
+                knowledge_chunk_id=gone_chunk.id,
+                principle="Principio derivado del documento borrado.",
+                category="capital_allocation",
+                exact_fragment="gone chunk 0",
+                status="proposed",
+                principle_fingerprint=uuid4().hex,
+            )
+        )
+        db.add(
+            InvestmentCaseStudy(
+                knowledge_document_id=gone.id,
+                title="Caso que sobrevive sin enlace",
+                summary="Resumen",
+                outcome="Resultado",
+            )
+        )
+        db.commit()
+
+        result = KnowledgeLibraryService.delete_document(db, gone)
+        assert result == {"chunks_deleted": 2, "principles_deleted": 1}
+
+        assert db.get(KnowledgeDocument, gone.id) is None
+        assert db.get(KnowledgeDocument, kept.id) is not None
+        remaining_chunks = db.scalars(
+            select(KnowledgeChunk).where(KnowledgeChunk.knowledge_document_id == gone.id)
+        ).all()
+        assert remaining_chunks == []
+        assert kept_chunk.id is not None
+        assert db.scalar(
+            select(InvestmentPrinciple).where(
+                InvestmentPrinciple.knowledge_document_id == gone.id
+            )
+        ) is None
+        case_study = db.scalar(
+            select(InvestmentCaseStudy).where(
+                InvestmentCaseStudy.title == "Caso que sobrevive sin enlace"
+            )
+        )
+        assert case_study is not None
+        assert case_study.knowledge_document_id is None
+
+
+def test_delete_document_cross_tenant_devuelve_404(monkeypatch):
+    init_db()
+    seed()
+    secret = "tenant-test-secret-with-at-least-32-characters"
+    monkeypatch.setattr(
+        auth_module,
+        "get_settings",
+        lambda: auth_settings(strict=True, secret=secret, app_env="local"),
+    )
+    suffix = uuid4().hex[:8]
+    tenant_a = f"tenant-a-{suffix}"
+    tenant_b = f"tenant-b-{suffix}"
+    client = TestClient(main.app)
+
+    # Documento del tenant A creado con el contexto de tenant de la sesion,
+    # como lo haria cualquier escritura real.
+    db = SessionLocal()
+    tenant_row = Tenant(external_id=tenant_a, name="Tenant A")
+    db.add(tenant_row)
+    db.flush()
+    db.info["tenant_id"] = tenant_row.id
+    document = _document(f"Doc privado {suffix}")
+    db.add(document)
+    db.flush()
+    db.add(KnowledgeChunk(knowledge_document_id=document.id, chunk_index=0, content="privado"))
+    db.commit()
+    document_id = document.id
+    tenant_row_id = tenant_row.id
+    db.close()
+
+    unauthenticated = client.delete(f"/api/knowledge/documents/{document_id}")
+    assert unauthenticated.status_code == 401
+
+    cross_tenant = signed_request(
+        client, secret, tenant_b, f"user-b-{suffix}", "DELETE",
+        f"/api/knowledge/documents/{document_id}",
+    )
+    assert cross_tenant.status_code == 404
+
+    own = signed_request(
+        client, secret, tenant_a, f"user-a-{suffix}", "DELETE",
+        f"/api/knowledge/documents/{document_id}",
+    )
+    assert own.status_code == 204
+
+    gone = signed_request(
+        client, secret, tenant_a, f"user-a-{suffix}", "GET",
+        f"/api/knowledge/documents/{document_id}",
+    )
+    assert gone.status_code == 404
+
+    db = SessionLocal()
+    assert db.get(KnowledgeDocument, document_id, execution_options={"include_all_tenants": True}) is None
+    assert db.scalars(
+        select(KnowledgeChunk)
+        .where(KnowledgeChunk.knowledge_document_id == document_id)
+        .execution_options(include_all_tenants=True)
+    ).all() == []
+    db.delete(db.get(Tenant, tenant_row_id))
+    db.commit()
+    db.close()
