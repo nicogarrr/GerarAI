@@ -17,6 +17,10 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 const POLL_MS = 3000;
+// 600 polls x 3 s = 30 min de espera continua por job. Sin corte, un job
+// atascado dejaba "Generando en segundo plano..." para siempre: pasado el
+// maximo el estado es DESCONOCIDO y se dice, no se sigue fingiendo progreso.
+const MAX_POLLS = 600;
 
 export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }: { ticker: string; label?: string }) {
     const router = useRouter();
@@ -26,6 +30,8 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
     const [recoveryCycle, setRecoveryCycle] = useState(0);
     const [starting, setStarting] = useState(false);
     const startingRef = useRef(false);
+    const [pollExhausted, setPollExhausted] = useState(false);
+    const pollCountRef = useRef(0);
 
     const active = job !== null && ['queued', 'running', 'retrying', 'dispatch_failed'].includes(job.status);
     const busy = recovering || starting || active;
@@ -65,8 +71,14 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
     }, [ticker, recoveryCycle]);
 
     const jobId = job?.id;
+    // Job nuevo (o cambio de job): ventana de polling nueva.
     useEffect(() => {
-        if (!active || !jobId) return;
+        pollCountRef.current = 0;
+        setPollExhausted(false);
+    }, [jobId]);
+
+    useEffect(() => {
+        if (!active || !jobId || pollExhausted) return;
         let disposed = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
         const tick = async () => {
@@ -81,14 +93,22 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
             } catch {
                 // A failed poll must never cancel or re-enqueue server work.
             }
-            if (!disposed) timer = setTimeout(tick, POLL_MS);
+            if (disposed) return;
+            pollCountRef.current += 1;
+            if (pollCountRef.current >= MAX_POLLS) {
+                // El trabajo del servidor sigue (o no): aqui ya no lo sabemos
+                // y no se re-agenda. El copy pasa a "estado desconocido".
+                setPollExhausted(true);
+                return;
+            }
+            timer = setTimeout(tick, POLL_MS);
         };
         void tick();
         return () => {
             disposed = true;
             clearTimeout(timer);
         };
-    }, [active, jobId, router]);
+    }, [active, jobId, router, pollExhausted]);
 
     const start = async () => {
         if (busy || startingRef.current) return;
@@ -130,8 +150,9 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
                 </Button>
                 {active ? (
                     <span className="text-sm text-gray-400">
-                        {phaseLabel ?? (job?.status === 'dispatch_failed' ? 'Esperando reconexión de la cola' : job?.status === 'retrying' ? 'Reintentando en el servidor' : 'En cola')}
-                        {doneCount > 0 ? ` · ${doneCount} fases completadas` : ''}
+                        {pollExhausted
+                            ? 'Estado desconocido: la generación no responde desde hace 30 min. El trabajo del servidor no se cancela; recarga la página para volver a leer su estado.'
+                            : `${phaseLabel ?? (job?.status === 'dispatch_failed' ? 'Esperando reconexión de la cola' : job?.status === 'retrying' ? 'Reintentando en el servidor' : 'En cola')}${doneCount > 0 ? ` · ${doneCount} fases completadas` : ''}`}
                     </span>
                 ) : null}
             </div>
