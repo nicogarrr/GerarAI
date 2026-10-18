@@ -63,10 +63,13 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
         watchlistTickers={tickerContext.watchlistTickers}
       />
 
+      <details className="rounded-lg border border-gray-800 bg-surface-1 p-5">
+        <summary className="cursor-pointer font-semibold text-gray-300">Añadir noticias</summary>
+        <div className="mt-4 grid gap-6">
       <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2">
           <AlertTriangle aria-hidden="true" className="h-5 w-5 text-teal-300" />
-          <h2 className="text-lg font-semibold text-gray-100">Analizar noticia manual</h2>
+          <h2 className="text-lg font-semibold text-gray-100">Analizar un artículo</h2>
         </div>
         <MutationForm action={submitAnalyzeNews} className="grid gap-3" resetOnSuccess successMessage="Noticia analizada">
           <div className="grid gap-2">
@@ -102,9 +105,9 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
       <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2">
           <AlertTriangle aria-hidden="true" className="h-5 w-5 text-teal-300" />
-          <h2 className="text-lg font-semibold text-gray-100">Ingerir lote de feed</h2>
+          <h2 className="text-lg font-semibold text-gray-100">Importar noticias en lote</h2>
         </div>
-        <MutationForm action={submitIngestFeed} className="grid gap-3" resetOnSuccess successMessage="Feed importado">
+        <MutationForm action={submitIngestFeed} className="grid gap-3" resetOnSuccess successMessage="Noticias importadas">
           <div className="grid gap-2 sm:grid-cols-[160px_1fr] sm:items-center">
             <label className="text-sm font-semibold text-gray-400" htmlFor="feed-source">
               Fuente
@@ -118,10 +121,12 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
             required
           />
           <Button className="w-full sm:w-fit" type="submit" variant="outline">
-            Ingerir feed
+            Importar lote
           </Button>
         </MutationForm>
       </section>
+        </div>
+      </details>
     </main>
   );
 }

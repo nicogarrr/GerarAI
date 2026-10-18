@@ -51,7 +51,7 @@ export default function PortfolioSummary({ summary }: Props) {
         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
           <PiggyBank className="h-12 w-12 text-blue-400" />
         </div>
-        <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Costo de las posiciones</p>
+        <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Coste de las posiciones</p>
         <p className="text-base min-[420px]:text-lg sm:text-2xl font-bold text-gray-100 tracking-tight break-words">
           {noData ? NA : format(summary.totalCost)}
         </p>
