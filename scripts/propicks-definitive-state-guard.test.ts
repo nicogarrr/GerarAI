@@ -90,3 +90,9 @@ describe('ProPicks sin estados intermedios (ficha, backtest, rebalanceo)', () =>
     assert.match(rebalance, /previousSnapshotError\(parsed, strategyId, month\)/);
   });
 });
+ it('la referencia de la ficha coincide con la pestaña Selección IA', () => {
+    const tabs = readFileSync('components/proPicks/ProPicksTabs.tsx', 'utf8');
+    assert.match(tabs, />\s*Selección IA\s*</);
+    assert.match(tabs, /No valida la selección IA:/);
+    assert.match(factsheet, /pestaña «Selección IA»/);
+ });
