@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -93,6 +94,11 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
 
     // La pastilla "Viendo X": el eco del servidor manda sobre la etiqueta local.
     const viewing = echo?.label ?? page?.label ?? null;
+    // Y la pastilla NAVEGA: si el eco resolvió un ticker va a su ficha; si no,
+    // a la página que el cliente está viendo (la pastilla deja de ser texto muerto).
+    const viewingHref = echo?.ticker
+        ? `/research/${encodeURIComponent(echo.ticker)}`
+        : page?.path ?? null;
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -187,13 +193,24 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                     <BrainGlassesIcon className="h-9 w-9 shrink-0 object-contain" />
                     <CardTitle id="global-brain-title" className="text-sm font-medium">Cerebro GerarAI</CardTitle>
                     {viewing && (
-                        <span
-                            data-testid="brain-page-context"
-                            title={echo?.company_name ?? undefined}
-                            className="max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300"
-                        >
-                            Viendo {viewing}
-                        </span>
+                        viewingHref ? (
+                            <Link
+                                href={viewingHref}
+                                data-testid="brain-page-context"
+                                title={echo?.company_name ?? undefined}
+                                className="max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300 hover:border-indigo-400 hover:text-indigo-200"
+                            >
+                                Viendo {viewing}
+                            </Link>
+                        ) : (
+                            <span
+                                data-testid="brain-page-context"
+                                title={echo?.company_name ?? undefined}
+                                className="max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300"
+                            >
+                                Viendo {viewing}
+                            </span>
+                        )
                     )}
                 </div>
                 <div className="flex items-center gap-1">
@@ -244,7 +261,20 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                                                     h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-300 mt-2 mb-1" {...props} />,
                                                     ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-1" {...props} />,
                                                     li: ({ node, ...props }) => <li className="text-slate-300" {...props} />,
-                                                    strong: ({ node, ...props }) => <strong className="font-semibold text-white bg-indigo-500/10 px-1 rounded" {...props} />
+                                                    strong: ({ node, ...props }) => <strong className="font-semibold text-white bg-indigo-500/10 px-1 rounded" {...props} />,
+                                                    // Los enlaces de la respuesta son navegación real: las rutas
+                                                    // internas (/research/ASTS, /portfolio…) abren con next/link
+                                                    // sin recargar la app; las externas abren en pestaña nueva.
+                                                    a: ({ node, href, children, ...props }) =>
+                                                        href && href.startsWith('/') ? (
+                                                            <Link href={href} className="text-indigo-300 underline underline-offset-2 hover:text-indigo-200">
+                                                                {children}
+                                                            </Link>
+                                                        ) : (
+                                                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-300 underline underline-offset-2 hover:text-indigo-200" {...props}>
+                                                                {children}
+                                                            </a>
+                                                        )
                                                 }}
                                             >
                                                 {m.content}
