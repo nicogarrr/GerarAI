@@ -85,3 +85,46 @@ def test_get_text_retries_on_403_then_succeeds(monkeypatch):
         text = form4_connector._get_text("https://www.sec.gov/x.xml", client)
     assert text == "<ownershipDocument/>"
     assert calls["n"] == 3
+
+def test_group_tranches_merges_same_filing_lines():
+    items = [
+        {
+            "ticker": "META", "insider": "ZUCKERBERG MARK", "type": "S",
+            "accession_number": "0001", "shares": 100.0, "price": 10.0,
+            "value": 1000.0, "date": "2026-09-24", "source_url": "https://x",
+        },
+        {
+            "ticker": "META", "insider": "ZUCKERBERG MARK", "type": "S",
+            "accession_number": "0001", "shares": 300.0, "price": 20.0,
+            "value": 6000.0, "date": "2026-09-24", "source_url": "https://x",
+        },
+        {
+            "ticker": "META", "insider": "OTRO INSIDER", "type": "S",
+            "accession_number": "0001", "shares": 50.0, "price": 10.0,
+            "value": 500.0, "date": "2026-09-24", "source_url": "https://x",
+        },
+    ]
+    grouped = insider_feed._group_tranches(items)
+    assert len(grouped) == 2
+    main = next(g for g in grouped if g["insider"] == "ZUCKERBERG MARK")
+    assert main["tranches"] == 2
+    assert main["shares"] == 400.0
+    assert main["value"] == 7000.0
+    assert main["price"] == 7000.0 / 400.0
+    other = next(g for g in grouped if g["insider"] == "OTRO INSIDER")
+    assert other["tranches"] == 1
+    assert other["price"] == 10.0
+
+
+def test_feed_exposes_big_buys():
+    db = _db()
+    try:
+        _cleanup(db)
+        _persist(db)  # CEO compra $5M en el XML de prueba
+        feed = insider_feed.build_feed(db, days=3650, today=date(2024, 3, 20))
+        assert any(s["signal"] == "big_buy" for s in feed["big_buys"])
+        tx = feed["transactions"][0]
+        assert tx["tranches"] >= 1
+    finally:
+        _cleanup(db)
+        db.close()

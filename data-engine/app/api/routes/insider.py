@@ -53,6 +53,7 @@ def insider_feed_route(
             "transactions": [],
             "clusters": [],
             "c_suite_buys": [],
+            "big_buys": [],
         }
 
 
