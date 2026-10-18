@@ -2,7 +2,7 @@
 
 import { getAuth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
-import { AuthenticationError, toAppError, getErrorMessage } from "@/lib/types/errors";
+import { AuthenticationError, toAppError, getSafeErrorMessage } from "@/lib/types/errors";
 import { ERROR_MESSAGES } from "@/lib/constants";
 
 export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; data?: unknown; error?: string }> => {
@@ -30,7 +30,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
         } else if (appError.message.includes('unavailable') || appError.message.includes('temporarily')) {
             errorMessage = ERROR_MESSAGES.AUTH_UNAVAILABLE;
         } else {
-            errorMessage = getErrorMessage(error);
+            errorMessage = getSafeErrorMessage(error);
         }
 
         console.error('Sign up failed:', appError);
@@ -67,7 +67,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
         } else if (appError.message.includes('unavailable') || appError.message.includes('temporarily')) {
             errorMessage = ERROR_MESSAGES.AUTH_UNAVAILABLE;
         } else {
-            errorMessage = getErrorMessage(error);
+            errorMessage = getSafeErrorMessage(error);
         }
 
         console.error('Sign in failed:', appError);
@@ -118,7 +118,7 @@ export const enableTwoFactorTotp = async ({ password }: { password: string }): P
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('Enable 2FA failed:', appError);
-        return { success: false, error: getErrorMessage(error) };
+        return { success: false, error: getSafeErrorMessage(error) };
     }
 }
 
@@ -158,7 +158,7 @@ export const disableTwoFactor = async ({ password }: { password: string }): Prom
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('Disable 2FA failed:', appError);
-        return { success: false, error: getErrorMessage(error) };
+        return { success: false, error: getSafeErrorMessage(error) };
     }
 }
 
@@ -177,7 +177,7 @@ export const getTwoFactorStatus = async (): Promise<{ success: boolean; enabled?
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('2FA status check failed:', appError);
-        return { success: false, error: getErrorMessage(error) };
+        return { success: false, error: getSafeErrorMessage(error) };
     }
 }
 

@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { AppError, ExternalAPIError, ValidationError, getErrorMessage } from '@/lib/types/errors';
+import { AppError, ExternalAPIError, ValidationError, getSafeErrorMessage } from '@/lib/types/errors';
 import { sourcesPageInfo } from '@/lib/research/sources-inventory';
 import { researchRequest } from '@/lib/research/client';
 import { paginateAll } from '@/lib/paginate-all';
@@ -857,7 +857,7 @@ export async function getResearchThesisWorkspace(ticker: string) {
       return { value: await getJson<T>(path, fallback) };
     } catch (error) {
       // Una capa secundaria no puede convertir el resto del workspace en 500.
-      return { value: fallback, error: getErrorMessage(error) };
+      return { value: fallback, error: getSafeErrorMessage(error) };
     }
   };
   const [thesis, history, claims, sections, graph, redTeam, historyDetail] = await Promise.all([
