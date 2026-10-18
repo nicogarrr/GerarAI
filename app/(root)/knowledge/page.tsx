@@ -160,6 +160,16 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
   const documentNames = new Map(documents.map((document) => [document.id, document.title]));
   const selectedDocument = documents.find((document) => document.id === selectedDocumentId);
   const activeJobs = jobs.filter((job) => job.status === 'queued' || job.status === 'running');
+  const collectionsWithCount = (() => {
+    const withCount = collections.map((collection) => ({
+      collection,
+      count: documents.filter((document) => document.collection_id === collection.id).length,
+    }));
+    return {
+      nonEmpty: withCount.filter((entry) => entry.count > 0),
+      empty: withCount.filter((entry) => entry.count === 0),
+    };
+  })();
   const latestJobByDocument = new Map<number, (typeof jobs)[number]>();
   jobs.forEach((job) => {
     if (job.entity_id && !latestJobByDocument.has(job.entity_id)) {
@@ -257,7 +267,42 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
 
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-4">
         <h2 className="mb-3 font-semibold text-gray-100">Colecciones</h2>
-        {collections.length ? <ul className="grid gap-2 sm:grid-cols-2">{collections.map((collection) => { const count = documents.filter(document => document.collection_id === collection.id).length; return <li key={collection.id} className="flex items-center justify-between gap-2 rounded-lg border border-gray-800 p-3 text-sm"><span><span className="font-medium text-gray-200">{collection.name}</span><span className="ml-2 text-xs text-gray-500">· {count} {count === 1 ? 'documento' : 'documentos'} en esta vista</span></span>{count === 0 ? <DeleteCollectionButton collectionId={collection.id} name={collection.name} /> : null}</li>; })}</ul> : <p className="text-sm text-gray-500">Sin colecciones.</p>}
+        {/*
+          Las vacías (p. ej. las 10 instaladas por defecto antes de subir
+          nada) no compiten con las que tienen documentos: quedan plegadas
+          bajo un desplegable, donde sigue estando su botón de borrado.
+        */}
+        {collections.length ? (
+          <>
+            {collectionsWithCount.nonEmpty.length ? (
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {collectionsWithCount.nonEmpty.map(({ collection, count }) => (
+                  <li className="flex items-center justify-between gap-2 rounded-lg border border-gray-800 p-3 text-sm" key={collection.id}>
+                    <span>
+                      <span className="font-medium text-gray-200">{collection.name}</span>
+                      <span className="ml-2 text-xs text-gray-500">· {count} {count === 1 ? 'documento' : 'documentos'}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-sm text-gray-500">Ninguna colección tiene documentos todavía.</p>}
+            {collectionsWithCount.empty.length ? (
+              <details className="mt-3">
+                <summary className="inline-flex min-h-[44px] cursor-pointer items-center text-sm text-gray-500">
+                  {collectionsWithCount.empty.length} {collectionsWithCount.empty.length === 1 ? 'colección vacía' : 'colecciones vacías'}
+                </summary>
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {collectionsWithCount.empty.map(({ collection }) => (
+                    <li className="flex items-center justify-between gap-2 rounded-lg border border-gray-800 p-3 text-sm" key={collection.id}>
+                      <span className="font-medium text-gray-200">{collection.name}</span>
+                      <DeleteCollectionButton collectionId={collection.id} name={collection.name} />
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </>
+        ) : <p className="text-sm text-gray-500">Sin colecciones.</p>}
       </section>
 
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">

@@ -1,0 +1,37 @@
+/**
+ * La sección Colecciones de /knowledge pintaba las 10 colecciones por
+ * defecto vacías con el mismo peso que las que tienen documentos (11
+ * tarjetas, 10 de ruido, cada una con su botón Eliminar) antes de la tabla
+ * de documentos. Ahora: las colecciones con documentos van primero y las
+ * vacías quedan plegadas en un <details>, conservando su borrado.
+ *
+ * Ejecucion: node --experimental-strip-types --test scripts/knowledge-empty-collections-guard.test.ts
+ */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const page = readFileSync('app/(root)/knowledge/page.tsx', 'utf8');
+
+describe('knowledge empty collections guard', () => {
+  it('separa colecciones con documentos de las vacías', () => {
+    assert.match(page, /collectionsWithCount\.nonEmpty/);
+    assert.match(page, /collectionsWithCount\.empty/);
+  });
+
+  it('las vacías quedan plegadas en un desplegable etiquetado', () => {
+    assert.match(page, /<details className="mt-3">/);
+    assert.match(page, /colecciones vacías/);
+    assert.match(page, /colección vacía/);
+  });
+
+  it('las vacías conservan su botón de borrado dentro del desplegable', () => {
+    const details = page.match(/<details className="mt-3">[\s\S]*?<\/details>/);
+    assert.ok(details, 'desplegable localizado');
+    assert.match(details[0], /<DeleteCollectionButton collectionId=\{collection\.id\} name=\{collection\.name\} \/>/);
+  });
+
+  it('la lista principal ya no repite "en esta vista" ni muestra vacías', () => {
+    assert.ok(!page.includes('documentos en esta vista'), 'copy "en esta vista" eliminado');
+  });
+});
