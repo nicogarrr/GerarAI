@@ -1,7 +1,7 @@
 import type { PaperTradeView } from '@/lib/actions/paper-trading.actions';
 
 const stateLabel: Record<string, string> = { pending: 'Pendiente de entrada', open: 'Abierta', closed: 'Cerrada' };
-const closeLabel: Record<string, string> = { stop: 'Stop', target: 'Objetivo', horizon: 'Fin del horizonte', manual: 'Cierre anticipado' };
+const closeLabel: Record<string, string> = { stop: 'Límite de pérdidas', target: 'Objetivo', horizon: 'Fin del horizonte', manual: 'Cierre anticipado' };
 function number(value: string | number | null | undefined) {
     if (value === null || value === undefined || String(value).trim() === '') return 'Sin datos';
     const parsed = Number(value);
@@ -18,7 +18,7 @@ function conviction(value: string) {
 
 export function PaperProposalCard({ trade }: { trade: PaperTradeView }) {
     const direction = trade.direction === 'long' ? 'Largo' : trade.direction === 'short' ? 'Corto' : 'Sin dirección';
-    const horizon = trade.horizon === 'five_years' ? 'Tesis 5 años' : trade.horizon === 'short' ? 'Trade 30 días' : 'Sin horizonte';
+    const horizon = trade.horizon === 'five_years' ? 'Tesis 5 años' : trade.horizon === 'short' ? 'Operación a 30 días' : 'Sin horizonte';
     return <article className="min-w-0 space-y-4 rounded-lg border border-gray-700 p-4 text-sm text-gray-300" aria-label={`Propuesta simulada ${trade.ticker}`}>
         <div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold text-gray-100">{trade.ticker} · {direction} · {horizon}</h3><span>{stateLabel[trade.status] ?? 'Estado no disponible'}</span></div>
         <p className="text-xs text-gray-400">Operación simulada sin capital real. No es una orden al broker.</p>
@@ -27,7 +27,7 @@ export function PaperProposalCard({ trade }: { trade: PaperTradeView }) {
             <p className="break-words whitespace-pre-wrap">{trade.thesis || 'Tesis no disponible.'}</p>
             <dl className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4">
                 <div><dt>Entrada propuesta</dt><dd>{number(trade.proposed_entry)}</dd></div>
-                <div><dt>Stop propuesto</dt><dd>{number(trade.stop)}</dd></div>
+                <div><dt>Límite de pérdidas propuesto</dt><dd>{number(trade.stop)}</dd></div>
                 <div><dt>Objetivo propuesto</dt><dd>{number(trade.target)}</dd></div>
                 <div><dt>Convicción del modelo</dt><dd>{conviction(trade.conviction)}</dd></div>
             </dl>
@@ -44,7 +44,7 @@ export function PaperProposalCard({ trade }: { trade: PaperTradeView }) {
             </dl>
             <p className="break-words">Fuente de precios: {trade.price_source || 'Sin datos'} · Fechas en hora de Madrid.</p>
             <p>Cantidad simulada (supuesto): {number(trade.quantity)}</p>
-            <p>P&amp;L bruto simulado: {number(trade.status === 'closed' ? trade.realized_pnl : trade.unrealized_pnl)} {trade.currency || ''}</p>
+            <p>Resultado bruto simulado: {number(trade.status === 'closed' ? trade.realized_pnl : trade.unrealized_pnl)} {trade.currency || ''}</p>
             {trade.status === 'closed' && <p>Motivo de cierre: {trade.close_reason ? closeLabel[trade.close_reason] || 'Otro motivo registrado' : 'Sin datos'}</p>}
         </section>
     </article>;

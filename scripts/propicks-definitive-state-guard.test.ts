@@ -51,7 +51,7 @@ describe('ProPicks sin estados intermedios (ficha, backtest, rebalanceo)', () =>
     assert.match(factsheet, /import \{ getStrategyById \} from '@\/lib\/utils\/proPicksStrategies';/);
     assert.match(factsheet, /CATEGORY_KEYS\.map\(\(key\)/);
     assert.match(factsheet, /strategy\.categoryWeights\[key\]/);
-    assert.match(factsheet, /Score mínimo de entrada:/);
+    assert.match(factsheet, /Puntuación mínima de entrada:/);
   });
 
   it('la ficha explica la estrategia no disponible sin prometer nada', () => {
