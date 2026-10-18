@@ -42,7 +42,7 @@ class AssistantSection(BaseModel):
 
 class AssistantCitation(BaseModel):
     id: str
-    kind: Literal["news_event", "financial_fact", "document_chunk", "claim_evidence", "market_observation"]
+    kind: Literal["news_event", "financial_fact", "document_chunk", "claim_evidence", "market_observation", "thesis_record"]
     source: str
     url: str | None = None
     as_of: str | None = None
