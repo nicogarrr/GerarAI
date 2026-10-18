@@ -16,7 +16,7 @@ class _EngineReturning:
     def __init__(self, result: dict) -> None:
         self.result = result
 
-    def build_context(self, db, company, current_price):
+    def build_context(self, db, company, current_price, as_of=None):
         return object()
 
     def value(self, context) -> dict:
