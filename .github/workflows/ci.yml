@@ -120,7 +120,7 @@ jobs:
     # tiempo se sumaba al camino critico. Aqui el feedback de lint llega en
     # ~2 min y `backend` solo corre tests.
     name: Backend lint (ruff + pyright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
