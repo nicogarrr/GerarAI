@@ -316,6 +316,7 @@ describe('el escaner y el guard cuentan lo mismo', () => {
   });
 
   it('el numero de directivas client del repo no crece sin explicacion', () => {
+    // 99 = IngestLettersButton: useState del estado de descarga y onClick que llama a la server action (inversores/cartas con biblioteca vacia).
     // 98 = NewsSecondOrder (useState y onToggle del <details> que carga el segundo orden bajo demanda) + TaxDeclarantForm (useState de los campos fiscales y envío del formulario en /settings): ambas justificadas por hooks y eventos, no heredadas.
     // 96 = ThesisAudioPlayer: useState/useRef/useSyncExternalStore y handlers de play/pausa/detener sobre window.speechSynthesis (la lectura en voz alta solo existe en el navegador).
     // 95 = PublicMobileNav: useState del drawer, listeners de teclado (Escape/Tab), matchMedia para cerrar al cruzar md y bloqueo de scroll del body en el header publico.
@@ -335,7 +336,7 @@ describe('el escaner y el guard cuentan lo mismo', () => {
     assert.equal(inherited, 5, 'cambian las excepciones: revisa COMPONENTS_EXCEPTIONS y su motivo');
     assert.equal(
       total,
-      98,
+      99,
       `han aparecido directivas 'use client' sin revisar (total ${total}, justificadas ${justified}, heredadas ${inherited})`,
     );
   });

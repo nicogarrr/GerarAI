@@ -5,6 +5,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { getKnowledgeDocuments } from '@/lib/actions/research-tools.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 
+import { IngestLettersButton } from '../_components/IngestLettersButton';
 import { LibraryChat } from '../_components/LibraryChat';
 import { Pagination, paginate } from '../_components/Pagination';
 import { groupLetters, titleYear } from './letters';
@@ -51,7 +52,10 @@ export default async function LettersPage({ searchParams }: PageProps) {
             <LibraryChat authors={groups.filter(group => group.name !== 'Sin autor').map(group => group.name)} />
 
             {groups.length === 0 || !selected || !paged ? (
-                <p className="text-sm text-gray-500">Todavía no hay cartas en la biblioteca.</p>
+                <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-8 text-center">
+                    <p className="text-sm text-gray-500">Todavía no hay cartas en la biblioteca.</p>
+                    <IngestLettersButton />
+                </div>
             ) : (
                 <>
                     <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

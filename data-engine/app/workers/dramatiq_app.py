@@ -2477,6 +2477,47 @@ def sync_investor_holdings(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@_coalesce_on_success("ingest_letters_corpus", 6 * 60 * 60, ("tenant_id",))
+def ingest_letters_corpus(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Primera carga del corpus libre de cartas para un tenant.
+
+    Se encola desde la UI (POST /api/knowledge/corpus/ingest-async) cuando la
+    biblioteca esta vacia: la cuenta nueva no espera a una corrida manual del
+    script CLI. Fuentes publicas declaradas; dedupe SHA-256 en la biblioteca.
+    """
+    actor_name = "ingest_letters_corpus"
+    try:
+        from app.services.corpus_ingestion_service import ingest_free_corpus
+
+        db = _session(tenant_id, user_id)
+        try:
+            lease = acquire_job_lease(
+                f"ingest_letters_corpus:{tenant_id}",
+                ttl_seconds=3600,
+                redis_url=_lease_redis_url(),
+            )
+        except Exception:
+            db.close()
+            raise
+        if lease is None:
+            db.close()
+            return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
+        try:
+            result = ingest_free_corpus(db)
+        finally:
+            release_job_lease(
+                f"ingest_letters_corpus:{tenant_id}", lease, redis_url=_lease_redis_url()
+            )
+            db.close()
+        return {"actor": actor_name, **result}
+    except Exception as exc:
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
+
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000, queue_name=ALERT_QUEUE_NAME)
 def dispatch_insider_alerts(
     tenant_id: int | None = None,
