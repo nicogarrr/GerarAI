@@ -1,4 +1,5 @@
 """Free SEC refresh primitive. Caller owns queue, dedupe and user-facing state."""
+import re
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
@@ -26,7 +27,10 @@ async def refresh_free_financials(db: Session, company: Company, *, now: datetim
     previous = last_sec_refresh(db, company)
     base = {"provider": "SEC", "last_refreshed_at": previous.isoformat() if previous else None, "facts_imported": 0}
     # Do not send a bare European ticker to the US registry as its US namesake.
-    us_exchange = company.exchange.upper() in {"NASDAQ", "NYSE", "AMEX", "NYSEARCA", "NYSE AMERICAN", "NASDAQGS", "NASDAQGM", "NASDAQCM"}
+    us_exchange = bool(re.search(
+        r"\b(?:NASDAQ(?:GS|GM|CM)?|NEW YORK STOCK EXCHANGE|NYSE(?:ARCA)?|AMEX|ARCA)\b",
+        company.exchange.upper(),
+    ))
     if not company.cik and not (company.currency == "USD" and us_exchange):
         return {**base, "status": "skipped", "reason": "emisor_no_sec"}
     stored = int(db.scalar(select(func.count(FinancialFact.id)).where(
