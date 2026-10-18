@@ -1,18 +1,9 @@
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-/**
- * Memorando de la tesis renderizado como markdown formateado (antes se
- * pintaba el texto crudo con pipes y almohadillas en un <pre>). Solo
- * markdown seguro: react-markdown no ejecuta HTML en crudo. Las tablas
- * GFM se envuelven para scroll horizontal en móvil.
- */
-export default function ThesisMarkdown({ content }: { content: string }) {
-  return (
-    <div className="rounded-lg border border-gray-800 bg-black/20 p-4 text-sm leading-6 text-gray-300">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
+/** Mapa de componentes markdown -> estilos de la app, compartido por el
+ *  memorando de tesis y otros visores (fragmentos de conocimiento). */
+export const markdownComponents: Components = {
           h1: ({ node: _node, ...props }) => (
             <h1 className="mb-3 text-lg font-semibold text-gray-100" {...props} />
           ),
@@ -67,8 +58,18 @@ export default function ThesisMarkdown({ content }: { content: string }) {
           td: ({ node: _node, ...props }) => (
             <td className="border-b border-gray-800/60 px-2 py-1.5 align-top text-gray-400" {...props} />
           ),
-        }}
-      >
+};
+
+/**
+ * Memorando de la tesis renderizado como markdown formateado (antes se
+ * pintaba el texto crudo con pipes y almohadillas en un <pre>). Solo
+ * markdown seguro: react-markdown no ejecuta HTML en crudo. Las tablas
+ * GFM se envuelven para scroll horizontal en móvil.
+ */
+export default function ThesisMarkdown({ content }: { content: string }) {
+  return (
+    <div className="rounded-lg border border-gray-800 bg-black/20 p-4 text-sm leading-6 text-gray-300">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {content}
       </ReactMarkdown>
     </div>
