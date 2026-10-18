@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Claim, ClaimEvidence, Company, ThesisSection, ThesisVersion
-from app.services.memo_text_es import percent_es
+from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, percent_es
 
 
 def _money(value) -> str:
@@ -44,11 +44,17 @@ def build_memo_markdown(
     ).all()
 
     probs = thesis.scenario_probabilities or {}
+
+    def _prob(key: str) -> str:
+        value = probs.get(key)
+        return percent_es(float(value), decimals=0) if isinstance(value, (int, float)) else "pendiente"
+
     lines: list[str] = []
     lines.append(f"# Memo de tesis — {company.ticker} ({company.name or company.ticker})")
     lines.append("")
     lines.append(
-        f"Versión {thesis.version} · estado `{thesis.status}` · rating `{thesis.rating}` · "
+        f"Versión {thesis.version} · estado {label_es(STATUS_ES, thesis.status)} · "
+        f"rating {label_es(RATING_ES, thesis.rating)} · "
         f"generada {thesis.created_at:%Y-%m-%d %H:%M} UTC · actualizada {thesis.updated_at:%Y-%m-%d %H:%M} UTC"
     )
     if stale:
@@ -67,9 +73,9 @@ def build_memo_markdown(
     lines.append("## Valoración y escenarios")
     lines.append("| Escenario | Valor | Probabilidad |")
     lines.append("|---|---|---|")
-    lines.append(f"| Bajista | {_money(thesis.bear_value)} | {probs.get('bear', 'pendiente')} |")
-    lines.append(f"| Base | {_money(thesis.base_value)} | {probs.get('base', 'pendiente')} |")
-    lines.append(f"| Alcista | {_money(thesis.bull_value)} | {probs.get('bull', 'pendiente')} |")
+    lines.append(f"| Bajista | {_money(thesis.bear_value)} | {_prob('bear')} |")
+    lines.append(f"| Base | {_money(thesis.base_value)} | {_prob('base')} |")
+    lines.append(f"| Alcista | {_money(thesis.bull_value)} | {_prob('bull')} |")
     lines.append(
         f"\nPrecio actual: {_money(thesis.current_price)} · Valor esperado: "
         f"{_money(thesis.expected_value)} · Margen de seguridad: "
@@ -82,7 +88,7 @@ def build_memo_markdown(
     if catalysts:
         for item in catalysts:
             if isinstance(item, dict):
-                label = item.get("title") or item.get("name") or str(item)
+                label = item.get("label") or item.get("title") or item.get("name") or str(item)
                 when = item.get("date") or item.get("when") or ""
                 lines.append(f"- {label}" + (f" ({when})" if when else ""))
             else:
