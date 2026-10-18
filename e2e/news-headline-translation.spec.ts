@@ -36,7 +36,7 @@ async function post(request: import("@playwright/test").APIRequestContext, path:
 
 for (const width of [390,820,1440]) test(`translated headline preserves original ${width}`, async ({page,request}) => {
  const marker=randomUUID().slice(0,8);
- const original=`कंपनी ने परिणाम 2026 घोषित किए ${marker}`;
+ const original=`Microsoft कंपनी ने परिणाम 2026 घोषित किए ${marker}`;
  await post(request,"/api/news/ingest",{source:"manual_feed",items:[{ticker:"MSFT",title:original,text:original,url:`https://example.com/${marker}`} ]});
  let calls=0;
  const rows=await request.get(`${apiBase}/api/news`,{headers:signedHeaders("GET","/api/news",Buffer.alloc(0))});

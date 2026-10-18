@@ -38,7 +38,7 @@ async function post(request: import("@playwright/test").APIRequestContext, path:
 
 for(const width of [390,820,1440]) test(`news pages replace rather than append ${width}`,async({page,request})=>{
  const marker=randomUUID().slice(0,8);
- await post(request,"/api/news/ingest",{source:"manual_feed",items:Array.from({length:25},(_,i)=>({ticker:"MSFT",title:`PageFixture ${marker} item ${i}`,text:"Company announced a product.",url:`https://example.com/${marker}/${i}`}))});
+ await post(request,"/api/news/ingest",{source:"manual_feed",items:Array.from({length:25},(_,i)=>({ticker:"MSFT",title:`Microsoft PageFixture ${marker} item ${i}`,text:"Microsoft announced a product.",url:`https://example.com/${marker}/${i}`}))});
  await page.setViewportSize({width,height:1000});await page.goto("/research/news?lane=empresa");
  await page.addStyleTag({content:"nextjs-portal{display:none!important}"});
  const pager=page.getByRole("navigation",{name:"Paginación",exact:true});

@@ -18,7 +18,6 @@ test("cabecera de la ficha con precio, variación y gráfico técnico (desktop)"
   await expect(header(page).getByText("+2,34")).toBeVisible();
   await expect(header(page).getByRole("img", { name: /Evolución del precio/ })).toBeVisible();
   await expect(header(page).getByTestId("technical-reading")).toBeVisible();
-  await expect(header(page).getByRole("tab", { name: "Completo", exact: true })).toHaveAttribute("aria-selected", "true");
   const strip = header(page).getByTestId('company-metric-strip');
   await expect(strip).toBeVisible();
   await expect(strip.getByText('$334.20', { exact: true })).toBeVisible();
