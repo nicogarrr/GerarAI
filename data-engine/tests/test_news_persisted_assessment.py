@@ -144,7 +144,7 @@ def test_get_news_legacy_event_without_assessment_returns_honest_nulls(monkeypat
     engine.dispose()
 
 
-def test_legacy_solicitation_projects_low_materiality_without_changing_storage():
+def test_legacy_solicitation_excluded_from_portada_without_changing_storage():
     engine, factory = _make_db()
     with factory() as db:
         db.add(Tenant(id=1, external_id="t"))
@@ -152,12 +152,11 @@ def test_legacy_solicitation_projects_low_materiality_without_changing_storage()
         for title in titles:
             db.add(NewsEvent(tenant_id=1, title=title, summary=title, source="prnewswire/GDELT", date=NOW, materiality_score=3, requires_update=True))
         db.commit()
-        rows = {row["title"]: row for row in _client(db).get("/api/news").json()}
-        for title in titles[:2]:
-            assert rows[title]["materiality_score"] == 1
-            assert rows[title]["event_type"] == "legal_solicitation"
-            assert rows[title]["requires_update"] is False
-        assert rows[titles[2]]["materiality_score"] == 3
-        assert rows[titles[2]]["requires_update"] is True
+        # Portada: el spam legal de bufetes queda FUERA (QA 2026-10-18); la
+        # proyeccion legal_solicitation sigue aplicando en la ficha de empresa
+        # (test_news_portada_dedupe_spam). La noticia real de acuerdo judicial
+        # no es solicitud y se muestra intacta.
+        titles_shown = [row["title"] for row in _client(db).get("/api/news").json()]
+        assert titles_shown == [titles[2]]
         assert all(event.materiality_score == 3 for event in db.query(NewsEvent).all())
     engine.dispose()

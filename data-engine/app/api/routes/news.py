@@ -31,6 +31,15 @@ def _is_off_topic(event: NewsEvent, company: Company | None) -> bool:
     return _only_ticker_prefix_mention(company, event.title or "", event.summary or "")
 
 
+def _headline_dedupe_key(event: NewsEvent) -> str:
+    """Titular mostrado, normalizado (minusculas, espacios colapsados).
+
+    Dos filas con el mismo titular literal son el mismo evento re-publicado:
+    en la portada solo se muestra la mas reciente.
+    """
+    return " ".join(original_headline(event).strip().lower().split())
+
+
 @router.post("/manual", response_model=ManualNewsResponse)
 def manual_news(payload: ManualNewsRequest, db: Session = Depends(get_db)) -> ManualNewsResponse:
     return NewsService().analyze_manual_news(db, payload.text, payload.source, payload.url)
@@ -67,6 +76,7 @@ def news_events(
     rows: list = []
     skipped = 0
     scanned = 0
+    seen_headlines: set[str] = set()
     while len(rows) < limit and scanned < _SCAN_LIMIT:
         chunk = db.execute(ordered.limit(_SCAN_CHUNK).offset(scanned)).all()
         if not chunk:
@@ -75,6 +85,18 @@ def news_events(
         for event, company in chunk:
             if _is_off_topic(event, company):
                 continue
+            if ticker is None:
+                # Portada (sin filtro de empresa): fuera el spam legal de
+                # bufetes ("SHAREHOLDER ALERT"...) y los titulares literales
+                # repetidos. En la ficha de una empresa se muestra todo lo
+                # de esa empresa, incluidas las solicitudes de bufetes.
+                if is_law_firm_solicitation(original_headline(event), event.summary):
+                    continue
+                dedupe_key = _headline_dedupe_key(event)
+                if dedupe_key:
+                    if dedupe_key in seen_headlines:
+                        continue
+                    seen_headlines.add(dedupe_key)
             if skipped < offset:
                 skipped += 1
             elif len(rows) < limit:
