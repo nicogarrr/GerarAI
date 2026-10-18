@@ -25,16 +25,16 @@ def test_hypothesis_below_base_value() -> None:
     }
     hypothesis = service._hypothesis(_company(), valuation)
     # MoS = base/price - 1: se nombra explicitamente (F341).
-    assert "margen de seguridad del 20%" in hypothesis
+    assert "margen de seguridad del 20,0 %" in hypothesis
     assert "100.00" in hypothesis
-    assert "12.0%" in hypothesis
+    assert "12,0 %" in hypothesis
 
 
 def test_hypothesis_above_base_value() -> None:
     service = ThesisService()
     valuation = {"current_price": 120.0, "base_value": 100.0, "margin_of_safety": -0.2}
     hypothesis = service._hypothesis(_company(), valuation)
-    assert "margen de seguridad del -20%" in hypothesis
+    assert "margen de seguridad del -20,0 %" in hypothesis
     assert "descuenta más" in hypothesis
 
 

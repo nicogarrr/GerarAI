@@ -45,7 +45,7 @@ from app.valuation.moat_framework import empty_moat_framework
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "thesis-render-v4-cited-context"
+PROMPT_VERSION = "thesis-render-v5-number-formats"
 
 
 def latest_missing_inputs(db: Session, company_id: int) -> list[str] | None:
@@ -190,10 +190,25 @@ def _metric_claim_statement(ticker: str, metric: str, fact: FinancialFact) -> st
     # "humanizarla" a una frase en inglés dentro del texto en español.
     label = _METRIC_LABELS_ES.get(metric) or f'dato "{metric}"'
 
+    if metric in {"fcf_margin", "revenue_growth"} and fact.unit in {"decimal", "ratio"}:
+        return f"{ticker}: {label} de {_thesis_percent(float(fact.value))} ({fact.period})."
     value = format_compact_es(fact.value) or str(fact.value)
     unit = fact.unit if fact.unit and len(fact.unit) == 3 and fact.unit.isupper() else None
     amount = f"{value} {unit}" if unit else value
     return f"{ticker}: {label} de {amount} ({fact.period})."
+
+
+def _thesis_money(value: float, currency: str | None) -> str:
+    if currency == "USD":
+        return f"${value:,.2f}" if value >= 0 else f"-${abs(value):,.2f}"
+    if currency and len(currency) == 3 and currency.isupper():
+        number = f"{value:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
+        return f"{number} {currency}"
+    return f"{value:,.2f}"
+
+
+def _thesis_percent(value: float) -> str:
+    return f"{value * 100:.1f}".replace(".", ",") + " %"
 
 
 class ThesisService:
@@ -708,18 +723,21 @@ class ThesisService:
                 "Hipótesis en formación: faltan datos de mercado o de valoración "
                 "para formular una hipótesis comprobable."
             )
+        currency = valuation.get("currency") or company.currency
+        price_text = _thesis_money(float(price), currency)
+        base_text = _thesis_money(float(base), currency)
         if base <= 0:
             # Con un escenario base negativo o nulo el margen (base/precio - 1)
             # no es interpretable: -249% sobre una base de -84.70 se leia como
             # un dato real. Se dice tal cual, sin porcentaje.
             return (
-                f"A {price:.2f}, el escenario base de {company.name} es {base:.2f} "
+                f"A {price_text}, el escenario base de {company.name} es {base_text} "
                 f"(no positivo): el margen de seguridad no es interpretable."
             )
         reverse = valuation.get("reverse_dcf") or {}
         required_growth = reverse.get("required_revenue_growth")
         growth_txt = (
-            f" El reverse DCF exige un crecimiento de ingresos del {required_growth:.1%} anual."
+            f" El reverse DCF exige un crecimiento de ingresos del {_thesis_percent(required_growth)} anual."
             if required_growth is not None
             else ""
         )
@@ -730,14 +748,14 @@ class ThesisService:
         # esta un ~215% por encima.
         if mos >= 0:
             return (
-                f"A {price:.2f}, {company.name} cotiza con un margen de seguridad "
-                f"del {mos:.0%} respecto al escenario base ({base:.2f}). Hipótesis: "
+                f"A {price_text}, {company.name} cotiza con un margen de seguridad "
+                f"del {_thesis_percent(mos)} respecto al escenario base ({base_text}). Hipótesis: "
                 f"los fundamentales modelados son alcanzables y el mercado corrige "
                 f"ese descuento.{growth_txt}"
             )
         return (
-            f"A {price:.2f}, {company.name} cotiza con un margen de seguridad "
-            f"del {mos:.0%} respecto al escenario base ({base:.2f}). Hipótesis: "
+            f"A {price_text}, {company.name} cotiza con un margen de seguridad "
+            f"del {_thesis_percent(mos)} respecto al escenario base ({base_text}). Hipótesis: "
             f"el precio descuenta más de lo que los fundamentales modelados "
             f"soportan.{growth_txt}"
         )
