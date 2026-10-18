@@ -19,7 +19,6 @@ import {
   createKnowledgeCollection,
   decideKnowledgePrinciple,
   extractKnowledgePrinciples,
-  deleteKnowledgeDocument,
   getKnowledgeDocumentChunks,
   getKnowledgeLibrary,
   installKnowledgeDefaults,
@@ -274,7 +273,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                   <td className="py-3 text-gray-400">{documentTypeLabel(document.document_type)}</td>
                   <td className="py-3 text-gray-500">{parserLabel(document.metadata.parser)}</td>
                   <td className="py-3"><Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge></td>
-                  <td className="py-3"><div className="flex justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button><MutationForm action={deleteKnowledgeDocument.bind(null, document.id)} confirmMessage={`¿Eliminar el documento «${document.title}» y sus fragmentos? Esta acción no se puede deshacer.`} successMessage="Documento eliminado" showSuccessInline><Button disabled={busy} size="sm" variant="outline" type="submit" aria-label={`Eliminar documento ${document.title}`}>Eliminar</Button></MutationForm><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm></div>{extractionResultText(job) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}</td>
+                  <td className="py-3"><div className="flex justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm></div>{extractionResultText(job) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}</td>
                 </tr>
                 );
               })}
@@ -298,7 +297,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                 {extractionResultText(job) ? <p className="mt-2 text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}
                 <div className="mt-4 grid grid-cols-1 gap-2">
                   <Button asChild className="h-11 w-full" size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button>
-                  <MutationForm action={deleteKnowledgeDocument.bind(null, document.id)} confirmMessage={`¿Eliminar el documento «${document.title}» y sus fragmentos? Esta acción no se puede deshacer.`} successMessage="Documento eliminado" showSuccessInline><Button disabled={busy} size="sm" variant="outline" type="submit" aria-label={`Eliminar documento ${document.title}`}>Eliminar</Button></MutationForm><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada">
+                  <MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada">
                     <Button className="h-11 w-full" disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button>
                   </MutationForm>
                 </div>

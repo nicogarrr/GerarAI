@@ -8,7 +8,6 @@ import { classifyError, getFriendlyErrorMessage, isNextRedirectError } from '@/l
 type MutationFormProps = Omit<ComponentPropsWithoutRef<'form'>, 'action'> & {
   action: (formData: FormData) => Promise<unknown>;
   successMessage?: string;
-  confirmMessage?: string;
   resetOnSuccess?: boolean;
   showSuccessInline?: boolean;
 };
@@ -16,7 +15,6 @@ type MutationFormProps = Omit<ComponentPropsWithoutRef<'form'>, 'action'> & {
 export function MutationForm({
   action,
   children,
-  confirmMessage,
   successMessage = 'Operación completada',
   resetOnSuccess = false,
   showSuccessInline = false,
@@ -29,7 +27,7 @@ export function MutationForm({
   const [isPending, setIsPending] = useState(false);
 
   async function submit(formData: FormData) {
-    if (isPending || (confirmMessage && !window.confirm(confirmMessage))) return;
+    if (isPending) return;
     lastFormData.current = formData;
     setError(null);
     setSuccess(null);

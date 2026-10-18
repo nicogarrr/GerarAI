@@ -734,7 +734,3 @@ export async function getKnowledgeNeighborhood(nodeId: number, depth = 2): Promi
   return requestJson(`/api/knowledge-graph/nodes/${assertPositiveInt(nodeId, 'nodeId')}/neighbors?depth=${Math.max(1, Math.min(4, depth))}`);
 }
 
-export async function deleteKnowledgeDocument(documentId: number) {
-  await requestJson(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`, {method: 'DELETE'});
-  revalidatePath('/knowledge');
-}
