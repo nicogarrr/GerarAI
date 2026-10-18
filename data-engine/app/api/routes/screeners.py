@@ -424,6 +424,7 @@ class FinnhubScreenVendor:
             market_cap = raw.get("marketCapitalization")
             return {
                 "name": raw.get("name") or symbol,
+                "currency": raw.get("currency") or None,
                 # None cuando Finnhub no lo reporta: 0.0 seria un dato inventado.
                 "marketCap": float(market_cap) * 1_000_000.0 if market_cap else None,
                 "sector": raw.get("finnhubIndustry") or None,
@@ -489,6 +490,7 @@ class YahooScreenVendor:
             change = (last - previous) if previous else None
             return {
                 "price": float(last),
+                "currency": meta.get("currency") or None,
                 "change": float(change) if change is not None else None,
                 "changePercent": (
                     float(change / previous * 100) if change is not None else None
@@ -915,6 +917,7 @@ def _refetch_real_items(
                 "symbol": symbol,
                 "name": name,
                 "price": quote["price"],
+                "currency": quote.get("currency") or (profile or {}).get("currency"),
                 "change": quote["change"],
                 "changePercent": quote["changePercent"],
                 # None sin perfil real: la UI muestra N/D; un 0.0 inventado

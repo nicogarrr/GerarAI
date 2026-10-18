@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getMarketIndicesResult } from '@/lib/actions/market.actions';
 import { getSavedScreenerEngines, getScreenerStocksReal } from '@/lib/actions/screener.actions';
-import { formatMarketCapUsd, formatNumber, formatPercent, formatPrice } from '@/lib/format';
+import { formatMarketCapUsd, formatNumber, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { indicesCardState } from '@/lib/market/indices-card-state';
@@ -47,12 +47,11 @@ function screenerMarketCap(value: number): string {
   return value > 0 ? formatMarketCapUsd(value) : 'N/D';
 }
 
-// La fila del screener no trae divisa: `RealScreenerRow` no la declara y
-// /api/screeners/real tampoco la devuelve. Por eso el precio va como número
-// pelado (como los niveles de índice, F152) en vez de pintarse en dólares, y
-// la leyenda de la tabla declara el hueco en lugar de taparlo con un «US$».
-function screenerPrice(price: number): string {
-  return formatNumber(price, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Solo el proveedor confirma la divisa, nunca se infiere del ticker.
+function screenerPrice(price: number, currency: string | null | undefined): string {
+  return isValidCurrencyCode(currency)
+    ? formatPrice(price, currency)
+    : formatNumber(price, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default async function ScreenerPage({ searchParams }: { searchParams?: Promise<{ sector?: string }> }) {
@@ -228,7 +227,7 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
                           <span className="text-xs text-gray-500 md:hidden">Precio</span>
-                          <span className="font-semibold text-gray-200">{screenerPrice(r.price)}</span>
+                          <span className="font-semibold text-gray-200">{screenerPrice(r.price, r.currency)}</span>
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
                           <span className="text-xs text-gray-500 md:hidden">Cambio sesión</span>
@@ -250,9 +249,6 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                     ))}
                   </tbody>
                 </table>
-                <p className="mt-3 text-xs text-gray-500">
-El precio va sin símbolo: el backend no expone la divisa de la cotización.
-                </p>
               </div>
             )}
           </CardContent>

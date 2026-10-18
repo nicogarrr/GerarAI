@@ -227,6 +227,7 @@ export type RealScreenerFilters = {
 
 export type RealScreenerRow = {
   symbol: string;
+  currency?: string | null;
   name: string;
   price: number;
   change: number | null;
