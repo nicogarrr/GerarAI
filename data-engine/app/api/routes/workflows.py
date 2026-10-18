@@ -1,5 +1,7 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -7,6 +9,7 @@ from app.core.database import get_db
 from app.core.errors import safe_detail
 from app.models import Company
 from app.models.entities import WorkflowRun
+from app.services.async_bridge import run_from_any_context
 from app.services.workflow_run_service import WorkflowEnvelope, begin_run
 from app.workflows.catalog import (
     RETIRED_WORKFLOWS,
@@ -28,6 +31,37 @@ router = APIRouter()
 class WorkflowRunRequest(BaseModel):
     ticker: str | None = None
     params: dict = Field(default_factory=dict)
+
+
+class EarningsRunParams(BaseModel):
+    """Params validados de EarningsWorkflow.
+
+    Antes el handler coaccionaba en silencio dentro del paso MAF:
+    ``bool("false")`` es True (un ``"false"`` en JSON forzaba una tesis
+    nueva), ``int(2024.9)`` truncaba y ``str(2024)`` aceptaba un entero
+    como trimestre; ademas el envelope grababa los params crudos, no los
+    valores ejecutados. Aqui se valida una sola vez: lo invalido es 422
+    antes de abrir el run y el envelope graba exactamente lo que corre.
+    """
+
+    fiscal_year: int = Field(default_factory=lambda: datetime.now().year)
+    fiscal_quarter: str = "FY"
+    document_ids: list[int] = Field(default_factory=list)
+    force_new_thesis: bool = False
+
+
+def _params_422(exc: ValidationError, *, context: str) -> HTTPException:
+    """422 con los errores de pydantic del propio payload del cliente."""
+    return HTTPException(
+        status_code=422,
+        detail={
+            "error": context,
+            "fields": [
+                {"loc": list(error["loc"]), "msg": error["msg"], "type": error["type"]}
+                for error in exc.errors()
+            ],
+        },
+    )
 
 
 @router.get("")
@@ -89,8 +123,14 @@ def _replay_response(envelope: WorkflowEnvelope, workflow: dict, ticker: str | N
     }
 
 
+# Endpoint sync a proposito: el cuerpo es I/O sqlalchemy y servicios
+# sincronos (shadow LangGraph, ThesisService, NewsService) y FastAPI lo
+# ejecuta en el threadpool. Como ``async def`` bloqueaba el event loop del
+# proceso durante toda la ejecucion del workflow. Las dos ramas MAF (la
+# unica corutina real) puentean con run_from_any_context, que en un hilo
+# sin loop es un asyncio.run directo.
 @router.post("/{name}/run")
-async def run_workflow(
+def run_workflow(
     name: str,
     payload: WorkflowRunRequest,
     db: Session = Depends(get_db),
@@ -255,10 +295,17 @@ async def run_workflow(
                     "The remaining daily stages run in the daily_research scheduled job."
                 ),
             )
+        # Validar ANTES de abrir el run: un payload invalido es un 422 sin
+        # mas. Antes la validacion iba despues de begin_run y una
+        # ValidationError salia como 500 dejando el workflow_runs colgado
+        # en "running" para siempre.
+        try:
+            items = [NewsFeedItem.model_validate(item) for item in news_items]
+        except ValidationError as exc:
+            raise _params_422(exc, context="DailyResearchWorkflow params.news_items") from exc
         envelope = open_envelope({"ticker": payload.ticker, "params": payload.params})
         if envelope.replayed:
             return _replay_response(envelope, workflow, payload.ticker)
-        items = [NewsFeedItem.model_validate(item) for item in news_items]
 
         def ingest() -> dict:
             result = NewsService().ingest_news_items(
@@ -282,8 +329,6 @@ async def run_workflow(
         }
 
     if name == "EarningsWorkflow":
-        from datetime import datetime
-
         from app.services.earnings_service import EarningsWorkflowService
         from app.workflows.maf_runtime import NativeMAFStep, NativeMAFWorkflowRunner
 
@@ -291,13 +336,18 @@ async def run_workflow(
         company = db.scalar(select(Company).where(Company.ticker == ticker))
         if not company:
             raise HTTPException(status_code=404, detail=f"Company {ticker} not found")
+        # Intake validado antes de abrir el run (ver EarningsRunParams).
+        try:
+            earnings_params = EarningsRunParams.model_validate(payload.params)
+        except ValidationError as exc:
+            raise _params_422(exc, context="EarningsWorkflow params") from exc
 
         def load_context(state: dict) -> dict:
             return {
                 "ticker": ticker,
-                "fiscal_year": int(payload.params.get("fiscal_year", datetime.now().year)),
-                "fiscal_quarter": str(payload.params.get("fiscal_quarter", "FY")),
-                "document_ids": [int(item) for item in payload.params.get("document_ids", [])],
+                "fiscal_year": earnings_params.fiscal_year,
+                "fiscal_quarter": earnings_params.fiscal_quarter,
+                "document_ids": earnings_params.document_ids,
             }
 
         def execute_review(state: dict) -> dict:
@@ -307,7 +357,7 @@ async def run_workflow(
                 fiscal_year=state["fiscal_year"],
                 fiscal_quarter=state["fiscal_quarter"],
                 document_ids=state["document_ids"],
-                force_new_thesis=bool(payload.params.get("force_new_thesis", False)),
+                force_new_thesis=earnings_params.force_new_thesis,
             )
             return {
                 "run": {
@@ -321,17 +371,21 @@ async def run_workflow(
                 }
             }
 
-        envelope = open_envelope({"ticker": ticker, "params": payload.params})
+        # El envelope graba los params ya normalizados: lo que corre es lo
+        # que queda firmado en input_payload.
+        envelope = open_envelope({"ticker": ticker, "params": earnings_params.model_dump()})
         if envelope.replayed:
             return _replay_response(envelope, workflow, ticker)
-        maf_result = await NativeMAFWorkflowRunner(
-            name,
-            [
-                NativeMAFStep("load_earnings_context", load_context),
-                NativeMAFStep("execute_earnings_review", execute_review),
-            ],
-            recorder=envelope.record_step,
-        ).run({"ticker": ticker})
+        maf_result = run_from_any_context(
+            NativeMAFWorkflowRunner(
+                name,
+                [
+                    NativeMAFStep("load_earnings_context", load_context),
+                    NativeMAFStep("execute_earnings_review", execute_review),
+                ],
+                recorder=envelope.record_step,
+            ).run({"ticker": ticker})
+        )
         run = maf_result["run"]
         result = {
             "earnings_run_id": run["earnings_run_id"],
@@ -386,14 +440,16 @@ async def run_workflow(
         envelope = open_envelope({"ticker": ticker, "params": payload.params})
         if envelope.replayed:
             return _replay_response(envelope, workflow, ticker)
-        maf_result = await NativeMAFWorkflowRunner(
-            name,
-            [
-                NativeMAFStep("load_review_evidence", load_evidence),
-                NativeMAFStep("execute_adversarial_review", execute_red_team),
-            ],
-            recorder=envelope.record_step,
-        ).run({"ticker": ticker})
+        maf_result = run_from_any_context(
+            NativeMAFWorkflowRunner(
+                name,
+                [
+                    NativeMAFStep("load_review_evidence", load_evidence),
+                    NativeMAFStep("execute_adversarial_review", execute_red_team),
+                ],
+                recorder=envelope.record_step,
+            ).run({"ticker": ticker})
+        )
         run = maf_result["run"]
         result = {
             "red_team_run_id": run["red_team_run_id"],
