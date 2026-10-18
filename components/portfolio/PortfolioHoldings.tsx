@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus';
 import type { PortfolioHolding } from '@/lib/actions/portfolio.actions';
 import { deleteHolding, refreshPortfolioHoldings } from '@/lib/actions/portfolio.actions';
 import { useState, useEffect } from 'react';
@@ -168,6 +169,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         <Trash2 aria-hidden="true" className="h-4 w-4" />
                       </Button>
                     </div>
+                    <TrackedAnalysisStatus analysis={holding.analysis} />
                     <dl className="mt-3 space-y-1.5 text-sm">
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Cantidad</dt><dd className="text-gray-200">{formatNumber(holding.quantity, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Promedio</dt><dd className="text-gray-200">{holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : NA}</dd></div>
@@ -251,7 +253,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <TableRow key={holding.symbol} className="border-gray-700 hover:bg-gray-800/50">
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Link href={`/research/${holding.symbol}`} className="font-mono font-bold text-teal-400 hover:text-teal-300 transition-colors">{holding.symbol}</Link>
+                          <Link href={`/research/${holding.symbol}`} className="font-mono font-bold text-teal-400 hover:text-teal-300 transition-colors">{holding.symbol}</Link><TrackedAnalysisStatus analysis={holding.analysis} />
                           <details className="relative">
                             <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={`Opciones de ${holding.symbol}`}>Opciones</summary>
                             <div className="mt-1 min-w-36 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">

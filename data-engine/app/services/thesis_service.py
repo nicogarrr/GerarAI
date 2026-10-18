@@ -410,6 +410,8 @@ class ThesisService:
         ticker: str,
         force_new_version: bool = False,
         phase_callback=None,
+        *,
+        stored_evidence_only: bool = False,
     ) -> ThesisVersion:
         """Persist model, valuation, thesis, evidence, graph and red team atomically.
 
@@ -427,6 +429,7 @@ class ThesisService:
             thesis = self._generate_atomic(
                 db, ticker, force_new_version, phase_callback, savepoint=savepoint,
                 prepared_narrative=narrative_sections,
+                stored_evidence_only=stored_evidence_only,
             )
         except Exception as exc:
             # Guard the savepoint: the phase callback and _generate_atomic both
@@ -455,6 +458,7 @@ class ThesisService:
         phase_callback=None,
         savepoint=None,
         prepared_narrative=None,
+        stored_evidence_only=False,
     ) -> ThesisVersion:
         def _phase(name: str) -> None:
             if phase_callback is not None:
@@ -472,7 +476,8 @@ class ThesisService:
         try:
             from app.services.thesis_evidence_service import ThesisEvidenceService
 
-            evidence = ThesisEvidenceService().collect(db, company) or {}
+            if not stored_evidence_only:
+                evidence = ThesisEvidenceService().collect(db, company) or {}
         except Exception:
             evidence = {}
 
@@ -706,7 +711,8 @@ class ThesisService:
                 maybe_request_thesis_approval,
             )
 
-            maybe_request_thesis_approval(db, thesis, company.ticker)
+            if not stored_evidence_only:
+                maybe_request_thesis_approval(db, thesis, company.ticker)
         except Exception:
             pass
         return thesis

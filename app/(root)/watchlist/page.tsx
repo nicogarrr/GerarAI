@@ -1,3 +1,5 @@
+import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus';
+import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-analysis-status';
 import type { Metadata } from 'next';
 import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 import { getWatchlistState, getWatchlistEntryData } from '@/lib/actions/watchlist.actions';
@@ -26,6 +28,7 @@ export const metadata: Metadata = {
 };
 
 interface WatchlistStock {
+    analysis?: AnalysisStatus | null;
     symbol: string;
     name: string;
     currency: string | null;
@@ -75,6 +78,7 @@ export default async function WatchlistPage({
                     currency: data.currency,
                     marketCap: data.marketCap,
                     peRatio: data.peRatio,
+                    analysis: item.analysis,
                     addedAt: item.addedAt
                 };
             } catch {
@@ -91,6 +95,7 @@ export default async function WatchlistPage({
                     currency: null,
                     marketCap: null,
                     peRatio: null,
+                    analysis: item.analysis,
                     addedAt: item.addedAt
                 };
             }
@@ -179,7 +184,7 @@ export default async function WatchlistPage({
                                         </Link>
                                         <p className="truncate text-xs text-gray-500" title={stock.name}>
                                             {stock.name}
-                                        </p>
+                                        </p><TrackedAnalysisStatus analysis={stock.analysis} />
                                         {stock.price === null ? (
                                             <Badge variant="outline" className="mt-1 border-gray-700 text-gray-400">
                                                 sin datos
@@ -260,7 +265,7 @@ export default async function WatchlistPage({
                                                     </div>
                                                     <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>
                                                         {stock.name}
-                                                    </div>
+                                                    </div><TrackedAnalysisStatus analysis={stock.analysis} />
                                                 </div>
                                             </Link>
                                             <details className="relative ml-2 inline-block align-middle">
