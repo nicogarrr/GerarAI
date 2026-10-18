@@ -1616,6 +1616,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/investors/holders/{ticker}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holders By Ticker Route
+         * @description Gestores revisados que declaran el ticker en su último 13F (vista inversa).
+         */
+        get: operations["holders_by_ticker_route_api_investors_holders__ticker__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/investors/most-bought": {
         parameters: {
             query?: never;
@@ -2519,6 +2539,23 @@ export interface paths {
         put?: never;
         /** Manual News */
         post: operations["manual_news_api_news_manual_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/news/translate-headline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Translate External */
+        post: operations["translate_external_api_news_translate_headline_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3564,6 +3601,24 @@ export interface paths {
         /** Create Screen */
         post: operations["create_screen_api_screeners_screens_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screeners/screens/{screen_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Screen */
+        put: operations["update_screen_api_screeners_screens__screen_id__put"];
+        post?: never;
+        /** Delete Screen */
+        delete: operations["delete_screen_api_screeners_screens__screen_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4721,6 +4776,11 @@ export interface components {
         };
         /** BottleneckSignalOut */
         BottleneckSignalOut: {
+            /**
+             * Evidence
+             * @default []
+             */
+            evidence: components["schemas"]["DiscoveryEvidenceOut"][];
             /** Evidence Ids */
             evidence_ids: string[];
             /** First Seen */
@@ -5624,6 +5684,11 @@ export interface components {
             timestamp?: number | null;
             /** Trading Date */
             trading_date?: string | null;
+        };
+        /** ExternalHeadlineRequest */
+        ExternalHeadlineRequest: {
+            /** Headline */
+            headline: string;
         };
         /** FXRateInput */
         FXRateInput: {
@@ -11303,6 +11368,48 @@ export interface operations {
             };
         };
     };
+    holders_by_ticker_route_api_investors_holders__ticker__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     most_bought_route_api_investors_most_bought_get: {
         parameters: {
             query?: never;
@@ -12056,6 +12163,9 @@ export interface operations {
             query?: {
                 collection_id?: number | null;
                 limit?: number;
+                offset?: number;
+                document_type?: string | null;
+                status?: string | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -13648,6 +13758,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManualNewsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translate_external_api_news_translate_headline_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExternalHeadlineRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -16349,6 +16503,94 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_screen_api_screeners_screens__screen_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_screen_api_screeners_screens__screen_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
