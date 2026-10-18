@@ -46,7 +46,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { exchangeDisplayName } from '@/lib/exchangeName';
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
-import { sectorIndustryLine } from '@/lib/labels';
+import { companyTypeLabel, sectorIndustryLine } from '@/lib/labels';
 import { cleanThesisText } from '@/lib/research/thesis-text';
 import { Button } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
@@ -1331,7 +1331,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // posicion viva se muestra como candidato de analisis.
   const holdingBadge = snapshot.in_portfolio
     ? 'en cartera'
-    : label(company.company_type === 'portfolio_holding' ? 'research_candidate' : company.company_type);
+    : companyTypeLabel(company.company_type === 'portfolio_holding' ? 'research_candidate' : company.company_type);
 
   return (
     <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8">
