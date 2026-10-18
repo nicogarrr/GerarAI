@@ -149,6 +149,7 @@ _LAW_FIRM_SOLICITATION = re.compile(
             r"portnoy law|howard g\. smith|rigrodsky|holzer & holzer|"
             r"frank r\. cruz|the law offices)\b",
             r"\blead plaintiff deadline\b",
+            r"\bdeadline in \d+ days\b[^.]{0,180}\bclass action\b",
             r"\b(?:investors?|shareholders?|stockholders?)\s+(?:who|that)\s+(?:lost|suffered|incurred)\b",
             r"\b(?:investigat\w+|announces?|reminds?|encourages?|urges?)\b[^.]{0,80}\bon behalf of\b[^.]{0,40}\b(?:investors?|shareholders?|stockholders?)\b",
             r"\b(?:securities )?class action (?:lawsuit )?(?:deadline|reminder)\b",

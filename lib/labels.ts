@@ -128,6 +128,7 @@ const TIPOS_EVENTO: Record<string, string> = {
   contract: 'Contrato',
   capital_allocation: 'Asignación de capital',
   general_news: 'Noticia general',
+  legal_solicitation: 'Ruido: captación legal',
   macro: 'Macro',
   opinion: 'Opinión',
   unknown: 'Desconocido',

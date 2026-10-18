@@ -10,7 +10,11 @@ from app.schemas import ManualNewsRequest, ManualNewsResponse, NewsIngestRequest
 from app.services.news_headline_translation import display_translation, original_headline, translate_headline
 from app.services.news_service import NewsService
 from app.services.second_order_news_service import analyze_second_order
-from app.services.ticker_news_lane import _only_ticker_prefix_mention, fails_strict_name
+from app.services.ticker_news_lane import (
+    _only_ticker_prefix_mention,
+    fails_strict_name,
+    is_law_firm_solicitation,
+)
 
 router = APIRouter()
 
@@ -84,6 +88,9 @@ def news_events(
         # persistido. Eventos legacy sin assessment persistido -> nulls
         # honestos (la UI los muestra como N/D).
         persisted = (event.metadata_ or {}).get("assessment") or {}
+        # Legacy rows predate the ingestion solicitation filter. A deterministic
+        # read projection marks recruitment noise without rewriting provenance.
+        solicitation = is_law_firm_solicitation(original_headline(event), event.summary)
         events.append(
             {
                 "id": event.id,
@@ -94,10 +101,10 @@ def news_events(
                 "headline_translation": display_translation(event),
                 "source": event.source,
                 "url": event.url,
-                "event_type": event.event_type,
-                "materiality_score": event.materiality_score,
+                "event_type": "legal_solicitation" if solicitation else event.event_type,
+                "materiality_score": 1 if solicitation else event.materiality_score,
                 "impact_direction": event.impact_direction,
-                "requires_update": event.requires_update,
+                "requires_update": False if solicitation else event.requires_update,
                 "date_source": (event.metadata_ or {}).get("date_source"),
                 # False solo en titulares de display generados por CavaAI
                 # (ausente en filas legacy = titular real de la fuente).

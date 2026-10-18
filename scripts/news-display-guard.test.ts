@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { dedupeNewsEvents, newsDisplayTitle, untokenizeHeadline } from '../lib/news-display.ts';
+import { dedupeRepeatedHeadline, dedupeNewsEvents, newsDisplayTitle, untokenizeHeadline } from '../lib/news-display.ts';
 
 const page = (readFileSync('app/(root)/research/news/page.tsx', 'utf8') + readFileSync('components/research/NewsEventsFlow.tsx', 'utf8') + readFileSync('components/research/NewsHeadline.tsx', 'utf8'));
 
@@ -61,4 +61,12 @@ test('titular de la fuente con ticker añadido por la ingesta: se pinta el origi
     assert.equal(newsDisplayTitle('NVDA stock jumps', 'NVDA', true, 'NVDA stock jumps'), 'NVDA stock jumps');
     // Sin original persistido: intacto.
     assert.equal(newsDisplayTitle('NVDA TSMC Is Spending Billions', 'NVDA', true, null), 'NVDA TSMC Is Spending Billions');
+});
+
+
+test('legacy title plus identical summary displays once without removing real words', () => {
+  const headline = 'ASTS SHAREHOLDER ALERT: Bronstein invites investors';
+  assert.equal(dedupeRepeatedHeadline(`${headline} ${headline}`), headline);
+  assert.equal(dedupeRepeatedHeadline('New York New York reports earnings'), 'New York New York reports earnings');
+  assert.equal(newsDisplayTitle(`${headline} ${headline}`, 'ASTS', true), headline);
 });
