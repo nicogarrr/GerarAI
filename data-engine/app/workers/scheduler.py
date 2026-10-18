@@ -19,6 +19,7 @@ from app.workers.dramatiq_app import (
     reconcile_alert_deliveries,
     refresh_asts_catalog,
     refresh_bottlenecks,
+    refresh_esef_fundamentals,
     refresh_ir_pages,
     refresh_macro_context,
     refresh_macro_news,
@@ -358,6 +359,11 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # Splits declarados (Yahoo, FMP de respaldo): sin ellos el modelo no puede
     # ajustar los recuentos historicos de acciones y degrada el CAGR a N/D.
     # Semanal: cartera+watchlist completo; universo en chunks auto-encolados.
+    # ESEF semanal: rebuild de snapshots (filings.xbrl.org, gratis) +
+    # re-ingesta de emisores reviewed. Sin esto los fundamentales IFRS se
+    # quedaban congelados en el snapshot one-off del 25-sep.
+    _register(scheduler, partial(enqueue_for_all_tenants, refresh_esef_fundamentals),
+              "cron", job_id="esef_weekly_reingest", day_of_week="sat", hour=6, minute=30, jitter=600)
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="tracked"),
               "cron", job_id="splits_tracked_weekly", day_of_week="sun", hour=5, minute=10, jitter=600)
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="universe"),

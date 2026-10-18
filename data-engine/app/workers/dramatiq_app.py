@@ -1290,6 +1290,110 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
         db.close()
 
 
+ESEF_REINGEST_CHUNK = 25
+
+
+@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
+def refresh_esef_fundamentals(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+    phase: str = "build",
+    cursor: int = 0,
+) -> dict[str, Any]:
+    """Re-ingesta ESEF semanal (emisores IBEX reviewed, gratis).
+
+    Fase build: reconstruye los snapshots locales desde filings.xbrl.org
+    (indice ESEF de XBRL International, sin key) con la misma logica del
+    script build_esef_snapshots - el snapshot anterior era de 25-sep y no
+    habia re-ingesta programada, asi que los fundamentales ESEF se quedaban
+    congelados. Fase ingest: refresh_from_esef por emisor reviewed que
+    exista como Company, en chunks auto-encolados. Los emisores sin snapshot
+    o sin Company quedan contados, nunca inventados.
+    """
+    from sqlalchemy import select as _select
+
+    from app.core.config import get_settings
+    from app.models import Company
+    from app.services.async_bridge import run_from_any_context
+
+    db = _session(tenant_id, user_id)
+    try:
+        if phase == "build":
+            base = get_settings().esef_snapshot_dir
+            if not base:
+                return {"actor": "refresh_esef_fundamentals", "status": "skipped",
+                        "reason": "esef_snapshot_dir_not_configured"}
+            import sys
+            from datetime import date as _date
+            from pathlib import Path as _Path
+
+            scripts_dir = str(_Path(__file__).resolve().parents[2] / "scripts")
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+            from build_esef_snapshots import build as build_esef
+
+            from app.services.connectors.esef import EsefClient
+
+            manifest = run_from_any_context(
+                build_esef(_Path(base), "ES", _date.today().isoformat(), EsefClient())
+            )
+            refresh_esef_fundamentals.send(
+                tenant_id, user_id, phase="ingest", cursor=0
+            )
+            return {
+                "actor": "refresh_esef_fundamentals",
+                "status": "ok",
+                "phase": "build",
+                "issuers": len(manifest.get("issuers", {})),
+                "unresolved": len(manifest.get("unresolved", {})),
+            }
+
+        from app.services.cnmv_mapping import REVIEWED_ISSUERS
+        from app.services.financial_ingestion_service import (
+            FinancialIngestionService,
+        )
+
+        tickers = sorted({issuer.ticker for issuer in REVIEWED_ISSUERS})
+        chunk = tickers[cursor:cursor + ESEF_REINGEST_CHUNK]
+        service = FinancialIngestionService()
+        results: dict[str, str] = {}
+        for ticker in chunk:
+            company = db.scalar(_select(Company).where(Company.ticker == ticker))
+            if company is None:
+                results[ticker] = "no_company"
+                continue
+            try:
+                run_from_any_context(service.refresh_from_esef(db=db, company=company))
+                db.commit()
+                results[ticker] = "ok"
+            except Exception as exc:  # snapshot ausente o hechos no importables
+                _rollback(db)
+                results[ticker] = f"error:{type(exc).__name__}"
+        next_cursor = (
+            cursor + ESEF_REINGEST_CHUNK
+            if cursor + ESEF_REINGEST_CHUNK < len(tickers)
+            else None
+        )
+        if next_cursor is not None:
+            refresh_esef_fundamentals.send(
+                tenant_id, user_id, phase="ingest", cursor=next_cursor
+            )
+        return {
+            "actor": "refresh_esef_fundamentals",
+            "status": "ok",
+            "phase": "ingest",
+            "cursor": cursor,
+            "next_cursor": next_cursor,
+            "reviewed_total": len(tickers),
+            "results": results,
+        }
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("refresh_esef_fundamentals", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
 SPLIT_SYNC_UNIVERSE_CHUNK = 100
 
 
