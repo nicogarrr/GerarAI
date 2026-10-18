@@ -644,12 +644,19 @@ def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) ->
 
 
 @router.post("/refresh-market")
-async def refresh_portfolio_market_data(
+def refresh_portfolio_market_data(
     as_of: date | None = None,
     db: Session = Depends(get_db),
 ) -> dict:
+    # Handler sync: FastAPI lo ejecuta en su threadpool. MarketRefreshService
+    # intercala awaits de red con trabajo SQLAlchemy sync pesado (reescritura
+    # de precios de TODO el universo de companias del tenant + revalorizacion);
+    # como corutina del loop, esos tramos sync congelaban el event loop entero.
+    # El puente compartido le da su propio loop dentro del hilo del pool.
+    from app.services.async_bridge import run_from_any_context
+
     try:
-        return await MarketRefreshService().refresh(db, as_of=as_of)
+        return run_from_any_context(MarketRefreshService().refresh(db, as_of=as_of))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
