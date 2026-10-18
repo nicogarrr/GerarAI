@@ -9,6 +9,7 @@ import { Trash2 } from 'lucide-react';
 import { deleteTransaction } from '@/lib/actions/portfolio.actions';
 import { useRouter } from 'next/navigation';
 import EditTransactionDialog from './EditTransactionDialog';
+import ImportIBKRButton from './ImportIBKRButton';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 
@@ -77,7 +78,10 @@ export default function PortfolioTransactions({ transactions, userId }: Props) {
             <div className="h-10 w-10 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-gray-500">?</span>
             </div>
-            <p className="text-gray-500 text-sm">Sin actividad reciente</p>
+            <p className="text-gray-500 text-sm mb-4">Sin actividad reciente</p>
+            <div className="flex justify-center">
+              <ImportIBKRButton userId={userId} />
+            </div>
           </div>
         ) : (
           <div className="overflow-y-auto h-full max-h-[400px] scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent">
