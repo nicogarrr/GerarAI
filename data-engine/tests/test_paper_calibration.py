@@ -44,7 +44,7 @@ def test_brier_value_and_reference():
     # (0.8-1)^2 y (0.8-0)^2 -> (0.04 + 0.64) / 2
     assert result["brier"] == pytest.approx(0.34)
     assert result["brier_referencia_sin_informacion"] == pytest.approx(0.25)
-    assert result["muestra_insuficiente"] is True and "muestra insuficiente" in result["aviso"]
+    assert result["muestra_insuficiente"] is True and "Muestra insuficiente" in result["aviso"]
 
 
 def test_small_bins_are_nd_and_large_bins_report_gap():

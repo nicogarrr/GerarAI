@@ -77,7 +77,7 @@ class DiscoveriesOut(BaseModel):
     offset: int
     has_more: bool
     note: str = (
-        "Candidatos INFERIDOS por un modelo a partir de evidencias almacenadas; son hipotesis, "
+        "Candidatos INFERIDOS por un modelo a partir de evidencias almacenadas; son hipótesis, "
         "no hechos ni recomendaciones. Las URLs proceden de la fuente guardada, nunca del modelo"
     )
 

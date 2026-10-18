@@ -952,7 +952,7 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
             reason = {
                 "adr_without_listed_values": "ADR sin valores por accion cotizada: comparacion con el precio no verificada (N/D).",
                 "currency_mismatch": "Moneda de la posicion distinta de la moneda de cotizacion de la compania: comparacion sin conversion verificada (N/D).",
-            }.get(basis_label, "Base de valoracion no verificada (tesis sin value_per_share_basis del motor): comparacion con el precio N/D, nunca asumida.")
+            }.get(basis_label, "Base de valoración no verificada (tesis sin value_per_share_basis del motor): comparación con el precio N/D, nunca asumida.")
             excluded_out.append({**base_info, "reason": reason})
             continue
         if model is not None:
@@ -1097,7 +1097,7 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
         + (f" MANUAL/NO OFICIAL en: {', '.join(manual)}." if manual else "")
         + (f" NO VERIFICADA en: {', '.join(unverified)}." if unverified else ""),
         "Valores intrinsecos y probabilidades: solo tesis PUBLICADAS y modelos publicables (INFERIDO; los borradores nunca son vigencia).",
-        "HIPOTESIS etiquetada (INFERENCIA, no objetivo del modelo): los intrinsecos son valores presentes descontados; el CAGR supone convergencia del precio al intrinseco en el horizonte del modelo vigente (5 anos sin modelo).",
+        "HIPÓTESIS etiquetada (INFERENCIA, no objetivo del modelo): los intrínsecos son valores presentes descontados; el CAGR supone convergencia del precio al intrínseco en el horizonte del modelo vigente (5 años sin modelo).",
         "Escenarios: 'scenarios' son CONTRIBUCIONES ponderadas del subset cubierto (suma peso x CAGR), NUNCA la rentabilidad total de la cartera; 'coverage' es la fraccion de cartera usada y 'covered_only' normaliza por ESA cobertura por escenario. 'horizon_scope' mixed etiqueta horizontes de convergencia mezclados (proxy anual ponderado, no CAGR buy-and-hold de cartera). Nunca esperado de cartera completa con huecos.",
         "'expected_cagr' es la media ponderada por probabilidad de los CAGR por escenario (esperado DEL CAGR, NO el CAGR del valor esperado: no coinciden por no linealidad). Solo se emite con masa completa (==1) y sin entradas invalidas descartadas; el parcial va en 'partial_expected_cagr' y 'probability_mass' indica la masa usada."
         + (" Probabilidades invalidas (fuera de [0, 1] o no finitas) descartadas en alguna posicion." if any_invalid_probs else ""),
