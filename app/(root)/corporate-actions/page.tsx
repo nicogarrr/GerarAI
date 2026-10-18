@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import { Building2 } from 'lucide-react';
 import CorporateActionsView from '@/components/corporate-actions/CorporateActionsView';
 import BackendOffline from '@/components/system/BackendOffline';
-import { getCorporateActions, type CorporateActionRecord } from '@/lib/actions/corporate-actions.actions';
+import { getCorporateActions, getCorporateActionsSyncStatus, type CorporateActionRecord } from '@/lib/actions/corporate-actions.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatNumber } from '@/lib/format';
+import { corporateActionsEmptyMessage } from '@/lib/research/corporate-actions-empty';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -29,6 +30,10 @@ export default async function CorporateActionsPage() {
         throw error;
     }
 
+    const emptyMessage = actions.length === 0
+        ? corporateActionsEmptyMessage(await getCorporateActionsSyncStatus())
+        : undefined;
+
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex max-w-6xl flex-col gap-6">
             <header className="flex flex-col gap-3 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
@@ -45,7 +50,7 @@ export default async function CorporateActionsPage() {
                 </div>
             </header>
 
-            <CorporateActionsView initialActions={actions} />
+            <CorporateActionsView emptyMessage={emptyMessage} initialActions={actions} />
         </main>
     );
 }

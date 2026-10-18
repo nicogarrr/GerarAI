@@ -54,3 +54,17 @@ def test_daily_dividend_sync_is_scheduled():
     from pathlib import Path
     src = (Path(__file__).resolve().parents[1] / "app" / "workers" / "scheduler.py").read_text()
     assert 'job_id="portfolio_dividends_daily"' in src and "sync_portfolio_dividends" in src
+
+
+def test_sync_status_reports_last_real_import_or_none(db):
+    from datetime import UTC, datetime
+
+    from app.api.routes.corporate_actions import sync_status
+
+    assert sync_status(db=db) == {"dividends_last_import": None, "splits_last_import": None}
+    comp = _company(db, "HLD")
+    stamp = datetime(2026, 10, 10, 6, 20, tzinfo=UTC)
+    db.add(DividendRecord(tenant_id=1, company_id=comp.id, ex_date=date(2026, 10, 1), amount=Decimal("1"), currency="USD", source="yahoo_finance", fetched_at=stamp))
+    db.commit()
+    status = sync_status(db=db)
+    assert status["dividends_last_import"].startswith("2026-10-10") and status["splits_last_import"] is None
