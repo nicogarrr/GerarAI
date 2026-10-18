@@ -79,7 +79,8 @@ test('sin divisa verificada no se muestra precio (nunca USD asumido)', () => {
     assert.equal(isValidCurrencyCode('usd'), false);
     assert.equal(isValidCurrencyCode('US DOLLAR'), false);
     assert.match(component, /isValidCurrencyCode\(currency\)/);
-    assert.ok(!/'USD'/.test(component), 'la cabecera no debe asumir USD como fallback');
+    assert.ok(!/currency\s*=\s*'USD'|currency\s*\?\?\s*'USD'/.test(component), 'la cabecera no debe asumir USD como fallback');
+    assert.ok(component.includes("if (currency === 'USD'"));
     assert.match(actions, /currency: researchCompany\?\.currency \|\| profile\?\.currency \|\| null/);
 });
 
@@ -90,7 +91,7 @@ test('la variación omite ausencias: línea entera fuera si faltan ambos', () =>
     assert.match(component, /quote.change != null \|\| quote.change_percent != null/);
     assert.match(component, /\.filter\(Boolean\)\s*\.join\(' · '\)/);
     assert.ok(!/\{' · '\}/.test(component), 'queda un separador incondicional');
-    assert.match(component, /value == null \|\| !isValidCurrencyCode\(currency\) \? NA : formatMoney/, 'ausencias en la tira de métricas, nunca precio fabricado');
+    assert.match(component, /value == null \|\| !isValidCurrencyCode\(currency\) \? NA : headerMoney/, 'ausencias en la tira de métricas, nunca precio fabricado');
 });
 
 test('el color del signo sigue al dato disponible (change ?? changePercent)', () => {

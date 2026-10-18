@@ -1,3 +1,4 @@
+import { formatResearchMetric } from '@/lib/research/metric-value';
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import { healthText, listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
@@ -96,7 +97,7 @@ import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import CitationsList from '@/components/chat/CitationsList';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
-import { formatCompact, formatDate, formatMarketDate, formatNumber, formatUserDateTime, formatMoney, formatPercent, NA } from '@/lib/format';
+import { formatDate, formatMarketDate, formatNumber, formatUserDateTime, formatMoney, NA } from '@/lib/format';
 import { glossary, moatGlossaryKey } from '@/lib/glossary';
 import {
   RESEARCH_RENDER_BUDGET_MS,
@@ -268,8 +269,7 @@ function moatDefinition(type: string): string | null {
 function metricValue(value: number | string | null | undefined, unit: string) {
   const parsed = number(value);
   if (parsed === null) return 'desconocido';
-  if (unit === 'decimal') return formatPercent(parsed);
-  return formatCompact(parsed);
+  return formatResearchMetric(parsed, unit);
 }
 
 function FactCard({ fact, ticker, staleness }: { fact: ResearchFact; ticker: string; staleness: string | null }) {
@@ -517,7 +517,7 @@ function MarketOpportunityView({ model, ticker }: { model: ResearchLongTermModel
             <div className="rounded-lg border border-gray-800 p-3" key={formula.label}>
               <div className="flex justify-between gap-4 text-sm">
                 <span className="text-gray-200">{formula.label}</span>
-                <span className="text-teal-300">{formula.value === null ? label(formula.status) : metricValue(formula.value, 'USD')}</span>
+                <span className="text-teal-300">{formula.value === null ? label(formula.status) : metricValue(formula.value, formula.unit ?? '')}</span>
               </div>
               {formula.missing_inputs?.length ? <p className="mt-2 text-xs text-amber-300">Faltan entradas: {formula.missing_inputs.map(termLabel).join(', ')}</p> : null}
             </div>

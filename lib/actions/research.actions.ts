@@ -601,7 +601,7 @@ export type ResearchLongTermModel = {
       current_market_share: number | null;
       missing_inputs: string[];
     };
-    bottom_up: { status: string; value: number | null; formulas: Array<{ label: string; value: number | null; status: string; missing_inputs?: string[]; source_fact_ids: number[] }>; missing_inputs: string[] };
+    bottom_up: { status: string; value: number | null; formulas: Array<{ label: string; value: number | null; unit?: string | null; status: string; missing_inputs?: string[]; source_fact_ids: number[] }>; missing_inputs: string[] };
     implied_by_valuation: { status: string; conclusion: string; current_market_share: number | null; prior_market_share: number | null; base_future_market_share: number | null; valuation_implied_market_share: number | null; missing_inputs: string[]; source_fact_ids: number[] };
     market_share: { status: string; conclusion: string; confidence: string; current_market_share: number | null; prior_market_share: number | null; base_future_market_share: number | null; valuation_implied_market_share: number | null; source_fact_ids: number[]; missing_inputs: string[] };
     constraints: { status: string; binding_constraint: string | null; severity: string; conclusion: string; framework_constraints: string[] };

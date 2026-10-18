@@ -7,6 +7,14 @@ import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { CompanyTechnicalWorkspace } from './CompanyTechnicalWorkspace';
 import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
 
+/** USD prices follow the user's English style; other listings keep their own currency. */
+function headerMoney(value: number | null | undefined, currency: string): string {
+    if (currency === 'USD' && value != null && Number.isFinite(value)) {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+    }
+    return formatMoney(value, currency);
+}
+
 /** One timestamped Yahoo payload supplies the price and all header metrics. */
 export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapshot }) {
     const [quote, setQuote] = useState<ExtendedQuote | null>(null);
@@ -58,7 +66,7 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
             <div>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">{showPrice ? label : NA}</p>
                 <div className="text-4xl font-semibold tracking-tight text-gray-100 sm:text-5xl">
-                    {showPrice ? formatMoney(quote!.price, currency) : NA}
+                    {showPrice ? headerMoney(quote!.price, currency) : NA}
                 </div>
                 {showPrice && quote && quote.session !== 'cerrado' && (quote.change != null || quote.change_percent != null) ? (
                     <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${signBase > 0 ? 'bg-emerald-500/10 text-emerald-300' : signBase < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
@@ -70,7 +78,7 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                 ) : null}
                 {duplicatedClose ? null : (
                     <p className="mt-2 text-xs text-gray-500">
-                        Cierre regular: {showPrice && quote?.regular_close != null && (quote.regular_close_timestamp || quote.regular_close_date) ? `${formatMoney(quote.regular_close, currency)} · ${quote.regular_close_timestamp ? `${quoteDate(quote.regular_close_timestamp)} · ${quoteTime(quote.regular_close_timestamp)}` : quoteSessionDate(quote.regular_close_date)}` : NA}
+                        Cierre regular: {showPrice && quote?.regular_close != null && (quote.regular_close_timestamp || quote.regular_close_date) ? `${headerMoney(quote.regular_close, currency)} · ${quote.regular_close_timestamp ? `${quoteDate(quote.regular_close_timestamp)} · ${quoteTime(quote.regular_close_timestamp)}` : quoteSessionDate(quote.regular_close_date)}` : NA}
                     </p>
                 )}
                 {showPrice ? <p className="mt-1 text-xs text-gray-500">{quote!.source} · {quoteTime(quote!.timestamp)} (Madrid)</p> : null}
@@ -85,7 +93,7 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                     ].map(([metricLabel, value]) => (
                         <div className="min-w-0 py-3 sm:px-3 sm:first:pl-0" key={String(metricLabel)}>
                             <dt className="text-xs text-gray-500">{metricLabel}</dt>
-                            <dd className="mt-1 break-words text-sm font-medium text-gray-200">{value == null || !isValidCurrencyCode(currency) ? NA : formatMoney(value as number, currency)}</dd>
+                            <dd className="mt-1 break-words text-sm font-medium text-gray-200">{value == null || !isValidCurrencyCode(currency) ? NA : headerMoney(value as number, currency)}</dd>
                             {metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <p className="break-words text-[11px] text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp)} · ${quoteTime(quote.previous_close_timestamp)}` : quoteSessionDate(quote.previous_close_date)}</p> : null}
                         </div>
                     ))}
