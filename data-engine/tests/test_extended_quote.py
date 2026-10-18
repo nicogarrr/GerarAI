@@ -1,6 +1,7 @@
 """Hermetic Yahoo extended-hours contracts: no database, no invented dates."""
 import asyncio
 from copy import deepcopy
+from datetime import UTC
 from unittest.mock import AsyncMock
 
 import httpx
@@ -321,10 +322,10 @@ def test_closed_no_extended_market_uses_dated_auction_price_not_prior_minute():
 def _bme_weekend_nodes():
     """SAN.MC un domingo: bounds ya en lunes, velas/meta del viernes y
     minutos sin contratacion en null (patron real de BME en Yahoo)."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     def ts(y, m, d, hh, mm):
-        return int(datetime(y, m, d, hh, mm, tzinfo=timezone.utc).timestamp())
+        return int(datetime(y, m, d, hh, mm, tzinfo=UTC).timestamp())
 
     fri_start, fri_end = ts(2026, 10, 16, 7, 0), ts(2026, 10, 16, 15, 30)
     mon_start, mon_end = ts(2026, 10, 19, 7, 0), ts(2026, 10, 19, 15, 30)

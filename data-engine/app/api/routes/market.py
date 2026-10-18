@@ -6,7 +6,6 @@ Cache en memoria de 60s para no golpear Yahoo en cada carga de la home.
 from __future__ import annotations
 
 import math
-import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor

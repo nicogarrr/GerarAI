@@ -1,6 +1,6 @@
 """yahoo_chart_symbol: la clase US punto->guion vive en el conector (fuente
 unica usada por extended-quote, quote, velas, dividendos y splits)."""
-import pytest
+import asyncio
 
 from app.services.connectors.yahoo import YahooFinanceClient, yahoo_chart_symbol
 
@@ -20,8 +20,7 @@ def test_everything_else_passes_untouched():
     assert yahoo_chart_symbol("GOOG") == "GOOG"
 
 
-@pytest.mark.asyncio
-async def test_chart_requests_the_dashed_symbol(monkeypatch):
+def test_chart_requests_the_dashed_symbol(monkeypatch):
     """BRK.B debe pedir a Yahoo la URL con guion (BRK.B da 404 real)."""
     requested = []
 
@@ -44,6 +43,6 @@ async def test_chart_requests_the_dashed_symbol(monkeypatch):
             return FakeResponse()
 
     monkeypatch.setattr("app.services.connectors.yahoo.httpx.AsyncClient", lambda **kw: FakeClient())
-    node = await YahooFinanceClient().extended_chart("BRK.B")
+    node = asyncio.run(YahooFinanceClient().extended_chart("BRK.B"))
     assert node["meta"]["symbol"] == "BRK-B"
     assert requested and requested[0].endswith("/BRK-B")
