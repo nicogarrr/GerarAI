@@ -139,6 +139,7 @@ def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
         )
         .where(CalculatedMetric.metric.in_(wanted))
         .group_by(CalculatedMetric.company_id, CalculatedMetric.metric)
+        .execution_options(include_all_tenants=True)
         .subquery()
     )
     rows = db.execute(
@@ -152,6 +153,8 @@ def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
             & (CalculatedMetric.metric == latest_period.c.metric)
             & (CalculatedMetric.period == latest_period.c.max_period),
         )
+        .order_by(CalculatedMetric.tenant_id.desc().nulls_last())
+        .execution_options(include_all_tenants=True)
     ).all()
     return {
         (cid, metric): float(value)
@@ -179,6 +182,7 @@ def _earnings_consistency(db: Session) -> dict[int, tuple[int, int]]:
             FinancialFact.fiscal_year.desc(),
             FinancialFact.created_at.desc(),
         )
+        .execution_options(include_all_tenants=True)
     ).all()
     by_company: dict[int, list[tuple[int, float]]] = {}
     seen: set[tuple[int, int]] = set()
@@ -211,6 +215,7 @@ def _revenue_cagr(db: Session) -> dict[int, float]:
             FinancialFact.fiscal_year.asc(),
             FinancialFact.created_at.desc(),
         )
+        .execution_options(include_all_tenants=True)
     ).all()
     by_company: dict[int, list[tuple[int, float]]] = {}
     seen: set[tuple[int, int]] = set()
