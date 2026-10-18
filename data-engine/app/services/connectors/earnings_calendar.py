@@ -16,6 +16,7 @@ navegador, de ahi las cabeceras por defecto.
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import date, timedelta
 from typing import Any
 
@@ -188,7 +189,7 @@ async def _fetch_day_pooled(
     key = (kind, day)
     loop = asyncio.get_running_loop()
     hit = _day_cache.get(key)
-    if hit is not None and loop.time() - hit[0] < _DAY_CACHE_TTL_S:
+    if hit is not None and time.monotonic() - hit[0] < _DAY_CACHE_TTL_S:
         return hit[1]
     # El singleflight es por event loop: una Task creada en otro loop no se
     # puede esperar desde este ("attached to a different loop").
@@ -200,7 +201,7 @@ async def _fetch_day_pooled(
         task.add_done_callback(lambda _t: _day_inflight.pop(flight_key, None))
     events = await task
     if events is not None:
-        _day_cache[key] = (loop.time(), events)
+        _day_cache[key] = (time.monotonic(), events)
     return events
 
 
