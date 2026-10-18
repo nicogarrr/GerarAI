@@ -21,5 +21,7 @@ test('watchlist and movers do not interpolate raw quote dates', () => {
 
 test('screener: el precio de vela diaria se rotula como cierre con su fecha, no como hora de cotización', () => {
   const page = readFileSync('app/(root)/screener/page.tsx', 'utf8');
-  assert.match(page, /r\.priceDate \? `Cierre \$\{formatMarketDate\(r\.priceDate\)\}` : quoteObserved\(r\.priceAsOf\)/);
+  // #1436: quoteObserved recibe ademas el kind para no rotular la apertura de
+  // la vela diaria como hora de cotizacion; el ternario que protege el guard sigue igual.
+  assert.match(page, /r\.priceDate \? `Cierre \$\{formatMarketDate\(r\.priceDate\)\}` : quoteObserved\(r\.priceAsOf, r\.priceTimestampKind\)/);
 });
