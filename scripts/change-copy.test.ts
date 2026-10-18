@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+// @ts-expect-error TS5097: ejecución directa con Node.
+import { changeSummaryText } from '../lib/research/change-copy.ts';
+
+test('traduce el impacto antiguo incluso después del titular', () => {
+  assert.equal(changeSummaryText('Noticia. Affects 0 claims and thesis nodes: Funding, Regulatory.'), 'Noticia. Afecta a 0 afirmaciones y a estos apartados de la tesis: Financiación, Regulación.');
+  assert.equal(changeSummaryText('No stored thesis is available for semantic impact mapping.'), 'No hay una tesis guardada para evaluar el impacto.');
+  assert.equal(changeSummaryText('No structural thesis node matched with sufficient confidence.'), 'No se ha encontrado una relación suficientemente fiable con la tesis.');
+});
+
+test('no inventa la continuación de un texto antiguo truncado', () => {
+  assert.equal(changeSummaryText('ASTS recibe una autorizaci'), 'ASTS recibe una autorizaci');
+});
