@@ -24,7 +24,7 @@ const MIXED_BASE_PAYLOAD: PortfolioForecast = {
             name: 'Holding sin conversión',
             weight: null,
             currency: 'USD',
-            reason: 'Sin valor en moneda base (conversion N/D): no se suma a la cartera.',
+            reason: 'Sin valor en moneda base (conversión N/D): no se suma a la cartera.',
         },
     ],
     assumptions: [
@@ -38,7 +38,7 @@ const REAL_EMPTY_PAYLOAD: PortfolioForecast = {
     portfolio: null,
     positions: [],
     excluded: [],
-    assumptions: ['Sin posiciones: no hay prevision que calcular.'],
+    assumptions: ['Sin posiciones: no hay previsión que calcular.'],
 };
 
 async function renderForecast(payload: PortfolioForecast): Promise<string> {
@@ -60,6 +60,7 @@ async function renderForecast(payload: PortfolioForecast): Promise<string> {
         }).outputText;
     try {
         writeFileSync(`${dir}/utils.mjs`, compile('lib/utils.ts'));
+        writeFileSync(`${dir}/format.mjs`, compile('lib/format.ts'));
         writeFileSync(
             `${dir}/panel.mjs`,
             compile('components/ui/panel.tsx').replaceAll('@/lib/utils', './utils.mjs'),
@@ -77,7 +78,7 @@ export default function Link({ href, children, ...rest }) { return createElement
             compile('components/portfolio/PortfolioForecast.tsx').replaceAll(
                 '@/components/ui/panel',
                 './panel.mjs',
-            ).replaceAll("'next/link'", "'./next-link.mjs'"),
+            ).replaceAll("'next/link'", "'./next-link.mjs'").replaceAll('@/lib/format', './format.mjs'),
         );
         const mod = await import(`${process.cwd()}/${dir}/forecast.mjs`);
         return renderToStaticMarkup(createElement(mod.default, { forecast: payload }));
@@ -92,12 +93,12 @@ describe('PortfolioForecast montado con react-dom/server', () => {
         assert.ok(html.includes('Monedas base mezcladas'), `debe mostrar la assumption del backend, obtuvo: ${html}`);
         assert.ok(html.includes('Excluidas del cálculo'), 'las excluidas siguen visibles en el estado sin agregado');
         assert.ok(html.includes('peso N/D'), 'el peso sin conversión se rotula N/D, nunca un cero');
-        assert.ok(!html.includes('no hay prevision que calcular'), 'no puede colapsar a vacío real');
+        assert.ok(!html.includes('no hay previsión que calcular'), 'no puede colapsar a vacío real');
     });
 
     it('con cartera realmente vacía muestra el mensaje verbatim del backend', async () => {
         const html = await renderForecast(REAL_EMPTY_PAYLOAD);
-        assert.ok(html.includes('Sin posiciones: no hay prevision que calcular.'), `vacío real verbatim, obtuvo: ${html}`);
+        assert.ok(html.includes('Sin posiciones: no hay previsión que calcular.'), `vacío real verbatim, obtuvo: ${html}`);
     });
 
     it('los porcentajes se renderizan en formato es-ES con coma decimal', async () => {
@@ -107,4 +108,11 @@ describe('PortfolioForecast montado con react-dom/server', () => {
         assert.ok(!source.includes('.toFixed('), 'toFixed rompe la coma decimal es-ES');
         assert.ok(source.includes('Number.isFinite'), 'Infinity/NaN se filtran a Sin datos');
     });
+});
+
+it('los fixtures sin agregado conservan literalmente el copy vigente del backend', async () => {
+    const {readFileSync} = await import('node:fs');
+    const backend = readFileSync('data-engine/app/api/routes/portfolio.py','utf8');
+    assert.ok(backend.includes(REAL_EMPTY_PAYLOAD.assumptions[0]));
+    assert.ok(backend.includes(MIXED_BASE_PAYLOAD.excluded[0].reason));
 });
