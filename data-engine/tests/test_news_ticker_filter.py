@@ -250,5 +250,10 @@ def test_ticker_feed_hides_rows_that_only_carry_the_ticker_label():
         # Marca verificada (Google para GOOGL): se conserva; Unity solo con etiqueta: se oculta.
         googl_titles = {row["title"] for row in client.get("/api/news?ticker=GOOGL").json()}
         assert googl_titles == {"GOOGL Google launches new Gemini model"}
-        assert len(client.get("/api/news").json()) == 5
+        # Feed global: tambien oculta las filas con solo la etiqueta (Unity, Novo) y el offset cuenta visibles.
+        visible = [row["title"] for row in client.get("/api/news").json()]
+        assert len(visible) == 3
+        assert not any("Novo Nordisk" in t or "Unity" in t for t in visible)
+        second = client.get("/api/news?limit=1&offset=1").json()
+        assert [row["title"] for row in second] == [visible[1]]
     engine.dispose()

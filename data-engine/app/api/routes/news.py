@@ -14,7 +14,8 @@ from app.services.ticker_news_lane import _only_ticker_prefix_mention
 
 router = APIRouter()
 
-_TICKER_SCAN_LIMIT = 400
+_SCAN_CHUNK = 200
+_SCAN_LIMIT = 2000
 
 
 def _is_off_topic(event: NewsEvent, company: Company | None) -> bool:
@@ -44,7 +45,8 @@ def news_events(
 ) -> list[dict]:
     """Eventos por pagina (scroll infinito). ``lane`` filtra en SQL:
     ``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT.
-    ``ticker`` limita a los eventos de esa empresa (ficha de accion)."""
+    ``ticker`` limita a los eventos de esa empresa (ficha de accion).
+    Las filas etiquetadas con un ticker que no citan a la empresa se omiten."""
     stmt = select(NewsEvent, Company).outerjoin(Company, NewsEvent.company_id == Company.id)
     if ticker:
         stmt = stmt.where(Company.ticker == ticker.strip().upper())
@@ -53,18 +55,26 @@ def news_events(
     elif lane == "macro":
         stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == "macro")
     ordered = stmt.order_by(desc(NewsEvent.date), desc(NewsEvent.id))
-    if ticker:
-        # Lectura de la ficha: se ocultan filas etiquetadas con el ticker cuyo
-        # titular y resumen no citan a la empresa (ticker pegado delante, nada
-        # mas). Criterio sin LLM; las filas no se borran.
-        candidates = db.execute(ordered.limit(_TICKER_SCAN_LIMIT)).all()
-        rows = [
-            (event, company)
-            for event, company in candidates
-            if not _is_off_topic(event, company)
-        ][offset : offset + limit]
-    else:
-        rows = db.execute(ordered.limit(limit).offset(offset)).all()
+    # Lectura: se ocultan filas etiquetadas con un ticker cuyo titular y resumen
+    # no citan a la empresa (ticker pegado delante, nada mas). Criterio sin LLM;
+    # las filas no se borran. El offset cuenta filas visibles.
+    rows: list = []
+    skipped = 0
+    scanned = 0
+    while len(rows) < limit and scanned < _SCAN_LIMIT:
+        chunk = db.execute(ordered.limit(_SCAN_CHUNK).offset(scanned)).all()
+        if not chunk:
+            break
+        scanned += len(chunk)
+        for event, company in chunk:
+            if _is_off_topic(event, company):
+                continue
+            if skipped < offset:
+                skipped += 1
+            elif len(rows) < limit:
+                rows.append((event, company))
+        if len(chunk) < _SCAN_CHUNK:
+            break
     events = []
     for event, company in rows:
         # Solo lo persistido en ingesta (F314): recomputar por peticion
