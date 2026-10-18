@@ -63,6 +63,7 @@ DETERMINISTIC_THEMES: tuple[tuple[tuple[str, ...], str, str, str], ...] = (
 # reason (measured in prod: 100 sector-level candidates for one ASTS news
 # item), so only industry/factor matches count and the list stays short.
 CANDIDATE_LIMIT = 10
+CANDIDATES_PER_THEME = 2
 
 _REASON_FIELD_LABEL = {"industry": "industria", "factor_tags": "etiqueta de factor"}
 
@@ -172,7 +173,8 @@ def _candidate_reason(company: Company, theme: Theme, field: str, value: str) ->
     """Concrete match reason; a hypothesis is never presented as a fact."""
     label = _REASON_FIELD_LABEL.get(field, field)
     return (f"La {label} '{value}' de {company.ticker} coincide exactamente con "
-            f"la exposición '{theme.exposure}' de la hipótesis.")
+            f"la exposición '{theme.exposure}' de la hipótesis; "
+            "es una coincidencia de metadatos, no exposición económica verificada.")
 
 
 # Risk/maturity/style tags describe a stock, not an economic transmission channel.
@@ -184,9 +186,34 @@ _GENERIC_EXPOSURES = frozenset({
 })
 
 
+# An umbrella industry cannot substantiate a product-specific indirect channel.
+# In particular "Insurance" does not show that a firm underwrites D&O risk.
+_BROAD_INDUSTRIES = frozenset({
+    "insurance", "insurers", "aseguradoras", "seguros", "financial services",
+    "financials", "technology", "healthcare", "industrials", "legal", "services",
+})
+
+
+def _match_relevance(company: Company, exposure: str) -> tuple[int, str, str] | None:
+    """Rank only observed exact metadata evidence, not market size or alphabet."""
+    normalized = _normalized(exposure)
+    if normalized in _BROAD_INDUSTRIES:
+        return None
+    fields = [(field, value) for field, value in _company_exposures(company)
+              if field != "sector" and _normalized(value) == normalized]
+    if not fields:
+        return None
+    # Concrete factor tagging is closer to the proposed channel than an
+    # industry label alone. Independent industry agreement adds support.
+    fields.sort(key=lambda item: item[0] != "factor_tags")
+    score = sum(2 if field == "factor_tags" else 1 for field, _ in dict(fields).items())
+    field, value = fields[0]
+    return score, field, value
+
+
 def _specific_exposure(value: str) -> bool:
     normalized = _normalized(value)
-    return bool(normalized) and normalized not in _GENERIC_EXPOSURES
+    return bool(normalized) and normalized not in _GENERIC_EXPOSURES and normalized not in _BROAD_INDUSTRIES
 
 
 def _company_exposures(company: Company) -> list[tuple[str, str]]:
@@ -323,7 +350,7 @@ def _matching_companies(db: Session, exposure: str) -> list[Company]:
         for token in exposure_norm.split()
     ]
     return list(db.scalars(
-        select(Company).where(or_(*token_predicates)).order_by(Company.ticker)
+        select(Company).where(or_(*token_predicates)).order_by(Company.id)
     ).all())
 
 
@@ -383,40 +410,61 @@ def analyze_second_order(db: Session, event: NewsEvent, *, use_llm: bool = False
     subject = db.get(Company, snap.company_id) if snap.company_id is not None else None
     subject_ticker = subject.ticker.strip().upper() if subject else None
     seen_tickers: set[str] = set()
+    theme_pools = []
+    seen_themes: set[str] = set()
     for theme in extraction.themes:
-        if not theme.chain or not _specific_exposure(theme.exposure):
+        theme_key = _normalized(theme.exposure)
+        if not theme.chain or not _specific_exposure(theme.exposure) or theme_key in seen_themes:
             continue
+        seen_themes.add(theme_key)
         matches = []
         for company in _matching_companies(db, theme.exposure):
             ticker = company.ticker.strip().upper()
-            if not ticker or company.id == snap.company_id or ticker == subject_ticker or ticker in seen_tickers:
+            if not ticker or company.id == snap.company_id or ticker == subject_ticker:
                 continue
-            for field, value in _company_exposures(company):
-                if field == "sector":
+            relevance = _match_relevance(company, theme.exposure)
+            if relevance:
+                score, field, value = relevance
+                matches.append((company, field, value, score))
+        # Score is grounded exact metadata support. ID only stabilizes equal
+        # evidence ties; it is not a relevance claim or an alphabetical ranking.
+        matches.sort(key=lambda row: (-row[3], row[0].id))
+        theme_pools.append((theme, matches))
+    # All themes get a first opportunity before any theme gets a second.
+    # Repeated/aliased tickers never consume either the per-theme or total cap.
+    markers: dict[str, dict] = {}
+    for _round in range(CANDIDATES_PER_THEME):
+        for theme, matches in theme_pools:
+            while matches:
+                company, field, value, score = matches.pop(0)
+                ticker = company.ticker.strip().upper()
+                if ticker in seen_tickers:
                     continue
-                if _normalized(value) == _normalized(theme.exposure):
-                    matches.append((company, field, value))
-                    seen_tickers.add(ticker)
-                    break
-            if len(matches) + len(candidates) >= CANDIDATE_LIMIT:
+                theme_key = _normalized(theme.exposure)
+                if theme_key not in markers:
+                    markers[theme_key] = _jev_marker(theme)
+                marker = markers[theme_key]
+                candidate = _candidate(company, theme, field, value, snap, marker,
+                                       _candidate_reason(company, theme, field, value))
+                candidate["selection_basis"] = {
+                    "kind": "exact_metadata_support", "score": score,
+                    "limitation": "Prioridad por metadatos exactos, no por impacto económico verificado. Empates sin preferencia económica.",
+                }
+                candidates.append(candidate)
+                seen_tickers.add(ticker)
                 break
-        if matches:
-            marker = _jev_marker(theme)
-            candidates.extend(
-                _candidate(company, theme, field, value, snap, marker,
-                           _candidate_reason(company, theme, field, value))
-                for company, field, value in matches
-            )
+            if len(candidates) >= CANDIDATE_LIMIT:
+                break
         if len(candidates) >= CANDIDATE_LIMIT:
             break
-    candidates = candidates[:CANDIDATE_LIMIT]
     return {
         "news_event_id": snap.id, "status": "hipótesis_no_verificadas" if candidates else "sin_datos",
         "generated_at": datetime.now(UTC).isoformat(), "mode": mode,
         "source": {"url": snap.url, "published_at": _source_date(snap), "name": snap.source},
         "source_claim": text, "source_verified": False,
         "themes": [theme.model_dump() for theme in extraction.themes],
-        "candidates": candidates, "limited_to": CANDIDATE_LIMIT, "note": llm_note,
+        "candidates": candidates, "limited_to": CANDIDATE_LIMIT,
+        "per_theme_limit": CANDIDATES_PER_THEME, "note": llm_note,
         "llm_model": llm_model, "llm_quota": llm_quota,
         "warning": "Solo hipótesis. Verificar fuente, cadena causal y exposición antes de usar como conclusión.",
     }
