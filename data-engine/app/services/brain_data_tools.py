@@ -24,6 +24,13 @@ def _number(value) -> str:
     return f"{float(value):,.2f}".replace(",", "\x07").replace(".", ",").replace("\x07", ".")
 
 
+def _money(value, currency) -> str:
+    """USD en formato en-US ($120.50); el resto de divisas, es-ES con su código."""
+    if currency == "USD":
+        return f"${float(value):,.2f}"
+    return f"{_number(value)} {currency or ''}".strip()
+
+
 def _link(company: Company, view: str = "financials") -> str:
     return f"/research/{quote(company.ticker, safe='')}?view={view}"
 
@@ -48,7 +55,7 @@ def _company_data(db: Session, company: Company) -> tuple[list[str], list[dict]]
     if price is None:
         lines.append("Precio: sin cotización válida almacenada.")
     else:
-        lines.append(f"Último precio almacenado: {_number(price.close)} {company.currency} "
+        lines.append(f"Último precio almacenado: {_money(price.close, company.currency)} "
                      f"({price.date.isoformat()}, {price.source}). No es una cotización en directo.")
         sources.append(_source("market_price", price.id, f"Precio {company.ticker} · {price.date}", _link(company)))
     ratio = load_screener_ratios(db, {company.ticker}).get(company.ticker, {}) if price else {}
@@ -84,7 +91,7 @@ def _company_in_question(db: Session, question: str) -> Company | None:
 
 def _dividend_line(company: Company, record: DividendRecord) -> str:
     pay = f", pago {record.pay_date.isoformat()}" if record.pay_date else ""
-    return (f"{company.ticker}: {_number(record.amount)} {record.currency} por acción, "
+    return (f"{company.ticker}: {_money(record.amount, record.currency)} por acción, "
             f"ex-dividendo {record.ex_date.isoformat()}{pay} ({record.source}).")
 
 
@@ -129,13 +136,13 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
             continue
         amount = sum((r.amount for r in records), Decimal("0")) * Decimal(str(position.quantity))
         totals[position.currency] = totals.get(position.currency, Decimal("0")) + amount
-        lines.append(f"- {comp.ticker}: {len(records)} pago(s) en {today.year}, {_number(amount)} {position.currency} "
+        lines.append(f"- {comp.ticker}: {len(records)} pago(s) en {today.year}, {_money(amount, position.currency)} "
                      f"({_number(position.quantity)} acciones, importes brutos declarados).")
         sources.append(_source("dividend_record", records[-1].id, f"Dividendo {comp.ticker} · {records[-1].ex_date}", _link(comp)))
     if not lines:
         return _response([f"No hay dividendos guardados de tus posiciones para {today.year}. No he consultado el proveedor en directo."], [], "portfolio_dividends")
     head = f"Dividendos declarados guardados de tus posiciones abiertas en {today.year} (brutos, cantidad actual por acción declarada):"
-    total = "Total: " + " · ".join(f"{_number(v)} {cur}" for cur, v in sorted(totals.items())) + "."
+    total = "Total: " + " · ".join(f"{_money(v, cur)}" for cur, v in sorted(totals.items())) + "."
     tail = [f"Sin dividendos guardados: {', '.join(without)}."] if without else []
     return _response([head, *lines, total, *tail], sources, "portfolio_dividends")
 
@@ -147,7 +154,7 @@ def _plan_answer(db: Session) -> ChatResponse:
     if not drift.get("plan_exists"):
         return _response(["No tienes un plan de inversión guardado."], [], "investment_plan")
     cur = PortfolioFXService().base_currency(db)
-    lines = [f"Tu plan guardado marca una aportación de {_number(drift['next_contribution'])} {cur} al mes."]
+    lines = [f"Tu plan guardado marca una aportación de {_money(drift['next_contribution'], cur)} al mes."]
     if drift.get("suggestions_blocked"):
         lines.append("No calculo desviaciones ni importes: faltan tipos de cambio de alguna posición o saldo.")
         return _response(lines, sources, "investment_plan")
@@ -157,13 +164,13 @@ def _plan_answer(db: Session) -> ChatResponse:
         by_label = {x["label"]: x for x in drift["suggestions"] if x["direction"] == "buy"}
         for d in sorted(below, key=lambda d: d["deviation_pct"]):
             amount = by_label.get(d["label"], {}).get("amount_base")
-            extra = f", hueco de {_number(amount)} {cur} para llegar al objetivo" if amount is not None else ""
+            extra = f", hueco de {_money(amount, cur)} para llegar al objetivo" if amount is not None else ""
             lines.append(f"- {d['label']}: {_number(d['current_pct'])} % actual frente a {_number(d['target_pct'])} % objetivo{extra}.")
     elif drift["deviations"]:
         lines.append("Ningún objetivo del plan está por debajo de su banda.")
     else:
         lines.append("El plan no tiene objetivos de asignación guardados.")
-    lines.append(f"Valor de la cartera usado: {_number(drift['portfolio_value_base'])} {cur}. Son las cifras de tu plan, no una orden ni una recomendación nueva.")
+    lines.append(f"Valor de la cartera usado: {_money(drift['portfolio_value_base'], cur)}. Son las cifras de tu plan, no una orden ni una recomendación nueva.")
     return _response(lines, sources, "investment_plan")
 
 
@@ -193,13 +200,13 @@ def _thesis_valuation_answer(db: Session, question: str, tenant: int) -> ChatRes
         lines.append("Margen de seguridad: pendiente en la tesis.")
     else:
         lines.append(f"Margen de seguridad de la tesis: {_pct(published.margin_of_safety)}.")
-    parts = [f"{label} {_number(value)} {ccy}" for label, value in (
+    parts = [f"{label} {_money(value, ccy)}" for label, value in (
         ("bajista", published.bear_value), ("base", published.base_value), ("alcista", published.bull_value),
         ("esperado", published.expected_value)) if value is not None]
     if parts:
         lines.append("Valores de la tesis: " + ", ".join(parts) + ".")
     if published.current_price is not None:
-        lines.append(f"Precio usado al generar la tesis: {_number(published.current_price)} {ccy} (no es la cotización actual).")
+        lines.append(f"Precio usado al generar la tesis: {_money(published.current_price, ccy)} (no es la cotización actual).")
     return _response(lines, [_source("thesis_version", published.id, f"Tesis {company.ticker} v{published.version}", _link(company, "thesis"))], "thesis_valuation")
 
 

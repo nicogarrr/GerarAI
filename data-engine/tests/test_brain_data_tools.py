@@ -40,7 +40,7 @@ def test_quote_and_ratio_are_dated_sourced_and_ignore_other_tenant_and_future(db
     db.commit()
     db.info["tenant_id"] = 1
     response = asyncio.run(ChatService().answer(db, "¿Precio actual de AAPL y su PER?", "portfolio", None))
-    assert "200,00 USD" in response.answer
+    assert "$200.00" in response.answer
     assert "20,00 veces" in response.answer
     assert "999" not in response.answer
     assert "no es una cotización en directo" in response.answer.lower()
@@ -167,7 +167,7 @@ def test_mixed_quote_and_fcf_margin_answers_both_without_provider(db):
         db.add(FinancialFact(tenant_id=1, company_id=a.id, metric=metric, value=Decimal(value), unit="USD", period="2025:FY", fiscal_year=2025, source_type="SEC", is_reported=True))
     db.commit()
     response = asyncio.run(ChatService().answer(db, "¿Cuál es el margen FCF de AAPL y cuál es su precio actual?", "portfolio", None))
-    assert "200,00 USD" in response.answer
+    assert "$200.00" in response.answer
     assert "25,00 %" in response.answer
     assert response.llm_trace["provider_calls"] == 0
     assert len(response.sources) == 3
@@ -191,8 +191,8 @@ def test_company_dividend_by_name_next_and_last_declared(db):
     db.commit()
     db.info["tenant_id"] = 1
     response = asyncio.run(ChatService().answer(db, "¿Qué dividendo paga Coca-Cola y cuándo es el próximo?", "portfolio", None))
-    assert "Próximo declarado" in response.answer and "0,53 USD" in response.answer
-    assert "0,51 USD" in response.answer and "9,99" not in response.answer
+    assert "Próximo declarado" in response.answer and "$0.53" in response.answer
+    assert "$0.51" in response.answer and "9,99" not in response.answer
     assert response.llm_trace["provider_calls"] == 0
     assert response.sources and all(s["url"].startswith("/research/KO") for s in response.sources)
 
@@ -218,7 +218,7 @@ def test_portfolio_dividends_this_year_only_own_open_positions(db):
     _dividend(db, c, date(today.year, 3, 1), "5.00")
     db.commit()
     response = asyncio.run(ChatService().answer(db, "¿Qué dividendos cobrará mi cartera este año?", "portfolio", None))
-    assert "AAA: 2 pago(s)" in response.answer and "25,00 USD" in response.answer
+    assert "AAA: 2 pago(s)" in response.answer and "$25.00" in response.answer
     assert "Sin dividendos guardados: BBB" in response.answer
     assert "CCC" not in response.answer
     assert response.sources and response.llm_trace["provider_calls"] == 0
@@ -243,7 +243,7 @@ def test_thesis_margin_uses_latest_published_version_only(db):
     db.commit()
     response = asyncio.run(ChatService().answer(db, "¿Cuánto margen de seguridad tiene Apple según mi tesis? AAPL", "portfolio", None))
     assert "v11" in response.answer and "-64,90 %" in response.answer
-    assert "bajista 60,00 USD" in response.answer and "no es la cotización actual" in response.answer
+    assert "bajista $60.00" in response.answer and "no es la cotización actual" in response.answer
     assert "50,00" not in response.answer
     assert response.sources[0]["url"] == "/research/AAPL?view=thesis"
     assert response.llm_trace["provider_calls"] == 0
@@ -276,12 +276,12 @@ def test_plan_question_reads_plan_and_underweight_targets(db):
     db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("1"), average_cost=Decimal("100"), currency="USD", base_currency="USD", as_of=date.today(), market_value=Decimal("100"), market_value_base=Decimal("100")))
     db.commit()
     response = asyncio.run(ChatService().answer(db, "Tengo 500 € este mes. Según mi plan, ¿qué compro?", "portfolio", None))
-    assert "500,00 USD al mes" in response.answer
+    assert "$500.00 al mes" in response.answer
     assert "Objetivos por debajo de su banda" in response.answer
-    assert "BBB: 0,00 % actual frente a 20,00 % objetivo, hueco de 20,00 USD" in response.answer
+    assert "BBB: 0,00 % actual frente a 20,00 % objetivo, hueco de $20.00" in response.answer
     assert "Tech:" not in response.answer
     assert response.sources == [{"type": "investment_plan", "id": "plan", "title": "Plan de inversión", "url": "/plan"}]
-    assert "Valor de la cartera usado: 100,00 USD" in response.answer
+    assert "Valor de la cartera usado: $100.00" in response.answer
     assert "no una orden" in response.answer
     assert response.llm_trace["provider_calls"] == 0
 
