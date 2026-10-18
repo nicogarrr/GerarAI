@@ -10,6 +10,7 @@ import { classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/t
 import { getStockQuote, getStockFinancialDataLight } from '@/lib/actions/finnhub.actions';
 import { getResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
+import { hasPriorClose } from '@/lib/market/session-change';
 import { sessionDateEt } from '@/lib/market/quote-freshness';
 
 // Helper para obtener userId (researchRequest añade la identidad firmada
@@ -198,13 +199,13 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         currency: base.currency,
         price,
         change:
-            price === null
+            price === null || !hasPriorClose(quote)
                 ? null
                 : typeof quote?.d === 'number' && Number.isFinite(quote.d)
                   ? quote.d
                   : null,
         changePercent:
-            price === null
+            price === null || !hasPriorClose(quote)
                 ? null
                 : typeof quote?.dp === 'number' && Number.isFinite(quote.dp)
                   ? quote.dp
