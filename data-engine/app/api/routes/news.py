@@ -9,9 +9,19 @@ from app.models import Company, NewsEvent
 from app.schemas import ManualNewsRequest, ManualNewsResponse, NewsIngestRequest, NewsIngestResponse
 from app.services.news_headline_translation import display_translation, original_headline, translate_headline
 from app.services.news_service import NewsService
+from app.services.ticker_news_lane import _only_ticker_prefix_mention
 from app.services.second_order_news_service import analyze_second_order
 
 router = APIRouter()
+
+_TICKER_SCAN_LIMIT = 400
+
+
+def _is_off_topic(event: NewsEvent, company: Company | None) -> bool:
+    metadata = event.metadata_ or {}
+    if company is None or not metadata.get("headline_from_source", True):
+        return False
+    return _only_ticker_prefix_mention(company, event.title or "", event.summary or "")
 
 
 @router.post("/manual", response_model=ManualNewsResponse)
@@ -42,9 +52,19 @@ def news_events(
         stmt = stmt.where(NewsEvent.company_id.is_not(None))
     elif lane == "macro":
         stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == "macro")
-    rows = db.execute(
-        stmt.order_by(desc(NewsEvent.date), desc(NewsEvent.id)).limit(limit).offset(offset)
-    ).all()
+    ordered = stmt.order_by(desc(NewsEvent.date), desc(NewsEvent.id))
+    if ticker:
+        # Lectura de la ficha: se ocultan filas etiquetadas con el ticker cuyo
+        # titular y resumen no citan a la empresa (ticker pegado delante, nada
+        # mas). Criterio sin LLM; las filas no se borran.
+        candidates = db.execute(ordered.limit(_TICKER_SCAN_LIMIT)).all()
+        rows = [
+            (event, company)
+            for event, company in candidates
+            if not _is_off_topic(event, company)
+        ][offset : offset + limit]
+    else:
+        rows = db.execute(ordered.limit(limit).offset(offset)).all()
     events = []
     for event, company in rows:
         # Solo lo persistido en ingesta (F314): recomputar por peticion
