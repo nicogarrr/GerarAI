@@ -18,6 +18,9 @@ test('plantilla del declarante sin sustituciones rotas ni ids de caja crudos', (
   assert.doesNotMatch(text, /la tus|la los|tenant|tax_declarant/);
   assert.match(text, /Guárdalos en tus datos fiscales, en los datos del declarante/);
   assert.equal(humanizeTaxText('cash-EUR'), 'caja EUR');
+  const dates = humanizeTaxText("Faltan first_acquisition_dates por ISIN y previous_year_isins");
+  assert.doesNotMatch(dates, /_/);
+  assert.match(dates, /fechas de primera adquisición/);
 });
 
 test('el cuerpo del cambio no repite el titular y las etiquetas van en español', () => {

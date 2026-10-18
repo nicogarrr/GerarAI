@@ -16,6 +16,11 @@ const PHASE_LABELS: Record<string, string> = {
     persist_thesis: 'Persistiendo la versión',
 };
 
+const THESIS_STATUS_LABELS: Record<string, string> = {
+    insufficient_data: 'datos insuficientes',
+    draft_failed_audit: 'no superó la auditoría',
+};
+
 const POLL_MS = 3000;
 // 600 polls x 3 s = 30 min de espera continua por job. Sin corte, un job
 // atascado dejaba "Generando en segundo plano..." para siempre: pasado el
@@ -32,6 +37,9 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
     const startingRef = useRef(false);
     const [pollExhausted, setPollExhausted] = useState(false);
     const pollCountRef = useRef(0);
+    // El resultado solo se anuncia para el trabajo lanzado en esta sesión: el
+    // último job guardado puede ser de una versión anterior a la vigente.
+    const [startedHere, setStartedHere] = useState(false);
 
     const active = job !== null && ['queued', 'running', 'retrying', 'dispatch_failed'].includes(job.status);
     const busy = recovering || starting || active;
@@ -114,6 +122,7 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
         if (busy || startingRef.current) return;
         startingRef.current = true;
         setStarting(true);
+        setStartedHere(true);
         setError(null);
         try {
             setJob(await startThesisJob(ticker, true, crypto.randomUUID()));
@@ -156,9 +165,10 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
                     </span>
                 ) : null}
             </div>
-            {job?.status === 'succeeded' ? (
+            {startedHere && job?.status === 'succeeded' ? (
                 <p className="text-sm text-teal-300">
-                    Tesis v{job.result?.version} generada ({job.result?.status}).
+                    Tesis v{job.result?.version} generada
+                    {job.result?.status && THESIS_STATUS_LABELS[job.result.status] ? ` (${THESIS_STATUS_LABELS[job.result.status]})` : ''}.
                 </p>
             ) : null}
             {job?.status === 'failed' ? (
