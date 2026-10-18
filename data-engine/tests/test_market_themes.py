@@ -303,3 +303,30 @@ def test_resultado_parcial_caduca_pronto_y_uno_completo_dura_el_ttl():
     ok.get(lambda: {"symbols_with_data": 5, "status": "ok"})
     clock["now"] = 3000
     assert ok.get(lambda: {"symbols_with_data": 5, "status": "ok"})["stale"] is False
+
+
+def test_toda_cesta_curada_justifica_sus_valores():
+    """Cada ticker de las cestas publicadas lleva su razon (verificable, corta),
+    y no hay razones colgadas de tickers que ya no estan."""
+    assert mt.REASONS, "sin razones curadas"
+    for basket in mt.BASKETS:
+        reasons = mt.REASONS.get(basket["id"], {})
+        for ticker in basket["tickers"]:
+            reason = reasons.get(ticker)
+            assert reason, f"{basket['id']}:{ticker} sin justificacion"
+            assert len(reason) <= 70, f"{basket['id']}:{ticker} razon demasiado larga"
+        extra = set(reasons) - set(basket["tickers"])
+        assert not extra, f"{basket['id']}: razones sobrantes {sorted(extra)}"
+
+
+def test_la_justificacion_llega_al_constituyente():
+    candles = {t: _series(100, 110, base_ytd=100, base_1m=100) for t in ("NVDA", "AMD")}
+    basket = {
+        "id": "semiconductores",
+        "name": "Semiconductores",
+        "tickers": ["NVDA", "AMD"],
+    }
+    out = mt.compute_themes(candles, baskets=[basket])
+    rows = {r["ticker"]: r for r in out["themes"][0]["constituents"]}
+    assert rows["NVDA"]["reason"] == "GPU dominantes para entrenar IA"
+    assert rows["AMD"]["reason"] == "CPU EPYC y GPU Instinct"
