@@ -119,6 +119,36 @@ _METRIC_LABELS = {
     "dividends": "Dividendos",
     "buybacks": "Recompras",
 }
+_FIELD_VALUES_ES = {
+    "sector": {
+        "Information Technology": "Tecnología de la información", "Technology": "Tecnología",
+        "Communication Services": "Servicios de comunicación", "Consumer Discretionary": "Consumo discrecional",
+        "Consumer Staples": "Consumo básico", "Consumer Cyclical": "Consumo cíclico",
+        "Consumer Defensive": "Consumo defensivo", "Financials": "Finanzas",
+        "Financial Services": "Servicios financieros", "Health Care": "Salud", "Healthcare": "Salud",
+        "Industrials": "Industria", "Materials": "Materiales", "Basic Materials": "Materiales básicos",
+        "Energy": "Energía", "Utilities": "Servicios públicos", "Real Estate": "Inmobiliario", "Unknown": "Sin datos",
+    },
+    "company_type": {
+        "research_candidate": "Candidata de análisis", "portfolio_holding": "Posición en cartera",
+        "operating": "Operativa", "holding": "Sociedad de cartera", "bank": "Banco",
+        "insurance": "Aseguradora", "unassigned": "Sin clasificar", "pre_revenue": "Pre-ingresos",
+    },
+    "rating": {
+        "expensive": "Cara", "attractive": "Atractiva", "buy": "Compra", "sell": "Venta",
+        "hold": "Mantener", "watch": "Seguimiento", "accumulate": "Acumular", "avoid": "Evitar",
+        "trim": "Recortar", "overweight": "Sobreponderar", "underweight": "Infraponderar",
+        "blocked": "Bloqueada", "insufficient_data": "Datos insuficientes", "incomplete_price": "Precio incompleto",
+    },
+}
+
+
+def _field_value(key: str, value: Any) -> str:
+    if key in _FIELD_VALUES_ES and isinstance(value, str):
+        return _FIELD_VALUES_ES[key].get(value, value.replace("_", " "))
+    return _format(value)
+
+
 _STATUS_LABELS = {
     "missing": "sin datos",
     "ok": "correcto",
@@ -274,7 +304,7 @@ def _render_payload(
             elif key in _PERCENT_KEYS:
                 lines.append(f"- **{_label(key)}**: {_format_pct(value)}")
             else:
-                lines.append(f"- **{_label(key)}**: {_format(value)}")
+                lines.append(f"- **{_label(key)}**: {_field_value(key, value)}")
     elif isinstance(payload, list):
         if not payload:
             lines.append("_Sin datos._")
@@ -284,7 +314,7 @@ def _render_payload(
                 _render_observation("valor", item, lines)
             elif isinstance(item, dict):
                 pairs = [
-                    f"**{_label(k)}**: {_format(v)}"
+                    f"**{_label(k)}**: {_field_value(k, v)}"
                     for k, v in item.items()
                     if k != "citation" and v is not None and not isinstance(v, (dict, list))
                 ]

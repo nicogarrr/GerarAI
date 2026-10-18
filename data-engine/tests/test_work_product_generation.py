@@ -184,3 +184,21 @@ def test_margin_of_safety_is_a_spanish_percent():
     lines: list[str] = []
     _render_payload({"margin_of_safety": Decimal("0.255")}, lines, "USD")
     assert lines == ["- **Margen de seguridad**: 25,5 %"]
+
+
+def test_memo_humanizes_structured_company_and_rating_without_rewriting_sources():
+    from app.services.work_product_service import _render_payload
+    lines = []
+    _render_payload({"sector": "Information Technology", "company_type": "research_candidate",
+                     "rating": "expensive", "current_price": 343.46,
+                     "executive_summary": "Source says expensive in Information Technology."}, lines, "USD")
+    text = "\n".join(lines)
+    assert "**Sector**: Tecnología de la información" in text
+    assert "**Tipo de empresa**: Candidata de análisis" in text
+    assert "**Calificación**: Cara" in text
+    assert "$343.46" in text
+    assert "Source says expensive in Information Technology." in text
+    nested = []
+    _render_payload([{"company_type": "new_kind", "rating": "expensive"}], nested, "USD")
+    assert "new kind" in "".join(nested)
+    assert "Cara" in "".join(nested)
