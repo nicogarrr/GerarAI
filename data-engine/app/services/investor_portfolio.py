@@ -384,7 +384,7 @@ def _portfolio_13f(db: Session, slug: str) -> dict[str, Any]:
         "coverage": "ok" if complete else "partial",
         "note": None
         if complete
-        else "Cobertura parcial: el 13F no esta verificado como completo; pesos y total son SIN_DATOS.",
+        else "Cobertura parcial: el 13F no esta verificado como completo; pesos y total no disponibles (N/D).",
     }
 
 
@@ -511,7 +511,7 @@ def investor_portfolio(db: Session, slug: str) -> dict[str, Any] | None:
     coverage_note = (
         LIMITATIONS
         if inv.cik
-        else "Sin 13F: solo posiciones documentadas en 13D/Forms 3/4. El valor y el peso son SIN_DATOS "
+        else "Sin 13F: solo posiciones documentadas en 13D/Forms 3/4. El valor y el peso no están disponibles (N/D) "
         "mientras no haya valoracion con fuente; no es la cartera completa."
     )
     return {
