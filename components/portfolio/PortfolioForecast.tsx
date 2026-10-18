@@ -2,6 +2,7 @@ import type {
   PortfolioForecast,
   PortfolioForecastExcluded,
 } from '@/lib/actions/portfolio.actions';
+import Link from 'next/link';
 import { Panel } from '@/components/ui/panel';
 
 const SCENARIO_LABELS: Record<string, string> = {
@@ -42,7 +43,13 @@ function ExcludedList({ items }: { items: PortfolioForecastExcluded[] }) {
       <ul className="mt-1 space-y-1 text-sm text-amber-100/80">
         {items.map((item) => (
           <li key={item.ticker}>
-            {item.ticker} —{' '}
+            <Link
+              href={`/research/${encodeURIComponent(item.ticker)}?view=thesis`}
+              className="font-medium text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+            >
+              {item.ticker}
+            </Link>{' '}
+            —{' '}
             {item.weight === null
               ? 'peso N/D (divisa sin conversión)'
               : `${pct(item.weight)} de la cartera`}
@@ -160,7 +167,14 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
             <tbody>
               {forecast.positions.map((item) => (
                 <tr className="border-b border-gray-900 text-gray-300" key={item.ticker}>
-                  <td className="py-2 pr-4 font-medium text-gray-100">{item.ticker}</td>
+                  <td className="py-2 pr-4 font-medium">
+                    <Link
+                      href={`/research/${encodeURIComponent(item.ticker)}?view=thesis`}
+                      className="text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+                    >
+                      {item.ticker}
+                    </Link>
+                  </td>
                   <td className="py-2 pr-4">
                     {pct(item.weight)}
                     {item.weight_scope === 'valued_subset' ? (

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, TrendingUp, CircleDollarSign, Coins, Percent } from 'lucide-react';
 import { formatNumber, formatPercent } from '@/lib/format';
@@ -28,8 +29,11 @@ export default function PortfolioScores({ scores }: PortfolioScoresProps) {
 
     return (
         <Card className="bg-gray-800/50 border-gray-700">
-            <CardHeader className="pb-2">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-lg text-gray-100">Indicadores históricos</CardTitle>
+                <Link href="/metodologia" className="inline-flex min-h-[44px] items-center text-sm text-purple-300 underline-offset-2 hover:text-purple-200 hover:underline">
+                    Metodología
+                </Link>
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
