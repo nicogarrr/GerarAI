@@ -50,6 +50,17 @@ export async function previewTaxFiling(fiscalYear: number, tmePercent: number): 
     });
 }
 
+export type TaxCustodyEntity = {
+    name: string;
+    nif: string;
+    street: string;
+    city: string;
+    zip: string;
+    country: string;
+    complement: string;
+    region: string;
+};
+
 export type TaxDeclarant = {
     nif: string;
     apellidos_nombre: string;
@@ -57,11 +68,17 @@ export type TaxDeclarant = {
     telefono: string;
     filed_720_before: boolean | null;
     custody: Record<string, string>;
+    custody_entities: Record<string, TaxCustodyEntity>;
+    first_acquisition_dates: Record<string, string>;
     partidas: string[];
 };
 
-export type TaxDeclarantInput = Partial<Omit<TaxDeclarant, 'partidas' | 'custody'>> & {
+export type TaxDeclarantInput = Partial<
+    Omit<TaxDeclarant, 'partidas' | 'custody' | 'custody_entities' | 'first_acquisition_dates'>
+> & {
     custody?: Record<string, string | null>;
+    custody_entities?: Record<string, Partial<TaxCustodyEntity> | null>;
+    first_acquisition_dates?: Record<string, string | null>;
 };
 
 /** GET /api/taxes/declarant — datos del declarante y partidas a las que asignar custodia */

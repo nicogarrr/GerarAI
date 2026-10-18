@@ -2345,6 +2345,37 @@
             ],
             "title": "Custody"
           },
+          "custody_entities": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custody Entities"
+          },
           "filed_720_before": {
             "anyOf": [
               {
@@ -2355,6 +2386,27 @@
               }
             ],
             "title": "Filed 720 Before"
+          },
+          "first_acquisition_dates": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Acquisition Dates"
           },
           "nif": {
             "anyOf": [

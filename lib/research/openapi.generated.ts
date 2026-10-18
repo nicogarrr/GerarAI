@@ -5253,8 +5253,18 @@ export interface components {
             custody?: {
                 [key: string]: string | null;
             } | null;
+            /** Custody Entities */
+            custody_entities?: {
+                [key: string]: {
+                    [key: string]: string | null;
+                } | null;
+            } | null;
             /** Filed 720 Before */
             filed_720_before?: boolean | null;
+            /** First Acquisition Dates */
+            first_acquisition_dates?: {
+                [key: string]: string | null;
+            } | null;
             /** Nif */
             nif?: string | null;
             /** Numero Declaracion */

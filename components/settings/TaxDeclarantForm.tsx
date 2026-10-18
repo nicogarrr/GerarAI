@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { saveTaxDeclarant, type TaxDeclarant } from '@/lib/actions/taxes.actions';
+import { saveTaxDeclarant, type TaxCustodyEntity, type TaxDeclarant } from '@/lib/actions/taxes.actions';
 import { showErrorToast } from '@/lib/toast';
 
 const FIELDS = [
@@ -20,6 +20,20 @@ const FILED = [
     { value: 'false', label: 'No' },
 ] as const;
 
+const ENTITY_FIELDS: { key: keyof TaxCustodyEntity; label: string }[] = [
+    { key: 'name', label: 'Entidad depositaria' },
+    { key: 'nif', label: 'NIF de la entidad' },
+    { key: 'street', label: 'Domicilio' },
+    { key: 'complement', label: 'Complemento' },
+    { key: 'city', label: 'Ciudad' },
+    { key: 'region', label: 'Región' },
+    { key: 'zip', label: 'Código postal' },
+    { key: 'country', label: 'País (ISO)' },
+];
+
+const EMPTY_ENTITY: TaxCustodyEntity = { name: '', nif: '', street: '', city: '', zip: '', country: '', complement: '', region: '' };
+const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
+
 function partidaLabel(key: string): string {
     return key.startsWith('cash:') ? `Cuenta ${key.slice(5)}` : key;
 }
@@ -33,6 +47,8 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
     });
     const [filed, setFiled] = useState(initial.filed_720_before === null ? '' : String(initial.filed_720_before));
     const [custody, setCustody] = useState<Record<string, string>>(initial.custody);
+    const [entities, setEntities] = useState<Record<string, TaxCustodyEntity>>(initial.custody_entities);
+    const [dates, setDates] = useState<Record<string, string>>(initial.first_acquisition_dates);
     const [busy, setBusy] = useState(false);
 
     async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -43,6 +59,10 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                 ...values,
                 filed_720_before: filed === '' ? null : filed === 'true',
                 custody: Object.fromEntries(initial.partidas.map((key) => [key, (custody[key] ?? '').trim() || null])),
+                custody_entities: Object.fromEntries(initial.partidas.map((key) => [key, entities[key] ?? null])),
+                first_acquisition_dates: Object.fromEntries(
+                    initial.partidas.filter((key) => ISIN.test(key)).map((key) => [key, dates[key] || null]),
+                ),
             });
             setValues({
                 apellidos_nombre: saved.apellidos_nombre,
@@ -51,6 +71,8 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                 telefono: saved.telefono,
             });
             setCustody(saved.custody);
+            setEntities(saved.custody_entities);
+            setDates(saved.first_acquisition_dates);
             toast.success('Datos guardados');
         } catch (cause) {
             showErrorToast(cause);
@@ -87,21 +109,55 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
             </div>
             {initial.partidas.length ? (
                 <fieldset className="space-y-2">
-                    <legend className="text-sm font-medium text-gray-200">País de custodia por partida (ISO, ej. IE, US, ES)</legend>
-                    <div className="grid gap-3 md:grid-cols-2">
-                        {initial.partidas.map((key) => (
-                            <label className="flex items-center justify-between gap-3 rounded-md border border-gray-800 p-3 text-sm text-gray-300" key={key}>
-                                <span className="min-w-0 break-words">{partidaLabel(key)}</span>
-                                <Input
-                                    aria-label={`País de custodia de ${partidaLabel(key)}`}
-                                    className="w-20 uppercase"
-                                    disabled={busy}
-                                    maxLength={2}
-                                    onChange={(event) => setCustody((current) => ({ ...current, [key]: event.target.value }))}
-                                    value={custody[key] ?? ''}
-                                />
-                            </label>
-                        ))}
+                    <legend className="text-sm font-medium text-gray-200">Custodia por partida</legend>
+                    <div className="space-y-3">
+                        {initial.partidas.map((key) => {
+                            const entity = entities[key] ?? EMPTY_ENTITY;
+                            return (
+                                <div className="rounded-md border border-gray-800 p-3 text-sm text-gray-300" key={key}>
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <span className="min-w-0 break-words font-medium">{partidaLabel(key)}</span>
+                                        <Input
+                                            aria-label={`País de custodia de ${partidaLabel(key)}`}
+                                            className="w-20 uppercase"
+                                            disabled={busy}
+                                            maxLength={2}
+                                            onChange={(event) => setCustody((current) => ({ ...current, [key]: event.target.value }))}
+                                            value={custody[key] ?? ''}
+                                        />
+                                    </div>
+                                    <details className="mt-3">
+                                        <summary className="min-h-10 cursor-pointer py-2 text-teal-300">Entidad depositaria y fecha</summary>
+                                        <div className="mt-2 grid gap-3 md:grid-cols-2">
+                                            {ISIN.test(key) ? (
+                                                <label className="space-y-1">
+                                                    <span>Primera adquisición</span>
+                                                    <Input
+                                                        disabled={busy}
+                                                        onChange={(event) => setDates((current) => ({ ...current, [key]: event.target.value }))}
+                                                        type="date"
+                                                        value={dates[key] ?? ''}
+                                                    />
+                                                </label>
+                                            ) : null}
+                                            {ENTITY_FIELDS.map((field) => (
+                                                <label className="space-y-1" key={field.key}>
+                                                    <span>{field.label}</span>
+                                                    <Input
+                                                        disabled={busy}
+                                                        onChange={(event) => setEntities((current) => ({
+                                                            ...current,
+                                                            [key]: { ...(current[key] ?? EMPTY_ENTITY), [field.key]: event.target.value },
+                                                        }))}
+                                                        value={entity[field.key]}
+                                                    />
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </details>
+                                </div>
+                            );
+                        })}
                     </div>
                 </fieldset>
             ) : null}
