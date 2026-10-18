@@ -23,12 +23,17 @@ async function getHandler(
     method: 'GET',
     path: `/api/thesis/${encodeURIComponent(ticker.toUpperCase())}/memo.md`,
   });
+  // published=1: la descarga es siempre la ultima version PUBLICADA. Un
+  // borrador no enseña cifras ni margen (regla vigente de la app).
   const upstream = await fetch(
-    `${BACKEND_URL}/api/thesis/${encodeURIComponent(ticker.toUpperCase())}/memo.md`,
+    `${BACKEND_URL}/api/thesis/${encodeURIComponent(ticker.toUpperCase())}/memo.md?published=1`,
     { headers: identity, cache: 'no-store' },
   );
   if (!upstream.ok) {
-    return NextResponse.json({ error: 'Memo no disponible' }, { status: upstream.status });
+    return NextResponse.json(
+      { error: upstream.status === 404 ? 'Aún no hay ninguna tesis publicada de este ticker' : 'Memo no disponible' },
+      { status: upstream.status },
+    );
   }
   const body = await upstream.text();
   const disposition =

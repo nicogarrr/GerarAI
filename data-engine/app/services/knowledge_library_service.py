@@ -56,6 +56,7 @@ KNOWLEDGE_DOCUMENT_TYPES = {
     "sector_report",
     "personal_note",
     "third_party_thesis",
+    "own_thesis",
     "historical_case",
     "personal_postmortem",
 }

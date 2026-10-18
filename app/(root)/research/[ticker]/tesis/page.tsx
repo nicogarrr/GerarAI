@@ -1,0 +1,228 @@
+import Link from 'next/link';
+import { ArrowLeft, FileDown, FileText } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { formatGeneratedDate, formatPercent } from '@/lib/format';
+import {
+  getResearchCompanySnapshot,
+  getResearchThesisWorkspace,
+} from '@/lib/actions/research.actions';
+import { thesisMoney } from '@/lib/research/thesis-number-format';
+import { cleanThesisText } from '@/lib/research/thesis-text';
+import { isValidCurrencyCode } from '@/lib/format';
+import PrintButton from '@/components/research/PrintButton';
+import { publicEditorial } from '@/lib/public-fonts';
+
+export const dynamic = 'force-dynamic';
+
+type PageProps = { params: Promise<{ ticker: string }> };
+
+const RATING_LABELS: Record<string, string> = {
+  buy: 'compra', accumulate: 'acumular', overweight: 'sobreponderar',
+  hold: 'mantener', underweight: 'infraponderar', trim: 'recortar',
+  sell: 'venta', avoid: 'evitar', watch: 'seguimiento',
+  attractive: 'atractiva', expensive: 'cara',
+  incomplete_price: 'precio incompleto', blocked: 'bloqueada',
+  insufficient_data: 'datos insuficientes',
+};
+
+function money(value: string | null, currency: string | null | undefined): string {
+  if (value === null) return 'N/D';
+  const parsed = Number(value);
+  if (Number.isNaN(parsed) || !isValidCurrencyCode(currency)) return 'N/D';
+  return thesisMoney(parsed, currency);
+}
+
+/**
+ * Vista de lectura de la tesis PUBLICADA: documento limpio, imprimible y
+ * descargable (PDF/Markdown). Solo lo que contiene la version publicada;
+ * un borrador mas reciente se anuncia sin cifras ni margen (regla vigente).
+ */
+export default async function ThesisReadingPage({ params }: PageProps) {
+  const { ticker: rawTicker } = await params;
+  const ticker = rawTicker.toUpperCase();
+
+  const [snapshot, workspace] = await Promise.all([
+    getResearchCompanySnapshot(ticker).catch(() => null),
+    getResearchThesisWorkspace(ticker).catch(() => null),
+  ]);
+  const company = snapshot?.company ?? null;
+  const currency = company?.currency ?? null;
+  const latest = workspace?.thesis ?? null;
+  const published = workspace ? await readLatestPublished(ticker) : null;
+
+  const encoded = encodeURIComponent(ticker);
+  const name = company?.name ?? ticker;
+  const generated = published ? formatGeneratedDate(published.created_at) : null;
+
+  return (
+    <main id="content" className={`print-document min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8 ${publicEditorial.variable}`}>
+      <div className="mx-auto max-w-3xl">
+        <div className="print:hidden flex flex-wrap items-center gap-3">
+          <Link
+            href={`/research/${encoded}?view=thesis`}
+            className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />Ficha de {ticker}
+          </Link>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <PrintButton />
+            <a
+              href={`/api/thesis/${encoded}/pdf`}
+              download
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-teal-700 hover:text-teal-200 sm:min-h-0"
+            >
+              <FileDown className="h-4 w-4" />PDF
+            </a>
+            <a
+              href={`/api/thesis-memo/${encoded}`}
+              download
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-teal-700 hover:text-teal-200 sm:min-h-0"
+            >
+              <FileText className="h-4 w-4" />Markdown
+            </a>
+          </div>
+        </div>
+
+        {!published ? (
+          <div className="mt-10">
+            <EmptyState
+              title={`Aún no hay ninguna tesis publicada de ${ticker}.`}
+              description={latest ? `La v${latest.version} está en estado «${latest.status}»: un borrador no enseña cifras ni margen hasta que se aprueba.` : undefined}
+            />
+          </div>
+        ) : (
+          <article className="mt-8 space-y-8">
+            <header className="border-b border-gray-800 pb-6">
+              <p className="text-xs uppercase tracking-wide text-gray-500">Tesis de inversión</p>
+              <h1 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="mt-2 text-3xl text-gray-50 sm:text-4xl">
+                {ticker} · {name}
+              </h1>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge>{RATING_LABELS[published.rating] ?? published.rating}</Badge>
+                <Badge variant="outline">v{published.version}</Badge>
+                {generated ? <span className="text-xs text-gray-500">generada el {generated}</span> : null}
+              </div>
+              {latest && latest.version !== published.version ? (
+                <p className="mt-3 text-xs text-amber-300">
+                  Existe una v{latest.version} en borrador pendiente de aprobación; sus cifras no se muestran hasta publicarse.
+                </p>
+              ) : null}
+            </header>
+
+            {published.executive_summary ? (
+              <section>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Resumen ejecutivo</h2>
+                <p className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(published.executive_summary)}</p>
+              </section>
+            ) : null}
+
+            {published.hypothesis ? (
+              <section>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Hipótesis</h2>
+                <p className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(published.hypothesis)}</p>
+              </section>
+            ) : null}
+
+            <section>
+              <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Escenarios y valoración</h2>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700 text-left text-xs uppercase text-gray-500">
+                      <th className="py-2 pr-4">Escenario</th>
+                      <th className="py-2 pr-4">Valor</th>
+                      <th className="py-2">Probabilidad</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-200">
+                    {([
+                      ['Bajista', published.bear_value, published.scenario_probabilities?.bear],
+                      ['Base', published.base_value, published.scenario_probabilities?.base],
+                      ['Alcista', published.bull_value, published.scenario_probabilities?.bull],
+                    ] as const).map(([label, value, probability]) => (
+                      <tr key={label} className="border-b border-gray-800/70">
+                        <td className="py-2 pr-4 text-gray-400">{label}</td>
+                        <td className="py-2 pr-4 font-medium">{money(value, currency)}</td>
+                        <td className="py-2">{typeof probability === 'number' ? formatPercent(probability, { digits: 0 }) : 'N/D'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-sm text-gray-400">
+                Precio actual: {money(published.current_price, currency)} · Valor esperado: {money(published.expected_value, currency)}
+                {published.margin_of_safety !== null
+                  ? ` · Margen de seguridad: ${formatPercent(Number(published.margin_of_safety))}`
+                  : ''}
+              </p>
+            </section>
+
+            {(published.narrative_sections ?? []).map((section) => (
+              <section key={section.titulo}>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">{section.titulo}</h2>
+                {section.parrafos.map((parrafo, index) => (
+                  <p key={index} className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(parrafo)}</p>
+                ))}
+              </section>
+            ))}
+
+            {(published.catalysts ?? []).length > 0 ? (
+              <section>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Catalizadores</h2>
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200">
+                  {(published.catalysts ?? []).map((catalyst, index) => (
+                    <li key={index}>
+                      {catalyst.label ?? 'Catalizador'}{catalyst.date ? ` (${catalyst.date})` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {(published.invalidation_criteria ?? []).length > 0 ? (
+              <section>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Qué invalidaría la tesis</h2>
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200">
+                  {(published.invalidation_criteria ?? []).map((criterion, index) => (
+                    <li key={index}>{criterion}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <footer className="border-t border-gray-800 pt-4 text-xs leading-6 text-gray-500">
+              <p>
+                Calidad de la evidencia: confianza de datos {published.data_confidence_score}/100 ·
+                cobertura de fuentes {published.source_coverage_score}/100 · red-team {published.red_team_score}/100.
+              </p>
+              <p className="mt-2">
+                Documento informativo de investigación. No es asesoramiento financiero ni recomendación de compra o venta.
+              </p>
+            </footer>
+          </article>
+        )}
+      </div>
+    </main>
+  );
+}
+
+/** La publicada con contenido completo: /versions trae cada version entera. */
+async function readLatestPublished(ticker: string) {
+  const { researchRequest } = await import('@/lib/research/client');
+  type Version = NonNullable<Awaited<ReturnType<typeof getResearchThesisWorkspace>>['thesis']>;
+  let versions: Version[] = [];
+  try {
+    versions = await researchRequest<Version[]>(
+      `/api/thesis/${encodeURIComponent(ticker)}/versions`,
+      { timeoutMs: 12_000 },
+    );
+  } catch {
+    versions = [];
+  }
+  const published = versions
+    .filter((version) => version.status === 'published')
+    .sort((a, b) => b.version - a.version)[0];
+  return published ?? null;
+}

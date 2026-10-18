@@ -433,3 +433,22 @@
     background-color: rgba(113, 113, 122, 0.7);
     border-radius: 4px;
 }
+
+/* Vista de lectura de la tesis (/research/[ticker]/tesis): impresion limpia
+   en papel claro y sin el chrome de la app (sidebar, header, navegacion). */
+@media print {
+  body:has(.print-document) :is(header, nav, aside) {
+    display: none !important;
+  }
+  body:has(.print-document) main {
+    padding: 0 !important;
+  }
+  .print-document,
+  .print-document * {
+    background: transparent !important;
+    color: #111111 !important;
+    border-color: #cccccc !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}

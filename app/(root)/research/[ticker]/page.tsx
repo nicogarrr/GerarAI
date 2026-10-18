@@ -1141,6 +1141,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             El historial muestra estado, fecha y resumen del cambio tal como están persistidos; el sistema no registra quién aprobó cada versión.
           </p>
         </Panel>
+        <div id="tesis-actual" style={{ scrollMarginTop: '5rem' }}>
         <Panel title="Tesis actual">
           {data.thesis ? (
             <ThesisMemo
@@ -1159,6 +1160,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             />
           )}
         </Panel>
+        </div>
         <ThesisScenariosPanel adrRatio={data.thesis?.valuation_basis?.adr_ratio} currency={company.currency} data={data.scenarios} />
         <Panel title="Secciones de tesis específicas de la empresa" collapsible="mobile">
           {data.sections.length ? (

@@ -4301,6 +4301,10 @@ export interface paths {
         /**
          * Thesis Memo
          * @description Memo Markdown descargable de la ultima tesis persistida.
+         *
+         *     Con ``published=1`` la version es la ultima PUBLICADA (regla vigente: un
+         *     borrador no enseña cifras ni margen); sin el parametro se conserva el
+         *     comportamiento historico (ultima version, sea cual sea su estado).
          */
         get: operations["thesis_memo_api_thesis__ticker__memo_md_get"];
         put?: never;
@@ -18139,7 +18143,9 @@ export interface operations {
     };
     thesis_memo_api_thesis__ticker__memo_md_get: {
         parameters: {
-            query?: never;
+            query?: {
+                published?: boolean;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;
