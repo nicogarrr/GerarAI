@@ -26,6 +26,7 @@ from app.services.claim_scope import supersede_claims_of
 from app.services.company_resolver import resolve_company
 from app.services.inferred_input_service import validate as validate_inferred
 from app.services.long_term_model_service import LongTermModelService
+from app.services.memo_text_es import number_es, term_es
 from app.services.number_format import format_compact_es
 from app.services.source_auditor import SourceAuditor
 from app.services.source_hierarchy_service import classify_source
@@ -1088,8 +1089,8 @@ class ThesisService:
         ]
         for metric, fact in facts.items():
             rows.append(
-                f"| {metric} | {fact.value} | {fact.unit} | {fact.period} | "
-                f"{fact.source_type} #{fact.source_id or 'n/a'} |"
+                f"| {term_es(metric)} | {number_es(fact.value)} | {fact.unit} | {fact.period} | "
+                f"{term_es(fact.source_type)} #{fact.source_id or 's/d'} |"
             )
         return "\n".join(rows)
 
@@ -1098,7 +1099,7 @@ class ThesisService:
             missing = "\n".join(f"- {item}" for item in (valuation.get("missing_inputs") or []))
             return (
                 "**SIN VALORACIÓN — datos insuficientes**\n\n"
-                f"Motor: `{(valuation.get('trace') or {}).get('engine', 'unknown')}`\n\n"
+                f"Motor: {term_es((valuation.get('trace') or {}).get('engine', 'unknown'))}\n\n"
                 f"Faltan:\n{missing or '- inputs requeridos'}\n\n"
                 "GerarAI no publica un valor justo a partir de supuestos de arranque."
             )
@@ -1117,7 +1118,7 @@ class ThesisService:
             )
             return (
                 "**RANGO INDICATIVO PARCIAL — no es un valor justo final**\n\n"
-                f"Motor: `{trace.get('engine', 'unknown')}` "
+                f"Motor: {term_es(trace.get('engine', 'unknown'))} "
                 f"(base: `{trace.get('valuation_basis', 'indicative_assumptions')}`).\n\n"
                 f"{self._range_lines(valuation)}\n\n"
                 f"Supuestos documentados (NO son datos reportados): {supuestos}.\n\n"
@@ -1130,8 +1131,8 @@ class ThesisService:
             [
                 f"- Estado: `{valuation.get('status')}` publicable={valuation.get('publishable')}",
                 *self._range_lines(valuation).split("\n"),
-                f"- Fuente de inputs: {(valuation.get('trace') or {}).get('input_source', 'unknown')}",
-                f"- Motor: {(valuation.get('trace') or {}).get('engine', 'unknown')}",
+                f"- Fuente de inputs: {term_es((valuation.get('trace') or {}).get('input_source', 'unknown'))}",
+                f"- Motor: {term_es((valuation.get('trace') or {}).get('engine', 'unknown'))}",
             ]
         )
 
@@ -1294,12 +1295,13 @@ class ThesisService:
         ]
         for item in items:
             value = item.get("value")
-            value_txt = "n/a" if value is None else f"{float(value):.4g}"
+            value_txt = "s/d" if value is None else number_es(f"{float(value):.4g}")
             facts = item.get("source_fact_ids") or []
-            citation = f"facts: {', '.join(str(f) for f in facts)}" if facts else "-"
+            ids = ", ".join(str(f) for f in facts)
+            citation = (f"{len(facts)} hecho citado ({ids})" if len(facts) == 1 else f"{len(facts)} hechos citados ({ids})") if facts else "-"
             method = (item.get("method") or "-").replace("|", "/")
             lines.append(
-                f"| {item.get('key')} | {item.get('label')} | {value_txt} | {method} | {citation} |"
+                f"| {term_es(item.get('key'))} | {item.get('label')} | {value_txt} | {method} | {citation} |"
             )
         return "\n".join(lines)
 
@@ -1464,9 +1466,9 @@ class ThesisService:
         return f"""# Tesis de {company.ticker} — v{version}
 
 ## 1. Resumen ejecutivo
-{company.name} se sigue como `{company.company_type}` con el modelo `{company.valuation_model}`.
-Fuente de los inputs de valoración: `{(valuation.get("trace") or {}).get("input_source", "unknown")}`.
-Motor: `{(valuation.get("trace") or {}).get("engine", "unknown")}`.
+{company.name} se sigue como {term_es(company.company_type)} con el modelo {term_es(company.valuation_model)}.
+Fuente de los inputs de valoración: {term_es((valuation.get("trace") or {}).get("input_source", "unknown"))}.
+Motor: {term_es((valuation.get("trace") or {}).get("engine", "unknown"))}.
 
 ## 2. Hipótesis
 {hypothesis}
@@ -1474,7 +1476,7 @@ La pregunta invertible es si la evidencia respalda los supuestos detrás del mod
 
 ## 3. Modelo de negocio
 Sector: {company.sector}. Industria: {company.industry}.
-Marco específico de la empresa: `{framework.get("key", "unknown")}`. Pregunta primaria: {framework.get("primary_question", "unknown")}.
+Marco específico de la empresa: {term_es(framework.get("key", "unknown"))}. Pregunta primaria: {str(framework.get("primary_question") or "desconocida").rstrip(" .?!")}.
 Drivers obligatorios ausentes: {", ".join(mandatory_missing) if mandatory_missing else "ninguno"}.
 
 ## 4. Últimos resultados
