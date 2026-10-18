@@ -1705,6 +1705,25 @@ def freeze_propicks_snapshot(
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000)
+def ingest_spy_daily(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Ingesta diaria de la serie SPY (Yahoo, gratis) en benchmark_prices."""
+    from app.services.propicks_track_record_service import ingest_spy_prices
+
+    db = _session(tenant_id, user_id)
+    try:
+        result = ingest_spy_prices(db)
+        return {"actor": "ingest_spy_daily", **result}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("ingest_spy_daily", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000)
 def sync_official_closes(
     tenant_id: int | None = None,

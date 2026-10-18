@@ -180,6 +180,17 @@ def freeze_snapshot(db: Session = Depends(get_db)) -> dict:
     return {"month": row.month, "as_of": row.as_of, "passed_count": row.passed_count}
 
 
+@router.get("/track-record")
+def track_record(db: Session = Depends(get_db)) -> dict:
+    """Ganadores anteriores: track record vivo desde los snapshots mensuales.
+
+    Cada cifra lleva su fecha; sin agregados anuales ni compuestos mientras
+    el historial sea corto."""
+    from app.services.propicks_track_record_service import build_track_record
+
+    return build_track_record(db)
+
+
 @router.get("/snapshots")
 def list_snapshots(db: Session = Depends(get_db)) -> list[dict]:
     from app.models.propick_snapshot import PropickSnapshot
