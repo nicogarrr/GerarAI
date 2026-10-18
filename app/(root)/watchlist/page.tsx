@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { formatMarketCapUsd, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
+import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 import { getWatchlistState, getWatchlistEntryData } from '@/lib/actions/watchlist.actions';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -199,7 +199,7 @@ export default async function WatchlistPage({
                                         <dt className="text-[11px] text-gray-500">Precio</dt>
                                         <dd className="truncate font-mono text-sm font-medium text-gray-200">{formatPriceCell(stock.price, stock.currency)}</dd>
                                         {stock.priceKind === 'close' ? (
-                                            <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${stock.priceAsOf}` : 'Cierre sin fecha de la fuente'}</dd>
+                                            <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</dd>
                                         ) : null}
                                     </div>
                                     <div className="min-w-0">
@@ -276,7 +276,7 @@ export default async function WatchlistPage({
                                         <TableCell className="text-right font-mono font-medium text-gray-200">
                                             {formatPriceCell(stock.price, stock.currency)}
                                             {stock.priceKind === 'close' ? (
-                                                <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? `Cierre ${stock.priceAsOf}` : 'Cierre sin fecha de la fuente'}</div>
+                                                <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</div>
                                             ) : null}
                                         </TableCell>
                                         <TableCell className="text-right">
