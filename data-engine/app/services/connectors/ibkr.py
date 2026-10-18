@@ -87,13 +87,23 @@ class IBKRFlexClient:
             return None, None, None
         return root.findtext(".//Status"), root.findtext(".//ErrorCode"), root.findtext(".//ErrorMessage")
 
-    async def request_statement(self) -> str:
+    async def request_statement(self, from_date: str | None = None, to_date: str | None = None) -> str:
+        """``from_date``/``to_date`` (yyyyMMdd) sustituyen el periodo de la query.
+
+        IBKR exige ambas, un rango de como mucho 366 dias y un ``to_date`` ya cerrado
+        (dia habil pasado); sin ellas la query devuelve su periodo por defecto.
+        """
         self._require_config()
         params = {
             "t": self.settings.ibkr_flex_token,
             "q": self.settings.ibkr_flex_query_id,
             "v": "3",
         }
+        if from_date or to_date:
+            if not (from_date and to_date):
+                raise IBKRFlexError("IBKR Flex range needs both from_date and to_date")
+            params["fd"] = from_date
+            params["td"] = to_date
         text = await self._get(self.send_url, params, 30)
         status, code, message = self._status(text)
         if status != "Success":
@@ -120,6 +130,10 @@ class IBKRFlexClient:
             if attempt + 1 < self.poll_attempts:
                 await asyncio.sleep(self.poll_delay_seconds)
         raise IBKRFlexError(f"IBKR Flex statement not ready ({last})")
+
+    async def fetch_range_xml(self, from_date: str, to_date: str) -> str:
+        reference_code = await self.request_statement(from_date, to_date)
+        return await self.fetch_statement(reference_code)
 
     async def fetch_latest_xml(self) -> str:
         reference_code = await self.request_statement()
