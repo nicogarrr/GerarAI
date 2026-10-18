@@ -86,7 +86,7 @@ def mark_credit_exhausted() -> None:
                              if mode == "instructor" else
                              "JEV está desactivado; se usa el flujo habitual sin sus etiquetas."),
                     fingerprint=f"typesafe_credit_exhausted:{tenant_id}",
-                    channels=["in_app"], metadata_={"changed_at": now.isoformat()},
+                    channels=["in_app"], metadata_={"changed_at": now.isoformat(), "audience": "internal_ops"},
                 )
                 tenant_db.add(alert)
                 tenant_db.flush()

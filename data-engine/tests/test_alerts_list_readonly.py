@@ -442,3 +442,25 @@ def test_legacy_novo_headline_is_not_presented_as_nvidia_alert(db):
     assert [row.title for row in out] == ['NVIDIA unveils new chip']
     assert db.query(ResearchAlert).count() == 2  # No destructive cleanup from a GET.
     assert not db.dirty
+
+
+@pytest.mark.parametrize("status,include_snoozed", [(None, False), ("open", False), (None, True)])
+def test_product_feed_omits_ops_before_limit_preserving_daily_digest(db, status, include_snoozed):
+    from sqlalchemy import func
+    now = datetime.now(UTC)
+    for kind, title, metadata, stamp in [
+        ("daily_digest", "Resumen de cartera", {}, now - timedelta(hours=1)),
+        ("typesafe_credit_exhausted", "Legacy ops", {}, now),
+        ("provider_incident", "Marked ops", {"audience":"internal_ops"}, now),
+    ]:
+        db.add(ResearchAlert(company_id=None, alert_type=kind, title=title,
+                             message="m", fingerprint=kind, severity="high", status="open",
+                             channels=["in_app"], metadata_=metadata, last_triggered_at=stamp))
+    db.commit()
+    before = db.scalar(select(func.count()).select_from(ResearchAlert))
+    result = list_alerts(ticker=None, status=status, include_snoozed=include_snoozed, limit=1, db=db)
+    assert [item.title for item in result] == ["Resumen de cartera"]
+    assert result[0].ticker is None
+    # Read-only projection: operations history remains for internal diagnosis.
+    assert db.scalar(select(func.count()).select_from(ResearchAlert)) == before == 3
+    assert not db.dirty
