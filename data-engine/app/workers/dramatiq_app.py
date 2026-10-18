@@ -859,8 +859,10 @@ def extract_knowledge_principles(
     except Exception as exc:
         _rollback(db)
         if job is not None:
+            from app.services.knowledge_library_service import extraction_error_message
+
             job.status = "failed"
-            job.error = f"{type(exc).__name__}: {exc}"
+            job.error = extraction_error_message(exc)
             job.completed_at = datetime.now(UTC)
             db.commit()
         return _handle_actor_error(
