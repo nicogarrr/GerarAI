@@ -295,6 +295,15 @@ def test_valuation_question_uses_published_thesis_figures_and_flags_newer_draft(
     db.commit()
     r = AssistantResponse.model_validate(answer(db, AssistantRequest(
         mode="explore", ticker="ASTS", question="¿Cómo va la valoración y la tesis?")))
-    assert "base 120,50" in r.answer and "12,3 %" in r.answer and "v10 publicada" in r.answer
+    assert "base $120.50" in r.answer and "12,3 %" in r.answer and "v10 publicada" in r.answer
     assert "borrador sin publicar" in r.answer
     assert "999" not in r.answer and "50,0" not in r.answer
+
+
+def test_thesis_money_format_usd_en_us_other_es_es():
+    from decimal import Decimal
+
+    from app.services.research_assistant_service import _money
+
+    assert _money(Decimal("1234.5"), "USD") == "$1,234.50"
+    assert _money(Decimal("1234.5"), "EUR") == "1.234,50 EUR"

@@ -262,7 +262,11 @@ def _evidence(db: Session, company: Company, tenant_id: int, question: str) -> l
 
 
 def _money(value, currency: str | None) -> str:
-    text = f"{float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    """USD en formato en-US ($120.50); el resto de divisas, es-ES con su código."""
+    amount = float(value)
+    if currency == "USD":
+        return f"${amount:,.2f}"
+    text = f"{amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{text} {currency or ''}".strip()
 
 
