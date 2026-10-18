@@ -254,6 +254,7 @@ def _natural_company_answer(
     price_line: str | None,
     memory_notes: list[str] | None = None,
     market_cap_fact: FinancialFact | None = None,
+    question: str = "",
 ) -> str:
     """Respuesta visible: prosa natural en castellano.
 
@@ -263,6 +264,7 @@ def _natural_company_answer(
     queda plegado.
     """
     parts: list[str] = []
+    thesis_line: str | None = None
     if price_line:
         parts.append(price_line)
     if market_cap_fact is not None and market_cap_fact.value is not None:
@@ -272,6 +274,9 @@ def _natural_company_answer(
             f"({_fmt_period_es(market_cap_fact.period, market_cap_fact.fiscal_year, market_cap_fact.fiscal_quarter)}, "
             f"{market_cap_fact.source_type or 'fuente almacenada'})."
         )
+    focus_metrics = _question_metrics(question)
+    if focus_metrics:
+        facts = sorted(facts, key=lambda f: f.metric not in focus_metrics)
     if facts:
         rendered = "; ".join(
             f"{_METRIC_LABELS_ES.get(fact.metric, fact.metric)} "
@@ -295,10 +300,11 @@ def _natural_company_answer(
             detalles.append(f"estado {estado}")
         if rating_es:
             detalles.append(f"rating {rating_es}")
-        parts.append(
+        thesis_line = (
             f"Tengo guardada la tesis v{thesis.version}"
             + (f" ({', '.join(detalles)})." if detalles else ".")
         )
+        parts.append(thesis_line)
     seen_notes: set[str] = set()
     for content in (memory_notes or [])[:3]:
         note = _short(content, 180)
@@ -337,7 +343,82 @@ def _natural_company_answer(
     if missing_metrics:
         labels = ", ".join(_METRIC_LABELS_ES.get(m, m) for m in missing_metrics)
         parts.append(f"Aun faltan datos almacenados de: {labels}.")
+    lead = _answer_lead(
+        question, company=company, facts=facts, thesis=thesis, thesis_line=thesis_line,
+        news=news, claims=claims, contradiction_claims=contradiction_claims,
+        price_line=price_line, focus_metrics=focus_metrics,
+    )
+    if lead:
+        parts = [lead, *[p for p in parts if not lead.startswith(p)]]
     return "\n\n".join(parts)
+
+
+_METRIC_KEYWORDS = (
+    (r"ingres|ventas|factur", ("revenue",)),
+    (r"benefici|ganancia|resultado", ("net_income",)),
+    (r"flujo de caja|caja libre|\bfcf\b", ("free_cash_flow", "operating_cash_flow")),
+    (r"deuda", ("net_debt", "total_debt")),
+    (r"efectivo|liquidez|\bcaja\b", ("cash_and_equivalents",)),
+    (r"acciones diluidas|n[uú]mero de acciones", ("shares_diluted",)),
+    (r"capitalizaci|market cap", ("market_cap",)),
+)
+
+
+def _question_metrics(question: str) -> set[str]:
+    text = (question or "").lower()
+    found: set[str] = set()
+    for pattern, metrics in _METRIC_KEYWORDS:
+        if re.search(pattern, text):
+            found.update(metrics)
+    return found
+
+
+def _answer_lead(
+    question: str, *, company: Company, facts: list[FinancialFact], thesis: ThesisVersion | None,
+    thesis_line: str | None, news: list[NewsEvent], claims: list[Claim],
+    contradiction_claims: list[Claim], price_line: str | None, focus_metrics: set[str],
+) -> str | None:
+    """Primera frase que contesta lo preguntado con lo que hay guardado; nunca inventa.
+
+    Sin intención reconocida no hay lead y la respuesta queda como el resumen
+    habitual. Con intención reconocida y sin dato guardado, lo dice.
+    """
+    text = (question or "").lower()
+    if not text.strip():
+        return None
+    ticker = company.ticker
+    if re.search(r"riesgo", text):
+        bits = []
+        if contradiction_claims:
+            bits.append(f"{len(contradiction_claims)} afirmaciones contradichas o desactualizadas")
+        pending = sum(1 for c in claims if c.status == "unverified")
+        if pending:
+            bits.append(f"{pending} afirmaciones pendientes de verificar")
+        if thesis is not None and thesis.valuation_risk_score:
+            bits.append(f"riesgo de valoración {thesis.valuation_risk_score}/100 en la tesis v{thesis.version}")
+        if bits:
+            return f"Sobre los riesgos de {ticker}, lo guardado señala: " + "; ".join(bits) + "."
+        return f"No tengo riesgos documentados guardados de {ticker}."
+    if re.search(r"tesis|valoraci|margen de seguridad|rating", text):
+        if thesis is None or thesis_line is None:
+            return f"No tengo ninguna tesis guardada de {ticker}."
+        summary = " ".join((thesis.executive_summary or "").split())
+        return thesis_line + (f" Resumen: {_short(summary, 320)}" if summary else "")
+    if focus_metrics:
+        wanted = [f for f in facts if f.metric in focus_metrics]
+        if not wanted:
+            labels = ", ".join(sorted(_METRIC_LABELS_ES.get(m, m) for m in focus_metrics))
+            return f"No tengo guardado ese dato de {ticker} ({labels})."
+        f = wanted[0]
+        return (f"{_METRIC_LABELS_ES.get(f.metric, f.metric).capitalize()} de {ticker}: "
+                f"{_fmt_value_es(_decimal_to_float(f.value), f.unit)} "
+                f"({_fmt_period_es(f.period, f.fiscal_year, f.fiscal_quarter)}, {f.source_type or 'fuente almacenada'}).")
+    if re.search(r"precio|cotiza|cotizaci", text) and price_line:
+        return price_line
+    if re.search(r"noticia|titular|novedad", text) and not news:
+        return f"No tengo noticias guardadas de {ticker}."
+    return None
+
 
 _GENERATED_SUMMARY_RE = re.compile(r"^Generated from (.+?) source\.?$")
 
@@ -1496,6 +1577,7 @@ class ChatService:
                 price_line=price_line,
                 memory_notes=[item.item.content for item in retrieved_memory[:3]],
                 market_cap_fact=market_cap_fact,
+                question=question,
             )
 
             sections = [
