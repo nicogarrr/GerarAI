@@ -7,10 +7,12 @@ import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getMarketThemes } from '@/lib/actions/market-themes.actions';
 import { NA, formatMarketDate, formatPercent } from '@/lib/format';
 import {
+  constituentContribution,
+  constituentWeight,
   coverageLabel,
-  isHot,
   parseThemeOrder,
   sortThemes,
+  themeBadge,
   themeMetric,
   themeRank,
   themeTone,
@@ -43,6 +45,13 @@ function ThemeCard({ theme, order }: { theme: MarketTheme; order: ThemeOrder }) 
   const other = order === 'ytd' ? theme.m1 : theme.ytd;
   const tone = themeTone(main.pct);
   const rank = themeRank(theme, order);
+  const badge = themeBadge(theme, order);
+  const first = order === 'ytd' ? theme.ytd : theme.m1;
+  const firstLabel = order === 'ytd' ? 'YTD' : '1M';
+  const rows = [...theme.constituents].sort(
+    (x, y) =>
+      ((order === 'ytd' ? y.ytd : y.m1) ?? -Infinity) - ((order === 'ytd' ? x.ytd : x.m1) ?? -Infinity),
+  );
   const Arrow = tone === 'down' ? TrendingDown : TrendingUp;
   return (
     <li className={`rounded-xl border ${TONE_CARD[tone]}`}>
@@ -50,18 +59,19 @@ function ThemeCard({ theme, order }: { theme: MarketTheme; order: ThemeOrder }) 
         <summary className="flex min-h-11 cursor-pointer list-none flex-col gap-3 p-4 [&::-webkit-details-marker]:hidden">
           <div className="flex items-start justify-between gap-2">
             <p className="text-xs font-semibold text-gray-500">{rank === null ? NA : `#${rank}`}</p>
-            <span className="flex gap-1.5">
-              {theme.turn ? (
-                <span
-                  className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${theme.turn === 'sube' ? 'bg-teal-400/15 text-teal-300' : 'bg-red-400/15 text-red-300'}`}
-                >
-                  {theme.turn === 'sube' ? 'Giro al alza' : 'Giro a la baja'}
-                </span>
-              ) : null}
-              {isHot(theme, order) ? (
-                <span className="rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Caliente</span>
-              ) : null}
-            </span>
+            {badge ? (
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                  badge.kind === 'turn-up'
+                    ? 'bg-teal-400/15 text-teal-300'
+                    : badge.kind === 'turn-down'
+                      ? 'bg-red-400/15 text-red-300'
+                      : 'bg-red-500 text-white'
+                }`}
+              >
+                {badge.label}
+              </span>
+            ) : null}
           </div>
           <h2 className="text-sm font-semibold text-gray-100">{theme.name}</h2>
           {main.pct === null ? (
@@ -81,26 +91,40 @@ function ThemeCard({ theme, order }: { theme: MarketTheme; order: ThemeOrder }) 
         </summary>
         <div className="border-t border-gray-800 px-4 pb-4 pt-3">
           <table className="w-full text-left text-xs">
-            <caption className="sr-only">Valores de {theme.name}</caption>
+            <caption className="sr-only">Composición de {theme.name}</caption>
             <thead className="uppercase text-gray-500">
               <tr>
                 <th className="py-1 pr-2 font-medium" scope="col">Valor</th>
-                <th className="py-1 px-2 text-right font-medium" scope="col">YTD</th>
-                <th className="py-1 pl-2 text-right font-medium" scope="col">1M</th>
+                <th className="px-2 py-1 text-right font-medium" scope="col">Peso</th>
+                <th className="px-2 py-1 text-right font-medium" scope="col">{firstLabel}</th>
+                <th className="px-2 py-1 text-right font-medium" scope="col">Aporta</th>
+                <th className="py-1 pl-2 text-right font-medium" scope="col">{order === 'ytd' ? '1M' : 'YTD'}</th>
               </tr>
             </thead>
             <tbody>
-              {theme.constituents.map((row) => (
-                <tr className="border-t border-gray-900" key={row.ticker}>
-                  <th className="py-1.5 pr-2 font-semibold" scope="row">
-                    <Link className="text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>
-                      {row.ticker}
-                    </Link>
-                  </th>
-                  <td className={`px-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(row.ytd)]}`}>{pct(row.ytd)}</td>
-                  <td className={`pl-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(row.m1)]}`}>{pct(row.m1)}</td>
-                </tr>
-              ))}
+              {rows.map((row) => {
+                const v1 = order === 'ytd' ? row.ytd : row.m1;
+                const v2 = order === 'ytd' ? row.m1 : row.ytd;
+                const weight = constituentWeight(theme, first, v1);
+                const contribution = constituentContribution(theme, first, v1);
+                return (
+                  <tr className="border-t border-gray-900" key={row.ticker}>
+                    <th className="py-1.5 pr-2 font-semibold" scope="row">
+                      <Link className="text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>
+                        {row.ticker}
+                      </Link>
+                    </th>
+                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">
+                      {weight === null ? NA : formatPercent(weight, { fromRatio: false, digits: 1 })}
+                    </td>
+                    <td className={`px-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(v1)]}`}>{pct(v1)}</td>
+                    <td className={`px-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(contribution)]}`}>
+                      {contribution === null ? NA : formatPercent(contribution, { fromRatio: false, digits: 2, signDisplay: 'always' })}
+                    </td>
+                    <td className={`pl-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(v2)]}`}>{pct(v2)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -153,11 +177,22 @@ export default async function TemasPage({ searchParams }: PageProps) {
       )}
 
       <footer className="border-t border-gray-800 pt-3 text-xs text-gray-500">
-        {data.as_of
-          ? `${data.source} · ${data.intraday ? 'intradía' : 'cierre'} del ${formatMarketDate(data.as_of)} · ${data.method}`
-          : `${data.source} · sin fecha de datos disponible · ${data.method}`}
-        {data.status === 'parcial' ? ' · datos parciales' : ''}
-        {data.stale ? ' · recalculando: se muestra la última versión calculada' : ''}
+        <p>
+          {data.as_of
+            ? `${data.source} · ${data.intraday ? 'intradía' : 'cierre'} del ${formatMarketDate(data.as_of)} · ${data.method}`
+            : `${data.source} · sin fecha de datos disponible · ${data.method}`}
+          {data.status === 'parcial' ? ' · datos parciales' : ''}
+          {data.stale ? ' · recalculando: se muestra la última versión calculada' : ''}
+        </p>
+        <details className="mt-2">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-gray-400">Metodología</summary>
+          <ul className="list-disc space-y-1 pl-5 leading-5">
+            <li>Cada tema es una cesta curada; su rentabilidad es la media simple (mismo peso) de los valores con dato.</li>
+            <li>Un tema sólo publica una métrica si al menos el 70 % de sus valores tiene dato.</li>
+            <li>Caliente: los 3 primeros del orden elegido. Giro: YTD y 1M con signo contrario y 1M relevante; el giro sustituye a Caliente.</li>
+            <li>Aporta: peso × rentabilidad del valor, en puntos porcentuales.</li>
+          </ul>
+        </details>
       </footer>
     </main>
   );
