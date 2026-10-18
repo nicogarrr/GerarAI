@@ -62,3 +62,20 @@ const DEFINITIONS: Record<string, string> = {
 export function financialDefinition(value: string): string {
   return DEFINITIONS[value] ?? financialFormula(value);
 }
+
+/** Solo las versiones conocidas reciben un nombre; no inventa una versión. */
+export function financialVersion(value: string): string {
+  return ({ MARCO_V1: 'Marco de calidad · versión 1', MARCO_V2: 'Marco de calidad · versión 2' } as Record<string, string>)[value] ?? value;
+}
+
+/** El rango visible describe los datos cargados, no la ventana solicitada. */
+export function loadedFinancialRange(metrics: Array<{ series: Array<{ period: string; value: string | number | null }> }>): string | null {
+  const years = metrics.flatMap((metric) => metric.series.flatMap((point) => {
+    if (point.value === null) return [];
+    const match = /^(?:FY)?(\d{4})(?:$|[-:])/.exec(point.period);
+    return match ? [Number(match[1])] : [];
+  }));
+  if (!years.length) return null;
+  const first = Math.min(...years), last = Math.max(...years);
+  return first === last ? String(first) : `${first}–${last}`;
+}
