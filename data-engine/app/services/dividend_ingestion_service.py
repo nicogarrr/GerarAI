@@ -18,7 +18,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Company, DividendRecord, Position
+from app.models import Company, DividendRecord, Position, WatchItem
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.split_ingestion_service import ProviderIngestionService
 
@@ -106,6 +106,28 @@ class DividendIngestionService(ProviderIngestionService):
             source=source,
             fetched_at=fetched_at,
         )
+
+    async def sync_portfolio(self, db: Session) -> dict[str, Any]:
+        """Posiciones abiertas y watchlist: el Cerebro responde dividendos de ambas.
+
+        El rendimiento de cartera (portfolio_yields) sigue contando solo posiciones.
+        """
+        held = set(db.scalars(select(Position.company_id).distinct()).all())
+        symbols = {x.upper() for x in db.scalars(select(WatchItem.symbol)).all() if x}
+        watched = set(db.scalars(select(Company.id).where(Company.ticker.in_(symbols))).all()) if symbols else set()
+        ids = held | watched
+        tickers = sorted(db.scalars(select(Company.ticker).where(Company.id.in_(ids))).all()) if ids else []
+        results = [await self.sync_company(db, ticker=t) for t in tickers]
+        ok = sum(1 for r in results if r["status"] == "ok")
+        unavailable = sum(1 for r in results if r["status"] == "unavailable")
+        return {
+            "companies": len(results), "synced": ok, "unavailable": unavailable, "results": results,
+            "provenance": provenance(
+                self._PROVENANCE_SOURCE, SourceKind.UNOFFICIAL,
+                coverage=(Coverage.OK if unavailable == 0 else Coverage.PARTIAL if ok else Coverage.UNAVAILABLE),
+                note=self._PROVENANCE_NOTE,
+            ),
+        }
 
     def portfolio_yields(self, db: Session) -> dict[str, Any]:
         """Trailing-12-month dividend yield per held position + portfolio aggregate.

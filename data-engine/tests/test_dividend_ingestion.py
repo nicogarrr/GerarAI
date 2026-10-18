@@ -238,3 +238,17 @@ def test_both_providers_down_is_unavailable(db):
     result = asyncio.run(service.sync_company(db, ticker="AAPL"))
     assert result["status"] == "unavailable"
     assert db.scalars(select(DividendRecord)).all() == []
+
+
+def test_sync_portfolio_includes_watchlist_companies(db):
+    from app.models.entities import WatchItem
+
+    service = DividendIngestionService(fmp=FakeFMP(payload=PAYLOAD), yahoo=_YAHOO_DOWN)
+    _company(db, "AAPL")
+    _company(db, "KO")
+    _company(db, "MSFT")
+    db.add(WatchItem(symbol="KO"))
+    db.commit()
+    result = asyncio.run(service.sync_portfolio(db))
+    synced = {r["ticker"] for r in result["results"] if "ticker" in r}
+    assert "KO" in synced and "MSFT" not in synced
