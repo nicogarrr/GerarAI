@@ -54,6 +54,8 @@ function AlertsManager() {
     const [reviewing, setReviewing] = useState<string | null>(null);
     /** Borrado en curso: sin esto el boton se puede pulsar dos veces. */
     const [deleting, setDeleting] = useState<string | null>(null);
+    /** Alta en curso: igual que el borrado, doble click = alerta duplicada. */
+    const [creating, setCreating] = useState(false);
     /** Estado de entrega del motor (evaluacion cada 5 min + Telegram). */
     const [telegram, setTelegram] = useState<TelegramStatus | null>(null);
     const [triggered, setTriggered] = useState<TriggeredAlertDelivery[]>([]);
@@ -108,6 +110,7 @@ function AlertsManager() {
     }, []);
 
     const handleCreateAlert = async () => {
+        if (creating) return;
         try {
             if (!formData.symbol.trim()) {
                 toast.error('Introduce un símbolo válido');
@@ -123,6 +126,7 @@ function AlertsManager() {
                 ? formData.condition.value
                 : (parsedValue as number);
 
+            setCreating(true);
             await createAlert({
                 ...formData,
                 condition: {
@@ -148,6 +152,8 @@ function AlertsManager() {
                 duplicateMessage: 'Ya tienes esta alerta configurada.',
                 onRetry: handleCreateAlert,
             });
+        } finally {
+            setCreating(false);
         }
     };
 
@@ -322,7 +328,7 @@ function AlertsManager() {
                                     </div>
                                 </>
                             )}
-                            <Button onClick={handleCreateAlert} className="w-full min-h-[44px] text-sm sm:text-xs">
+                            <Button onClick={handleCreateAlert} disabled={creating} aria-busy={creating} className="w-full min-h-[44px] text-sm sm:text-xs">
                                 {t('alerts.create')}
                             </Button>
                         </div>
