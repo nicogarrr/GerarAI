@@ -105,7 +105,7 @@ def test_templates_are_correct_by_construction():
         "un crecimiento de ingresos del 35,0 % anual."
     )
     assert FRAGMENTS["titular_0"] == (
-        'TechCrunch publico el 2026-09-25 "Meta presenta Muse, su nuevo modelo". Fuente: URL no disponible.'
+        'TechCrunch publico el 25 de septiembre de 2026 "Meta presenta Muse, su nuevo modelo". Fuente: URL no disponible.'
     )
     assert "caveat_titulares" in FRAGMENTS
     assert "caveat_parcial" not in FRAGMENTS

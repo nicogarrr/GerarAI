@@ -26,7 +26,7 @@ from app.services.claim_scope import supersede_claims_of
 from app.services.company_resolver import resolve_company
 from app.services.inferred_input_service import validate as validate_inferred
 from app.services.long_term_model_service import LongTermModelService
-from app.services.memo_text_es import money_thesis, number_es, percent_es, term_es
+from app.services.memo_text_es import date_es, money_thesis, number_es, percent_es, term_es
 from app.services.number_format import format_compact_es
 from app.services.source_auditor import SourceAuditor
 from app.services.source_hierarchy_service import classify_source
@@ -1028,7 +1028,9 @@ class ThesisService:
         raw = str(item.get("date") or "").strip()
         if not raw:
             return None
-        day = raw[:10]
+        # Fecha en es-ES dentro de la frase («17 de octubre de 2026»), nunca
+        # en formato ISO: date_es devuelve el valor intacto si no lo reconoce.
+        day = date_es(raw[:10])
         date_source = item.get("date_source")
         if date_source == "source":
             return f"publicado el {day}"
