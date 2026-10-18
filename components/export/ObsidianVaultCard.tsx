@@ -25,7 +25,6 @@ export default function ObsidianVaultCard() {
                     <li>Frontmatter en cada nota y wikilinks entre empresas.</li>
                     <li>Índice global del vault y un índice por ticker.</li>
                     <li>Citas con fuente y fecha; los huecos se muestran como «Sin datos», sin inventar.</li>
-                    <li>Coste cero: no usa LLM, solo datos ya persistidos.</li>
                 </ul>
                 <a
                     className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 sm:min-h-0"
