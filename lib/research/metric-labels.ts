@@ -24,6 +24,7 @@ export const METRIC_LABELS: Record<string, string> = {
     total_equity: 'Patrimonio neto',
     total_debt: 'Deuda total',
     net_debt: 'Deuda neta',
+    market_price: 'Precio de mercado',
     cash_and_equivalents: 'Efectivo y equivalentes',
     goodwill: 'Fondo de comercio',
     intangible_assets: 'Activos intangibles',
