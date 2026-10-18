@@ -127,3 +127,38 @@ def test_published_at_shared_frontend_contract_preserves_microseconds():
         assert datetime.fromisoformat(case["output"]) == datetime.fromisoformat(case["input"].replace("Z", "+00:00"))
     # Python datetime only supports microseconds: never silently truncate finer input.
     assert service.parse_feed(feed(entry(published="2026-10-01T10:00:00.1234567Z")), CHANNEL, "archive") == []
+
+
+def test_feed_level_channel_id_without_uc_prefix_accepted():
+    # YouTube sirve a veces el channelId del feed sin el prefijo "UC".
+    xml = feed(entry(), channel=CHANNEL.removeprefix("UC"))
+    (video,) = service.parse_feed(xml, CHANNEL, "archive")
+    assert video["video_id"] == VIDEO
+
+
+def test_feed_level_channel_id_mismatch_still_rejected():
+    assert service.parse_feed(feed(entry(), channel="UCotrocanal0000000000"), CHANNEL, "archive") == []
+    assert service.parse_feed(feed(entry(), channel="otrocanal"), CHANNEL, "archive") == []
+
+
+@pytest.mark.parametrize("junk", ["🎥", "🔴 🔵", "…", ""])
+def test_titles_without_letters_or_digits_rejected(junk):
+    xml = feed(entry().replace("<title>Titulo</title>", f"<title>{junk}</title>"))
+    assert service.parse_feed(xml, CHANNEL, "archive") == []
+
+
+@pytest.mark.parametrize("good", ["Terry Smith on short-term trading #fundsmith", "A", "2026 outlook"])
+def test_titles_with_letters_or_digits_kept(good):
+    xml = feed(entry().replace("<title>Titulo</title>", f"<title>{good}</title>"))
+    (video,) = service.parse_feed(xml, CHANNEL, "archive")
+    assert video["title"] == good
+
+
+def test_confirmed_channels_mapped():
+    assert service.CHANNELS["pabrai"] == ("UCw-OcYmKtk7ut-Ay7hIBaWg", "personal_confirmed")
+    assert service.CHANNELS["terry-smith"] == ("UCEW0yRVs0CbqT9CrP8i3mSQ", "firm_confirmed")
+
+
+def test_firm_confirmed_kind_accepted():
+    (video,) = service.parse_feed(feed(entry()), CHANNEL, "firm_confirmed")
+    assert video["channel_kind"] == "firm_confirmed"
