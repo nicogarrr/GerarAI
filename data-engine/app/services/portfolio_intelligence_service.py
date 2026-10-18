@@ -1027,7 +1027,16 @@ class PortfolioIntelligenceService:
                 if len(prices) >= 2 and prices[0].adj_close and prices[-1].adj_close
                 else None
             )
-            by_metric = all_facts.get(company.id, {})
+            # Los componentes fundamentales se miden en el MISMO horizonte que el
+            # retorno de precio. Antes usaban toda la historia de facts (ASTS:
+            # acciones x3 desde el inicio) frente a un retorno de 5 anos, y la
+            # atribucion salia con dilucion de -212 % o multiplos absurdos.
+            window_start = (prices[0].date if prices else cutoff).year
+            window_end = (prices[-1].date if prices else date.today()).year
+            by_metric = {
+                metric: self._window_facts(rows_, window_start, window_end)
+                for metric, rows_ in all_facts.get(company.id, {}).items()
+            }
             # eps_diluted is the ingested key; eps is a legacy alias (F376).
             fundamental_growth = self._series_change(by_metric.get("eps_diluted") or by_metric.get("eps", []))
             share_change = self._series_change(by_metric.get("shares_diluted", []))
@@ -1099,6 +1108,14 @@ class PortfolioIntelligenceService:
             ),
             "positions": positions,
         }
+
+    @staticmethod
+    def _window_facts(series: list[FinancialFact], start_year: int, end_year: int) -> list[FinancialFact]:
+        """Facts anuales cuyo ano fiscal cae dentro del horizonte del retorno de precio."""
+        return [
+            row for row in series
+            if row.fiscal_year is not None and start_year <= row.fiscal_year <= end_year
+        ]
 
     @staticmethod
     def _series_change(series: list[FinancialFact]) -> float | None:

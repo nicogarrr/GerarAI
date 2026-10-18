@@ -165,3 +165,20 @@ def test_snapshot_history_exactness_gate():
     assert service._snapshot_history_is_exact(missing_return) is False
     ambiguous = [snap(date(2026, 9, 22)), snap(date(2026, 9, 23), metadata_={"ambiguous_external_flows": [1]})]
     assert service._snapshot_history_is_exact(ambiguous) is False
+
+
+def test_attribution_facts_are_limited_to_the_price_window():
+    from types import SimpleNamespace
+
+    from app.services.portfolio_intelligence_service import PortfolioIntelligenceService as S
+
+    def fact(year, value):
+        return SimpleNamespace(fiscal_year=year, fiscal_quarter=None, value=value)
+
+    shares = [fact(2019, 100), fact(2021, 150), fact(2023, 300), fact(2025, 320)]
+    window = S._window_facts(shares, 2022, 2026)
+    assert [f.fiscal_year for f in window] == [2023, 2025]
+    # Toda la historia daria +220 %; el horizonte de precio solo +6,7 %.
+    assert S._series_change(shares) == 2.2
+    assert round(S._series_change(window), 3) == 0.067
+    assert S._series_change(S._window_facts(shares, 2025, 2026)) is None
