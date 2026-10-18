@@ -142,8 +142,10 @@ function PriceCanvas({ bars, levels, currency, hourly = false }: { bars: Company
         } });
         current.line.setData(bars.map((bar) => ({ time: bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date, value: bar.close })));
         current.volume.setData(bars.filter((bar) => typeof bar.volume === 'number' && Number.isFinite(bar.volume) && bar.volume >= 0).map((bar) => ({ time: bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date, value: bar.volume!, color: 'rgba(113,113,122,0.3)' })));
+        // En movil las etiquetas de precio de R/S taparian las del eje; los niveles exactos van en la tabla de pivotes.
+        const wide = window.matchMedia('(min-width: 640px)').matches;
         for (const level of current.levels) current.line.removePriceLine(level);
-        current.levels = levels.map((level) => current.line.createPriceLine({ price: level.price, title: level.label, color: level.kind === 'support' ? '#2dd4bf' : level.kind === 'resistance' ? '#fb7185' : '#a78bfa', lineWidth: 1, lineStyle: 2, axisLabelVisible: true }));
+        current.levels = levels.map((level) => current.line.createPriceLine({ price: level.price, title: level.label, color: level.kind === 'support' ? '#2dd4bf' : level.kind === 'resistance' ? '#fb7185' : '#a78bfa', lineWidth: 1, lineStyle: 2, axisLabelVisible: wide }));
         current.chart.timeScale().fitContent();
     }, [ready, bars, levels, hourly]);
     return <div className="relative">
