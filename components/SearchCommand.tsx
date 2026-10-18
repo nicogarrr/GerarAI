@@ -29,6 +29,14 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
+    const triggerRef = useRef<HTMLButtonElement | null>(null);
+    const returnFocusRef = useRef<HTMLElement | null>(null);
+    const openSearch = () => {
+        returnFocusRef.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+            ? document.activeElement : triggerRef.current;
+        setOpen(true);
+    };
+
     const isSearchMode = !!searchTerm.trim();
 
     const displayStocks = useMemo(() => {
@@ -41,6 +49,10 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
         const onKeyDown = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
                 e.preventDefault()
+                if (!document.querySelector('[data-slot="dialog-content"]')) {
+                    returnFocusRef.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+                        ? document.activeElement : triggerRef.current;
+                }
                 setOpen(v => !v)
                 return
             }
@@ -49,6 +61,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                 const tag = target?.tagName
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
                 e.preventDefault()
+                returnFocusRef.current = target && target !== document.body ? target : triggerRef.current;
                 setOpen(true)
             }
         }
@@ -251,7 +264,8 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
             {renderAs === 'text' ? (
                 <button
                     type="button"
-                    onClick={() => setOpen(true)}
+                    ref={triggerRef}
+                    onClick={openSearch}
                     className="search-text"
                     aria-label="Abrir buscador"
                 >
@@ -260,7 +274,8 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
             ) : renderAs === 'icon' ? (
                 <button
                     type="button"
-                    onClick={() => setOpen(true)}
+                    ref={triggerRef}
+                    onClick={openSearch}
                     aria-label="Abrir buscador"
                     className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700/50 hover:text-white"
                 >
@@ -269,7 +284,8 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
             ) : (
                 <button
                     type="button"
-                    onClick={() => setOpen(true)}
+                    ref={triggerRef}
+                    onClick={openSearch}
                     className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-gray-700 bg-gray-800/60 px-4 py-2.5 text-sm text-gray-400 backdrop-blur-sm transition-all duration-200 hover:bg-gray-700/60"
                     aria-label="Abrir buscador"
                 >
@@ -283,6 +299,11 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
             <CommandDialog
                 open={open}
                 onOpenChange={setOpen}
+                onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    const target = returnFocusRef.current?.isConnected ? returnFocusRef.current : triggerRef.current;
+                    target?.focus();
+                }}
                 className="search-dialog z-[70]"
                 overlayClassName="z-[70]"
                 title="Buscar acciones"

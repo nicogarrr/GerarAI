@@ -174,7 +174,7 @@ export default async function WatchlistPage({
                                         <Link
                                             href={`/research/${stock.symbol}`}
                                             prefetch
-                                            className="block truncate text-base font-bold text-gray-200"
+                                            className="flex min-h-11 items-center truncate text-base font-bold text-gray-200"
                                         >
                                             {stock.symbol}
                                         </Link>
