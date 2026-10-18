@@ -19,7 +19,7 @@ export default function SectionNav(){
  if(pathname==='/discover'||pathname.startsWith('/inversores'))return null;
  const section=sectionForRoute(pathname);
  if(!section)return null;
- const items=flattenNavItems().filter((item)=>item.hub===section);
+ const items=flattenNavItems().filter((item)=>item.hub===section&&!(item.href===pathname&&item.subnavHideSelf));
  if(items.length<2)return null;
  return <nav aria-label="Herramientas de la sección" className="mb-6 flex flex-wrap gap-1.5 border-b border-gray-800 pb-3">{items.map((item)=>{
   const active=item.href===pathname;
