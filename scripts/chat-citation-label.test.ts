@@ -5,6 +5,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+// @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
 import { citationKindLabel } from '../lib/chat/citations.ts';
 
 describe('citationKindLabel', () => {
