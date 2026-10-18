@@ -114,6 +114,33 @@ jobs:
       - name: Sign-up and sign-in against ephemeral MongoDB
         run: node scripts/test-auth-signup.mjs
 
+  backend-lint:
+    # ruff + pyright en job corto y PARALELO: antes iban dentro de `backend`
+    # (18 min), asi que un typo de lint no se sabia hasta instalar torch, y su
+    # tiempo se sumaba al camino critico. Aqui el feedback de lint llega en
+    # ~2 min y `backend` solo corre tests.
+    name: Backend lint (ruff + pyright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: data-engine
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.5"
+          enable-cache: true
+          cache-dependency-glob: "data-engine/uv.lock"
+      - run: uv sync --frozen --extra dev --no-install-project
+      - run: uv run --frozen ruff check .
+      - run: uv run --frozen pyright
+
   backend:
     name: Backend quality
     runs-on: ubuntu-24.04
@@ -135,28 +162,19 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 1
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: data-engine/requirements.txt
-      - run: python -m pip install --upgrade pip
-      # ruff y pyright con pin EXACTO a proposito: son la definicion del gate,
-      # y ruff anade reglas nuevas en cada minor (un run de manana puede fallar
-      # sin que haya cambiado ni una linea del repo). pytest lleva rango, no
-      # pin exacto: el piso declarado es el extra `test` de pyproject.toml
-      # (pytest>=8.0.0) y el techo <9 evita el salto mayor incompatible.
-      # TODO(#E2): los tres pins no estan en ningun fichero que los verifique;
-      # en cuanto exista un extra `dev` en data-engine/pyproject.toml, esta linea
-      # debe pasar a `-r requirements.txt -e .[dev]` y el duplicado con
-      # ruff.toml/pyrightconfig.json desaparece.
-      # python-version 3.12 coincide con `target-version = "py312"` de
-      # data-engine/ruff.toml y con `pythonVersion` de pyrightconfig.json. El
-      # desajuste que reporto E2 (venv local en 3.11) es SOLO local: por eso
-      # CI no se toca y el ajuste va en data-engine/**, no aqui.
-      - run: python -m pip install -r requirements.txt "pytest>=8.0.0,<9" "ruff==0.17.0" "pyright==1.1.414"
-      - run: python -m ruff check .
-      - run: pyright
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.5"
+          enable-cache: true
+          cache-dependency-glob: "data-engine/uv.lock"
+      # Instalacion congelada desde uv.lock (mismo criterio que coverage.yml y
+      # llm-evals.yml, FIX-3.3/3.4): ruff==0.17.0 y pyright==1.1.414 salen del
+      # extra `dev` y pytest/pytest-xdist del extra `test`, todos fijados por
+      # el lock. ruff y pyright corren en el job aparte `backend-lint`.
+      - run: uv sync --frozen --extra test --extra dev --no-install-project
       # TODO(#fixes): 14 tests preexistentes en rojo en el base del que parte
       # esta rama -- 13 en tests/test_retitle_sec_news_es.py y 1 en
       # tests/test_company_snapshot_batch.py. NO son fallos de CI: en
@@ -167,7 +185,12 @@ jobs:
       # fallo nuevo cuando se arreglen.
       - name: Redis local para tests de admision atomica
         run: sudo apt-get update && sudo apt-get install -y redis-server
-      - run: python -m pytest
+      # xdist -n 2: la suite son ~11 min single-process y el runner tiene 2
+      # vCPU. Los tests que necesitan Qdrant VIVO (marker `services`, solo
+      # test_rag_activation.py) van aparte y sin xdist, en el paso de RAG
+      # activation de abajo, que sigue siendo fail-closed contra el service.
+      # El resto de tests que importan qdrant_client usan fakes en memoria.
+      - run: uv run --frozen python -m pytest -n 2 -m "not services"
       - name: Wait for Qdrant
         run: for i in $(seq 1 30); do curl -fs http://localhost:6333/collections && break || sleep 2; done
       - name: RAG activation against real Qdrant (must not skip)
@@ -179,14 +202,15 @@ jobs:
           # `set -o pipefail` NO es cosmetico: sin el, el codigo de salida de un
           # `pytest ... | tee log` es el de `tee` (0 siempre) y un test en rojo
           # pasaria. El `grep` de abajo solo caza los skips; este lignea caza los
-          # fallos. Los dos hacen falta.
+          # fallos. Los dos hacen falta. Sin xdist A PROPOSITO: son los unicos
+          # tests con Qdrant VIVO (marker `services`) y comparten el service.
           set -o pipefail
-          python -m pytest tests/test_rag_activation.py -v -rs | tee /tmp/rag_activation.log
+          uv run --frozen python -m pytest tests/test_rag_activation.py -v -rs | tee /tmp/rag_activation.log
           if grep -Eq "[0-9]+ skipped" /tmp/rag_activation.log; then
             echo "RAG activation tests skipped: Qdrant service not reachable" >&2
             exit 1
           fi
-      - run: python scripts/run_financial_evals.py
+      - run: uv run --frozen python scripts/run_financial_evals.py
 
   evals:
     # Los evals de RAG, valuation, LLM, ingest, backtest y realized viven aqui y
@@ -714,6 +738,7 @@ jobs:
       - frontend
       - auth-store
       - backend
+      - backend-lint
       - openapi-drift
       - migrations
       - arm64-smoke
