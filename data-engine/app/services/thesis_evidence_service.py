@@ -445,10 +445,14 @@ class ThesisEvidenceService:
                 db.add(company)
                 result["name"] = name
             market_cap = _decimal(profile.get("marketCapitalization"))
-            if market_cap is not None and market_cap > 0:
+            # El market cap se fecha con la sesion de la quote del proveedor,
+            # nunca con el dia de la ingesta (fabricaba hechos de sabado/domingo
+            # con una variacion inexistente). Sin fecha honesta no se escribe.
+            cap_date = quote_date if quote_date and quote_date <= datetime.now(UTC).date() else None
+            if market_cap is not None and market_cap > 0 and cap_date is not None:
                 # marketCapitalization de Finnhub viene en millones de USD.
                 value = market_cap * Decimal("1000000")
-                period = datetime.now(UTC).date().isoformat()
+                period = cap_date.isoformat()
                 already = db.scalar(
                     select(FinancialFact).where(
                         FinancialFact.company_id == company.id,
