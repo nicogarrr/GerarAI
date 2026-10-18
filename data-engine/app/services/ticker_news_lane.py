@@ -85,7 +85,8 @@ def fails_strict_name(company, text: str) -> bool:
     text = text or ""
     if any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in patterns):
         return False
-    first = re.sub(rf"^\s*{re.escape(ticker)}\s+", "", text.strip(), count=1, flags=re.IGNORECASE)
+    # La etiqueta de ingesta es el ticker en mayusculas; «Aena sube...» natural no es etiqueta.
+    first = re.sub(rf"^\s*{re.escape(ticker)}\s+", "", text.strip(), count=1)
     bare_name = re.search(rf"(?<![\w$]){re.escape(ticker)}(?![\w])", first, flags=re.IGNORECASE)
     context = _STRICT_CONTEXT.get(ticker)
     return not (bare_name and context and context.search(first))
