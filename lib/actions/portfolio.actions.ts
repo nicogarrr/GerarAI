@@ -1,5 +1,7 @@
 'use server';
 
+import type { TrackedAnalysisStatus } from '@/lib/tracked-analysis-status';
+
 import { qualifiedHistoricalMetrics, verifiedPortfolioHistory, type PortfolioSnapshotPoint } from '@/lib/portfolio-history';
 
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -55,6 +57,7 @@ async function getQuote(symbol: string): Promise<{ c: number } | null> {
 }
 
 export type PortfolioHolding = {
+    analysis?: TrackedAnalysisStatus | null;
     symbol: string;
     quantity: number;
     avgPrice: number;
@@ -115,6 +118,7 @@ type ResearchPortfolioTransaction = {
 };
 
 type ResearchPortfolioPosition = {
+    analysis?: TrackedAnalysisStatus | null;
     ticker: string;
     quantity: number;
     average_cost: number;
@@ -229,6 +233,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         const gain = position.unrealized_pnl_base ?? 0;
         return {
             symbol: position.ticker,
+            analysis: position.analysis,
             quantity: position.quantity,
             avgPrice: position.average_cost,
             currentPrice,

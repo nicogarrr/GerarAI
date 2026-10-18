@@ -551,3 +551,30 @@ def test_concurrent_enqueue_with_distinct_click_ids_creates_one_active_run(monke
         assert len(sent) == 1
     finally:
         check.close()
+
+
+def test_tracked_worker_refreshes_sec_before_stored_only_generation(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    calls = []
+    async def refresh(db, company):
+        calls.append("sec")
+        return {"status": "ok", "provider": "SEC", "facts_imported": 5}
+    monkeypatch.setitem(sys.modules, "app.services.tracked_financial_refresh", SimpleNamespace(refresh_free_financials=refresh))
+    def generate(self, db, ticker, force_new_version=False, phase_callback=None, **kwargs):
+        calls.append("thesis")
+        assert kwargs == {"stored_evidence_only": True}
+        return _fake_generate()(self, db, ticker, force_new_version, phase_callback)
+    monkeypatch.setattr(ThesisService, "generate", generate)
+    run, _ = _enqueue_without_dispatch(monkeypatch)
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        stored.input_payload = {**stored.input_payload, "tracked": True}
+        db.commit()
+    jobs.run_thesis_job(run.id)
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        assert calls == ["sec", "thesis"]
+        assert stored.status == "succeeded"
+        assert stored.result_payload["financial_refresh"]["facts_imported"] == 5

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import WatchItem
+from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
 
 router = APIRouter()
 
@@ -31,12 +32,9 @@ def list_watchlist(db: Session = Depends(get_db)) -> list[dict]:
     Tenant scoping is applied implicitly by the session (see database.py):
     rows are only visible when their tenant_id matches the signed identity.
     """
-    return [
-        _payload(item)
-        for item in db.scalars(
-            select(WatchItem).order_by(desc(WatchItem.created_at))
-        ).all()
-    ]
+    items = db.scalars(select(WatchItem).order_by(desc(WatchItem.created_at))).all()
+    states = tracked_statuses(db, [item.symbol for item in items])
+    return [{**_payload(item), "analysis": states.get(item.symbol)} for item in items]
 
 
 @router.post("", status_code=201)
@@ -46,6 +44,7 @@ def upsert_watch_item(
     """Add a symbol to the watchlist, or update its label if it exists."""
     symbol = payload.symbol.strip().upper()
     item = db.scalar(select(WatchItem).where(WatchItem.symbol == symbol))
+    created = item is None
     if item is None:
         item = WatchItem(symbol=symbol, company=payload.company)
         db.add(item)
@@ -53,6 +52,11 @@ def upsert_watch_item(
         item.company = payload.company
     db.commit()
     db.refresh(item)
+    if created:
+        try:
+            enqueue_tracked_analysis(db, symbol)
+        except Exception:
+            db.rollback()  # Following succeeds even if the analysis outbox fails.
     return _payload(item)
 
 

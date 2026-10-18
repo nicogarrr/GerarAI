@@ -1,5 +1,6 @@
 'use server';
 
+import type { TrackedAnalysisStatus } from '@/lib/tracked-analysis-status';
 import { revalidatePath } from 'next/cache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest, jsonBody } from '@/lib/research/client';
@@ -35,6 +36,7 @@ function failure(error: unknown): WatchlistMutationResult {
 
 /** Entrada devuelta por GET /api/watchlist del backend research. */
 interface WatchlistEntry {
+    analysis?: TrackedAnalysisStatus | null;
     symbol: string;
     company?: string | null;
     created_at?: string;
@@ -43,7 +45,7 @@ interface WatchlistEntry {
 // Obtener watchlist del usuario actual desde el backend research (/api/watchlist).
 // `unavailable` distingue un fallo del backend de una watchlist realmente vacía (F386).
 export async function getWatchlistState(): Promise<{
-    items: { symbol: string; addedAt: Date }[];
+    items: { symbol: string; addedAt: Date; analysis?: TrackedAnalysisStatus | null }[];
     unavailable: boolean;
 }> {
     try {
@@ -57,6 +59,7 @@ export async function getWatchlistState(): Promise<{
         return {
             items: items.map((item) => ({
                 symbol: item.symbol,
+                analysis: item.analysis,
                 addedAt: item.created_at ? new Date(item.created_at) : new Date()
             })),
             unavailable: false,

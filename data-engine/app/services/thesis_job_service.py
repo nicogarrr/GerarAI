@@ -90,7 +90,8 @@ def _earlier_active_run(db: Session, run: WorkflowRun, ticker: str, force: bool)
 
 
 def enqueue_generation(
-    db: Session, ticker: str, force: bool = False, request_id: str | None = None
+    db: Session, ticker: str, force: bool = False, request_id: str | None = None,
+    *, tracked: bool = False,
 ) -> tuple[WorkflowRun, bool]:
     """Return a durable run, re-dispatching an unclaimed run when necessary.
 
@@ -104,6 +105,8 @@ def enqueue_generation(
     tenant_id = db.info.get("tenant_id")
     user_id = str(db.info.get("user_id") or "").strip() or None
     payload: dict = {"ticker": ticker.upper(), "force": bool(force), "attempt": 1}
+    if tracked:
+        payload["tracked"] = True
     if tenant_id is not None:
         payload["tenant_id"] = int(tenant_id)
     if user_id is not None:
@@ -402,11 +405,26 @@ def run_thesis_job(run_id: int) -> None:
             # Network enrichment belongs to the worker, never the enqueue
             # request (two 15 s Finnhub calls used to precede persistence).
             ensure_company_stub(db, payload["ticker"])
+            financial_refresh = None
+            kwargs = {}
+            if payload.get("tracked"):
+                from app.services.async_bridge import run_from_any_context
+                from app.services.company_resolver import resolve_company
+                from app.services.tracked_financial_refresh import refresh_free_financials
+
+                on_phase("refresh_sec")
+                db.commit()  # SEC owns its refresh transaction, outside thesis savepoint.
+                company = resolve_company(db, payload["ticker"])
+                if company is None:
+                    raise ValueError("No se pudo resolver la empresa para SEC")
+                financial_refresh = run_from_any_context(refresh_free_financials(db, company))
+                kwargs["stored_evidence_only"] = True
             thesis = ThesisService().generate(
                 db,
                 payload["ticker"],
                 force_new_version=payload.get("force", False),
                 phase_callback=on_phase,
+                **kwargs,
             )
             open_step = state["open_step"]
             if open_step is not None:
@@ -418,6 +436,8 @@ def run_thesis_job(run_id: int) -> None:
                 "version": thesis.version,
                 "status": thesis.status,
             }
+            if financial_refresh is not None:
+                run.result_payload["financial_refresh"] = financial_refresh
             run.error_class = None
             run.error_message = None
             run.finished_at = datetime.now(UTC)

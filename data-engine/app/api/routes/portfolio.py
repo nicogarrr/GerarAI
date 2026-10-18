@@ -38,6 +38,7 @@ from app.services.portfolio_snapshot_service import PortfolioSnapshotService
 from app.services.risk_service import RiskService
 from app.services.tax_report_service import CASH_UNIT_QUANTITIES
 from app.services.tearsheet_service import TearsheetService
+from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
 
 router = APIRouter()
 
@@ -413,6 +414,7 @@ def positions(
     fiscal = _fiscal_info_batch(
         db, {company.id: position.as_of for position, company in rows}
     )
+    analysis_states = tracked_statuses(db, [company.ticker for _, company in rows])
     payloads = []
     for position, company in rows:
         fiscal_info = fiscal.get(company.id) or _fiscal_info(db, company.id, position.as_of)
@@ -422,6 +424,7 @@ def positions(
                 "ticker": company.ticker,
             "name": company.name,
             "sector": company.sector,
+            "analysis": analysis_states.get(company.ticker),
             "quantity": float(position.quantity),
             "average_cost": float(position.average_cost),
             "market_price": float(position.market_price),
@@ -517,6 +520,11 @@ def create_transaction(
         db.refresh(transaction)
         company = db.get(Company, transaction.company_id)
         assert company is not None
+        if payload.action == "buy":
+            try:
+                enqueue_tracked_analysis(db, company.ticker)
+            except Exception:
+                db.rollback()  # Never roll back the already committed purchase record.
         return _transaction_payload(transaction, company)
     except PortfolioOversellError as exc:
         db.rollback()
