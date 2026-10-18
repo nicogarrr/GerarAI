@@ -463,3 +463,45 @@ def test_signals_propagate_execution_identity_fields():
     for signal in signals:
         assert signal["accession_number"] == "0001234567-24-000043"
         assert signal["tx_line"] == 2
+
+
+def test_all_filings_failing_with_sec_403_declares_the_reason(monkeypatch):
+    class _Forbidden(Exception):
+        class response:  # noqa: N801 - imita httpx.HTTPStatusError
+            status_code = 403
+
+    filings = [
+        {"form": "4", "accession_number": f"0000000000-26-00000{i}", "filing_date": "2026-10-01",
+         "document_url": f"https://www.sec.gov/Archives/edgar/data/1/{i}/form4.xml"}
+        for i in range(3)
+    ]
+    monkeypatch.setattr(form4_connector, "recent_form4_filings", lambda *a, **k: filings)
+
+    def _blocked(_filing):
+        raise _Forbidden("403")
+
+    result = insider_service.get_signals_for_ticker("ACME", cik="1234567", fetcher=_blocked)
+    assert result["status"] == "degraded"
+    assert result["filings_failed"] == 3
+    assert result["reason"] == "sec_bloquea_datacenter"
+
+
+def test_mixed_failure_causes_do_not_claim_a_single_reason(monkeypatch):
+    class _Forbidden(Exception):
+        class response:  # noqa: N801
+            status_code = 403
+
+    filings = [
+        {"form": "4", "accession_number": f"0000000000-26-00000{i}", "filing_date": "2026-10-01",
+         "document_url": f"https://www.sec.gov/Archives/edgar/data/1/{i}/form4.xml"}
+        for i in range(2)
+    ]
+    monkeypatch.setattr(form4_connector, "recent_form4_filings", lambda *a, **k: filings)
+    calls = iter([_Forbidden("403"), ValueError("parse")])
+
+    def _mixed(_filing):
+        raise next(calls)
+
+    result = insider_service.get_signals_for_ticker("ACME", cik="1234567", fetcher=_mixed)
+    assert result["status"] == "degraded"
+    assert "reason" not in result
