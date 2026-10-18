@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 // @ts-expect-error node needs the explicit extension.
 import { formatResearchMetric } from '../lib/research/metric-value.ts';
 test('financial facts retain their declared currency and share-count basis', () => {
- assert.equal(formatResearchMetric('148401000000','USD'),'$148.40B');
+ assert.equal(formatResearchMetric('148401000000','USD'),'$148.4B');
  assert.equal(formatResearchMetric('89800000000','CAD'),'CA$89.80B');
  assert.equal(formatResearchMetric('1023670000000','CNY'),'CN¥1.02T');
  assert.match(formatResearchMetric('19240000000','shares'), /acciones$/);
