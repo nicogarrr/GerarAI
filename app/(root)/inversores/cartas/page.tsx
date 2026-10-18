@@ -49,7 +49,7 @@ export default async function LettersPage({ searchParams }: PageProps) {
                 </Link>
             </header>
 
-            <LibraryChat authors={groups.filter(group => group.name !== 'Sin autor').map(group => group.name)} />
+            {groups.length > 0 ? <LibraryChat authors={groups.filter(group => group.name !== 'Sin autor').map(group => group.name)} /> : null}
 
             {groups.length === 0 || !selected || !paged ? (
                 <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-8 text-center">
