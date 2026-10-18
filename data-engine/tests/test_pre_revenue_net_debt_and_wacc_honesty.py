@@ -97,7 +97,6 @@ def _indicative_facts(db, company, *, net_debt=None):
     _fact(db, company, "shares_diluted", SHARES, unit="shares")
     _fact(db, company, "operating_cash_flow", 20_000_000.0)
     _fact(db, company, "cash_and_equivalents", NET_CASH)
-    _fact(db, company, "capital_expenditure", -10_000_000.0)
     if net_debt is not None:
         _fact(db, company, "net_debt", net_debt)
     db.commit()

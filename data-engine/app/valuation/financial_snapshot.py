@@ -278,6 +278,69 @@ class FinancialSnapshotBuilder:
         snapshot.balance_sheet = debt.period
         snapshot.derived["net_debt"] = [i for i in (debt.id, cash.id) if i is not None]
 
+    @staticmethod
+    def _derive_free_cash_flow(snapshot: FinancialSnapshot) -> None:
+        """free_cash_flow = operating_cash_flow - |capital_expenditure| (+ margen).
+
+        Solo si no hay FCF ni margen FCF y ambos componentes son hechos
+        persistidos del MISMO periodo del ancla (ya filtrados por periodo en
+        ``build``). Es un hecho transitorio ``DERIVED``: nunca se guarda ni se
+        presenta como reportado. Sin uno de los dos componentes no se deriva.
+        """
+        if "free_cash_flow" in snapshot.facts or "fcf_margin" in snapshot.facts:
+            return
+        ocf = snapshot.facts.get("operating_cash_flow")
+        capex = snapshot.facts.get("capital_expenditure")
+        if ocf is None or capex is None:
+            return
+        if (ocf.unit or "") != (capex.unit or ""):
+            return
+        try:
+            o, c = float(ocf.value), abs(float(capex.value))
+        except (TypeError, ValueError):
+            return
+        if not (math.isfinite(o) and math.isfinite(c)):
+            return
+        confidence = min(
+            Decimal(str(ocf.confidence if ocf.confidence is not None else "0.8")),
+            Decimal(str(capex.confidence if capex.confidence is not None else "0.8")),
+        )
+
+        def _fact(metric: str, value: Decimal, unit: str | None) -> FinancialFact:
+            return FinancialFact(
+                company_id=ocf.company_id,
+                source_id=ocf.source_id if ocf.source_id == capex.source_id else None,
+                metric=metric,
+                value=value,
+                period=ocf.period,
+                fiscal_year=ocf.fiscal_year,
+                fiscal_quarter=ocf.fiscal_quarter,
+                unit=unit,
+                source_type="DERIVED",
+                is_reported=False,
+                is_adjusted=False,
+                confidence=confidence,
+            )
+
+        sources = [i for i in (ocf.id, capex.id) if i is not None]
+        snapshot.facts["free_cash_flow"] = _fact(
+            "free_cash_flow", Decimal(str(o - c)), ocf.unit
+        )
+        snapshot.derived["free_cash_flow"] = sources
+        revenue = snapshot.facts.get("revenue")
+        if revenue is not None and (revenue.unit or "") == (ocf.unit or ""):
+            try:
+                r = float(revenue.value)
+            except (TypeError, ValueError):
+                return
+            if math.isfinite(r) and r > 0:
+                snapshot.facts["fcf_margin"] = _fact(
+                    "fcf_margin", Decimal(str((o - c) / r)), "decimal"
+                )
+                snapshot.derived["fcf_margin"] = sources + [
+                    i for i in (revenue.id,) if i is not None
+                ]
+
     def build(self, db: Session, company: Company) -> FinancialSnapshot:
         revenue_candidates = _facts_for_metric(db, company.id, "revenue")
         if not revenue_candidates:
@@ -345,6 +408,7 @@ class FinancialSnapshotBuilder:
             _facts_for_metric(db, company.id, "total_debt"),
             _facts_for_metric(db, company.id, "cash_and_equivalents"),
         )
+        self._derive_free_cash_flow(snapshot)
 
         missing: list[str] = []
         for metric in REQUIRED_FOR_DCF:
