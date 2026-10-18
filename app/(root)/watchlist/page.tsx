@@ -212,7 +212,7 @@ export default async function WatchlistPage({
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">PER (TTM)</dt>
-                                        <dd className="truncate font-mono text-sm text-gray-300" title={stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>{formatPeRatio(stock.peRatio)}</dd>
+                                        <dd className="truncate font-mono text-sm text-gray-300" title={stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
                                     </div>
                                 </dl>
                                 <div className="mt-3 flex items-center gap-2">
@@ -301,7 +301,7 @@ export default async function WatchlistPage({
                                                 // una app de «datos, no recomendaciones». Color
                                                 // neutro, como en la vista de tarjetas.
                                                 <Badge variant="outline" className="border-gray-700 font-mono text-gray-300">
-                                                    {formatPeRatio(stock.peRatio)}
+                                                    {formatPeRatio(stock.peRatio)}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}
                                                 </Badge>
                                             ) : (
                                                 <span className="text-gray-500">{NA}</span>
