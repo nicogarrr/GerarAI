@@ -14,8 +14,10 @@ import nextConfig from '../next.config.ts';
 type HeaderEntry = { key: string; value: string };
 
 async function cspFor(nodeEnv: string): Promise<string> {
-    const prev = process.env.NODE_ENV;
-    process.env.NODE_ENV = nodeEnv;
+    // @types/node declara NODE_ENV como readonly; en runtime es asignable.
+    const env = process.env as Record<string, string | undefined>;
+    const prev = env.NODE_ENV;
+    env.NODE_ENV = nodeEnv;
     try {
         const groups = await (nextConfig.headers as () => Promise<Array<{ headers: HeaderEntry[] }>>)();
         const all = groups.flatMap((g) => g.headers);
@@ -23,7 +25,8 @@ async function cspFor(nodeEnv: string): Promise<string> {
         assert.ok(csp, 'existe el header CSP');
         return csp.value;
     } finally {
-        process.env.NODE_ENV = prev;
+        if (prev === undefined) delete env.NODE_ENV;
+        else env.NODE_ENV = prev;
     }
 }
 
