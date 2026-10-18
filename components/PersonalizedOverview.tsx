@@ -427,7 +427,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     {insight.kind !== 'movement' ? 'N/D' : formatPercent(portfolioSummary.totalGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                                 </span>
                             </div>
-                            <p className="text-xs text-gray-400">Pesos sobre el valor bruto de las posiciones</p>
+                            <p className="text-xs text-gray-400">Rentabilidad desde la compra de cada posición. Si falta la base de coste se muestra su valor. Pesos sobre el valor bruto de las posiciones.</p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {sortedHoldings
                                     .map((h) => (

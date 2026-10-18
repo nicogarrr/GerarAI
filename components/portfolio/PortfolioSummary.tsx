@@ -38,12 +38,12 @@ export default function PortfolioSummary({ summary }: Props) {
         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
           <DollarSign className="h-12 w-12 text-teal-400" />
         </div>
-        <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Valor Total</p>
+        <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Valor Total (neto)</p>
         <p className="text-base min-[420px]:text-lg sm:text-2xl font-bold text-gray-100 tracking-tight break-words">
           {format(summary.totalValue)}
         </p>
         <p className="text-xs text-gray-500 mt-1">
-          RV {format(summary.equityValue)} + caja {format(summary.cash)}
+          Patrimonio neto: RV {format(summary.equityValue)} + caja {format(summary.cash)}
         </p>
       </div>
 
@@ -51,10 +51,15 @@ export default function PortfolioSummary({ summary }: Props) {
         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
           <PiggyBank className="h-12 w-12 text-blue-400" />
         </div>
-        <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Costo Total</p>
+        <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Costo de las posiciones</p>
         <p className="text-base min-[420px]:text-lg sm:text-2xl font-bold text-gray-100 tracking-tight break-words">
           {noData ? NA : format(summary.totalCost)}
         </p>
+        {noData ? null : (
+          <p className="text-xs text-gray-500 mt-1">
+            Se compara con el valor bruto de las posiciones ({format(summary.equityValue)}), no con el neto.
+          </p>
+        )}
       </div>
 
       <div className="bg-[#111111] border border-gray-800 rounded-xl p-4 sm:p-5 relative overflow-hidden group hover:border-purple-500/30 transition-colors">
