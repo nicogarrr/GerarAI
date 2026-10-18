@@ -1699,11 +1699,19 @@ def run_propicks_funnel(
     db = _session(tenant_id, user_id)
     try:
         run = execute_run(db, top_n=100)
+        # Bootstrap del track record: el congelado mensual corre el dia 1, asi
+        # que un despliegue a mitad de mes dejaba propick_snapshots vacio
+        # hasta el mes siguiente. freeze_monthly_snapshot es idempotente: el
+        # primer congelado del mes gana y lleva su as_of real.
+        from app.services.propicks_snapshot_service import freeze_monthly_snapshot
+
+        snapshot = freeze_monthly_snapshot(db)
         return {
             "actor": "run_propicks_funnel",
             "run_id": run.id,
             "passed_count": run.passed_count,
             "top_n": run.top_n,
+            "snapshot_month": snapshot.month if snapshot else None,
         }
     except Exception as exc:
         _rollback(db)
