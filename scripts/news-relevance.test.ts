@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+// @ts-expect-error TS5097: la extension explicita la exige node --experimental-strip-types.
 import { isFinanciallyRelevant } from '../lib/newsRelevance.ts';
 
 test('general headlines about consumer topics are dropped', () => {
