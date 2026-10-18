@@ -26,6 +26,7 @@ from app.workers.dramatiq_app import (
     refresh_portfolio_prices_intraday,
     refresh_propicks_prices,
     refresh_rss_feeds,
+    recompute_fundamental_metrics,
     refresh_sec_filings,
     refresh_ticker_news,
     review_theses,
@@ -202,6 +203,17 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         "interval",
         job_id="kpi_backfill",
         minutes=5,
+    )
+    # Cobertura de ratios derivados (roe/margenes/roic/wacc) para todo el
+    # universo con hechos: sin este barrido los CalculatedMetric solo se
+    # escribian on-demand y los screeners fundamentales no tenian datos.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, recompute_fundamental_metrics),
+        "cron",
+        job_id="fundamental_metrics_recompute",
+        hour=3,
+        minute=40,
     )
     _register(
         scheduler,

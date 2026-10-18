@@ -814,6 +814,96 @@ def backfill_document_kpis() -> dict[str, Any]:
     }
 
 
+RECOMPUTE_METRICS_CHUNK = 60
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=KPI_QUEUE_NAME)
+def recompute_fundamental_metrics(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+    ticker: str | None = None,
+    start_from: str | None = None,
+    limit: int = RECOMPUTE_METRICS_CHUNK,
+) -> dict[str, Any]:
+    """Recalcula CalculatedMetric en bulk para empresas con financial_facts.
+
+    Los ratios derivados (roe, margenes, roic, wacc...) solo se calculaban
+    on-demand al abrir una empresa: la cobertura del universo era ~cero y los
+    screeners fundamentales no podian filtrar. Este actor barre las empresas
+    con hechos por chunks (cursor por ticker) y se auto-encola hasta agotar
+    el universo; cada calculate_all es idempotente (upsert por empresa/
+    metrica/periodo) y nunca inventa inputs: sin hechos coherentes la
+    metrica queda "unavailable", como siempre. Un empresa que falla no frena
+    el barrido: se anota y se sigue.
+    """
+    actor_name = "recompute_fundamental_metrics"
+    from sqlalchemy import select
+
+    from app.models import Company, FinancialFact
+    from app.services.metric_calculation_service import MetricCalculationService
+
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, ticker=ticker)
+    try:
+        with_facts = (
+            select(FinancialFact.company_id)
+            .where(FinancialFact.tenant_id == db.info.get("tenant_id"))
+            .distinct()
+            .scalar_subquery()
+        )
+        statement = select(Company).where(Company.id.in_(with_facts))
+        if ticker:
+            statement = statement.where(Company.ticker == ticker.upper())
+        if start_from:
+            statement = statement.where(Company.ticker > start_from.upper())
+        companies = list(
+            db.scalars(statement.order_by(Company.ticker).limit(limit)).all()
+        )
+        service = MetricCalculationService()
+        processed = 0
+        status_counts: dict[str, int] = {}
+        errors: list[dict] = []
+        for company in companies:
+            try:
+                results = service.calculate_all(db, company, persist=True)
+                processed += 1
+                for result in results:
+                    key = result.status or "unknown"
+                    status_counts[key] = status_counts.get(key, 0) + 1
+            except Exception as exc:  # noqa: BLE001 - una empresa no frena el barrido
+                _rollback(db)
+                errors.append(
+                    {
+                        "ticker": company.ticker,
+                        "type": type(exc).__name__,
+                        "message": str(exc)[:200],
+                    }
+                )
+        next_cursor = None
+        if not ticker and len(companies) == limit:
+            # Queda universo por barrer: el chunk siguiente arranca tras el
+            # ultimo ticker visto. Sin coalesce a proposito: cada chunk es
+            # trabajo distinto y no debe suprimir al siguiente.
+            next_cursor = companies[-1].ticker
+            recompute_fundamental_metrics.send(
+                tenant_id, user_id, start_from=next_cursor, limit=limit
+            )
+        return {
+            "status": _batch_status(processed, errors),
+            "actor": actor_name,
+            "companies_processed": processed,
+            "metric_statuses": status_counts,
+            "next_start_from": next_cursor,
+            "errors": errors,
+        }
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, ticker=ticker)
+    finally:
+        db.close()
+
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
 def extract_knowledge_principles(
     processing_job_id: int,
