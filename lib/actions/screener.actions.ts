@@ -229,11 +229,11 @@ export type RealScreenerRow = {
   symbol: string;
   name: string;
   price: number;
-  change: number;
-  changePercent: number;
-  marketCap: number;
-  volume: number;
-  prevClose: number;
+  change: number | null;
+  changePercent: number | null;
+  marketCap: number | null;
+  volume: number | null;
+  prevClose: number | null;
   sector: string;
   exchange: string;
   type: string;

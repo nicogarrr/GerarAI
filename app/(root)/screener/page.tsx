@@ -239,14 +239,14 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
                           <span className="text-xs text-gray-500 md:hidden">Cambio sesión</span>
-                          <span className={`font-mono ${r.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {formatPercent(r.changePercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
+                          <span className={`font-mono ${r.changePercent == null ? 'text-gray-400' : r.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {r.changePercent == null ? 'N/D' : formatPercent(r.changePercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                           </span>
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
                           <span className="text-xs text-gray-500 md:hidden">Market Cap</span>
                           <span className="font-mono text-gray-300">
-                            {r.marketCap > 0 ? screenerMarketCap(r.marketCap) : 'N/D'}
+                            {r.marketCap != null && r.marketCap > 0 ? screenerMarketCap(r.marketCap) : 'N/D'}
                           </span>
                         </td>
                         <td className="mt-2 flex items-center justify-between gap-3 border-t border-gray-800/60 pt-3 md:table-cell md:mt-0 md:border-0 md:py-3 md:pt-3 md:text-right">
