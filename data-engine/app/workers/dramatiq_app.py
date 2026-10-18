@@ -1300,6 +1300,39 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
+def backfill_finnhub_profiles(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+    max_companies: int = 300,
+) -> dict[str, Any]:
+    """PR-D resto: backfill presupuestado de perfiles Finnhub (quote +
+    profile2) para el universo: nombre real, exchange, divisa, pais de
+    domicilio y market_cap de proveedor fechado con la sesion de la quote.
+
+    Presupuesto: como mucho `max_companies` companias por ejecucion con
+    pausa tras cada llamada (plan gratuito = 60 llamadas/min). La marca de
+    reanudacion es un Document ``finnhub_profile`` por compania; las
+    respuestas vacias no se reconsultan en 30 dias. Nunca inventa datos:
+    sin clave o sin respuesta queda contado, nada escrito.
+    """
+    from app.services.finnhub_profile_backfill import FinnhubProfileBackfill
+
+    db = _session(tenant_id, user_id)
+    try:
+        service = FinnhubProfileBackfill()
+        try:
+            result = service.backfill(db, max_companies=max_companies)
+        finally:
+            service.close()
+        return {"actor": "backfill_finnhub_profiles", **result}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("backfill_finnhub_profiles", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
 ESEF_REINGEST_CHUNK = 25
 
 

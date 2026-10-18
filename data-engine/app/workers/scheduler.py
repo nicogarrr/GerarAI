@@ -8,6 +8,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from app.services.thesis_job_service import reconcile_thesis_dispatches
 from app.workers.dramatiq_app import (
     backfill_document_kpis,
+    backfill_finnhub_profiles,
     consolidate_memory,
     dispatch_insider_alerts,
     dispatch_tracked_news_alerts,
@@ -369,6 +370,11 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
               "cron", job_id="esef_weekly_reingest", day_of_week="sat", hour=6, minute=30, jitter=600)
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_class_shares_outstanding),
               "cron", job_id="class_shares_weekly", day_of_week="sun", hour=6, minute=10, jitter=600)
+    # PR-D resto: backfill diario presupuestado de perfiles Finnhub
+    # (300 companias/run; universo completo en ~1 semana sin pasar el rate
+    # limit gratuito). Retoma donde lo dejo via Document finnhub_profile.
+    _register(scheduler, partial(enqueue_for_all_tenants, backfill_finnhub_profiles),
+              "cron", job_id="finnhub_profile_backfill_daily", hour=4, minute=50, jitter=300)
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="tracked"),
               "cron", job_id="splits_tracked_weekly", day_of_week="sun", hour=5, minute=10, jitter=600)
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="universe"),
