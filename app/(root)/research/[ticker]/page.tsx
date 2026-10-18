@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { getProfile } from '@/lib/actions/finnhub.actions';
 import { resolveUnknownListingIdentity } from '@/lib/research/unknown-listing';
 import { drainRejection } from '@/lib/research/drain-rejection';
-import { cache } from 'react';
+import { cache, Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { canonicalRedirectTicker } from '@/lib/research/canonical-ticker';
 import {
@@ -28,6 +28,11 @@ import {
   Target,
 } from 'lucide-react';
 
+import { researchRequest } from '@/lib/research/client';
+import { quoteSymbolFor } from '@/lib/market/quote-symbol';
+import type { ExtendedQuote } from '@/lib/market/extended-quote';
+import { isE2EMarketFixtureEnabled } from '@/lib/e2e-market-fixture';
+import { e2eExtendedQuoteFixture } from '@/lib/e2e-extended-quote-fixture';
 import { MoatTerm } from '@/components/GlossaryTerm';
 import { MutationForm } from '@/components/forms/MutationForm';
 import { FileUploadInput } from '@/components/forms/FileUploadInput';
@@ -899,6 +904,17 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   } catch {
     headerMarket = null;
   }
+  // La cotizacion de la cabecera se lanza YA (en cuanto se conoce el listado),
+  // en paralelo al resto de lecturas de la vista, en vez de pedirse desde el
+  // cliente tras hidratar. Nunca rechaza: null = el cliente la pide como antes.
+  const headerQuoteSymbol = headerMarket
+    ? quoteSymbolFor({ exchange: headerMarket.exchange ?? undefined, currency: headerMarket.currency ?? undefined }, headerMarket.ticker)
+    : null;
+  const headerQuotePromise: Promise<ExtendedQuote | null> | undefined = headerQuoteSymbol
+    ? (isE2EMarketFixtureEnabled(process.env, ticker)
+      ? Promise.resolve(e2eExtendedQuoteFixture(ticker) as ExtendedQuote)
+      : researchRequest<ExtendedQuote>(`/api/companies/${encodeURIComponent(headerQuoteSymbol)}/extended-quote`, { timeoutMs: 6000 }).catch(() => null))
+    : undefined;
   let content: React.ReactNode;
 
   if (activeView === 'overview') {
@@ -1534,7 +1550,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             return listing.stale ? <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200" role="status">{listing.message}</p> : null;
           })()}
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
-          {headerMarket ? <div id="grafico" className="scroll-mt-6"><CompanyHeaderQuote snapshot={headerMarket} /></div> : null}
+          {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<div aria-hidden="true" className="h-40 animate-pulse rounded bg-gray-900/60" />}><CompanyHeaderQuote snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
           <div className="flex flex-col gap-3 border-t border-gray-900 pt-4">
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><Target className="h-4 w-4" />{holdingBadge}</span><GuideBrainButton ticker={ticker} /><Link className="inline-flex min-h-[44px] items-center gap-1 text-gray-400 transition hover:text-teal-300 sm:min-h-0" href={`/research/${encodeURIComponent(ticker)}?view=changes`}><History className="h-4 w-4" />Qué ha cambiado{recentChangeCount ? <span aria-hidden="true" className="rounded-full bg-gray-800 px-1.5 text-xs font-semibold text-gray-300">{recentChangeCount}</span> : null}</Link></div>

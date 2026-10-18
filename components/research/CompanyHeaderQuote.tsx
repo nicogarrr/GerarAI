@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import { NA, formatMoney, formatNumber, formatPercent, isValidCurrencyCode } from '@/lib/format';
 import { extendedQuoteLabel, quoteDate, quoteTime, quoteSessionDate, type ExtendedQuote } from '@/lib/market/extended-quote';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
@@ -16,11 +16,23 @@ function headerMoney(value: number | null | undefined, currency: string): string
 }
 
 /** One timestamped Yahoo payload supplies the price and all header metrics. */
-export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapshot }) {
-    const [quote, setQuote] = useState<ExtendedQuote | null>(null);
+export function CompanyHeaderQuote({
+    snapshot,
+    initialQuote,
+}: {
+    snapshot: CompanyMarketSnapshot;
+    /** Lectura de cotizacion lanzada en servidor al conocer el listado (nunca rechaza: null = fallo). */
+    initialQuote?: Promise<ExtendedQuote | null>;
+}) {
+    // Una cotizacion de servidor valida evita la espera de hidratar + pedirla
+    // desde el cliente. Sin ella (null/undefined) todo sigue como antes.
+    const serverRead = initialQuote ? use(initialQuote) : null;
+    const serverQuote = serverRead && serverRead.status !== 'unavailable' ? serverRead : null;
+    const serverQuoteRef = useRef(serverQuote);
+    const [quote, setQuote] = useState<ExtendedQuote | null>(serverQuote);
     // false hasta que la primera lectura termina (con precio o sin él): antes
     // de eso no hay «N/D» que declarar, solo una carga en curso.
-    const [settled, setSettled] = useState(false);
+    const [settled, setSettled] = useState(serverQuote !== null);
     // Resolve the actual listing, never a naked non-US ticker's US namesake.
     const symbol = quoteSymbolFor({ exchange: snapshot.exchange ?? undefined, currency: snapshot.currency ?? undefined }, snapshot.ticker);
     const recoverListing = !symbol;
@@ -31,8 +43,17 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
         let lastRead = 0;
         let activeSession = true;
         const controller = new AbortController();
-        setQuote(null);
-        setSettled(false);
+        // Solo la primera ejecucion para este simbolo puede usar la lectura de
+        // servidor (ya sirve de lectura inicial); un cambio de simbolo la descarta.
+        const seeded = serverQuoteRef.current;
+        serverQuoteRef.current = null;
+        if (seeded) {
+            lastRead = Date.now();
+            activeSession = seeded.session === 'regular' || seeded.session === 'pre' || seeded.session === 'post';
+        } else {
+            setQuote(null);
+            setSettled(false);
+        }
         const refresh = async (initial = false) => {
             // The first read always runs: a tab opened in the background (or a
             // headless browser) must not stay on N/D forever. Only the polling
@@ -58,7 +79,7 @@ export function CompanyHeaderQuote({ snapshot }: { snapshot: CompanyMarketSnapsh
                 }
             } finally { inFlight = false; }
         };
-        void refresh(true);
+        if (!seeded) void refresh(true);
         // Closed sessions need a low-frequency recovery read: no exchange
         // calendar is supplied by the API, so never guess opening hours or
         // freeze a tab forever after a weekend/error.
