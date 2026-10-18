@@ -1516,6 +1516,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             módulos de ese paso. Antes eran 16 píldoras planas en una fila: no
             se escaneaban y el usuario no encontraba la tesis. Los dos `nav`
             llevan su propia etiqueta porque cada uno es un nivel distinto.
+            `scroll={false}`: cambiar de pestaña solo cambia el contenido, sin
+            devolver al usuario al inicio de la página (salto que parecía un
+            refresco). Los módulos de subruta (`path`) son otra página y ahí sí
+            arrancan arriba, como cualquier navegación.
         */}
         <nav aria-label="Etapas del research" className="-mx-4 mb-3 flex gap-6 overflow-x-auto border-b border-gray-800 px-4 [scrollbar-width:thin] sm:mx-0 sm:px-0">
           {GROUPS.map((group) => (
@@ -1524,6 +1528,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               className={`inline-flex min-h-[44px] items-center whitespace-nowrap border-b-2 py-2.5 text-sm font-medium transition ${activeModule.group === group.key ? 'border-teal-300 text-gray-100' : 'border-transparent text-gray-500 hover:text-gray-200'}`}
               href={`/research/${encodeURIComponent(ticker)}?view=${group.key}`}
               key={group.key}
+              scroll={false}
             >
               {group.label}
             </Link>
@@ -1536,6 +1541,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg border px-4 py-2.5 text-sm transition sm:min-h-0 sm:px-3 sm:py-2 ${activeView === module.key ? 'border-teal-600 bg-teal-950/40 text-teal-200' : 'border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200'}`}
               href={moduleHref(ticker, module)}
               key={module.key}
+              scroll={!('path' in module)}
             >
               {module.label}
             </Link>
