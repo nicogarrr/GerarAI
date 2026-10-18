@@ -350,3 +350,53 @@ def test_debate_llm_calls_counts_retry_and_double_rejection():
     bad = P(["文化 a", "文化 b", "Caso bajista limpio.", "VEREDICTO: neutral | Equilibrado."])
     res = asyncio.run(debate_thesis("SAN", "t", provider=bad))
     assert res["llm_calls"] == bad.calls == 4 and res["degraded"] is True
+
+
+def test_cjk_rejection_uses_provider_cjk_retry_hook():
+    """Chat 94,6 s: tras el primer rechazo CJK el reintento salta a la via
+    rapida del proveedor (cadena Groq) en vez de repetir el primario lento."""
+
+    class WithCjkRetry(Fake):
+        def __init__(self, *texts):
+            super().__init__(*texts)
+            self.cjk_retry_calls = []
+
+        async def complete_cjk_retry(self, request):
+            self.cjk_retry_calls.append(request)
+            return _resp(CLEAN)
+
+    p = WithCjkRetry("Margen estable 문화.")
+    out = asyncio.run(g.complete_guarded(p, _req(), source="t"))
+    assert out.retried and out.response.text == CLEAN
+    assert len(p.calls) == 1, "el primario lento no se repite"
+    assert len(p.cjk_retry_calls) == 1
+    assert "REINTENTO" in p.cjk_retry_calls[0].messages[0].content
+    s = g.guard_stats()
+    assert s["t.cjk_backup_retry"] == 1 and s["t.recovered"] == 1
+
+
+def test_cjk_retry_hook_failure_propagates_rejection():
+    class WithCjkRetry(Fake):
+        async def complete_cjk_retry(self, request):
+            return _resp("Otra vez 문화.")
+
+    p = WithCjkRetry("Margen 문화.")
+    with pytest.raises(g.LLMOutputRejected):
+        asyncio.run(g.complete_guarded(p, _req(), source="t"))
+    assert len(p.calls) == 1
+    assert g.guard_stats()["t.rejected"] == 1
+
+
+def test_english_rejection_does_not_use_cjk_hook():
+    """El salto a Groq es especifico del rechazo CJK; el ingles reintenta en
+    el mismo proveedor con el idioma forzado."""
+    bad = "However the company is strong, which is because the demand will grow and the margin is high."
+
+    class WithCjkRetry(Fake):
+        async def complete_cjk_retry(self, request):
+            raise AssertionError("no debe llamarse para rechazos no CJK")
+
+    p = WithCjkRetry(bad, CLEAN)
+    out = asyncio.run(g.complete_guarded(p, _req(), source="t"))
+    assert out.retried and len(p.calls) == 2
+    assert "t.cjk_backup_retry" not in g.guard_stats()
