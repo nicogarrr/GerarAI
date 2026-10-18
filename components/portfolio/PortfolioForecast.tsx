@@ -104,6 +104,9 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
   const scenarioOrder = ['bear', 'base', 'bull'] as const;
   return (
     <div className="space-y-6">
+      <p className="text-xs text-gray-500">
+        Contribución anual del subset valorado. No es la rentabilidad total de la cartera.
+      </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {scenarioOrder.map((key) => {
           const scenario = portfolio.scenarios?.[key];
