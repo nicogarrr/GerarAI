@@ -53,13 +53,24 @@ def calculate_portfolio_risk(positions: list[dict], cash: list[dict]) -> dict:
                 }
             )
 
+    net_items = {item["currency"]: item for item in cash if item.get("net_of")}
     for currency, balance in cash_by_currency.items():
         if balance < 0:
+            net = net_items.get(currency)
+            if net:
+                negative = ", ".join(
+                    f"{cur} ({amount:,.2f})" for cur, amount in sorted(net["net_of"].items()) if amount < 0
+                )
+                message = f"El saldo neto de caja, convertido a {currency}, es negativo"
+                if negative:
+                    message += f" (saldo negativo en {negative})"
+            else:
+                message = f"El saldo de caja en {currency} es negativo"
             alerts.append(
                 {
                     "severity": "high",
                     "ticker": None,
-                    "message": f"El saldo de caja en {currency} es negativo",
+                    "message": message,
                     "metric_value": balance,
                     "threshold": 0,
                 }

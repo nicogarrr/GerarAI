@@ -76,7 +76,7 @@ class RiskService:
             margin_debt_base += max(-converted, 0.0)
         result = calculate_portfolio_risk(
             positions,
-            [{"currency": base_currency, "balance": cash_base}],
+            [{"currency": base_currency, "balance": cash_base, "net_of": cash_native}],
         )
         result.update(
             {
