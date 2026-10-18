@@ -7,7 +7,7 @@ values instead of fabricating them. _position_price must prefer the stored
 position price over stale market closes and never invent a price.
 """
 
-from datetime import date
+from datetime import UTC, date
 from decimal import Decimal
 
 import pytest
@@ -208,7 +208,7 @@ def test_position_price_respects_as_of_cutoff(db):
 
 
 def test_traceable_wacc_ignores_metric_created_after_cutoff(db):
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.models.entities import CalculatedMetric
     from app.valuation.engines.base import traceable_wacc
@@ -218,7 +218,7 @@ def test_traceable_wacc_ignores_metric_created_after_cutoff(db):
         CalculatedMetric(
             company_id=company.id, metric="wacc", value=Decimal("0.09"), period="2025",
             fiscal_year=2025, status="ok", formula="f",
-            created_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+            created_at=datetime(2025, 6, 1, tzinfo=UTC),
         )
     )
     db.commit()
