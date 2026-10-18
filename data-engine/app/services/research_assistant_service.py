@@ -13,6 +13,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import Company, Document, DocumentChunk, FinancialFact, NewsEvent, ResearchReview
+from app.services.text_clip import clip_words
 
 
 def _url(value: str | None) -> str | None:
@@ -184,7 +185,7 @@ def _evidence(db: Session, company: Company, tenant_id: int, question: str) -> l
         label = "primera detección GDELT" if date_source == "gdelt_first_seen" else "fecha de la fuente"
         citations.append({"id": f"news_event:{row.id}", "kind": "news_event",
                           "source": row.source, "url": _url(row.url),
-                          "as_of": f"{row.date.isoformat()} ({label})", "excerpt": headline.strip()[:500]})
+                          "as_of": f"{row.date.isoformat()} ({label})", "excerpt": clip_words(headline.strip(), 500, ellipsis="")})
     # Seek document candidates using the question, not merely the 100 newest
     # chunks. The cap bounds work, and empty/low-overlap results fail closed.
     chunks = db.execute(select(DocumentChunk, Document).join(Document, DocumentChunk.document_id == Document.id).where(
@@ -196,7 +197,7 @@ def _evidence(db: Session, company: Company, tenant_id: int, question: str) -> l
             continue
         citations.append({"id": f"document_chunk:{chunk.id}", "kind": "document_chunk",
                           "source": doc.title, "url": _url(doc.source_url),
-                          "as_of": doc.published_at.isoformat(), "excerpt": chunk.text[:450]})
+                          "as_of": doc.published_at.isoformat(), "excerpt": clip_words(chunk.text, 450, ellipsis="")})
     return _rank(citations, question, company.ticker)
 
 
