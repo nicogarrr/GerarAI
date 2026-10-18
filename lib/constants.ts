@@ -106,6 +106,13 @@ export type NavItem = {
    * Migas, buscador y /discover siguen usando `label`.
    */
   subnavLabel?: string;
+  /**
+   * Oculta el enlace a la propia página en el subnav contextual cuando la
+   * página YA ofrece ese destino con su propia navegación: /portfolio tiene
+   * la pestaña «Resumen» y /knowledge el encabezado «Conocimiento», y el
+   * subnav pintaba el mismo nombre una línea encima (duplicado QA).
+   */
+  subnavHideSelf?: boolean;
   children?: NavItem[];
 };
 
@@ -137,7 +144,7 @@ export const ROUTE_CATALOG: NavSection[] = [
   {
     title: 'Cartera',
     items: [
-      { href: '/portfolio', label: 'Resumen', icon: Briefcase, hub: '/portfolio' },
+      { href: '/portfolio', label: 'Resumen', icon: Briefcase, hub: '/portfolio', subnavHideSelf: true },
       { href: '/portfolio/intelligence', label: 'Inteligencia', icon: Sparkles, hub: '/portfolio' },
       { href: '/risk', label: 'Exposiciones', icon: Gauge, hub: '/portfolio' },
       { href: '/taxes', label: 'Impuestos', icon: Receipt, hub: '/portfolio' },
@@ -179,6 +186,7 @@ export const ROUTE_CATALOG: NavSection[] = [
         label: 'Conocimiento',
         icon: BookOpen,
         hub: '/knowledge',
+        subnavHideSelf: true,
         children: [{ href: '/knowledge-graph', label: 'Grafo', icon: Share2, hub: '/knowledge' }],
       },
     ],
