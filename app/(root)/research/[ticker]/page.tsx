@@ -11,6 +11,8 @@ import { getProfile } from '@/lib/actions/finnhub.actions';
 import { resolveUnknownListingIdentity } from '@/lib/research/unknown-listing';
 import { drainRejection } from '@/lib/research/drain-rejection';
 import { cache } from 'react';
+import { redirect } from 'next/navigation';
+import { canonicalRedirectTicker } from '@/lib/research/canonical-ticker';
 import {
   ArrowLeft,
   BookOpen,
@@ -694,6 +696,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       return <BackendOffline feature={`Research de ${ticker}`} retryHref={`/research/${ticker}`} />;
     }
     throw error;
+  }
+  // Ticker con sufijo de mercado (SAN.MC) que el backend resuelve a su base
+  // (SAN): misma empresa, ficha canonica unica en vez de una ficha N/D.
+  const canonical = canonicalRedirectTicker(ticker, snapshot?.company.ticker);
+  if (canonical) {
+    redirect(`/research/${encodeURIComponent(canonical)}${query.view ? `?view=${encodeURIComponent(query.view)}` : ''}`);
   }
   if (!snapshot) {
     // F286: snapshot null tiene procedencia EXACTA: el frontend solo devuelve
