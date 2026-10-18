@@ -322,6 +322,8 @@ const searchStocksOrThrow = async (query?: string): Promise<StockWithWatchlistSt
                 };
                 return item;
             })
+            // Finnhub devuelve el mismo simbolo varias veces (AENA.MC x2): una sola entrada.
+            .filter((item, index, all) => all.findIndex((other) => other.symbol === item.symbol) === index)
             .slice(0, 15);
 
         return mapped;
