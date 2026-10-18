@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import Company, MarketPrice, ProPickCandidate, ProPickRun
-from app.services.propicks_funnel_service import execute_run
+from app.services.propicks_funnel_service import execute_run, run_funnel
+from app.services.propicks_gems_service import find_gems
 
 router = APIRouter()
 
@@ -145,3 +146,24 @@ def get_run(
         for c, co in rows
     ]
     return out
+
+
+class GemOut(BaseModel):
+    ticker: str
+    name: str
+    score: float
+    market_cap: float
+    reasons: list[dict]
+
+
+@router.get("/gems", response_model=list[GemOut])
+def list_gems(
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_db),
+) -> list[GemOut]:
+    """Joyas ocultas: calidad (embudo) + valor + insiders + 13F, con fuente y fecha por dato."""
+    results, _ = run_funnel(db, top_n=limit)
+    return [
+        GemOut(ticker=g.ticker, name=g.name, score=g.score, market_cap=g.market_cap, reasons=g.reasons)
+        for g in find_gems(db, results, limit=limit)
+    ]
