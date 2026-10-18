@@ -91,7 +91,10 @@ def test_news_materiality_uses_portfolio_weight_and_source_hierarchy():
     response = client.post(
         "/api/news/manual",
         json={
-            "text": f"{TARGET_TICKER} reports earnings and updates guidance after a margin miss.",
+            "text": (
+                f"Materiality Target ({TARGET_TICKER}) reports earnings "
+                "and updates guidance after a margin miss."
+            ),
             "source": "company_ir",
             "url": "https://ir.example.com/news",
         },

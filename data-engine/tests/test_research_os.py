@@ -17,7 +17,7 @@ from app.valuation import DCFInputs, ReverseDCFInputs, run_dcf, solve_required_g
 TEST_NEWS_SOURCES = {"manual_test", "test_feed", "workflow_test_feed"}
 TEST_NEWS_PATTERNS = [
     "%example.com/msft-%",
-    "%MSFT announces a large share offering%",
+    "%announces a large share offering%",
     "%MSFT wins major customer contract%",
     "%MSFT cuts guidance after earnings miss%",
 ]
@@ -302,7 +302,7 @@ def test_memory_api_tracks_claims_evidence_sections_and_sessions():
         "/api/news/manual",
         json={
             "text": (
-                "MSFT announces a large share offering and cuts revenue guidance, "
+                "Microsoft (MSFT) announces a large share offering and cuts revenue guidance, "
                 "raising dilution and fcf margin concerns for the current thesis."
             ),
             "source": "manual_test",
