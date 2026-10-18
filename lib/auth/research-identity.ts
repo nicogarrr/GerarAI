@@ -21,12 +21,25 @@ export interface NormalizedResearchBody {
   contentType?: string;
 }
 
-/** Pathname of a URL or path, without the query string. */
+/**
+ * Pathname of a URL or path, without the query string, in the DECODED form the
+ * data engine sees (`request.url.path` is percent-decoded). Signing the encoded
+ * path made tickers such as `^GSPC` (`%5EGSPC`) fail with 401. If decoding is
+ * not possible or yields non printable-ASCII (header-unsafe), the encoded path
+ * is kept.
+ */
 export function researchRequestPath(target: string): string {
+  let pathname: string;
   try {
-    return new URL(target).pathname;
+    pathname = new URL(target).pathname;
   } catch {
-    return target.split('?')[0] ?? target;
+    pathname = target.split('?')[0] ?? target;
+  }
+  try {
+    const decoded = decodeURIComponent(pathname);
+    return /^[\x20-\x7e]*$/.test(decoded) ? decoded : pathname;
+  } catch {
+    return pathname;
   }
 }
 
