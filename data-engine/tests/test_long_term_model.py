@@ -186,3 +186,29 @@ def test_derived_fcf_is_not_declared_when_a_leg_is_unreadable():
     ):
         assert service._derived_fcf_value(cache, 2024) is None
         assert service._derived_fcf_series(cache, [2024]) == []
+
+
+def test_reverse_dcf_missing_inputs_names_only_what_is_missing():
+    from types import SimpleNamespace
+
+    from app.services.long_term_model_service import LongTermModelService
+
+    service = LongTermModelService()
+    assumptions = {
+        "fcf_margin": SimpleNamespace(value=0.15, source_fact_ids=[]),
+        "wacc": SimpleNamespace(value=0.1, source_fact_ids=[]),
+        "terminal_growth": SimpleNamespace(value=0.02, source_fact_ids=[]),
+        "revenue_growth": SimpleNamespace(value=0.2, source_fact_ids=[]),
+    }
+    service._value_for_year = lambda facts, year: {  # type: ignore[method-assign]
+        "revenue": 100.0, "shares_diluted": 10.0, "net_debt": None,
+    }[facts]
+    result = service._reverse_dcf(
+        current_price=40.65,
+        assumptions=assumptions,
+        fact_cache={"revenue": "revenue", "shares_diluted": "shares_diluted", "net_debt": "net_debt"},
+        horizon=5,
+        source_year=2025,
+    )
+    assert result["status"] == "insufficient_data"
+    assert result["missing_inputs"] == ["net_debt"]

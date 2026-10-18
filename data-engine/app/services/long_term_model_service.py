@@ -1674,7 +1674,22 @@ class LongTermModelService:
         if current_price is None or revenue is None or shares in (None, 0) or margin is None or wacc is None or terminal is None or net_debt is None:
             # Missing net debt is never treated as "debt-free": the forward
             # DCF refuses without it, the reverse DCF does the same.
-            return {"status": "insufficient_data", "market_price": current_price, "missing_inputs": ["market_price", "revenue", "fcf_margin", "shares_diluted", "net_debt"], "trace": {"method": "binary_search_reverse_dcf", "source_fact_ids": assumptions["fcf_margin"].source_fact_ids}}
+            # Solo se declara lo que falta de verdad: la lista fija decia "falta el
+            # precio de mercado" aunque el precio existiera (ASTS).
+            missing = [
+                name
+                for name, value in (
+                    ("market_price", current_price),
+                    ("revenue", revenue),
+                    ("fcf_margin", margin),
+                    ("wacc", wacc),
+                    ("terminal_growth", terminal),
+                    ("shares_diluted", shares or None),
+                    ("net_debt", net_debt),
+                )
+                if value is None
+            ]
+            return {"status": "insufficient_data", "market_price": current_price, "missing_inputs": missing, "trace": {"method": "binary_search_reverse_dcf", "source_fact_ids": assumptions["fcf_margin"].source_fact_ids}}
         solved = solve_required_growth(
             ReverseDCFInputs(
                 market_price=current_price,

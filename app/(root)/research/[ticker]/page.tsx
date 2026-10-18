@@ -438,7 +438,7 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
   const priceAsOf = typeof valuation.trace?.price_as_of === 'string' ? valuation.trace.price_as_of : null;
   const modelPriceLabel = priceAsOf
     ? `Precio del modelo al ${formatMarketDate(priceAsOf, { day: 'numeric', month: 'short' })}`
-    : 'Precio del modelo';
+    : 'Precio del modelo (sin fecha)';
   if (notPublishable) {
     return (
       <div className="space-y-3">
