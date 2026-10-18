@@ -7,6 +7,7 @@ import { RecordDetail, RecordList, type DataRecord } from '@/components/data/Rec
 import { getPlan, getPlanContributions, getPlanDrift } from '@/lib/actions/plan.actions';
 import PlanSetupDialog from '@/components/plan/PlanSetupDialog';
 import { formatMoney, formatNumber, formatPercent, NA } from '@/lib/format';
+import { etiquetaSector } from '@/lib/labels';
 import { t } from '@/lib/i18n/t';
 
 interface PlanViewProps {
@@ -71,12 +72,12 @@ function planValue(value: unknown): string {
     if (typeof value === 'object') return Object.entries(value).map(([key, item]) => {
         const text = (key.endsWith('_pct') || key.startsWith('ticker:') || key.startsWith('asset_class:')) ? formatPercent(item as number, { fromRatio: false, digits: 2 })
             : key === 'kind' ? PLAN_KIND[String(item)] ?? String(item) : planValue(item);
-        return `${FIELD_LABELS[key] ?? key.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja').replaceAll('_', ' ')}: ${text}`;
+        return `${FIELD_LABELS[key] ?? etiquetaSector(key.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja').replaceAll('_', ' '))}: ${text}`;
     }).join(' · ');
     if (typeof value === 'number') return formatNumber(value);
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
     const text = String(value);
-    return ({ok: 'Completo', incomplete_fx: 'Faltan tipos de cambio', buy: 'Comprar', sell: 'Vender'} as Record<string, string>)[text] ?? text.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja');
+    return ({ok: 'Completo', incomplete_fx: 'Faltan tipos de cambio', buy: 'Comprar', sell: 'Vender'} as Record<string, string>)[text] ?? etiquetaSector(text.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja'));
 }
 const planMoney = (value: unknown, record: DataRecord) =>
     typeof record.base_currency === 'string' ? formatMoney(value as number | string | null, record.base_currency) : NA;
