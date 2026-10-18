@@ -97,3 +97,32 @@ def test_broken_db_fails_closed_and_stops_typesafe(monkeypatch):
     result = asyncio.run(jev_gates.jev_choice_or_none(
         name="claim_routing", text="x", instructions="?", criteria={"observed": "x"}))
     assert result is None
+
+
+def test_mark_credit_exhausted_with_auth_required_writes_alerts(monkeypatch):
+    """Regresión: con research_auth_required (producción) los guards de
+    database.py rechazaban las alertas tenant-owned escritas desde una sesión
+    anónima — RuntimeError «Tenant context is required for tenant-owned
+    writes» tras el 402 de TypeSafe. La transición y las alertas deben
+    persistir igualmente, cada alerta en la sesión de su tenant."""
+    from app.core import database as database_module
+
+    monkeypatch.setattr(database_module.settings, "research_auth_required", True)
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Tenant(external_id="t1", name="Uno", status="active"))
+        db.add(Tenant(external_id="t2", name="Dos", status="active"))
+        db.commit()
+    from sqlalchemy.orm import sessionmaker
+    monkeypatch.setattr(jev_availability, "SessionLocal", sessionmaker(engine))
+    monkeypatch.setattr(jev_availability, "_PERSISTENCE_BROKEN", False)
+    jev_availability.mark_credit_exhausted()
+    assert jev_availability._PERSISTENCE_BROKEN is False
+    with Session(engine) as db:
+        alerts = db.scalars(
+            select(ResearchAlert).where(ResearchAlert.alert_type == "typesafe_credit_exhausted")
+        ).all()
+        assert len(alerts) == 2
+        assert {alert.tenant_id for alert in alerts} == {1, 2}
+    assert jev_availability.credit_status()["last_billing_failure_at"]
