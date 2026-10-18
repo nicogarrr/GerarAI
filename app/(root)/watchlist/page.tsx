@@ -1,7 +1,7 @@
 import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus';
 import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-analysis-status';
 import type { Metadata } from 'next';
-import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
+import { formatMarketCap, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 import { getWatchlistState, getWatchlistEntryData } from '@/lib/actions/watchlist.actions';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
@@ -221,12 +221,12 @@ export default async function WatchlistPage({
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Market Cap</dt>
                                         <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCapUsd(stock.marketCap) : NA}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
                                         </dd>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">PER (TTM)</dt>
-                                        <dd className="truncate font-mono text-sm text-gray-300" title={stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
+                                        <dd className="font-mono text-sm text-gray-300" title={stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
                                     </div>
                                 </dl>
                                 <div className="mt-3 flex items-center gap-2">
@@ -305,7 +305,7 @@ export default async function WatchlistPage({
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCapUsd(stock.marketCap) : NA}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {stock.peRatio !== null && stock.peRatio !== undefined && Number.isFinite(stock.peRatio) ? (

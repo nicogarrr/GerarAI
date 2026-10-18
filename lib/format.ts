@@ -211,6 +211,27 @@ export function formatMarketCapUsd(value: NumericInput, fallback: string = NA): 
  * Porcentaje en español. Por defecto `value` es ratio (0.15 -> 15,0 %);
  * con `fromRatio: false` ya viene en tanto por ciento (15 -> 15,0 %).
  */
+/**
+ * Capitalización en la divisa real de la compañía (backend research la
+ * conoce; USD solo cuando la divisa consta como USD). Compacta.
+ */
+export function formatMarketCap(value: NumericInput, currency: string | null, fallback: string = NA): string {
+  if (!currency) return formatMarketCapUsd(value, fallback);
+  const parsed = toFinite(value);
+  if (parsed === null) return fallback;
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 0,
+      notation: 'compact',
+      maximumFractionDigits: 2,
+    }).format(parsed);
+  } catch {
+    return formatNumber(parsed, fallback);
+  }
+}
+
 export function formatPercent(
   value: NumericInput,
   { fromRatio = true, digits = 1, signDisplay }: { fromRatio?: boolean; digits?: number; signDisplay?: 'auto' | 'always' | 'never' } = {},
