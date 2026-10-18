@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+// @ts-expect-error TS5097: la extension explicita la exige node --experimental-strip-types.
 import { withAuthErrors } from '../lib/auth/route-auth.ts';
+// @ts-expect-error TS5097: la extension explicita la exige node --experimental-strip-types.
 import { AuthenticationError } from '../lib/types/errors.ts';
 
 test('AuthenticationError -> 401 JSON sin cache', async () => {
