@@ -1,4 +1,5 @@
 import { formatResearchMetric } from '@/lib/research/metric-value';
+import { financialFormula, financialPeriod, financialVersion } from '@/lib/research/financial-display';
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import { healthText, listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
@@ -381,8 +382,8 @@ function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
             <Badge className="shrink-0" variant="outline">{label(metric.status)}</Badge>
           </div>
           <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit)}</div>
-          <div className="mt-2 text-xs text-gray-500">{metric.period} · {metric.definition_version}</div>
-          <div className="mt-2 text-xs leading-5 text-gray-400">{metric.formula}</div>
+          <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period)} · {financialVersion(metric.definition_version)}</div>
+          <div className="mt-2 text-xs leading-5 text-gray-400">{financialFormula(metric.formula)}</div>
         </div>
       ))}
     </div>
