@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { PortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
 import { formatMoney, formatDate, formatPrice } from '@/lib/format';
 import { Panel } from '@/components/ui/panel';
@@ -7,6 +8,26 @@ import {
     fiscalYearNote,
     formatPositionQuantity,
 } from '@/lib/portfolio-dividends-display';
+
+/** Lista de tickers enlazados a su ficha: cada cifra de la proyección pertenece
+ *  a una posición concreta, así que el ticker lleva a su pantalla. */
+function TickerList({ tickers, className }: { tickers: string[]; className?: string }) {
+    return (
+        <>
+            {tickers.map((ticker, index) => (
+                <span key={ticker}>
+                    {index > 0 ? ', ' : ''}
+                    <Link
+                        href={`/research/${encodeURIComponent(ticker)}`}
+                        className={className ?? 'font-medium text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline'}
+                    >
+                        {ticker}
+                    </Link>
+                </span>
+            ))}
+        </>
+    );
+}
 
 const monthLabel = (key: string): string => {
     // "2027-01" -> "ene 2027". Se parsea el dia 2 para no caer en el mes
@@ -41,7 +62,7 @@ function FiscalYearCard({ year, data, baseCurrency }: { year: string; data: Port
             </dl>
             {data.excluded_tickers.length > 0 ? (
                 <p className="mt-3 text-xs text-amber-400/90">
-                    Subconjunto cubierto: excluye {data.excluded_tickers.join(', ')} (sin datos, no cero).
+                    Subconjunto cubierto: excluye <TickerList tickers={data.excluded_tickers} /> (sin datos, no cero).
                 </p>
             ) : null}
             {note !== null ? (
@@ -68,7 +89,12 @@ function DeclaredFuturePanel({ items }: { items: PortfolioDividendProjection['de
             <ul className="space-y-1.5 text-sm text-gray-300">
                 {items.map((item, index) => (
                     <li key={`${item.ticker}-${item.ex_date}`}>
-                        <span className="font-medium text-gray-100">{item.ticker}</span>
+                        <Link
+                            href={`/research/${encodeURIComponent(item.ticker)}`}
+                            className="font-medium text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+                        >
+                            {item.ticker}
+                        </Link>
                         {` · ex ${formatDate(item.ex_date)} · pago ${item.pay_date ? formatDate(item.pay_date) : 'N/D'} · `}
                         {formatPrice(item.amount_per_share, item.currency)} por acción
                         <span className="ml-2 rounded border border-gray-700 px-1.5 py-0.5 text-xs text-gray-400">
@@ -164,10 +190,10 @@ export default function PortfolioDividends({ projection }: { projection: Portfol
                                                         : 'N/D'}
                                                 </td>
                                                 <td className="py-2">
-                                                    {month.covered_tickers.join(', ')}
+                                                    <TickerList tickers={month.covered_tickers} />
                                                     {month.excluded_tickers.length > 0 ? (
                                                         <span className="block text-xs text-amber-400/90">
-                                                            Excluidas sin datos: {month.excluded_tickers.join(', ')}
+                                                            Excluidas sin datos: <TickerList tickers={month.excluded_tickers} className="font-medium text-amber-300 underline-offset-2 hover:text-amber-200 hover:underline" />
                                                         </span>
                                                     ) : null}
                                                 </td>
@@ -195,7 +221,14 @@ export default function PortfolioDividends({ projection }: { projection: Portfol
                                 <tbody>
                                     {projection.positions.map((position) => (
                                         <tr className="border-b border-gray-900 text-gray-300" key={position.ticker}>
-                                            <td className="py-2 pr-4 font-medium text-gray-100">{position.ticker}</td>
+                                            <td className="py-2 pr-4 font-medium">
+                                                <Link
+                                                    href={`/research/${encodeURIComponent(position.ticker)}`}
+                                                    className="text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+                                                >
+                                                    {position.ticker}
+                                                </Link>
+                                            </td>
                                             <td className="py-2 pr-4">
                                                 {formatPositionQuantity(position.quantity)}
                                             </td>
@@ -229,7 +262,7 @@ export default function PortfolioDividends({ projection }: { projection: Portfol
                     <ul className="mt-1 space-y-1 text-sm text-amber-100/80">
                         {coverageLists.map((entry) => (
                             <li key={entry.label}>
-                                {entry.label}: {entry.tickers.join(', ')}
+                                {entry.label}: <TickerList tickers={entry.tickers} className="font-medium text-amber-300 underline-offset-2 hover:text-amber-200 hover:underline" />
                             </li>
                         ))}
                     </ul>
