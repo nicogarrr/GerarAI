@@ -103,6 +103,8 @@ async def _extract_with_llm(text: str, context: str = "", before_retry=None) -> 
                 "Cada exposure debe ser un nombre de industria o factor concreto "
                 "que pueda coincidir literalmente con los metadatos de empresas; "
                 "un sector amplio solo no genera candidatos. "
+                "No uses etiquetas de riesgo o madurez como speculative, pre_fcf, "
+                "pre_revenue, growth o high_beta como exposición causal. "
                 "Si hay contexto verificado de la empresa, úsalo para afinar las "
                 "hipótesis; las relaciones entre empresas solo existen cuando el "
                 "contexto las lista ('sin relaciones conocidas' = no hay datos). "
@@ -146,8 +148,9 @@ def _company_context(db: Session, company_id: int | None, tenant_id) -> str:
         (f"- Ticker: {company.ticker}; Nombre: {company.name}; "
          f"Sector: {company.sector}; Industria: {company.industry}"),
     ]
-    if company.factor_tags:
-        lines.append(f"- Etiquetas de factor: {', '.join(company.factor_tags)}")
+    specific_tags = [value for value in company.factor_tags or [] if isinstance(value, str) and _specific_exposure(value)]
+    if specific_tags:
+        lines.append(f"- Etiquetas de exposición concreta: {', '.join(specific_tags)}")
     peers = db.execute(
         select(Company.ticker, Company.name)
         .join(PeerRelationship, PeerRelationship.peer_company_id == Company.id)
@@ -172,6 +175,20 @@ def _candidate_reason(company: Company, theme: Theme, field: str, value: str) ->
             f"la exposición '{theme.exposure}' de la hipótesis.")
 
 
+# Risk/maturity/style tags describe a stock, not an economic transmission channel.
+# Never use them to connect unrelated industries through a speculative narrative.
+_GENERIC_EXPOSURES = frozenset({
+    "speculative", "speculative growth", "pre fcf", "pre revenue", "pre profit",
+    "unprofitable", "growth", "value", "small cap", "mid cap", "large cap",
+    "high risk", "high beta", "cyclical", "defensive", "unknown", "other", "unassigned",
+})
+
+
+def _specific_exposure(value: str) -> bool:
+    normalized = _normalized(value)
+    return bool(normalized) and normalized not in _GENERIC_EXPOSURES
+
+
 def _company_exposures(company: Company) -> list[tuple[str, str]]:
     values: list[tuple[str, str]] = []
     for field in ("sector", "industry"):
@@ -179,7 +196,7 @@ def _company_exposures(company: Company) -> list[tuple[str, str]]:
         if isinstance(value, str) and _normalized(value) not in {"", "unknown", "other", "unassigned"}:
             values.append((field, value))
     for value in company.factor_tags or []:
-        if isinstance(value, str) and _normalized(value):
+        if isinstance(value, str) and _specific_exposure(value):
             values.append(("factor_tags", value))
     return values
 
@@ -363,16 +380,23 @@ def analyze_second_order(db: Session, event: NewsEvent, *, use_llm: bool = False
     # existing industry/factor metadata can create a candidate; a bare sector
     # coincidence has no concrete reason and is discarded.
     candidates = []
+    subject = db.get(Company, snap.company_id) if snap.company_id is not None else None
+    subject_ticker = subject.ticker.strip().upper() if subject else None
+    seen_tickers: set[str] = set()
     for theme in extraction.themes:
-        if not theme.chain or not _normalized(theme.exposure):
+        if not theme.chain or not _specific_exposure(theme.exposure):
             continue
         matches = []
         for company in _matching_companies(db, theme.exposure):
+            ticker = company.ticker.strip().upper()
+            if not ticker or company.id == snap.company_id or ticker == subject_ticker or ticker in seen_tickers:
+                continue
             for field, value in _company_exposures(company):
                 if field == "sector":
                     continue
                 if _normalized(value) == _normalized(theme.exposure):
                     matches.append((company, field, value))
+                    seen_tickers.add(ticker)
                     break
             if len(matches) + len(candidates) >= CANDIDATE_LIMIT:
                 break
