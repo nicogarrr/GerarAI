@@ -144,3 +144,10 @@ def test_otro_tenant_no_aparece_en_peso_ni_neto(db):
     assert resp.llm_trace["path"] == "portfolio_position"
     assert "9.999" not in resp.answer
     assert "SECRET" not in resp.answer
+
+
+def test_currency_symbol_only_for_eur_unknown_preserved():
+    from app.services.chat_service import _currency_display
+    assert _currency_display("EUR") == "€"
+    assert _currency_display("USD") == "USD"
+    assert _currency_display("XYZ") == "XYZ"
