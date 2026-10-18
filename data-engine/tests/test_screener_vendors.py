@@ -329,6 +329,7 @@ def test_yahoo_quote_normalization():
     assert quote["volume"] == pytest.approx(1000.0)
     assert quote["prevClose"] == pytest.approx(148.0)
     assert quote["asOf"] == 20
+    assert quote["asOfDate"] is None  # sin zona de mercado no se inventa fecha
 
 
 def test_yahoo_quote_rejects_garbage():
@@ -390,3 +391,26 @@ def test_yahoo_quote_time_matches_last_valid_close():
     assert quote is not None
     assert quote["price"] == 150.0
     assert quote["asOf"] == 20
+
+
+def test_yahoo_quote_dates_the_daily_candle_in_market_timezone():
+    # 2026-10-16 13:30 UTC es la apertura de la vela diaria, no una hora de cotizacion.
+    client = _FakeClient(
+        {
+            "chart": _FakeResponse(
+                {
+                    "chart": {
+                        "result": [
+                            {
+                                "timestamp": [1792157400 - 86400, 1792157400],
+                                "meta": {"exchangeTimezoneName": "America/New_York"},
+                                "indicators": {"quote": [{"close": [148.0, 150.0], "volume": [900, 1000]}]},
+                            }
+                        ]
+                    }
+                }
+            )
+        }
+    )
+    quote = YahooScreenVendor().fetch_quote(client, "AAPL")
+    assert quote["asOfDate"] == "2026-10-16"

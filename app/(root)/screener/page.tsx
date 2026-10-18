@@ -2,7 +2,7 @@ import { quoteObserved } from '@/lib/market/quote-observed';
 import type { Metadata } from 'next';
 import { getMarketIndicesResult } from '@/lib/actions/market.actions';
 import { getSavedScreenerEngines, getScreenerStocksReal } from '@/lib/actions/screener.actions';
-import { formatMarketCapUsd, formatNumber, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
+import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { indicesCardState } from '@/lib/market/indices-card-state';
@@ -230,7 +230,7 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                           <div className="text-right">
                             <span className="font-semibold text-gray-200">{screenerPrice(r.price, r.currency)}</span>
                             {!isValidCurrencyCode(r.currency) ? <div className="text-[10px] text-gray-500">Divisa N/D: proveedor sin divisa</div> : null}
-                            <div className="text-[10px] text-gray-500">{quoteObserved(r.priceAsOf)}</div>
+                            <div className="text-[10px] text-gray-500">{r.priceDate ? `Cierre ${formatMarketDate(r.priceDate)}` : quoteObserved(r.priceAsOf)}</div>
                           </div>
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
