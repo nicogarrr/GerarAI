@@ -58,4 +58,7 @@ def manager_changes(cik: str, db: Session = Depends(get_db)) -> dict:
 @router.get("/managers/{cik}/holdings")
 def manager_holdings(cik: str, db: Session = Depends(get_db)) -> dict:
     """Latest 13F report holdings for a reviewed manager, as filed."""
+    from app.services.investor_autosync import maybe_autosync_holdings
+
+    maybe_autosync_holdings(db)
     return ManagerHoldingIngestionService().latest_holdings(db, cik=cik)
