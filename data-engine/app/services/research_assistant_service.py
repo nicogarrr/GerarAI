@@ -13,6 +13,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import Company, Document, DocumentChunk, FinancialFact, NewsEvent, ResearchReview
+from app.services.text_clip import clip_words
 
 
 def _url(value: str | None) -> str | None:
