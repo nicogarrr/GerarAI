@@ -62,6 +62,18 @@ const CONTRIBUTION_LABELS: Record<string, string> = {
 };
 
 const PLAN_KIND: Record<string, string> = { ticker: 'Acción', sector: 'Sector', asset_class: 'Clase de activo' };
+
+/** Enlace de navegación cruzada Plan → Cartera: la desviación y los pesos del
+ *  plan se calculan SOBRE la cartera, así que cada estado (con datos o vacío)
+ *  ofrece el salto a su fuente en vez de quedarse en texto muerto. */
+const linkCartera = (
+    <Link
+        href="/portfolio"
+        className="inline-flex min-h-[44px] items-center rounded-lg border border-teal-700/60 px-3 text-sm font-medium text-teal-300 transition hover:border-teal-500 hover:text-teal-200"
+    >
+        Ver tu cartera
+    </Link>
+);
 const FIELD_LABELS: Record<string, string> = {
     kind: 'Tipo', label: 'Objetivo', target_pct: 'Peso objetivo', band_pct: 'Banda de tolerancia',
     current_pct: 'Peso actual', deviation_pct: 'Desviación', action: 'Acción', amount_base: 'Importe',
@@ -149,9 +161,12 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 </CardHeader>
                 <CardContent className="pt-4">
                     {tickers.length === 0 ? (
-                        <p className="py-6 text-center text-sm text-gray-500">
-                            El plan no tiene posiciones por ticker todavía.
-                        </p>
+                        <div className="flex flex-col items-center gap-3 py-6">
+                            <p className="text-center text-sm text-gray-500">
+                                El plan no tiene posiciones por ticker todavía.
+                            </p>
+                            {linkCartera}
+                        </div>
                     ) : (
                         <div className="flex flex-wrap gap-2">
                             {tickers.map((ticker) => (
@@ -179,6 +194,8 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 formatColumns={{...PLAN_FORMAT, ...DETAIL_FORMAT}}
                 maxKeys={24}
                 emptyMessage="Sin datos de desviación disponibles."
+                emptyAction={linkCartera}
+                actions={linkCartera}
             />
 
             <RecordList
