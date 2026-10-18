@@ -10,6 +10,7 @@ import GemsView from './GemsView';
 import PaperTradingView from './PaperTradingView';
 import MonthlyRebalanceView from './MonthlyRebalanceView';
 import StrategyFactsheet from './StrategyFactsheet';
+import TrackRecordView from './TrackRecordView';
 import StrategySelector from './StrategySelector';
 import WalkForwardResults from './WalkForwardResults';
 import { STRATEGY_CATALOG, mergeStrategies } from './monthlyRebalance';
@@ -170,6 +171,11 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
             </TabsContent>
 
             <TabsContent value="backtest" className="mt-6 space-y-4">
+                {/* Track record vivo de las selecciones reales (snapshots
+                    mensuales point-in-time), encima del baseline walk-forward:
+                    es la evidencia que de verdad le importa a Nico. */}
+                <TrackRecordView />
+
                 <Card className="flex min-w-0 flex-col gap-4 rounded-lg border border-gray-700 bg-gray-800/50 p-4 md:flex-row md:items-center md:justify-between">
                     <p className="max-w-xl text-sm leading-6 text-gray-400">
                         Baseline walk-forward point-in-time (momentum 12-1M,
