@@ -19,6 +19,26 @@ from app.models import (
     ProPickRun,
 )
 
+
+def _eligible_total(db: Session, label: str, source_name: str | None) -> int | None:
+    """Denominador de elegibilidad para fuentes estructuralmente acotadas.
+
+    ESEF solo cubre emisores revisados contra el registro CNMV (tabla
+    REVIEWED, hoy ~110): medirlo contra las 2.132 empresas del universo
+    reportaba un 4,6 % que parecia fuente rota cuando la cobertura real
+    sobre elegibles era ~89 %. Resto de fuentes: sin cota declarada, el
+    denominador sigue siendo el universo."""
+    if label == "Fundamentales" and source_name == "ESEF":
+        from app.services.cnmv_mapping import REVIEWED_ISSUERS
+
+        tickers = {issuer.ticker.upper() for issuer in REVIEWED_ISSUERS}
+        tickers |= {f"{t}.MC" for t in tickers}
+        return db.scalar(
+            select(func.count(Company.id)).where(func.upper(Company.ticker).in_(tickers))
+        ) or 0
+    return None
+
+
 _CACHE: dict[int, tuple[float, dict]] = {}
 _LOCK = threading.Lock()
 LAYERS = (
@@ -58,8 +78,13 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
             for name, covered, stamp in groups:
                 stamp = utc(stamp)
                 status = "stale" if stamp and now - stamp > timedelta(days=max_age) else "available"
+                eligible = _eligible_total(db, label, name)
                 rows.append({"layer": label, "source": name, "covered": covered,
                              "total": total, "coverage_pct": round(100 * covered / total, 2) if total else None,
+                             "eligible": eligible,
+                             "coverage_pct_eligible": (
+                                 round(100 * covered / eligible, 2) if eligible else None
+                             ),
                              "last_update": stamp.isoformat() if stamp else None,
                              "status": status, "max_age_days": max_age,
                              "reason": "Actualización almacenada fuera del límite de frescura del panel." if status == "stale" else None})
@@ -98,7 +123,7 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
         db.rollback()
         connectors.append({"source": "ProPicks · último run", "last_success": None, "last_attempt": None, "status": "error", "errors": None})
     return {"as_of": now.isoformat(), "total_companies": total, "sources": rows, "connectors": connectors,
-            "coverage_basis": "DERIVADO: empresas con al menos un registro / todas las empresas registradas. No mide completitud ni elegibilidad.",
+            "coverage_basis": "DERIVADO: empresas con al menos un registro / todas las empresas registradas. No mide completitud. Fuentes con alcance estructuralmente acotado (ESEF: emisores reviewed CNMV) llevan ademas eligible y coverage_pct_eligible con el denominador de elegibilidad real.",
             "freshness_basis": "Última escritura en la BD, no fecha del dato ni prueba de disponibilidad del proveedor."}
 
 

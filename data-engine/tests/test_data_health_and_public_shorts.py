@@ -168,3 +168,28 @@ def test_recent_fetch_does_not_make_old_finra_trade_current(db):
     db.add(ConnectorState(tenant_id=1, company_id=1, connector="public_shorts", feed_url="public-shorts", last_success_at=datetime.now(UTC), metadata_={"source": "FINRA", "date": "2024-01-01"}))
     db.commit()
     assert read_shorts(db, company)["status"] == "stale"
+
+
+def test_esef_row_carries_eligibility_denominator(db):
+    """ESEF solo aplica a emisores reviewed CNMV: la fila debe declarar el
+    denominador de elegibilidad (no el universo) y su cobertura relativa."""
+
+    now = datetime.now(UTC)
+    db.add(Company(id=2, ticker="SAN", name="Santander", exchange="BME",
+                   currency="EUR", company_type="mature", valuation_model="dcf"))
+    db.add(FinancialFact(company_id=2, tenant_id=1, metric="revenue",
+                         value=Decimal("1"), period="FY2025", source_type="ESEF",
+                         is_reported=True, updated_at=now))
+    db.commit()
+    result = inventory(db, now=now)
+    esef = [r for r in result["sources"] if r["source"] == "ESEF"][0]
+    assert esef["covered"] == 1
+    # De los reviewed existen SAN y GRF (fixture) como Company:
+    assert esef["eligible"] == 2
+    assert esef["coverage_pct_eligible"] == 50.0
+    # La cobertura cruda contra el universo se mantiene (contexto), sin
+    # disfrazarla de fallo de la fuente:
+    assert esef["coverage_pct"] == round(100 * 1 / esef["total"], 2)
+    sec = [r for r in result["sources"] if r["source"] == "SEC"]
+    if sec:  # fuentes sin cota: sin denominador de elegibilidad
+        assert sec[0]["eligible"] is None
