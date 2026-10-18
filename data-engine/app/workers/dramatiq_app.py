@@ -1303,6 +1303,57 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
 ESEF_REINGEST_CHUNK = 25
 
 
+@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=900_000)
+def ingest_class_shares_outstanding(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """shares_outstanding derivado (suma de clases dei ECSO) para filers
+    multi-clase (META, GOOGL, BRK.B, ASTS, V): la SEC no consolida las
+    clases en companyfacts, asi que sin este carril no tienen saldo de
+    acciones y el market cap derivado (#1555) no puede calcularse.
+
+    Idempotente (mismo periodo = no reescribe). CIK del Company; sin CIK o
+    sin Company queda contado, nunca inventado.
+    """
+    from sqlalchemy import select as _select
+
+    from app.models import Company
+    from app.services.class_filer_eps_service import (
+        CLASS_SHARES_FILERS,
+        backfill_class_shares_outstanding,
+    )
+
+    db = _session(tenant_id, user_id)
+    try:
+        results: dict[str, str] = {}
+        for ticker in CLASS_SHARES_FILERS:
+            company = db.scalar(_select(Company).where(Company.ticker == ticker))
+            if company is None:
+                results[ticker] = "no_company"
+                continue
+            if not company.cik:
+                results[ticker] = "no_cik"
+                continue
+            try:
+                outcome = backfill_class_shares_outstanding(
+                    db, company, cik=company.cik)
+                db.commit()
+                results[ticker] = (
+                    "ok" if outcome.written
+                    else f"skipped:{outcome.skipped_reason}"
+                )
+            except Exception:
+                _rollback(db)
+                logger.exception("class shares ECSO failed for %s", ticker)
+                results[ticker] = "error"
+        return {"actor": "ingest_class_shares_outstanding",
+                "status": "ok", "results": results}
+    finally:
+        db.close()
+
+
+
 @dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
 def refresh_esef_fundamentals(
     tenant_id: int | None = None,

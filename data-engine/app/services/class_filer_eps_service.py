@@ -22,6 +22,7 @@ import re
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -255,3 +256,139 @@ def backfill_class_based_eps(
     db.flush()
     return ClassEpsResult(company.ticker, written, member, tuple(periods))
 
+
+
+# ---------------------------------------------------------------------------
+# Saldo de acciones en circulacion por clase (dei ECSO) + suma derivada
+# documentada. Filers multi-clase: la SEC no consolida las clases en
+# companyfacts, asi que shares_outstanding nunca llega por la ingesta
+# estandar. La suma de clases se escribe como hecho DERIVADO
+# (is_reported=False, source_type="derived", confianza 0.70) con la
+# procedencia por clase en metadata del Document: nunca como dato reportado.
+# ---------------------------------------------------------------------------
+
+CLASS_SHARES_FILERS: tuple[str, ...] = ("META", "GOOGL", "BRK.B", "ASTS", "V")
+
+
+def _latest_instance_url(
+    cik: str, fetch_json: Callable[[str], dict], forms: tuple[str, ...] = ("10-K", "10-Q")
+) -> str | None:
+    """Instancia XBRL del filing mas reciente de `forms` (10-Q incluido: la
+    portada con el saldo de acciones se refresca cada trimestre)."""
+    submissions = fetch_json(_SUBMISSIONS_URL.format(cik=cik.zfill(10)))
+    recent = submissions.get("filings", {}).get("recent", {})
+    for index, form in enumerate(recent.get("form", [])):
+        if form not in forms:
+            continue
+        acc_nodash = recent["accessionNumber"][index].replace("-", "")
+        index_doc = fetch_json(
+            f"{_ARCHIVES_URL.format(cik_int=int(cik), acc_nodash=acc_nodash)}index.json"
+        )
+        for item in index_doc.get("directory", {}).get("item", []):
+            name = item.get("name", "")
+            if name.endswith("_htm.xml"):
+                return f"{_ARCHIVES_URL.format(cik_int=int(cik), acc_nodash=acc_nodash)}{name}"
+        return None
+    return None
+
+
+@dataclass(frozen=True)
+class ClassSharesResult:
+    ticker: str
+    written: bool
+    shares_total: Decimal | None
+    members: tuple[str, ...]
+    as_of: str | None
+    skipped_reason: str | None = None
+
+
+def backfill_class_shares_outstanding(
+    db: Session,
+    company: Company,
+    *,
+    cik: str,
+    fetch_json: Callable[[str], dict] = _fetch_json,
+    fetch_bytes: Callable[[str], bytes] = _fetch_bytes,
+) -> ClassSharesResult:
+    """shares_outstanding DERIVADO (suma de clases dei ECSO) para multi-clase.
+
+    Solo miembros en eje de CLASE (`*ClassAxis` / `*ClassMemberAxis` /
+    `*ClassOfStockAxis`): un miembro de segmento nunca suma acciones del
+    emisor. Por clase gana el instante mas reciente; la suma es de las
+    clases presentes en ESA fecha de portada mas reciente del filing (si un
+    miembro solo aparece en instantes antiguos, se usa el suyo propio y la
+    fecha del hecho es la del instante mas reciente global). Idempotente:
+    un shares_outstanding con el mismo periodo no se toca.
+    """
+    from app.services.connectors.sec_xbrl_instance import (
+        parse_instance_dimensioned_ecso,
+    )
+
+    url = _latest_instance_url(cik, fetch_json)
+    if url is None:
+        return ClassSharesResult(company.ticker, False, None, (), None,
+                                 skipped_reason="sin instancia 10-K/10-Q")
+    facts = parse_instance_dimensioned_ecso(io.BytesIO(fetch_bytes(url)))
+    # Solo miembros de CLASE (eje de clase): los de segmento/geografia no
+    # son acciones del emisor.
+    by_member: dict[str, DimensionedFact] = {}
+    for fact in facts:
+        class_axes = [
+            (axis, member)
+            for axis, member in fact.members
+            if axis.split(":")[-1].endswith(CLASS_AXIS_SUFFIXES)
+        ]
+        if not class_axes:
+            continue
+        member = class_axes[0][1]
+        current = by_member.get(member)
+        if current is None or (fact.instant or date.min) > (current.instant or date.min):
+            by_member[member] = fact
+    if not by_member:
+        return ClassSharesResult(company.ticker, False, None, (), None,
+                                 skipped_reason="sin ECSO dimensionado por clase")
+    total = sum(f.value for f in by_member.values())
+    if total <= 0:
+        return ClassSharesResult(company.ticker, False, None, (), None,
+                                 skipped_reason="suma de clases no positiva")
+    as_of = max(f.instant for f in by_member.values() if f.instant)
+    period = f"{as_of.isoformat()}:DEI"
+    exists = db.scalar(
+        select(FinancialFact.id).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == "shares_outstanding",
+            FinancialFact.period == period,
+        )
+    )
+    if exists:
+        return ClassSharesResult(company.ticker, False, total,
+                                 tuple(sorted(by_member)), as_of.isoformat(),
+                                 skipped_reason="ya existe")
+    document = _get_or_create_document(db, company, url)
+    db.add(
+        FinancialFact(
+            company_id=company.id,
+            metric="shares_outstanding",
+            value=total,
+            unit="shares",
+            period=period,
+            fiscal_year=None,
+            fiscal_quarter=None,
+            source_id=document.id,
+            source_type="derived",
+            is_reported=False,
+            confidence=Decimal("0.70"),
+        )
+    )
+    document.metadata_ = {
+        **(document.metadata_ or {}),
+        "class_shares_provenance": {
+            "concept": "dei:EntityCommonStockSharesOutstanding",
+            "derivation": "sum_of_class_members",
+            "as_of": as_of.isoformat(),
+            "members": {m: str(f.value) for m, f in sorted(by_member.items())},
+        },
+    }
+    db.flush()
+    return ClassSharesResult(company.ticker, True, total,
+                             tuple(sorted(by_member)), as_of.isoformat())

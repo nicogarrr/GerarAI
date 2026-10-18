@@ -13,6 +13,7 @@ from app.workers.dramatiq_app import (
     dispatch_tracked_news_alerts,
     evaluate_alert_rules,
     freeze_propicks_snapshot,
+    ingest_class_shares_outstanding,
     ingest_corporate_splits,
     recompute_fundamental_metrics,
     reconcile_alert_analyses,
@@ -364,6 +365,8 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # quedaban congelados en el snapshot one-off del 25-sep.
     _register(scheduler, partial(enqueue_for_all_tenants, refresh_esef_fundamentals),
               "cron", job_id="esef_weekly_reingest", day_of_week="sat", hour=6, minute=30, jitter=600)
+    _register(scheduler, partial(enqueue_for_all_tenants, ingest_class_shares_outstanding),
+              "cron", job_id="class_shares_weekly", day_of_week="sun", hour=6, minute=10, jitter=600)
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="tracked"),
               "cron", job_id="splits_tracked_weekly", day_of_week="sun", hour=5, minute=10, jitter=600)
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="universe"),
