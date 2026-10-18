@@ -7,6 +7,8 @@ import { METRIC_LABELS } from './metric-labels.ts';
 export function thesisCodeLabel(value: string): string {
   const labels: Record<string, string> = {
     insufficient_data: 'datos insuficientes', unknown: 'sin determinar',
+    unassigned: 'sin asignar', preview_only: 'solo vista previa',
+    fact_anchored_sensitivity: 'sensibilidad anclada a datos',
     'n/a': 'no disponible', fiscal_year: 'ejercicio fiscal',
     free_cash_flow_or_fcf_margin: 'flujo de caja libre o margen FCF',
     normalized_fcf_margin: 'margen FCF normalizado',

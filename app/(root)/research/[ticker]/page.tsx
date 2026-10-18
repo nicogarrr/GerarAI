@@ -930,7 +930,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               />
             )}
           </Panel>
-          <Panel collapsible="mobile" title="Modelo fundamental a largo plazo">
+          {snapshot.model_summary ? <Panel collapsible="mobile" title="Modelo fundamental a largo plazo">
             {snapshot.model_summary ? (
               <div className="space-y-3 text-sm text-gray-300">
                 <div className="flex flex-wrap gap-2">
@@ -946,7 +946,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 title="Sin modelo persistido. Genéralo de forma explícita desde el grupo Modelo."
               />
             )}
-          </Panel>
+          </Panel> : null}
         </div>
         <Panel collapsible="mobile"
           actions={
