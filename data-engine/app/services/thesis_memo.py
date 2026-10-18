@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Claim, ClaimEvidence, Company, ThesisSection, ThesisVersion
+from app.services.memo_text_es import percent_es
 
 
 def _money(value) -> str:
@@ -72,7 +73,7 @@ def build_memo_markdown(
     lines.append(
         f"\nPrecio actual: {_money(thesis.current_price)} · Valor esperado: "
         f"{_money(thesis.expected_value)} · Margen de seguridad: "
-        + (f"{float(thesis.margin_of_safety):.1%}" if thesis.margin_of_safety is not None else "pendiente")
+        + (percent_es(float(thesis.margin_of_safety)) if thesis.margin_of_safety is not None else "pendiente")
     )
     lines.append("")
 

@@ -92,7 +92,7 @@ def test_full_thesis_renders_every_section(db):
     assert "| Bajista | $150.00 | 20 |" in memo
     assert "| Base | $220.00 | 55 |" in memo
     assert "| Alcista | $300.00 | 25 |" in memo
-    assert "Precio actual: $200.00 · Valor esperado: $235.00 · Margen de seguridad: 15.0%" in memo
+    assert "Precio actual: $200.00 · Valor esperado: $235.00 · Margen de seguridad: 15,0 %" in memo
     # Catalysts: dict form renders title + date; string form renders verbatim.
     assert "- Resultados Q4 (2026-10-30)" in memo
     assert "- Ciclo de renovacion de iPhone" in memo

@@ -33,6 +33,7 @@ from app.llm import (
 from app.models.entities import Company
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
+from app.services.memo_text_es import percent_es
 from app.services.text_clip import clip_words
 from app.valuation.engines.base import margin_of_safety_reference
 
@@ -123,7 +124,7 @@ def _fragment_templates(
         ref_label, ref_value = margin_of_safety_reference(valuation) or ("escenario base", base)
         fragments["valoracion_posicion"] = (
             f"{company.name} cotiza a {price:.2f} {currency} frente a un "
-            f"{ref_label} de {ref_value:.2f} {currency} (margen de seguridad del {mos:.0%})."
+            f"{ref_label} de {ref_value:.2f} {currency} (margen de seguridad del {percent_es(mos)})."
         )
     growth = (valuation.get("reverse_dcf") or {}).get("required_revenue_growth")
     if status != "insufficient_data" and growth is not None:
@@ -131,7 +132,7 @@ def _fragment_templates(
         # expectativa observada del mercado: la atribucion va al DCF inverso.
         fragments["expectativas_mercado"] = (
             "Con los supuestos de este DCF inverso, el precio actual exigiría "
-            f"un crecimiento de ingresos del {growth * 100:.1f}% anual."
+            f"un crecimiento de ingresos del {percent_es(growth)} anual."
         )
     if status == "partial":
         fragments["caveat_parcial"] = (
@@ -449,8 +450,8 @@ def _section_templates(
         # Hechos vs interpretacion: el patron es fijo, el numero es un slot.
         ref_label = (margin_of_safety_reference(valuation) or ("escenario base", 0.0))[0]
         parrafos.append(
-            f"Un margen de seguridad del {mos:.0%} ({ref_label}/precio - 1: "
-            f"el {ref_label} equivale al {mos + 1:.0%} del precio actual) no "
+            f"Un margen de seguridad del {percent_es(mos)} ({ref_label}/precio - 1: "
+            f"el {ref_label} equivale al {percent_es(mos + 1, 0)} del precio actual) no "
             "es una predicción de revalorización ni de caída: es la relación "
             f"entre precio y {ref_label} con los supuestos registrados en "
             "esta tesis."

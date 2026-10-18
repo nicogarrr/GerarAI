@@ -131,10 +131,39 @@ _ES_EN: dict[str, frozenset[str]] = {
 }
 
 
+# Palabras de pregunta general («¿Qué sabemos, qué falta y qué contradicciones
+# hay?»): no nombran ningún tema, así que no pueden coincidir con un extracto.
+_GENERAL = frozenset({
+    "sabemos", "saber", "sabe", "falta", "faltan", "contradicciones", "contradiccion",
+    "resumen", "resume", "resumir", "tenemos", "evidencia", "evidencias", "fuentes",
+    "datos", "informacion", "empresa", "general", "principal", "principales", "situacion",
+})
+
+
+def is_general_question(question: str, ticker: str) -> bool:
+    terms = _tokens(question) - _tokens(ticker)
+    return bool(terms) and not (terms - _GENERAL)
+
+
+def _overview(citations: list[dict]) -> list[dict]:
+    """Pregunta general: las fuentes más recientes, primarias antes que titulares, una por fuente."""
+    order = {"document_chunk": 0, "financial_fact": 1, "news_event": 2}
+    picked, seen = [], set()
+    for citation in sorted(citations, key=lambda c: order.get(c["kind"], 3)):
+        key = (citation["kind"], citation["source"])
+        if key in seen:
+            continue
+        seen.add(key)
+        picked.append(citation)
+    return picked
+
+
 def _rank(citations: list[dict], question: str, ticker: str) -> list[dict]:
     terms = _tokens(question) - _tokens(ticker)
     if not terms:
         return []
+    if not (terms - _GENERAL):
+        return _overview(citations)
     groups = [frozenset({term}) | _ES_EN.get(term, frozenset()) for term in terms]
     ranked = []
     for citation in citations:
@@ -227,6 +256,8 @@ def answer(db: Session, payload) -> dict:
         lines.append(f"{statement} [{citation['id']}]")
     note = ("Fuente primaria documental disponible para consulta; este resumen no verifica el documento completo."
             if primary else "Fuente primaria no consultada o no disponible; los titulares no verifican sus afirmaciones.")
+    if is_general_question(payload.question, company.ticker):
+        note = "Pregunta general: se muestran las fuentes más recientes, sin filtrar por tema. " + note
     if payload.mode == "guide":
         note += " Contrasta el documento primario antes de aceptar una conclusión del ticket."
     return {"mode": payload.mode, "status": "answered", "answer": "\n".join([*lines, note]),
