@@ -69,8 +69,8 @@ def _frontmatter(ticker: str, note: Note) -> str:
     lines = [
         "---",
         f"ticker: {_yaml(ticker)}",
-        f"fecha: {_yaml(note.date)}",
-        f"estado: {_yaml(note.status)}",
+        *([f"fecha: {_yaml(note.date)}"] if note.date else []),
+        f"estado: {_yaml(note.status or 'sin datos')}",
         "fuentes:",
     ]
     lines.extend(f"  - {_yaml(url)}" for url in urls)
@@ -226,7 +226,7 @@ def build_obsidian_vault(
         index_lines = [
             "---",
             'tipo: "indice"',
-            f"fecha: {_yaml(latest)}",
+            *([f"fecha: {_yaml(latest)}"] if latest else []),
             "---",
             "",
             "# GerarAI - Índice del vault",
@@ -270,7 +270,7 @@ def build_obsidian_vault(
             index_note = Note(
                 title=f"{ticker} - Índice",
                 date=notes[-1].date if notes else "",
-                status=notes[-1].status if notes else "",
+                status=notes[-1].status if notes else "sin tesis",
             )
             content = (
                 _frontmatter(ticker, index_note)

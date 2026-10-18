@@ -14,6 +14,7 @@ async function getHandler() {
     upstream = await fetch(new URL(path, BACKEND_URL), {
       headers: await researchIdentityHeaders({ method: 'GET', path }),
       cache: 'no-store',
+      signal: AbortSignal.timeout(45_000),
     });
   } catch {
     return NextResponse.json({ detail: 'Motor de research no disponible' }, { status: 502 });
@@ -21,7 +22,13 @@ async function getHandler() {
   if (!upstream.ok) {
     return NextResponse.json({ detail: 'No se pudo exportar el vault de Obsidian' }, { status: upstream.status });
   }
-  return new NextResponse(await upstream.arrayBuffer(), {
+  let content: ArrayBuffer;
+  try {
+    content = await upstream.arrayBuffer();
+  } catch {
+    return NextResponse.json({ detail: 'La descarga se interrumpió. Vuelve a intentarlo.' }, { status: 502 });
+  }
+  return new NextResponse(content, {
     headers: {
       'content-type': 'application/zip',
       'content-disposition': 'attachment; filename="gerarai-obsidian-vault.zip"',
