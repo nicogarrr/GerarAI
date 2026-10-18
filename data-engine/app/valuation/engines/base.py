@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import math
-from datetime import date, datetime, time, timezone
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import UTC, date, datetime, time
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -25,7 +25,7 @@ MODEL_VERSION = "valuation-engines-v2"
 
 
 def _cutoff_end_of_day(as_of: date) -> datetime:
-    return datetime.combine(as_of, time.max, tzinfo=timezone.utc)
+    return datetime.combine(as_of, time.max, tzinfo=UTC)
 
 
 def traceable_wacc(

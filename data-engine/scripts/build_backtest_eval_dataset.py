@@ -398,6 +398,8 @@ def _seed_company(db, spec: dict) -> None:
             status="ok",
             definition_version="WACC_STANDARD_V1",
             formula="ke*E/(D+E) + kd*(1-t)*D/(D+E)",
+            # computed before every replay cutoff (PIT filter: created_at <= as_of)
+            created_at=datetime(2020, 1, 1, tzinfo=UTC),
         )
     )
 
