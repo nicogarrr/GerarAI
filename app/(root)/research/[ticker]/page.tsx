@@ -403,7 +403,7 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
   if (valuation.status === 'insufficient_data') {
     return (
       <div className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-4 text-sm text-amber-200">
-        La valoración está bloqueada por entradas faltantes: {(valuation.missing_inputs ?? []).join(', ') || 'entradas sin especificar'}.
+        La valoración está bloqueada por entradas faltantes: {(valuation.missing_inputs ?? []).map(termLabel).join(', ') || 'entradas sin especificar'}.
       </div>
     );
   }
@@ -412,7 +412,7 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
   const inputSource = typeof valuation.trace?.input_source === 'string' ? valuation.trace.input_source : null;
   const periods = Object.entries(valuation.trace?.periods ?? {})
     .filter(([, value]) => value)
-    .map(([metric, period]) => `${metric}: ${period}`)
+    .map(([metric, period]) => `${termLabel(metric)}: ${period}`)
     .join(' · ');
   // Una valoración no publicable (estado distinto de ok, p.ej. partial por
   // entradas sin trazabilidad fechada como traceable_wacc) no puede
@@ -450,11 +450,11 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
         <div className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-4 text-sm text-amber-200">
           <p className="font-semibold">Orientación del motor, no precio objetivo.</p>
           <p className="mt-1">
-            Esta valoración no es publicable (estado {valuation.status ?? 'desconocido'}): los números de
+            Esta valoración no es publicable (estado {label(valuation.status ?? 'unknown')}): los números de
             abajo son una orientación del motor, no una valoración final ni un precio objetivo.
           </p>
-          {blockers.length ? <p className="mt-2 text-xs">Motivos registrados: {blockers.join(', ')}.</p> : null}
-          {missingInputs.length ? <p className="mt-2 text-xs">Entradas faltantes: {missingInputs.join(', ')}.</p> : null}
+          {blockers.length ? <p className="mt-2 text-xs">Motivos registrados: {blockers.map(termLabel).join(', ')}.</p> : null}
+          {missingInputs.length ? <p className="mt-2 text-xs">Entradas faltantes: {missingInputs.map(termLabel).join(', ')}.</p> : null}
           {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">Nota del motor: {engineNotice}</p> : null}
         </div>
         <div className="grid grid-cols-1 gap-4 opacity-60 sm:grid-cols-3">
@@ -463,7 +463,7 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
           <Stat label={`Bull (orientación)${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
         </div>
         <p className="text-xs leading-5 text-gray-500">
-          Valoración persistida ({valuation.model_type}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {valuation.status ?? 'desconocido'}).
+          Valoración persistida ({termLabel(valuation.model_type)}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {label(valuation.status ?? 'unknown')}).
           El «valor por acción» del Modelo a largo plazo es otro cálculo (otra versión/fecha/motor).
           Fuente de datos: {inputSource ?? NA}{periods ? ` · periodos ${periods}` : ` · periodos ${NA}`}.
         </p>
@@ -479,7 +479,7 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
         <Stat label={`Bull${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
       </div>
       <p className="text-xs leading-5 text-gray-500">
-        Valoración persistida ({valuation.model_type}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {valuation.status ?? 'desconocido'}).
+        Valoración persistida ({termLabel(valuation.model_type)}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {label(valuation.status ?? 'unknown')}).
         No es comparable 1:1 con el «valor por acción» del Modelo a largo plazo: ese es un cálculo interno
         del escenario (otra versión/fecha/motor). Antes de fiarte, comprueba versión y fecha en ambas vistas.
         Fuente de datos: {inputSource ?? NA}{periods ? ` · periodos ${periods}` : ` · periodos ${NA}`}.

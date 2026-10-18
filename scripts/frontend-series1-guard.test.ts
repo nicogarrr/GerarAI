@@ -46,3 +46,10 @@ test('decisional fields removed from columns stay reachable in row detail (audit
   assert.match(portfolio, /En cartera desde: \{holding\.firstBuyDate \?\? NA\}/);
   assert.match(portfolio, /Sin historial de compra registrado/);
 });
+
+
+test('noticias conserva columna Materialidad sin leyenda explicativa', () => {
+  const source = readFileSync('components/research/NewsEventsFlow.tsx', 'utf8');
+  assert.match(source, /scope="col">Materialidad/);
+  assert.doesNotMatch(source, /Materialidad: puntuación del evento/);
+});
