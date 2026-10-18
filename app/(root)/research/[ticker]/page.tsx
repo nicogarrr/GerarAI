@@ -39,6 +39,8 @@ import { missingLayerAction, missingLayerLabel } from '@/lib/research/missing-la
 import { metricLabel } from '@/lib/research/metric-labels';
 import { MoatPanel } from '@/components/research/MoatPanel';
 import { AstOrbitPanel } from '@/components/research/AstOrbitPanel';
+import { ThesisScenariosPanel } from '@/components/research/ThesisScenariosPanel';
+import { getThesisWithScenarios } from '@/lib/actions/thesis-scenarios.actions';
 import { getAstOrbitOverview, getAstsAnalysis } from '@/lib/actions/asts-orbits.actions';
 import {
   DecisionAndRealityPanel,
@@ -68,7 +70,6 @@ import {
   getResearchMoatWorkspace,
   getResearchPeersWorkspace,
   getResearchSourceAuditsWorkspace,
-  getResearchThesisWorkspace,
   getResearchValuationWorkspace,
   importResearchDocumentFile,
   importResearchDocumentUrl,
@@ -589,7 +590,7 @@ function fmpCovers(ticker: string, exchange: string | null | undefined): boolean
  */
 type ViewWorkspaces = {
   overview: null;
-  thesis: Awaited<ReturnType<typeof getResearchThesisWorkspace>>;
+  thesis: Awaited<ReturnType<typeof getThesisWithScenarios>>;
   changes: Awaited<ReturnType<typeof getResearchChangesWorkspace>>;
   financials: Awaited<ReturnType<typeof getResearchFinancialsWorkspace>>;
   model: Awaited<ReturnType<typeof getResearchLongTermModel>>;
@@ -624,6 +625,7 @@ const EMPTY_VIEW_DATA: { [K in keyof ViewWorkspaces]: ViewWorkspaces[K] } = {
     historyDetail: { count: 0, history: [] },
     partial: true,
     errors: [],
+    scenarios: null,
   },
   changes: { changes: [], reviews: [], alerts: [], decisions: [], expectations: [] },
   financials: { facts: [], calculatedMetrics: [] },
@@ -656,7 +658,7 @@ function launchViewData(
 ): { key: keyof ViewWorkspaces; promise: Promise<unknown> } | undefined {
   switch (activeView) {
     case 'thesis':
-      return { key: 'thesis', promise: withResearchTelemetry('thesis-workspace', () => getResearchThesisWorkspace(ticker)) };
+      return { key: 'thesis', promise: withResearchTelemetry('thesis-workspace', () => getThesisWithScenarios(ticker)) };
     case 'changes':
       return { key: 'changes', promise: withResearchTelemetry('changes-workspace', () => getResearchChangesWorkspace(ticker)) };
     case 'financials':
@@ -1130,6 +1132,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             />
           )}
         </Panel>
+        <ThesisScenariosPanel adrRatio={data.thesis?.valuation_basis?.adr_ratio} currency={company.currency} data={data.scenarios} />
         <Panel title="Secciones de tesis específicas de la empresa" collapsible="mobile">
           {data.sections.length ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
