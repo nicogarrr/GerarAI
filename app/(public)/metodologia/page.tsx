@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 
 import { GlossaryTerm } from '@/components/GlossaryTerm';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 export const dynamic = 'force-dynamic';
@@ -41,7 +40,7 @@ const sources = [
   {
     icon: Database,
     title: 'Finnhub',
-    text: 'Precios (quotes), perfiles de compañía (profile2) y búsqueda de símbolos, incluidos tickers poco comunes. Capa gratuita con API key: es la fuente principal de nombres y cotizaciones.',
+    text: 'Precios (quotes), perfiles de compañía (profile2) y búsqueda de símbolos, incluidos tickers poco comunes. Capa gratuita con clave.',
     href: '/research',
     cta: 'Ver research',
   },
@@ -59,25 +58,32 @@ const sources = [
     href: '/insider',
     cta: 'Ver señales insider',
   },
+  {
+    icon: Database,
+    title: 'Otras fuentes públicas',
+    text: 'FRED (series macroeconómicas, cuando está configurada), CelesTrak (elementos orbitales), GDELT (noticias), CNMV (posiciones cortas en España) y FINRA (interés corto en EE. UU.).',
+    href: '/research',
+    cta: 'Ver research',
+  },
 ];
 
 const engines = [
   {
-    title: 'Standard DCF (por defecto)',
+    title: 'DCF estándar (por defecto)',
     text: (
       <>
         DCF FCFF a 5 años sobre ingresos y margen FCF del último snapshot coherente: si falta el margen se deriva
         como FCF/ingresos (acotado a 1%-50%) y el crecimiento sale de los hechos o de un valor por defecto (acotado
         a -15%/+45%). El <GlossaryTerm k="wacc" icon={false}>WACC</GlossaryTerm> y el crecimiento terminal usan un
         valor por defecto etiquetado como tal; la deuda neta del snapshot resta al equity (la caja neta suma).
-        Escenarios bear/base/bull, sensibilidad 3x3 crecimiento x WACC y{' '}
-        <GlossaryTerm k="reverse_dcf" icon={false}>reverse DCF</GlossaryTerm> incluidos.
+        Escenarios bajista/base/alcista, sensibilidad 3x3 crecimiento x WACC y{' '}
+        <GlossaryTerm k="reverse_dcf" icon={false}>DCF inverso</GlossaryTerm> incluidos.
       </>
     ),
   },
   {
     title: 'Pre-revenue / especulativo (pre-FCF)',
-    text: 'DCF a 5 años para empresas sin caja libre: ingresos mínimos de 1,0 (para que ~0 no rompa la matemática), margen 1%-40%, crecimiento por defecto del 20% (acotado a -15%/+60%) y WACC del 13% por defecto. Escenarios causales (retraso de ejecución o estrés de financiación, base, monetización acelerada) con dilución extra en el bear (>=15%, tope del 80% del valor) y funding gap estimado a 2 años con buffer del 50%.',
+    text: 'DCF a 5 años para empresas sin caja libre: ingresos mínimos de 1,0 (para que ~0 no rompa la matemática), margen 1%-40%, crecimiento por defecto del 20% (acotado a -15%/+60%) y WACC del 13% por defecto. Escenarios causales (retraso de ejecución o estrés de financiación, base, monetización acelerada) con dilución extra en el escenario bajista (≥15%, tope del 80% del valor) y necesidad de financiación estimada a 2 años con buffer del 50%.',
   },
   {
     title: 'Commodities (minería, energía, uranio)',
@@ -85,18 +91,18 @@ const engines = [
   },
   {
     title: 'SOTP (multi-segmento)',
-    text: 'NAV = suma de (métrica operativa del segmento x múltiplo del segmento) - deuda neta, con contrato explícito de hechos por segmento y descuento holding entre 0 y 1. Escenarios: descuento +15pp (techo 45%) / base / -8pp con NAV x1,12 en el bull; sensibilidad del descuento -5pp / base / +5pp. Nunca cae a un DCF de firma única.',
+    text: 'NAV = suma de (métrica operativa del segmento x múltiplo del segmento) - deuda neta, con contrato explícito de hechos por segmento y descuento holding entre 0 y 1. Escenarios: descuento +15pp (techo 45%) / base / -8pp con NAV x1,12 en el alcista; sensibilidad del descuento -5pp / base / +5pp. Nunca cae a un DCF de firma única.',
   },
   {
     title: 'Holding company (tipo BN/BABA)',
-    text: 'Para holdings: hereda el SOTP con descuento holding explícito que recoge el conglomerate discount persistente del grupo. Mismos escenarios y misma sensibilidad del descuento que el SOTP.',
+    text: 'Para holdings: hereda el SOTP con descuento holding explícito que recoge el descuento de conglomerado persistente del grupo. Mismos escenarios y misma sensibilidad del descuento que el SOTP.',
   },
 ];
 
 const steps = [
   {
     title: 'Métricas de calidad y crecimiento',
-    text: 'Rentabilidad, flujo de caja, crecimiento y salud de balance, calculadas sobre los filings persistidos. La valoración (FCF/earnings yield) y el momentum aún no puntúan en v1: lo declara el embudo de abajo.',
+    text: 'Rentabilidad, flujo de caja, crecimiento y salud de balance, calculadas sobre los filings persistidos. La valoración y el momentum aún no puntúan en v1 (ver el embudo).',
   },
   {
     title: 'Ranking por percentiles del universo',
@@ -128,7 +134,7 @@ const limits = [
     title: 'Point-in-time',
     text: (
       <>
-        Los motores de valoración solo usan información disponible en cada fecha simulada: sin mirar al futuro.
+        Los motores de valoración solo usan información disponible en cada fecha simulada.
         Evitar el <GlossaryTerm k="look_ahead" icon={false}>look-ahead</GlossaryTerm> es lo que hace que un backtest
         sea creíble.
       </>
@@ -145,17 +151,17 @@ const costs = [
   {
     icon: Wallet,
     title: 'Datos: 0 EUR/mes',
-    text: 'Finnhub (capa gratuita con key), Yahoo Finance (chart API sin key) y SEC EDGAR (acceso público). Las tres fuentes de datos activas son sin cuota.',
+    text: 'Finnhub (capa gratuita con clave), Yahoo Finance (sin clave), SEC EDGAR (acceso público) y el resto de fuentes listadas arriba se usan sin cuota de pago.',
   },
   {
     icon: FlaskConical,
     title: 'Modelos LLM: por uso',
-    text: 'OpenCode Go como único proveedor, con el precio por modelo publicado en model_aliases.py (coste real o "desconocido" explícito, nunca 0 silencioso). Las micro-decisiones van por el cliente Jev (~0,042 USD/MTok de entrada, salida gratuita) con presupuesto objetivo por debajo de 0,50 USD/mes.',
+    text: 'Los modelos de lenguaje usan OpenCode Go como proveedor principal; el chat tiene como respaldo Groq y Gemini cuando están configurados, en su capa gratuita. El coste se registra por modelo: si no se conoce, se dice «desconocido» en lugar de poner un 0.',
   },
   {
     icon: BookOpen,
     title: 'Infraestructura: autoalojada',
-    text: 'Frontend en Vercel (plan hobby); backend autoalojado con Postgres, Qdrant, MinIO y Redis en la máquina propia. Sin cuota cloud: solo energía y hardware del host.',
+    text: 'Frontend en Vercel; backend autoalojado en una máquina propia. Sin cuota cloud: solo energía y hardware del host.',
   },
 ];
 
@@ -175,7 +181,7 @@ export default function MetodologiaPage() {
           <Button asChild className="h-11 w-full sm:w-auto" variant="outline">
             <Link href="/knowledge">
               <BookOpen className="h-4 w-4" />
-              Knowledge
+              Biblioteca
             </Link>
           </Button>
           <Button asChild className="h-11 w-full sm:w-auto" variant="outline">
@@ -198,7 +204,7 @@ export default function MetodologiaPage() {
           descubra el muro de sesión al pulsarlos. */}
       <p className="rounded-xl border border-gray-700/50 bg-surface-overlay p-4 text-sm leading-6 text-gray-300">
         Esta página es pública. Los botones y las fichas que enlazan (research, índices, señales de
-        insiders, Knowledge, búsqueda de evidencia y ProPicks) forman parte del espacio de trabajo:
+        insiders, Biblioteca, búsqueda de evidencia y ProPicks) forman parte del espacio de trabajo:
         requieren una cuenta, así que al pulsarlos se te pedirá iniciar sesión.{' '}
         <Link href="/sign-up" className="public-footer-link">
           Crear cuenta
@@ -266,14 +272,10 @@ export default function MetodologiaPage() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Calculator className="h-5 w-5 text-teal-300" />
           <h2 className="text-lg font-semibold text-gray-100">Motores de valoración</h2>
-          <Badge className="sm:ml-auto" variant="outline">
-            5 motores
-          </Badge>
         </div>
         <p className="mb-4 text-sm leading-6 text-gray-400">
-          Cada compañía se valora con el motor que le corresponde por su tipo y factor tags; los supuestos de abajo
-          son los reales del código (data-engine/app/valuation/engines/), no una descripción de marketing. Cuando
-          falta un dato obligatorio el motor devuelve insufficient_data en lugar de inventar un número.
+          Cada compañía se valora con el motor que le corresponde por su tipo y sus etiquetas. Cuando falta un dato
+          obligatorio, el motor devuelve «datos insuficientes» en lugar de inventar un número.
         </p>
         <ol className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
           {engines.map((engine, index) => (
@@ -294,8 +296,7 @@ export default function MetodologiaPage() {
         <p className="mt-4 text-xs leading-5 text-gray-500">
           Además existen motores sectoriales dedicados para bancos (P/B justificado = (ROE - g)/(CoE - g)),
           aseguradoras (el mismo P/B multiplicado por un factor del combined ratio) e inmobiliarias cotizadas (REIT).
-          Los escenarios bear/base/bull de cada motor se muestran con sus supuestos en la ficha de la compañía,
-          dentro de &laquo;Supuestos del escenario&raquo;.
+          Los escenarios de cada motor se muestran con sus supuestos en la ficha de la compañía.
         </p>
       </section>
 
@@ -303,9 +304,6 @@ export default function MetodologiaPage() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Sparkles className="h-5 w-5 text-teal-300" />
           <h2 className="text-lg font-semibold text-gray-100">Cómo se generan los ProPicks</h2>
-          <Badge className="sm:ml-auto" variant="outline">
-            4 pasos
-          </Badge>
         </div>
         <ol className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
           {steps.map((step, index) => (
@@ -323,13 +321,9 @@ export default function MetodologiaPage() {
             </li>
           ))}
         </ol>
-        <p className="mt-4 rounded-xl border border-teal-900/60 bg-teal-950/20 p-4 text-sm leading-6 text-teal-100">
-          <strong>GerarAI ProPicks:</strong> la selección v1 puntúa calidad, rentabilidad, flujo de
-          caja y crecimiento por percentiles sobre todo el universo persistido. La valoración
-          (FCF yield / earnings yield) y el momentum aún no entran en el embudo v1: las series de
-          precios solo se persisten para el top-N tras cada run, no para todo el universo. De las cuatro estrategias (adaptativa, value, momentum y
-          defensiva), cada ficha declara su estado real: si aún no tiene selección o backtest
-          publicados, lo dice en lugar de mostrar estimaciones.
+        <p className="mt-4 text-sm leading-6 text-gray-400">
+          De las cuatro estrategias (adaptativa, value, momentum y defensiva), cada ficha declara su estado real: si
+          aún no tiene selección o backtest publicados, lo dice en lugar de mostrar estimaciones.
         </p>
       </section>
 
@@ -337,11 +331,8 @@ export default function MetodologiaPage() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Search className="h-5 w-5 text-teal-300" />
           <h2 className="text-lg font-semibold text-gray-100">
-            Embudo ProPicks (etapa big-data, v1)
+            Embudo de ProPicks
           </h2>
-          <Badge className="sm:ml-auto" variant="outline">
-            propicks-funnel-v1
-          </Badge>
         </div>
         <div className="space-y-3 text-sm leading-6 text-gray-400">
           <p>
@@ -381,11 +372,11 @@ export default function MetodologiaPage() {
             </li>
           </ul>
           <p>
-            <strong className="text-gray-200">Lo que v1 NO incluye todavía:</strong> valoración
-            (FCF yield / earnings yield) y momentum — el embudo v1 no los usa: las series de
-            precios solo se persisten para el top-N tras cada run, no para todo el universo. Cada ejecución del embudo se guarda completa (runs y candidatos,
-            incluidos los descartados con sus motivos), así que el histórico y el diff entra/sale
-            son auditables.
+            <strong className="text-gray-200">Lo que v1 NO incluye todavía:</strong> la valoración
+            (FCF yield / earnings yield) y el momentum aún no entran en el embudo v1: las series de
+            precios solo se guardan para el top-N de cada ejecución, no para todo el universo. Cada
+            ejecución se guarda completa, con los candidatos descartados y sus motivos, así que el
+            histórico y las entradas y salidas son auditables.
           </p>
         </div>
       </section>
@@ -394,18 +385,13 @@ export default function MetodologiaPage() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-teal-300" />
           <h2 className="text-lg font-semibold text-gray-100">Marco de calidad (MOAT)</h2>
-          <Badge className="sm:ml-auto" variant="outline">
-            Hasta 8 criterios
-          </Badge>
         </div>
         <p className="mb-4 text-sm leading-6 text-gray-400">
           Estos ocho criterios describen calidad financiera histórica, no demuestran por sí solos
           un foso competitivo. Solo se puntúan en el perfil operativo general y con datos
-          suficientes. Para empresas en etapa temprana o de crecimiento, financieras y cíclicas,
-          no se muestra un 0/8 engañoso: el resultado es «no evaluable con estos umbrales».
-          El perfil se basa en tipo, sector y etiquetas registrados, no en el ticker ni en pérdidas
-          de un año. Cada valor subyacente permanece accesible como métrica individual. La
-          evaluación del foso exige evidencia verificable por separado; su ausencia no equivale a cero.
+          suficientes. Para empresas en etapa temprana o de crecimiento, financieras y cíclicas
+          el resultado es «no evaluable con estos umbrales», no un 0/8. El perfil se basa en tipo, sector y etiquetas registrados, no en el ticker ni en pérdidas de un año. La evaluación del foso exige evidencia
+          verificable por separado; su ausencia no equivale a cero.
         </p>
         <ul className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
           {[
@@ -428,20 +414,15 @@ export default function MetodologiaPage() {
           ))}
         </ul>
         <p className="mt-4 rounded-xl border border-teal-900/60 bg-teal-950/20 p-4 text-sm leading-6 text-teal-100">
-          Los umbrales son ajustables: están definidos como constantes documentadas en el motor
-          de métricas (metric_calculation_service.py) y aquí para revisarlos en cualquier
-          momento. Owner earnings estima el capex de mantenimiento como min(|capex|, D&A), una
-          aproximación conservadora declarada (Buffett, carta de 1986); el CFROI usa la
-          aproximación declarada del sistema, no el CFROI completo de Credit Suisse.
+          Owner earnings estima el capex de mantenimiento como min(|capex|, D&A), una
+          aproximación conservadora (Buffett, carta de 1986); el CFROI es una aproximación, no el CFROI
+          completo de Credit Suisse.
         </p>
         <p className="mt-4 rounded-xl border border-gray-800 bg-black/30 p-4 text-sm leading-6 text-gray-400">
-          Emisores ESEF (España/UE): IFRS reparte la deuda en varios tags y la metodología
-          prohíbe sumarlos, así que ROIC y WACC estándar no son calculables. En su lugar el V2
-          usa dos aproximaciones declaradas, ambas conservadoras contra el check: el WACC se
-          calcula como coste de equity puro (cota superior del WACC real, umbral más exigente)
-          y el capital invertido como activos − caja (cota superior del denominador, ROIC a la
-          baja). Si una empresa no tiene datos suficientes, el check queda no evaluable aunque
-          el grado sea alcanzable: nunca se maquilla.
+          Emisores ESEF (España/UE): IFRS reparte la deuda en varias partidas y no se suman, así que ROIC y
+          WACC estándar no son calculables. Se usan dos aproximaciones conservadoras: el WACC como coste de
+          equity puro (umbral más exigente) y el capital invertido como activos menos caja (ROIC a la baja).
+          Sin datos suficientes, el criterio queda no evaluable.
         </p>
       </section>
 
@@ -485,11 +466,6 @@ export default function MetodologiaPage() {
             </article>
           ))}
         </div>
-        <p className="mt-4 rounded-xl border border-gray-800 bg-black/30 p-4 text-sm leading-6 text-gray-400">
-          Fuentes, límites y costes se documentan aquí mismo, sin letra pequeña: lo que ves es lo que hay. Si un
-          coste no se puede cuantificar, se dice &laquo;desconocido&raquo; en lugar de poner un 0 que rompería el
-          presupuesto.
-        </p>
       </section>
     </main>
   );
