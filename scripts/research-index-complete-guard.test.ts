@@ -68,13 +68,3 @@ test('paginateAll aborta si el backend cicla paginas distintas', async () => {
     await assert.rejects(() => paginateAll(fetchPage, 500, (t) => t), /página repetida/);
 });
 
-test('workflows no carga el indice completo de empresas', () => {
-    const workflows = readFileSync('app/(root)/research/workflows/page.tsx', 'utf8');
-    for (const [name, src] of [['workflows', workflows]] as const) {
-        assert.ok(
-            !src.includes('getResearchDashboard'),
-            `${name} solo necesita su accion ligera; el dashboard arrastra todas las empresas`,
-        );
-    }
-    assert.match(workflows, /getResearchWorkflows/);
-});

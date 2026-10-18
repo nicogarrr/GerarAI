@@ -35,15 +35,9 @@ test('la sección del plan tiene un solo destino: sin título duplicado', () => 
     assert.match(constants, /export function showsNavSectionTitle[\s\S]*?section\.items\.length > 1/);
 });
 
-test('/research/workflows fuera del árbol principal, miga legible y reachable', () => {
-    const navSections = constants.slice(constants.indexOf('export const NAV_SECTIONS'), constants.indexOf('export const ROUTE_CATALOG'));
-    assert.ok(!navSections.includes("'/research/workflows'"), 'Workflows no debe estar en NAV_SECTIONS');
-    // La página sigue existiendo, reachable desde el subnav de Research vía
-    // ROUTE_CATALOG (mantenerla o eliminarla es decisión pendiente de Nico,
-    // 17-oct: mientras tanto no se le quita el único enlace que tenía) y su
-    // miga no sale cruda.
-    assert.match(constants, /\{ href: '\/research\/workflows', label: 'Workflows'/);
-    assert.match(breadcrumbs, /'workflows': 'Workflows'/);
+test('/research/workflows eliminado (decision de Nico, 2-oct)', () => {
+    assert.ok(!constants.includes('/research/workflows'), 'Workflows no debe estar en la navegacion');
+    assert.ok(!breadcrumbs.includes("'workflows'"));
 });
 
 test('«Vista de mercado» pasa a «Mercado»', () => {

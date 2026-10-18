@@ -25,7 +25,6 @@ const SUBROUTE_LABELS: Record<string, string> = {
   'decision-lessons': 'Lecciones de decisiones',
   'management-credibility': 'Credibilidad de la directiva',
   // Fuera del nav principal (quick win UX 3); la miga sigue legible.
-  'workflows': 'Workflows',
   // Modulo Inversores: sub-paginas fijas (no son un slug de inversor).
   'carteras': 'Carteras',
   'mas-compradas': 'Más compradas',

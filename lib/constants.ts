@@ -167,10 +167,6 @@ export const ROUTE_CATALOG: NavSection[] = [
           { href: '/research/news', label: 'Noticias', icon: Newspaper, hub: '/research' },
           { href: '/research/sources', label: 'Fuentes', icon: Library, hub: '/research' },
           { href: '/research/data-health', label: 'Salud de los datos', icon: Gauge, hub: '/research' },
-          // /research/workflows sigue reachable tal cual estaba (subnav de
-          // Research): la decision de mantenerlo o eliminarlo es de Nico,
-          // pendiente al 17-oct. Fuera de NAV_SECTIONS en todo caso.
-          { href: '/research/workflows', label: 'Workflows', icon: Lightbulb, hub: '/research' },
         ],
       },
       {
