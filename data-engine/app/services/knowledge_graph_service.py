@@ -6,7 +6,7 @@ import re
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, union_all
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -373,7 +373,24 @@ class KnowledgeGraphService:
         if company_id is not None:
             conds.append(KnowledgeGraphNode.company_id == company_id)
         statement = select(KnowledgeGraphNode).where(*conds)
-        nodes = list(db.scalars(statement.order_by(KnowledgeGraphNode.id).limit(limit)).all())
+        # Rank by actual active degree within the requested scope, not insertion
+        # order (sync inserts all companies before their connected knowledge).
+        eligible = select(KnowledgeGraphNode.id).where(*conds).subquery()
+        active_edges = select(KnowledgeGraphEdge).where(
+            KnowledgeGraphEdge.status == "active",
+            KnowledgeGraphEdge.from_node_id.in_(select(eligible.c.id)),
+            KnowledgeGraphEdge.to_node_id.in_(select(eligible.c.id)),
+        ).subquery()
+        endpoints = union_all(
+            select(active_edges.c.from_node_id.label("node_id")),
+            select(active_edges.c.to_node_id.label("node_id")),
+        ).subquery()
+        degrees = select(endpoints.c.node_id, func.count().label("degree")).group_by(endpoints.c.node_id).subquery()
+        nodes = list(db.scalars(
+            statement.outerjoin(degrees, degrees.c.node_id == KnowledgeGraphNode.id)
+            .order_by(func.coalesce(degrees.c.degree, 0).desc(), KnowledgeGraphNode.id)
+            .limit(limit)
+        ).all())
         node_ids = {node.id for node in nodes}
         edges = (
             list(
