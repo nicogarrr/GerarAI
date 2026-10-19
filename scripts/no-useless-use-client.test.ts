@@ -200,7 +200,6 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/ui/tooltip.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-tooltip',
   'components/common/AnalystTargetLine.tsx': 'useState, useEffect: pide el consenso de objetivos tras el primer pintado (fuera del render de servidor)',
   'components/common/ExtendedHoursLine.tsx': 'useState, useEffect: pide la cotización extendida tras el primer pintado (fuera del render de servidor)',
-  'components/calendar/CompanyLogo.tsx': 'useState, jsx-onError: cae a iniciales si el logo no carga',
   'components/watchlist/WatchlistAddButton.tsx': 'useCallback, useEffect, useRef, useState, useRouter, jsx-onClick, libreria cliente: sonner',
   'components/watchlist/WatchlistRemoveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
   'components/work-products/WorkProductButton.tsx': 'useState, jsx-onOpenChange, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/label.tsx, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/select.tsx',
