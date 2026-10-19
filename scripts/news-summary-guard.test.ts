@@ -67,3 +67,26 @@ test('resumen sustancioso sin cierre se conserva y marca continuación', () => {
     const body = 'CEO Elon Musk challenged Anthropic’s plan to dedicate a portion of its ownership to public-benefit initiatives';
     assert.equal(newsSummaryToShow('Titular', body), `${body}…`);
 });
+
+// Afinado 19-oct-2026 (medido en prod tras #1750: los 4 resúmenes visibles
+// seguían siendo fragmentos). Casos reales de prod:
+test('resumen cortado en origen con puntos suspensivos no se pinta', () => {
+    assert.equal(newsSummaryToShow('Meta y los mercados esta semana', 'Earnings, crude oil prices, and macroeconomic data…'), null);
+    assert.equal(newsSummaryToShow('X', 'The company expects strong growth in the coming quarters and beyond...'), null);
+});
+test('resumen que arranca a media narración no se pinta', () => {
+    assert.equal(newsSummaryToShow("Did Tesla's Fall Catch You Out? What Investors Missed", 'Told a very different story. Investors who held Tesla over the past year are down 20.7%, including dividends.'), null);
+    assert.equal(newsSummaryToShow('Titular', 'Said the board would meet again next quarter to review the plan in detail.'), null);
+});
+test('resumen que arranca con unidad suelta (cifra cortada) no se pinta', () => {
+    assert.equal(newsSummaryToShow('Musk promete una acción de SpaceX por niño', 'Million children.'), null);
+    assert.equal(newsSummaryToShow('Titular', 'Billion euros in new commitments for the region.'), null);
+});
+test('cabecera de agencia se recorta y el resto vuelve a pasar la higiene', () => {
+    assert.equal(newsSummaryToShow('Informe de mercado de foundries', 'Dublin, Oct. 19, 2026 (GLOBE NEWSWIRE) -- "Wafer Foundry Service Market Report 2026" has been added to Researc…'), null);
+    const ok = newsSummaryToShow('Titular', 'Dublin, Oct. 19, 2026 (GLOBE NEWSWIRE) -- The company confirmed the plan for the next fiscal year.');
+    assert.equal(ok, 'The company confirmed the plan for the next fiscal year.');
+});
+test('resumen corto pero correcto sigue pintándose', () => {
+    assert.equal(newsSummaryToShow('A', 'Resumen completo.'), 'Resumen completo.');
+});

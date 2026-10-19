@@ -11,7 +11,13 @@
  * restos a media frase): no se pinta un resumen que
  *   - es un trozo del propio titular (subcadena normalizada), o
  *   - no cierra con puntuación y es demasiado corto o empieza por una
- *     palabra función («Of Tesla — Sees Announcement…»).
+ *     palabra función («Of Tesla — Sees Announcement…»), o
+ *   - llega ya cortado de origen (termina en «…»/«...»), empieza a media
+ *     narración («Told a very different story.…») o es demasiado corto para
+ *     aportar aunque cierre con punto («Million children.»). Medido en prod
+ *     19-oct-2026: los 4 resúmenes que sobrevivían eran de estos tipos.
+ * Las cabeceras de agencia («Dublin, Oct. 19, 2026 (GLOBE NEWSWIRE) -- …») se
+ * recortan al pintar y lo que queda vuelve a pasar la higiene.
  * Lo que sí se pinta se capitaliza y, si no cierra, termina en «…» (display;
  * el original guardado no se toca). Mejor sin resumen que un fragmento roto.
  */
@@ -45,11 +51,31 @@ function capitalizeFirst(text: string): string {
     return text.slice(0, i) + text[i].toUpperCase() + text.slice(i + 1);
 }
 
+/** Cortado en origen: el proveedor ya lo entregó con puntos suspensivos. */
+const TRUNCATED_AT_SOURCE = /(…|\.{3})\s*$/;
+
+/** Arranque a media narración (resto de un scraping cortado). */
+const CONTINUATION_START = /^(told|said|added|noted|reported|claimed|alleged|wrote|continued|dijo|contó|añadió|señaló)\b/i;
+
+/** Arranque con unidad suelta: resto de una cifra cortada («…70 Million children.»). */
+const UNIT_START = /^(million|billion|trillion|thousand|percent|percentage|millones|mil)\b/i;
+
+/** Cabecera de agencia al inicio: «Dublin, Oct. 19, 2026 (GLOBE NEWSWIRE) -- ». */
+const WIRE_DATELINE = /\((?:GLOBE NEWSWIRE|GlobeNewswire|PR Newswire|PRN|Business Wire|Businesswire|ACCESSWIRE|EIN Presswire)\)\s*[-–—]{1,2}\s*/i;
+
+function stripWireDateline(text: string): string {
+    const match = WIRE_DATELINE.exec(text);
+    if (match && match.index < 60) return text.slice(match.index + match[0].length).trim();
+    return text;
+}
+
 function looksLikeFragment(text: string): boolean {
     const trimmed = text.trim();
     if (!trimmed) return true;
-    if (TERMINAL_PUNCT.test(trimmed)) return false;
+    if (TRUNCATED_AT_SOURCE.test(trimmed)) return true;
     const words = trimmed.split(/\s+/);
+    if (CONTINUATION_START.test(trimmed) || UNIT_START.test(trimmed)) return true;
+    if (TERMINAL_PUNCT.test(trimmed)) return false;
     if (words.length < 6) return true;
     return FUNCTION_WORDS.has(norm(words[0]));
 }
@@ -76,6 +102,7 @@ export function newsSummaryToShow(headline: string, summary: string | null | und
         if (!out) return null;
     }
     out = stripSourceSuffix(out, source);
+    out = stripWireDateline(out);
     if (!out) return null;
     // Trozo del propio titular (p. ej. la cola del titular de otro agregador
     // guardada como resumen): no aporta nada bajo el titular.
