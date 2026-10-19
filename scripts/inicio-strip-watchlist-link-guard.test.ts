@@ -7,9 +7,9 @@ import test from 'node:test';
 const STRIP = readFileSync('components/calendar/EarningsDayStrip.tsx', 'utf8');
 const OVERVIEW = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
 
-test('tira de calendario: 7 columnas y logos de 48px solo desde xl; por debajo, scroll', () => {
-    assert.ok(STRIP.includes('xl:grid xl:grid-cols-7'));
-    assert.ok(STRIP.includes('sm:size-10 xl:size-12'));
+test('tira de calendario: 7 columnas y logos de 48px solo desde 2xl; por debajo, scroll', () => {
+    assert.ok(STRIP.includes('2xl:grid 2xl:grid-cols-[repeat(7,minmax(0,1fr))]'));
+    assert.ok(STRIP.includes('sm:size-10 2xl:size-12'));
     assert.ok(STRIP.includes('size-9'));
 });
 
