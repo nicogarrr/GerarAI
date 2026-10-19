@@ -416,6 +416,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                     <span className={tx.code === 'P' ? 'text-teal-300' : tx.code === 'S' ? 'text-red-400' : 'text-gray-400'}>
                                                         {insiderCodeLabel(tx.code)}
                                                         {tx.is_derivative ? ' · derivado' : ''}
+                                                        {tx.rule_10b5_1 ? ' · plan 10b5-1' : ''}
                                                     </span>
                                                     <span className="tabular-nums text-gray-300">{formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 })} acc.</span>
                                                     {tx.price !== null && tx.price !== undefined ? (

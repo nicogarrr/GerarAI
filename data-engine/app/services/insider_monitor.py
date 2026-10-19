@@ -37,6 +37,7 @@ from app.models.entities import (
 )
 from app.services import insider_persistence
 from app.services.connectors import form4 as form4_connector
+from app.services.insider_persistence import PARSER_VERSION as INSIDER_PARSER_VERSION
 from app.services.insider_service import _cik_for_ticker
 
 CONNECTOR_NAME = "insider_monitor"
@@ -212,6 +213,19 @@ def scan(
                 client=client,
                 fetcher=fetcher,
             )
+            budget = max(0, budget - stats["backfill"].get("examined", 0))
+        if backfill and budget > 0:
+            # Planes 10b5-1: re-lectura acotada de XML ya persistidos para
+            # marcar rule_10b5_1 (columna anadida despues del dato).
+            stats["backfill_10b5_1"] = backfill_rule_10b5_1(
+                db,
+                tenant_id=tenant_id,
+                max_fetches=budget,
+                delay_seconds=delay_seconds,
+                sleeper=sleeper,
+                client=client,
+                fetcher=fetcher,
+            )
         if stats["errors"]:
             stats["status"] = "partial" if stats["tickers_scanned"] else "error"
         _record_success(db, state, stats)
@@ -290,6 +304,98 @@ def backfill_empty_filings(
                 db.add(record)
                 db.commit()
                 stats["empty"] += 1
+        except Exception:  # noqa: BLE001 - best-effort por filing
+            db.rollback()
+            stats["failed"] += 1
+        if delay_seconds > 0:
+            sleeper(delay_seconds)
+    return stats
+
+
+def backfill_rule_10b5_1(
+    db: Session,
+    *,
+    tenant_id: int | None = None,
+    max_fetches: int = 25,
+    delay_seconds: float = DEFAULT_DELAY_SECONDS,
+    sleeper: Callable[[float], None] = time.sleep,
+    client=None,
+    fetcher: Callable[[dict], str] | None = None,
+) -> dict[str, Any]:
+    """Marca rule_10b5_1 en transacciones ya persistidas re-leyendo su XML.
+
+    La columna llego despues del dato: hace falta re-descargar cada Form 4
+    (el XML crudo no se guarda, solo su sha). Misma disciplina que el resto
+    del monitor: presupuesto de descargas por corrida, pausa entre
+    peticiones (por debajo del limite de la SEC) y best-effort por filing —
+    un fallo de red deja el filing para la siguiente corrida, nunca lo
+    marca. No machaca: solo actualiza el flag de filas cuyo fingerprint
+    coincide con la re-lectura y sube el parser_version del filing, que es
+    lo que lo saca de la cola.
+    """
+    stats: dict[str, Any] = {"examined": 0, "updated": 0, "flagged": 0, "failed": 0}
+    has_tx = select(InsiderTransaction.id).where(
+        InsiderTransaction.filing_id == InsiderFiling.id
+    )
+    stmt = (
+        select(InsiderFiling)
+        .where(
+            InsiderFiling.tenant_id.is_(tenant_id) if tenant_id is None
+            else InsiderFiling.tenant_id == tenant_id,
+            InsiderFiling.parser_version != INSIDER_PARSER_VERSION,
+            has_tx.exists(),
+        )
+        .order_by(InsiderFiling.filing_date.desc(), InsiderFiling.id.desc())
+        .limit(max_fetches)
+    )
+    for record in list(db.scalars(stmt)):
+        stats["examined"] += 1
+        filing = {
+            "accession_number": record.accession_number,
+            "form": record.form,
+            "filing_date": record.filing_date,
+            "report_date": record.report_date,
+            "document_url": record.source_url,
+            "index_url": record.index_url,
+        }
+        try:
+            if fetcher is not None:
+                xml_text = fetcher(filing)
+            else:
+                xml_text = form4_connector.fetch_filing_xml(
+                    str(record.source_url), client=client
+                )
+            parsed = form4_connector.parse_form4_xml(xml_text)
+            by_fingerprint = {
+                insider_persistence.transaction_fingerprint(
+                    record.accession_number, row_index, tx
+                ): tx
+                for row_index, tx in enumerate(parsed.get("transactions", []))
+            }
+            rows = list(
+                db.scalars(
+                    select(InsiderTransaction).where(
+                        InsiderTransaction.filing_id == record.id
+                    )
+                )
+            )
+            changed = False
+            for row in rows:
+                tx = by_fingerprint.get(row.fingerprint)
+                if tx is None:
+                    continue
+                flag = bool(tx.get("rule_10b5_1"))
+                if row.rule_10b5_1 != flag:
+                    row.rule_10b5_1 = flag
+                    db.add(row)
+                    changed = True
+                    if flag:
+                        stats["flagged"] += 1
+            record.parser_version = INSIDER_PARSER_VERSION
+            db.add(record)
+            db.commit()
+            if changed:
+                stats["updated"] += 1
         except Exception:  # noqa: BLE001 - best-effort por filing
             db.rollback()
             stats["failed"] += 1
