@@ -14,7 +14,7 @@ import { MOBILE_TAB_ITEMS, isNavItemActive } from '@/lib/constants';
 export default function BottomNav() {
     const pathname = usePathname();
     const middle = Math.ceil(MOBILE_TAB_ITEMS.length / 2);
-    const cells: Array<(typeof MOBILE_TAB_ITEMS)[number] | 'cerebro'> = [
+    const items: Array<(typeof MOBILE_TAB_ITEMS)[number] | 'cerebro'> = [
         ...MOBILE_TAB_ITEMS.slice(0, middle),
         'cerebro',
         ...MOBILE_TAB_ITEMS.slice(middle),
@@ -26,8 +26,8 @@ export default function BottomNav() {
             className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-800 bg-gray-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
         >
             <ul className="mx-auto grid max-w-md grid-cols-6">
-                {cells.map((cell) => {
-                    if (cell === 'cerebro') {
+                {items.map((item) => {
+                    if (item === 'cerebro') {
                         return (
                             <li key="cerebro">
                                 <button
@@ -42,18 +42,18 @@ export default function BottomNav() {
                             </li>
                         );
                     }
-                    const active = isNavItemActive(pathname, cell.href);
+                    const active = isNavItemActive(pathname, item.href);
                     return (
-                        <li key={cell.href}>
+                        <li key={item.href}>
                             <Link
-                                href={cell.href}
+                                href={item.href}
                                 aria-current={active ? 'page' : undefined}
                                 className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
                                     active ? 'text-teal-300' : 'text-gray-500 hover:text-gray-300'
                                 }`}
                             >
-                                <cell.icon aria-hidden="true" className="h-5 w-5" />
-                                <span>{cell.label}</span>
+                                <item.icon aria-hidden="true" className="h-5 w-5" />
+                                <span>{item.label}</span>
                             </Link>
                         </li>
                     );
