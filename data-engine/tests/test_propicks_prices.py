@@ -176,3 +176,26 @@ def test_refresh_cubre_todas_las_aprobadas_no_solo_el_top():
         assert result["bars_written"] == 3 * 401
         metrics = db.scalars(select(CalculatedMetric)).all()
         assert {m.company_id for m in metrics} == {c.id for c in companies}
+
+
+def test_fetch_history_descarta_barras_nan(monkeypatch):
+    import sys
+    import types
+
+    import pandas as pd
+
+    from app.services.propicks_price_service import fetch_history_yfinance
+
+    idx = pd.to_datetime(["2026-10-14", "2026-10-15", "2026-10-16"])
+    frame = pd.DataFrame(
+        {
+            "Close": [10.0, float("nan"), 11.0],
+            "Adj Close": [10.0, float("nan"), 11.0],
+            "Volume": [100, 0, 200],
+        },
+        index=idx,
+    )
+    fake = types.SimpleNamespace(Ticker=lambda s: types.SimpleNamespace(history=lambda **k: frame))
+    monkeypatch.setitem(sys.modules, "yfinance", fake)
+    out = fetch_history_yfinance(["AAA"], period="1y")
+    assert [b.day.isoformat() for b in out["AAA"]] == ["2026-10-14", "2026-10-16"]
