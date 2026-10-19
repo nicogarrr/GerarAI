@@ -346,7 +346,7 @@ def _allow_quota(monkeypatch):
         "allowed": True, "minute_used": 1, "minute_limit": 4, "day_used": 1, "day_limit": 100})
 
 
-def test_candidates_capped_at_ten_with_concrete_reason(monkeypatch):
+def test_single_theme_capped_at_two_with_concrete_reason(monkeypatch):
     companies = [_mk_company(f"C{i:02d}", industry="Copper") for i in range(12)]
     companies.append(_mk_company("SEC", sector="Copper"))  # solo sector: descartado
     _allow_quota(monkeypatch)
@@ -354,7 +354,7 @@ def test_candidates_capped_at_ten_with_concrete_reason(monkeypatch):
     with _company_db(*companies) as db:
         result = service.analyze_second_order(db, _llm_event(db), use_llm=True)
     assert result["mode"] == "llm"
-    assert len(result["candidates"]) == 10
+    assert len(result["candidates"]) == 2
     assert result["limited_to"] == 10
     assert "SEC" not in {item["ticker"] for item in result["candidates"]}
     assert all("Copper" in item["reason"] for item in result["candidates"])
@@ -504,6 +504,56 @@ def test_duplicate_themes_do_not_consume_unique_candidate_limit(monkeypatch):
         monkeypatch.setattr(service,'_jev_marker',lambda _:dict(direction=None,confidence=None,backend=None))
         result=service.analyze_second_order(db,event)
         tickers=[row['ticker'] for row in result['candidates']]
-        assert len(tickers)==len(set(tickers))==service.CANDIDATE_LIMIT==10
+        assert len(tickers)==len(set(tickers))==service.CANDIDATES_PER_THEME==2
     finally:
         db.close()
+
+
+def test_asts_insurance_first_does_not_starve_specific_themes(monkeypatch):
+    from types import SimpleNamespace
+    companies = [_mk_company(f"INS{i:02}",industry="Insurance") for i in range(15)]
+    # Insert Z before A deliberately: richer exact evidence must win, not alphabet.
+    companies += [_mk_company("ZSPACE",industry="Space Launch",tags=["Space Launch"]),
+                  _mk_company("ALAUNCH",industry="Space Launch"),
+                  _mk_company("BLAUNCH",industry="Space Launch"),
+                  _mk_company("ZSAT",industry="Satellite",tags=["Satellite"]),
+                  _mk_company("ASAT",industry="Satellite"),
+                  _mk_company("BSAT",industry="Satellite"),
+                  _mk_company("ZLAW",industry="Litigation Finance",tags=["Litigation Finance"]),
+                  _mk_company("ASTS",industry="Satellite",tags=["Satellite","speculative","pre_fcf"])]
+    with _company_db(*companies) as db:
+        event = _llm_event(db)
+        event.company_id = companies[-1].id
+        db.commit()
+        extraction=service.Extraction(themes=[service.Theme(exposure=exposure,direction="incierta",chain=[service.CausalStep(cause="Noticia ASTS: alegación no verificada",effect="Posible efecto indirecto por verificar")]) for exposure in ["Insurance","Space Launch","Satellite","Legal","Litigation Finance","Satellite"]])
+        monkeypatch.setenv("SECOND_ORDER_LLM_ENABLED","1")
+        monkeypatch.setattr(service,"reserve_llm_call",lambda *_:{"allowed":True})
+        async def extract(*args,**kwargs):
+            return extraction,SimpleNamespace(model="space-bunny-free")
+        monkeypatch.setattr(service,"_extract_with_llm",extract)
+        monkeypatch.setattr(service,"_jev_marker",lambda _:dict(direction=None,confidence=None,backend=None))
+        result=service.analyze_second_order(db,event,use_llm=True)
+        tickers=[row["ticker"] for row in result["candidates"]]
+        assert tickers == ["ZSPACE","ZSAT","ZLAW","ALAUNCH","ASAT"]
+        assert not any(t.startswith("INS") for t in tickers) and "ASTS" not in tickers
+        assert len(tickers)==len(set(tickers))
+        for exposure in ["Space Launch","Satellite","Litigation Finance"]:
+            assert sum(row["exposure"]["value"]==exposure for row in result["candidates"])<=2
+        assert result["mode"]=="llm" and result["source_verified"] is False
+        assert result["warning"] and result["per_theme_limit"]==2 and result["limited_to"]==10
+        assert all(row["reason"] and row["status"]=="hipótesis_no_verificada" for row in result["candidates"])
+        assert result["candidates"][0]["selection_basis"]["score"]==3
+        assert result["candidates"][-2]["selection_basis"]["score"]==1
+
+
+def test_total_cap_remains_ten_with_many_specific_themes(monkeypatch):
+    companies=[_mk_company(f"CO{i:02}",industry=f"Specific Industry {i//2}") for i in range(16)]
+    with _company_db(*companies) as db:
+        event=_llm_event(db)
+        themes=[service.Theme(exposure=f"Specific Industry {i}",direction="incierta",chain=[service.CausalStep(cause="Source",effect="Hypothesis")]) for i in range(8)]
+        monkeypatch.setattr(service,"_fallback",lambda _:service.Extraction(themes=themes))
+        monkeypatch.setattr(service,"_jev_marker",lambda _:dict(direction=None,confidence=None,backend=None))
+        result=service.analyze_second_order(db,event)
+        assert len(result["candidates"])==10
+        # Eight different themes each get one place before the first gets a second.
+        assert len({row["exposure"]["value"] for row in result["candidates"][:8]})==8

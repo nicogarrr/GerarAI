@@ -3,15 +3,17 @@
 ## Cambio
 
 - Excluye `company_id` de la noticia y su ticker, comparado sin espacios y en mayúsculas.
-- Cada ticker aparece como máximo una vez, incluso si coincide por industria y por varias etiquetas. La primera hipótesis específica en orden de extracción se conserva; no se suman confianzas ni se afirma que las otras hipótesis sean falsas.
-- El límite de 10 cuenta candidatos únicos, no repeticiones.
+- Cada ticker aparece como máximo una vez, incluso si coincide por industria y por varias etiquetas. Se conserva la primera hipótesis específica que lo selecciona en el reparto por rondas; no se suman confianzas ni se afirma que las otras hipótesis sean falsas.
+- El límite de 10 cuenta candidatos únicos, no repeticiones. Máximo 2 por tema específico normalizado. El reparto por rondas da una primera plaza a cada tema antes de volver al primero.
+- Dentro de cada tema se prioriza el respaldo exacto de metadatos: factor específico (2 puntos), industria (1), ambos (3). Empates estables por ID, sin preferencia económica afirmada. No se ordena alfabéticamente ni se simula relevancia económica verificada. Cada candidato lleva motivo y `selection_basis` con esa limitación.
+- `Insurance`, `Legal` y otras categorías paraguas no bastan para generar candidatos. D&O necesita una coincidencia específica; no se deduce de la industria Insurance.
 - Las etiquetas de madurez/riesgo/estilo (`speculative`, `pre_fcf`, `pre_revenue`, `growth`, `high_beta`, etc.) no generan candidatos y se excluyen del contexto de factores del sujeto.
 - Un tema legal, D&O o litigation finance sin coincidencia específica en metadatos sigue sin empresas. No se asignan aseguradoras o despachos por intuición.
 - Todas las filas siguen siendo hipótesis no verificadas. No cambia tesis, scores, alertas ni relaciones persistidas.
 
 ## Pruebas y límites
 
-`tests/test_second_order_news_service.py`: 24 pruebas, incluye regresión ASTS con temas genéricos y varias coincidencias del mismo ticker. ASTS del test es fixture, no una copia del evento 156016.
+`tests/test_second_order_news_service.py`: 26 pruebas, incluye regresión ASTS con temas genéricos y varias coincidencias del mismo ticker. ASTS del test es fixture, no una copia del evento 156016. La regresión del hallazgo del 19 de octubre pone Insurance primero, 15 aseguradoras genéricas, Space Launch, Satellite y Legal. Descarta el ruido y el sujeto, permite canales específicos posteriores, comprueba ranking por respaldo de metadatos y un máximo de 2 por tema. Otro test reparte 10 plazas entre 8 temas, sin que los primeros agoten el cupo.
 
 Replay local determinista de dos titulares públicos reales con universo de empresas fixture:
 
