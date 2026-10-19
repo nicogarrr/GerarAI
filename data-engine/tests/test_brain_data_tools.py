@@ -84,7 +84,7 @@ def test_news_scoped_to_owned_positions_and_tenant(db):
     b = company(db, "MSFT")
     db.add(Position(tenant_id=1, company_id=a.id, quantity=1, average_cost=10, currency="USD", market_value=10, as_of=date.today()))
     db.add_all([
-        NewsEvent(tenant_id=1, company_id=a.id, title="Apple anuncia resultados", source="SEC", url="https://example.com/apple"),
+        NewsEvent(tenant_id=1, company_id=a.id, title="Resultados de AAPL", source="SEC", url="https://example.com/apple"),
         NewsEvent(tenant_id=2, company_id=a.id, title="Privado tenant 2", source="SEC"),
         NewsEvent(tenant_id=1, company_id=b.id, title="No es mi posición", source="SEC"),
     ])
@@ -92,7 +92,7 @@ def test_news_scoped_to_owned_positions_and_tenant(db):
     db.commit()
     db.info["tenant_id"] = 1
     response = asyncio.run(ChatService().answer(db, "¿Qué noticias hay de mis empresas?", "portfolio", None))
-    assert "Apple anuncia resultados" in response.answer
+    assert "Resultados de AAPL" in response.answer
     assert "Privado" not in response.answer and "No es mi posición" not in response.answer
     assert response.sources[0]["url"] == "https://example.com/apple"
 
@@ -341,6 +341,29 @@ def test_per_without_verified_eps_explains_what_is_missing(db):
     assert "PER: sin dato calculable guardado" in response.answer
     assert "hace falta un precio reciente y un BPA anual positivo" in response.answer
     assert response.llm_trace["provider_calls"] == 0
+
+
+def test_news_drops_ticker_prefix_and_foreign_company_stories(db):
+    a = Company(ticker="MSFT", name="Microsoft Corp", currency="USD", exchange="NASDAQ", company_type="operating", valuation_model="unassigned")
+    g = Company(ticker="GOOGL", name="Alphabet Inc", currency="USD", exchange="NASDAQ", company_type="operating", valuation_model="unassigned")
+    db.add_all([a, g])
+    db.flush()
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=1, average_cost=10, currency="USD", market_value=10, as_of=date.today()))
+    db.add(Position(tenant_id=1, company_id=g.id, quantity=1, average_cost=10, currency="USD", market_value=10, as_of=date.today()))
+    db.add_all([
+        # El feed pega el ticker delante del titular.
+        NewsEvent(tenant_id=1, company_id=a.id, title="MSFT The Bet Behind Microsoft's Rally", summary="Microsoft sigue creciendo", source="Yahoo"),
+        # Noticia de otra empresa (AEP) ligada al ticker GOOGL por el feed.
+        NewsEvent(tenant_id=1, company_id=g.id, title="Fuel Cell Deal Could Be A Game Changer For American Electric Power", summary="American Electric Power plans to invest", source="Yahoo"),
+    ])
+    db.info.pop("tenant_id", None)
+    db.commit()
+    db.info["tenant_id"] = 1
+    response = asyncio.run(ChatService().answer(db, "¿Qué noticias hay de mis empresas?", "portfolio", None))
+    assert "MSFT: MSFT" not in response.answer
+    assert "MSFT: 'The Bet Behind Microsoft's Rally'" in response.answer
+    assert "American Electric Power" not in response.answer
+    assert all("American Electric Power" not in (src["title"] or "") for src in response.sources)
 def insider_tx(db, ticker, code, value, tx_date, tenant=1, insider="Cook Timothy D"):
     row = InsiderTransaction(
         tenant_id=tenant, fingerprint=f"{ticker}-{code}-{tx_date}-{value}-{tenant}",
