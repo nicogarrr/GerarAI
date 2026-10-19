@@ -89,3 +89,21 @@ def test_detect_ticker_picks_strongest_evidence_and_skips_ties(db):
     assert got is not None and got.ticker == "AAPL"
     # Empate en el nivel mas alto: ninguna.
     assert service.detect_ticker(db, "$AAPL and $IBM both up") is None
+
+
+def test_cornerback_headline_does_not_link_to_chubb():
+    """Caso real 19 oct 2026: «CB Target» (cornerback, fútbol americano) se
+    vinculó a Chubb (CB) por la palabra «target» en proximidad."""
+    assert not _ticker_evidence(
+        "CB", "Chubb Limited",
+        "Tennessee Football 2028 In-State CB Target Jermaine Cobbins Visits for Third Saturday in October")
+    assert not _ticker_evidence("CB", "Chubb Limited", "CB target practice scheduled for Saturday")
+
+
+def test_price_target_phrase_still_counts_as_context():
+    assert _ticker_evidence("CB", "Chubb Limited", "CB price target raised at Wells")
+    assert _ticker_evidence("CB", "Chubb Limited", "Elevan el precio objetivo de CB")
+    # Locuciones de analista reales (objeción del auditor, 19 oct 2026):
+    assert _ticker_evidence("CB", "Chubb Limited", "Wells Fargo raises CB target price to $300")
+    assert _ticker_evidence("CB", "Chubb Limited", "CB target price raised")
+    assert _ticker_evidence("CB", "Chubb Limited", "Jefferies sets CB target at $280")
