@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { RefreshCcw } from 'lucide-react';
 import FollowButton from '@/components/screener/FollowButton';
+import { MarketRegimeVista } from '@/components/market/MarketRegime';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -63,6 +64,7 @@ const VISTAS = [
   { id: 'subidas', label: 'Subidas', href: '/screener?vista=subidas' },
   { id: 'bajadas', label: 'Bajadas', href: '/screener?vista=bajadas' },
   { id: 'activas', label: 'Activas', href: '/screener?vista=activas' },
+  { id: 'regimen', label: 'Régimen', href: '/screener?vista=regimen' },
 ] as const;
 
 type Vista = (typeof VISTAS)[number]['id'];
@@ -132,6 +134,17 @@ async function MoversVista({ vista }: { vista: Exclude<Vista, 'empresas'> }) {
 export default async function ScreenerPage({ searchParams }: { searchParams?: Promise<{ sector?: string; vista?: string }> }) {
   const params = await searchParams;
   const vista = vistaDe(params?.vista);
+  if (vista === 'regimen') {
+    return (
+      <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip p-4 sm:p-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold break-words text-gray-100">{t('nav.screener')}</h1>
+        </div>
+        <VistaTabs vista={vista} />
+        <MarketRegimeVista />
+      </main>
+    );
+  }
   if (vista !== 'empresas') return <MoversVista vista={vista} />;
   const sector = sectorEn(params?.sector ?? 'Information Technology');
   // Screener (backend) e índices (backend) son independientes: en paralelo
