@@ -45,6 +45,7 @@ export function cleanThesisMarkdown(text: string): string {
         if (part.startsWith('http') || part.startsWith('```')) return part;
         return part.replace(/\bNone\b/g, 'N/D')
             .replace(/\b(?:unassigned|preview_only|fact_anchored_sensitivity)\b/g, thesisCodeLabel)
+            .replace(/Análisis narrativo INFERIDO/g, 'Análisis narrativo')
             .replace(/median of latest annual FCF margins/g, 'Mediana de los últimos márgenes FCF anuales')
             .replace(/annual revenue CAGR across available history/g, 'CAGR anual de ingresos del historial disponible')
             .replace(/diluted share count CAGR across available history/g, 'CAGR de acciones diluidas del historial disponible');

@@ -18,7 +18,7 @@ describe('cambio de estrategia ProPicks (F383)', () => {
     });
     it('la estrategia inicial tampoco reutiliza initialPicks', () => {
         assert.doesNotMatch(tabs, /\[initialStrategyId\]: initialPicks/);
-        assert.match(tabs, /useState<Record<string, ProPick\[\]>>\(\{\}\)/);
+        assert.match(tabs, /useState<Record<string, \{ picks: ProPick\[\]; asOf: string \| null \}>>\(\{\}\)/);
     });
     it('el snapshot anterior se descarta al cambiar de estrategia (key)', () => {
         assert.match(tabs, /<MonthlyRebalanceView\s+key=\{currentStrategy\}/);

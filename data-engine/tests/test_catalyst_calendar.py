@@ -231,7 +231,7 @@ def test_filing_deadline_10k_after_third_quarter_52_53_weeks():
     # Es el 10-K (fin de ejercicio 0926), 60 dias -> miercoles 25-nov (plazo real de Apple 2026).
     assert event["type"] == "filing_deadline" and event["ticker"] == "AAPL"
     assert event["date"] == "2026-11-25"
-    assert event["title"] == "Plazo para presentar el 10-K (INFERIDO)"
+    assert event["title"] == "Plazo para presentar el 10-K"
     assert "60 días" in event["detail"] and "Large accelerated filer" in event["detail"]
     assert "52/53 semanas" in event["detail"]
     assert event["source"] == svc.SOURCE_SEC_RULE
@@ -255,7 +255,7 @@ def test_filing_deadline_quarters_of_unequal_length_use_prior_year_not_13_weeks(
     cava = _subs([("10-Q", "2026-07-12"), ("10-Q", "2026-04-19"), ("10-K", "2025-12-28"),
                   ("10-Q", "2025-10-05"), ("10-Q", "2025-07-13"), ("10-Q", "2025-04-20")], fye="1228")
     event = _ev(cava, "CAVA")
-    assert event["title"] == "Plazo para presentar el 10-Q (INFERIDO)"
+    assert event["title"] == "Plazo para presentar el 10-Q"
     assert event["date"] == "2026-11-13"  # 4-oct-26 + 40 d (large accelerated)
 
 

@@ -656,7 +656,7 @@ class ThesisService:
             bull_value=_dec(valuation.get("bull_value")),
             expected_value=_dec(valuation.get("expected_value")),
             margin_of_safety=_dec(valuation.get("margin_of_safety")),
-            data_confidence_score=self._confidence_score(valuation, facts),
+            data_confidence_score=self._confidence_score(valuation, facts, claims),
             source_coverage_score=audit.source_coverage_score,
             red_team_score=0,
             valuation_risk_score=75 if "speculative" in (company.factor_tags or []) else 45,
@@ -765,14 +765,36 @@ class ThesisService:
                     )
                 )
 
-    def _confidence_score(self, valuation: dict, facts: dict) -> int:
+    def _confidence_score(
+        self,
+        valuation: dict,
+        facts: dict,
+        claims: list[dict] | None = None,
+    ) -> int:
+        """Confianza 0-100 derivada de la evidencia de ESTA generacion.
+
+        Antes devolvia cuatro constantes (15/25/55/85) segun el estado: todas
+        las versiones de una empresa pintaban la misma cifra aunque la
+        evidencia cambiara entre generaciones (QA F7: «red-team/confianza
+        identicos en las 12 versiones» de ASTS). Ahora la puntuacion se mueve
+        con la cobertura real de afirmaciones materiales (fuente vinculada) y
+        los inputs que faltan, manteniendo el orden fail-closed:
+        insufficient_data < sin facts < valoracion no publicable < publicable.
+        """
+        material = [claim for claim in (claims or []) if claim.get("material", True)]
+        backed = sum(1 for claim in material if claim.get("source_id"))
+        coverage = backed / len(material) if material else 0.0
+        missing = len(valuation.get("missing_inputs") or [])
         if valuation.get("status") == "insufficient_data":
-            return 15
-        if not facts:
-            return 25
-        if valuation.get("publishable"):
-            return 85
-        return 55
+            floor, ceiling = 5, 35
+        elif not facts:
+            floor, ceiling = 10, 40
+        elif valuation.get("publishable"):
+            floor, ceiling = 60, 100
+        else:
+            floor, ceiling = 35, 75
+        score = floor + coverage * (ceiling - floor) - 2 * missing
+        return max(0, min(100, round(score)))
 
 
     def _hypothesis(self, company: Company, valuation: dict) -> str:
@@ -1431,8 +1453,8 @@ class ThesisService:
             "o se aporta como supuesto etiquetado (método + fecha)."
         ),
         "normalized_fcf_or_fcf_margin": (
-            "falta un FCF o margen FCF reportado; si hay un margen INFERIDO "
-            "(base + fuentes https) se usa solo como valor indicativo no publicable."
+            "falta un FCF o margen FCF reportado; si hay un margen estimado con base "
+            "y fuentes https, se usa solo como valor indicativo no publicable."
         ),
         "net_debt": (
             "falta la deuda neta; se deriva de deuda total menos efectivo (mismo "

@@ -29,11 +29,22 @@ export function provenanceBasisEs(base: string | null | undefined): string | nul
   const clean = (base ?? '').trim().replace(/^dado\s+/i, '');
   if (!clean) return null;
   for (const [pattern, text] of BASIS_ES) if (pattern.test(clean)) return text;
+  // Claves sin etiqueta propia se humanizan («free_cash_flow» → «free cash
+  // flow»), nunca se pinta el snake_case crudo.
+  const metricLabelFor = (key: string): string =>
+    (METRIC_LABELS as Record<string, string>)[key]?.toLowerCase() ?? key.replace(/_/g, ' ');
   const median = /^mediana de las últimas (\d+) observaciones anuales de ([a-z_]+)$/i.exec(clean);
   if (median) {
-    const metric = (METRIC_LABELS as Record<string, string>)[median[2]];
-    if (metric) return `Mediana de las últimas ${median[1]} observaciones anuales de ${metric.toLowerCase()}`;
+    const count = Number(median[1]);
+    // Datos guardados antes de la gramatica singular (F13): 1 -> singular, 0 -> sin observaciones.
+    if (count === 1) return `Mediana de la última observación anual de ${metricLabelFor(median[2])}`;
+    if (count === 0) return `Sin observaciones anuales de ${metricLabelFor(median[2])}`;
+    return `Mediana de las últimas ${median[1]} observaciones anuales de ${metricLabelFor(median[2])}`;
   }
+  const medianOne = /^mediana de la última observación anual de ([a-z_]+)$/i.exec(clean);
+  if (medianOne) return `Mediana de la última observación anual de ${metricLabelFor(medianOne[1])}`;
+  const none = /^sin observaciones anuales de ([a-z_]+)$/i.exec(clean);
+  if (none) return `Sin observaciones anuales de ${metricLabelFor(none[1])}`;
   const reported = /^(.+?) reportado(?: \(periodo (.+)\))?$/.exec(clean);
   if (reported) return reported[2] ? `Reportado, periodo ${reported[2]}` : 'Reportado';
   const sentence = clean.charAt(0).toUpperCase() + clean.slice(1);
