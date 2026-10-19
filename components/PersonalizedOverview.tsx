@@ -553,8 +553,8 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                         <Eye aria-hidden="true" className="h-5 w-5 text-yellow-400" />
                         Watchlist
                     </CardTitle>
-                    <Link href="/watchlist" aria-label="Ver watchlist completa" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-end px-1 text-yellow-400 hover:text-yellow-300 text-sm transition-colors">
-                        <ArrowRight aria-hidden="true" className="w-4 h-4" />
+                    <Link href="/watchlist" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-yellow-400 hover:text-yellow-300 text-sm transition-colors">
+                        <span className="whitespace-nowrap">Ver todo</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
                     </Link>
                 </CardHeader>
                 <CardContent className="pt-4">
