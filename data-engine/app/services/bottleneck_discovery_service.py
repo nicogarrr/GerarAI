@@ -68,7 +68,7 @@ CHANNELS = {
     "proveedor_directo": "suministra de forma directa el recurso o componente escaso",
     "capacidad_productiva": "controla capacidad productiva en el segmento afectado",
     "cliente_dependiente": "depende del recurso escaso para producir o entregar",
-    "infraestructura_logistica": "opera infraestructura o logistica ligada al cuello de botella",
+    "infraestructura_logistica": "opera infraestructura o logística ligada al cuello de botella",
     "alternativa_sustitutiva": "ofrece una alternativa al recurso escaso",
 }
 _ALLOWED_KEYS = {"ticker", "exposicion", "canal", "evidence_ids"}
@@ -239,9 +239,9 @@ def build_request(context: ThemeContext, model: str | None = None) -> LLMRequest
 
 def compose_reasoning(ticker: str, exposure: str, channel: str) -> str:
     """Texto en espanol 100% de plantilla: nada del modelo llega al usuario salvo valores de listas cerradas."""
-    who = "Una empresa aun sin identificar (N/D)" if ticker == NO_DATA else f"{ticker}"
+    who = "Una empresa aún sin identificar (N/D)" if ticker == NO_DATA else f"{ticker}"
     return (
-        f"Hipotesis del modelo, no un hecho: {who} podria resultar {EXPOSURES[exposure]} por este cuello de "
+        f"Hipótesis del modelo, no un hecho: {who} podría resultar {EXPOSURES[exposure]} por este cuello de "
         f"botella porque {CHANNELS[channel]}. Se infiere de las evidencias citadas."
     )
 
