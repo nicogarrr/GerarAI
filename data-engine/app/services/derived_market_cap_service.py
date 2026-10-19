@@ -12,6 +12,16 @@ pisa. El hecho se escribe is_reported=False, source_type="derived", con la
 fecha del precio como period y la divisa de la compania como unit. Sin
 precio fresco o sin acciones: no se escribe nada (N/D honesto, nunca
 inventado). Idempotente: cada refresco reemplaza los derivados anteriores.
+
+Los recuentos de acciones son de la fecha de SU hecho y el precio es de
+hoy: si hubo un split entre ambos, el cap sale desplazado por el factor
+(caso real medido en prod 19-oct-2026: AENA, split 10:1 tras el FY2025 -
+precio post-split 25,70 x acciones pre-split 153M = 3,93B en vez de
+~39,3B; el PER ya lo corregia, el cap no). Misma regla que el PER y que
+long_term_model_service: se multiplica por el factor acumulado de los
+splits posteriores al cierre del periodo del hecho; sin CorporateAction
+registrado, factor 1 (nunca se adivina). El ajuste se declara:
+is_adjusted=True y la base lo nombra.
 """
 
 from __future__ import annotations
@@ -25,6 +35,11 @@ from sqlalchemy.orm import Session
 
 from app.models import FinancialFact, MarketPrice
 from app.models.entities import Company
+from app.services.split_adjustment import (
+    cumulative_split_factor_after,
+    period_end_date,
+    split_events_by_company,
+)
 
 MAX_PRICE_AGE = timedelta(days=7)
 DERIVED_SOURCE = "derived"
@@ -77,11 +92,25 @@ def _vendor_market_cap_fresh(db: Session, company: Company, price_date: date) ->
         return False
 
 
-def _shares_outstanding(db: Session, company: Company) -> tuple[Decimal, str] | None:
-    """(acciones, base): reported SEC dei o derivado net_income/eps ESEF."""
+def _split_note(factor: Decimal) -> str:
+    return "" if factor == 1 else f", acciones ajustadas por split x{factor.normalize():f}"
+
+
+def _shares_outstanding(
+    db: Session, company: Company
+) -> tuple[Decimal, str, Decimal] | None:
+    """(acciones actuales, base, factor split): reported SEC dei o derivado
+    net_income/eps ESEF. El recuento se expresa en acciones ACTUALES: se
+    multiplica por el factor acumulado de los splits posteriores al cierre
+    del periodo del hecho (misma regla que long_term_model_service y que
+    el ajuste de EPS del PER)."""
+    events = split_events_by_company(db, [company.id]).get(company.id, [])
     shares = _latest_fact(db, company, "shares_outstanding")
     if shares is not None and shares.value and Decimal(shares.value) > 0:
-        return Decimal(shares.value), "reported_shares_outstanding"
+        factor = cumulative_split_factor_after(events, period_end_date(shares.period))
+        return Decimal(shares.value) * factor, (
+            "reported_shares_outstanding" + _split_note(factor)
+        ), factor
     eps = _latest_fact(db, company, "eps_diluted")
     income = _latest_fact(db, company, "net_income")
     if (
@@ -95,9 +124,12 @@ def _shares_outstanding(db: Session, company: Company) -> tuple[Decimal, str] | 
         and eps.fiscal_year is not None
         and eps.fiscal_year == income.fiscal_year
     ):
-        return Decimal(income.value) / Decimal(eps.value), (
-            f"derived_net_income_over_eps FY{eps.fiscal_year}"
-        )
+        # El periodo del EPS ancla el factor (mismo ejercicio que el
+        # net_income por la guarda de arriba).
+        factor = cumulative_split_factor_after(events, period_end_date(eps.period))
+        return Decimal(income.value) / Decimal(eps.value) * factor, (
+            f"derived_net_income_over_eps FY{eps.fiscal_year}" + _split_note(factor)
+        ), factor
     return None
 
 
@@ -132,7 +164,7 @@ def refresh_derived_market_cap(
     if shares is None:
         db.flush()
         return {"status": "unavailable", "reason": "no_shares"}
-    value, basis = shares
+    value, basis, split_factor = shares
     market_cap = Decimal(price.close) * value
     db.add(
         FinancialFact(
@@ -146,7 +178,7 @@ def refresh_derived_market_cap(
             source_id=None,
             source_type=DERIVED_SOURCE,
             is_reported=False,
-            is_adjusted=False,
+            is_adjusted=split_factor != 1,
             confidence=Decimal("0.70"),
         )
     )
@@ -157,5 +189,6 @@ def refresh_derived_market_cap(
         "price_date": price.date.isoformat(),
         "price": float(price.close),
         "shares_basis": basis,
+        "split_factor": float(split_factor),
         "currency": str(getattr(company, "currency", "") or "USD"),
     }

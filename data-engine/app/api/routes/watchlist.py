@@ -227,7 +227,9 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
     if cap_row is not None:
         sources.append(
             f"Capitalización: {cap_row.source_type}"
-            + ("" if cap_row.is_reported else " (derivada: precio x acciones)"))
+            + ("" if cap_row.is_reported else " (derivada: precio x acciones)")
+            + (" · acciones ajustadas por split"
+               if not cap_row.is_reported and cap_row.is_adjusted else ""))
 
     price_row = db.execute(
         select(MarketPrice)
