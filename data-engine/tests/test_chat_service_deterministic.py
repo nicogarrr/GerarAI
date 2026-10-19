@@ -141,3 +141,23 @@ def test_document_sources_preserve_stored_urls_without_inventing_missing_links(d
     db.commit()
     response = ChatService()._deterministic_answer(db, "revenue", "company", "AAPL")
     assert "url" not in next(source for source in response.sources if source["type"] == "document_chunk")
+
+
+def test_thesis_status_source_entry_is_spanish_not_snake_case(db):
+    company = _company(db)
+    db.add(FinancialFact(
+        company_id=company.id, metric="revenue", value=Decimal("1000000"),
+        unit="USD", period="2025-12-31:FY", fiscal_year=2025, fiscal_quarter="FY",
+        source_type="sec_xbrl",
+    ))
+    db.add(ThesisVersion(
+        company_id=company.id, version=3, status="insufficient_data",
+        thesis_markdown="...", executive_summary="...", rating="insufficient_data",
+    ))
+    db.commit()
+    response = ChatService()._deterministic_answer(db, "AAPL tesis?", "company", "AAPL")
+    thesis_sources = [s for s in response.sources if s["type"] == "thesis_version"]
+    assert thesis_sources, "la tesis debe viajar como fuente"
+    for source in thesis_sources:
+        assert source.get("status") == "datos insuficientes"
+        assert "insufficient_data" not in str(source.get("status"))

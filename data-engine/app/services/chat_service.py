@@ -1311,7 +1311,11 @@ class ChatService:
                         "thesis_version",
                         thesis.id,
                         f"Tesis {company.ticker} v{thesis.version}",
-                        status=thesis.status,
+                        # El LLM ve este campo y lo copia en la respuesta:
+                        # siempre la etiqueta en castellano, nunca el enum.
+                        status=_THESIS_STATUS_ES.get(
+                            (thesis.status or "").strip(), thesis.status
+                        ),
                     )
                 )
             for section in sections:
