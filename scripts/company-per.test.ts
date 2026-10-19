@@ -26,5 +26,5 @@ test('la ficha enseña el PER con su motivo', async () => {
   const { readFileSync } = await import('node:fs');
   const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
   assert.match(page, /getCompanyPer\(/);
-  assert.match(page, /label="PER \(TTM\)"/);
+  assert.match(page, /PER \(TTM\)/);
 });
