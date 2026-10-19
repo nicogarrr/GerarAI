@@ -1,128 +1,79 @@
 'use client';
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Pause, Play, Square } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Headphones, Loader2 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { pickLocalSpanishVoice, speechChunks } from '@/lib/research/speech';
+
+type AudioState = 'loading' | 'ready' | 'pending' | 'missing' | 'error';
 
 /**
- * Audio básico de la tesis (WorldStocks punto 6): lectura en voz alta con la
- * síntesis del propio navegador (Web Speech API). No hay API nueva ni coste.
- *
- * La promesa «nada sale del dispositivo» solo vale con una voz LOCAL
- * (localService !== false): una voz de red manda el texto al proveedor. Sin
- * voz española local el botón queda deshabilitado y se dice por qué; nunca se
- * cae a la voz por defecto del navegador.
- *
- * El texto se trocea en frases cortas: una utterance larga se corta a los
- * ~15 s en Chromium; una cola de utterances cortas no. Cualquier error de la
- * cola devuelve el control a reposo (nunca se queda «sonando» de mentira).
+ * Escuchar la tesis: `<audio controls>` con el mp3 ya generado. Si no existe,
+ * un botón lo pide; mientras se genera se consulta el estado cada 5 s.
+ * Nunca se pinta un reproductor sin audio detrás.
  */
-type SpeechStatus = 'idle' | 'playing' | 'paused';
+export default function ThesisAudioPlayer({ ticker, version }: { ticker: string; version: number }) {
+    const base = `/api/thesis/${encodeURIComponent(ticker)}/audio`;
+    const [state, setState] = useState<AudioState>('loading');
+    const [requesting, setRequesting] = useState(false);
 
-const EMPTY_VOICES: SpeechSynthesisVoice[] = [];
-let cachedVoices: SpeechSynthesisVoice[] = EMPTY_VOICES;
-
-function subscribeVoices(onChange: () => void): () => void {
-    if (!('speechSynthesis' in window)) return () => {};
-    const synth = window.speechSynthesis;
-    const update = () => {
-        cachedVoices = synth.getVoices();
-        onChange();
-    };
-    // Carga tardía: en muchos navegadores getVoices() llega vacío hasta el
-    // evento voiceschanged.
-    update();
-    synth.addEventListener('voiceschanged', update);
-    return () => synth.removeEventListener('voiceschanged', update);
-}
-
-export default function ThesisAudioPlayer({ paragraphs, label }: { paragraphs: string[]; label: string }) {
-    const supported = useSyncExternalStore(
-        () => () => {},
-        () => 'speechSynthesis' in window,
-        () => false,
-    );
-    const voices = useSyncExternalStore(
-        subscribeVoices,
-        () => cachedVoices,
-        () => EMPTY_VOICES,
-    );
-    const voice = supported ? pickLocalSpanishVoice(voices) : null;
-    const [status, setStatus] = useState<SpeechStatus>('idle');
-    const queue = useRef<SpeechSynthesisUtterance[]>([]);
+    const refresh = useCallback(async (): Promise<AudioState> => {
+        try {
+            const res = await fetch(`${base}/status`, { cache: 'no-store' });
+            const body = (await res.json()) as { state?: AudioState };
+            return body.state && ['ready', 'pending', 'missing', 'error'].includes(body.state) ? body.state : 'error';
+        } catch {
+            return 'error';
+        }
+    }, [base]);
 
     useEffect(() => {
-        return () => {
-            window.speechSynthesis?.cancel();
+        let cancelled = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const tick = async () => {
+            const next = await refresh();
+            if (cancelled) return;
+            setState(next);
+            if (next === 'pending') timer = setTimeout(tick, 5000);
         };
-    }, []);
+        void tick();
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
+    }, [refresh, version]);
 
-    if (!supported || paragraphs.length === 0) return null;
-
-    function stop() {
-        window.speechSynthesis.cancel();
-        queue.current = [];
-        setStatus('idle');
-    }
-
-    function play() {
-        // Sin voz española local no se habla: caer a la voz por defecto
-        // podría ser una voz de red (el texto saldría del dispositivo).
-        if (!voice) return;
-        if (status === 'paused') {
-            window.speechSynthesis.resume();
-            setStatus('playing');
-            return;
+    async function generate() {
+        setRequesting(true);
+        try {
+            const res = await fetch(base, { method: 'POST' });
+            setState(res.ok ? 'pending' : 'error');
+        } catch {
+            setState('error');
+        } finally {
+            setRequesting(false);
         }
-        window.speechSynthesis.cancel();
-        const utterances = speechChunks([label, ...paragraphs]).map((text) => {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = voice.lang;
-            utterance.voice = voice;
-            utterance.onerror = () => {
-                stop();
-            };
-            return utterance;
-        });
-        if (utterances.length === 0) return;
-        const last = utterances[utterances.length - 1];
-        last.onend = () => setStatus('idle');
-        queue.current = utterances;
-        for (const utterance of utterances) window.speechSynthesis.speak(utterance);
-        setStatus('playing');
-    }
-
-    function pause() {
-        window.speechSynthesis.pause();
-        setStatus('paused');
     }
 
     return (
-        <section aria-label="Escuchar la tesis" className="rounded-lg border border-gray-800 p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Escuchar la tesis</h3>
-            <p className="mt-1 text-xs text-gray-500">
-                Lectura en voz alta con una voz local de tu navegador, en este dispositivo: ningún texto sale de él ni usa servicios nuevos.
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-                {status === 'playing' ? (
-                    <Button type="button" variant="outline" onClick={pause}>
-                        <Pause className="mr-2 h-4 w-4" />Pausar
-                    </Button>
-                ) : (
-                    <Button type="button" variant="outline" onClick={play} disabled={!voice}>
-                        <Play className="mr-2 h-4 w-4" />{status === 'paused' ? 'Reanudar' : 'Escuchar'}
-                    </Button>
-                )}
-                {status !== 'idle' ? (
-                    <Button type="button" variant="outline" onClick={stop}>
-                        <Square className="mr-2 h-4 w-4" />Detener
-                    </Button>
-                ) : null}
-                {!voice ? (
-                    <span className="text-xs text-gray-500">Sin voz en español local en este navegador.</span>
-                ) : null}
-            </div>
-        </section>
+        <div aria-label="Escuchar la tesis" className="flex flex-wrap items-center gap-3" role="group">
+            <span className="inline-flex items-center gap-2 text-sm font-medium text-gray-200">
+                <Headphones className="h-4 w-4" />Escuchar la tesis
+            </span>
+            {state === 'ready' ? (
+                <audio className="h-10 max-w-full" controls key={version} onError={() => setState('error')} preload="none" src={`${base}?v=${version}`} />
+            ) : state === 'pending' ? (
+                <span className="inline-flex items-center gap-2 text-sm text-gray-400" role="status">
+                    <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />Generando audio…
+                </span>
+            ) : state === 'missing' ? (
+                <Button disabled={requesting} onClick={generate} type="button" variant="outline">Generar audio</Button>
+            ) : state === 'error' ? (
+                <>
+                    <span className="text-sm text-red-300">No se pudo generar el audio.</span>
+                    <Button disabled={requesting} onClick={generate} type="button" variant="outline">Reintentar</Button>
+                </>
+            ) : null}
+        </div>
     );
 }

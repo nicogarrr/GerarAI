@@ -185,16 +185,6 @@ export default function ThesisMemo({
   );
   const generatedLabel = formatGeneratedDate(thesis.created_at);
 
-  // Lo que se lee en voz alta: solo texto persistido y ya visible en esta
-  // vista (resumen, narrativa, hipótesis e invalidación). Nada se genera
-  // para el audio: si un bloque no existe, no se lee.
-  const audioParagraphs = [
-    thesis.executive_summary,
-    ...(thesis.narrative_sections ?? []).flatMap((section) => [section.titulo, ...section.parrafos]),
-    thesis.hypothesis ? `Hipótesis: ${thesis.hypothesis}` : null,
-    ...(thesis.invalidation_criteria ?? []).map((criterion) => `Criterio de invalidación: ${criterion}`),
-  ].filter((paragraph): paragraph is string => typeof paragraph === 'string' && paragraph.trim().length > 0);
-
   return (
     <div className="min-w-0 max-w-full space-y-5 [overflow-wrap:anywhere]">
       <div className="flex flex-wrap items-center gap-2">
@@ -210,6 +200,8 @@ export default function ThesisMemo({
           </span>
         ) : null}
       </div>
+
+      {ticker ? <ThesisAudioPlayer ticker={ticker} version={thesis.version} /> : null}
 
       {thesis.status === 'insufficient_data' ? (
         <div
@@ -438,10 +430,6 @@ export default function ThesisMemo({
           ]}
         />
       </section>
-
-      {/* Audio básico al final (WorldStocks punto 6): el resumen, la narrativa,
-          la hipótesis y los criterios de invalidación, leídos en local. */}
-      <ThesisAudioPlayer label={`Tesis de ${ticker ?? 'la empresa'}`} paragraphs={audioParagraphs} />
     </div>
   );
 }
