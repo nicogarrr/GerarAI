@@ -59,7 +59,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
 
             <div className="flex flex-1 items-start">
                 <Sidebar collapsed={collapsed} />
-                <div className="min-w-0 flex-1 px-4 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-5 md:px-6 md:pb-6 md:py-6 lg:px-8">
+                <div className="min-w-0 flex-1 px-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-5 md:px-6 md:pb-6 md:py-6 lg:px-8">
                     <Breadcrumbs />
                     <SectionNav />
                     <ErrorBoundary>

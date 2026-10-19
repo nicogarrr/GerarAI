@@ -24,7 +24,9 @@ describe('barra inferior móvil', () => {
     it('el layout autenticado la monta y deja hueco bajo el contenido', () => {
         const layout = readFileSync('app/(root)/layout.tsx', 'utf8');
         assert.match(layout, /<BottomNav \/>/);
-        assert.ok(layout.includes("pb-[calc(7.5rem+env(safe-area-inset-bottom))]"));
+        // Contrato nuevo (#1805): la barra es UNA fila (min-h-14) + safe-area;
+        // los 7.5rem eran de cuando el Cerebro iba apilado encima pisándola.
+        assert.ok(layout.includes("pb-[calc(4.5rem+env(safe-area-inset-bottom))]"));
     });
     it('solo se ve en móvil (md:hidden)', () => {
         assert.match(readFileSync('components/layout/BottomNav.tsx', 'utf8'), /md:hidden/);

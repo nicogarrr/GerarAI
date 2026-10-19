@@ -9,6 +9,9 @@ test('scroll and underlying page content cannot hide the mobile Cerebro entry', 
   assert.ok(!brain.includes('fabScrollHidden'));
   assert.ok(!brain.includes('fabLegendBlocked'));
   assert.ok(!nav.includes('opacity-0'));
-  assert.ok(nav.includes('min-h-11'));
-  assert.ok(layout.includes('pb-[calc(7.5rem+env(safe-area-inset-bottom))]'));
+  // #1805: el Cerebro es una celda min-h-14 de la propia barra (ya no una
+  // franja apilada que la pisaba); el hueco del contenido baja a 4.5rem.
+  assert.ok(nav.includes('min-h-14'));
+  assert.ok(nav.includes('gerarai:open-brain'));
+  assert.ok(layout.includes('pb-[calc(4.5rem+env(safe-area-inset-bottom))]'));
 });

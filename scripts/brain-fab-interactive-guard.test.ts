@@ -8,7 +8,9 @@ test('mobile access is in its reserved navigation row, not over page controls', 
   assert.ok(brain.includes('className="hidden md:flex fixed'));
   assert.ok(!brain.includes('fabHidden'));
   assert.ok(!brain.includes('translate-y-24'));
-  assert.ok(nav.includes('grid-cols-5'));
-  assert.ok(nav.indexOf('>Cerebro') < nav.indexOf('<ul'));
+  // #1805: el Cerebro es una celda más de la rejilla (6 columnas), ya no una
+  // franja apilada encima de la barra; sigue en la fila de navegación.
+  assert.ok(nav.includes('grid-cols-6'));
+  assert.ok(nav.indexOf('<ul') < nav.indexOf('>Cerebro'));
   assert.ok(nav.includes("new Event('gerarai:open-brain')"));
 });
