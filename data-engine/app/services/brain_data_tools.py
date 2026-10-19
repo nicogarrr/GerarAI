@@ -155,6 +155,67 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     return _response([head, *lines, total, *tail], sources, "portfolio_dividends")
 
 
+def _company_news_answer(db: Session, company: Company, tenant: int) -> ChatResponse:
+    """Noticias GUARDADAS de una empresa concreta (mencionada en la pregunta).
+
+    Antes, "que noticias hay de ASTS y como afectan a mi cartera" caia en el
+    volcado de cartera por llevar "mi cartera": la respuesta eran titulares de
+    OTRAS posiciones (el spam 13F de AMZN) y cero de ASTS. Con empresa nombrada
+    la respuesta se acota a ella: solo noticias que la citan de verdad, sin el
+    ticker pegado del feed y sin duplicados. Si la tiene en cartera se declara
+    la posicion (es lo que "como me afecta" permite decir con datos guardados,
+    sin inventar un impacto por noticia).
+    """
+    from app.services.ticker_news_lane import _cites_company
+
+    rows = db.scalars(select(NewsEvent).where(
+        NewsEvent.tenant_id == tenant, NewsEvent.company_id == company.id,
+    ).order_by(NewsEvent.date.desc(), NewsEvent.id.desc()).limit(60)).all()
+    lines, sources, seen = [], [], set()
+    for event in rows:
+        if not _cites_company(company, event.title or "", event.summary or ""):
+            continue
+        title = re.sub(
+            rf"^\s*{re.escape(company.ticker)}\s*[:\-\u2013]?\s+",
+            "", event.title or "", count=1, flags=re.IGNORECASE,
+        ).strip()
+        if not title:
+            continue
+        key = " ".join(title.lower().split())
+        if key in seen:
+            continue
+        seen.add(key)
+        lines.append(f"- '{title}' ({event.date.date().isoformat()}, {event.source}).")
+        sources.append(_source("news_event", event.id, f"{company.ticker}: {title}", event.url or _link(company, "news")))
+        if len(lines) == 6:
+            break
+    holding_lines: list[str] = []
+    position = db.scalars(select(Position).where(
+        Position.tenant_id == tenant, Position.company_id == company.id, Position.quantity > 0,
+    ).limit(1)).first()
+    if position is not None:
+        def _value(pos: Position) -> float:
+            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
+            return float(raw or 0)
+        total = sum(
+            _value(row) for row in db.scalars(select(Position).where(
+                Position.tenant_id == tenant, Position.quantity > 0)).all()
+        )
+        weight = f", el {_number(_value(position) / total * 100)} % de tu cartera" if total > 0 else ""
+        holding_lines.append(
+            f"Tienes {_number(position.quantity)} acciones de {company.ticker} en cartera{weight}. "
+            "No calculo el impacto de cada noticia: eso pediria un analisis nuevo."
+        )
+    if not lines:
+        head = (f"No hay noticias guardadas de {company.ticker} que citen de verdad a la empresa. "
+                "No he consultado noticias en directo.")
+        return _response([head, *holding_lines], [], "company_news")
+    return _response(
+        [f"Ultimas noticias guardadas de {company.ticker} · {company.name}:", *lines, *holding_lines],
+        sources, "company_news",
+    )
+
+
 def _plan_answer(db: Session) -> ChatResponse:
     """Plan de inversion guardado y su desviacion actual; solo las cifras del plan, sin ordenes."""
     drift = InvestmentPlanService().drift_analysis(db)
@@ -335,6 +396,9 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     if not (news or theses or comparison or valuation):
         return None
     if news:
+        mentioned = _company_in_question(db, question)
+        if mentioned is not None:
+            return _company_news_answer(db, mentioned, tenant)
         from app.services.ticker_news_lane import _cites_company
 
         company_ids = select(Position.company_id).where(Position.tenant_id == tenant, Position.quantity > 0)
