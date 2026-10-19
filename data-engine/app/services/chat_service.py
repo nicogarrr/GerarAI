@@ -24,7 +24,12 @@ from app.models import (
     ThesisVersion,
 )
 from app.schemas import ChatPageContext, ChatResponse, ChatTurn
-from app.services.brain_service import SMALL_TALK_RE, resolve_page_context, small_talk_answer
+from app.services.brain_service import (
+    LEADING_GREETING_RE,
+    SMALL_TALK_RE,
+    resolve_page_context,
+    small_talk_answer,
+)
 from app.services.chat_synthesis_service import ChatSynthesisService
 from app.services.claim_scope import live_claims
 from app.services.company_resolver import resolve_company
@@ -489,9 +494,12 @@ _CAPABILITIES_RE = re.compile(
     r"qu[eé]\s+(?:puedes|puede|sabes)\s+hacer|"
     r"(?:en\s+)?qu[eé]\s+(?:me\s+)?puedes\s+ayudar|"
     r"c[oó]mo\s+(?:es\s+que\s+)?(?:me\s+)?puedes\s+ayudar|"
-    r"qu[eé]\s+(?:eres|es\s+esto)|para\s+qu[eé]\s+sirves|"
+    r"qu[eé]\s+(?:eres|es\s+esto)|qui[eé]n\s+eres|para\s+qu[eé]\s+sirves|"
     r"what can you do|who are you"
-    r")\s*[?!.]*\s*$"
+    r")"
+    # Preguntas gemelas: "quien eres y que puedes hacer" (en cualquier orden).
+    r"(?:\s+y\s+(?:qu[eé]\s+(?:puedes|sabes)\s+hacer|qui[eé]n\s+eres))*"
+    r"\s*[?!.]*\s*$"
 )
 _CAPABILITIES_ANSWER = (
     "Soy el Cerebro de GerarAI. Puedo contarte qué posiciones tienes "
@@ -931,7 +939,12 @@ class ChatService:
                 llm_trace={"path": "memory_note"},
                 context=context_echo,
             )
-        if _CAPABILITIES_RE.match(question or ""):
+        # Saludo inicial + pregunta real ("hola, quien eres?"): se responde
+        # a la pregunta, no al saludo.
+        without_greeting = LEADING_GREETING_RE.sub("", question or "").strip()
+        if _CAPABILITIES_RE.match(question or "") or (
+            without_greeting and _CAPABILITIES_RE.match(without_greeting)
+        ):
             return ChatResponse(
                 answer=_CAPABILITIES_ANSWER,
                 sources=[],

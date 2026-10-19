@@ -25,10 +25,21 @@ from app.services.company_resolver import resolve_company
 
 BRAND_NAME = "GerarAI"
 
+_GREETING_TOKEN = (
+    r"hola|buenas|buenos d[ií]as|buenas tardes|buenas noches|hey|hi|hello|"
+    r"qu[eé]\s+tal|c[oó]mo\s+est[aá]s|est[aá]s|gracias|muchas\s+gracias|ok|vale|"
+    r"adi[oó]s|hasta\s+luego"
+)
+# Saludos compuestos: "hola, buenos dias", "hola que tal", "buenas!".
 SMALL_TALK_RE = re.compile(
-    r"^\s*(?:[¿¡]\s*)?(hola|buenas|buenos d[ií]as|buenas tardes|buenas noches|hey|hi|hello|"
-    r"qu[eé] tal|c[oó]mo est[aá]s|gracias|muchas gracias|ok|vale|adi[oó]s|hasta luego)"
+    rf"^\s*(?:[¿¡]\s*)?(?:{_GREETING_TOKEN})(?:[\s!.,¡¿?]+(?:{_GREETING_TOKEN}))*"
     r"[\s!.,¡¿?]*$",
+    re.IGNORECASE,
+)
+# Saludo inicial seguido de una pregunta real: se retira para que el resto
+# del enrutado (capacidades, cartera, empresa) vea la pregunta.
+LEADING_GREETING_RE = re.compile(
+    rf"^\s*(?:[¿¡]\s*)?(?:(?:{_GREETING_TOKEN})[\s!.,¡¿?]+)+",
     re.IGNORECASE,
 )
 
