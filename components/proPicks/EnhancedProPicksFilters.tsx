@@ -108,10 +108,11 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
         <CardContent className={`space-y-6 ${open ? '' : 'hidden'} lg:block`} id="propicks-filtros-cuerpo">
           {/* Cantidad de Resultados */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-gray-200">
+            <Label id="propicks-filtro-limit-label" className="text-sm font-medium text-gray-200">
               Cantidad de Acciones: {filters.limit}
             </Label>
             <Slider
+              aria-labelledby="propicks-filtro-limit-label"
               disabled={disabled}
               value={[filters.limit]}
               onValueChange={(value) => updateFilter('limit', value[0])}
@@ -128,10 +129,11 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
 
           {/* Puntuación mínima */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-gray-200">
+            <Label id="propicks-filtro-minscore-label" className="text-sm font-medium text-gray-200">
               Puntuación mínima: {filters.minScore}
             </Label>
             <Slider
+              aria-labelledby="propicks-filtro-minscore-label"
               disabled={disabled}
               value={[filters.minScore]}
               onValueChange={(value) => updateFilter('minScore', value[0])}
@@ -148,12 +150,12 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
 
           {/* Sector */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-gray-200">Sector</Label>
+            <Label id="propicks-filtro-sector-label" className="text-sm font-medium text-gray-200">Sector</Label>
             <Select disabled={disabled}
               value={filters.sector}
               onValueChange={(value) => updateFilter('sector', value)}
             >
-              <SelectTrigger className="h-11 w-full border-gray-700 bg-gray-900 text-base md:text-sm">
+              <SelectTrigger aria-labelledby="propicks-filtro-sector-label" className="h-11 w-full border-gray-700 bg-gray-900 text-base md:text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -168,12 +170,12 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
 
           {/* Ordenar por */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-gray-200">Ordenar por</Label>
+            <Label id="propicks-filtro-sortby-label" className="text-sm font-medium text-gray-200">Ordenar por</Label>
             <Select disabled={disabled}
               value={filters.sortBy}
               onValueChange={(value: ProPicksFilters['sortBy']) => updateFilter('sortBy', value)}
             >
-              <SelectTrigger className="h-11 w-full border-gray-700 bg-gray-900 text-base md:text-sm">
+              <SelectTrigger aria-labelledby="propicks-filtro-sortby-label" className="h-11 w-full border-gray-700 bg-gray-900 text-base md:text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
