@@ -38,3 +38,62 @@ def test_long_whitespace_input_is_not_small_talk_and_does_not_backtrack_quadrati
     start = time.monotonic()
     assert _SMALL_TALK_RE.match(" " * 200000 + "x") is None
     assert time.monotonic() - start < 1.0
+
+
+def _db_with_company():
+    from app.models.entities import Base, Company
+
+    db = _db()
+    db.add(Company(
+        ticker="NVDA", name="NVIDIA Corp", exchange="NASDAQ", currency="USD",
+        company_type="operating", valuation_model="unassigned",
+    ))
+    db.commit()
+    return db
+
+
+def test_page_identity_answered_deterministically_without_sources():
+    from app.schemas.api import ChatPageContext
+
+    provider = StubProvider()
+    response = asyncio.run(ChatService(provider).answer(
+        _db_with_company(),
+        '¿qué página estoy viendo y qué me puedes contar de ella?',
+        'portfolio', None,
+        page=ChatPageContext(path='/research/NVDA', label='NVDA', ticker='NVDA'),
+    ))
+    assert response.llm_trace['path'] == 'page_identity'
+    assert 'Estás viendo NVDA (NVIDIA Corp).' in response.answer
+    assert response.sources == []
+    assert provider.requests == []
+
+
+def test_page_identity_without_resolved_company_uses_label():
+    from app.schemas.api import ChatPageContext
+
+    provider = StubProvider()
+    response = asyncio.run(ChatService(provider).answer(
+        _db(), '¿qué página es esta?', 'portfolio', None,
+        page=ChatPageContext(path='/alerts', label='Alertas', ticker=None),
+    ))
+    assert response.llm_trace['path'] == 'page_identity'
+    assert 'Estás viendo Alertas.' in response.answer
+    assert provider.requests == []
+
+
+def test_general_route_receives_current_page_in_prompt_payload():
+    import json
+
+    from app.schemas.api import ChatPageContext
+
+    provider = StubProvider()
+    response = asyncio.run(ChatService(provider).answer(
+        _db_with_company(),
+        '¿Qué tiempo hace fuera?',
+        'portfolio', None,
+        page=ChatPageContext(path='/research/NVDA', label='NVDA', ticker='NVDA'),
+    ))
+    assert provider.requests, 'la ruta general debió llamar al LLM'
+    payload = json.loads(provider.requests[0].messages[-1].content)
+    assert payload.get('current_page', {}).get('ticker') == 'NVDA'
+    assert payload['current_page'].get('company_name') == 'NVIDIA Corp'
