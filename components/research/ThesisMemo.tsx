@@ -150,6 +150,14 @@ function narrativeParagraph(parrafo: string): string {
   return parrafo.replace(/^INFERIDO:\s*/u, '');
 }
 
+/** Solo se oculta si es igual o está contenida en el resumen; una hipótesis más larga se conserva entera. */
+function hypothesisRepeatsSummary(hypothesis: string | null | undefined, summary: string | null | undefined): boolean {
+  const norm = (t: string | null | undefined) => (t ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const h = norm(hypothesis);
+  const s = norm(summary);
+  return h.length > 0 && s.length > 0 && s.includes(h);
+}
+
 export default function ThesisMemo({
   thesis,
   ticker,
@@ -312,13 +320,15 @@ export default function ThesisMemo({
         </section>
       ) : null}
 
-      <section className="rounded-lg border border-teal-900/60 bg-teal-950/10 p-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-teal-300">Hipótesis</h3>
-        <p className="mt-2 text-sm leading-6 text-gray-200">
-          {cleanThesisText(thesis.hypothesis) ||
-            'Pendiente: esta versión es anterior a los campos profesionales. Genera una nueva versión para registrar la hipótesis.'}
-        </p>
-      </section>
+      {hypothesisRepeatsSummary(thesis.hypothesis, thesis.executive_summary) ? null : (
+  <section className="rounded-lg border border-teal-900/60 bg-teal-950/10 p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-teal-300">Hipótesis</h3>
+          <p className="mt-2 text-sm leading-6 text-gray-200">
+            {cleanThesisText(thesis.hypothesis) ||
+              'Pendiente: esta versión es anterior a los campos profesionales. Genera una nueva versión para registrar la hipótesis.'}
+          </p>
+        </section>
+      )}
 
       <section>
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
