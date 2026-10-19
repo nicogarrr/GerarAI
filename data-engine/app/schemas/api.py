@@ -665,6 +665,8 @@ class ResearchAlertOut(BaseModel):
     event_date: datetime | None = None
     event_date_source: str | None = None
     event_form: str | None = None
+    # Titular de la noticia de origen (news_events.title), solo en alertas de noticias.
+    event_headline: str | None = None
     acknowledged_at: datetime | None
     acknowledged_by: str | None
     snoozed_until: datetime | None
