@@ -7,6 +7,16 @@
  */
 export type AlertCardDestination = { href: string; external: boolean };
 
+/** Una alerta puede traer varias clases de acciones ("LEN, LEN.B"): la ficha usa solo la primera. */
+export function alertPrimaryTicker(ticker: string): string {
+    return ticker.split(/[,\s]+/).filter(Boolean)[0] ?? ticker;
+}
+
+/** Destino de "Revisar tesis": nunca un ticker con coma o espacio (daba 404). */
+export function alertThesisHref(ticker: string): string {
+    return `/research/${encodeURIComponent(alertPrimaryTicker(ticker))}?view=thesis`;
+}
+
 export function alertCardDestination(item: {
     ticker?: string | null;
     sourceUrl?: string | null;
@@ -14,7 +24,7 @@ export function alertCardDestination(item: {
     if (item.ticker) {
         // Mismo destino que el CTA visible: la vista de tesis de la ficha.
         // La copia promete tesis; mandar al overview seria un destino desalineado.
-        return { href: `/research/${item.ticker}?view=thesis`, external: false };
+        return { href: alertThesisHref(item.ticker), external: false };
     }
     if (item.sourceUrl) {
         return { href: item.sourceUrl, external: true };

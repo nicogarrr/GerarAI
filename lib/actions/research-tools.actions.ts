@@ -282,7 +282,8 @@ export type PortfolioIntelligence = {
     period_end?: string | null;
     portfolio_components: Record<string, number | null>;
     incomplete_components?: string[];
-    positions: Array<{ ticker: string; weight: number; total_return: number | null; period_start?: string | null; period_end?: string | null; components: Record<string, number | null> }>;
+    excluded_partial_histories?: string[];
+    positions: Array<{ ticker: string; weight: number; total_return: number | null; period_start?: string | null; period_end?: string | null; period_days?: number | null; partial_history?: boolean; components: Record<string, number | null> }>;
   };
   ledger_contribution: {
     positions: Array<{
@@ -311,7 +312,7 @@ export type PortfolioIntelligence = {
     information_ratio: number | null;
     observations: number;
   };
-  coverage: { positions: number; positions_with_price_history: number; price_history_percent: number; portfolio_snapshots: number; snapshot_returns: number; snapshot_pricing_complete: number; limitations: string[] };
+  coverage: { positions: number; positions_with_price_history: number; positions_with_full_horizon: number; price_history_window_percent: number; price_history_percent: number; portfolio_snapshots: number; snapshot_returns: number; snapshot_pricing_complete: number; limitations: string[] };
 };
 
 export type KnowledgeGraph = {
@@ -646,6 +647,18 @@ export async function deleteSavedScreen(formData: FormData) {
   const id = assertPositiveInt(Number(formData.get('screen_id')), 'screen_id');
   await requestJson(`/api/screeners/screens/${id}`, { method: 'DELETE' });
   revalidatePath('/screeners');
+}
+
+export async function getScreenerMetricCoverage(): Promise<string[] | null> {
+  // Names with data for at least one company; null when the engine cannot
+  // answer, so the UI keeps its full static suggestion list instead of
+  // offering nothing.
+  try {
+    const payload = await requestJson<{ metrics_with_data: string[] }>('/api/screeners/metric-coverage');
+    return Array.isArray(payload.metrics_with_data) ? payload.metrics_with_data : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function runAdHocScreen(input: {

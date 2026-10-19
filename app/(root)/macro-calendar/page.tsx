@@ -128,7 +128,8 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                                 </div>
                                 {entry.status === 'insufficient_data' ? (
                                     <p className="mt-3 text-sm text-gray-400">{entry.reason}</p>
-                                ) : (
+                                ) : null}
+                                {entry.items.length > 0 ? (
                                     <ul className="mt-3 flex flex-col gap-3">
                                         {entry.items.map((item) => (
                                             <li key={item.code}>
@@ -139,7 +140,7 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                                             </li>
                                         ))}
                                     </ul>
-                                )}
+                                ) : null}
                             </li>
                         ))}
                     </ul>

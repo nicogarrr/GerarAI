@@ -170,6 +170,16 @@ def run_saved_screen(screen_id: int, db: Session = Depends(get_db)) -> dict:
     return ScreenerService().run_saved(db, screen)
 
 
+@router.get("/metric-coverage")
+def metric_coverage(db: Session = Depends(get_db)) -> dict:
+    """Metric names with data for at least one company.
+
+    The screener UI uses this to only suggest metrics that can actually
+    match something; see ScreenerService.metric_coverage.
+    """
+    return {"metrics_with_data": ScreenerService().metric_coverage(db)}
+
+
 @router.post("/run")
 def run_ad_hoc_screen(payload: AdHocScreen, db: Session = Depends(get_db)) -> dict:
     try:

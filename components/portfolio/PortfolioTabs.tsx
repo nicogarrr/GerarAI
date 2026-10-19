@@ -57,7 +57,12 @@ type Props = {
 const VALID_TABS = ['resumen', 'prevision', 'dividendos', 'posiciones', 'movimientos', 'estrategia'] as const;
 type PortfolioTab = (typeof VALID_TABS)[number];
 
+// Alias legibles: la pestaña visible se llama "Factores" pero el valor
+// interno es "estrategia"; un enlace a ?tab=factores no debe caer a resumen.
+const TAB_ALIASES: Record<string, PortfolioTab> = { factores: 'estrategia' };
+
 function normalizeTab(value: string | null): PortfolioTab {
+    if (value && value in TAB_ALIASES) return TAB_ALIASES[value];
     return (VALID_TABS as readonly string[]).includes(value ?? '') ? (value as PortfolioTab) : 'resumen';
 }
 
