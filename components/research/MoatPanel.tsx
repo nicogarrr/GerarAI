@@ -182,7 +182,7 @@ export function MoatClassificationPanel({ moat }: { moat: import('@/lib/actions/
     <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {Object.entries(moat.nico_mapping.types).map(([key, title]) => <li key={key} className="min-w-0 rounded-lg border border-gray-800 p-3">
         <h3 className="text-sm text-gray-200">{title}</h3>
-        <p className="mt-1 text-xs text-gray-400">{moat.moats.filter(item => item.nico_classification?.type === key).length} categorías con evaluación</p>
+        <p className="mt-1 text-xs text-gray-400">{(() => { const count = moat.moats.filter(item => item.nico_classification?.type === key).length; return `${count} ${count === 1 ? 'categoría' : 'categorías'} con evaluación`; })()}</p>
       </li>)}
     </ul>
     <details className="text-xs text-gray-400"><summary className="cursor-pointer">Mapeo declarado</summary>
