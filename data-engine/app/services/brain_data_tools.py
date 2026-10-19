@@ -39,6 +39,10 @@ def _money(value, currency) -> str:
     return f"{_number(value)} {currency or ''}".strip()
 
 
+from app.services.display_es import fecha_es as _fecha_es
+from app.services.display_es import source_label as _source_label
+
+
 def _link(company: Company, view: str = "financials") -> str:
     return f"/research/{quote(company.ticker, safe='')}?view={view}"
 
@@ -64,7 +68,7 @@ def _company_data(db: Session, company: Company) -> tuple[list[str], list[dict]]
         lines.append("Precio: sin cotización válida almacenada.")
     else:
         lines.append(f"Último precio almacenado: {_money(price.close, company.currency)} "
-                     f"({price.date.isoformat()}, {price.source}). No es una cotización en directo.")
+                     f"({_fecha_es(price.date)}, {_source_label(price.source)}). No es una cotización en directo.")
         sources.append(_source("market_price", price.id, f"Precio {company.ticker} · {price.date}", _link(company)))
     ratio = load_screener_ratios(db, {company.ticker}).get(company.ticker, {}) if price else {}
     pe = ratio.get("pe")
@@ -98,9 +102,9 @@ def _company_in_question(db: Session, question: str) -> Company | None:
 
 
 def _dividend_line(company: Company, record: DividendRecord) -> str:
-    pay = f", pago {record.pay_date.isoformat()}" if record.pay_date else ""
+    pay = f", pago {_fecha_es(record.pay_date)}" if record.pay_date else ""
     return (f"{company.ticker}: {_money(record.amount, record.currency)} por acción, "
-            f"ex-dividendo {record.ex_date.isoformat()}{pay} ({record.source}).")
+            f"ex-dividendo {_fecha_es(record.ex_date)}{pay} ({_source_label(record.source)}).")
 
 
 def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | None:
@@ -185,7 +189,7 @@ def _company_news_answer(db: Session, company: Company, tenant: int) -> ChatResp
         if key in seen:
             continue
         seen.add(key)
-        lines.append(f"- '{title}' ({event.date.date().isoformat()}, {event.source}).")
+        lines.append(f"- '{title}' ({_fecha_es(event.date.date())}, {_source_label(event.source)}).")
         sources.append(_source("news_event", event.id, f"{company.ticker}: {title}", event.url or _link(company, "news")))
         if len(lines) == 6:
             break
@@ -286,7 +290,7 @@ def _insider_tx_line(tx: InsiderTransaction, ticker: str) -> str:
         parts.append(f"{_number(tx.shares)} acciones")
     if tx.value is not None:
         parts.append(f"por {_money(tx.value, 'USD')}")
-    when = tx.tx_date or "fecha no declarada"
+    when = _fecha_es(tx.tx_date) if tx.tx_date else "fecha no declarada"
     return " ".join(parts) + f" ({when}, SEC Form 4)."
 
 
@@ -433,7 +437,7 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
                 continue
             seen.add(key)
             kept_signatures.append((signature, event.date))
-            lines.append(f"- {company.ticker}: '{title}' ({event.date.date().isoformat()}, {event.source}).")
+            lines.append(f"- {company.ticker}: '{title}' ({_fecha_es(event.date.date())}, {_source_label(event.source)}).")
             sources.append(_source("news_event", event.id, f"{company.ticker}: {title}", event.url or _link(company, "news")))
             if len(lines) == 6:
                 break

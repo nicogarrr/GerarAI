@@ -455,9 +455,10 @@ def test_insider_by_ticker_lists_sec_dated_trades_and_hides_other_tenant(db):
     assert "Cook Timothy D compró" in response.answer
     assert "Jain Ajit vendió" in response.answer
     assert "SEC Form 4" in response.answer
-    assert "2026-10-10" in response.answer
+    assert "10 oct 2026" in response.answer  # fecha en español natural, nunca ISO
+    assert "2026-10-10" not in response.answer
     assert "$9,000.00" in response.answer
-    assert "2026-10-11" not in response.answer  # del tenant 2
+    assert "11 oct 2026" not in response.answer  # del tenant 2
     assert response.llm_trace["path"] == "company_insider"
     assert all(source["url"].startswith("https://www.sec.gov/") for source in response.sources)
 
@@ -504,3 +505,26 @@ def test_portfolio_news_dedups_same_story_with_appended_fragment(db):
     db.info["tenant_id"] = 1
     response = asyncio.run(ChatService().answer(db, "¿Qué noticias hay de mis empresas?", "portfolio", None))
     assert response.answer.count("Apple stock is at a record high") == 1
+
+
+def test_company_quote_shows_spanish_date_and_human_source(db):
+    """Visto en prod con AAPL (19-oct-2026): la prosa del chat enseñaba
+    «(2026-10-18, Finnhub)» y el slug «yahoo_finance_intraday»."""
+    a = company(db, "AAPL")
+    db.add(MarketPrice(company_id=a.id, date=date(2026, 10, 18), close=Decimal("200"), source="yahoo_finance_intraday"))
+    db.commit()
+    response = answer_data_question(db, "¿Precio actual de AAPL?")
+    assert response is not None
+    assert "(18 oct 2026, Yahoo Finance · intradía)" in response.answer
+    assert "2026-10-18" not in response.answer
+    assert "yahoo_finance_intraday" not in response.answer
+
+
+def test_fecha_es_tolerates_non_iso_text():
+    """Objeción del auditor (19-oct-2026): un tx_date no ISO no rompe la
+    respuesta; se devuelve el texto tal cual."""
+    from app.services.display_es import fecha_es
+
+    assert fecha_es(date(2026, 10, 18)) == "18 oct 2026"
+    assert fecha_es("2026-10-18") == "18 oct 2026"
+    assert fecha_es("finales de octubre") == "finales de octubre"

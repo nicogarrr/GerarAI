@@ -42,7 +42,10 @@ def test_declared_dividends_of_open_positions_listed_with_source_and_dates(db):
     assert first["action_type"] == "dividend" and first["declared"] is True and first["id"] is None
     assert first["effective_date"] == (today + timedelta(days=10)).isoformat()
     assert "0.53 USD por acción" in first["description"] and "fuente Yahoo Finance" in first["description"]
-    assert f"pago {(today + timedelta(days=24)).isoformat()}" in first["description"]
+    # La descripción visible pinta la fecha en español natural (nunca ISO).
+    from app.services.display_es import fecha_es
+    assert f"pago {fecha_es(today + timedelta(days=24))}" in first["description"]
+    assert f"pago {(today + timedelta(days=24)).isoformat()}" not in first["description"]
     assert first["applied"] is None
     assert first["amount_per_share"] == 0.53 and first["currency"] == "USD"
     assert first["pay_date"] == (today + timedelta(days=24)).isoformat()
