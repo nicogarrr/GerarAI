@@ -486,3 +486,21 @@ def test_insider_portfolio_aggregates_positions_and_declares_missing(db):
     assert "AAPL" in response.answer and "compró" in response.answer
     assert "Sin operaciones insider guardadas: MSFT." in response.answer
     assert response.llm_trace["path"] == "portfolio_insider"
+
+
+def test_portfolio_news_dedups_same_story_with_appended_fragment(db):
+    # La misma noticia guardada con el titular solo y con titular+entrada
+    # pegada salía dos veces: el dedup por coincidencia exacta no las casaba.
+    a = company(db, "AAPL")
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=1, average_cost=10, currency="USD", market_value=10, as_of=date.today()))
+    db.add_all([
+        NewsEvent(tenant_id=1, company_id=a.id, source="Yahoo Finance",
+                  title="Apple stock is at a record high but is it warranted given slowing iPhone 18 demand?"),
+        NewsEvent(tenant_id=1, company_id=a.id, source="Yahoo Finance",
+                  title="Apple stock is at a record high but is it warranted given slowing iPhone 18 demand? Apple's new crop of iPhones may be falling shy of the sales mark."),
+    ])
+    db.info.pop("tenant_id", None)
+    db.commit()
+    db.info["tenant_id"] = 1
+    response = asyncio.run(ChatService().answer(db, "¿Qué noticias hay de mis empresas?", "portfolio", None))
+    assert response.answer.count("Apple stock is at a record high") == 1
