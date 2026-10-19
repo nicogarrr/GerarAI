@@ -520,3 +520,29 @@ def test_concurrent_429s_count_once_per_run_and_breaker_opens_after_3_runs():
     assert observations == {}
     assert len(errors) == 8
     assert all("Finnhub:provider_unavailable" in e["reason"] for e in errors)
+
+
+class _LateSpotProvider:
+    async def fetch(self, companies, *, as_of):
+        return {
+            company.ticker: PriceObservation(
+                ticker=company.ticker,
+                price=Decimal("100.50"),
+                price_date=date(2026, 9, 21),
+                source="Finnhub",
+            )
+            for company in companies
+        }, []
+
+
+def test_late_spot_does_not_overwrite_closed_official_bar(db):
+    _seed(db, 1)
+    company = db.scalars(select(Company)).one()
+    db.add(MarketPrice(company_id=company.id, date=date(2026, 9, 21), close=Decimal("100.40"),
+                       adj_close=Decimal("100.40"), source="yfinance"))
+    db.commit()
+    service = MarketRefreshService(price_provider=_LateSpotProvider(), fx_provider=_FakeFXProvider())
+    asyncio.run(service.refresh(db, as_of=date(2026, 9, 22)))
+    bar = db.scalars(select(MarketPrice).where(MarketPrice.date == date(2026, 9, 21))).one()
+    assert bar.close == Decimal("100.40")
+    assert bar.source == "yfinance"
