@@ -25,10 +25,10 @@ test('el avatar usa la foto si existe y las iniciales si no', () => {
     assert.match(avatar, /NameAvatar/);
 });
 
-test('las tres pantallas pasan el slug al avatar', () => {
+test('las pantallas con avatar pasan el slug', () => {
+    // Carteras se fusiona en /inversores (decisión de Nico, 2026-10-20): quedan hub y ficha.
     for (const file of [
         'app/(root)/inversores/page.tsx',
-        'app/(root)/inversores/carteras/page.tsx',
         'app/(root)/inversores/[slug]/page.tsx',
     ]) {
         assert.match(readFileSync(file, 'utf8'), /<InvestorAvatar[^>]*slug=\{investor\.slug\}/, file);
@@ -41,9 +41,9 @@ test('la ficha muestra la atribucion de la foto', () => {
     assert.match(ficha, /Wikimedia Commons/);
 });
 
-test('lista y carteras atribuyen las fotos (title en la miniatura y nota al pie)', () => {
+test('la lista atribuye las fotos (title en la miniatura y nota al pie)', () => {
     assert.match(readFileSync('app/(root)/inversores/_components/Avatar.tsx', 'utf8'), /photoTitle=\{photo \? `Foto: \$\{photo\.author\}/);
-    for (const file of ['app/(root)/inversores/page.tsx', 'app/(root)/inversores/carteras/page.tsx']) {
+    for (const file of ['app/(root)/inversores/page.tsx']) {
         assert.match(readFileSync(file, 'utf8'), /Fotos con licencia libre de Wikimedia Commons/, file);
     }
 });

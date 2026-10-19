@@ -9,14 +9,13 @@ import { newLabel } from '../app/(root)/inversores/_components/labels.ts';
 const read = (path: string) => readFileSync(path, 'utf8');
 const crumbs = read('components/layout/Breadcrumbs.tsx');
 const grid = read('app/(root)/inversores/page.tsx');
-const portfolios = read('app/(root)/inversores/carteras/page.tsx');
+const portfolios = read('app/(root)/inversores/page.tsx'); // carteras fusionada en el hub (decision de Nico, 2026-10-20)
 const bought = read('app/(root)/inversores/mas-compradas/page.tsx');
 const ficha = read('app/(root)/inversores/_components/Portfolio.tsx');
 const pagination = read('app/(root)/inversores/_components/Pagination.tsx');
 
 test('las migas no muestran el slug crudo de las subpaginas de Inversores', () => {
     assert.match(crumbs, /'mas-compradas': 'Más compradas'/);
-    assert.match(crumbs, /'carteras': 'Carteras'/);
     assert.match(crumbs, /humanizeSlug/);
 });
 

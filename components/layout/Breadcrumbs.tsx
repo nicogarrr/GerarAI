@@ -27,7 +27,6 @@ const SUBROUTE_LABELS: Record<string, string> = {
   'management-credibility': 'Credibilidad de la directiva',
   // Fuera del nav principal (quick win UX 3); la miga sigue legible.
   // Modulo Inversores: sub-paginas fijas (no son un slug de inversor).
-  'carteras': 'Carteras',
   'mas-compradas': 'Más compradas',
   // Sub-pestaña de Calendarios (#1777): sin entrada, la miga salia cruda.
   'suscripcion': 'Suscripción',
