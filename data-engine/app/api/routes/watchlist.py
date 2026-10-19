@@ -203,13 +203,26 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
     today = date.today()
     sources: list[str] = []
 
-    cap_row = db.execute(
-        select(FinancialFact)
-        .where(FinancialFact.company_id == company.id,
-               FinancialFact.metric == "market_cap")
-        .order_by(desc(FinancialFact.is_reported), desc(FinancialFact.period))
-        .limit(1)
-    ).scalar_one_or_none()
+    def _cap_row() -> FinancialFact | None:
+        return db.execute(
+            select(FinancialFact)
+            .where(FinancialFact.company_id == company.id,
+                   FinancialFact.metric == "market_cap")
+            .order_by(desc(FinancialFact.is_reported), desc(FinancialFact.period))
+            .limit(1)
+        ).scalar_one_or_none()
+
+    cap_row = _cap_row()
+    if cap_row is None:
+        # Respaldo bajo demanda (QA Tester 6, 19-oct-2026: AENA/CGEO.L con
+        # cap N/D en la watchlist porque el barrido de métricas aún no lo
+        # había derivado): precio x acciones, idempotente. Sin base (sin
+        # precio fresco o sin acciones) no escribe nada: None honesto.
+        from app.services.derived_market_cap_service import (
+            refresh_derived_market_cap,
+        )
+        refresh_derived_market_cap(db, company)
+        cap_row = _cap_row()
     market_cap = float(cap_row.value) if cap_row is not None else None
     if cap_row is not None:
         sources.append(
