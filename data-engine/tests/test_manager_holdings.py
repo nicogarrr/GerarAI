@@ -161,6 +161,32 @@ def test_sync_marks_unavailable_on_http_error(db):
     assert manager.coverage == "unavailable"
 
 
+def test_latest_holdings_resolves_issuer_name_by_cusip(db):
+    """La pestana 13F muestra el nombre completo de la referencia por CUSIP
+    (el de la SEC viene truncado) y conserva el del filing."""
+    from datetime import date
+
+    from app.models.entities import InstrumentReference
+
+    service = ManagerHoldingIngestionService(client=_sec_client())
+    service.sync_manager(db, cik=CIK)
+    db.add(
+        InstrumentReference(
+            ticker_normalized="AAPL",
+            name="Apple Inc.",
+            cusip="037833100",
+            as_of=date(2026, 10, 1),
+            source="financedatabase",
+        )
+    )
+    db.commit()
+    result = service.latest_holdings(db, cik=CIK)
+    by_cusip = {h["cusip"]: h for h in result["holdings"]}
+    assert by_cusip["037833100"]["name_of_issuer"] == "Apple Inc."
+    assert by_cusip["037833100"]["name_of_issuer_filed"] == "APPLE INC"
+    assert by_cusip["060505104"]["name_of_issuer"] == "BANK OF AMERICA CORP"
+
+
 def test_latest_holdings_serves_latest_report(db):
     service = ManagerHoldingIngestionService(client=_sec_client())
     assert service.latest_holdings(db, cik=CIK)["status"] == "unavailable"

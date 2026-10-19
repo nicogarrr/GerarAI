@@ -101,6 +101,63 @@ def _holding(manager: FundManager, accession: str, filing: date, cusip: str, val
     )
 
 
+def test_issuer_names_resolve_by_cusip_with_filed_fallback():
+    """El nameOfIssuer del 13F viene truncado por la SEC; con referencia por
+    CUSIP exacto se muestra el nombre completo y el del filing queda en
+    name_of_issuer_filed. Sin referencia, fallback al nombre del filing."""
+    from app.models.entities import InstrumentReference
+
+    db = _db()
+    manager = FundManager(
+        cik="0001067983",
+        name=REVIEWED_MANAGERS["0001067983"],
+        last_report_date=date(2026, 6, 30),
+    )
+    db.add(manager)
+    db.flush()
+    db.add_all(
+        [
+            _holding(manager, "A-1", date(2026, 8, 14), "037833100", "100", "APPLE INC"),
+            _holding(manager, "A-1", date(2026, 8, 14), "060505104", "300", "BANK OF AMERICA"),
+        ]
+    )
+    db.add(
+        InstrumentReference(
+            ticker_normalized="AAPL",
+            name="Apple Inc.",
+            cusip="037833100",
+            as_of=date(2026, 10, 1),
+            source="financedatabase",
+        )
+    )
+    db.commit()
+    detail = investor_detail(db, "buffett")
+    assert detail is not None
+    by_filed = {h["name_of_issuer_filed"]: h for h in detail["holdings"]}
+    assert by_filed["APPLE INC"]["name_of_issuer"] == "Apple Inc."
+    assert by_filed["BANK OF AMERICA"]["name_of_issuer"] == "BANK OF AMERICA"
+
+
+def test_most_bought_resolves_issuer_name_by_cusip():
+    from app.models.entities import InstrumentReference
+
+    db = _db()
+    _two_quarters(db, "0001067983", {"037833100": ("10", "20")})
+    db.add(
+        InstrumentReference(
+            ticker_normalized="AAPL",
+            name="Apple Inc.",
+            cusip="037833100",
+            as_of=date(2026, 10, 1),
+            source="financedatabase",
+        )
+    )
+    db.commit()
+    result = most_bought(db)
+    assert result["items"][0]["name_of_issuer"] == "Apple Inc."
+    assert result["items"][0]["name_of_issuer_filed"] == "EMISOR 037833100"
+
+
 def test_summary_uses_latest_accession_so_amendments_do_not_double_count():
     db = _db()
     manager = FundManager(

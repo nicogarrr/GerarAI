@@ -85,6 +85,31 @@ def normalize_row(raw: dict, *, as_of: date, source: str = "financedatabase") ->
     }
 
 
+def names_by_cusip(db: Session, cusips: list[str]) -> dict[str, str]:
+    """Nombre legible del emisor por CUSIP exacto (referencia registrada).
+
+    El nameOfIssuer del 13F viene truncado por la SEC («TAIWAN SEMICONDUCTOR
+    MANUFAC»); la referencia de instrumentos trae el nombre completo. Solo se
+    sustituye por CUSIP exacto, nunca por parecido de nombre; sin referencia,
+    el llamador conserva el nombre tal cual del filing.
+    """
+    wanted = sorted({c.strip().upper() for c in cusips if c and c.strip()})
+    if not wanted:
+        return {}
+    try:
+        rows = db.scalars(
+            select(InstrumentReference).where(InstrumentReference.cusip.in_(wanted))
+        ).all()
+    except Exception:
+        # Tabla aun sin migrar (DB anterior a 0047): sin referencia, fallback intacto.
+        return {}
+    out: dict[str, str] = {}
+    for row in rows:
+        if row.cusip and row.name:
+            out.setdefault(row.cusip.strip().upper(), row.name)
+    return out
+
+
 def get_by_ticker(db: Session, ticker: str) -> InstrumentReference | None:
     """Fila de referencia por ticker normalizado, o None si es desconocido."""
     normalized = normalize_ticker(ticker)
