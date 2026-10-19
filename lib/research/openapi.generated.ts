@@ -4667,6 +4667,8 @@ export interface paths {
          *     Con ``published=1`` la version es la ultima PUBLICADA (regla vigente: un
          *     borrador no enseña cifras ni margen); sin el parametro se conserva el
          *     comportamiento historico (ultima version, sea cual sea su estado).
+         *     ``draft=1`` devuelve la version de borrador sin veredicto, hipotesis,
+         *     resumen, valoracion ni secciones (ver ``build_memo_markdown``).
          */
         get: operations["thesis_memo_api_thesis__ticker__memo_md_get"];
         put?: never;
