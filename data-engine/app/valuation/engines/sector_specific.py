@@ -475,9 +475,13 @@ class InsurerValuationEngine(ValuationEngine):
     def value(self, context: ValuationContext) -> dict:
         resolved = _resolve_inputs(
             context,
-            anchor_metrics=("book_value", "common_equity"),
+            # total_equity: nombre canonico del hecho reportado SEC
+            # (StockholdersEquity); book_value es el mismo stock con otro
+            # nombre, asi que el motor lo acepta como alias en vez de pedir
+            # una copia derivada del mismo dato.
+            anchor_metrics=("book_value", "common_equity", "total_equity"),
             inputs={
-                "book_value": ("book_value", "common_equity"),
+                "book_value": ("book_value", "common_equity", "total_equity"),
                 "shares_diluted": ("shares_diluted",),
                 "roe": ("roe",),
                 "cost_of_equity": ("cost_of_equity",),
