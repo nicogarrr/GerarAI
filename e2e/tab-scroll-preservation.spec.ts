@@ -12,13 +12,20 @@ const SCROLL_PX = 300;
 
 async function medirSalto(
   page: import("@playwright/test").Page,
-  pulsar: () => Promise<void>,
+  destino: import("@playwright/test").Locator,
   urlEsperada: RegExp,
 ) {
   await page.evaluate((y) => window.scrollTo(0, y), SCROLL_PX);
+  // Un usuario real pulsa la pestaña que VE. El hover provoca el mismo
+  // scroll-into-view de Playwright que el clic, así `antes` se mide en la
+  // posición desde la que se pulsa de verdad. Medir a 300px con la pestaña
+  // fuera del viewport falseaba la comparación: el propio clic desplazaba
+  // la página antes del pointerdown que captura ScrollPreserver, y la
+  // posición restaurada (correcta) ya no coincidía con `antes`.
+  await destino.hover();
   const antes = await page.evaluate(() => window.scrollY);
   expect(antes).toBeGreaterThan(0);
-  await pulsar();
+  await destino.click();
   await expect(page).toHaveURL(urlEsperada);
   // La vista nueva renderiza en servidor: espera a que llegue contenido.
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
@@ -38,7 +45,7 @@ test("ficha: las pestañas de módulo conservan la posición de scroll (desktop)
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
   await medirSalto(
     page,
-    () => page.getByRole("navigation", { name: /Módulos de/ }).getByRole("link", { name: "Tesis", exact: true }).click(),
+    page.getByRole("navigation", { name: /Módulos de/ }).getByRole("link", { name: "Tesis", exact: true }),
     /\/research\/MSFT\?view=thesis/,
   );
 });
@@ -49,7 +56,7 @@ test("ficha: los 3 pasos conservan la posición de scroll (móvil)", async ({ pa
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
   await medirSalto(
     page,
-    () => page.getByRole("navigation", { name: "Etapas del research", exact: true }).getByRole("link", { name: "2 · Valorar", exact: true }).click(),
+    page.getByRole("navigation", { name: "Etapas del research", exact: true }).getByRole("link", { name: "2 · Valorar", exact: true }),
     /\/research\/MSFT\?view=valorar/,
   );
 });
@@ -60,7 +67,7 @@ test("biblioteca: las pestañas conservan la posición de scroll", async ({ page
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   await medirSalto(
     page,
-    () => page.getByRole("tab", { name: "Subir", exact: true }).click(),
+    page.getByRole("tab", { name: "Subir", exact: true }),
     /\/knowledge\?tab=subir/,
   );
 });
