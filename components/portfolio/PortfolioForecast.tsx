@@ -109,6 +109,36 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
       </Panel>
     );
   }
+  if (portfolio.covered_count === 0 && forecast.excluded.length > 0) {
+    // Ninguna posición tiene tesis publicada vigente: tres tarjetas N/D no
+    // informan. Una sola línea accionable sobre la posición de mayor peso.
+    const heaviest = [...forecast.excluded]
+      .filter((item) => item.weight !== null)
+      .sort((a, b) => (b.weight as number) - (a.weight as number))[0];
+    return (
+      <Panel title="Previsión">
+        <p className="text-sm text-gray-200">
+          {heaviest ? (
+            <>
+              Publica la tesis de{' '}
+              <Link
+                href={`/research/${encodeURIComponent(heaviest.ticker)}?view=thesis`}
+                className="font-medium text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+              >
+                {heaviest.ticker}
+              </Link>{' '}
+              ({pct(heaviest.weight)} de la cartera) para activar la previsión.
+            </>
+          ) : (
+            'Publica la tesis de alguna posición para activar la previsión.'
+          )}
+        </p>
+        <p className="mt-1 text-xs text-gray-500">
+          Un borrador no cuenta: {forecast.excluded.length} de {portfolio.position_count} posiciones sin tesis publicada vigente.
+        </p>
+      </Panel>
+    );
+  }
   const scenarioOrder = ['bear', 'base', 'bull'] as const;
   return (
     <div className="space-y-6">
