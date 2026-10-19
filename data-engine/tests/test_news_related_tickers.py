@@ -7,11 +7,19 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.models.entities import Base, Company, MarketPrice
+from app.services import news_related_tickers as nrt
 from app.services.news_related_tickers import (
     build_index,
     mentioned_companies,
     related_for_events,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_cache():
+    nrt._INDEX_CACHE.update(at=0.0, value=None)
+    yield
+    nrt._INDEX_CACHE.update(at=0.0, value=None)
 
 
 @pytest.fixture
@@ -95,3 +103,20 @@ def test_missing_prices_give_none_not_invented_values(db):
     vod = next(r for r in related if r["ticker"] == "VOD")
     assert vod["price"] is None and vod["change_pct"] is None and vod["date"] is None
 
+
+
+def test_single_word_name_needs_adjacent_legal_suffix(db):
+    pgr = _co(db, "PGR", "Progressive Corp", exchange="NYSE")
+    so = _co(db, "SO", "Southern Company", exchange="NYSE")
+    by_name, by_ticker = build_index([pgr, so])
+    assert mentioned_companies("Progressive policies on Southern Europe", by_name, by_ticker) == []
+    found = {c.ticker for c in mentioned_companies("Progressive Corp and Southern Co. results", by_name, by_ticker)}
+    assert found == {"PGR"}
+
+
+def test_index_is_cached_with_ttl(db):
+    _co(db, "AAA", "Alpha Beta Industries Inc")
+    nrt._cached_index(db)
+    _co(db, "BBB", "Gamma Delta Industries Inc")
+    by_name, _ = nrt._cached_index(db)
+    assert "gamma delta industries" not in by_name

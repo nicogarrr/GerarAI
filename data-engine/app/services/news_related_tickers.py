@@ -13,7 +13,9 @@ SQL por peticion de feed."""
 from __future__ import annotations
 
 import re
+import time
 import unicodedata
+from dataclasses import dataclass
 from datetime import date, timedelta
 
 from sqlalchemy import select
@@ -23,6 +25,30 @@ from app.models.entities import Company, MarketPrice
 from app.services.market_change import OFFICIAL_CLOSE_SOURCES, common_sessions
 
 MAX_RELATED = 6
+INDEX_TTL_SECONDS = 600
+
+# Una empresa de nombre de UNA palabra («Progressive», «Southern») solo se
+# vincula si en el texto le sigue un sufijo legal («Progressive Corp»): sola es
+# una palabra corriente («Progressive policies», «Southern Europe»).
+_LEGAL_ADJ = {
+    "inc", "corp", "corporation", "company", "ltd", "plc", "llc", "limited", "nv", "sa", "ag",
+    "group", "holdings", "holding",
+}
+
+# Alias de UNA palabra verificados a mano: marcas sin otro significado corriente.
+# Solo cuentan si ese ticker existe en companies.
+VERIFIED_ALIASES = {
+    "telefonica": "TEF", "nvidia": "NVDA", "microsoft": "MSFT", "broadcom": "AVGO",
+    "qualcomm": "QCOM", "palantir": "PLTR", "iberdrola": "IBE", "inditex": "ITX",
+}
+
+
+@dataclass(frozen=True)
+class CompanyRef:
+    id: int
+    ticker: str | None
+    name: str | None
+    currency: str | None
 
 _SUFFIX = {
     "inc", "corp", "corporation", "co", "company", "ltd", "plc", "sa", "nv", "ag", "se",
@@ -55,7 +81,7 @@ def _name_key(name: str | None) -> str | None:
     return key if len(key) >= 7 else None
 
 
-def build_index(companies: list[Company]) -> tuple[dict[str, Company], dict[str, Company]]:
+def build_index(companies: list[CompanyRef | Company]) -> tuple[dict[str, Company], dict[str, Company]]:
     """(nombre -> empresa, ticker -> empresa). Un nombre compartido por dos
     empresas se descarta: ambiguo."""
     by_name: dict[str, Company | None] = {}
@@ -70,14 +96,17 @@ def build_index(companies: list[Company]) -> tuple[dict[str, Company], dict[str,
             by_name[key] = None
         else:
             by_name.setdefault(key, company)
+    for alias, tkr in VERIFIED_ALIASES.items():
+        if tkr in by_ticker and by_name.get(alias, "x") is not None:
+            by_name[alias] = by_ticker[tkr]
     return {k: v for k, v in by_name.items() if v is not None}, by_ticker
 
 
 def mentioned_companies(
     text: str,
-    by_name: dict[str, Company],
-    by_ticker: dict[str, Company],
-) -> list[Company]:
+    by_name: dict[str, CompanyRef | Company],
+    by_ticker: dict[str, CompanyRef | Company],
+) -> list[CompanyRef | Company]:
     found: dict[int, Company] = {}
     for pattern in (_CASHTAG, _EXCHANGE):
         for match in pattern.finditer(text or ""):
@@ -89,6 +118,10 @@ def mentioned_companies(
     for size in range(1, max_n + 1):
         for i in range(len(words) - size + 1):
             company = by_name.get(" ".join(words[i : i + size]))
+            if company is not None and size == 1 and words[i] not in VERIFIED_ALIASES:
+                nxt = words[i + 1] if i + 1 < len(words) else None
+                if nxt not in _LEGAL_ADJ:
+                    company = None
             if company is not None:
                 found.setdefault(company.id, company)
     return list(found.values())
@@ -138,6 +171,21 @@ def quotes_for(db: Session, company_ids: set[int]) -> dict[int, dict]:
     return out
 
 
+_INDEX_CACHE: dict = {"at": 0.0, "value": None}
+
+
+def _cached_index(db: Session):
+    """Indice en memoria con TTL: evita leer toda la tabla companies en cada
+    peticion del feed. Solo 4 columnas."""
+    now = time.monotonic()
+    if _INDEX_CACHE["value"] is None or now - _INDEX_CACHE["at"] > INDEX_TTL_SECONDS:
+        rows = db.execute(select(Company.id, Company.ticker, Company.name, Company.currency)).all()
+        refs = [CompanyRef(r[0], r[1], r[2], r[3]) for r in rows]
+        _INDEX_CACHE["value"] = build_index(refs)
+        _INDEX_CACHE["at"] = now
+    return _INDEX_CACHE["value"]
+
+
 def related_for_events(
     db: Session,
     items: list[tuple[int, Company | None, str]],
@@ -145,8 +193,7 @@ def related_for_events(
     """items = (event_id, empresa_principal, texto). Devuelve event_id ->
     lista [principal, *relacionadas] con cierre/variacion; vacio si no hay
     ninguna relacionada distinta de la principal (la tira seria redundante)."""
-    companies = list(db.scalars(select(Company)).all())
-    by_name, by_ticker = build_index(companies)
+    by_name, by_ticker = _cached_index(db)
     per_event: dict[int, list[Company]] = {}
     ids: set[int] = set()
     for event_id, primary, text in items:

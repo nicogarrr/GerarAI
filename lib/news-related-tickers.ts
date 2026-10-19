@@ -29,6 +29,8 @@ export type RelatedTickerView = {
     href: string;
     priceText: string;
     changeText: string;
+    /** Fecha corta (dd/mm) del cierre cuando no es comparable con el anterior; '' si hay variacion. */
+    dateText: string;
     tone: 'up' | 'down' | 'flat' | 'none';
     title: string;
 };
@@ -53,12 +55,15 @@ export function relatedTickerView(item: RelatedTicker): RelatedTickerView {
         ? new Intl.NumberFormat('es-ES', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'exceptZero' }).format((item.change_pct as number) / 100)
         : NA;
     const tone = !hasChange ? 'none' : item.change_pct! > 0 ? 'up' : item.change_pct! < 0 ? 'down' : 'flat';
+    const m = item.date ? /^\d{4}-(\d{2})-(\d{2})/.exec(item.date) : null;
+    const dateText = !hasChange && hasPrice && m ? `${m[2]}/${m[1]}` : '';
     const day = item.date ? `cierre ${item.date}` : 'sin cierre disponible';
     return {
         ticker: item.ticker,
         href: `/research/${encodeURIComponent(item.ticker)}`,
         priceText,
         changeText,
+        dateText,
         tone,
         title: `${item.name ?? item.ticker} · ${day}`,
     };

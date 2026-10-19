@@ -20,6 +20,7 @@ export function RelatedTickersStrip({ items }: { items?: RelatedTicker[] | null 
             <Link prefetch={false} href={view.href} className="font-medium text-gray-200 hover:text-teal-200">{view.ticker}</Link>
             <span className="text-gray-400">{view.priceText}</span>
             <span className={TONE[view.tone]}>{view.changeText}</span>
+            {view.dateText ? <span className="text-gray-500">cierre {view.dateText}</span> : null}
           </li>
         );
       })}

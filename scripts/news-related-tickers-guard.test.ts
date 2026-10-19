@@ -30,6 +30,7 @@ void test('sin cierre o sin variacion consecutiva: N/D, nunca 0 %', () => {
   const noChange = relatedTickerView({ ticker: 'DTE', currency: 'EUR', price: 30, date: '2026-10-15', change_pct: null });
   assert.equal(noChange.changeText, 'N/D');
   assert.notEqual(noChange.priceText, 'N/D');
+  assert.equal(noChange.dateText, '15/10', 'cierre no comparable: fecha corta visible');
 });
 
 void test('divisa no ISO (GBX) se muestra tal cual, sin convertir ni usar USD', () => {
