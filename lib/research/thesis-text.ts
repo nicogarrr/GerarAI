@@ -49,12 +49,27 @@ export function cleanThesisText(text: string | null | undefined): string {
         .replace(/(?<!\.)\.{2}(?!\.)/g, '.');
 }
 
+const isoDate = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid' });
+const ISO_TIMESTAMP = /(?<![\d-])\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?(?![\d:])/g;
+// Decimal con punto pegado a % ("36.2%") -> "36,2 %" como el resto de la ficha.
+const DOT_PERCENT = /(?<![\w.])(-?\d{1,3}\.\d{1,2})\s?%/g;
+
+/** Fechas ISO y porcentajes con punto -> es-ES. Solo presentacion; el resto intacto. */
+export function localizeMemoNumbers(text: string): string {
+    return text
+        .replace(ISO_TIMESTAMP, (iso) => {
+            const date = new Date(/(?:Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`);
+            return Number.isNaN(date.getTime()) ? iso : isoDate.format(date);
+        })
+        .replace(DOT_PERCENT, (_m, num: string) => `${num.replace('.', ',')}\u00A0%`);
+}
+
 /** Presentation of legacy memoranda only. Preserve URLs, citations and numbers. */
 export function cleanThesisMarkdown(text: string): string {
     const withoutDuplicateNarrative = text.replace(/\n## 24\. Análisis narrativo INFERIDO[\s\S]*?(?=\n## (?!#)|$)/g, '');
     return withoutDuplicateNarrative.split(/(```[\s\S]*?```|https?:\/\/[^\s<>]+?)(?=\s|$|>)/g).map(part => {
         if (part.startsWith('http') || part.startsWith('```')) return part;
-        return part.replace(/\bNone\b/g, 'N/D')
+        return localizeMemoNumbers(part).replace(/\bNone\b/g, 'N/D')
             .replace(/\b(?:unassigned|preview_only|fact_anchored_sensitivity)\b/g, thesisCodeLabel)
             .replace(/Análisis narrativo INFERIDO/g, 'Análisis narrativo')
             .replace(/median of latest annual FCF margins/g, 'Mediana de los últimos márgenes FCF anuales')
