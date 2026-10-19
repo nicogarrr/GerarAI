@@ -52,10 +52,14 @@ _AMBIGUOUS_TICKERS = {
 
 _FINANCE_WORDS = re.compile(
     r"^(stocks?|shares?|equity|earnings|dividends?|guidance|ipo|trading|trades?|traded|halted|"
-    r"buybacks?|repurchase|upgrade[sd]?|downgrade[sd]?|target|analysts?|revenue|quarterly|eps|"
+    r"buybacks?|repurchase|upgrade[sd]?|downgrade[sd]?|analysts?|revenue|quarterly|eps|"
     r"acciones|bolsa|resultados|dividendo)$",
     flags=re.IGNORECASE,
 )
+_TARGET_ANCHOR = re.compile(r"^(price|precio)$", flags=re.IGNORECASE)
+# «target» suelto NO es evidencia: «CB Target J. Cobbins» (cornerback de
+# fútbol americano) vinculaba una noticia deportiva a Chubb (CB). Solo vale la
+# locución «price target» / «precio objetivo».
 _WORD = re.compile(r"[\w$&.\-]+")
 _PROXIMITY_WORDS = 3
 
@@ -81,8 +85,24 @@ def _near_finance_word(ticker: str, text: str) -> bool:
         if w != ticker:
             continue
         lo, hi = max(0, i - _PROXIMITY_WORDS), min(len(words), i + _PROXIMITY_WORDS + 1)
-        if any(_FINANCE_WORDS.match(x) for j, x in enumerate(words[lo:hi], start=lo) if j != i):
-            return True
+        for j, x in enumerate(words[lo:hi], start=lo):
+            if j == i:
+                continue
+            if _FINANCE_WORDS.match(x):
+                return True
+            # «target»/«objetivo» solo cuenta como locución financiera:
+            #  - «price target» / «precio objetivo» (ancla delante),
+            #  - «target price» («CB target price raised»),
+            #  - «target to/at $N» («Jefferies sets CB target at $280»).
+            # «target» suelto no: «CB Target J. Cobbins» es un cornerback.
+            if x.lower() in ("target", "objetivo"):
+                if j > 0 and _TARGET_ANCHOR.match(words[j - 1]):
+                    return True
+                next_w = words[j + 1].lower() if j + 1 < len(words) else ""
+                if next_w == "price":
+                    return True
+                if next_w in ("to", "at") and j + 2 < len(words) and words[j + 2].startswith("$"):
+                    return True
     return False
 
 
