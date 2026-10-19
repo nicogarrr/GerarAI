@@ -155,20 +155,24 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
             locked = await asyncio.to_thread(db.scalar, select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update(skip_locked=True).execution_options(populate_existing=True))
             if locked is None:
                 logger.warning("headline translation: fila %s bloqueada por otra transaccion; busy", event_id)
+                res = _result(event, "busy", reason="busy")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
                 await asyncio.to_thread(db.rollback)
-                return _result(event, "busy", reason="busy")
+                return res
             event = locked
             cached = cached_translation(event)
             if cached and cached.get("status") == "translated":
+                res = _result(event, "translated", cached["text"])  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
                 await asyncio.to_thread(db.rollback)
-                return _result(event, "translated", cached["text"])
+                return res
             if _cooldown_active(cached, now):
+                res = _result(event, "busy", reason="busy")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
                 await asyncio.to_thread(db.rollback)
-                return _result(event, "busy", reason="busy")
+                return res
             original = original_headline(event)
             if (event.metadata_ or {}).get("headline_from_source") is False or not _needs_translation(original) or len(original) > 500:
+                res = _result(event, "not_needed")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
                 await asyncio.to_thread(db.rollback)
-                return _result(event, "not_needed")
+                return res
             digest = fingerprint(original)
             event.metadata_ = {**(event.metadata_ or {}), "headline_translation": {"fingerprint": digest, "status": "pending", "retry_after": (now + timedelta(minutes=10)).isoformat(), "chain_failures": (cached or {}).get("chain_failures", 0)}}
             await asyncio.to_thread(db.commit)
@@ -227,8 +231,9 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
                 failure_reason = _classify_translation_failure(exc)
             await asyncio.to_thread(db.refresh, event)
             if fingerprint(original_headline(event)) != digest:
+                res = _result(event, "unavailable", reason="changed")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
                 await asyncio.to_thread(db.rollback)
-                return _result(event, "unavailable", reason="changed")
+                return res
             record = {"fingerprint": digest, "status": "translated" if translated else "unavailable", "text": translated,
                       "target_language": "es", "machine_translation": True, "created_at": now.isoformat()}
             if not translated:
@@ -318,20 +323,24 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
             locked = await asyncio.to_thread(db.scalar, select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update(skip_locked=True).execution_options(populate_existing=True))
             if locked is None:
                 logger.warning("summary translation: fila %s bloqueada por otra transaccion; busy", event_id)
+                res = _summary_result(event, "busy", reason="busy")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
                 await asyncio.to_thread(db.rollback)
-                return _summary_result(event, "busy", reason="busy")
+                return res
             event = locked
             cached = cached_summary_translation(event)
             if cached and cached.get("status") == "translated":
+                res = _summary_result(event, "translated", cached["text"])  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
                 await asyncio.to_thread(db.rollback)
-                return _summary_result(event, "translated", cached["text"])
+                return res
             if _cooldown_active(cached, now):
+                res = _summary_result(event, "busy", reason="busy")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
                 await asyncio.to_thread(db.rollback)
-                return _summary_result(event, "busy", reason="busy")
+                return res
             original = original_summary(event)
             if len(original) < 3 or not _needs_translation(original) or len(original) > SUMMARY_MAX_CHARS:
+                res = _summary_result(event, "not_needed")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
                 await asyncio.to_thread(db.rollback)
-                return _summary_result(event, "not_needed")
+                return res
             digest = summary_fingerprint(original)
             event.metadata_ = {**(event.metadata_ or {}), "summary_translation": {"fingerprint": digest, "status": "pending", "retry_after": (now + timedelta(minutes=10)).isoformat(), "chain_failures": (cached or {}).get("chain_failures", 0)}}
             await asyncio.to_thread(db.commit)
@@ -391,8 +400,9 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
                 failure_reason = _classify_translation_failure(exc)
             await asyncio.to_thread(db.refresh, event)
             if summary_fingerprint(original_summary(event)) != digest:
+                res = _summary_result(event, "unavailable", reason="changed")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
                 await asyncio.to_thread(db.rollback)
-                return _summary_result(event, "unavailable", reason="changed")
+                return res
             record = {"fingerprint": digest, "status": "translated" if translated else "unavailable", "text": translated,
                       "target_language": "es", "machine_translation": True, "created_at": now.isoformat()}
             if not translated:
