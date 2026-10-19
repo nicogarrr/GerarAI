@@ -273,3 +273,62 @@ async def test_locked_row_returns_busy_instead_of_waiting(db, monkeypatch):
     out = await translate_headline(db, row.id, provider=p)
     assert seen == [True], "el lease debe usar skip_locked"
     assert out["status"] == "busy" and out["reason"] == "busy" and p.calls == 0
+
+
+@sync_test
+async def test_db_access_does_not_block_the_event_loop(db, monkeypatch):
+    """Una consulta lenta (lock, pool) no debe congelar el loop de todo el backend."""
+    import time
+
+    row = event(db, "La empresa anuncia resultados")  # latino: solo hace la primera consulta
+    real = db.scalar
+
+    def slow_scalar(*a, **k):
+        time.sleep(0.5)
+        return real(*a, **k)
+
+    monkeypatch.setattr(db, "scalar", slow_scalar)
+    ticks = 0
+
+    async def ticker():
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.05)
+            ticks += 1
+
+    task = asyncio.create_task(ticker())
+    out = await translate_headline(db, row.id, provider=Provider())
+    task.cancel()
+    assert out["status"] == "not_needed"
+    assert ticks >= 5, f"el event loop estuvo bloqueado (ticks={ticks})"
+
+
+@sync_test
+async def test_no_sql_runs_on_the_event_loop_thread(db, monkeypatch):
+    """Ninguna consulta debe ejecutarse en el hilo del loop (rutas busy y traduccion completa)."""
+    import threading
+
+    from sqlalchemy import event as sa_event
+
+    loop_thread = threading.get_ident()
+    on_loop = []
+    sa_event.listen(db.get_bind(), "before_cursor_execute", lambda *a, **k: on_loop.append(a[2]) if threading.get_ident() == loop_thread else None)
+    row = event(db)
+    row_id = row.id
+    on_loop.clear()
+    # camino traducido completo
+    assert (await translate_headline(db, row_id, provider=Provider()))["status"] == "translated"
+    # camino busy por fila bloqueada (rollback + resultado)
+    row2 = event(db, "Η εταιρεία ανακοινώνει άλλα αποτελέσματα 2027")
+    row2_id = row2.id
+    real = db.scalar
+    on_loop.clear()
+
+    def scalar(stmt, *a, **k):
+        if getattr(stmt, "_for_update_arg", None) is not None:
+            return None
+        return real(stmt, *a, **k)
+
+    monkeypatch.setattr(db, "scalar", scalar)
+    assert (await translate_headline(db, row2_id, provider=Provider()))["status"] == "busy"
+    assert on_loop == [], f"SQL en el hilo del event loop: {on_loop[:3]}"

@@ -127,7 +127,7 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
     tenant = db.info.get("tenant_id")
     if tenant is None:
         raise PermissionError("Tenant context required")
-    event = db.scalar(select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant))
+    event = await asyncio.to_thread(db.scalar, select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant))
     if event is None:
         raise LookupError("News event not found")
     original = original_headline(event)
@@ -146,32 +146,36 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
     try:
         async with _slots:
             budget = BudgetController()
-            if not budget.can_spend(db, 0.01):
+            if not await asyncio.to_thread(budget.can_spend, db, 0.01):
                 return _result(event, "unavailable", reason="budget")
             # Atomic row lease also prevents duplicate calls across worker processes.
             # skip_locked: esta consulta es SINCRONA dentro de un handler async; un
             # FOR UPDATE que espera el lock de otra transaccion (ingesta) congelaria
             # el event loop de TODO el backend (medido: 76-156 s sin atender nada).
-            locked = db.scalar(select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update(skip_locked=True).execution_options(populate_existing=True))
+            locked = await asyncio.to_thread(db.scalar, select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update(skip_locked=True).execution_options(populate_existing=True))
             if locked is None:
                 logger.warning("headline translation: fila %s bloqueada por otra transaccion; busy", event_id)
-                db.rollback()
-                return _result(event, "busy", reason="busy")
+                res = _result(event, "busy", reason="busy")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
+                await asyncio.to_thread(db.rollback)
+                return res
             event = locked
             cached = cached_translation(event)
             if cached and cached.get("status") == "translated":
-                db.rollback()
-                return _result(event, "translated", cached["text"])
+                res = _result(event, "translated", cached["text"])  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
+                await asyncio.to_thread(db.rollback)
+                return res
             if _cooldown_active(cached, now):
-                db.rollback()
-                return _result(event, "busy", reason="busy")
+                res = _result(event, "busy", reason="busy")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
+                await asyncio.to_thread(db.rollback)
+                return res
             original = original_headline(event)
             if (event.metadata_ or {}).get("headline_from_source") is False or not _needs_translation(original) or len(original) > 500:
-                db.rollback()
-                return _result(event, "not_needed")
+                res = _result(event, "not_needed")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
+                await asyncio.to_thread(db.rollback)
+                return res
             digest = fingerprint(original)
             event.metadata_ = {**(event.metadata_ or {}), "headline_translation": {"fingerprint": digest, "status": "pending", "retry_after": (now + timedelta(minutes=10)).isoformat(), "chain_failures": (cached or {}).get("chain_failures", 0)}}
-            db.commit()
+            await asyncio.to_thread(db.commit)
             translated = None
             failure_reason = "bad_output"  # si el proveedor responde pero se rechaza su salida
             try:
@@ -210,7 +214,7 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
                         failure_reason = _classify_translation_failure(exc)
                         continue
                     cost = budget.estimate_cost_eur(response.model, response.usage.input_tokens, response.usage.output_tokens)
-                    budget.record(db, response.model, "headline_translation", cost, response.usage.total_tokens)
+                    await asyncio.to_thread(budget.record, db, response.model, "headline_translation", cost, response.usage.total_tokens)
                     payload = parse_json_response(response.text)
                     candidate = payload.get("text") if isinstance(payload, dict) else None
                     if (isinstance(candidate, str) and 3 <= len(candidate.strip()) <= 500
@@ -222,13 +226,14 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
                     failure_reason = "bad_output"
             except Exception as exc:
                 # Source headline remains usable even when the provider fails.
-                db.rollback()
+                await asyncio.to_thread(db.rollback)
                 translated = None
                 failure_reason = _classify_translation_failure(exc)
-            db.refresh(event)
+            await asyncio.to_thread(db.refresh, event)
             if fingerprint(original_headline(event)) != digest:
-                db.rollback()
-                return _result(event, "unavailable", reason="changed")
+                res = _result(event, "unavailable", reason="changed")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
+                await asyncio.to_thread(db.rollback)
+                return res
             record = {"fingerprint": digest, "status": "translated" if translated else "unavailable", "text": translated,
                       "target_language": "es", "machine_translation": True, "created_at": now.isoformat()}
             if not translated:
@@ -245,7 +250,7 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
                 record["retry_after"] = (now + timedelta(minutes=retry_minutes)).isoformat()
                 record["failure"] = failure_reason
             event.metadata_ = {**(event.metadata_ or {}), "headline_translation": record}
-            db.commit()
+            await asyncio.to_thread(db.commit)
             return _result(event, record["status"], translated, reason=None if translated else failure_reason)
     finally:
         _inflight.discard(key)
@@ -294,7 +299,7 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
     tenant = db.info.get("tenant_id")
     if tenant is None:
         raise PermissionError("Tenant context required")
-    event = db.scalar(select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant))
+    event = await asyncio.to_thread(db.scalar, select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant))
     if event is None:
         raise LookupError("News event not found")
     original = original_summary(event)
@@ -313,28 +318,32 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
     try:
         async with _slots:
             budget = BudgetController()
-            if not budget.can_spend(db, 0.02):
+            if not await asyncio.to_thread(budget.can_spend, db, 0.02):
                 return _summary_result(event, "unavailable", reason="budget")
-            locked = db.scalar(select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update(skip_locked=True).execution_options(populate_existing=True))
+            locked = await asyncio.to_thread(db.scalar, select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update(skip_locked=True).execution_options(populate_existing=True))
             if locked is None:
                 logger.warning("summary translation: fila %s bloqueada por otra transaccion; busy", event_id)
-                db.rollback()
-                return _summary_result(event, "busy", reason="busy")
+                res = _summary_result(event, "busy", reason="busy")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
+                await asyncio.to_thread(db.rollback)
+                return res
             event = locked
             cached = cached_summary_translation(event)
             if cached and cached.get("status") == "translated":
-                db.rollback()
-                return _summary_result(event, "translated", cached["text"])
+                res = _summary_result(event, "translated", cached["text"])  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
+                await asyncio.to_thread(db.rollback)
+                return res
             if _cooldown_active(cached, now):
-                db.rollback()
-                return _summary_result(event, "busy", reason="busy")
+                res = _summary_result(event, "busy", reason="busy")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
+                await asyncio.to_thread(db.rollback)
+                return res
             original = original_summary(event)
             if len(original) < 3 or not _needs_translation(original) or len(original) > SUMMARY_MAX_CHARS:
-                db.rollback()
-                return _summary_result(event, "not_needed")
+                res = _summary_result(event, "not_needed")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
+                await asyncio.to_thread(db.rollback)
+                return res
             digest = summary_fingerprint(original)
             event.metadata_ = {**(event.metadata_ or {}), "summary_translation": {"fingerprint": digest, "status": "pending", "retry_after": (now + timedelta(minutes=10)).isoformat(), "chain_failures": (cached or {}).get("chain_failures", 0)}}
-            db.commit()
+            await asyncio.to_thread(db.commit)
             translated = None
             failure_reason = "bad_output"  # si el proveedor responde pero se rechaza su salida
             try:
@@ -373,7 +382,7 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
                         failure_reason = _classify_translation_failure(exc)
                         continue
                     cost = budget.estimate_cost_eur(response.model, response.usage.input_tokens, response.usage.output_tokens)
-                    budget.record(db, response.model, "summary_translation", cost, response.usage.total_tokens)
+                    await asyncio.to_thread(budget.record, db, response.model, "summary_translation", cost, response.usage.total_tokens)
                     payload = parse_json_response(response.text)
                     candidate = payload.get("text") if isinstance(payload, dict) else None
                     if (isinstance(candidate, str) and 3 <= len(candidate.strip()) <= SUMMARY_MAX_CHARS + 400
@@ -386,13 +395,14 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
             except Exception as exc:
                 # El original sigue usable aunque el proveedor falle. La causa
                 # se clasifica para diagnóstico (sin detalles internos).
-                db.rollback()
+                await asyncio.to_thread(db.rollback)
                 translated = None
                 failure_reason = _classify_translation_failure(exc)
-            db.refresh(event)
+            await asyncio.to_thread(db.refresh, event)
             if summary_fingerprint(original_summary(event)) != digest:
-                db.rollback()
-                return _summary_result(event, "unavailable", reason="changed")
+                res = _summary_result(event, "unavailable", reason="changed")  # antes del rollback: expira el objeto y releerlo seria SQL en el loop
+                await asyncio.to_thread(db.rollback)
+                return res
             record = {"fingerprint": digest, "status": "translated" if translated else "unavailable", "text": translated,
                       "target_language": "es", "machine_translation": True, "created_at": now.isoformat()}
             if not translated:
@@ -409,7 +419,7 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
                 record["retry_after"] = (now + timedelta(minutes=retry_minutes)).isoformat()
                 record["failure"] = failure_reason
             event.metadata_ = {**(event.metadata_ or {}), "summary_translation": record}
-            db.commit()
+            await asyncio.to_thread(db.commit)
             return _summary_result(event, record["status"], translated, reason=None if translated else failure_reason)
     finally:
         _inflight.discard(key)
