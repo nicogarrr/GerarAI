@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Activity, ArrowRight, BellRing, Eye, Gem, Wallet } from 'lucide-react';
+import { ArrowRight, BellRing, Eye, Gem, Wallet } from 'lucide-react';
 import { PortfolioValueBreakdown } from '@/components/portfolio/PortfolioValueBreakdown';
 import { getPortfolioSummary, type PortfolioHolding, type PortfolioSummary } from '@/lib/actions/portfolio.actions';
 import { getHomeWatchlistPreview, getHomeOpportunities } from '@/lib/actions/home-overview.actions';
@@ -368,31 +368,6 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                         <InlineSectionError message={portfolioError} onRetry={() => retrySection('portfolio')} />
                     ) : portfolioSummary && portfolioSummary.holdings.length > 0 ? (
                         <div className="space-y-5">
-                            <div className="flex flex-col min-[420px]:flex-row min-[420px]:items-center gap-3 rounded-xl border border-teal-800/50 bg-teal-950/20 p-3">
-                                <div className="p-2 bg-teal-500/10 rounded-full shrink-0 self-start">
-                                    <Activity aria-hidden="true" className="h-5 w-5 text-teal-400" />
-                                </div>
-                                <div className="min-w-0">
-                                    <h3 className="text-sm font-semibold text-teal-300">Tu cartera en una línea</h3>
-                                    <p className="text-gray-200 text-sm leading-relaxed">
-                                        {insight.kind === 'empty' &&
-                                            'Todavía no tienes posiciones. Añade tu primera inversión para ver aquí qué ha cambiado desde la compra.'}
-                                        {insight.kind === 'no-cost-basis' &&
-                                            'Todavía no tenemos la base de coste de tus posiciones. Cuando esté cargada, aquí verás cómo va tu cartera desde la compra.'}
-                                        {insight.kind === 'movement' &&
-                                            `${insight.partial ? 'Entre las posiciones con base de coste, tu' : 'Tu'} cartera acumula ${insight.direction === 'up' ? 'una subida' : 'una caída'} del ${formatPercent(insight.totalPercent, { fromRatio: false, digits: 2, signDisplay: 'never' })} desde la compra. ${insight.topSymbol} es la posición con mayor variación desde la compra (${formatPercent(insight.topGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}).`}
-                                    </p>
-                                    <Link
-                                        href={topMover ? `/research/${topMover.symbol}?view=changes` : '/portfolio'}
-                                        className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-sm text-teal-300 hover:text-teal-200"
-                                    >
-                                        <span className="whitespace-nowrap">
-                                            {topMover ? `Ver qué ha cambiado en ${topMover.symbol}` : 'Revisar tu cartera'}
-                                        </span>
-                                        <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
-                                    </Link>
-                                </div>
-                            </div>
                             <PortfolioValueBreakdown summary={portfolioSummary} />
                             <div className="flex items-center justify-between gap-3 text-sm">
                                 <span className="text-gray-400">Ganancia/Pérdida desde la compra</span>
@@ -400,7 +375,16 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     {insight.kind !== 'movement' ? 'N/D' : formatPercent(portfolioSummary.totalGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                                 </span>
                             </div>
-                            <p className="text-xs text-gray-400">Rentabilidad desde la compra de cada posición. Si falta la base de coste se muestra su valor. Pesos sobre el valor bruto de las posiciones.</p>
+                            <p className="text-xs text-gray-400">Pesos sobre el valor bruto de las posiciones.</p>
+                            {insight.kind === 'empty' && (
+                                <p className="text-xs text-gray-400">Todavía no tienes posiciones. Añade tu primera inversión para ver aquí qué ha cambiado desde la compra.</p>
+                            )}
+                            {insight.kind === 'no-cost-basis' && (
+                                <p className="text-xs text-gray-400">Todavía no tenemos la base de coste de tus posiciones. Cuando esté cargada, aquí verás cómo va tu cartera desde la compra.</p>
+                            )}
+                            {insight.kind === 'movement' && insight.partial && (
+                                <p className="text-xs text-gray-400">Entre las posiciones con base de coste: la ganancia/pérdida no incluye las demás.</p>
+                            )}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {sortedHoldings
                                     .map((h) => (
@@ -429,6 +413,15 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                         </Link>
                                     ))}
                             </div>
+                            <Link
+                                href={topMover ? `/research/${topMover.symbol}?view=changes` : '/portfolio'}
+                                className="inline-flex min-h-[44px] items-center gap-1 text-sm text-teal-300 hover:text-teal-200"
+                            >
+                                <span className="whitespace-nowrap">
+                                    {topMover ? `Ver qué ha cambiado en ${topMover.symbol}` : 'Revisar tu cartera'}
+                                </span>
+                                <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
+                            </Link>
                         </div>
                     ) : (
                         <div className="text-center py-10">
