@@ -123,6 +123,9 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
       <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-gray-100 flex items-center gap-2">
           Posiciones Actuales
+          <span className="text-xs font-normal text-gray-500">
+            La G/P va en {cashCurrency} (divisa base) con el tipo de cambio de cada compra: no coincide con la variación del precio en la divisa de la acción.
+          </span>
         </CardTitle>
         <Button
           variant="outline"
