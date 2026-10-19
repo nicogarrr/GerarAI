@@ -133,6 +133,23 @@ class EarningsDate(Base, TimestampMixin):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
+class CalendarFeedToken(TenantOwnedMixin, Base, TimestampMixin):
+    """Token publico (solo su hash) de la suscripcion ICS del calendario de resultados.
+
+    El token en claro se muestra una unica vez al crearlo; aqui solo vive el
+    SHA-256. Revocar = ``revoked_at``. Una suscripcion activa por tenant: crear
+    una nueva revoca la anterior.
+    """
+
+    __tablename__ = "calendar_feed_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    scope: Mapped[str] = mapped_column(String(20), default="followed")
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class FXRate(TenantOwnedMixin, Base, TimestampMixin):
     """Historical conversion where quote amount × rate = base amount."""
 

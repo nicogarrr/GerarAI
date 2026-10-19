@@ -3,7 +3,8 @@
 import asyncio
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -160,3 +161,83 @@ async def catalysts_calendar(
         "events": events,
         "errors": earnings["errors"] + dividends["errors"] + filings["errors"],
     }
+
+
+class FeedCreate(BaseModel):
+    scope: str = "followed"
+
+
+def _feed_state(row) -> dict:
+    return {
+        "active": row is not None,
+        "scope": row.scope if row else None,
+        "created_at": row.created_at.isoformat() if row else None,
+        "last_used_at": row.last_used_at.isoformat() if row and row.last_used_at else None,
+    }
+
+
+@router.get("/feed")
+def calendar_feed_status(db: Session = Depends(get_db)) -> dict:
+    """Estado de la suscripcion ICS del tenant. Nunca devuelve el token (solo se guarda su hash)."""
+    from app.services.calendar_feed_service import active_token
+
+    return _feed_state(active_token(db))
+
+
+@router.post("/feed")
+def calendar_feed_create(payload: FeedCreate, db: Session = Depends(get_db)) -> dict:
+    """Crea (o regenera) la suscripcion: revoca la anterior y devuelve el token UNA vez.
+
+    ``path`` es relativo al backend; la URL publica la compone el front con su
+    propio dominio (``/api/calendar-feed/<token>.ics`` y su variante webcal://).
+    ``scope``: ``watchlist`` (solo la watchlist, valor prudente) o ``followed``
+    (watchlist + empresas de posiciones abiertas: revela que se siguen, sin cantidades).
+    """
+    from app.services.calendar_feed_service import SCOPES, create_token
+
+    if payload.scope not in SCOPES:
+        raise HTTPException(status_code=422, detail=f"scope debe ser uno de {list(SCOPES)}")
+    token, row = create_token(db, payload.scope)
+    return {**_feed_state(row), "token": token, "path": f"/api/calendar/feed/{token}.ics"}
+
+
+@router.delete("/feed")
+def calendar_feed_revoke(db: Session = Depends(get_db)) -> dict:
+    """Revoca la suscripcion activa: la URL deja de funcionar al instante."""
+    from app.services.calendar_feed_service import revoke_tokens
+
+    return {"revoked": revoke_tokens(db)}
+
+
+@router.get("/feed/{filename}")
+def calendar_feed_public(filename: str) -> Response:
+    """Feed ICS publico: el unico secreto es el token del nombre de fichero.
+
+    Sin identidad firmada a proposito (Apple/Google/Outlook no pueden firmar):
+    abre su propia sesion, resuelve el tenant por el hash del token y responde
+    404 identico para token desconocido o revocado.
+    """
+    from app.core.database import SessionLocal
+    from app.services.calendar_feed_service import feed_for_token
+
+    token = filename[:-4] if filename.endswith(".ics") else ""
+    not_found = HTTPException(status_code=404, detail="Feed no encontrado")
+    if not token.startswith("gfc_") or len(token) > 80:
+        raise not_found
+    db = SessionLocal()
+    try:
+        body = feed_for_token(db, token)
+    finally:
+        db.close()
+    if body is None:
+        raise not_found
+    return Response(
+        content=body,
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Cache-Control": "private, max-age=300",
+            "Content-Disposition": 'inline; filename="resultados.ics"',
+            "Referrer-Policy": "no-referrer",
+            "X-Robots-Tag": "noindex",
+        },
+    )
