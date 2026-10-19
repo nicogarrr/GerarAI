@@ -7,7 +7,7 @@ import {
     summarizeDcfProbe,
     type DcfScope,
 } from '@/lib/overview/dcf-candidates';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +32,8 @@ import { buildPortfolioInsight } from '@/lib/portfolio-insight';
 
 interface PersonalizedOverviewProps {
     userId: string;
+    /** Bloque de servidor que se pinta entre Alertas y Watchlist (calendario). */
+    afterAlerts?: ReactNode;
 }
 
 interface WatchlistItem {
@@ -167,7 +169,7 @@ function settle<T>(promise: Promise<T>, fallback: T): Promise<{ data: T; error: 
         .catch((error) => ({ data: fallback, error: sectionError(error) }));
 }
 
-export default function PersonalizedOverview({ userId }: PersonalizedOverviewProps) {
+export default function PersonalizedOverview({ userId, afterAlerts }: PersonalizedOverviewProps) {
     const [retryTokens, setRetryTokens] = useState<Record<SectionKey, number>>(EMPTY_RETRY_TOKENS);
     const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
     const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
@@ -539,6 +541,8 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                 </CardContent>
             </Card>
 
+            {afterAlerts}
+
             {/* 3 · Watchlist: mirada de 3 filas. La lista completa es /watchlist. */}
             <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
@@ -594,7 +598,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                 ))}
                             </div>
                             <p className="text-xs text-gray-500">
-                                {watchlistTotal} en total ·{' '}
+                                {watchlistTotal > watchlist.length ? `Las ${watchlist.length} últimas añadidas de ${watchlistTotal}` : `${watchlistTotal} en total`} ·{' '}
                                 <Link href="/watchlist" className="inline-flex min-h-[44px] items-center text-yellow-400 hover:underline">
                                     ver la lista completa
                                 </Link>

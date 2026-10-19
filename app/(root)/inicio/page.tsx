@@ -43,10 +43,16 @@ export default async function Home() {
                 real y deja que las noticias lleguen por streaming al final del
                 scroll, sin bloquear el resto del dashboard.
             */}
-            <PersonalizedOverview userId={userId} />
-            <Suspense fallback={null}>
-                <EarningsDayStrip />
-            </Suspense>
+            {/* El calendario (logos grandes, lectura rápida) va entre Alertas y
+                Watchlist: PersonalizedOverview lo pinta en su sitio. */}
+            <PersonalizedOverview
+                userId={userId}
+                afterAlerts={(
+                    <Suspense fallback={null}>
+                        <EarningsDayStrip />
+                    </Suspense>
+                )}
+            />
             <Suspense fallback={<NewsLoadingSkeleton />}>
                 <NewsSection />
             </Suspense>
