@@ -321,3 +321,68 @@ def test_company_without_records_is_synced_on_demand_before_answering(db, monkey
     response = asyncio.run(ChatService().answer(db, "¿Qué dividendo paga Coca-Cola y cuándo es el próximo?", "portfolio", None))
     assert calls == ["KO"]
     assert "$0.51" in response.answer
+
+
+def _news(db_, company_, title, summary=None, source="MarketBeat", tenant=1):
+    from datetime import datetime
+    row = NewsEvent(tenant_id=tenant, company_id=company_.id, title=title, summary=summary,
+                    source=source, date=datetime(2026, 10, 19, 9, 54))
+    db_.add(row)
+    return row
+
+
+def test_news_question_naming_a_company_is_scoped_to_it(db):
+    """"noticias de ASTS y mi cartera" no vuelca las noticias de otras posiciones."""
+    asts = company(db, "ASTS")
+    amzn = company(db, "AMZN")
+    db.add(Position(tenant_id=1, company_id=amzn.id, quantity=10, average_cost=185, currency="USD",
+                    market_value=2221, market_value_base=2221, as_of=date.today()))
+    _news(db, amzn, "AMZN Amazon.com, Inc. $AMZN Shares Sold by Cooper Investors PTY Ltd. "
+                    "Amazon.com, Inc. $AMZN Shares Sold by Cooper Investors PTY Ltd. MarketBeat",
+          summary="Cooper Investors sold Amazon shares")
+    _news(db, asts, "AST SpaceMobile anuncia acuerdo con operadora europea",
+          summary="AST SpaceMobile firma un acuerdo comercial", source="SEC")
+    db.info.pop("tenant_id", None)
+    db.commit()
+    db.info["tenant_id"] = 1
+    response = asyncio.run(ChatService().answer(
+        db, "¿Qué noticias hay de ASTS últimamente y cómo afectan a mi cartera?", "portfolio", None))
+    assert response.llm_trace["path"] == "company_news"
+    assert "AST SpaceMobile anuncia acuerdo" in response.answer
+    assert "Amazon" not in response.answer and "AMZN" not in response.answer
+    assert all("AMZN" not in (src["title"] or "") for src in response.sources)
+
+
+def test_company_news_without_rows_says_so_without_portfolio_dump(db):
+    asts = company(db, "ASTS")
+    amzn = company(db, "AMZN")
+    db.add(Position(tenant_id=1, company_id=amzn.id, quantity=10, average_cost=185, currency="USD",
+                    market_value=2221, market_value_base=2221, as_of=date.today()))
+    _news(db, amzn, "AMZN Amazon.com shares rally on AWS growth", summary="Amazon shares rose")
+    db.info.pop("tenant_id", None)
+    db.commit()
+    db.info["tenant_id"] = 1
+    response = asyncio.run(ChatService().answer(
+        db, "¿Qué noticias hay de ASTS últimamente y cómo afectan a mi cartera?", "portfolio", None))
+    assert response.llm_trace["path"] == "company_news"
+    assert "No hay noticias guardadas de ASTS" in response.answer
+    assert "Amazon" not in response.answer
+
+
+def test_company_news_declares_holding_weight_without_inventing_impact(db):
+    asts = company(db, "ASTS")
+    amzn = company(db, "AMZN")
+    db.add(Position(tenant_id=1, company_id=asts.id, quantity=300, average_cost=40, currency="USD",
+                    market_value=12000, market_value_base=9000, as_of=date.today()))
+    db.add(Position(tenant_id=1, company_id=amzn.id, quantity=10, average_cost=185, currency="USD",
+                    market_value=2221, market_value_base=1000, as_of=date.today()))
+    _news(db, asts, "AST SpaceMobile lanza dos BlueBird mas", summary="AST SpaceMobile lanzo", source="SEC")
+    db.info.pop("tenant_id", None)
+    db.commit()
+    db.info["tenant_id"] = 1
+    response = asyncio.run(ChatService().answer(
+        db, "¿Qué noticias hay de ASTS y cómo afectan a mi cartera?", "portfolio", None))
+    assert response.llm_trace["path"] == "company_news"
+    assert "300,00 acciones de ASTS" in response.answer
+    assert "90,00 % de tu cartera" in response.answer
+    assert "No calculo el impacto de cada noticia" in response.answer
