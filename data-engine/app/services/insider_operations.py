@@ -69,6 +69,50 @@ def _finish_side(side: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_US_EXCHANGES = {"NYSE", "NASDAQ", "AMEX", "NYSE ARCA", "NYSE MKT", "NYSEARCA", "BATS", "CBOE"}
+
+
+def _without_data_reason(ticker: str, company: Any, has_filings: bool) -> dict[str, Any]:
+    """Por que una empresa seguida no tiene fila: nunca un 'sin datos' generico.
+
+    Reglas deterministas sobre lo que sabemos (no consulta la red): un emisor
+    sin registro SEC (sufijo de bolsa extranjera u OTC sin CIK) no presenta
+    Form 4; sus directivos declaran en su regimen local (MAR en Londres, SEDI
+    en Canada). Con CIK nunca se afirma 'extranjero' (BRK.B, BF.B llevan punto y son
+    NYSE con CIK): cero Form 4 propios se declara tal cual, sin afirmar la causa.
+    """
+    exchange = (getattr(company, "exchange", None) or "").strip().upper()
+    cik = (getattr(company, "cik", None) or "").strip()
+    if has_filings:
+        reason, label = (
+            "no_open_market_trades",
+            "Hay Form 4 pero ninguna compra/venta en mercado abierto (P/S) en el periodo.",
+        )
+    elif not cik and exchange and exchange not in _US_EXCHANGES and not exchange.startswith("OTC"):
+        reason, label = (
+            "foreign_issuer_no_form4",
+            "No presenta Form 4: emisor extranjero sin registro SEC. Sus directivos "
+            "declaran en su regimen local (p. ej. MAR/RNS en Londres, SEDI en Canada).",
+        )
+    elif not cik and exchange.startswith("OTC"):
+        reason, label = (
+            "otc_no_cik",
+            "Sin CIK SEC (cotiza en OTC): probablemente emisor extranjero sin Form 4; no verificado automaticamente.",
+        )
+    elif not cik:
+        reason, label = (
+            "cik_unresolved",
+            "Sin datos: no se ha podido resolver el CIK SEC de este emisor (fallo de mapeo, no ausencia de operaciones).",
+        )
+    else:
+        reason, label = (
+            "no_form4_as_issuer",
+            "Sin Form 4 propios registrados: puede ser un emisor extranjero exento "
+            "(40-F) o una ingesta pendiente; causa no verificada automaticamente.",
+        )
+    return {"ticker": ticker, "reason": reason, "label": label}
+
+
 def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
     """Agregado por empresa (cartera + watchlist) e insider, ultimos `days` dias."""
     followed = followed_companies(db)
@@ -88,6 +132,7 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
 
     companies: list[dict[str, Any]] = []
     without_data: list[str] = []
+    without_data_detail: list[dict[str, Any]] = []
     for ticker in sorted(followed):
         entries = by_ticker.get(ticker, [])
         insiders: dict[str, dict[str, Any]] = {}
@@ -146,6 +191,7 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
         if not any(bucket["buy"]["trades"] or bucket["sell"]["trades"] for bucket in insiders.values()):
             # Sin operaciones P/S en el periodo: se declara, no fila de ceros.
             without_data.append(ticker)
+            without_data_detail.append(_without_data_reason(ticker, followed[ticker]["company"], bool(entries)))
             continue
 
         insider_rows = [
@@ -194,4 +240,5 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
         ),
         "companies": companies,
         "companies_without_data": without_data,
+        "companies_without_data_detail": without_data_detail,
     }

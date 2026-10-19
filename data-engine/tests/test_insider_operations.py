@@ -229,3 +229,46 @@ def test_operations_coalesces_tx_date_with_filing_date(db):
     assert inva["totals"]["sell"]["trades"] == 1
     assert inva["rows_without_date"] == 1
     assert inva["period"] == {"from": None, "to": None}
+
+
+def test_without_data_detail_says_why_never_a_generic_no_data(db):
+    from app.services.insider_operations import _without_data_reason
+
+    us = _company(db, "BN", "Brookfield Corporation")
+    us.cik = "0001001085"
+    uk = _company(db, "CGEO.L", "Georgia Capital PLC")
+    uk.exchange = "LSE"
+    otc = _company(db, "KRKNF", "Kraken Robotics")
+    otc.exchange = "OTC PINK"
+    nocik = _company(db, "XYZ", "Xyz Inc")
+
+    assert _without_data_reason("CGEO.L", uk, False)["reason"] == "foreign_issuer_no_form4"
+    assert _without_data_reason("KRKNF", otc, False)["reason"] == "otc_no_cik"
+    assert _without_data_reason("BN", us, False)["reason"] == "no_form4_as_issuer"
+    assert _without_data_reason("XYZ", nocik, False)["reason"] == "cik_unresolved"
+    assert _without_data_reason("BN", us, True)["reason"] == "no_open_market_trades"
+
+
+def test_dotted_us_tickers_with_cik_are_never_called_foreign(db):
+    from app.services.insider_operations import _without_data_reason
+
+    for tk, name in (("BRK.B", "Berkshire Hathaway B"), ("BF.B", "Brown-Forman B")):
+        co = _company(db, tk, name)
+        co.exchange = "NYSE"
+        co.cik = "0000000001"
+        assert _without_data_reason(tk, co, False)["reason"] == "no_form4_as_issuer"
+    # Sin CIK y con sufijo: sigue siendo extranjero sin registro SEC.
+    uk = _company(db, "CGEO.L", "Georgia Capital")
+    uk.exchange = "LSE"
+    assert _without_data_reason("CGEO.L", uk, False)["reason"] == "foreign_issuer_no_form4"
+
+
+def test_us_exchange_or_empty_exchange_without_cik_is_unresolved_not_foreign(db):
+    from app.services.insider_operations import _without_data_reason
+
+    brk = _company(db, "BRK.B", "Berkshire Hathaway B")
+    brk.exchange = "NYSE"
+    assert _without_data_reason("BRK.B", brk, False)["reason"] == "cik_unresolved"
+    blank = _company(db, "FOO.X", "Foo")
+    blank.exchange = ""
+    assert _without_data_reason("FOO.X", blank, False)["reason"] == "cik_unresolved"
