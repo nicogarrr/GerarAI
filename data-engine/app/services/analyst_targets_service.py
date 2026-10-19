@@ -62,6 +62,10 @@ class AnalystTargets(BaseModel):
     note: str | None = None
 
 
+# Subunidades que Yahoo distingue solo por mayusculas/minusculas.
+_SUBUNIT_CURRENCY = {"GBp": "GBX", "ZAc": "ZAC"}
+
+
 def _positive(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
@@ -152,7 +156,11 @@ def _fetch_sync(symbol: str) -> dict[str, Any]:
     try:
         raw_currency = ticker.fast_info.get("currency")
         if raw_currency:
-            currency = str(raw_currency).strip().upper() or None
+            raw = str(raw_currency).strip()
+            # Yahoo cotiza Londres en peniques ("GBp") y Johannesburgo en centavos
+            # ("ZAc"): los objetivos vienen en esa subunidad. Poner .upper() daba
+            # "GBP" y los precios salian x100. Se distingue con un codigo propio.
+            currency = _SUBUNIT_CURRENCY.get(raw) or raw.upper() or None
     except Exception:  # noqa: BLE001 - la divisa es declarativa; sin ella, None
         currency = None
     return {"records": records, "consensus": consensus, "currency": currency}

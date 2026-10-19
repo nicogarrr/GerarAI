@@ -146,3 +146,28 @@ def test_consensus_only_is_available_with_aggregate_note(monkeypatch) -> None:
     assert result.rows == [] and result.consensus and result.consensus.mean == 9.07
     assert result.note and "consenso agregado" in result.note
     assert result.currency == "CAD"
+
+
+def _fake_yf(monkeypatch, currency):
+    import sys
+    import types
+
+    class FakeTicker:
+        upgrades_downgrades = None
+        analyst_price_targets = {"mean": 4945.0, "current": 4170.0}
+        fast_info = {"currency": currency}
+
+        def __init__(self, symbol):
+            pass
+
+    monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=FakeTicker))
+
+
+def test_subunit_currency_is_not_collapsed_to_the_main_currency(monkeypatch) -> None:
+    # CGEO.L: Yahoo da objetivos en peniques ("GBp"); "GBP" los haria x100.
+    _fake_yf(monkeypatch, "GBp")
+    assert svc._fetch_sync("CGEO.L")["currency"] == "GBX"
+    _fake_yf(monkeypatch, "GBP")
+    assert svc._fetch_sync("X.L")["currency"] == "GBP"
+    _fake_yf(monkeypatch, "usd")
+    assert svc._fetch_sync("AAPL")["currency"] == "USD"
