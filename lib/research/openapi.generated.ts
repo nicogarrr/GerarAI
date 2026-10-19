@@ -418,7 +418,8 @@ export interface paths {
          *
          *     ``path`` es relativo al backend; la URL publica la compone el front con su
          *     propio dominio (``/api/calendar-feed/<token>.ics`` y su variante webcal://).
-         *     ``scope``: ``followed`` (cartera + watchlist) o ``watchlist``.
+         *     ``scope``: ``watchlist`` (solo la watchlist, valor prudente) o ``followed``
+         *     (watchlist + empresas de posiciones abiertas: revela que se siguen, sin cantidades).
          */
         post: operations["calendar_feed_create_api_calendar_feed_post"];
         /**

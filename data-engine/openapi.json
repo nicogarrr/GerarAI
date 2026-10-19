@@ -12947,7 +12947,7 @@
         ]
       },
       "post": {
-        "description": "Crea (o regenera) la suscripcion: revoca la anterior y devuelve el token UNA vez.\n\n``path`` es relativo al backend; la URL publica la compone el front con su\npropio dominio (``/api/calendar-feed/<token>.ics`` y su variante webcal://).\n``scope``: ``followed`` (cartera + watchlist) o ``watchlist``.",
+        "description": "Crea (o regenera) la suscripcion: revoca la anterior y devuelve el token UNA vez.\n\n``path`` es relativo al backend; la URL publica la compone el front con su\npropio dominio (``/api/calendar-feed/<token>.ics`` y su variante webcal://).\n``scope``: ``watchlist`` (solo la watchlist, valor prudente) o ``followed``\n(watchlist + empresas de posiciones abiertas: revela que se siguen, sin cantidades).",
         "operationId": "calendar_feed_create_api_calendar_feed_post",
         "parameters": [
           {

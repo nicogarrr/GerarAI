@@ -190,7 +190,8 @@ def calendar_feed_create(payload: FeedCreate, db: Session = Depends(get_db)) -> 
 
     ``path`` es relativo al backend; la URL publica la compone el front con su
     propio dominio (``/api/calendar-feed/<token>.ics`` y su variante webcal://).
-    ``scope``: ``followed`` (cartera + watchlist) o ``watchlist``.
+    ``scope``: ``watchlist`` (solo la watchlist, valor prudente) o ``followed``
+    (watchlist + empresas de posiciones abiertas: revela que se siguen, sin cantidades).
     """
     from app.services.calendar_feed_service import SCOPES, create_token
 
@@ -234,7 +235,7 @@ def calendar_feed_public(filename: str) -> Response:
         content=body,
         media_type="text/calendar; charset=utf-8",
         headers={
-            "Cache-Control": "private, max-age=3600",
+            "Cache-Control": "private, max-age=300",
             "Content-Disposition": 'inline; filename="resultados.ics"',
             "Referrer-Policy": "no-referrer",
             "X-Robots-Tag": "noindex",

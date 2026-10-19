@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.api.routes import calendar as calendar_routes
 from app.core.database import SessionLocal, init_db
-from app.models import CalendarFeedToken, Company, EarningsDate, Position, Tenant, WatchItem
+from app.models import Company, EarningsDate, Position, Tenant, WatchItem
 from app.services import calendar_feed_service as svc
 
 TODAY = date(2026, 10, 19)
@@ -42,7 +42,7 @@ def _setup(db):
     for t, d in (("FHELD", 21), ("FWATCH", 22), ("FOTHER", 23)):
         db.add(EarningsDate(ticker=t, event_date=date(2026, 10, d), source="nasdaq+yahoo", source_label="NASDAQ + Yahoo",
                             session="after_market" if t == "FHELD" else None, fiscal_label="Sep/2026",
-                            confirmed=False if t == "FWATCH" else True, fetched_at=now))
+                            confirmed=t != "FWATCH", fetched_at=now))
     db.commit()
     return ta, tb
 
@@ -59,7 +59,8 @@ def test_token_lifecycle_hash_only_and_rotation():
         db.refresh(row1)
         assert row1.revoked_at is not None and row2.revoked_at is None
         assert svc.active_token(db).id == row2.id
-        assert svc.revoke_tokens(db) == 1 and svc.active_token(db) is None
+        assert svc.revoke_tokens(db) == 1
+        assert svc.active_token(db) is None
         with pytest.raises(ValueError):
             svc.create_token(db, "todo")
     finally:

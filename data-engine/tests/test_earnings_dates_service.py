@@ -36,33 +36,48 @@ def test_merge_nasdaq_only_has_unknown_confirmation_and_none_when_empty():
     assert merge_candidate(None, None) is None
 
 
+def _tenant_with_watch(db, tickers):
+    from uuid import uuid4
+
+    from app.models import Tenant
+
+    uid = uuid4().hex[:6].upper()
+    tenant = Tenant(external_id=f"ed-{uid}", name=uid)
+    db.add(tenant)
+    db.flush()
+    names = {}
+    for base in tickers:
+        ticker = f"{base}{uid}" if not base.endswith(".L") else f"{base[:-2]}{uid}.L"
+        names[base] = ticker
+        db.add(Company(ticker=ticker, name=f"{ticker} Inc", exchange="LSE" if ticker.endswith(".L") else "NYSE",
+                       currency="GBX" if ticker.endswith(".L") else "USD",
+                       company_type="research_candidate", valuation_model="unassigned"))
+        db.add(WatchItem(symbol=ticker, company=ticker, tenant_id=tenant.id))
+    db.commit()
+    db.info["tenant_id"] = tenant.id
+    return names
+
+
 def test_refresh_writes_rows_keeps_manual_and_reports_missing():
     init_db()
     db = SessionLocal()
     try:
-        for t in ("ZQA", "ZQB", "ZQC.L"):
-            if db.scalar(select(Company).where(Company.ticker == t)) is None:
-                db.add(Company(ticker=t, name=f"{t} Inc", exchange="LSE" if t.endswith(".L") else "NYSE",
-                               currency="GBX" if t.endswith(".L") else "USD",
-                               company_type="research_candidate", valuation_model="unassigned"))
-            if db.scalar(select(WatchItem).where(WatchItem.symbol == t)) is None:
-                db.add(WatchItem(symbol=t, company=t))
-        db.add(EarningsDate(ticker="ZQC.L", event_date=date(2026, 10, 28), source="manual",
+        n = _tenant_with_watch(db, ["ZQA", "ZQB", "ZQC.L"])
+        db.add(EarningsDate(ticker=n["ZQC.L"], event_date=date(2026, 10, 28), source="manual",
                             source_label="Comunicado", source_url="https://example.test/rns"))
         db.commit()
         result = refresh_earnings_dates(
             db, today=TODAY,
-            yahoo_fetcher=lambda syms: {"ZQA": {"date": date(2026, 10, 20), "estimate": False}},
+            yahoo_fetcher=lambda syms: {n["ZQA"]: {"date": date(2026, 10, 20), "estimate": False}},
             nasdaq_fetcher=lambda tickers, today: {},
         )
-        # La BD de tests es compartida: otros tests dejan seguidas; solo se afirma lo propio.
-        assert result["written"] >= 1
-        assert "ZQB" in result["without_date"] and "ZQA" not in result["without_date"]
+        assert result["followed"] == 3 and result["written"] == 1
+        assert result["without_date"] == [n["ZQB"]]
         cal = followed_calendar(db, TODAY, date(2026, 12, 31))
         by = {e["ticker"]: e for d in cal["days"] for e in d["events"]}
-        assert by["ZQA"]["confirmed"] is True and by["ZQA"]["session"] is None
-        assert by["ZQC.L"]["source_url"] == "https://example.test/rns"
-        assert "ZQB" in cal["without_date_in_range"]
+        assert by[n["ZQA"]]["confirmed"] is True and by[n["ZQA"]]["session"] is None
+        assert by[n["ZQC.L"]]["source_url"] == "https://example.test/rns"
+        assert cal["without_date_in_range"] == [n["ZQB"]]
     finally:
         db.rollback()
         db.close()
@@ -91,22 +106,17 @@ def test_stale_automatic_dates_are_omitted_but_manual_stays():
     init_db()
     db = SessionLocal()
     try:
-        for t in ("ZSA", "ZSB"):
-            if db.scalar(select(Company).where(Company.ticker == t)) is None:
-                db.add(Company(ticker=t, name=t, exchange="NYSE", currency="USD",
-                               company_type="research_candidate", valuation_model="unassigned"))
-            if db.scalar(select(WatchItem).where(WatchItem.symbol == t)) is None:
-                db.add(WatchItem(symbol=t, company=t))
+        n = _tenant_with_watch(db, ["ZSA", "ZSB"])
         old = datetime.now(UTC) - timedelta(days=5)
-        db.add(EarningsDate(ticker="ZSA", event_date=date(2026, 11, 2), source="yahoo",
+        db.add(EarningsDate(ticker=n["ZSA"], event_date=date(2026, 11, 2), source="yahoo",
                             source_label="Yahoo", fetched_at=old))
-        db.add(EarningsDate(ticker="ZSB", event_date=date(2026, 11, 3), source="manual",
+        db.add(EarningsDate(ticker=n["ZSB"], event_date=date(2026, 11, 3), source="manual",
                             source_label="Comunicado", fetched_at=old))
         db.commit()
         cal = followed_calendar(db, date(2026, 11, 1), date(2026, 11, 30))
         tickers = {e["ticker"] for d in cal["days"] for e in d["events"]}
-        assert "ZSA" not in tickers and "ZSA" in cal["without_date_in_range"]
-        assert "ZSB" in tickers
+        assert n["ZSA"] not in tickers and n["ZSA"] in cal["without_date_in_range"]
+        assert n["ZSB"] in tickers
     finally:
         db.rollback()
         db.close()

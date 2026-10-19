@@ -4,8 +4,10 @@ Modelo de amenaza: la URL es un secreto portador (256 bits). Solo se guarda su
 SHA-256; el token en claro se devuelve una vez al crearlo. Revocar o regenerar
 deja la URL antigua en 404 (mismo cuerpo que un token inexistente). El feed
 contiene unicamente empresa, ticker, fecha, franja publicada, trimestre cerrado,
-si la fuente la da por estimada y la fuente: ni posiciones, ni cantidades, ni
-precios, ni el origen cartera/watchlist. Eventos de dia completo: nunca se
+si la fuente la da por estimada y la fuente: ni cantidades, ni precios, ni el
+origen cartera/watchlist. Aviso: el scope ``followed`` SI lista las empresas de
+posiciones abiertas (solo su nombre y fecha de resultados), asi que revela que
+se siguen; ``watchlist`` las excluye y es el valor prudente por defecto. Eventos de dia completo: nunca se
 inventa una hora.
 """
 
