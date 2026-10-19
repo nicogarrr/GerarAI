@@ -4,12 +4,26 @@ import { readFileSync } from 'node:fs';
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
 import { asView, moduleHref, GROUPS, MODULES, type View } from '../lib/research/research-views.ts';
 
-describe('ficha en 3 pasos: mapeo de vistas', () => {
-    it('los 3 pasos abren su módulo de entrada', () => {
+describe('ficha en 3 pestañas + Más: mapeo de vistas', () => {
+    it('las pestañas abren su módulo de entrada', () => {
+        assert.equal(asView('resumen'), 'overview');
+        assert.equal(asView('numeros'), 'financials');
+        assert.equal(asView('fuentes'), 'documents');
+        assert.equal(asView('mas'), 'changes');
+        assert.equal(GROUPS.length, 4);
+        assert.deepEqual(GROUPS.map((g) => g.label), ['Resumen', 'Números', 'Fuentes', 'Más']);
+    });
+    it('los 3 pasos anteriores (Entender/Valorar/Seguir) siguen abriendo lo mismo', () => {
         assert.equal(asView('entender'), 'overview');
         assert.equal(asView('valorar'), 'model');
         assert.equal(asView('seguir'), 'changes');
-        assert.equal(GROUPS.length, 3);
+    });
+    it('cada módulo cuelga de la pestaña acordada', () => {
+        const groupOf = (key: string) => MODULES.find((m) => m.key === key)?.group;
+        for (const key of ['overview', 'thesis']) assert.equal(groupOf(key), 'resumen');
+        for (const key of ['financials', 'valuation', 'model', 'peers', 'moat', 'capital', 'terminal']) assert.equal(groupOf(key), 'numeros');
+        for (const key of ['documents', 'sources', 'chat']) assert.equal(groupOf(key), 'fuentes');
+        for (const key of ['changes', 'holders', 'lecciones', 'directiva', 'satellites']) assert.equal(groupOf(key), 'mas');
     });
     it('las 6 claves de grupo antiguas siguen abriendo su módulo', () => {
         assert.equal(asView('resumen'), 'overview');

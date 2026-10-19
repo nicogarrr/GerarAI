@@ -1010,10 +1010,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 </div>
               </>
             ) : (
-              <EmptyState
-                action={<ThesisGenerateButton ticker={ticker} label="Genera la primera tesis" />}
-                title="Aún no se ha generado ninguna tesis. Se genera en segundo plano y la página se actualiza sola al terminar."
-              />
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm text-gray-400">Sin tesis todavía.</span>
+                <ThesisGenerateButton ticker={ticker} label="Genera la primera tesis" />
+              </div>
             )}
           </Panel>
           {snapshot.model_summary ? <Panel collapsible="mobile" title="Modelo fundamental a largo plazo">
@@ -1660,7 +1660,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             </Link>
           ))}
         </nav>
-        <nav aria-label={`Módulos de ${activeGroupLabel}`} className="-mx-4 mb-7 flex flex-wrap gap-2 px-4 pb-2 sm:mx-0 sm:px-0 sm:pb-0">
+        {groupModules.length > 1 ? <nav aria-label={`Módulos de ${activeGroupLabel}`} className="-mx-4 mb-7 flex flex-wrap gap-2 px-4 pb-2 sm:mx-0 sm:px-0 sm:pb-0">
           {groupModules.map((module) => (
             <Link
               aria-current={activeView === module.key ? 'page' : undefined}
@@ -1672,7 +1672,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               {module.label}
             </Link>
           ))}
-        </nav>
+        </nav> : null}
         {content}
       </div>
     </main>
