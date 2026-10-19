@@ -223,7 +223,14 @@ class SequentialFallbackProvider(LLMProvider):
         raise last
 
 
-def _groq_backup(settings: Settings, client: httpx.AsyncClient | None) -> OpenAICompatibleProvider | None:
+def _groq_backup(
+    settings: Settings,
+    client: httpx.AsyncClient | None,
+    *,
+    timeout_seconds: float = 12,
+    total_timeout_seconds: float = 15,
+    max_output_tokens: int = 2400,
+) -> OpenAICompatibleProvider | None:
     if not settings.groq_chat_fallback_enabled:
         return None
     if not (settings.groq_api_key and settings.groq_free_plan_confirmed and settings.groq_zdr_confirmed):
@@ -235,15 +242,22 @@ def _groq_backup(settings: Settings, client: httpx.AsyncClient | None) -> OpenAI
         provider_name="groq",
         extra_headers={"User-Agent": "cavaai/1.0"},
         reasoning_effort="low",
-        timeout_seconds=12,
-        total_timeout_seconds=15,
+        timeout_seconds=timeout_seconds,
+        total_timeout_seconds=total_timeout_seconds,
         max_retries=0,
-        max_output_tokens=2400,
+        max_output_tokens=max_output_tokens,
         client=client,
     )
 
 
-def _gemini_backup(settings: Settings, client: httpx.AsyncClient | None) -> OpenAICompatibleProvider | None:
+def _gemini_backup(
+    settings: Settings,
+    client: httpx.AsyncClient | None,
+    *,
+    timeout_seconds: float = 15,
+    total_timeout_seconds: float = 18,
+    max_output_tokens: int = 8000,
+) -> OpenAICompatibleProvider | None:
     if not settings.gemini_chat_fallback_enabled:
         return None
     if not (settings.gemini_api_key and settings.gemini_free_plan_confirmed):
@@ -254,10 +268,10 @@ def _gemini_backup(settings: Settings, client: httpx.AsyncClient | None) -> Open
         default_model=GEMINI_MODEL,
         provider_name="gemini",
         reasoning_effort="low",
-        timeout_seconds=15,
-        total_timeout_seconds=18,
+        timeout_seconds=timeout_seconds,
+        total_timeout_seconds=total_timeout_seconds,
         max_retries=0,
-        max_output_tokens=8000,
+        max_output_tokens=max_output_tokens,
         client=client,
     )
 
@@ -299,13 +313,21 @@ def create_background_llm_provider(settings: Settings | None = None, *, client: 
     primary = create_llm_provider(settings, client=client, max_retries=0)
     if primary.name == "disabled":
         return primary
+    # Presupuestos de trabajo largo, no de chat: un lote de extraccion son
+    # ~6k tokens de entrada y hasta 3.000 de salida; con los 12-18 s del chat
+    # los respaldos gratuitos caian en read timeout y el job de principios
+    # moria como «La extracción tardó demasiado» (prod, 18 oct 2026).
     try:
-        backup = _groq_backup(settings, client)
+        backup = _groq_backup(
+            settings, client, timeout_seconds=60, total_timeout_seconds=75,
+        )
     except ValueError:
         logger.warning("background LLM fallback: Groq mal configurado; se omite el respaldo")
         backup = None
     try:
-        backup2 = _gemini_backup(settings, client)
+        backup2 = _gemini_backup(
+            settings, client, timeout_seconds=90, total_timeout_seconds=110,
+        )
     except ValueError:
         logger.warning("background LLM fallback: Gemini mal configurado; se omite el respaldo")
         backup2 = None

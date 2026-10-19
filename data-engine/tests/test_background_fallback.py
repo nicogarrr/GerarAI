@@ -154,3 +154,35 @@ def test_factory_wraps_with_backups_when_configured():
     provider = create_background_llm_provider(settings)
     assert isinstance(provider, SequentialFallbackProvider)
     assert provider.backup is not None and provider.backup2 is None
+
+
+
+def test_background_backups_use_long_call_budgets_not_chat_budgets():
+    """Un lote de extraccion son ~6k tokens in / 3k out: con los 12-18 s del
+    chat los respaldos caian en read timeout y el job moria («La extracción
+    tardó demasiado», prod 18 oct 2026). El chat conserva sus presupuestos
+    cortos via los defaults."""
+    from app.core.config import Settings
+    from app.llm.chat_provider import create_chat_llm_provider
+
+    settings = Settings(
+        llm_enabled=True,
+        llm_provider="opencode-go",
+        opencode_go_api_key="sk-test",
+        groq_chat_fallback_enabled=True,
+        groq_api_key="gsk-test",
+        groq_free_plan_confirmed=True,
+        groq_zdr_confirmed=True,
+        gemini_chat_fallback_enabled=True,
+        gemini_api_key="gm-test",
+        gemini_free_plan_confirmed=True,
+    )
+    provider = create_background_llm_provider(settings)
+    assert provider.backup._timeout.read == 60.0  # noqa: SLF001
+    assert provider.backup._total_timeout_seconds == 75.0  # noqa: SLF001
+    assert provider.backup2._timeout.read == 90.0  # noqa: SLF001
+    assert provider.backup2._total_timeout_seconds == 110.0  # noqa: SLF001
+
+    chat = create_chat_llm_provider(settings)
+    assert chat.backup._timeout.read == 12.0  # noqa: SLF001
+    assert chat.backup2._timeout.read == 15.0  # noqa: SLF001
