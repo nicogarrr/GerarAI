@@ -438,6 +438,11 @@ class MarketRefreshService:
                     source=observation.source,
                 )
                 db.add(market)
+            elif market.source == "yfinance" and observation.price_date < as_of:
+                # Barra de una sesion YA cerrada con el cierre oficial del
+                # OHLCV: un spot tardio del proveedor (0,01 % de deriva) no la
+                # pisa ni le cambia la fuente.
+                continue
             else:
                 # An existing row is a real bar from the OHLCV path: update
                 # only the close, never the session's open/high/low.
