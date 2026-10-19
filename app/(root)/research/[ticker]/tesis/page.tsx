@@ -81,6 +81,22 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   const encoded = encodeURIComponent(ticker);
   const name = company?.name ?? ticker;
   const generated = published ? formatGeneratedDate(published.created_at) : null;
+  // La columna Probabilidad solo se muestra cuando el motor persistio
+  // probabilidades: sin ellas seria un «N/D» triple que aparenta un dato
+  // que no existe (regla de veracidad: no inventar ni insinuar datos).
+  const hasProbabilities = published
+    ? [published.scenario_probabilities?.bear,
+       published.scenario_probabilities?.base,
+       published.scenario_probabilities?.bull].some((p) => typeof p === 'number')
+    : false;
+  // Sin valores de escenario (p. ej. insufficient_data) la tabla no se
+  // pinta: serian tres filas de «N/D» aparentando una valoracion que el
+  // modelo no produjo. Las probabilidades pueden existir aun sin valores
+  // (el motor las persiste aparte), pero sin valores no hay tabla que
+  // acompanar: se dice tal cual.
+  const hasScenarioValues = published
+    ? [published.bear_value, published.base_value, published.bull_value].some((v) => v !== null)
+    : false;
 
   return (
     <main id="content" className={`print-document min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8 ${publicEditorial.variable}`}>
@@ -156,13 +172,14 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             <section>
               <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Escenarios y valoración</h2>
+              {hasScenarioValues ? (
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-700 text-left text-xs uppercase text-gray-500">
                       <th className="py-2 pr-4">Escenario</th>
                       <th className="py-2 pr-4">Valor</th>
-                      <th className="py-2">Probabilidad</th>
+                      {hasProbabilities ? <th className="py-2">Probabilidad</th> : null}
                     </tr>
                   </thead>
                   <tbody className="text-gray-200">
@@ -174,12 +191,17 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                       <tr key={label} className="border-b border-gray-800/70">
                         <td className="py-2 pr-4 text-gray-400">{label}</td>
                         <td className="py-2 pr-4 font-medium">{money(value, currency)}</td>
-                        <td className="py-2">{typeof probability === 'number' ? formatPercent(probability, { digits: 0 }) : 'N/D'}</td>
+                        {hasProbabilities ? (
+                          <td className="py-2">{typeof probability === 'number' ? formatPercent(probability, { digits: 0 }) : 'N/D'}</td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              ) : (
+                <p className="mt-4 text-sm text-gray-400">Sin cifras de valoración.</p>
+              )}
               <p className="mt-3 text-sm text-gray-400">
                 Precio actual: {money(published.current_price, currency)} · Valor esperado: {money(published.expected_value, currency)}
                 {published.margin_of_safety !== null
