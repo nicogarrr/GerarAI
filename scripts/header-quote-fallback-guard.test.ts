@@ -38,8 +38,8 @@ describe('cabecera de precio con fallback al cierre del gráfico', () => {
 describe('logo de la cabecera', () => {
     it('muestra iniciales mientras carga y recupera errores previos a hidratar', () => {
         assert.match(logo, /el\.complete/);
-        assert.match(logo, /naturalWidth > 0/);
-        assert.match(logo, /state === 'loading' \?/);
+        assert.match(logo, /naturalWidth === 0/); // misma comprobación, rama de fallo
+        assert.match(logo, /loading \?/); // iniciales mientras carga (estado derivado)
         assert.ok(!logo.includes('loading="lazy"'), 'lazy dejaba la imagen sin pedir en un hueco vacío');
     });
 });
