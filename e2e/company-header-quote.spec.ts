@@ -51,7 +51,9 @@ test("quote unavailable never hides the company heading or chart structure", asy
   await page.route('**/api/companies/MSFT/extended-quote', route => route.fulfill({ status: 502, json: { status: 'unavailable' } }));
   await page.goto('/research/MSFT');
   await expect(page.getByRole('heading', { name: 'MSFT', level: 1 })).toBeVisible();
-  await expect(header(page).locator('.text-4xl')).toHaveText('N/D');
+  // Sin cotización, la cabecera cae al último cierre del gráfico, rotulado.
+  await expect(header(page).getByText('Cotización en vivo no disponible ahora', { exact: false })).toBeVisible();
+  await expect(header(page).getByText('Último cierre del gráfico', { exact: false })).toBeVisible();
   await expect(header(page).getByTestId('company-metric-strip')).toBeVisible();
   await expect(header(page).getByTestId('company-technical-chart')).toBeVisible();
 });
