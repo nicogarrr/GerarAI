@@ -30,6 +30,17 @@ def test_merge_disagreement_prefers_yahoo_and_drops_session():
     assert row["source"] == "yahoo" and row["confirmed"] is False and row["session"] is None
 
 
+def test_merge_disagreement_with_yahoo_non_estimate_is_not_confirmed():
+    """NVDA 19-oct-2026: Yahoo 17-nov (estimate=False) vs NASDAQ 18-nov: al
+    menos una fuente proyecta, luego la fecha no puede exhibirse confirmada."""
+    row = merge_candidate(
+        {"date": date(2026, 11, 17), "estimate": False},
+        {"date": date(2026, 11, 18), "session": None, "fiscal": None},
+    )
+    assert row["source"] == "yahoo" and row["confirmed"] is False
+    assert "NASDAQ publica otra fecha" in row["label"]
+
+
 def test_merge_nasdaq_only_has_unknown_confirmation_and_none_when_empty():
     row = merge_candidate(None, {"date": date(2026, 10, 20), "session": None, "fiscal": None})
     assert row["confirmed"] is None and row["source"] == "nasdaq"

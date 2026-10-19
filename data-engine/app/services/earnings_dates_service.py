@@ -182,9 +182,21 @@ def merge_candidate(yahoo: dict | None, nasdaq: dict | None) -> dict[str, Any] |
             "label": f"{SOURCE_NASDAQ_LABEL} + {SOURCE_YAHOO_LABEL}",
         }
     if yahoo:
+        # Yahoo y NASDAQ discrepan: al menos una de las dos esta proyectando
+        # (medido 19 oct 2026: NVDA 17-nov Yahoo vs 18-nov NASDAQ; AVGO 9-dic
+        # vs 10-dic, ambas con ``isEarningsDateEstimate=False``). Una fecha
+        # contradicha por la otra fuente NO puede exhibirse como confirmada,
+        # aunque Yahoo la marque como no estimada. Se conserva la fecha de
+        # Yahoo (regla del modulo) pero se degrada el sello a no confirmada.
+        disagreed = nasdaq is not None and nasdaq["date"] != yahoo["date"]
         return {
             "date": yahoo["date"], "session": None, "fiscal": None,
-            "confirmed": not yahoo["estimate"], "source": "yahoo", "label": SOURCE_YAHOO_LABEL,
+            "confirmed": False if disagreed else not yahoo["estimate"],
+            "source": "yahoo",
+            "label": (
+                f"{SOURCE_YAHOO_LABEL} (NASDAQ publica otra fecha: sin confirmar)"
+                if disagreed else SOURCE_YAHOO_LABEL
+            ),
         }
     if nasdaq:
         return {
