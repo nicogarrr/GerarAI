@@ -11,12 +11,12 @@ def test_memo_to_speech_text_strips_markdown_and_tables():
     assert not any("|" in line or "http" in line for line in lines)
 
 
-def test_audio_key_changes_with_text_and_version():
-    a = svc.audio_key("BRK.B", 1, "hola")
-    assert a == svc.audio_key("BRK.B", 1, "hola")
-    assert a != svc.audio_key("BRK.B", 1, "hola!")
-    assert a != svc.audio_key("BRK.B", 2, "hola")
-    assert a.startswith("BRKB-v1-")
+def test_audio_key_is_stable_per_version_and_state():
+    a = svc.audio_key("BRK.B", 1, "texto A")
+    assert a == svc.audio_key("BRK.B", 1, "texto B distinto")
+    assert a != svc.audio_key("BRK.B", 2)
+    assert a != svc.audio_key("BRK.B", 1, draft=True)
+    assert a.startswith("BRKB-v1-p-")
 
 
 def test_status_is_unavailable_when_sidecar_is_down(monkeypatch):
@@ -56,7 +56,7 @@ def test_audio_context_uses_draft_memo_for_unpublished_thesis(monkeypatch):
     key, text = route._audio_context(None, "EXEL")
     assert calls["draft"] is True
     assert "Margen de seguridad" not in text and "Compra" not in text
-    assert key.startswith("EXEL-v3-")
+    assert key.startswith("EXEL-v3-d-")
 
 
 def test_audio_post_does_not_requeue_while_pending(monkeypatch):

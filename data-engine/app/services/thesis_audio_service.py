@@ -7,7 +7,6 @@ hay LLM ni proveedores de pago.
 """
 from __future__ import annotations
 
-import hashlib
 import os
 import re
 
@@ -40,10 +39,17 @@ def memo_to_speech_text(markdown: str, *, ticker: str, version: int) -> str:
     return ("\n".join([head, *lines]))[:MAX_CHARS]
 
 
-def audio_key(ticker: str, version: int, speech_text: str) -> str:
-    digest = hashlib.sha256(speech_text.encode("utf-8")).hexdigest()[:10]
+_FORMAT = "f1"  # subir al cambiar memo_to_speech_text para invalidar la cache
+
+
+def audio_key(ticker: str, version: int, speech_text: str = "", *, draft: bool = False) -> str:
+    """Clave estable por ticker + version + estado (+ formato).
+
+    No depende del texto: el memo incluye datos vivos y su hash cambiaba entre
+    llamadas, de modo que POST y status apuntaban a claves distintas.
+    """
     safe = re.sub(r"[^A-Za-z0-9]", "", ticker.upper())[:20] or "X"
-    return f"{safe}-v{int(version)}-{digest}"
+    return f"{safe}-v{int(version)}-{'d' if draft else 'p'}-{_FORMAT}"
 
 
 def status(key: str) -> str:

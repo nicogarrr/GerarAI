@@ -435,7 +435,7 @@ def _audio_context(db: Session, ticker: str) -> tuple[str, str]:
         db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=is_draft
     )
     text = thesis_audio_service.memo_to_speech_text(markdown, ticker=company.ticker, version=thesis.version)
-    return thesis_audio_service.audio_key(company.ticker, thesis.version, text), text
+    return thesis_audio_service.audio_key(company.ticker, thesis.version, draft=is_draft), text
 
 
 @router.get("/{ticker}/audio/status")
