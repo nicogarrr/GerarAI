@@ -196,6 +196,39 @@ async def enforce_rate_limit(
     response.headers["X-RateLimit-Remaining"] = str(max(0, limit - count))
 
 
+PUBLIC_FEED_LIMIT_PER_MINUTE = 60
+
+
+async def enforce_public_ip_rate_limit(request: Request) -> None:
+    """Limite por IP para rutas publicas sin identidad (feed ICS).
+
+    La IP es el peer del socket, nunca una cabecera falsificable. En
+    produccion falla cerrado (503) si Redis no responde, como el limite
+    principal.
+    """
+    settings = get_settings()
+    if not settings.rate_limit_enabled:
+        return
+    client_ip = request.client.host if request.client else "unknown"
+    digest = hashlib.sha256(f"public-feed:{client_ip}".encode()).hexdigest()
+    try:
+        count, retry_after = await _record_hit(
+            f"cavaai:rate:{digest}",
+            window_seconds=WINDOW_SECONDS,
+            use_redis=not settings.is_local_environment,
+            redis_url=settings.redis_url,
+            degrade_to_local=not settings.is_production,
+        )
+    except RateLimitBackendUnavailable as exc:
+        raise HTTPException(status_code=503, detail="Rate limit backend unavailable") from exc
+    if count > PUBLIC_FEED_LIMIT_PER_MINUTE:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
 # --- Limite previo a la auth: peticiones que acaban en 401 -----------------
 # enforce_rate_limit depende de get_research_principal, asi que un 401 se
 # lanza ANTES de contar nada: un cliente sin credenciales podia martillear la

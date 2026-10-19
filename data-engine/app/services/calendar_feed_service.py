@@ -14,6 +14,7 @@ inventa una hora.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import secrets
 from datetime import UTC, date, datetime, timedelta
 
@@ -136,8 +137,10 @@ def build_ics(calendar: dict, *, now: datetime | None = None) -> str:
 
 def feed_for_token(db: Session, token: str, *, today: date | None = None) -> str | None:
     """ICS del tenant dueño del token, o None si no existe/esta revocado. `db` sin tenant."""
-    row = db.scalar(select(CalendarFeedToken).where(CalendarFeedToken.token_hash == hash_token(token)))
-    if row is None or row.revoked_at is not None:
+    digest = hash_token(token)
+    row = db.scalar(select(CalendarFeedToken).where(CalendarFeedToken.token_hash == digest))
+    # Comparacion en tiempo constante del hash (defensa en profundidad).
+    if row is None or not hmac.compare_digest(row.token_hash, digest) or row.revoked_at is not None:
         return None
     row.last_used_at = datetime.now(UTC)
     tenant_id, scope = row.tenant_id, row.scope
