@@ -174,6 +174,9 @@ def investor_detail(db: Session, slug: str) -> dict[str, Any] | None:
     rows = _latest_view(db, manager) if manager else []
     rows.sort(key=lambda r: r.value_usd_thousands or Decimal(0), reverse=True)
     total = _total(rows)
+    from app.services.instrument_reference import names_by_cusip
+
+    display_names = names_by_cusip(db, [r.cusip for r in rows])
     detail.update(
         {
             "coverage": manager.coverage if manager and rows else None,
@@ -185,7 +188,8 @@ def investor_detail(db: Session, slug: str) -> dict[str, Any] | None:
             "value_usd_thousands": total,
             "holdings": [
                 {
-                    "name_of_issuer": r.name_of_issuer,
+                    "name_of_issuer": display_names.get(r.cusip) or r.name_of_issuer,
+                    "name_of_issuer_filed": r.name_of_issuer,
                     "title_of_class": r.title_of_class,
                     "cusip": r.cusip,
                     "shares": float(r.shares) if r.shares is not None else None,
@@ -275,9 +279,13 @@ def most_bought(db: Session) -> dict[str, Any]:
                 entry["sellers"] += 1
     ranked = [e for e in issuers.values() if e["buyers"]]
     ranked.sort(key=lambda e: (-len(e["buyers"]), -e["value_usd"], e["name_of_issuer"]))
+    from app.services.instrument_reference import names_by_cusip
+
+    display_names = names_by_cusip(db, [e["cusip"] for e in ranked[:MOST_BOUGHT_TOP]])
     items = [
         {
-            "name_of_issuer": e["name_of_issuer"],
+            "name_of_issuer": display_names.get(e["cusip"]) or e["name_of_issuer"],
+            "name_of_issuer_filed": e["name_of_issuer"],
             "cusip": e["cusip"],
             "buyers_count": len(e["buyers"]),
             "new_count": sum(1 for b in e["buyers"] if b["change"] == "new"),

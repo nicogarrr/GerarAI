@@ -467,6 +467,9 @@ class ManagerHoldingIngestionService:
         if rows:
             accession = _latest_accession(rows)
             rows = [row for row in rows if row.accession_number == accession]
+        from app.services.instrument_reference import names_by_cusip
+
+        display_names = names_by_cusip(db, [row.cusip for row in rows])
         return {
             "cik": cik,
             "manager": manager.name,
@@ -477,7 +480,8 @@ class ManagerHoldingIngestionService:
                 {
                     "accession_number": row.accession_number,
                     "is_amendment": row.is_amendment,
-                    "name_of_issuer": row.name_of_issuer,
+                    "name_of_issuer": display_names.get(row.cusip) or row.name_of_issuer,
+                    "name_of_issuer_filed": row.name_of_issuer,
                     "title_of_class": row.title_of_class,
                     "cusip": row.cusip,
                     "value_usd_thousands": (
