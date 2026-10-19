@@ -23,7 +23,8 @@ describe('ficha en 3 pestañas + Más: mapeo de vistas', () => {
         for (const key of ['overview', 'thesis']) assert.equal(groupOf(key), 'resumen');
         for (const key of ['financials', 'valuation', 'model', 'peers', 'moat', 'capital', 'terminal']) assert.equal(groupOf(key), 'numeros');
         for (const key of ['documents', 'sources', 'chat']) assert.equal(groupOf(key), 'fuentes');
-        for (const key of ['changes', 'holders', 'lecciones', 'directiva', 'satellites']) assert.equal(groupOf(key), 'mas');
+        for (const key of ['changes', 'holders', 'lecciones', 'directiva', 'satellites', 'supuestos', 'market-opportunity']) assert.equal(groupOf(key), 'mas');
+        assert.equal(MODULES.filter((m) => m.group === 'numeros').length, 7);
     });
     it('las 6 claves de grupo antiguas siguen abriendo su módulo', () => {
         assert.equal(asView('resumen'), 'overview');
