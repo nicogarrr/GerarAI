@@ -1634,7 +1634,7 @@ La pregunta invertible es si la evidencia respalda los supuestos detrás del mod
 ## 3. Modelo de negocio
 Sector: {company.sector}. Industria: {company.industry}.
 Marco específico de la empresa: {term_es(framework.get("key", "unknown"))}. Pregunta primaria: {str(framework.get("primary_question") or "desconocida").rstrip(" .?!")}.
-Drivers obligatorios ausentes: {", ".join(mandatory_missing) if mandatory_missing else "ninguno"}.
+Drivers obligatorios ausentes: {", ".join(term_es(m) for m in mandatory_missing) if mandatory_missing else "ninguno"}.
 
 ## 4. Últimos resultados
 {self._facts_markdown(facts)}

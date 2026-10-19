@@ -169,3 +169,19 @@ def test_cifras_y_claves_del_memo_en_es():
     )
     assert "| Ingresos | 416,16 mil M | USD | FY2025 | Informe SEC #23 |" in facts
     assert "revenue" not in facts
+
+
+def test_drivers_ausentes_y_noticias_de_bufetes_no_llegan_al_memo():
+    from app.services.memo_text_es import term_es
+    from app.services.ticker_news_lane import is_law_firm_solicitation
+
+    assert term_es("addressable_subscribers") == "suscriptores direccionables"
+    assert term_es("price_per_gb") == "precio por GB"
+    assert is_law_firm_solicitation(
+        "ASTS Investors Have Opportunity to Lead AST SpaceMobile, Inc. Securities Fraud Lawsuit with SBS Law"
+    )
+    assert is_law_firm_solicitation(
+        "ASTS Investors Have Opportunity to Lead AST SpaceMobile, Inc. Securities Fraud Lawsuit"
+    )
+    assert not is_law_firm_solicitation("AST SpaceMobile launches BlueBird 6 satellite")
+    assert not is_law_firm_solicitation("AST SpaceMobile faces securities lawsuit, Reuters reports")

@@ -568,15 +568,27 @@ class ThesisEvidenceService:
         # Se leen más filas de las necesarias: una misma noticia publicada por
         # varias agencias (PR Newswire, GlobeNewswire, Morningstar) ocupaba 3 de
         # los 5 huecos de «noticias materiales» y contaba como 3 eventos.
+        # Captacion de demandantes de despachos de abogados y paginas de datos
+        # de precios no son noticias de la empresa: no entran en la tesis.
+        from app.services.ticker_news_lane import is_data_page_headline, is_law_firm_solicitation
+
+        candidates = [
+            row
+            for row in db.scalars(
+                select(NewsEvent)
+                .where(NewsEvent.company_id == company.id)
+                .order_by(desc(NewsEvent.materiality_score), desc(NewsEvent.date))
+                .limit(MAX_NEWS_ITEMS * 8)
+            ).all()
+            if not (
+                is_law_firm_solicitation(
+                    (row.metadata_ or {}).get("source_headline") or row.title, None
+                )
+                or is_data_page_headline((row.metadata_ or {}).get("source_headline") or row.title)
+            )
+        ]
         rows = _dedupe_news_rows(
-            list(
-                db.scalars(
-                    select(NewsEvent)
-                    .where(NewsEvent.company_id == company.id)
-                    .order_by(desc(NewsEvent.materiality_score), desc(NewsEvent.date))
-                    .limit(MAX_NEWS_ITEMS * 4)
-                ).all()
-            ),
+            candidates,
             MAX_NEWS_ITEMS,
             company.ticker,
         )
