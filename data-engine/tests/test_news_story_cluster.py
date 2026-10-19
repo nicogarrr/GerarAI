@@ -205,9 +205,12 @@ def test_misma_nota_con_y_sin_traduccion_cacheada_se_agrupa():
     con traducción ES cacheada y otra sin ella. Antes no se agrupaban porque
     la firma solo miraba el idioma cacheado; ahora la firma es bilingüe."""
     title = "Mariachi Singer Aaron Nicholas Reimagine Islands in the Stream as a Vibrant Anthem"
+    # Carril macro: tras #1785 el wire sin empresa solo entra en «Todas» si es
+    # macro; el test fija el agrupado, no la visibilidad de portada.
     metadata_con_traduccion = {
         "connector": "rss",
         "date_source": "source",
+        "news_lane": "macro",
         "headline_translation": {
             "status": "translated",
             "text": "El cantante de mariachi Aaron Nicholas reimagina Islands in the Stream como un vibrante himno",
@@ -216,7 +219,8 @@ def test_misma_nota_con_y_sin_traduccion_cacheada_se_agrupa():
     }
     events = [
         _event(None, title, "https://prn.example/1", source="PR Newswire",
-               date=NOW - timedelta(minutes=5)),
+               date=NOW - timedelta(minutes=5),
+               metadata_={"connector": "rss", "date_source": "source", "news_lane": "macro"}),
         _event(None, title, "https://prn.example/2", source="PR Newswire",
                date=NOW, metadata_=metadata_con_traduccion),
     ]
@@ -229,9 +233,11 @@ def test_historias_distintas_sin_empresa_no_se_agrupan_con_firma_bilingue():
     """Control: dos notas de agencia distintas y sin empresa no se juntan."""
     events = [
         _event(None, "Mariachi Singer Aaron Nicholas Reimagine Islands in the Stream",
-               "https://prn.example/10", source="PR Newswire", date=NOW),
+               "https://prn.example/10", source="PR Newswire", date=NOW,
+               metadata_={"connector": "rss", "date_source": "source", "news_lane": "macro"}),
         _event(None, "World Food Championships Crown 10 Category Champions at WFC2026",
-               "https://prn.example/11", source="PR Newswire", date=NOW),
+               "https://prn.example/11", source="PR Newswire", date=NOW,
+               metadata_={"connector": "rss", "date_source": "source", "news_lane": "macro"}),
     ]
     body = _client_untagged(events).get("/api/news").json()
     assert len(body) == 2
