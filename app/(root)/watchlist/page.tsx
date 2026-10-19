@@ -351,7 +351,7 @@ export default async function WatchlistPage({
                         <span>{watchlistItems.length} empresas · Página {page} de {totalPages}</span>
                         {/* Ordenar también sin cabeceras de tabla (móvil/tablet con tarjetas): menú de enlaces, sin JS. */}
                         <details className="relative xl:hidden">
-                            <summary className="min-h-[36px] cursor-pointer list-none rounded px-2 py-1.5 text-xs text-gray-300 hover:text-gray-100">
+                            <summary className="min-h-[44px] cursor-pointer list-none rounded px-2 py-2 text-xs text-gray-300 hover:text-gray-100">
                                 Ordenar: {SORT_LABELS[sort]}{sort !== 'added' ? <span aria-hidden="true" className="text-teal-400"> {dir === 'asc' ? '▲' : '▼'}</span> : null}
                             </summary>
                             <div className="absolute z-10 mt-1 min-w-44 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
