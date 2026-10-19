@@ -16,6 +16,8 @@ from app.core.database import get_db
 from app.models import Company, CorporateAction, DividendRecord, Position
 from app.services.async_bridge import run_from_any_context
 from app.services.corporate_actions_service import CorporateActionService
+from app.services.display_es import fecha_es as _fecha_es
+from app.services.display_es import source_label as _source_label
 from app.services.split_ingestion_service import SplitIngestionService
 
 router = APIRouter()
@@ -70,7 +72,7 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
     ).all()
     out = []
     for record, company in rows:
-        pay = f" · pago {record.pay_date.isoformat()}" if record.pay_date else ""
+        pay = f" · pago {_fecha_es(record.pay_date)}" if record.pay_date else ""
         out.append(
             {
                 "id": None,
@@ -80,7 +82,7 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
                 "ratio": None,
                 "description": (
                     f"Dividendo de {record.amount.normalize():f} {record.currency} por acción"
-                    f"{pay} · fuente {_SOURCE_LABELS.get(record.source, record.source)}"
+                    f"{pay} · fuente {_source_label(record.source)}"
                 ),
                 "applied": None,
                 "applied_at": None,
@@ -111,8 +113,6 @@ async def sync_portfolio_splits(db: Session = Depends(get_db)) -> dict:
     )
 
 
-# Fuentes con nombre legible: el slug interno (yahoo_finance) no se muestra.
-_SOURCE_LABELS = {"yahoo_finance": "Yahoo Finance"}
 
 
 @router.get("/sync-status")
