@@ -81,7 +81,7 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                             <div>
                                 <div className="flex flex-col min-[420px]:flex-row gap-3 sm:gap-4">
                                     {article.image && (
-                                        <div className="h-40 w-full min-w-0 shrink-0 relative rounded-lg overflow-hidden min-[420px]:h-24 min-[420px]:w-32">
+                                        <div className="h-28 w-full min-w-0 shrink-0 relative rounded-lg overflow-hidden min-[420px]:h-24 min-[420px]:w-32">
                                             <Image
                                                 src={article.image}
                                                 /* El titular ya está en el <h3> de al lado: con alt
