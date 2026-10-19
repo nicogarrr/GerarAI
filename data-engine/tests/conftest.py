@@ -157,6 +157,8 @@ def isolate_llm_free_tier_breaker():
     from app.llm import base
     base._free_tier_breaker.clear()
     base._free_tier_breaker_status.clear()
+    base._interactive_quota_breaker.clear()
     yield
     base._free_tier_breaker.clear()
     base._free_tier_breaker_status.clear()
+    base._interactive_quota_breaker.clear()

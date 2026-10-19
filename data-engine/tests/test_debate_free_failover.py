@@ -18,9 +18,11 @@ from app.services.thesis_debate_service import debate_thesis
 def clean_breaker():
     base._free_tier_breaker.clear()
     base._free_tier_breaker_status.clear()
+    base._interactive_quota_breaker.clear()
     yield
     base._free_tier_breaker.clear()
     base._free_tier_breaker_status.clear()
+    base._interactive_quota_breaker.clear()
 
 
 def settings(**kw):
@@ -100,20 +102,21 @@ def test_paid_environment_cannot_reach_debate_transport():
 
 
 def test_429_breaker_expiry_reprobes(monkeypatch):
-    from app.llm.errors import ProviderHTTPError
     from app.llm.adapters import OpenAICompatibleProvider
+    from app.llm.errors import ProviderHTTPError
     calls = []
     async def run():
         async with httpx.AsyncClient(transport=httpx.MockTransport(
             lambda req: (calls.append(1), httpx.Response(429))[1])) as client:
             p = OpenAICompatibleProvider(api_key="k", base_url="https://test.invalid", default_model="m",
                                          provider_name="opencode-go", client=client, max_retries=2)
+            p.interactive_quota_breaker = True
             for _ in range(2):
                 with pytest.raises(ProviderHTTPError) as exc:
                     await p._post_json("https://test.invalid", headers={}, payload={"model": "m"})
                 assert exc.value.status_code == 429
             assert len(calls) == 1
-            base._free_tier_breaker[("opencode-go", "m")] = 0
+            base._interactive_quota_breaker[("opencode-go", "m")] = 0
             with pytest.raises(ProviderHTTPError):
                 await p._post_json("https://test.invalid", headers={}, payload={"model": "m"})
     asyncio.run(run())
@@ -135,3 +138,39 @@ def test_deadline_cancels_member_and_never_runs_an_orphan():
     with pytest.raises(FreeLLMUnavailable):
         asyncio.run(provider.complete(LLMRequest([Message("user", "tesis")], task="red_team")))
     assert p.cancelled
+
+
+def test_interactive_quota_does_not_block_background_jobs():
+    from app.llm.factory import create_llm_provider
+    calls = []
+    def handle(req):
+        calls.append(json.loads(req.content)["model"])
+        return httpx.Response(429) if len(calls) <= 2 else httpx.Response(200, json=envelope())
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+            request = LLMRequest([Message("user", "tesis")], task="red_team")
+            with pytest.raises(FreeLLMUnavailable):
+                await create_free_interactive_provider(settings(), client=client).complete(request)
+            background = create_llm_provider(settings(), client=client, max_retries=0)
+            assert (await background.complete(request)).model == "deepseek-v4.1-flash-free"
+    asyncio.run(run())
+    assert calls == ["deepseek-v4.1-flash-free", "space-bunny-free", "deepseek-v4.1-flash-free"]
+
+
+@pytest.mark.parametrize("config", [
+    {"opencode_go_model": "paid"},
+    {"opencode_go_fallback_model": "paid"},
+    {"llm_model_overrides": {"chat": "paid"}},
+])
+def test_bad_chat_configuration_degrades_at_call_not_constructor(config):
+    from app.llm.errors import ProviderDisabledError
+    provider = create_chat_llm_provider(settings(**config))
+    assert provider.name == "disabled"
+    with pytest.raises(ProviderDisabledError):
+        asyncio.run(provider.complete(LLMRequest([Message("user", "hola")], task="chat")))
+
+
+def test_chat_primary_is_capped_at_twenty_seconds_without_groq():
+    provider = create_chat_llm_provider(settings(llm_timeout_seconds=120, llm_total_timeout_seconds=240))
+    assert provider._timeout.read == 20
+    assert provider._total_timeout_seconds == 20

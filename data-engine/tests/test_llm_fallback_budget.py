@@ -348,5 +348,5 @@ def test_fallback_aliased_to_primary_by_override_is_not_called():
     assert seen == [PRIMARY]
     seen.clear()
     asyncio.run(scenario({}))
-    # The first scenario exhausted PRIMARY: the shared breaker skips it.
-    assert seen == [FALLBACK]
+    # Background/general providers do not use the interactive quota breaker.
+    assert seen == [PRIMARY, FALLBACK]

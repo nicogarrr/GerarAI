@@ -176,7 +176,8 @@ async def test_paid_primary_override_rejected_before_network():
         raise AssertionError("network must not run")
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         cfg = Settings(llm_enabled=True, opencode_go_api_key="synthetic", opencode_go_model="paid-unknown", llm_model_overrides={"chat": "paid-unknown"}, groq_api_key="synthetic", groq_chat_fallback_enabled=True, groq_free_plan_confirmed=True, groq_zdr_confirmed=True)
-        with pytest.raises(ProviderRequestError, match="not verified free"):
+        from app.llm.errors import ProviderDisabledError
+        with pytest.raises(ProviderDisabledError, match="not_verified_free"):
             await create_chat_llm_provider(cfg, client=client).complete(LLMRequest([Message("user", "hola")], task="chat"))
     assert not seen
 

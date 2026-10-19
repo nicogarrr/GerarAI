@@ -26,10 +26,12 @@ _FREE_TIER_ORIGIN_MARKERS = (
     "abusive traffic from this ip",
 )
 _FREE_TIER_BREAKER_SECONDS = 120.0
-# (provider, model) -> monotonic time until which calls fail fast (502 origin or
-# 429 quota). After expiry the next call is a real probe, not a permanent disable.
+# Existing origin breaker (all flows). After expiry the next call is a real probe.
 _free_tier_breaker: dict[tuple[str, str], float] = {}
 _free_tier_breaker_status: dict[tuple[str, str], int] = {}
+# Quota state is shared ONLY by opted-in interactive providers (chat/debate).
+# Background providers neither read nor write it.
+_interactive_quota_breaker: dict[tuple[str, str], float] = {}
 
 
 def _is_free_tier_origin_error(response: httpx.Response) -> bool:
@@ -153,6 +155,9 @@ class LLMProvider(ABC):
         breaker_key = (str(self.name), str(payload.get("model")))
         if _free_tier_breaker.get(breaker_key, 0.0) > time.monotonic():
             raise ProviderHTTPError(self.name, _free_tier_breaker_status.get(breaker_key, 502))
+        interactive_quota = getattr(self, "interactive_quota_breaker", False)
+        if interactive_quota and _interactive_quota_breaker.get(breaker_key, 0.0) > time.monotonic():
+            raise ProviderHTTPError(self.name, 429)
         for attempt in range(self._max_retries + 1):
             try:
                 response = await self._send(url, headers=headers, payload=payload)
@@ -172,9 +177,8 @@ class LLMProvider(ABC):
             if response.status_code < 400:
                 return response
             self._log_http_error(response, headers, payload, attempt)
-            if self.name == "opencode-go" and response.status_code == 429:
-                _free_tier_breaker[breaker_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
-                _free_tier_breaker_status[breaker_key] = 429
+            if interactive_quota and self.name == "opencode-go" and response.status_code == 429:
+                _interactive_quota_breaker[breaker_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
                 raise ProviderHTTPError(self.name, 429)
             if _is_free_tier_origin_error(response):
                 _free_tier_breaker_status[breaker_key] = 502

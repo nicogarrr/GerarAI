@@ -469,8 +469,9 @@ async def debate_thesis_endpoint(ticker: str, db: Session = Depends(get_db)) -> 
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     import asyncio
-    from app.llm.free_interactive import FreeLLMUnavailable, create_free_interactive_provider
+
     from app.llm.errors import LLMError
+    from app.llm.free_interactive import FreeLLMUnavailable, create_free_interactive_provider
     from app.services.budget import BudgetExceededError
 
     try:

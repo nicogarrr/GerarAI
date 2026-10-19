@@ -15,7 +15,7 @@ from dataclasses import replace
 import httpx
 
 from app.core.config import Settings, get_settings
-from app.llm.adapters import OpenAICompatibleProvider
+from app.llm.adapters import DisabledProvider, OpenAICompatibleProvider
 from app.llm.base import LLMProvider
 from app.llm.cascade import _FALL_THROUGH, CascadeModelRouter
 from app.llm.contracts import LLMRequest, LLMResponse, Message
@@ -342,10 +342,10 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
     # que compita en la carrera en vez de perderla siempre y quedar cancelado
     # a medias en el bridge (BrokenPipe).
     if settings.llm_enabled and settings.llm_provider != "disabled" and settings.opencode_go_model not in VERIFIED_FREE_MODELS:
-        raise ProviderRequestError("Chat primary not verified free")
+        return DisabledProvider("chat_primary_not_verified_free")
     fallback = settings.opencode_go_fallback_model
     if fallback and fallback not in VERIFIED_FREE_MODELS:
-        raise ProviderRequestError("Chat refuses a paid OpenCode fallback")
+        return DisabledProvider("chat_fallback_not_verified_free")
     settings = settings.model_copy(update={
         "opencode_go_fallback_model": fallback or (
             "space-bunny-free" if settings.opencode_go_model != "space-bunny-free"
@@ -363,11 +363,16 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
         total_timeout_seconds=settings.chat_total_timeout_seconds,
     )
     if primary.name == "opencode-go":
+        primary.interactive_quota_breaker = True
         probe = LLMRequest([Message("user", "route validation")], task="chat")
         routes = (probe, replace(probe, task="main_financial_analysis"),
                   replace(probe, model=settings.opencode_go_fallback_model))
-        if any(primary.model_router.resolve(route) not in VERIFIED_FREE_MODELS for route in routes):
-            raise ProviderRequestError("Chat refuses a model override not verified free")
+        try:
+            verified = all(primary.model_router.resolve(route) in VERIFIED_FREE_MODELS for route in routes)
+        except (ValueError, KeyError):
+            verified = False
+        if not verified:
+            return DisabledProvider("chat_override_not_verified_free")
     if not settings.groq_chat_fallback_enabled or primary.name == "disabled":
         return primary
     if primary.name != "opencode-go":

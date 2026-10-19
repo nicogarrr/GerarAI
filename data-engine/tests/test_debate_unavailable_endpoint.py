@@ -1,9 +1,9 @@
 """Endpoint returns public 503 without persisting unavailable or invalid debates."""
 from types import SimpleNamespace
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from fastapi import FastAPI
 from app.api.routes.thesis import router
 
 app = FastAPI()

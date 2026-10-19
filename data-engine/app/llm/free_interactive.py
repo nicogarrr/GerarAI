@@ -6,12 +6,11 @@ import logging
 import httpx
 
 from app.core.config import Settings, get_settings
-from app.llm.cascade import CascadeProvider, _FALL_THROUGH
+from app.llm.cascade import _FALL_THROUGH, CascadeProvider
 from app.llm.contracts import LLMRequest
 from app.llm.errors import LLMError, ProviderHTTPError, ProviderResponseError, ProviderTransportError
 from app.llm.factory import _opencode_go, _pin_to_model
 from app.llm.model_aliases import VERIFIED_FREE_MODELS
-
 
 logger = logging.getLogger(__name__)
 
@@ -66,4 +65,6 @@ def create_free_interactive_provider(settings: Settings | None = None, *, client
         members.append(_opencode_go(pinned, client=client, max_retries=0,
                                     timeout_seconds=12, total_timeout_seconds=14,
                                     reasoning_effort="low"))
+    for member in members:
+        member.interactive_quota_breaker = True
     return FreeInteractiveProvider(members, total_timeout_seconds=28)
