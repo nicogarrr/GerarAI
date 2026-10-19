@@ -27,6 +27,7 @@ import {
 import { holdingDisplayMode } from '@/lib/portfolio/holding-display';
 import { alertCardDestination } from '@/lib/alerts/card-destination';
 import { alertCardCopy } from '@/lib/alerts/card-copy';
+import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { t } from '@/lib/i18n/t';
 import { buildPortfolioInsight } from '@/lib/portfolio-insight';
 
@@ -467,7 +468,13 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                         <span className="text-xs text-gray-500">{formatUserDateTime(item.createdAt)}</span>
                                     </div>
                                     <p className="mt-2 text-sm break-words font-semibold text-gray-100">{copy.heading}</p>
-                                    <p className="mt-1 text-sm break-words text-gray-300">{copy.summary}</p>
+                                    {/* tracked_news lleva el titular crudo de la fuente: misma
+                                        traducción bajo demanda que en /alerts (#1493). */}
+                                    {item.alert_type === 'tracked_news' ? (
+                                        <ExternalNewsHeadline headline={copy.summary} url={item.sourceUrl} className="mt-1 text-sm break-words text-gray-300" />
+                                    ) : (
+                                        <p className="mt-1 text-sm break-words text-gray-300">{copy.summary}</p>
+                                    )}
                                     <details className="relative z-10 mt-2 break-words text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">Ver aviso original</summary><p className="whitespace-pre-wrap">{copy.technical}</p></details>
                                     {(item.ticker || item.sourceUrl) && (
                                         <span className="mt-2 inline-flex flex-wrap gap-3">
