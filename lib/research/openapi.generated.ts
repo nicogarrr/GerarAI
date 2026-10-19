@@ -532,7 +532,9 @@ export interface paths {
          * Company Analyst Targets
          * @description Per-firm analyst price targets (Yahoo Finance via yfinance, free and
          *     unofficial). Every row carries its source and date; a failed or empty
-         *     source is reported as such, never filled in.
+         *     source is reported as such, never filled in. Tickers without coverage on
+         *     their bare line fall back to their reviewed listing (KRKNF -> PNG.V),
+         *     declaring symbol and currency; a currency mismatch is never adopted.
          */
         get: operations["company_analyst_targets_api_companies__ticker__analyst_targets_get"];
         put?: never;
@@ -1241,6 +1243,26 @@ export interface paths {
         put?: never;
         /** Refresh Wacc Inputs */
         post: operations["refresh_wacc_inputs_api_companies__ticker__refresh_wacc_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{ticker}/refresh/yahoo-fundamentals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Yahoo Fundamentals
+         * @description Fundamentales anuales NO oficiales (Yahoo) para emisores sin SEC/ESEF del mapa revisado.
+         */
+        post: operations["refresh_yahoo_fundamentals_api_companies__ticker__refresh_yahoo_fundamentals_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4945,6 +4967,8 @@ export interface components {
         /** AnalystTargets */
         AnalystTargets: {
             consensus?: components["schemas"]["AnalystConsensus"] | null;
+            /** Currency */
+            currency?: string | null;
             /** Fetched At */
             fetched_at: number;
             /** Note */
@@ -10856,6 +10880,46 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_yahoo_fundamentals_api_companies__ticker__refresh_yahoo_fundamentals_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancialRefreshResponse"];
                 };
             };
             /** @description Validation Error */

@@ -50,6 +50,9 @@ class AnalystTargets(BaseModel):
     source: str = SOURCE
     source_url: str | None = None
     fetched_at: int
+    # Divisa declarada por Yahoo para el listado consultado; sin ella la UI
+    # pinta el numero pelado y no calcula recorrido (nunca se mezclan divisas).
+    currency: str | None = None
     reference_price: float | None = None
     reference_price_source: str | None = None
     consensus: AnalystConsensus | None = None
@@ -143,7 +146,14 @@ def _fetch_sync(symbol: str) -> dict[str, Any]:
         consensus = dict(ticker.analyst_price_targets or {})
     except Exception:  # noqa: BLE001 - el consenso es accesorio
         consensus = {}
-    return {"records": records, "consensus": consensus}
+    currency: str | None = None
+    try:
+        raw_currency = ticker.fast_info.get("currency")
+        if raw_currency:
+            currency = str(raw_currency).strip().upper() or None
+    except Exception:  # noqa: BLE001 - la divisa es declarativa; sin ella, None
+        currency = None
+    return {"records": records, "consensus": consensus, "currency": currency}
 
 
 class AnalystTargetsService:
@@ -179,16 +189,25 @@ class AnalystTargetsService:
         has_consensus = any(
             value is not None for value in (consensus.low, consensus.high, consensus.mean, consensus.median)
         )
+        # Disponible tambien con SOLO consenso agregado (sin detalle por firma,
+        # p.ej. PNG.V): el consenso es dato real y se etiqueta como agregado.
+        if rows:
+            note = None
+        elif has_consensus:
+            note = "Yahoo Finance publica solo el consenso agregado, sin detalle por firma."
+        else:
+            note = "Yahoo Finance no publica precios objetivo por analista para este valor."
         result = AnalystTargets(
             symbol=key,
-            status="available" if rows else "empty",
+            status="available" if rows or has_consensus else "empty",
             source_url=SOURCE_URL.format(symbol=key),
             fetched_at=fetched_at,
+            currency=data.get("currency"),
             reference_price=reference,
             reference_price_source="Yahoo Finance, precio al obtener los datos" if reference else None,
             consensus=consensus if has_consensus else None,
             rows=rows,
-            note=None if rows else "Yahoo Finance no publica precios objetivo por analista para este valor.",
+            note=note,
         )
         self._cache[key] = (now, result)
         return result

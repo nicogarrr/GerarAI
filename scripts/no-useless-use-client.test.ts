@@ -197,6 +197,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/ui/sonner.tsx': 'jsx-spread, libreria cliente: sonner',
   'components/ui/tabs.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-tabs',
   'components/ui/tooltip.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-tooltip',
+  'components/common/AnalystTargetLine.tsx': 'useState, useEffect: pide el consenso de objetivos tras el primer pintado (fuera del render de servidor)',
   'components/watchlist/ExtendedHoursLine.tsx': 'useState, useEffect: pide la cotización extendida tras el primer pintado (fuera del render de servidor)',
   'components/watchlist/WatchlistAddButton.tsx': 'useCallback, useEffect, useRef, useState, useRouter, jsx-onClick, libreria cliente: sonner',
   'components/watchlist/WatchlistRemoveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',

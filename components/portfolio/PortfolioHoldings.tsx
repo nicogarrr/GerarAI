@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw } from 'lucide-react';
 import AddTransactionButton from '@/components/portfolio/AddTransactionButton';
+import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 import ImportIBKRButton from '@/components/portfolio/ImportIBKRButton';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -220,6 +221,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         </dd>
                       </div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">En cartera desde</dt><dd className="text-gray-200">{formatDate(holding.firstBuyDate)}</dd></div>
+                      <div className="flex items-center justify-between gap-2"><dt className="text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</dt><dd><AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice > 0 ? holding.currentPrice : null} /></dd></div>
                     </dl>
                   </div>
                 );
@@ -250,6 +252,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                   <TableHead className="text-right text-gray-400">Valor</TableHead>
                   <TableHead className="text-right text-gray-400">Peso</TableHead>
                   <TableHead className="text-right text-gray-400">G/P</TableHead>
+                  <TableHead className="text-right text-gray-400" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</TableHead>
 
                 </TableRow>
               </TableHeader>
@@ -308,6 +311,9 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                           </Badge>
                         </div>
                       </TableCell>
+                      <TableCell className="text-right text-sm">
+                        <AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice > 0 ? holding.currentPrice : null} />
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -322,6 +328,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <TableCell className="text-right font-semibold text-gray-100">
                       {format(cash, cashCurrency)}
                     </TableCell>
+                    <TableCell className="text-right text-gray-500">{NA}</TableCell>
                     <TableCell className="text-right text-gray-500">{NA}</TableCell>
                     <TableCell className="text-right text-gray-500">{NA}</TableCell>
 
