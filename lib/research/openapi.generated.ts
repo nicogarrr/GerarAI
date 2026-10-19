@@ -2420,6 +2420,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/flows/themes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Temas con flujo de dinero */
+        get: operations["list_flow_themes_api_market_flows_themes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/flows/themes/{theme_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Flujo de dinero de un tema */
+        get: operations["get_flow_theme_api_market_flows_themes__theme_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/indices": {
         parameters: {
             query?: never;
@@ -6331,6 +6365,137 @@ export interface components {
             ticker: string;
             /** Valuation Input Ready */
             valuation_input_ready: boolean;
+        };
+        /** FlowDestinationOut */
+        FlowDestinationOut: {
+            /** Amount */
+            amount?: number | null;
+            /** Label */
+            label: string;
+            source: components["schemas"]["FlowSourceOut"];
+            /**
+             * Unit
+             * @default USD
+             */
+            unit: string;
+        };
+        /** FlowSourceOut */
+        FlowSourceOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reportado" | "estimacion_terceros";
+            /** Label */
+            label: string;
+            /** Note */
+            note?: string | null;
+            /** Url */
+            url?: string | null;
+        };
+        /** FlowSpenderOut */
+        FlowSpenderOut: {
+            /** Amount */
+            amount?: number | null;
+            /** Extra Amount */
+            extra_amount?: number | null;
+            /** Extra Label */
+            extra_label?: string | null;
+            extra_source?: components["schemas"]["FlowSourceOut"] | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note?: string | null;
+            /** Period Label */
+            period_label?: string | null;
+            /** Reason */
+            reason?: string | null;
+            source?: components["schemas"]["FlowSourceOut"] | null;
+            /** Ticker */
+            ticker?: string | null;
+            /**
+             * Unit
+             * @default USD
+             */
+            unit: string;
+        };
+        /** FlowSupplierOut */
+        FlowSupplierOut: {
+            /** Amount */
+            amount?: number | null;
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Reason */
+            reason: string;
+            source?: components["schemas"]["FlowSourceOut"] | null;
+            /** Ticker */
+            ticker?: string | null;
+            /**
+             * Unit
+             * @default USD
+             */
+            unit: string;
+        };
+        /** FlowThemeOut */
+        FlowThemeOut: {
+            /** Destinations */
+            destinations: components["schemas"]["FlowDestinationOut"][];
+            /** Destinations Note */
+            destinations_note?: string | null;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Id */
+            id: string;
+            /** Limitation */
+            limitation: string;
+            /** Method */
+            method: string;
+            /** Name */
+            name: string;
+            /**
+             * Notes
+             * @default []
+             */
+            notes: string[];
+            /** Period Label */
+            period_label?: string | null;
+            /** Spenders */
+            spenders: components["schemas"]["FlowSpenderOut"][];
+            spenders_total?: components["schemas"]["FlowTotalOut"] | null;
+            /** Suppliers */
+            suppliers: components["schemas"]["FlowSupplierOut"][];
+            /** Suppliers Note */
+            suppliers_note?: string | null;
+            /** Tagline */
+            tagline: string;
+        };
+        /** FlowThemeSummaryOut */
+        FlowThemeSummaryOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Tagline */
+            tagline: string;
+        };
+        /** FlowTotalOut */
+        FlowTotalOut: {
+            /** Amount */
+            amount: number;
+            /** Note */
+            note: string;
+            /**
+             * Unit
+             * @default USD
+             */
+            unit: string;
         };
         /** GemOut */
         GemOut: {
@@ -12129,10 +12294,12 @@ export interface operations {
             };
         };
     };
-    insider_operations_route_api_insider_operations_get: {
+    insider_filings_api_insider_filings_get: {
         parameters: {
-            query?: {
-                days?: number;
+            query: {
+                ticker: string;
+                limit?: number;
+                offset?: number;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -12171,12 +12338,10 @@ export interface operations {
             };
         };
     };
-    insider_filings_api_insider_filings_get: {
+    insider_operations_route_api_insider_operations_get: {
         parameters: {
-            query: {
-                ticker: string;
-                limit?: number;
-                offset?: number;
+            query?: {
+                days?: number;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -13893,6 +14058,84 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_flow_themes_api_market_flows_themes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowThemeSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_flow_theme_api_market_flows_themes__theme_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowThemeOut"];
                 };
             };
             /** @description Validation Error */
