@@ -20,6 +20,8 @@ TERMS_ES: dict[str, str] = {
     "free_cash_flow": "Flujo de caja libre",
     "operating_cash_flow": "Flujo de caja operativo",
     "capex": "Capex",
+    "capital_expenditure": "Gasto de capital (capex)",
+    "cash_and_equivalents": "Caja y equivalentes",
     "total_debt": "Deuda total",
     "cash": "Caja",
     "total_assets": "Activos totales",
@@ -171,3 +173,92 @@ def date_es(value: object) -> str:
     except ValueError:
         return text
     return f"{parsed.day} de {_MESES_ES[parsed.month - 1]} de {parsed.year}"
+
+
+# Unidades de hechos financieros que no son divisa ISO.
+UNIT_ES: dict[str, str] = {
+    "shares": "acciones",
+    "decimal": "fracción",
+    "ratio": "ratio",
+    "pure": "ratio",
+}
+
+
+def unit_es(unit: object) -> str:
+    text = str(unit or "").strip()
+    if not text:
+        return "N/D"
+    return UNIT_ES.get(text.lower(), text)
+
+
+# Sectores GICS (11) tal y como llegan del dato maestro. Un valor desconocido se
+# muestra tal cual: nunca se inventa una traduccion.
+SECTOR_ES: dict[str, str] = {
+    "information technology": "Tecnología de la información",
+    "technology": "Tecnología",
+    "communication services": "Servicios de comunicación",
+    "consumer discretionary": "Consumo discrecional",
+    "consumer staples": "Consumo básico",
+    "energy": "Energía",
+    "financials": "Finanzas",
+    "financial services": "Servicios financieros",
+    "health care": "Salud",
+    "healthcare": "Salud",
+    "industrials": "Industriales",
+    "materials": "Materiales",
+    "basic materials": "Materiales básicos",
+    "real estate": "Inmobiliario",
+    "utilities": "Servicios públicos",
+}
+
+INDUSTRY_ES: dict[str, str] = {
+    "technology": "Tecnología",
+    "telecommunication": "Telecomunicaciones",
+    "telecommunications": "Telecomunicaciones",
+    "software": "Software",
+    "application software": "Software de aplicaciones",
+    "semiconductors": "Semiconductores",
+    "consumer electronics": "Electrónica de consumo",
+    "aerospace & defense": "Aeroespacial y defensa",
+    "biotechnology": "Biotecnología",
+    "banks": "Banca",
+    "insurance": "Seguros",
+    "oil & gas": "Petróleo y gas",
+    "retail": "Comercio minorista",
+}
+
+
+def sector_es(value: object) -> str:
+    text = str(value or "").strip()
+    return SECTOR_ES.get(text.lower(), text) if text else "N/D"
+
+
+def industry_es(value: object) -> str:
+    text = str(value or "").strip()
+    return INDUSTRY_ES.get(text.lower(), text) if text else "N/D"
+
+
+# Pregunta primaria de cada marco (company_framework.py, en ingles) en espanol.
+PRIMARY_QUESTION_ES: dict[str, str] = {
+    "can physical network capacity, monetization and funding support the revenue ramp": "¿Pueden la capacidad física de la red, la monetización y la financiación sostener el aumento de ingresos?",
+    "does backlog convert into a profitable, scalable space systems and launch business": "¿La cartera de pedidos se convierte en un negocio rentable y escalable de sistemas espaciales y lanzamientos?",
+    "can engagement, volume and take rate compound without losing quality or share": "¿Pueden el engagement, el volumen y la comisión por transacción crecer de forma compuesta sin perder calidad ni cuota?",
+    "can subscriber growth, retention and arpu support durable fcf and reinvestment": "¿Pueden el crecimiento de suscriptores, la retención y el ARPU sostener un FCF duradero y la reinversión?",
+    "can seats, usage, pricing and retention grow faster than compute and go-to-market costs": "¿Pueden los puestos, el uso, los precios y la retención crecer más rápido que los costes de computación y de comercialización?",
+    "can capacity, utilization and pricing earn an acceptable return on heavy investment": "¿Pueden la capacidad, la utilización y los precios dar un retorno aceptable sobre una inversión elevada?",
+    "can the asset base compound nav and cash earnings through disciplined capital allocation": "¿Puede la base de activos aumentar el NAV y los beneficios en caja con una asignación de capital disciplinada?",
+    "can the deposit franchise earn returns above its cost of equity through the credit cycle": "¿Puede la franquicia de depósitos rentar por encima de su coste de capital a lo largo del ciclo de crédito?",
+    "can underwriting discipline and investment returns compound book value above the cost of equity": "¿Pueden la disciplina de suscripción y la rentabilidad de las inversiones aumentar el valor contable por encima del coste de capital?",
+    "can same-store noi and accretive investment outgrow financing and cap-rate pressure": "¿Pueden el NOI en mismos activos y la inversión creadora de valor superar la presión de financiación y de las tasas de capitalización?",
+    "what is the normalized cash return across price, volume, reserves and reinvestment cycles": "¿Cuál es el retorno de caja normalizado a lo largo de los ciclos de precio, volumen, reservas y reinversión?",
+    "can the pipeline or platform reach durable revenue before the cash runway and dilution capacity run out": "¿Puede el pipeline o la plataforma alcanzar ingresos duraderos antes de que se agote la caja y la capacidad de dilución?",
+    "can organic growth, margins and reinvestment compound owner earnings at attractive returns": "¿Pueden el crecimiento orgánico, los márgenes y la reinversión aumentar el beneficio del propietario con retornos atractivos?",
+}
+
+
+def primary_question_es(question: object) -> str:
+    text = str(question or "").strip().rstrip(" .?!")
+    if not text:
+        return "desconocida"
+    es = PRIMARY_QUESTION_ES.get(text.lower())
+    return es.rstrip(" .?!") if es else text
