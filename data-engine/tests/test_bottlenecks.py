@@ -376,6 +376,44 @@ def test_run_endpoint_enqueues_manual_sweep_without_calling_any_model(db, monkey
     assert db.scalars(select(BottleneckSignal)).all() == []
 
 
+def test_discoveries_expose_theme_status_and_last_signal(db):
+    """Un candidato guardado persiste aunque su tema caiga bajo el umbral:
+    la API expone si el tema sigue detectado y la fecha de su ultima senal."""
+    from datetime import date as dt_date
+
+    from app.models import BottleneckDiscovery
+
+    seed(db)
+    refresh_signals(db)
+    db.commit()
+    last_seen = db.scalar(select(BottleneckSignal).where(
+        BottleneckSignal.theme == "Semiconductores")).last_seen
+    db.add_all([
+        # Tema detectado (Semiconductores llega a MIN_SOURCES con el seed).
+        BottleneckDiscovery(theme="Semiconductores", ticker="NVDA", reasoning="h",
+                            evidence_ids=[], model="m", day=dt_date(2026, 10, 9),
+                            created_at=datetime(2026, 10, 9, tzinfo=UTC), n_sources=2),
+        # Tema bajo umbral (Minerales no tiene evidencias en el seed).
+        BottleneckDiscovery(theme="Minerales", ticker="BHP", reasoning="h",
+                            evidence_ids=[], model="m", day=dt_date(2026, 10, 9),
+                            created_at=datetime(2026, 10, 9, tzinfo=UTC), n_sources=0),
+        # Tema sin fila de senal (fuera del universo actual, historico).
+        BottleneckDiscovery(theme="Histórico", ticker="X", reasoning="h",
+                            evidence_ids=[], model="m", day=dt_date(2026, 10, 9),
+                            created_at=datetime(2026, 10, 9, tzinfo=UTC), n_sources=0),
+    ])
+    db.commit()
+    app = FastAPI()
+    app.include_router(router, prefix="/api/bottlenecks")
+    app.dependency_overrides[get_db] = lambda: db
+    with TestClient(app) as client:
+        items = {i["theme"]: i for i in client.get("/api/bottlenecks/discoveries").json()["items"]}
+    assert items["Semiconductores"]["theme_detected"] is True
+    assert items["Semiconductores"]["theme_last_seen"] is not None
+    assert items["Minerales"]["theme_detected"] is False
+    assert items["Histórico"]["theme_detected"] is False
+    assert items["Histórico"]["theme_last_seen"] is None
+
 def test_news_summary_counts_as_evidence_text(db):
     """El carril de noticias analiza tambien el resumen guardado (coste 0):
     la escasez que solo aparece en el cuerpo resumido ya no se pierde."""

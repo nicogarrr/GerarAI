@@ -2809,6 +2809,22 @@
             "title": "Theme",
             "type": "string"
           },
+          "theme_detected": {
+            "title": "Theme Detected",
+            "type": "boolean"
+          },
+          "theme_last_seen": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme Last Seen"
+          },
           "ticker": {
             "title": "Ticker",
             "type": "string"
@@ -2822,7 +2838,9 @@
           "reasoning",
           "evidence",
           "model",
-          "created_at"
+          "created_at",
+          "theme_detected",
+          "theme_last_seen"
         ],
         "title": "DiscoveryOut",
         "type": "object"

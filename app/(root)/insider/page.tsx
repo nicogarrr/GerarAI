@@ -99,15 +99,6 @@ export default async function InsiderPage({ searchParams }: PageProps) {
                 </div>
             </header>
 
-            <details className="rounded-lg border border-gray-800 bg-surface-1 px-4 py-3 text-sm">
-                <summary className="cursor-pointer font-semibold text-gray-300">Metodología · Monitor cada 15 min sobre tu watchlist y cartera</summary>
-                <ul className="mt-3 list-disc space-y-1 pl-5 leading-6 text-gray-400">
-                    <li>Form 4 de EDGAR; compra = código <strong>P</strong> (mercado abierto o privado), venta = código <strong>S</strong>.</li>
-                    <li><em>Cluster buy</em>: 3 o más insiders compran en 30 días. <em>C-suite buy</em> (CEO o CFO). <em>Big buy</em>: más de $1.000.000.</li>
-                    <li>El monitor automático guarda los filings; esta pantalla lee lo guardado.</li>
-                </ul>
-            </details>
-
             <InsiderSignalsView
                 initialTicker={ticker ?? ''}
                 initialResult={signals}

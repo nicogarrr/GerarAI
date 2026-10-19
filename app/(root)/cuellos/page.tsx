@@ -97,6 +97,11 @@ function DiscoveryCard({ item }: { item: DiscoveryView }) {
         <Badge className="border-amber-500/50 text-amber-300" variant="outline">
           {item.label}
         </Badge>
+        {!item.theme_detected ? (
+          <Badge className="border-gray-600 text-gray-400" variant="outline">
+            Tema ya no detectado
+          </Badge>
+        ) : null}
       </div>
       <p className="mt-2 text-sm leading-relaxed text-gray-300">{item.reasoning}</p>
       {item.evidence.length > 0 ? (
@@ -123,7 +128,8 @@ function DiscoveryCard({ item }: { item: DiscoveryView }) {
         </ul>
       ) : null}
       <p className="mt-3 text-[11px] text-gray-500">
-        {formatUserDate(item.created_at)} · modelo {item.model}
+        {formatUserDate(item.created_at)} · modelo {item.model} · última señal del tema:{' '}
+        {item.theme_last_seen ? formatUserDate(item.theme_last_seen) : NA}
       </p>
     </li>
   );

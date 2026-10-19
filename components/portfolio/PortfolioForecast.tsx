@@ -109,6 +109,40 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
       </Panel>
     );
   }
+  const noThesis = forecast.excluded.filter((item) => item.reason_code === 'no_published_thesis');
+  if (portfolio.covered_count === 0 && noThesis.length > 0) {
+    // Solo se afirma "falta la tesis" para las posiciones cuyo motivo es ese
+    // (código de motivo del backend). El resto se declara aparte, sin causa asumida.
+    const heaviest = [...noThesis]
+      .filter((item) => item.weight !== null)
+      .sort((a, b) => (b.weight as number) - (a.weight as number))[0];
+    const others = forecast.excluded.length - noThesis.length;
+    return (
+      <Panel title="Previsión">
+        <p className="text-sm text-gray-200">
+          {heaviest ? (
+            <>
+              Publica la tesis de{' '}
+              <Link
+                href={`/research/${encodeURIComponent(heaviest.ticker)}?view=thesis`}
+                className="font-medium text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+              >
+                {heaviest.ticker}
+              </Link>{' '}
+              ({pct(heaviest.weight)} de la cartera) para activar la previsión.
+            </>
+          ) : (
+            'Publica la tesis de alguna posición para activar la previsión.'
+          )}
+        </p>
+        <p className="mt-1 text-xs text-gray-500">
+          {noThesis.length} de {portfolio.position_count} posiciones sin tesis publicada vigente (un borrador no cuenta)
+          {others > 0 ? `; ${others} sin comparación verificada por otro motivo (ver detalle)` : ''}.
+        </p>
+        {others > 0 ? <ExcludedList items={forecast.excluded.filter((item) => item.reason_code !== 'no_published_thesis')} /> : null}
+      </Panel>
+    );
+  }
   const scenarioOrder = ['bear', 'base', 'bull'] as const;
   return (
     <div className="space-y-6">

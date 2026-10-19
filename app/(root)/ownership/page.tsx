@@ -111,7 +111,6 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
 
             {!managers.length ? (
                 <EmptyState
-                    description="La lista de gestores es una tabla revisada en código; se amplía de forma explícita en cada versión."
                     title="No hay gestores revisados en esta versión"
                 />
             ) : (
@@ -134,6 +133,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">
                             <h2 className="font-semibold text-gray-100">
                                 {ownershipManagerName(activeCik, holdings.manager ?? activeCik)} - informe {reportLabel(holdings.report_date)}
+                                <span className="ml-2 text-xs font-normal text-gray-500">publicado hasta 45 días después</span>
                             </h2>
                             <Badge className="md:ml-auto" variant="outline">
                                 cobertura {holdings.coverage}
@@ -205,6 +205,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">
                             <h2 className="font-semibold text-gray-100">
                                 Cambios trimestre a trimestre ({reportLabel(changes.previous_report)} → {reportLabel(changes.latest_report)})
+                                <span className="ml-2 text-xs font-normal text-gray-500">informes publicados hasta 45 días después de cada cierre</span>
                             </h2>
                             <Badge className="md:ml-auto" variant="outline">
                                 {formatNumber(changes.changes.filter((c) => c.change !== 'unchanged').length, { maximumFractionDigits: 0 })} movimientos

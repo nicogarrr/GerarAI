@@ -5998,6 +5998,10 @@ export interface components {
             reasoning: string;
             /** Theme */
             theme: string;
+            /** Theme Detected */
+            theme_detected: boolean;
+            /** Theme Last Seen */
+            theme_last_seen: string | null;
             /** Ticker */
             ticker: string;
         };
@@ -12129,10 +12133,12 @@ export interface operations {
             };
         };
     };
-    insider_operations_route_api_insider_operations_get: {
+    insider_filings_api_insider_filings_get: {
         parameters: {
-            query?: {
-                days?: number;
+            query: {
+                ticker: string;
+                limit?: number;
+                offset?: number;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -12171,12 +12177,10 @@ export interface operations {
             };
         };
     };
-    insider_filings_api_insider_filings_get: {
+    insider_operations_route_api_insider_operations_get: {
         parameters: {
-            query: {
-                ticker: string;
-                limit?: number;
-                offset?: number;
+            query?: {
+                days?: number;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
