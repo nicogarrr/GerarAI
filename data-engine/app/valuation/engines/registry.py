@@ -57,6 +57,14 @@ def resolve_engine_key(company: Company) -> str:
         return "bank"
     if "insurer" in company_type or "insurance" in company_type:
         return "insurer"
+    # Las altas por watchlist/enriquecimiento dejan company_type en
+    # "research_candidate" y la clasificacion real solo vive en el industry del
+    # proveedor. Un FCFF DCF sobre una aseguradora no tiene sentido (el flujo
+    # operativo incluye float de reservas), asi que el motor correcto es el
+    # insurer, que se niega declarando combined_ratio/roe/g si no estan.
+    industry = (getattr(company, "industry", None) or "").lower()
+    if "insurance" in industry and "broker" not in industry:
+        return "insurer"
     if "reit" in company_type:
         return "reit"
     return "standard_dcf"
