@@ -279,9 +279,9 @@ def test_many_lines_of_one_form4_become_a_single_spanish_alert(monkeypatch):
     big = [a for a in alerts if a["rule"] == "big_buy"]
     assert len(big) == 1
     msg = big[0]["message"]
-    assert "3 operaciones" in msg and "41,59 M US$" in msg
+    assert "3 operaciones" in msg and "$41.59M" in msg
     assert "entre el 18 sep 2026 y el 21 sep 2026" in msg
-    assert "XML" not in msg and "$" not in msg.replace("US$", "")
+    assert "XML" not in msg and "US$" not in msg
     assert big[0]["metadata"]["transactions"] == 3
     # El listado resuelve el emisor por la huella del primer movimiento.
     assert big[0]["metadata"]["tx_fingerprint"] == "fp2"
@@ -298,8 +298,8 @@ def test_different_filings_or_insiders_stay_separate(monkeypatch):
 
 
 def test_spanish_number_and_date_formats():
-    assert insider_alerts._es_num(1390347) == "1.390.347"
-    assert insider_alerts._es_num(76.62, 2) == "76,62"
-    assert insider_alerts._es_money(1_390_347) == "1,39 M US$"
-    assert insider_alerts._es_money(250_000) == "250.000 US$"
+    assert insider_alerts._es_num(1390347) == "1,390,347"
+    assert insider_alerts._es_num(76.62, 2) == "76.62"
+    assert insider_alerts._es_money(1_390_347) == "$1.39M"
+    assert insider_alerts._es_money(250_000) == "$250,000"
     assert insider_alerts._es_date("2026-09-21") == "21 sep 2026"

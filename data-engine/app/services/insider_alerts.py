@@ -100,15 +100,18 @@ _MESES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", 
 
 
 def _es_num(value: float, decimals: int = 0) -> str:
-    """Formato es-ES: miles con punto y decimales con coma."""
-    text = f"{value:,.{decimals}f}"
-    return text.replace(",", "X").replace(".", ",").replace("X", ".")
+    """Numero en formato en-US (miles con coma, decimales con punto).
+
+    Decision de Nico: los importes en USD van siempre en-US con `$`.
+    El nombre se conserva por compatibilidad con los llamadores.
+    """
+    return f"{value:,.{decimals}f}"
 
 
 def _es_money(value: float) -> str:
     if value >= 1_000_000:
-        return f"{_es_num(value / 1_000_000, 2)} M US$"
-    return f"{_es_num(value)} US$"
+        return f"${_es_num(value / 1_000_000, 2)}M"
+    return f"${_es_num(value)}"
 
 
 def _es_date(raw: object) -> str:
@@ -127,12 +130,12 @@ def _purchase_phrase(group: list[InsiderTransaction], total: float) -> str:
     )
     if len(group) == 1:
         t = group[0]
-        detail = f"{_es_num(float(t.shares))} acciones a {_es_num(float(t.price), 2)} US$" if t.shares and t.price else ""
+        detail = f"{_es_num(float(t.shares))} acciones a ${_es_num(float(t.price), 2)}" if t.shares and t.price else ""
         head = f"compró acciones por {_es_money(total)}"
         head += f" ({detail})" if detail else ""
     else:
         shares = sum(float(t.shares) for t in group if t.shares)
-        avg = f", precio medio {_es_num(total / shares, 2)} US$" if shares else ""
+        avg = f", precio medio ${_es_num(total / shares, 2)}" if shares else ""
         head = f"compró acciones en {len(group)} operaciones por {_es_money(total)} en total{avg}"
     return (f"{head}, {when}. Compra declarada en el Formulario 4; puede ser en mercado "
             "abierto o privada.")
