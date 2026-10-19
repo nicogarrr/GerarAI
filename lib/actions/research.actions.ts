@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache';
 import { AppError, ExternalAPIError, ValidationError, getSafeErrorMessage } from '@/lib/types/errors';
 import { sourcesPageInfo } from '@/lib/research/sources-inventory';
 import { researchRequest } from '@/lib/research/client';
-import { paginateAll } from '@/lib/paginate-all';
 import type { components } from '@/lib/research/openapi.generated';
 
 
@@ -19,23 +18,6 @@ type ResearchCompany = {
   factor_tags: string[];
   special_sources: string[];
   special_risks: string[];
-};
-
-type ResearchPortfolioSummary = {
-  total_value: number;
-  equity_value: number;
-  /** Moneda base de la cartera; ausente si el backend no respondió. */
-  base_currency?: string;
-  cash: Record<string, number>;
-  top_1_weight: number;
-  top_5_weight: number;
-  alerts: Array<{
-    severity: string;
-    ticker: string | null;
-    message: string;
-    metric_value: number;
-    threshold: number;
-  }>;
 };
 
 type ResearchWorkflow = {
@@ -710,17 +692,45 @@ async function postForm<T>(path: string, fallback: T, body: FormData): Promise<T
  * ficha. Paginamos hasta recibir una página corta.
  */
 const COMPANIES_PAGE_SIZE = 500;
+// Páginas pedidas a la vez tras la primera. Con ~2.100 fichas y tope 500 el
+// índice eran 5 peticiones EN CADENA (~1 s del render de /research); cada
+// oleada resuelve 4 offsets en paralelo y se detiene en la primera página
+// corta. La guarda adversa de paginateAll (backend que ignora `offset` y
+// repite páginas) se conserva: primera ficha repetida => error, nunca un
+// índice parcial rotulado como completo.
+const COMPANIES_PARALLEL_WAVE = 4;
 
 async function getAllResearchCompanies(): Promise<ResearchCompany[]> {
-  return paginateAll(
-    (offset) =>
-      getJson<ResearchCompany[]>(
-        `/api/companies?limit=${COMPANIES_PAGE_SIZE}&offset=${offset}`,
-        [],
+  const fetchPage = (offset: number) =>
+    getJson<ResearchCompany[]>(
+      `/api/companies?limit=${COMPANIES_PAGE_SIZE}&offset=${offset}`,
+      [],
+    );
+  const first = await fetchPage(0);
+  if (first.length < COMPANIES_PAGE_SIZE) return first;
+  const all: ResearchCompany[] = [...first];
+  const seenFirstTickers = new Set<string>();
+  if (first[0]) seenFirstTickers.add(first[0].ticker);
+  for (let offset = COMPANIES_PAGE_SIZE; ; offset += COMPANIES_PARALLEL_WAVE * COMPANIES_PAGE_SIZE) {
+    const pages = await Promise.all(
+      Array.from({ length: COMPANIES_PARALLEL_WAVE }, (_, i) =>
+        fetchPage(offset + i * COMPANIES_PAGE_SIZE),
       ),
-    COMPANIES_PAGE_SIZE,
-    (company) => company.ticker,
-  );
+    );
+    for (const page of pages) {
+      const firstItem = page[0];
+      if (firstItem !== undefined) {
+        if (seenFirstTickers.has(firstItem.ticker)) {
+          throw new Error(
+            '/api/companies: el backend no avanza con offset (página repetida); índice incompleto',
+          );
+        }
+        seenFirstTickers.add(firstItem.ticker);
+      }
+      all.push(...page);
+      if (page.length < COMPANIES_PAGE_SIZE) return all;
+    }
+  }
 }
 
 export async function getResearchWorkflows(): Promise<ResearchWorkflow[]> {
@@ -752,26 +762,18 @@ export async function getResearchSettings(): Promise<ResearchSettings> {
  * trabajo y latencia regalados en cada visita.
  */
 export async function getResearchDashboard() {
-  const [companies, portfolio, workflows, settings, thesisTickers] = await Promise.all([
+  // Solo lo que el índice materializa: el registro completo y los tickers
+  // con tesis. Antes pedía también /api/portfolio/summary (duplicada: la
+  // página ya la lee para el orden por relevancia), /api/workflows y
+  // /api/settings sin que ninguna tarjeta los usara: latencia y carga de
+  // backend regaladas en cada visita.
+  const [companies, thesisTickers] = await Promise.all([
     getAllResearchCompanies(),
-    getJson<ResearchPortfolioSummary>('/api/portfolio/summary', {
-      total_value: 0,
-      equity_value: 0,
-      cash: {},
-      top_1_weight: 0,
-      top_5_weight: 0,
-      alerts: [],
-    }),
-    getResearchWorkflows(),
-    getResearchSettings(),
     getResearchThesisTickers(),
   ]);
 
   return {
     companies,
-    portfolio,
-    workflows,
-    settings,
     thesisTickers,
   };
 }
