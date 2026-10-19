@@ -77,8 +77,11 @@ def test_company_and_portfolio_chat_expose_cited_doctrine_only(db, monkeypatch):
     monkeypatch.setenv("CAVAAI_ENABLE_VECTOR_CHAT", "1")
     monkeypatch.setattr(RAGIndex, "search", lambda *a, **k: hits(chunk))
     service = ChatService()
+    # Guarda intencional anti-ruido: una pregunta de ficha sin cue de doctrina no cita la biblioteca.
+    plain = service._deterministic_answer(session, "Explain capital allocation", "company", company.ticker)
+    assert not any(s["type"] == "knowledge_chunk" for s in plain.sources)
     for scope, ticker in (("company", company.ticker), ("portfolio", None)):
-        response = service._deterministic_answer(session, "Explain capital allocation", scope, ticker)
+        response = service._deterministic_answer(session, "Explain Buffett capital allocation doctrine", scope, ticker)
         source = next(s for s in response.sources if s["type"] == "knowledge_chunk")
         assert source["id"] == chunk.id
         section = next(s for s in response.sections if s.key == "inferences")
