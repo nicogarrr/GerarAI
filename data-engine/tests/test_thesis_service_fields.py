@@ -187,7 +187,7 @@ def test_card_summary_partial_es_indicativo():
     service = ThesisService()
     valuation = {"status": "partial", "missing_inputs": ["beta"], "trace": {"engine": "dcf_v2"}}
     text = service._card_summary(_company(), valuation, "hipotesis")
-    assert text.startswith("hipotesis Valoración parcial-indicativa")
+    assert text.startswith("hipotesis Faltan")
     assert "beta" in text
 
 
@@ -341,8 +341,8 @@ def test_card_summary_partial_keeps_hypothesis_plus_caveat():
     valuation = {"status": "partial", "missing_inputs": ["shares_diluted"]}
     summary = service._card_summary(_company(), valuation, "Hipotesis X.")
     assert summary.startswith("Hipotesis X.")
-    assert "parcial-indicativa" in summary
-    assert "shares_diluted" in summary
+    # La etiqueta de indicativa la lleva la hipotesis; aqui queda la lista.
+    assert "Faltan shares_diluted" in summary
 
 
 # -- fingerprint: las noticias nuevas son evidencia material -------------------------

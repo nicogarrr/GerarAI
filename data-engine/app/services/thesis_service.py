@@ -814,15 +814,21 @@ class ThesisService:
         # esta un ~215% por encima.
         ref_label, ref_value = margin_of_safety_reference(valuation) or ("escenario base", base)
         ref_text = _thesis_money(float(ref_value), currency)
+        # B6: la cifra es la salida real del modelo y se mantiene, pero cuando
+        # la valoracion no es publicable (status "partial" o publishable False)
+        # la frase viaja sola a memo, tarjeta y chat: sin la etiqueta aqui, un
+        # -95 % construido sobre supuestos se leia como conclusion firme.
+        indicative = valuation.get("status") == "partial" or valuation.get("publishable") is False
+        prefix = "Valoración indicativa sobre supuestos: " if indicative else ""
         if mos >= 0:
             return (
-                f"A {price_text}, {company.name} cotiza con un margen de seguridad "
+                f"{prefix}A {price_text}, {company.name} cotiza con un margen de seguridad "
                 f"del {_thesis_percent(mos)} respecto al {ref_label} ({ref_text}). Hipótesis: "
                 f"los fundamentales modelados son alcanzables y el mercado corrige "
                 f"ese descuento.{growth_txt}"
             )
         return (
-            f"A {price_text}, {company.name} cotiza con un margen de seguridad "
+            f"{prefix}A {price_text}, {company.name} cotiza con un margen de seguridad "
             f"del {_thesis_percent(mos)} respecto al {ref_label} ({ref_text}). Hipótesis: "
             f"el precio descuenta más de lo que los fundamentales modelados "
             f"soportan.{growth_txt}"
@@ -976,10 +982,7 @@ class ThesisService:
             )
         elif valuation.get("status") == "partial":
             missing = ", ".join(valuation.get("missing_inputs") or []) or "algunos inputs"
-            base = (
-                f"{hypothesis} Valoración parcial-indicativa: "
-                f"faltan {missing} (ver sección 13 del memo)."
-            )
+            base = f"{hypothesis} Faltan {missing} (ver sección 13 del memo)."
         else:
             base = hypothesis
 
