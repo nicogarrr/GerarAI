@@ -590,7 +590,7 @@ class ChatSynthesisService:
                     ),
                     metadata={
                         "prompt_version": PROMPT_VERSION,
-                        **get_prompt("chat_source_synthesis").trace_metadata(),
+                        **get_prompt("chat_source_synthesis", allow_remote=False).trace_metadata(),
                     },
                 )
                 spent = {"cost": 0.0}
