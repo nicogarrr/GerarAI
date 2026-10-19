@@ -267,7 +267,7 @@ class PortfolioIntelligenceService:
             else None
         )
         xirr, xirr_trace = self._xirr(db, rows)
-        correlations = self._correlations(returns, rows)
+        correlations, correlation_observations = self._correlations(returns, rows)
         beta, beta_trace = self._beta(db, portfolio_returns, cutoff)
         benchmark = self._benchmark_comparison(db, portfolio_returns, cutoff)
         exposures = self._exposures(rows, total_value, base_values)
@@ -318,6 +318,8 @@ class PortfolioIntelligenceService:
                 "beta": beta,
                 "beta_trace": beta_trace,
                 "correlations": correlations,
+                "correlation_observations": correlation_observations,
+                "correlation_min_observations": PortfolioIntelligenceService.MIN_CORRELATION_OBSERVATIONS,
             },
             "concentration": {
                 "top_1": max(weights.values(), default=0),
@@ -643,20 +645,31 @@ class PortfolioIntelligenceService:
             "ambiguous_cash_excluded": ambiguous_cash_excluded,
         }
 
-    @staticmethod
+    # Pearson con muy pocas sesiones compartidas es ruido con aspecto de
+    # medida (con n~14 salen -0,5 por azar). Se exige un minimo de
+    # observaciones solapadas, alineado con el de _beta, y el conteo se
+    # publica para que la UI pueda explicar cada N/D.
+    MIN_CORRELATION_OBSERVATIONS = 20
+
+    @classmethod
     def _correlations(
+        cls,
         returns: dict[int, dict[date, float]], rows: list[tuple[Position, Company]]
-    ) -> dict[str, dict[str, float | None]]:
+    ) -> tuple[dict[str, dict[str, float | None]], dict[str, dict[str, int]]]:
         result: dict[str, dict[str, float | None]] = {}
+        observations: dict[str, dict[str, int]] = {}
         for _, left_company in rows:
             result[left_company.ticker] = {}
+            observations[left_company.ticker] = {}
             for _, right_company in rows:
                 left = returns.get(left_company.id, {})
                 right = returns.get(right_company.id, {})
                 dates = sorted(left.keys() & right.keys())
+                observations[left_company.ticker][right_company.ticker] = len(dates)
                 if left_company.id == right_company.id and dates:
-                    correlation = 1.0
-                elif len(dates) < 3:
+                    correlation: float | None = 1.0
+                elif len(dates) < cls.MIN_CORRELATION_OBSERVATIONS:
+                    # Historico insuficiente: N/D, no un coeficiente de ruido.
                     correlation = None
                 else:
                     xs, ys = [left[day] for day in dates], [right[day] for day in dates]
@@ -668,7 +681,7 @@ class PortfolioIntelligenceService:
                     )
                     correlation = numerator / denominator if denominator else None
                 result[left_company.ticker][right_company.ticker] = correlation
-        return result
+        return result, observations
 
     @staticmethod
     def _beta(

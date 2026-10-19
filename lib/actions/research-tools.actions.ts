@@ -273,6 +273,8 @@ export type PortfolioIntelligence = {
     beta: number | null;
     beta_trace: Record<string, unknown>;
     correlations: Record<string, Record<string, number | null>>;
+    correlation_observations: Record<string, Record<string, number>>;
+    correlation_min_observations: number;
   };
   concentration: { top_1: number; top_5: number; herfindahl: number; weights: Record<string, number> };
   exposures: Record<'sectors' | 'countries' | 'currencies' | 'factors', Record<string, number>>;

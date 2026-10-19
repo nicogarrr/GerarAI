@@ -198,3 +198,43 @@ def test_trailing_spot_rows_use_close_but_interior_gaps_stay_empty():
     assert [r.adj_close for r in filled] == [D("10"), None, D("12"), D("13"), D("14")]
     assert S._returns(filled) == {date(2026, 1, 4): pytest.approx(13 / 12 - 1), date(2026, 1, 5): pytest.approx(14 / 13 - 1)}
     assert S._fill_trailing_spot([row(1, "10", None)])[0].adj_close is None
+
+
+def _ns(**kwargs):
+    return SimpleNamespace(**kwargs)
+
+
+def _daily_returns(start: date, days: int, step: float = 0.001):
+    return {start + timedelta(days=i): step * (1 if i % 2 == 0 else -1) for i in range(days)}
+
+
+def test_correlations_below_min_observations_is_none_with_count():
+    service = PortfolioIntelligenceService
+    start = date(2026, 1, 5)
+    left_company = _ns(id=1, ticker="AAA")
+    right_company = _ns(id=2, ticker="BBB")
+    rows = [(_ns(), left_company), (_ns(), right_company)]
+    # 19 sesiones compartidas: por debajo del mínimo, el coeficiente sería ruido.
+    returns = {
+        1: _daily_returns(start, 19),
+        2: _daily_returns(start, 19, step=0.002),
+    }
+    matrix, observations = service._correlations(returns, rows)
+    assert matrix["AAA"]["BBB"] is None
+    assert matrix["BBB"]["AAA"] is None
+    assert observations["AAA"]["BBB"] == 19
+    assert matrix["AAA"]["AAA"] == 1.0
+
+
+def test_correlations_at_min_observations_is_computed():
+    service = PortfolioIntelligenceService
+    start = date(2026, 1, 5)
+    left_company = _ns(id=1, ticker="AAA")
+    right_company = _ns(id=2, ticker="BBB")
+    rows = [(_ns(), left_company), (_ns(), right_company)]
+    shared = service.MIN_CORRELATION_OBSERVATIONS
+    identical = _daily_returns(start, shared)
+    returns = {1: dict(identical), 2: dict(identical)}
+    matrix, observations = service._correlations(returns, rows)
+    assert matrix["AAA"]["BBB"] == pytest.approx(1.0)
+    assert observations["AAA"]["BBB"] == shared
