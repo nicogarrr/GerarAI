@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 
 import BackendOffline from '@/components/system/BackendOffline';
+import { ThemeBrainButton } from './_components/ThemeBrainButton';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getMarketThemes } from '@/lib/actions/market-themes.actions';
 import { NA, formatMarketDate, formatPercent } from '@/lib/format';
@@ -48,6 +49,10 @@ function ThemeCard({ theme, order }: { theme: MarketTheme; order: ThemeOrder }) 
   const badge = themeBadge(theme, order);
   const first = order === 'ytd' ? theme.ytd : theme.m1;
   const firstLabel = order === 'ytd' ? 'YTD' : '1M';
+  const metrics: string[] = [];
+  if (theme.ytd.pct !== null) metrics.push(`YTD ${pct(theme.ytd.pct)}`);
+  if (theme.m1.pct !== null) metrics.push(`1M ${pct(theme.m1.pct)}`);
+  const brainQuestion = `Analiza el tema ${theme.name}${metrics.length > 0 ? ` (${metrics.join(', ')}, media simple de ${theme.n_total} valores)` : ''}: qué lo está moviendo, qué empresas de la cesta destacan y qué vigilarías.`;
   const rows = [...theme.constituents].sort(
     (x, y) =>
       ((order === 'ytd' ? y.ytd : y.m1) ?? -Infinity) - ((order === 'ytd' ? x.ytd : x.m1) ?? -Infinity),
@@ -97,7 +102,7 @@ function ThemeCard({ theme, order }: { theme: MarketTheme; order: ThemeOrder }) 
                 <th className="py-1 pr-2 font-medium" scope="col">Valor</th>
                 <th className="px-2 py-1 text-right font-medium" scope="col">Peso</th>
                 <th className="px-2 py-1 text-right font-medium" scope="col">{firstLabel}</th>
-                <th className="px-2 py-1 text-right font-medium" scope="col">Aporta</th>
+                <th className="hidden px-2 py-1 text-right font-medium sm:table-cell" scope="col">Aporta</th>
                 <th className="py-1 pl-2 text-right font-medium" scope="col">{order === 'ytd' ? '1M' : 'YTD'}</th>
               </tr>
             </thead>
@@ -113,12 +118,17 @@ function ThemeCard({ theme, order }: { theme: MarketTheme; order: ThemeOrder }) 
                       <Link className="text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>
                         {row.ticker}
                       </Link>
+                      {row.reason ? (
+                        <span className="mt-0.5 block max-w-[11rem] text-[11px] font-normal leading-4 text-gray-500">
+                          {row.reason}
+                        </span>
+                      ) : null}
                     </th>
                     <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">
                       {weight === null ? NA : formatPercent(weight, { fromRatio: false, digits: 1 })}
                     </td>
                     <td className={`px-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(v1)]}`}>{pct(v1)}</td>
-                    <td className={`px-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(contribution)]}`}>
+                    <td className={`hidden px-2 py-1.5 text-right tabular-nums sm:table-cell ${TONE_TEXT[themeTone(contribution)]}`}>
                       {contribution === null ? NA : formatPercent(contribution, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                     </td>
                     <td className={`pl-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(v2)]}`}>{pct(v2)}</td>
@@ -127,6 +137,7 @@ function ThemeCard({ theme, order }: { theme: MarketTheme; order: ThemeOrder }) 
               })}
             </tbody>
           </table>
+          <ThemeBrainButton question={brainQuestion} />
         </div>
       </details>
     </li>

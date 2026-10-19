@@ -8,7 +8,8 @@ un indice) y solo hay cierre diario.
 
 Honestidad de los datos: un valor sin cierre del año anterior (YTD) o sin cierre de hace
 un mes (1M) no cuenta para esa metrica; un tema solo publica una metrica si al menos el
-70 % de sus valores la tiene. Nunca se rellena un hueco con un cero.
+70 % de sus valores la tiene. Nunca se rellena un hueco con un cero. Cada valor lleva ademas su razon de
+estar en la cesta (REASONS), un hecho verificable sobre su negocio.
 """
 
 from __future__ import annotations
@@ -163,6 +164,242 @@ BASKETS: list[dict] = [
     },
 ]
 
+
+# Por que cada valor esta en su cesta: hechos verificables sobre su negocio, en
+# espanol y cortos. Cobertura obligatoria (lo exige el test de justificacion):
+# anadir un ticker sin su razon rompe los tests.
+REASONS: dict[str, dict[str, str]] = {
+    "semiconductores": {
+        "NVDA": "GPU dominantes para entrenar IA",
+        "AMD": "CPU EPYC y GPU Instinct",
+        "AVGO": "Redes y ASICs a medida",
+        "TSM": "Fabrica los chips de NVDA y Apple",
+        "MU": "Memoria DRAM y HBM para IA",
+        "INTC": "CPU x86 y fabricas propias",
+        "QCOM": "SoC Snapdragon y modems 5G",
+        "AMAT": "Equipos para fabricar chips",
+        "LRCX": "Equipos de grabado para fabs",
+        "KLAC": "Inspeccion y control de obleas",
+        "ASML": "Unico proveedor de litografia EUV",
+        "ARM": "Arquitectura de casi todo movil",
+    },
+    "cuantica": {
+        "IONQ": "Ordenadores cuanticos de iones",
+        "RGTI": "Chips cuanticos superconductores",
+        "QBTS": "Recocido cuantico (annealing)",
+        "QUBT": "Fotonica y computacion cuantica",
+        "ARQQ": "Cifrado resistente a cuantica",
+        "IBM": "Linea IBM Quantum",
+        "GOOGL": "Chip cuantico Willow (Alphabet)",
+        "HON": "Quantinuum, su filial cuantica",
+    },
+    "ia": {
+        "MSFT": "Copilot y Azure OpenAI",
+        "GOOGL": "Gemini, DeepMind y chips TPU",
+        "META": "Llama abierto e IA en sus apps",
+        "AMZN": "AWS Bedrock y chips Trainium",
+        "PLTR": "Plataforma de IA para empresas",
+        "AI": "Software empresarial de IA (C3)",
+        "PATH": "Automatizacion con IA (RPA)",
+        "SOUN": "IA de voz para comercios",
+        "ORCL": "Nube OCI para entrenar IA",
+        "ADBE": "Firefly: IA generativa en diseno",
+        "NOW": "IA en flujos de trabajo (Now Assist)",
+        "TSLA": "Conduccion autonoma y robot Optimus",
+    },
+    "centros-de-datos": {
+        "EQIX": "REIT de centros neutros de datos",
+        "DLR": "REIT de grandes centros de datos",
+        "IRM": "REIT de datos y almacenaje",
+        "VRT": "Refrigeracion y energia para racks",
+        "SMCI": "Servidores a medida para IA",
+        "DELL": "Servidores y almacenamiento IA",
+        "ANET": "Redes de centros de datos (Arista)",
+        "CRWV": "Nube de GPU para IA (CoreWeave)",
+        "NBIS": "Nube de IA (Nebius)",
+        "APLD": "Construye campus de datos para IA",
+        "CORZ": "Mineria BTC reconvertida a IA",
+        "CIFR": "Mineria BTC y campus de IA",
+    },
+    "ciberseguridad": {
+        "CRWD": "EDR en la nube (Falcon)",
+        "PANW": "Cortafuegos y plataforma Cortex",
+        "FTNT": "Cortafuegos FortiGate",
+        "ZS": "Zero Trust en la nube",
+        "S": "EDR autonomo (SentinelOne)",
+        "OKTA": "Identidad y accesos (IAM)",
+        "NET": "CDN y seguridad de red",
+        "QLYS": "Gestion de vulnerabilidades",
+        "TENB": "Escaner Nessus (Tenable)",
+        "RPD": "Deteccion y respuesta (InsightIDR)",
+        "CHKP": "Cortafuegos Check Point",
+    },
+    "salud": {
+        "ISRG": "Robot quirurgico da Vinci",
+        "DXCM": "Monitores continuos de glucosa",
+        "VRTX": "Medicamentos para fibrosis quistica",
+        "REGN": "Eylea y anticuerpos (Dupixent)",
+        "MRNA": "Vacunas de ARNm",
+        "CRSP": "Edicion genetica CRISPR",
+        "NTLA": "CRISPR dentro del cuerpo",
+        "BEAM": "Edicion de bases del ADN",
+        "TMO": "Instrumental y reactivos de laboratorio",
+        "ILMN": "Secuenciacion de ADN",
+        "ALNY": "ARN de interferencia (RNAi)",
+    },
+    "cloud-saas": {
+        "CRM": "CRM numero 1 en la nube",
+        "NOW": "Flujos de trabajo TI (ServiceNow)",
+        "SNOW": "Almacen de datos en la nube",
+        "DDOG": "Observabilidad en la nube",
+        "MDB": "Base de datos MongoDB Atlas",
+        "WDAY": "RRHH y finanzas en la nube",
+        "TEAM": "Jira y Confluence (Atlassian)",
+        "HUBS": "Marketing y CRM para pymes",
+        "SHOP": "Comercio electronico (tiendas)",
+        "ADBE": "Creative Cloud por suscripcion",
+        "TWLO": "APIs de mensajeria y voz",
+        "ZM": "Videollamadas y suite Zoom",
+    },
+    "robotica": {
+        "ROK": "Automatizacion industrial (Rockwell)",
+        "TER": "Pruebas y cobots (Universal Robots)",
+        "ZBRA": "Escaneres y robots de almacen",
+        "CGNX": "Vision artificial industrial",
+        "EMR": "Automatizacion industrial (Emerson)",
+        "SYM": "Robots de almacen (cliente: Walmart)",
+        "ISRG": "Cirugia robotica da Vinci",
+        "FANUY": "Robots industriales (Fanuc)",
+        "ABBNY": "Robotica y automatizacion (ABB)",
+        "SERV": "Robots de reparto (Serve)",
+    },
+    "infraestructuras": {
+        "PWR": "Ingenieria electrica y de redes (Quanta)",
+        "EME": "Instalaciones mecanicas y electricas (EMCOR)",
+        "FIX": "Instalaciones mecanicas (Comfort Systems)",
+        "VMC": "Aridos y cemento (Vulcan)",
+        "MLM": "Aridos (Martin Marietta)",
+        "CAT": "Maquinaria de construccion",
+        "URI": "Alquiler de maquinaria (United Rentals)",
+        "J": "Ingenieria y consultoria (Jacobs)",
+        "ACM": "Consultoria de infraestructuras (AECOM)",
+        "STRL": "Construccion civil (Sterling)",
+        "MTZ": "Infraestructura energetica (MasTec)",
+        "DY": "Cableado de telecomunicaciones (Dycom)",
+    },
+    "defensa": {
+        "LMT": "F-35 y misiles (Lockheed Martin)",
+        "RTX": "Motores y misiles (Raytheon)",
+        "NOC": "Bombardero B-21 y sistemas no tripulados",
+        "GD": "Tanques y submarinos (General Dynamics)",
+        "LHX": "Comunicaciones tactica militares (L3Harris)",
+        "BA": "Aviones comerciales y defensa",
+        "HII": "Portaaviones y submarinos (HII)",
+        "KTOS": "Drones militares y blancos aereos",
+        "AVAV": "Drones tacticos (Switchblade)",
+        "RKLB": "Lanzaderas y satelites (Rocket Lab)",
+        "TDG": "Componentes aeronauticos (TransDigm)",
+        "HWM": "Componentes aeroespaciales (Howmet)",
+    },
+    "materiales": {
+        "MP": "Tierras raras (Mountain Pass)",
+        "FCX": "Cobre (Freeport-McMoRan)",
+        "ALB": "Litio (Albemarle)",
+        "LAC": "Litio (Thacker Pass)",
+        "SQM": "Litio y yodo (Chile)",
+        "UUUU": "Uranio y tierras raras (Energy Fuels)",
+        "TECK": "Cobre y zinc (Teck)",
+        "SCCO": "Cobre (Southern Copper)",
+        "NEM": "Oro (Newmont)",
+        "CCJ": "Uranio (Cameco)",
+        "USAR": "Imanes de tierras raras (USA Rare Earth)",
+    },
+    "adtech": {
+        "TTD": "Compra programatica (The Trade Desk)",
+        "APP": "Monetizacion de apps (AppLovin)",
+        "META": "Publicidad en Instagram y Facebook",
+        "GOOGL": "Publicidad en busqueda y YouTube",
+        "PUBM": "Sell-side para publishers",
+        "MGNI": "Sell-side (Magnite)",
+        "DV": "Verificacion publicitaria (DoubleVerify)",
+        "CRTO": "Retargeting (Criteo)",
+        "PINS": "Publicidad en Pinterest",
+        "RDDT": "Publicidad en Reddit",
+        "ZETA": "Marketing con IA (Zeta)",
+    },
+    "utilities": {
+        "NEE": "Renovables y Florida Power & Light",
+        "DUK": "Electrica regulada (Duke, Carolinas)",
+        "SO": "Electrica regulada (Southern, Georgia)",
+        "D": "Electrica regulada (Dominion)",
+        "AEP": "Red y generacion (Ohio-Texas)",
+        "VST": "Generacion y nuclear (Vistra)",
+        "CEG": "Nuclear (Constellation)",
+        "NRG": "Generacion y retail (Texas)",
+        "XEL": "Electrica regulada (Xcel)",
+        "SRE": "Gas y electricidad (Sempra)",
+        "PCG": "Electrica de California (PG&E)",
+        "EXC": "Redes reguladas (Exelon)",
+    },
+    "espacio": {
+        "RKLB": "Cohetes Electron y Neutron",
+        "ASTS": "Banda ancha directa al movil",
+        "LUNR": "Modulos lunares (Intuitive Machines)",
+        "PL": "Imagenes diarias de la Tierra (Planet)",
+        "RDW": "Satelites y componentes (Redwire)",
+        "SPCE": "Vuelos suborbitales (Virgin Galactic)",
+        "BKSY": "Imagenes de alta resolucion (BlackSky)",
+        "VSAT": "Banda ancha por satelite (Viasat)",
+        "IRDM": "Constelacion de comunicaciones (Iridium)",
+        "GSAT": "Satelite para iPhone (Globalstar)",
+        "MNTS": "Propulsion y buses de satelite (Momentus)",
+    },
+    "drones": {
+        "AVAV": "Switchblade y drones tacticales",
+        "KTOS": "Drones de combate (XQ-58 Valkyrie)",
+        "RCAT": "Drones militares (Red Cat)",
+        "UMAC": "Componentes para drones (Unusual Machines)",
+        "ONDS": "Redes y drones (Ondas)",
+        "ACHR": "Taxi aereo electrico (eVTOL Midnight)",
+        "JOBY": "Taxi aereo electrico (Joby)",
+        "DPRO": "Drones comerciales (Draganfly)",
+        "AIRO": "Drones militares y avionica (AIRO)",
+        "PDYN": "Software de control de drones (Palladyne)",
+    },
+    "fintech": {
+        "XYZ": "Block: Cash App y Square",
+        "PYPL": "Pagos en linea (PayPal)",
+        "AFRM": "Compra ahora, paga despues (Affirm)",
+        "SOFI": "Banco digital (SoFi)",
+        "HOOD": "Broker sin comisiones (Robinhood)",
+        "COIN": "Exchange de cripto (Coinbase)",
+        "UPST": "Prestamos con IA (Upstart)",
+        "TOST": "TPV y pagos para restaurantes (Toast)",
+        "NU": "Neobanco latinoamericano (Nubank)",
+        "FOUR": "Pagos integrados (Shift4)",
+    },
+    "nuclear": {
+        "CEG": "Mayor operador nuclear de EE. UU.",
+        "VST": "Nuclear y gas (Vistra)",
+        "OKLO": "Microrreactores (Oklo)",
+        "SMR": "Diseno SMR (NuScale)",
+        "NNE": "Microreactor portatil (Nano Nuclear)",
+        "LEU": "Enriquecimiento HALEU (Centrus)",
+        "CCJ": "Uranio (Cameco)",
+        "BWXT": "Combustible nuclear naval (BWX)",
+        "UEC": "Mineria de uranio (Uranium Energy)",
+        "NXE": "Proyecto de uranio Rook I (NexGen)",
+        "DNN": "Uranio en Canada (Denison)",
+        "GEV": "Turbinas y SMR BWRX-300 (GE Vernova)",
+    },
+}
+
+
+def basket_reason(basket: dict, ticker: str) -> str | None:
+    """Justificacion curada del ticker en su cesta; None si el llamador usa una
+    cesta propia sin razones (tests)."""
+    return REASONS.get(str(basket.get("id")), {}).get(ticker)
+
 # Cobertura minima para publicar una metrica de un tema.
 MIN_COVERAGE = 0.7
 # Un valor cuyo ultimo cierre va mas de 7 dias por detras de la sesion mas reciente
@@ -308,7 +545,14 @@ def compute_themes(
         rows = []
         for ticker in basket["tickers"]:
             r = per_symbol[ticker]
-            rows.append({"ticker": ticker, "ytd": _round(r["ytd"]), "m1": _round(r["m1"])})
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "ytd": _round(r["ytd"]),
+                    "m1": _round(r["m1"]),
+                    "reason": basket_reason(basket, ticker),
+                }
+            )
         ytd_values = [per_symbol[t]["ytd"] for t in basket["tickers"] if per_symbol[t]["ytd"] is not None]
         m1_values = [per_symbol[t]["m1"] for t in basket["tickers"] if per_symbol[t]["m1"] is not None]
         ytd = _mean(ytd_values) if len(ytd_values) >= needed else None

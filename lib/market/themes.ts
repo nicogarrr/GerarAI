@@ -7,7 +7,13 @@
  */
 
 export type ThemeMetric = { pct: number | null; n: number };
-export type ThemeConstituent = { ticker: string; ytd: number | null; m1: number | null };
+export type ThemeConstituent = {
+  ticker: string;
+  ytd: number | null;
+  m1: number | null;
+  /** Por qué está en la cesta (hecho verificable, curado en el backend). */
+  reason?: string | null;
+};
 export type ThemeTurn = 'sube' | 'baja' | null;
 
 export type MarketTheme = {
