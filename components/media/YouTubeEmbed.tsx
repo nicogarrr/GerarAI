@@ -24,13 +24,13 @@ export function YouTubeEmbed({ videoId, title }: { videoId: string; title: strin
             ) : (
                 <button
                     aria-label={`Reproducir: ${title}`}
-                    className="group absolute inset-0 size-full focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-lime-300"
+                    className="group absolute inset-0 size-full focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-teal-300"
                     onClick={() => setLoaded(true)}
                     type="button"
                 >
                     <Image alt="" className="object-cover" fill sizes="(max-width: 640px) 100vw, 448px" src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`} />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/35">
-                        <span className="flex size-12 items-center justify-center rounded-full bg-lime-300 text-gray-950">
+                        <span className="flex size-12 items-center justify-center rounded-full bg-teal-300 text-gray-950">
                             <Play aria-hidden="true" className="size-5" fill="currentColor" />
                         </span>
                     </span>

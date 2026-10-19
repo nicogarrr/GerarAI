@@ -134,7 +134,7 @@ export default async function InvestorPage({
         {VIEWS.map((item) => (
           <Link
             aria-current={item.id === view ? "page" : undefined}
-            className={`-mb-px border-b-2 pb-3 text-sm ${item.id === view ? "border-lime-300 text-gray-100" : "border-transparent text-gray-500 hover:text-gray-300"}`}
+            className={`-mb-px border-b-2 pb-3 text-sm ${item.id === view ? "border-teal-300 text-gray-100" : "border-transparent text-gray-500 hover:text-gray-300"}`}
             href={`/inversores/${investor.slug}?vista=${item.id}`}
             key={item.id}
             scroll={false}

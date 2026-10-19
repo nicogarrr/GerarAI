@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 };
 
 const PAGE_SIZE = 12;
-const LINK = 'text-sm text-lime-300 hover:underline';
+const LINK = 'text-sm text-teal-300 hover:underline';
 
 type PageProps = {
     searchParams: Promise<{ autor?: string; pagina?: string }>;
@@ -64,7 +64,7 @@ export default async function LettersPage({ searchParams }: PageProps) {
                                 <Link
                                     aria-current={group.key === selected.key ? 'page' : undefined}
                                     className={`flex h-full flex-col gap-1 rounded-2xl border bg-surface-1 p-4 transition-colors hover:border-gray-700 ${
-                                        group.key === selected.key ? 'border-lime-300/60' : 'border-gray-800'
+                                        group.key === selected.key ? 'border-teal-300/60' : 'border-gray-800'
                                     }`}
                                     href={`/inversores/cartas?autor=${group.key}`}
                                 >

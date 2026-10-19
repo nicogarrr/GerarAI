@@ -158,16 +158,16 @@ test('sectionForRoute se deriva del catálogo: sin listas de rutas paralelas', (
     assert.ok(!fn.includes("'/"), 'sectionForRoute no debe listar rutas a mano');
 });
 
-test('SectionNav se deriva del catálogo y cede /inversores a su HubNav', () => {
+test('SectionNav se deriva del catálogo y se muestra también en /inversores, /insider y /ownership', () => {
     const nav = readFileSync('components/layout/SectionNav.tsx', 'utf8');
     assert.match(nav, /flattenNavItems/);
-    // Sin mapa de grupos hardcodeado: los únicos literales permitidos son los
-    // dos huecos documentados (/discover portada, /inversores con HubNav).
+    // Sin mapa de grupos hardcodeado: el único literal permitido es la portada /discover.
     const literals = [...nav.matchAll(/'(\/[^']*)'/g)].map((m) => m[1]).filter((l) => l.startsWith('/'));
-    assert.deepEqual([...new Set(literals)].sort(), ['/discover', '/insider', '/inversores', '/ownership']);
-    assert.match(nav, /startsWith\('\/inversores'\)/);
-    assert.match(nav, /startsWith\('\/insider'\)/);
-    assert.match(nav, /startsWith\('\/ownership'\)/);
+    assert.deepEqual([...new Set(literals)].sort(), ['/discover']);
+    // El HubNav de Inversores es una segunda fila solo de sus subsecciones (sin 13F ni Insiders repetidos).
+    const hub = readFileSync('app/(root)/inversores/_components/HubNav.tsx', 'utf8');
+    assert.ok(!hub.includes('"/ownership"') && !hub.includes('"/insider"'));
+    assert.ok(!hub.includes('lime-'));
 });
 
 test('/discover se deriva del catálogo: sin lista de tarjetas paralela', () => {
