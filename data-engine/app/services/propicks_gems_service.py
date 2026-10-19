@@ -23,6 +23,7 @@ from app.models import (
     MarketPrice,
 )
 from app.models.entities import InstrumentReference, ManagerHolding
+from app.services.display_es import fecha_es
 from app.services.propicks_funnel_service import FunnelResult
 
 MIN_MARKET_CAP = 3e8        # below this liquidity/quality of data is poor
@@ -72,6 +73,18 @@ def _clip(x: float) -> float:
     return max(0.0, min(1.0, x))
 
 
+def _periodo_es(period: str | None) -> str:
+    # Periodo SEC legible: «2025-12-31:FY» -> «FY2025». Cualquier otra forma
+    # («FY2025», trimestres, vacio) se muestra tal cual: nunca se reinterpreta.
+    if not period:
+        return "FY"
+    if ":" in period:
+        end, _, fp = period.partition(":")
+        if end[:4].isdigit() and fp:
+            return f"{fp}{end[:4]}"
+    return period
+
+
 def score_gem(g: GemInputs) -> Gem | None:
     """Return a Gem or None when the company does not qualify."""
     if g.market_cap is None or not (MIN_MARKET_CAP <= g.market_cap <= MAX_MARKET_CAP):
@@ -83,7 +96,7 @@ def score_gem(g: GemInputs) -> Gem | None:
         {
             "key": "fcf_yield",
             "value": g.fcf_yield,
-            "source": f"SEC {g.fcf_period or 'FY'} + precio {g.price_date}",
+            "source": f"SEC {_periodo_es(g.fcf_period)} + precio {fecha_es(g.price_date) if g.price_date else 'sin fecha'}",
         }
     ]
     if g.roic_spread is not None:
@@ -96,7 +109,7 @@ def score_gem(g: GemInputs) -> Gem | None:
         parts["insiders"] = _clip(g.insider_net_usd / INSIDER_FULL_USD)
         if g.insider_net_usd > 0:
             reasons.append(
-                {"key": "insider_net_buy_usd", "value": g.insider_net_usd, "source": f"SEC Form 4, {INSIDER_WINDOW_DAYS} dias"}
+                {"key": "insider_net_buy_usd", "value": g.insider_net_usd, "source": f"SEC Form 4, {INSIDER_WINDOW_DAYS} días"}
             )
     if g.managers_adding is not None:
         parts["smart_money"] = _clip(g.managers_adding / SMART_MONEY_FULL)
@@ -105,7 +118,7 @@ def score_gem(g: GemInputs) -> Gem | None:
                 {
                     "key": "managers_adding_13f",
                     "value": g.managers_adding,
-                    "source": f"SEC 13F, trimestre {g.thirteenf_report} (retraso hasta 45 días; solo largos)",
+                    "source": f"SEC 13F, trimestre a {fecha_es(g.thirteenf_report) if g.thirteenf_report else 'sin fecha'} (retraso hasta 45 días; solo largos)",
                 }
             )
     total_w = sum(GEM_WEIGHTS[k] for k in parts)

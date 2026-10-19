@@ -23,6 +23,11 @@ export function gemReasonValue(reason: GemReason): string {
       return `${new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(reason.value)}x`;
     case 'insider_net_buy_usd':
       return formatMarketCapUsd(reason.value);
+    case 'managers_adding_13f': {
+      // El número suelto («7») no decía qué cuenta (Tester 6): son gestores.
+      const n = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(reason.value);
+      return `${n} ${reason.value === 1 ? 'gestor' : 'gestores'}`;
+    }
     default:
       return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(reason.value);
   }
