@@ -231,3 +231,17 @@ def test_run_does_not_duplicate_open_review(db):
     ).all()
     assert len(reviews) == 1
     assert db.scalars(select(RedTeamRun).where(RedTeamRun.company_id == company.id)).all().__len__() == 2
+
+
+def test_valuation_not_publishable_message_names_missing_inputs_in_spanish():
+    from app.services.red_team_service import _valuation_not_publishable_message
+
+    msg = _valuation_not_publishable_message(
+        ["fiscal_year", "book_value_growth", "free cash flow or fcf margin", "combined_ratio"]
+    )
+    assert "año fiscal" in msg and "crecimiento del valor contable" in msg
+    assert "flujo de caja libre o margen FCF" in msg and "ratio combinado" in msg
+    assert "fiscal_year" not in msg and "book_value_growth" not in msg
+    # Clave desconocida: espacios, nunca el identificador crudo con guiones bajos.
+    assert "dato raro" in _valuation_not_publishable_message(["dato_raro"])
+    assert "necesarios" in _valuation_not_publishable_message([])

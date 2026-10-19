@@ -193,7 +193,7 @@ def test_card_summary_insufficient_data_es_honesto():
     }
     text = service._card_summary(_company(), valuation, "hipotesis")
     assert "no publicable todavía" in text
-    assert "revenue, shares" in text
+    assert "Ingresos, shares" in text
     assert "NOT PUBLISHABLE" not in text
 
 
@@ -346,7 +346,7 @@ def test_card_summary_insufficient_data_honest_spanish():
     valuation = {"status": "insufficient_data", "missing_inputs": ["revenue", "fcf"]}
     summary = service._card_summary(_company(), valuation, "hipotesis")
     assert "no publicable" in summary
-    assert "revenue, fcf" in summary
+    assert "Ingresos, fcf" in summary
     assert "NOT PUBLISHABLE" not in summary
 
 
@@ -356,7 +356,7 @@ def test_card_summary_partial_keeps_hypothesis_plus_caveat():
     summary = service._card_summary(_company(), valuation, "Hipotesis X.")
     assert summary.startswith("Hipotesis X.")
     # La etiqueta de indicativa la lleva la hipotesis; aqui queda la lista.
-    assert "Faltan shares_diluted" in summary
+    assert "Faltan Acciones diluidas" in summary
 
 
 # -- fingerprint: las noticias nuevas son evidencia material -------------------------

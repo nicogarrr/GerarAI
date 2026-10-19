@@ -40,6 +40,17 @@ def _finding_types(finding: dict) -> set[str]:
     return types | set(merged)
 
 
+
+def _valuation_not_publishable_message(missing_inputs: list) -> str:
+    """Alerta de valoración no publicable: dice CONCRETAMENTE qué falta,
+    en lenguaje de usuario (regla: identificadores internos en UI son bug)."""
+    from app.services.memo_text_es import term_es
+
+    missing = [term_es(key) for key in missing_inputs]
+    if not missing:
+        return "La valoración no se puede publicar porque faltan datos necesarios."
+    return "La valoración no se puede publicar todavía: faltan " + ", ".join(missing) + "."
+
 class RedTeamService:
     prompt_version = "red-team-v1"
 
@@ -170,7 +181,7 @@ class RedTeamService:
                 self._finding(
                     "high",
                     "valuation_not_publishable",
-                    "La valoración no se puede publicar porque faltan datos necesarios.",
+                    _valuation_not_publishable_message(valuation.get("missing_inputs") or []),
                     missing_inputs=valuation.get("missing_inputs", []),
                 )
             )
