@@ -122,7 +122,8 @@ async def test_real_adapter_envelope_is_groq_not_deepseek():
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         cfg = Settings(llm_enabled=True, opencode_go_api_key="synthetic", opencode_go_base_url="https://primary.invalid/v1", llm_max_retries=0, groq_api_key="synthetic", groq_chat_fallback_enabled=True, groq_free_plan_confirmed=True, groq_zdr_confirmed=True)
         out = await create_chat_llm_provider(cfg, client=client).complete(LLMRequest([Message("user", "hola")], task="chat"))
-    assert out.provider == "groq" and len(seen) == 2
+    assert out.provider == "groq" and len(seen) == 3
+    assert [row["model"] for row in seen[:2]] == ["deepseek-v4.1-flash-free", "space-bunny-free"]
 
 
 @run_async

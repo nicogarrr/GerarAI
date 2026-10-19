@@ -348,4 +348,5 @@ def test_fallback_aliased_to_primary_by_override_is_not_called():
     assert seen == [PRIMARY]
     seen.clear()
     asyncio.run(scenario({}))
-    assert seen == [PRIMARY, FALLBACK]
+    # The first scenario exhausted PRIMARY: the shared breaker skips it.
+    assert seen == [FALLBACK]

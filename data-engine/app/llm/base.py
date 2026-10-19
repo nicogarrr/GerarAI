@@ -26,9 +26,10 @@ _FREE_TIER_ORIGIN_MARKERS = (
     "abusive traffic from this ip",
 )
 _FREE_TIER_BREAKER_SECONDS = 120.0
-# (provider, model) -> monotonic time until which calls fail fast. After it passes,
-# the next call is a real probe; if the 502 persists the breaker closes again.
+# (provider, model) -> monotonic time until which calls fail fast (502 origin or
+# 429 quota). After expiry the next call is a real probe, not a permanent disable.
 _free_tier_breaker: dict[tuple[str, str], float] = {}
+_free_tier_breaker_status: dict[tuple[str, str], int] = {}
 
 
 def _is_free_tier_origin_error(response: httpx.Response) -> bool:
@@ -151,7 +152,7 @@ class LLMProvider(ABC):
     ) -> httpx.Response:
         breaker_key = (str(self.name), str(payload.get("model")))
         if _free_tier_breaker.get(breaker_key, 0.0) > time.monotonic():
-            raise ProviderHTTPError(self.name, 502)
+            raise ProviderHTTPError(self.name, _free_tier_breaker_status.get(breaker_key, 502))
         for attempt in range(self._max_retries + 1):
             try:
                 response = await self._send(url, headers=headers, payload=payload)
@@ -171,7 +172,12 @@ class LLMProvider(ABC):
             if response.status_code < 400:
                 return response
             self._log_http_error(response, headers, payload, attempt)
+            if self.name == "opencode-go" and response.status_code == 429:
+                _free_tier_breaker[breaker_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
+                _free_tier_breaker_status[breaker_key] = 429
+                raise ProviderHTTPError(self.name, 429)
             if _is_free_tier_origin_error(response):
+                _free_tier_breaker_status[breaker_key] = 502
                 _free_tier_breaker[breaker_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
                 raise ProviderHTTPError(self.name, 502)
             if response.status_code not in {408, 409, 429} and response.status_code < 500:

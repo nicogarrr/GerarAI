@@ -341,6 +341,17 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
     # no el tope de llamadas largas) y primario con reasoning reducido para
     # que compita en la carrera en vez de perderla siempre y quedar cancelado
     # a medias en el bridge (BrokenPipe).
+    if settings.llm_enabled and settings.llm_provider != "disabled" and settings.opencode_go_model not in VERIFIED_FREE_MODELS:
+        raise ProviderRequestError("Chat primary not verified free")
+    fallback = settings.opencode_go_fallback_model
+    if fallback and fallback not in VERIFIED_FREE_MODELS:
+        raise ProviderRequestError("Chat refuses a paid OpenCode fallback")
+    settings = settings.model_copy(update={
+        "opencode_go_fallback_model": fallback or (
+            "space-bunny-free" if settings.opencode_go_model != "space-bunny-free"
+            else "deepseek-v4.1-flash-free"
+        ),
+    })
     primary = create_llm_provider(
         settings,
         client=client,
@@ -348,7 +359,15 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
         # Un intento por modelo: un 429 del free tier no se repite (el
         # reintento duplicaba la espera); la carrera ya tiene respaldo Groq.
         max_retries=0,
+        timeout_seconds=min(settings.llm_timeout_seconds, settings.chat_total_timeout_seconds),
+        total_timeout_seconds=settings.chat_total_timeout_seconds,
     )
+    if primary.name == "opencode-go":
+        probe = LLMRequest([Message("user", "route validation")], task="chat")
+        routes = (probe, replace(probe, task="main_financial_analysis"),
+                  replace(probe, model=settings.opencode_go_fallback_model))
+        if any(primary.model_router.resolve(route) not in VERIFIED_FREE_MODELS for route in routes):
+            raise ProviderRequestError("Chat refuses a model override not verified free")
     if not settings.groq_chat_fallback_enabled or primary.name == "disabled":
         return primary
     if primary.name != "opencode-go":

@@ -455,8 +455,8 @@ def refresh_thesis_graph(ticker: str, db: Session = Depends(get_db)) -> dict:
 async def debate_thesis_endpoint(ticker: str, db: Session = Depends(get_db)) -> dict:
     """Debate bull/bear sobre la última tesis y persiste el veredicto.
 
-    El debate en sí nunca lanza (degrada a veredicto determinista); si el
-    upsert de la sección falla, se devuelve el debate con persisted=False.
+    Sin LLM gratuito se devuelve 503, nunca se persiste un debate inventado.
+    Si el upsert falla, se devuelve el debate con persisted=False.
     """
     from app.services.thesis_debate_service import debate_thesis
 
@@ -468,28 +468,29 @@ async def debate_thesis_endpoint(ticker: str, db: Session = Depends(get_db)) -> 
     company = await run_in_threadpool(resolve_company, db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
+    import asyncio
+    from app.llm.free_interactive import FreeLLMUnavailable, create_free_interactive_provider
+    from app.llm.errors import LLMError
+    from app.services.budget import BudgetExceededError
+
     try:
-        result = await debate_thesis(
+        # One deadline for bull, bear, judge and output-guard retries together.
+        result = await asyncio.wait_for(debate_thesis(
             company.ticker,
             thesis.thesis_markdown or thesis.executive_summary or "",
+            provider=create_free_interactive_provider(),
+            use_jev=False,  # Jev is metered, not part of the zero-cost chain.
+            strict_provider=True,
             db=db,
-        )
-    except Exception:  # noqa: BLE001 — sin provider LLM: veredicto determinista
-        from app.services.thesis_debate_service import _deterministic_verdict
-
-        fallback = _deterministic_verdict(company.ticker, thesis.thesis_markdown or "", "", "")
-        result = {
-            "ticker": company.ticker,
-            "bull_case": "",
-            "bear_case": "",
-            "verdict": fallback["verdict"],
-            "verdict_rationale": fallback["verdict_rationale"],
-            "llm_calls": 0,
-            "degraded": True,
-            "model": "deterministic",
-            "materiality_score": 0,
-            "portfolio_weight": 0.0,
-        }
+        ), timeout=45)
+    except FreeLLMUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    except TimeoutError:
+        raise HTTPException(status_code=503, detail="El debate tardó demasiado; vuelve más tarde") from None
+    except BudgetExceededError:
+        raise HTTPException(status_code=503, detail="Presupuesto LLM agotado, vuelve más tarde") from None
+    except (LLMError, ValueError):
+        raise HTTPException(status_code=503, detail="El debate devolvió una respuesta no válida; vuelve más tarde") from None
     def _persist_verdict() -> bool:
         try:
             section = db.scalar(
