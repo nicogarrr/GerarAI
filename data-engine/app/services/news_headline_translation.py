@@ -109,9 +109,11 @@ def headline_numbers_match(original: str, translated: str) -> bool:
       -> «28 de octubre»): basta que los numeros exactos coincidan y que la
       traduccion no añada porcentajes, divisas ni magnitudes; las palabras
       vecinas cambian al traducir.
-    - Cualquier otro numero (%, divisa, magnitud, cifras sueltas): firma
-      estricta con la palabra anterior y posterior, para que una traduccion
-      que invierta el sentido («falls 8%» -> «suben un 8%») no pase.
+    - Titular con un solo sentido declarado (sube o baja) y la misma direccion
+      en la traduccion: mismos numeros y dimensiones exactos, sin palabras
+      vecinas («Amazon Soars 5%» -> «se dispara un 5%»).
+    - Cualquier otro caso (sentidos mezclados, sin sentido, cifras sueltas):
+      firma estricta con la palabra anterior y posterior.
     """
     # Direccion: un titular que dice subir/bajar no puede traducirse con la
     # direccion contraria ni sin ella («Q3 profit falls» -> «el beneficio sube»).
@@ -122,7 +124,32 @@ def headline_numbers_match(original: str, translated: str) -> bool:
         tokens = lambda t: sorted(token for token, _, _ in numeric_signature(t) if token not in {"dimensions", "ambiguous"})  # noqa: E731
         return not any(token == "ambiguous" for token, _, _ in numeric_signature(original) + numeric_signature(translated)) \
             and tokens(original) == tokens(translated)
+    # Un solo sentido declarado (todo sube o todo baja) y mismos numeros y
+    # dimensiones exactos («Amazon Soars 5%» -> «Amazon se dispara un 5%»): sin
+    # dos movimientos que intercambiar cifras, las palabras vecinas no aportan
+    # garantia. Con sentidos mezclados o sin sentido, firma estricta.
+    pol = _polarity(original)
+    if len(pol) == 1 and _relaxed_numbers(original) is not None and _relaxed_numbers(original) == _relaxed_numbers(translated):
+        return True
     return numeric_signature(original) == numeric_signature(translated)
+
+
+_SCALE_ALIASES = {"millón": "million", "millones": "million"}
+
+
+def _relaxed_numbers(text: str) -> tuple[tuple[str, ...], str] | None:
+    """Numeros exactos + dimensiones (divisa, %, million...) sin palabras
+    vecinas. None si el texto tiene un signo ambiguo (falla cerrado)."""
+    tokens: list[str] = []
+    dimensions = ""
+    for token, first, _ in numeric_signature(text):
+        if token == "ambiguous":
+            return None
+        if token == "dimensions":
+            dimensions = "|".join(_SCALE_ALIASES.get(part, part) for part in first.split("|") if part)
+        else:
+            tokens.append(token)
+    return tuple(sorted(tokens)), dimensions
 
 
 def numeric_token_signature(text: str) -> list[str]:
