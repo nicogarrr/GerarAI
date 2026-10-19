@@ -14,8 +14,9 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -128,10 +129,40 @@ def fetch_history_yfinance(
     return out
 
 
-def upsert_prices(db: Session, company: Company, bars: Iterable[PriceBar]) -> int:
-    """Upsert por (company_id, date). Devuelve barras escritas."""
+_NY = ZoneInfo("America/New_York")
+# Una barra del dia en curso solo es cierre oficial cuando la sesion US ya
+# termino (misma regla que market_close_sync._SESSION_CLOSED_AFTER).
+_SESSION_CLOSED_AFTER = (16, 30)
+
+
+def _us_session_open(now: datetime) -> bool:
+    local = now.astimezone(_NY)
+    if local.weekday() >= 5:
+        return False
+    return (local.hour, local.minute) < _SESSION_CLOSED_AFTER
+
+
+def upsert_prices(
+    db: Session,
+    company: Company,
+    bars: Iterable[PriceBar],
+    *,
+    now: datetime | None = None,
+) -> int:
+    """Upsert por (company_id, date). Devuelve barras escritas.
+
+    Con la sesion US abierta la barra de hoy es una foto intradia, no un
+    cierre: se descarta siempre. Estas filas se leen como cierre oficial
+    (source="yfinance") en Movers, Mercado y watchlist, y una foto intradia
+    escrita aquí salía en /screener como «Cierre {hoy}» a media sesión.
+    """
+    now = now or datetime.now(UTC)
+    skip_today = _us_session_open(now)
+    today_ny = now.astimezone(_NY).date()
     written = 0
     for bar in bars:
+        if skip_today and bar.day >= today_ny:
+            continue
         values = {
             "company_id": company.id,
             "date": bar.day,
