@@ -256,8 +256,12 @@ async def ingest_all(
     for theme in THEMES:
         try:
             per_theme[theme] = await ingest_theme(db, tenant, theme, since=since, client=client)
+            # Commit por tema: un fallo posterior no arrastra lo ya bueno.
+            db.commit()
         except Exception as exc:  # noqa: BLE001 - fail-closed: sin ingesta, estado intacto
+            # Rollback por tema: los flush parciales del tema fallido NO pueden
+            # colarse en el commit del siguiente (objecion del auditor).
+            db.rollback()
             per_theme[theme] = {"error": type(exc).__name__}
         await asyncio.sleep(REQUEST_PAUSE_SECONDS)
-    db.commit()
     return {"themes": per_theme, "since": since.isoformat()}

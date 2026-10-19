@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -186,3 +186,49 @@ def test_actor_runs_ingestion_and_commits(monkeypatch):
     result = dramatiq_app.ingest_sec_bottleneck_filings(tenant_id=1, user_id="owner")
     assert result["actor"] == "ingest_sec_bottleneck_filings" and result["status"] == "ok"
     assert calls == [1]
+
+
+async def _no_sleep(*args, **kwargs):
+    return None
+
+
+def test_sec_gov_counts_as_one_source():
+    """Objecion del auditor: todo sec.gov = UN origen en aggregate()."""
+    from datetime import UTC, datetime
+
+    from app.services.bottleneck_service import Evidence, aggregate
+
+    def sec_chunk(i):
+        return Evidence(f"document_chunk:{i}", "Chip shortages persist",
+                        datetime(2026, 10, 1, tzinfo=UTC), "sec.gov", (f"document:{i}",))
+
+    rows = [sec_chunk(i) for i in range(4)]
+    assert aggregate(rows)["Semiconductores"]["n_sources"] == 1
+    # Una carta de fondo independiente SI suma la segunda via; una que enlaza
+    # al mismo filing se funde en el mismo componente y no suma.
+    fund = Evidence("k:1", "Chip shortages persist", datetime(2026, 10, 2, tzinfo=UTC),
+                    "fund-a", ("doc:x",))
+    assert aggregate([sec_chunk(1), fund])["Semiconductores"]["n_sources"] == 2
+    linked = Evidence("k:2", "Chip shortages persist", datetime(2026, 10, 3, tzinfo=UTC),
+                      "fund-a", ("document:1", "doc:x"))
+    assert aggregate([sec_chunk(1), linked])["Semiconductores"]["n_sources"] == 1
+
+
+def test_ingest_all_rolls_back_failed_theme(db, monkeypatch):
+    """Un flush fallido en un tema no contamina el commit del siguiente."""
+    from app.services import sec_bottleneck_filings as svc
+
+    async def fake_ingest(db, tenant, theme, *, since, client=None):
+        if theme == "Semiconductores":
+            db.add(Document(title="parcial", source_type=svc.SOURCE_TYPE,
+                            source_url="https://www.sec.gov/x.htm"))
+            db.flush()
+            raise RuntimeError("boom")
+        return {"hits": 0, "skipped_existing": 0, "documents": 0, "passages": 0}
+
+    monkeypatch.setattr(svc, "ingest_theme", fake_ingest)
+    monkeypatch.setattr(svc.asyncio, "sleep", _no_sleep)
+    result = asyncio.run(svc.ingest_all(db, 1, now=datetime(2026, 10, 20, tzinfo=UTC)))
+    assert result["themes"]["Semiconductores"] == {"error": "RuntimeError"}
+    # La fila parcial del tema fallido NO quedo persistida.
+    assert db.scalar(select(func.count()).select_from(Document)) == 0
