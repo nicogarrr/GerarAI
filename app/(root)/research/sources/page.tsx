@@ -111,7 +111,7 @@ export default async function ResearchSourcesPage({
           <div className="grid gap-3">
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="ticker">Ticker</label>
-              <Input id="ticker" name="ticker" placeholder="MSFT" required />
+              <Input id="ticker" name="ticker" placeholder="p. ej. ASTS" required />
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="manual-source-type">Tipo de fuente</label>
@@ -123,7 +123,7 @@ export default async function ResearchSourcesPage({
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="period">Periodo</label>
-              <Input id="period" name="period" placeholder="Q2 2026" />
+              <Input id="period" name="period" placeholder="p. ej. Q2 2026" />
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="title">Título</label>
@@ -159,7 +159,7 @@ export default async function ResearchSourcesPage({
             <div className="grid gap-3">
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-ticker">Ticker</label>
-                <Input id="file-ticker" name="ticker" placeholder="MSFT" required />
+                <Input id="file-ticker" name="ticker" placeholder="p. ej. ASTS" required />
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-title">Título</label>
@@ -192,7 +192,7 @@ export default async function ResearchSourcesPage({
             <div className="grid gap-3">
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url-ticker">Ticker</label>
-                <Input id="url-ticker" name="ticker" placeholder="MSFT" required />
+                <Input id="url-ticker" name="ticker" placeholder="p. ej. ASTS" required />
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url-title">Título</label>

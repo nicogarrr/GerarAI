@@ -70,8 +70,9 @@ def call(context, provider, items=None):
 def test_real_text_is_not_template_and_labels_and_citations_are_code_owned(context):
     provider = Provider()
     result = call(context, provider)
-    assert result[0]["parrafos"][0] == "INFERIDO: " + TEXT
-    assert all("INFERIDO" in s["titulo"] for s in result)
+    # Sin marca «INFERIDO» en lo que pinta la UI (decision de Nico, 17-oct).
+    assert result[0]["parrafos"][0] == TEXT
+    assert all("INFERIDO" not in s["titulo"] for s in result)
     assert ITEM["url"] in result[0]["parrafos"][1]
     assert "news:17" in result[0]["parrafos"][1]
     assert provider.calls == 1

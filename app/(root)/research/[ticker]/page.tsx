@@ -108,6 +108,7 @@ import { SourceAuditDetail } from '@/components/research/SourceAuditDetail';
 import { dedupeNewsEvents, newsDisplayTitle } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import CitationsList from '@/components/chat/CitationsList';
+import { toChatCitations } from '@/lib/chat/citations';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
 import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, NA } from '@/lib/format';
@@ -1558,7 +1559,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         {response ? (
           <Panel title="Respuesta">
             <div className="whitespace-pre-wrap text-sm leading-7 text-gray-300">{humanizeChatAnswer(response.answer)}</div>
-            <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline">modelo {response.model && response.model !== 'deterministic' ? response.model : 'determinista'}</Badge><Badge variant="outline">{response.sources.length} fuentes</Badge><Badge variant="outline">{response.blocked ? 'datos insuficientes' : 'con evidencia'}</Badge></div>
+            <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline">modelo {response.model && response.model !== 'deterministic' ? response.model : 'determinista'}</Badge><Badge variant="outline">{toChatCitations(response.sources).length} citas · {response.sources.length} fuentes</Badge><Badge variant="outline">{response.blocked ? 'datos insuficientes' : 'con evidencia'}</Badge></div>
             <CitationsList citations={[]} sources={response.sources} />
           </Panel>
         ) : chatFailed ? (

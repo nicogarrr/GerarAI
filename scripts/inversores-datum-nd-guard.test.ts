@@ -22,10 +22,11 @@ test('el peso se deriva de valor/total solo con ambos datos y NO pinta «INFERID
     assert.match(portfolio, /function derivedWeight\(/);
     assert.match(portfolio, /\(100 \* value\) \/ totalValue/);
     assert.match(portfolio, /totalValue > 0/);
-    // La etiqueta interna sigue existiendo (puerta de la barra) pero la UI la
-    // oculta: decisión de Nico (16-oct), la app no marca «inferido».
-    assert.match(portfolio, /hideLabel=\{weight !== row\.weight_pct\}/);
-    assert.match(portfolio, /hideLabel \? "" : `\$\{datum\.label\} · `/);
+    // La etiqueta interna sigue existiendo (puerta de la barra) pero la UI
+    // nunca la pinta: decisión de Nico (17-oct), la app no marca «inferido».
+    // Solo se muestran fecha y fuente; el rótulo OFICIAL/INFERIDO no sale.
+    assert.doesNotMatch(portfolio, /datum\.label\} · `/);
+    assert.doesNotMatch(portfolio, /hideLabel/);
 });
 
 test('las comparaciones con la etiqueta del backend (SIN_DATOS) se conservan', () => {

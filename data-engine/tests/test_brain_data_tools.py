@@ -396,6 +396,18 @@ def test_company_news_declares_holding_weight_without_inventing_impact(db):
     assert "No calculo el impacto de cada noticia" in response.answer
 
 
+def test_per_without_verified_eps_explains_what_is_missing(db):
+    a = company(db, "AAPL")
+    db.add(MarketPrice(company_id=a.id, date=date.today(), close=Decimal("200"), source="yahoo"))
+    db.info.pop("tenant_id", None)
+    db.commit()
+    db.info["tenant_id"] = 1
+    response = asyncio.run(ChatService().answer(db, "¿Precio actual de AAPL y su PER?", "portfolio", None))
+    assert "PER: sin dato calculable guardado" in response.answer
+    assert "hace falta un precio reciente y un BPA anual positivo" in response.answer
+    assert response.llm_trace["provider_calls"] == 0
+
+
 def test_news_drops_ticker_prefix_and_foreign_company_stories(db):
     a = Company(ticker="MSFT", name="Microsoft Corp", currency="USD", exchange="NASDAQ", company_type="operating", valuation_model="unassigned")
     g = Company(ticker="GOOGL", name="Alphabet Inc", currency="USD", exchange="NASDAQ", company_type="operating", valuation_model="unassigned")

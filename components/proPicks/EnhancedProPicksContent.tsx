@@ -21,9 +21,13 @@ interface EnhancedProPicksContentProps {
     initialPicks: ProPick[];
     generatedAt?: string;
     initialPassedCount?: number | null;
+    /** Avisa al contenedor cuando la selección visible pasa a venir de otro run
+     *  (generación o actualización): invalida los picks cacheados por estrategia
+     *  para que «Estrategia y rebalanceo» no muestre el run viejo (o 0 valores). */
+    onRunUpdated?: (asOf: string | null) => void;
 }
 
-export default function EnhancedProPicksContent({ initialPicks, generatedAt, initialPassedCount = null }: EnhancedProPicksContentProps) {
+export default function EnhancedProPicksContent({ initialPicks, generatedAt, initialPassedCount = null, onRunUpdated }: EnhancedProPicksContentProps) {
     const [picks, setPicks] = useState<ProPick[]>(initialPicks);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -74,6 +78,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
         try {
             const result = await generateEnhancedProPicksWithRun(requestedFilters);
             setPicks(result.picks);
+            if (result.runAsOf !== lastGenerated) onRunUpdated?.(result.runAsOf);
             setLastGenerated(result.runAsOf);
             setPassedCount(result.passedCount);
             setAppliedFilters(requestedFilters);
