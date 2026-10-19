@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
+  ["/calendar/resultados", "Resultados"],
   ["/calendar", "Catalizadores"],
   ["/macro-calendar", "Macro y 8-K"],
   ["/corporate-actions", "Acciones corp."],
@@ -11,13 +12,18 @@ const TABS = [
 
 export function CalendarTabs() {
   const pathname = usePathname();
+  // La pestaña activa es la de href más largo que encaja: /calendar/resultados
+  // no debe encender también /calendar.
+  const activeHref = TABS.map(([href]) => href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
   return (
     <nav
       aria-label="Calendarios"
       className="mx-auto flex max-w-7xl flex-wrap gap-2 px-4 pt-4 sm:px-6"
     >
       {TABS.map(([href, label]) => {
-        const active = pathname === href || pathname.startsWith(`${href}/`);
+        const active = href === activeHref;
         return (
           <Link
             aria-current={active ? "page" : undefined}
