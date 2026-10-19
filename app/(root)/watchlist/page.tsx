@@ -228,6 +228,14 @@ export default async function WatchlistPage({
 
     // La divisa la fija el listado real; sin divisa verificada se muestra el
     // número pelado, nunca un «US$» asumido (F253).
+    // Cuando el calendario de resultados (NASDAQ) cae, el backend devuelve
+    // earningsStatus != 'ok' y todas las fechas llegan null: un N/D pelado
+    // parecería «sin fecha anunciada». Se explica la causa como en el cap.
+    const earningsNote = monitorData.earningsStatus === 'unavailable'
+        ? 'Calendario de resultados no disponible ahora mismo.'
+        : monitorData.earningsStatus === 'partial'
+          ? 'Calendario de resultados incompleto: puede faltar alguna fecha.'
+          : null;
     const formatPriceCell = (price: number | null, currency: string | null) =>
         price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
 
@@ -347,7 +355,7 @@ export default async function WatchlistPage({
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Próx. resultados</dt>
-                                        <dd className="font-mono text-sm text-gray-300">{stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}</dd>
+                                        <dd className="font-mono text-sm text-gray-300">{stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}</dd>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Market Cap</dt>
@@ -474,8 +482,8 @@ export default async function WatchlistPage({
                                                 <span className="text-gray-500">{NA}</span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono text-sm text-gray-300" title={stock.monitor?.next_earnings_source ?? undefined}>
-                                            {stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}
+                                        <TableCell className="text-right font-mono text-sm text-gray-300" title={stock.monitor?.next_earnings_source ?? (!stock.monitor?.next_earnings_date ? earningsNote ?? undefined : undefined)}>
+                                            {stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}
                                         </TableCell>
 
                                     </TableRow>
