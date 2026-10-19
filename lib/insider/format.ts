@@ -82,7 +82,7 @@ export function isInstitutionalInsiderName(name: string | null | undefined): boo
  *  se inventa una lectura. */
 const SIGNAL_LABELS: Record<string, string> = {
     cluster_buy: 'Cluster de compra',
-    c_suite_buy: 'Compra de alto directivo',
+    c_suite_buy: 'Compra de CEO/CFO',
     big_buy: 'Gran compra',
 };
 
@@ -90,4 +90,21 @@ export function signalLabel(signal: string | null | undefined): string {
     const key = (signal ?? '').trim();
     if (!key) return '—';
     return SIGNAL_LABELS[key] ?? key;
+}
+
+/** Tooltip con el umbral REAL del backend (insider_service.py): el guard lo
+ *  fija contra la fuente. big_buy es estrictamente mayor que 1 M$ (>), así
+ *  que «supera», no «≥». Nunca afirma «mercado abierto»: el código P no
+ *  siempre lo distingue (docstring del backend). Clave desconocida: sin
+ *  tooltip, no se inventa umbral. */
+const SIGNAL_TOOLTIPS: Record<string, string> = {
+    cluster_buy: '3 o más insiders distintos compran en 30 días',
+    c_suite_buy: 'El CEO o el CFO compra acciones',
+    big_buy: 'Una compra supera 1 M$',
+};
+
+export function signalTooltip(signal: string | null | undefined): string | undefined {
+    const key = (signal ?? '').trim();
+    if (!key) return undefined;
+    return SIGNAL_TOOLTIPS[key];
 }
