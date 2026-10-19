@@ -25,14 +25,21 @@ export function alertCardCopy(alert: TriggeredAlertDelivery): { heading: string;
       technical: `${alert.title}\n${alert.message}`,
     };
   }
+  const headline = alert.eventHeadline?.trim() || null;
   const summary = form
     ? `Documento ${form} asociado a ${company}.`
     : alert.alert_type === 'tracked_news'
       ? trackedNewsSummary(alert, company)
       : alert.alert_type.includes('news')
-        ? `Noticia marcada para revisión de la tesis de ${company}; el impacto aún debe verificarse.`
+        // El titular viene de la noticia de origen (news_events.title). Sin él no se rellena con frases genéricas.
+        ? (headline ?? `Noticia sobre ${company}; el aviso no trae titular verificable.`)
         : alertOwnText(alert, company);
   return { heading: `${company} · ${kind}${suffix}`, summary, technical: `${alert.title}\n${alert.message}` };
+}
+
+/** Las tarjetas pintan el resumen como titular enlazado a la fuente (tracked_news, o noticia con titular de origen). */
+export function alertSummaryIsSourceHeadline(alert: Pick<TriggeredAlertDelivery, 'alert_type' | 'eventHeadline'>): boolean {
+  return alert.alert_type === 'tracked_news' || (alert.alert_type.includes('news') && Boolean(alert.eventHeadline?.trim()));
 }
 
 /** El titular de la noticia viaja en el título de la alerta ("Noticia sobre TICKER: titular",

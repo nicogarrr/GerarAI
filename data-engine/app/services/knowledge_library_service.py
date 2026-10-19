@@ -349,6 +349,12 @@ class KnowledgeLibraryService:
                 )
                 budget_stopped = True
                 break
+            # Nada pendiente de escritura en este punto: el commit cierra la
+            # transaccion de lectura (chunks/companies/can_spend) para que el
+            # await del LLM (segundos o minutos) no deje la sesion "idle in
+            # transaction" reteniendo locks. chunks, companies y document ya
+            # estan materializados y expire_on_commit=False los mantiene.
+            db.commit()
             response = await self.provider.complete(
                 LLMRequest(
                     messages=[

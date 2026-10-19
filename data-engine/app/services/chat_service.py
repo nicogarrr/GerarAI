@@ -24,7 +24,12 @@ from app.models import (
     ThesisVersion,
 )
 from app.schemas import ChatPageContext, ChatResponse, ChatTurn
-from app.services.brain_service import SMALL_TALK_RE, resolve_page_context, small_talk_answer
+from app.services.brain_service import (
+    LEADING_GREETING_RE,
+    SMALL_TALK_RE,
+    resolve_page_context,
+    small_talk_answer,
+)
 from app.services.chat_synthesis_service import ChatSynthesisService
 from app.services.claim_scope import live_claims
 from app.services.company_resolver import resolve_company
@@ -489,9 +494,12 @@ _CAPABILITIES_RE = re.compile(
     r"qu[eé]\s+(?:puedes|puede|sabes)\s+hacer|"
     r"(?:en\s+)?qu[eé]\s+(?:me\s+)?puedes\s+ayudar|"
     r"c[oó]mo\s+(?:es\s+que\s+)?(?:me\s+)?puedes\s+ayudar|"
-    r"qu[eé]\s+(?:eres|es\s+esto)|para\s+qu[eé]\s+sirves|"
+    r"qu[eé]\s+(?:eres|es\s+esto)|qui[eé]n\s+eres|para\s+qu[eé]\s+sirves|"
     r"what can you do|who are you"
-    r")\s*[?!.]*\s*$"
+    r")"
+    # Preguntas gemelas: "quien eres y que puedes hacer" (en cualquier orden).
+    r"(?:\s+y\s+(?:qu[eé]\s+(?:puedes|sabes)\s+hacer|qui[eé]n\s+eres))*"
+    r"\s*[?!.]*\s*$"
 )
 _CAPABILITIES_ANSWER = (
     "Soy el Cerebro de GerarAI. Puedo contarte qué posiciones tienes "
@@ -504,11 +512,36 @@ _CAPABILITIES_ANSWER = (
     "te muestro tus datos guardados y conocimiento general."
 )
 
+_DOCTRINE_CUE_RE = re.compile(
+    r"(?i)\b(?:doctrina|cartas?|biblioteca|principios|filosof[ií]a|"
+    r"buffett|munger|howard\s+marks|fundsmith|smithson|numantia|azvalor|magallanes|"
+    r"value\s+investing|inversi[oó]n\s+en\s+valor)\b"
+)
+
 _PORTFOLIO_SELF_RE = re.compile(
     r"(?i)\b(?:mi|mis)\s+(?:cartera|posici[oó]n(?:es)?|inversi[oó]n(?:es)?|acciones|holdings)\b"
     r"|\bmy\s+(?:portfolio|positions|holdings)\b"
 )
 _ORDER_VERB_RE = re.compile(r"(?i)\b(compra|compro|comprar|vende|vendo|vender|ejecuta|buy|sell)\b")
+# "¿Cuál es mi posición con más peso?" / "¿qué posición pesa menos?": ranking
+# directo de posiciones guardadas, no el volcado de la tabla completa.
+_PORTFOLIO_RANKING_RE = re.compile(
+    r"(?i)(?:qu[eé]|cu[aá]l)\b[^.!?\n]{0,30}\b(?:m[aá]s|mayor|menos|menor)\s+(?:peso|pesa|vale|valor|grande|peque[nñ]a)\b"
+    r"|\bposici[oó]n\b[^.!?\n]{0,25}\b(?:m[aá]s|mayor|menos|menor)\s+(?:peso|grande|peque[nñ]a|valor)\b"
+    r"|\bposici[oó]n\s+(?:que\s+)?pesa\s+(?:m[aá]s|menos)\b"
+    r"|\b(?:mayor|menor)\s+posici[oó]n\b"
+)
+# Rentabilidad de la cartera o de una posición: cifra guardada (coste base y
+# valor base), declarada como rentabilidad simple sobre coste, nunca TWR.
+_PERFORMANCE_RE = re.compile(
+    r"(?i)\b(?:rentabilidad|rendimiento|ganancia(?:s)?|p[ée]rdida(?:s)?|"
+    r"cu[aá]nto\s+(?:he\s+)?(?:ganado|perdido)|c[oó]mo\s+(?:me\s+)?va\s+(?:la|mi)\s+inversi[oó]n)\b"
+)
+# "¿Qué es la rentabilidad?" / "¿cómo se calcula?" son preguntas de concepto:
+# las responde la ruta educativa, no la cifra de cartera.
+_CONCEPT_QUESTION_RE = re.compile(
+    r"(?i)\b(?:qu[eé]\s+es|qu[eé]\s+significa|c[oó]mo\s+se\s+calcula|en\s+qu[eé]\s+consiste)\b"
+)
 # Preguntas de cartera sin la formula "mi cartera": recuento, peso, valor o
 # patrimonio. Se responden con los datos guardados del tenant, nunca con una
 # orden ni con una recomendacion.
@@ -530,10 +563,15 @@ _POSITION_QUERY_RE = re.compile(
     r"|\bqu[eé]\s+peso\s+tiene[n]?\b"
 )
 # Cuando la misma frase pide ademas caja o patrimonio se adjunta ese bloque.
-_RANK_HIGH_RE = re.compile(r"(?i)\b(?:m[aá]s\s+(?:alto|caro|grande)|mayor|m[aá]xim[oa])\b")
-_RANK_LOW_RE = re.compile(r"(?i)\b(?:m[aá]s\s+(?:bajo|barato|peque[nñ]o)|menor|m[ií]nim[oa])\b")
+_RANK_HIGH_RE = re.compile(
+    r"(?i)\b(?:m[aá]s\s+(?:alto|caro|grande|pesad[oa])|mayor|m[aá]xim[oa]|m[aá]s\s+peso|pesa\s+m[aá]s)\b"
+)
+_RANK_LOW_RE = re.compile(
+    r"(?i)\b(?:m[aá]s\s+(?:bajo|barato|peque[nñ]o|livian[oa]|ligera)|menor|m[ií]nim[oa]|menos\s+peso|pesa\s+menos)\b"
+)
 _RANK_COST_RE = re.compile(r"(?i)\bcoste\s+medio\b|\bprecio\s+medio\b")
-_RANK_VALUE_RE = re.compile(r"(?i)\b(?:valor|peso)\b")
+_RANK_VALUE_RE = re.compile(r"(?i)\b(?:valor|pes[oa])\b")
+_RANK_WEIGHT_LABEL_RE = re.compile(r"(?i)\bpes[oa]\b")
 
 
 def _ranking_metric(question: str) -> tuple[str, str, bool] | None:
@@ -545,7 +583,8 @@ def _ranking_metric(question: str) -> tuple[str, str, bool] | None:
     if _RANK_COST_RE.search(question):
         return ("cost", "coste medio", high)
     if _RANK_VALUE_RE.search(question):
-        return ("value", "valor", high)
+        label = "peso" if _RANK_WEIGHT_LABEL_RE.search(question) else "valor"
+        return ("value", label, high)
     return None
 
 
@@ -563,6 +602,10 @@ def _history_is_portfolio(history: list[ChatTurn] | None) -> bool:
 _PAGE_IDENTITY_RE = re.compile(
     r"(?i)\bqu[eé]\s+(?:p[aá]gina|pantalla|secci[oó]n)\s+(?:es\s+esta|estoy\s+viendo|es|ves)\b"
     r"|\bqu[eé]\s+estoy\s+viendo\b|\bd[oó]nde\s+estoy\b"
+)
+_PROMPT_OVERRIDE_RE = re.compile(
+    r"(?i)\b(?:ignora|olvida|descarta)\b[^.?!\n]{0,40}\b(?:instrucciones|reglas)\b"
+    r"|\b(?:tu|el)\s+prompt\b|\bsystem\s+prompt\b"
 )
 _PAGE_CONTENT_RE = re.compile(
     r"(?i)\b(?:en|de|sobre)\s+(?:esta|la\s+presente)\s+(?:p[aá]gina|pantalla|secci[oó]n)\b"
@@ -820,7 +863,11 @@ class ChatService:
         # "¿Qué página estoy viendo?": la identidad de la página ya está
         # resuelta en servidor; se responde sin LLM y sin fuentes (la
         # pastilla "Viendo X" es la propia UI, no un documento citable).
-        if page_context is not None and _PAGE_IDENTITY_RE.search(question or ""):
+        if (
+            page_context is not None
+            and _PAGE_IDENTITY_RE.search(question or "")
+            and not _PROMPT_OVERRIDE_RE.search(question or "")
+        ):
             seen = (
                 f"{page_context.label} ({page_context.company.name})"
                 if page_context.company is not None
@@ -917,7 +964,12 @@ class ChatService:
                 llm_trace={"path": "memory_note"},
                 context=context_echo,
             )
-        if _CAPABILITIES_RE.match(question or ""):
+        # Saludo inicial + pregunta real ("hola, quien eres?"): se responde
+        # a la pregunta, no al saludo.
+        without_greeting = LEADING_GREETING_RE.sub("", question or "").strip()
+        if _CAPABILITIES_RE.match(question or "") or (
+            without_greeting and _CAPABILITIES_RE.match(without_greeting)
+        ):
             return ChatResponse(
                 answer=_CAPABILITIES_ANSWER,
                 sources=[],
@@ -936,6 +988,26 @@ class ChatService:
             if position_answer is not None:
                 position_answer.context = context_echo
                 return position_answer
+        if (
+            company is None
+            and not ticker
+            and _PORTFOLIO_RANKING_RE.search(question or "")
+            and not _ORDER_VERB_RE.search(question or "")
+        ):
+            ranking_answer = self._portfolio_ranking(db, question or "")
+            if ranking_answer is not None:
+                ranking_answer.context = context_echo
+                return ranking_answer
+        if (
+            not ticker
+            and _PERFORMANCE_RE.search(question or "")
+            and not _CONCEPT_QUESTION_RE.search(question or "")
+            and not _ORDER_VERB_RE.search(question or "")
+        ):
+            performance_answer = self._portfolio_performance(db, question or "", company)
+            if performance_answer is not None:
+                performance_answer.context = context_echo
+                return performance_answer
         if (
             company is None
             and not ticker
@@ -1153,7 +1225,12 @@ class ChatService:
         cur = currencies[0]
         amount = _fmt_number_es(keyfn(rows[0]), 2)
         word = "más alto" if highest else "más bajo"
-        answer = f"La posición con el {label} {word} es {comp.ticker}: {amount} {_currency_display(cur)}."
+        weight_text = ""
+        if key_name == "value":
+            total = sum(keyfn(row) for row in rows)
+            if total > 0:
+                weight_text = f", el {_fmt_number_es(keyfn(rows[0]) / total * 100, 1)} % de tu cartera"
+        answer = f"Tu posición con el {label} {word} es {comp.ticker}: {amount} {_currency_display(cur)}{weight_text}."
         if len(rows) > 1:
             nxt_pos, nxt = rows[1]
             answer += f" Le sigue {nxt.ticker} con {_fmt_number_es(keyfn(rows[1]), 2)} {_currency_display(cur)}."
@@ -1164,6 +1241,102 @@ class ChatService:
             prompt_version="portfolio-ranking-v1",
             confidence=0.9,
             llm_trace={"path": "portfolio_ranking", "generated": False, "provider_calls": 0},
+        )
+
+    def _portfolio_performance(
+        self, db: Session, question: str, company: Company | None
+    ) -> ChatResponse | None:
+        """Rentabilidad guardada: valor frente a coste de compra (simple, no TWR).
+
+        Solo posiciones abiertas con sus cifras base del tenant; sin caja,
+        dividendos ni ventas cerradas, y se dice asi. Monedas base mezcladas o
+        coste sin datos: se declara, no se mezcla ni se inventa.
+        """
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return None
+        rows = list(
+            db.execute(
+                select(Position, Company)
+                .join(Company, Company.id == Position.company_id)
+                .where(Position.quantity > 0, Position.tenant_id == tenant_id)
+            ).all()
+        )
+        if company is not None:
+            rows = [row for row in rows if row[0].company_id == company.id]
+            if not rows:
+                return ChatResponse(
+                    answer=(
+                        f"No tienes ninguna posición abierta en {company.ticker}: "
+                        "no hay rentabilidad guardada que contar."
+                    ),
+                    sources=[],
+                    model="deterministic",
+                    prompt_version="portfolio-performance-v1",
+                    confidence=0.9,
+                    llm_trace={"path": "portfolio_performance", "generated": False, "provider_calls": 0},
+                )
+        if not rows:
+            return None
+
+        def _pair(pos: Position) -> tuple[float, float, str]:
+            if pos.market_value_base is not None and pos.cost_basis_base is not None:
+                return float(pos.cost_basis_base), float(pos.market_value_base), pos.base_currency or "EUR"
+            cost = float(pos.average_cost or 0) * float(pos.quantity or 0)
+            return cost, float(pos.market_value or 0), pos.currency or "EUR"
+
+        currencies = sorted({_pair(pos)[2] for pos, _ in rows})
+        if len(currencies) > 1:
+            return ChatResponse(
+                answer=(
+                    "No puedo sumar la rentabilidad: tus posiciones están valoradas en monedas "
+                    f"distintas ({', '.join(currencies)}) y faltan las cifras en moneda base para compararlas."
+                ),
+                sources=[],
+                model="deterministic",
+                prompt_version="portfolio-performance-v1",
+                confidence=0.9,
+                llm_trace={"path": "portfolio_performance", "generated": False, "provider_calls": 0, "mixed_currency": True},
+            )
+        cur = currencies[0]
+        total_cost = sum(_pair(pos)[0] for pos, _ in rows)
+        total_value = sum(_pair(pos)[1] for pos, _ in rows)
+        if total_cost <= 0:
+            return ChatResponse(
+                answer="No tengo el coste de compra guardado de tus posiciones: sin él no calculo rentabilidad.",
+                sources=[],
+                model="deterministic",
+                prompt_version="portfolio-performance-v1",
+                confidence=0.9,
+                llm_trace={"path": "portfolio_performance", "generated": False, "provider_calls": 0},
+            )
+        pnl = total_value - total_cost
+        pct = pnl / total_cost * 100
+
+        def _signed(value: float) -> str:
+            return f"+{_fmt_number_es(value, 2)}" if value >= 0 else _fmt_number_es(value, 2)
+
+        label = "tu cartera" if company is None else f"tu posición en {company.ticker}"
+        as_of = max(pos.as_of for pos, _ in rows)
+        answer = (
+            f"La rentabilidad guardada de {label} es {_signed(pct).replace(' %', '')} % "
+            f"sobre el coste de compra: valor {_fmt_money_es(total_value)} {_currency_display(cur)} "
+            f"frente a coste {_fmt_money_es(total_cost)} {_currency_display(cur)} "
+            f"({_signed(pnl)} {_currency_display(cur)}), con datos a {_fmt_date_es(as_of.isoformat())}. "
+            "Es rentabilidad simple sobre el coste de las posiciones abiertas, no TWR: "
+            "no cuenta caja, dividendos ni ventas cerradas."
+        )
+        sources = [
+            self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))
+            for pos, comp in rows[:15]
+        ]
+        return ChatResponse(
+            answer=answer,
+            sources=sources,
+            model="deterministic",
+            prompt_version="portfolio-performance-v1",
+            confidence=0.9,
+            llm_trace={"path": "portfolio_performance", "generated": False, "provider_calls": 0},
         )
 
     def _cash_line(
@@ -1322,9 +1495,16 @@ class ChatService:
         retrieved_memory = self.memory.retrieve(db, question, company, scope=scope, limit=6)
         recent_sessions = self._recent_sessions(db, company)
 
+        # Doctrina de la biblioteca (cartas Buffett/Numantia/...): contexto para
+        # preguntas generales o de doctrina, NUNCA fuente visible de una ficha de
+        # empresa. Antes se recuperaba siempre y la seccion "inferences" citaba
+        # cada chunk, asi que una respuesta sobre ASTS salia con "Fuentes:
+        # Numantia Patrimonio - Carta 2020" sin relacion alguna con ASTS.
         library_context = (
             retrieve_library_context(db, question)
-            if os.getenv("CAVAAI_ENABLE_VECTOR_CHAT") == "1" else []
+            if os.getenv("CAVAAI_ENABLE_VECTOR_CHAT") == "1"
+            and (company is None or _DOCTRINE_CUE_RE.search(question or ""))
+            else []
         )
         library_lines = [
             f"- Investment doctrine, not a company fact: {item['text']} "
