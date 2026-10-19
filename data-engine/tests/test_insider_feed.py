@@ -234,3 +234,38 @@ def test_feed_exposes_rule_10b5_1():
     finally:
         _cleanup(db)
         db.close()
+
+
+def test_primary_ticker_collapses_share_class_lists():
+    from app.services.insider_feed import primary_ticker
+
+    assert primary_ticker("LEN, LEN.B") == "LEN"
+    assert primary_ticker("GTX,GTXAP") == "GTX"
+    assert primary_ticker("len") == "LEN"
+    assert primary_ticker("BRK.B") == "BRK.B"
+    assert primary_ticker(None) is None
+    assert primary_ticker("LEN; LEN.B") == "LEN"
+    assert primary_ticker(" len ,len.b") == "LEN"
+    assert primary_ticker("") == ""
+
+
+def test_build_feed_ticker_filter_matches_multiclass_separators():
+    db = _db()
+    try:
+        _cleanup(db)
+        _persist(db)
+        for raw in ("LEN, LEN.B", "LEN; LEN.B", "len,len.b"):
+            db.query(InsiderFiling).update({"issuer_ticker": raw})
+            db.query(InsiderTransaction).update({"issuer_ticker": raw})
+            db.commit()
+            for wanted in ("LEN", "len", "LEN.B", " LEN "):
+                feed = insider_feed.build_feed(db, days=3650, ticker=wanted, today=date(2024, 3, 20))
+                assert feed["count"] >= 1, (raw, wanted)
+                tx = feed["transactions"][0]
+                assert tx["ticker"] == "LEN"
+                assert tx["issuer_tickers_raw"] == raw
+            miss = insider_feed.build_feed(db, days=3650, ticker="XYZ", today=date(2024, 3, 20))
+            assert miss["count"] == 0
+    finally:
+        _cleanup(db)
+        db.close()
