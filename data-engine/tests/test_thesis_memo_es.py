@@ -185,3 +185,17 @@ def test_drivers_ausentes_y_noticias_de_bufetes_no_llegan_al_memo():
     )
     assert not is_law_firm_solicitation("AST SpaceMobile launches BlueBird 6 satellite")
     assert not is_law_firm_solicitation("AST SpaceMobile faces securities lawsuit, Reuters reports")
+
+
+def test_marcos_sector_y_unidades_en_espanol_sin_perder_datos():
+    from app.services.company_framework import FRAMEWORKS
+    from app.services.memo_text_es import primary_question_es, sector_es, term_es, unit_es
+
+    for framework in FRAMEWORKS.values():
+        question = primary_question_es(framework.primary_question)
+        assert question.startswith("¿"), framework.primary_question
+    assert sector_es("Information Technology") == "Tecnología de la información"
+    assert sector_es("Sector Raro") == "Sector Raro"  # desconocido: tal cual, no se inventa
+    assert unit_es("shares") == "acciones" and unit_es("USD") == "USD"
+    assert term_es("capital_expenditure") == "Gasto de capital (capex)"
+    assert term_es("cash_and_equivalents") == "Caja y equivalentes"

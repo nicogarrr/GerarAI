@@ -26,7 +26,17 @@ from app.services.claim_scope import supersede_claims_of
 from app.services.company_resolver import resolve_company
 from app.services.inferred_input_service import validate as validate_inferred
 from app.services.long_term_model_service import LongTermModelService
-from app.services.memo_text_es import date_es, money_thesis, number_es, percent_es, term_es
+from app.services.memo_text_es import (
+    date_es,
+    industry_es,
+    money_thesis,
+    number_es,
+    percent_es,
+    primary_question_es,
+    sector_es,
+    term_es,
+    unit_es,
+)
 from app.services.number_format import format_compact_es
 from app.services.source_auditor import SourceAuditor
 from app.services.source_hierarchy_service import classify_source
@@ -1229,7 +1239,7 @@ class ThesisService:
         ]
         for metric, fact in facts.items():
             rows.append(
-                f"| {term_es(metric)} | {format_compact_es(fact.value) or number_es(fact.value)} | {fact.unit} | {fact.period} | "
+                f"| {term_es(metric)} | {format_compact_es(fact.value) or number_es(fact.value)} | {unit_es(fact.unit)} | {fact.period} | "
                 f"{term_es(fact.source_type)} #{fact.source_id or 's/d'} |"
             )
         return "\n".join(rows)
@@ -1632,8 +1642,8 @@ Motor: {term_es((valuation.get("trace") or {}).get("engine", "unknown"))}.
 La pregunta invertible es si la evidencia respalda los supuestos detrás del modelo elegido, no si la salida de un modelo parece atractiva de forma aislada.
 
 ## 3. Modelo de negocio
-Sector: {company.sector}. Industria: {company.industry}.
-Marco específico de la empresa: {term_es(framework.get("key", "unknown"))}. Pregunta primaria: {str(framework.get("primary_question") or "desconocida").rstrip(" .?!")}.
+Sector: {sector_es(company.sector)}. Industria: {industry_es(company.industry)}.
+Marco específico de la empresa: {term_es(framework.get("key", "unknown"))}. Pregunta primaria: {primary_question_es(framework.get("primary_question"))}.
 Drivers obligatorios ausentes: {", ".join(term_es(m) for m in mandatory_missing) if mandatory_missing else "ninguno"}.
 
 ## 4. Últimos resultados
