@@ -122,14 +122,13 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
 
     return (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6 w-full min-w-0">
-            {/* `overflow-x-auto` en movil: con teclado no hay barra de scroll, asi que
-                el list scrollea necesita ser alcanzable (WCAG 2.1.1). No se le pone
-                `role="region"` porque sobrescribiria el `tablist` de Radix y la
-                navegacion con flechas; `tabIndex` + nombre accesible bastan. */}
+            {/* En movil las pestañas envuelven a dos filas: antes se cortaban a
+                media palabra («Estrategia y rebalanc…») y el resto solo se
+                alcanzaba por scroll horizontal sin affordance. Todos los
+                triggers son alcanzables con flechas (tablist de Radix). */}
             <TabsList
-                tabIndex={0}
                 aria-label="Secciones de Pro Picks"
-                className="flex h-auto w-full min-w-0 max-w-full justify-start snap-x gap-1 overflow-x-auto border border-gray-700 bg-gray-800 pb-2 text-gray-400 sm:inline-flex sm:h-9 sm:w-auto sm:max-w-none sm:overflow-visible sm:pb-[3px]"
+                className="flex h-auto w-full min-w-0 max-w-full flex-wrap justify-start gap-1 border border-gray-700 bg-gray-800 pb-2 text-gray-400 sm:inline-flex sm:h-9 sm:w-auto sm:max-w-none sm:pb-[3px]"
             >
                 <TabsTrigger value="picks" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">
                     Selección IA

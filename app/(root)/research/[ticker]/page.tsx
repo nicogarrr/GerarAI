@@ -1643,7 +1643,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             refresco). Los módulos de subruta (`path`) son otra página y ahí sí
             arrancan arriba, como cualquier navegación.
         */}
-        <nav aria-label="Etapas del research" className="-mx-4 mb-3 flex gap-6 overflow-x-auto border-b border-gray-800 px-4 [scrollbar-width:thin] sm:mx-0 sm:px-0">
+        <nav aria-label="Etapas del research" className="-mx-4 mb-3 flex flex-wrap gap-x-6 gap-y-2 border-b border-gray-800 px-4 pb-2 sm:mx-0 sm:px-0">
           {GROUPS.map((group) => (
             <Link
               aria-current={activeModule.group === group.key ? 'true' : undefined}
@@ -1656,7 +1656,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             </Link>
           ))}
         </nav>
-        <nav aria-label={`Módulos de ${activeGroupLabel}`} className="-mx-4 mb-7 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] sm:mx-0 sm:flex-wrap sm:overflow-x-visible sm:px-0 sm:pb-0">
+        <nav aria-label={`Módulos de ${activeGroupLabel}`} className="-mx-4 mb-7 flex flex-wrap gap-2 px-4 pb-2 sm:mx-0 sm:px-0 sm:pb-0">
           {groupModules.map((module) => (
             <Link
               aria-current={activeView === module.key ? 'page' : undefined}
