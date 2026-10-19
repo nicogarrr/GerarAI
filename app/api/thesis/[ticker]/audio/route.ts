@@ -5,33 +5,34 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL;
 
-/**
- * Proxy firmado del audio de la tesis por (ticker, versión). El navegador no
- * puede firmar la identidad research, así que el `<audio>` pasa por aquí.
- * Reenvía Range para poder avanzar y retroceder. Si el backend no tiene audio
- * para esa versión devuelve 404 y el reproductor lo dice.
- */
-async function getHandler(
-  request: NextRequest,
-  { params }: { params: Promise<{ ticker: string }> },
-) {
+type Ctx = { params: Promise<{ ticker: string }> };
+
+type Resolved = { error: NextResponse; path?: undefined; identity?: undefined } | { error?: undefined; path: string; identity: Record<string, string> };
+
+async function resolve(ctx: Ctx, method: 'GET' | 'POST'): Promise<Resolved> {
   await requireAuthenticatedUser();
-  const { ticker } = await params;
+  const { ticker } = await ctx.params;
   if (!/^[A-Za-z0-9.^=-]{1,15}$/.test(ticker)) {
-    return NextResponse.json({ error: 'Ticker no valido' }, { status: 400 });
-  }
-  const version = request.nextUrl.searchParams.get('v') ?? '';
-  if (!/^\d{1,6}$/.test(version)) {
-    return NextResponse.json({ error: 'Versión no válida' }, { status: 400 });
+    return { error: NextResponse.json({ error: 'Ticker no valido' }, { status: 400 }) };
   }
   if (!BACKEND_URL) {
-    return NextResponse.json({ error: 'Backend no configurado' }, { status: 503 });
+    return { error: NextResponse.json({ error: 'Backend no configurado' }, { status: 503 }) };
   }
   const path = `/api/thesis/${encodeURIComponent(ticker.toUpperCase())}/audio`;
-  const identity = await researchIdentityHeaders({ method: 'GET', path });
+  return { path, identity: await researchIdentityHeaders({ method, path }) };
+}
+
+/**
+ * Proxy firmado del mp3 de la tesis. El navegador no puede firmar la identidad
+ * research, así que el `<audio>` pasa por aquí. Reenvía Range (avanzar y
+ * retroceder). `v` solo invalida la caché del navegador al cambiar de versión.
+ */
+async function getHandler(request: NextRequest, ctx: Ctx) {
+  const r = await resolve(ctx, 'GET');
+  if (r.error) return r.error;
   const range = request.headers.get('range');
-  const upstream = await fetch(`${BACKEND_URL}${path}?version=${version}`, {
-    headers: range ? { ...identity, Range: range } : identity,
+  const upstream = await fetch(`${BACKEND_URL}${r.path}`, {
+    headers: range ? { ...r.identity, Range: range } : r.identity,
     cache: 'no-store',
   });
   if (!upstream.ok && upstream.status !== 206) {
@@ -49,4 +50,13 @@ async function getHandler(
   return new NextResponse(upstream.body, { status: upstream.status, headers });
 }
 
+/** Pide generar el audio (202). 503 si el sintetizador no responde. */
+async function postHandler(_request: NextRequest, ctx: Ctx) {
+  const r = await resolve(ctx, 'POST');
+  if (r.error) return r.error;
+  const upstream = await fetch(`${BACKEND_URL}${r.path}`, { method: 'POST', headers: r.identity, cache: 'no-store' });
+  return NextResponse.json({ ok: upstream.ok }, { status: upstream.ok ? 202 : upstream.status === 503 ? 503 : 502 });
+}
+
 export const GET = withAuthErrors(getHandler);
+export const POST = withAuthErrors(postHandler);
