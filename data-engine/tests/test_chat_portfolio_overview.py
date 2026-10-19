@@ -123,3 +123,15 @@ def test_ranking_refuses_to_compare_mixed_currencies(db):
         assert "monedas distintas" in resp.answer
         assert "EUR" in resp.answer and "USD" in resp.answer
         assert resp.llm_trace["mixed_currency"] is True
+
+
+def test_risk_question_about_my_portfolio_is_not_answered_with_the_positions_table(db):
+    a = _company(db, "AAA", "Alpha")
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), market_value=Decimal("300")))
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Qué riesgos tiene mi cartera?", "portfolio", None))
+    assert resp.prompt_version != "portfolio-overview-v1"
+    assert not (resp.llm_trace or {}).get("path") == "portfolio_overview"
+    # La pregunta de listado sigue por el volcado de posiciones.
+    listing = asyncio.run(ChatService().answer(db, "¿Qué tengo en mi cartera?", "portfolio", None))
+    assert listing.prompt_version == "portfolio-overview-v1"

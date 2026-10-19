@@ -522,6 +522,14 @@ _PORTFOLIO_SELF_RE = re.compile(
     r"(?i)\b(?:mi|mis)\s+(?:cartera|posici[oó]n(?:es)?|inversi[oó]n(?:es)?|acciones|holdings)\b"
     r"|\bmy\s+(?:portfolio|positions|holdings)\b"
 )
+# Preguntas de analisis sobre la cartera ("¿qué riesgos tiene mi cartera?"):
+# "mi cartera" solo las mandaba al volcado de posiciones, que contesta otra
+# cosa sin LLM. Siguen por la ruta de sintesis (LLM con datos de cartera).
+_PORTFOLIO_ANALYSIS_RE = re.compile(
+    r"(?i)\b(?:riesgos?|riesgosa|arriesgad\w*|diversific\w*|concentraci[oó]n|"
+    r"exposici[oó]n|vulnerab\w*|debilidades|fortalezas|qu[eé]\s+opinas|"
+    r"c[oó]mo\s+(?:la\s+)?(?:mejorar|veo)|risks?|diversif\w*)\b"
+)
 _ORDER_VERB_RE = re.compile(r"(?i)\b(compra|compro|comprar|vende|vendo|vender|ejecuta|buy|sell)\b")
 # "¿Cuál es mi posición con más peso?" / "¿qué posición pesa menos?": ranking
 # directo de posiciones guardadas, no el volcado de la tabla completa.
@@ -1012,7 +1020,10 @@ class ChatService:
             company is None
             and not ticker
             and (
-                _PORTFOLIO_SELF_RE.search(question or "")
+                (
+                    _PORTFOLIO_SELF_RE.search(question or "")
+                    and not _PORTFOLIO_ANALYSIS_RE.search(question or "")
+                )
                 or _PORTFOLIO_QUERY_RE.search(question or "")
             )
             and not _ORDER_VERB_RE.search(question or "")
