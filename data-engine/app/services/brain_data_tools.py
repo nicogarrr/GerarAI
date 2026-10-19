@@ -6,7 +6,7 @@ is always dated. Ratios reuse the screener's audited annual EPS/currency rules.
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from urllib.parse import quote
 
@@ -406,6 +406,8 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
             NewsEvent.tenant_id == tenant, NewsEvent.company_id.in_(company_ids),
         ).order_by(NewsEvent.date.desc(), NewsEvent.id.desc()).limit(40)).all()
         lines, sources, seen = [], [], set()
+        kept_signatures: list[tuple[set[str], datetime]] = []
+        from app.services.news_story_cluster import event_signature, same_story
         for event, company in rows:
             # El feed liga la noticia al ticker aunque trate de otra empresa
             # (un articulo de AEP etiquetado GOOGL): se descarta lo que no la
@@ -423,7 +425,14 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
             key = " ".join(title.lower().split())
             if key in seen:
                 continue
+            # Dedup por historia, no por titular literal (la misma noticia
+            # llega con titular solo y con titular+entrada pegada: la
+            # coincidencia exacta no las casaba y salía dos veces).
+            signature = event_signature(event, company)
+            if any(same_story(signature, kept_sig, event.date, kept_date) for kept_sig, kept_date in kept_signatures):
+                continue
             seen.add(key)
+            kept_signatures.append((signature, event.date))
             lines.append(f"- {company.ticker}: '{title}' ({event.date.date().isoformat()}, {event.source}).")
             sources.append(_source("news_event", event.id, f"{company.ticker}: {title}", event.url or _link(company, "news")))
             if len(lines) == 6:
