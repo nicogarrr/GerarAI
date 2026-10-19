@@ -648,6 +648,18 @@ export async function deleteSavedScreen(formData: FormData) {
   revalidatePath('/screeners');
 }
 
+export async function getScreenerMetricCoverage(): Promise<string[] | null> {
+  // Names with data for at least one company; null when the engine cannot
+  // answer, so the UI keeps its full static suggestion list instead of
+  // offering nothing.
+  try {
+    const payload = await requestJson<{ metrics_with_data: string[] }>('/api/screeners/metric-coverage');
+    return Array.isArray(payload.metrics_with_data) ? payload.metrics_with_data : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function runAdHocScreen(input: {
   left: string;
   operator: ScreenCriterion['operator'];
