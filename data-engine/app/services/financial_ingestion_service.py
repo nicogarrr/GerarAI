@@ -1697,7 +1697,7 @@ class FinancialIngestionService:
                         value=val,
                         unit="EUR/share" if unit.endswith("/xbrli:shares") else "EUR",
                         period=f"{period_date}:FY",
-                        fiscal_year=int(period_date[:4]),
+                        fiscal_year=_annual_fiscal_year(period_date, None),
                         fiscal_quarter="FY",
                         source_id=document.id,
                         source_type="ESEF",
