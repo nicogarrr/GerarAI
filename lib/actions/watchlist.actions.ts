@@ -169,6 +169,19 @@ export type WatchlistEntryData = {
     quoteSymbol: string | null;
 };
 
+type BackendWatchlistMetrics = {
+    market_cap: number | null;
+    per: number | null;
+    currency: string | null;
+    sources: string[];
+};
+
+function fetchBackendMetrics(symbol: string): Promise<BackendWatchlistMetrics | null> {
+    return researchRequest<BackendWatchlistMetrics>(
+        `/api/watchlist/metrics/${encodeURIComponent(symbol)}`,
+    ).catch(() => null);
+}
+
 export async function getWatchlistEntryData(
     symbol: string,
     precomputedBasics?: ResearchCompanyBasics | null,
@@ -213,14 +226,7 @@ export async function getWatchlistEntryData(
         // completa pedía /quote duplicada y /price-target sin uso.
         usListing ? getStockValuationBasics(normalized) : Promise.resolve(null),
         !usListing
-            ? researchRequest<{
-                  market_cap: number | null;
-                  per: number | null;
-                  currency: string | null;
-                  sources: string[];
-              }>(
-                  `/api/watchlist/metrics/${encodeURIComponent(normalized)}`,
-              ).catch(() => null)
+            ? fetchBackendMetrics(normalized)
             : Promise.resolve(null),
     ]);
 
@@ -237,10 +243,19 @@ export async function getWatchlistEntryData(
     const metrics = light?.metrics?.metric ?? {};
     const marketCapM = typeof metrics.marketCapitalization === 'number' ? metrics.marketCapitalization : null;
     const peRatio = typeof metrics.peTTM === 'number' && Number.isFinite(metrics.peTTM) ? metrics.peTTM : null;
-    const backendCap = backend && typeof backend.market_cap === 'number' ? backend.market_cap : null;
-    const backendPer = backend && typeof backend.per === 'number' && Number.isFinite(backend.per) ? backend.per : null;
-    const backendDerived = (backend?.sources ?? []).some((src) => src.toLowerCase().includes('derivada'));
-    const backendPerSource = (backend?.sources ?? []).find((src) => src.startsWith('PER:')) ?? null;
+    // Línea US con Finnhub sin cap o PER (caída, 429 u otro hueco del
+    // proveedor — QA Tester 6 final, 19-oct-2026: megacaps N/D en una
+    // ventana de despliegues con el proveedor sano): mismo respaldo del
+    // backend que las no-US (cap proveedor o derivado precio x acciones,
+    // PER cierre/EPS FY), declarado igual («· derivado», «· FY»).
+    const backendUs = usListing && (marketCapM === null || peRatio === null)
+        ? await fetchBackendMetrics(normalized)
+        : null;
+    const backendAll = backend ?? backendUs;
+    const backendCap = backendAll && typeof backendAll.market_cap === 'number' ? backendAll.market_cap : null;
+    const backendPer = backendAll && typeof backendAll.per === 'number' && Number.isFinite(backendAll.per) ? backendAll.per : null;
+    const backendDerived = (backendAll?.sources ?? []).some((src) => src.toLowerCase().includes('derivada'));
+    const backendPerSource = (backendAll?.sources ?? []).find((src) => src.startsWith('PER:')) ?? null;
 
     return {
         ...base,
@@ -250,7 +265,7 @@ export async function getWatchlistEntryData(
         // ser línea US — sin divisa real, número pelado.
         // Master curado manda; para no-US el backend devuelve la divisa real
         // de la compañía y la rellena cuando el master no la conoce.
-        currency: base.currency ?? backend?.currency ?? null,
+        currency: base.currency ?? backendAll?.currency ?? null,
         price,
         change:
             price === null || !hasPriorClose(quote)
