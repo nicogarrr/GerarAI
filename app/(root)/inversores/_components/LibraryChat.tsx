@@ -4,6 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+import { markdownComponents } from '@/components/research/ThesisMarkdown';
 import { askKnowledge, type LibraryAnswer } from '@/lib/actions/knowledge-chat.actions';
 import { analysisToText, isSubmitShortcut, SUGGESTED_QUESTIONS, type CitedPoint } from '@/lib/knowledge/analysis';
 
@@ -27,7 +31,7 @@ function links(cite: Citation) {
 function Cited({ point }: { point: CitedPoint }) {
   return <div className="min-w-0">
     <p className="whitespace-pre-wrap break-words text-sm">{point.nombre && <strong>{point.nombre}: </strong>}{point.text}</p>
-    <blockquote className="mt-1 whitespace-pre-wrap break-words border-l-2 border-lime-300 pl-3 text-sm leading-6 text-gray-300">{point.citation.quote}</blockquote>
+    <blockquote className="mt-1 min-w-0 break-words border-l-2 border-lime-300 pl-3 text-sm leading-6 text-gray-300"><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{point.citation.quote}</ReactMarkdown></blockquote>
     <p className="mt-1 text-xs text-gray-500">{citationLine(point.citation)}</p>
     {links(point.citation)}
   </div>;
@@ -58,7 +62,7 @@ function Answer({ result }: { result: LibraryAnswer }) {
     <Analysis result={result} />
     {result.answers.map((answer, index) => <article key={`${answer.citation.chunk_id}-${index}`} className="min-w-0 border-t border-gray-800 pt-3">
       {answer.text && <p className="mb-2 whitespace-pre-wrap break-words text-sm">{answer.text}</p>}
-      <blockquote className="whitespace-pre-wrap break-words border-l-2 border-lime-300 pl-3 text-sm leading-6 text-gray-300">{answer.citation.quote}</blockquote>
+      <blockquote className="min-w-0 break-words border-l-2 border-lime-300 pl-3 text-sm leading-6 text-gray-300"><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{answer.citation.quote}</ReactMarkdown></blockquote>
       <p className="mt-2 text-xs text-gray-500">{citationLine(answer.citation)}</p>
       {links(answer.citation)}
     </article>)}
