@@ -21,6 +21,7 @@ from app.api.routes import (
     macro_calendar,
     market,
     market_context,
+    money_flows,
     memory,
     news,
     obsidian,
@@ -104,6 +105,7 @@ api_router.include_router(sources.router, prefix="/sources", tags=["sources"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
 api_router.include_router(market.router, prefix="/market", tags=["market"])
 api_router.include_router(market_context.router, prefix="/market", tags=["market"])
+api_router.include_router(money_flows.router, prefix="/market/flows", tags=["market", "flows"])
 api_router.include_router(asts.router, prefix="/market/asts", tags=["market", "asts"])
 api_router.include_router(
     macro_calendar.router, prefix="/macro-calendar", tags=["macro-calendar"]
