@@ -12,7 +12,9 @@ from app.api.routes import news as news_module
 from app.core.database import get_db
 from app.models.entities import Base, Company, NewsEvent, Tenant
 
-NOW = datetime(2026, 9, 27, 12, tzinfo=UTC)
+# Relativa a ahora: la ruta filtra frescura real (macro 72 h) contra el reloj
+# del sistema; una fecha fija (27-sep) quedó vieja y el carril macro devolvía 0.
+NOW = datetime.now(UTC)
 
 
 def _client():
