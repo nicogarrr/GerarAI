@@ -190,7 +190,8 @@
       "columnDegree": "Relaciones",
       "select": "Seleccionar y centrar el nodo {label}",
       "rowCount": "{count} nodos en el subgrafo visible.",
-      "empty": "No hay nodos que listar."
+      "empty": "No hay nodos que listar.",
+      "caption": "Tabla de nodos del grafo: etiqueta, tipo y número de relaciones de cada nodo."
     }
   },
   "taxes": {

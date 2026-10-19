@@ -671,7 +671,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                     {scene.nodes.length ? (
                         <div aria-label={t('knowledgeGraph.listing.title')} className="mt-3 overflow-x-auto" role="region" tabIndex={0}>
                             <table className="w-full min-w-[520px] text-left text-sm">
-                                <caption className="sr-only">{t('knowledgeGraph.listing.description')}</caption>
+                                <caption className="sr-only">{t('knowledgeGraph.listing.caption')}</caption>
                                 <thead className="text-xs uppercase text-gray-500">
                                     <tr>
                                         <th className="border-b border-gray-800 py-2" scope="col">
