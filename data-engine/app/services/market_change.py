@@ -174,3 +174,36 @@ def compute_session_changes(db: Session) -> tuple[list[dict], int, object]:
             }
         )
     return movers, stale_excluded, session_day
+
+
+def ticker_close_change(db: Session, company_id: int) -> dict | None:
+    """Variacion "ultimo cierre vs anterior" de UNA compania, con la misma regla
+    que compute_session_changes: solo cierres oficiales (OFFICIAL_CLOSE_SOURCES),
+    el ultimo debe ser el de la ultima sesion comun y el previo el de la sesion
+    comun inmediatamente anterior. Con cualquier hueco devuelve None: nunca un
+    cambio de varios dias presentado como el de la ultima sesion."""
+    session_day, prev_session_day = common_sessions(db)
+    if session_day is None or prev_session_day is None:
+        return None
+    rows = db.execute(
+        select(MarketPrice.date, MarketPrice.close)
+        .where(MarketPrice.company_id == company_id, MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES))
+        .order_by(MarketPrice.date.desc())
+        .limit(2)
+    ).all()
+    if len(rows) < 2:
+        return None
+    (last_day, last_close), (prev_day, prev_close) = rows
+    if last_day != session_day or prev_day != prev_session_day:
+        return None
+    last, prev = float(last_close or 0), float(prev_close or 0)
+    if last <= 0 or prev <= 0:
+        return None
+    return {
+        "close": last,
+        "previous_close": prev,
+        "date": last_day.isoformat(),
+        "previous_date": prev_day.isoformat(),
+        "change": last - prev,
+        "change_percent": (last - prev) / prev * 100,
+    }

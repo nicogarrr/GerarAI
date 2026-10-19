@@ -34,6 +34,7 @@ from app.schemas import (
     FinancialRefreshResponse,
     ThesisTickersOut,
 )
+from app.services import market_change
 from app.services.async_bridge import run_from_any_context
 from app.services.company_changes_service import changes_since
 from app.services.company_enrichment_service import CompanyEnrichmentService
@@ -88,9 +89,28 @@ MAX_SNAPSHOT_BATCH_TICKERS = 50
 
 
 @router.get("/{ticker}/extended-quote", response_model=ExtendedQuote)
-async def company_extended_quote(ticker: str) -> ExtendedQuote:
-    """Yahoo intraday/extended hours; no persistence or database dependency."""
-    return await extended_quote_service.get(ticker)
+async def company_extended_quote(ticker: str, db: Session = Depends(get_db)) -> ExtendedQuote:
+    """Yahoo intraday/extended hours. With the market closed, `change` and
+    `change_percent` stay null (no live reference) and the day variation comes
+    from official closes in our DB as `close_change*` (last close vs previous
+    session). Any DB failure leaves those fields null; the quote still works."""
+    quote = await extended_quote_service.get(ticker)
+    if quote.session == "cerrado" and quote.price is not None:
+        try:
+            def _close_change() -> dict | None:
+                company = resolve_company(db, ticker)
+                return market_change.ticker_close_change(db, company.id) if company else None
+
+            info = await run_in_threadpool(_close_change)
+        except Exception:  # noqa: BLE001 - the quote must not depend on the DB
+            logger.warning("extended-quote close change unavailable for %s", ticker, exc_info=True)
+            info = None
+        if info:
+            quote.close_change = info["change"]
+            quote.close_change_percent = info["change_percent"]
+            quote.close_change_date = info["date"]
+            quote.close_change_previous_date = info["previous_date"]
+    return quote
 
 
 

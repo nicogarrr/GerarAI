@@ -40,6 +40,13 @@ class ExtendedQuote(BaseModel):
     low: float | None = None
     metrics_timestamp: int | None = None
     metrics_session: str | None = None
+    # "Ultimo cierre vs anterior" con cierres oficiales de nuestra BD (misma
+    # regla que /api/market/changes). Solo con mercado cerrado y dos sesiones
+    # comunes consecutivas; nunca se mezcla con el previous_close de Yahoo.
+    close_change: float | None = None
+    close_change_percent: float | None = None
+    close_change_date: str | None = None
+    close_change_previous_date: str | None = None
 
 
 def _number(value: Any) -> float | None:

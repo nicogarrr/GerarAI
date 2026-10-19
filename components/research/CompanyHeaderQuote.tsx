@@ -118,9 +118,20 @@ export function CompanyHeaderQuote({
                 {showPrice && quote && quote.session !== 'cerrado' && (quote.change != null || quote.change_percent != null) ? (
                     <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${signBase > 0 ? 'bg-emerald-500/10 text-emerald-300' : signBase < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
                         {[
-                            quote.change != null ? (currency === 'USD' ? new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', signDisplay:'always', minimumFractionDigits:2, maximumFractionDigits:2}).format(quote.change) : formatNumber(quote.change, { signDisplay: 'always', maximumFractionDigits: 2 })) : null,
+                            quote.change != null ? (currency === 'USD' ? new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', signDisplay:'exceptZero', minimumFractionDigits:2, maximumFractionDigits:2}).format(quote.change) : formatNumber(quote.change, { signDisplay: 'exceptZero', maximumFractionDigits: 2 })) : null,
                             quote.change_percent != null ? formatPercent(quote.change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }) : null,
                         ].filter(Boolean).join(' · ')}
+                    </div>
+                ) : null}
+                {showPrice && quote && quote.session === 'cerrado' && quote.close_change_percent != null && quote.close_change_date && quote.close_change_previous_date ? (
+                    <div data-testid="close-change">
+                        <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${quote.close_change_percent > 0 ? 'bg-emerald-500/10 text-emerald-300' : quote.close_change_percent < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
+                            {[
+                                quote.close_change != null ? (currency === 'USD' ? new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', signDisplay:'exceptZero', minimumFractionDigits:2, maximumFractionDigits:2}).format(quote.close_change) : formatNumber(quote.close_change, { signDisplay: 'exceptZero', maximumFractionDigits: 2 })) : null,
+                                formatPercent(quote.close_change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }),
+                            ].filter(Boolean).join(' · ')}
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">Último cierre vs anterior · {quoteSessionDate(quote.close_change_date)} vs {quoteSessionDate(quote.close_change_previous_date)} (cierres oficiales)</p>
                     </div>
                 ) : null}
                 {duplicatedClose ? null : (
