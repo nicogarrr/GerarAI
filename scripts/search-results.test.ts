@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error TS5097
-import { exactSymbolFirst, onePerIssuer } from '../lib/market/search-results.ts';
+import { exactSymbolFirst, marketPriority, onePerIssuer } from '../lib/market/search-results.ts';
 
 test('oculta el simbolo desnudo cuando existe el listado base del mismo emisor', () => {
     const rows = [
@@ -54,4 +54,16 @@ test('sin ticker exacto el comportamiento previo no cambia', () => {
         { symbol: 'ASML.AS', description: 'ASML HOLDING NV' },
     ];
     assert.deepEqual(onePerIssuer(rows, 'ASML HOLDING').map((r: { symbol: string }) => r.symbol), ['ASML.AS']);
+});
+
+test('marketPriority pone EE. UU. antes que bolsas secundarias (CPT Camden antes que CPT.BK)', () => {
+    const rows = [
+        { symbol: 'CPT.BK', description: 'CAPITAL TRUST' },
+        { symbol: 'CPT.SW', description: 'CPT SA' },
+        { symbol: 'CPTX', description: 'CAMDEN PROPERTY TRUST' },
+        { symbol: 'CPT.MC', description: 'CPT' },
+    ];
+    assert.deepEqual(marketPriority(rows, 'CPT').map((r: { symbol: string }) => r.symbol), ['CPTX', 'CPT.SW', 'CPT.MC', 'CPT.BK']);
+    const exact = [{ symbol: 'ABC.BK' }, { symbol: 'ABC' }];
+    assert.equal(marketPriority(exact, 'ABC.BK')[0].symbol, 'ABC.BK');
 });
