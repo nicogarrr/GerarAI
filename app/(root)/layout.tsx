@@ -1,4 +1,5 @@
 import SectionNav from "@/components/layout/SectionNav";
+import { ScrollPreserver } from "@/components/layout/ScrollPreserver";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import Header from "@/components/Header";
 import BottomNav from "@/components/layout/BottomNav";
@@ -63,6 +64,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                 </div>
             </div>
             <BottomNav />
+            <ScrollPreserver />
             {/* Cerebro global: una sola instancia para toda la app, con
                 contexto de página explícito. Solo lectura. */}
             <GlobalBrain userId={user.id} />
