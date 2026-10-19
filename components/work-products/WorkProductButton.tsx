@@ -1,4 +1,5 @@
 'use client';
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 
 import { useState } from 'react';
 import { FileOutput, Loader2 } from 'lucide-react';
@@ -103,10 +104,11 @@ export default function WorkProductButton() {
                         <Label htmlFor="wp-ticker" className="text-gray-300">
                             Ticker <span className="text-gray-500">(opcional)</span>
                         </Label>
-                        <Input
+                        <TickerSearchInput
                             id="wp-ticker"
                             value={ticker}
-                            onChange={(event) => setTicker(event.target.value.toUpperCase())}
+                            onValueChange={setTicker}
+                            onSelect={(stock) => setTicker(stock.symbol)}
                             placeholder="AAPL"
                             className="bg-gray-900 border-gray-600 text-gray-100"
                         />

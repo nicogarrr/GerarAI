@@ -1,3 +1,4 @@
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { BookOpen, Filter, Search as SearchIcon } from 'lucide-react';
@@ -91,7 +92,7 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
         <details className="mt-4">
           <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-gray-400"><Filter aria-hidden="true" className="h-4 w-4" />Filtros avanzados</summary>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Input className="h-11 w-full" defaultValue={query.ticker} name="ticker" placeholder="Ticker" />
+            <TickerSearchInput className="h-11 w-full" defaultValue={query.ticker} name="ticker" placeholder="Ticker" />
             <Input className="h-11 w-full" defaultValue={query.entity_types} name="entity_types" placeholder="Tipos de entidad, separados por comas" />
             <Input className="h-11 w-full" defaultValue={query.source_types} name="source_types" placeholder="Tipos de fuente, separados por comas" />
             <Input className="h-11 w-full" defaultValue={query.statuses} name="statuses" placeholder="Estados, separados por comas" />

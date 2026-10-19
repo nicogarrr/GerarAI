@@ -1,3 +1,4 @@
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { NOT_VALUABLE, researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -255,13 +256,13 @@ export default async function ResearchPage({
                             <label className="sr-only" htmlFor="research-index-q">
                                 Filtrar por ticker o nombre
                             </label>
-                            <input
+                            <TickerSearchInput
                                 className="w-full max-w-xs rounded-lg border border-gray-700 bg-surface-1 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:border-teal-600 focus:outline-none"
                                 defaultValue={query}
                                 id="research-index-q"
                                 name="q"
                                 placeholder="Filtrar por ticker o nombre"
-                                type="search"
+                                options={ordered.map(company => ({symbol: company.ticker, name: company.name}))}
                             />
                             <button
                                 className="rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-200 transition hover:border-teal-700"

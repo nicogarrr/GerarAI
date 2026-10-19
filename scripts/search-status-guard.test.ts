@@ -63,33 +63,44 @@ describe('F215: búsqueda con estado explícito', () => {
     assert.equal(gate.isLatest(enVuelo), false);
   });
 
-  it('el alta de transacciones invalida en el efecto de query, no tras el debounce', () => {
-    const add = source('components/portfolio/AddTransactionButton.tsx');
-    const effect = add.slice(add.indexOf('useEffect('), add.indexOf('}, [searchQuery, handleSearch])'));
-    const invalidateAt = effect.indexOf('searchGateRef.current.invalidate()');
+  it('el buscador de ticker compartido invalida en el efecto de query, no tras el debounce', () => {
+    const add = source('components/search/TickerSearchInput.tsx');
+    const effect = add.slice(add.indexOf('useEffect('), add.indexOf('}, [value, runSearch])'));
+    const invalidateAt = effect.indexOf('gate.invalidate()');
     const debounceAt = effect.indexOf('setTimeout(');
     assert.ok(invalidateAt !== -1, 'el efecto debe invalidar lo que está en vuelo');
     assert.ok(invalidateAt < debounceAt, 'la invalidación va ANTES del debounce, no detrás');
     const emptyBranch = effect.slice(effect.indexOf('} else {'));
-    assert.ok(emptyBranch.includes('setSearchLoading(false)'), 'al borrar, el spinner no puede quedarse colgado de una respuesta vieja');
+    assert.ok(emptyBranch.includes('setLoading(false)'), 'al borrar, el spinner no puede quedarse colgado de una respuesta vieja');
+    assert.ok(emptyBranch.includes('setError(false)'), 'borrar la query limpia el error');
   });
 
-  it('el alta de transacciones invalida respuestas tardías y limpia el error al borrar', () => {
-    const add = source('components/portfolio/AddTransactionButton.tsx');
+  it('el buscador de ticker compartido invalida respuestas tardías en todas las vías', () => {
+    const add = source('components/search/TickerSearchInput.tsx');
     assert.ok(add.includes('searchGateRef.current.begin()'), 'cada búsqueda pide ticket');
     assert.ok(
       (add.match(/isLatest\(ticket\)/g) ?? []).length >= 2,
       'tanto la vía ok como la de error comprueban el ticket antes de pintar',
     );
-    // al borrar la query se limpia el error en las dos ramas de salida
-    const emptyBranch = add.slice(add.indexOf('if (query.length < 1)'), add.indexOf('setSearchLoading(true);'));
-    assert.ok(emptyBranch.includes('setSearchError(false)'), 'borrar la query limpia el error');
   });
 
-  it('el alta de transacciones tampoco confunde error con "sin resultados"', () => {
-    const add = source('components/portfolio/AddTransactionButton.tsx');
-    assert.ok(add.includes('searchStocksWithStatus'), 'AddTransactionButton debe usar la variante con estado');
-    assert.ok(add.includes('searchError'), 'debe tener estado de error visible');
+  it('el buscador de ticker compartido tampoco confunde error con "sin resultados"', () => {
+    const add = source('components/search/TickerSearchInput.tsx');
+    assert.ok(add.includes('searchStocksWithStatus'), 'TickerSearchInput debe usar la variante con estado');
+    assert.ok(add.includes("result.status === 'error'"), 'debe distinguir error de proveedor de lista vacía');
+    assert.ok(add.includes('Sin resultados para'), 'la lista vacía real se declara como tal');
+  });
+
+  it('los buscadores de ticker de la app usan el componente compartido', () => {
+    for (const file of [
+      'components/portfolio/AddTransactionButton.tsx',
+      'components/insider/InsiderSignalsView.tsx',
+      'components/alerts/AlertsManager.tsx',
+    ]) {
+      assert.ok(source(file).includes('TickerSearchInput'), `${file} debe usar el buscador compartido`);
+    }
+    // Sin implementaciones duplicadas del dropdown inline.
+    assert.ok(!source('components/portfolio/AddTransactionButton.tsx').includes('Dropdown de resultados'), 'no queda dropdown duplicado en cartera');
   });
 });
 

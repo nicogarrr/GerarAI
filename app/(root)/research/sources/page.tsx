@@ -1,3 +1,4 @@
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, FileText, ShieldCheck, UploadCloud } from 'lucide-react';
@@ -111,13 +112,13 @@ export default async function ResearchSourcesPage({
           <label className="sr-only" htmlFor="sources-ticker">
             Filtrar por ticker
           </label>
-          <Input
+          <TickerSearchInput
             className="min-w-0 flex-1 border-gray-800 bg-black/30 text-gray-200 sm:max-w-xs sm:flex-none"
             defaultValue={ticker}
             id="sources-ticker"
             name="ticker"
             placeholder="Filtrar por ticker (p. ej. AAPL)"
-            type="search"
+            
           />
           <Button size="sm" type="submit" variant="outline">
             Filtrar
@@ -260,7 +261,7 @@ export default async function ResearchSourcesPage({
           <div className="grid gap-3">
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="ticker">Ticker</label>
-              <Input id="ticker" name="ticker" placeholder="p. ej. ASTS" required />
+              <TickerSearchInput id="ticker" name="ticker" placeholder="p. ej. ASTS" required />
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="manual-source-type">Tipo de fuente</label>
@@ -308,7 +309,7 @@ export default async function ResearchSourcesPage({
             <div className="grid gap-3">
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-ticker">Ticker</label>
-                <Input id="file-ticker" name="ticker" placeholder="p. ej. ASTS" required />
+                <TickerSearchInput id="file-ticker" name="ticker" placeholder="p. ej. ASTS" required />
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-title">Título</label>
@@ -341,7 +342,7 @@ export default async function ResearchSourcesPage({
             <div className="grid gap-3">
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url-ticker">Ticker</label>
-                <Input id="url-ticker" name="ticker" placeholder="p. ej. ASTS" required />
+                <TickerSearchInput id="url-ticker" name="ticker" placeholder="p. ej. ASTS" required />
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url-title">Título</label>

@@ -40,10 +40,13 @@ test('reviewed snapshot only contains explicit CNMV .MC aliases', () => {
 
 test('modal handles rejection, deadline, stale query and close', () => {
     const modal = readFileSync('components/watchlist/WatchlistAddButton.tsx', 'utf8');
-    assert.match(modal, /withFetchDeadline\(\(\) => searchStocksWithStatus\(query\), 6000\)/);
-    assert.match(modal, /catch \{[\s\S]*setSearchFailed\(true\)/);
-    assert.match(modal, /if \(!open \|\| !query\) return/);
-    assert.ok((modal.match(/isLatest\(ticket\)/g) ?? []).length >= 3);
+    assert.ok(modal.includes('TickerSearchInput'));
+    const shared = readFileSync('components/search/TickerSearchInput.tsx', 'utf8');
+    assert.match(shared, /withFetchDeadline\(\(\) => searchStocksWithStatus\(query\), 6000\)/);
+    assert.match(shared, /catch \{[\s\S]*setError\(true\)/);
+    assert.ok(shared.includes('focused.current'));
+    assert.ok(shared.includes('gate.invalidate()'));
+    assert.ok((shared.match(/isLatest\(ticket\)/g) ?? []).length >= 3);
 });
 
 

@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { ExternalLink, Search, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatRecordValue, type DataRecord } from '@/components/data/RecordViews';
@@ -148,12 +148,13 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                 </CardHeader>
                 <CardContent className="pt-4">
                     <form onSubmit={handleSearch} className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
-                        <Input
+                        <TickerSearchInput
                             value={ticker}
-                            onChange={(event) => setTicker(event.target.value.toUpperCase())}
-                            placeholder={t('insider.searchPlaceholder')}
-                            maxLength={20}
-                            className="h-11 w-full bg-gray-900 font-mono uppercase"
+                            onValueChange={setTicker}
+                            onSelect={(stock) => router.push(`/insider?ticker=${encodeURIComponent(stock.symbol.toUpperCase())}`)}
+                            placeholder="Buscar por ticker o empresa"
+                            ariaLabel={t('insider.searchPlaceholder')}
+                            className="h-11 w-full bg-gray-900"
                         />
                         <Button type="submit" className="h-11 w-full gap-2 bg-teal-600 hover:bg-teal-700 sm:w-auto">
                             <Search aria-hidden="true" className="h-4 w-4" />

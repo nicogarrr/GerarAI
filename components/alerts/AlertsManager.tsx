@@ -25,6 +25,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
@@ -255,12 +256,14 @@ function AlertsManager() {
                         <div className="space-y-4 mt-4">
                             <div>
                                 <Label htmlFor="symbol" className="text-gray-300">Símbolo</Label>
-                                <Input
+                                <TickerSearchInput
                                     id="symbol"
                                     value={formData.symbol}
-                                    onChange={(e) => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })}
+                                    onValueChange={(value) => setFormData({ ...formData, symbol: value.toUpperCase() })}
+                                    onSelect={(stock) => setFormData({ ...formData, symbol: stock.symbol.toUpperCase() })}
                                     placeholder="AAPL"
-                                    className="bg-gray-900 border-gray-600 text-gray-100 h-11 text-base sm:h-9 sm:text-sm"
+                                    ariaLabel="Símbolo"
+                                    className="bg-gray-900 border-gray-600 text-gray-100 h-11 text-base sm:h-9 sm:text-sm w-full"
                                 />
                             </div>
                             <div>
