@@ -71,9 +71,13 @@ STRICT_NAME_PATTERNS: dict[str, tuple[str, ...]] = {
 # «Aena» suelto vale si el texto trae ademas una palabra del sector o de su
 # entorno en Espana; sin ella, es una colision de palabra.
 _STRICT_CONTEXT = {
+    # «shares»/«stocks» sueltos NO valen como contexto: «She shares her CPT
+    # experience for F-1 students» (visado) vinculaba con Camden por «shares»
+    # (objeción del auditor, 19-oct-2026). Contexto del sector REIT o
+    # financiero, no verbos corrientes.
     "CPT": re.compile(
         r"\breit\b|residencial|apartamentos?|apartments?|multifamily|vivienda|alquiler|"
-        r"beneficio|resultados|dividendo|ingresos|\bNYSE\b|\bstocks?\b|\bshares?\b|\bearnings\b",
+        r"beneficio|resultados|dividendo|ingresos|\bNYSE\b|\bearnings\b",
         flags=re.IGNORECASE,
     ),
     "AENA": re.compile(

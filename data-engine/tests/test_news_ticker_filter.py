@@ -300,3 +300,17 @@ def test_cpt_requires_full_name_or_reit_context():
     assert not fails_strict_name(cpt, "Camden Property Trust raises guidance")
     assert not fails_strict_name(cpt, "CPT Camden Property Trust raises guidance")
     assert not fails_strict_name(cpt, "CPT CPT apartments REIT raises dividend")
+
+
+def test_cpt_context_rejects_plain_shares_stocks():
+    """Objeción del auditor (19-oct-2026): «She shares her CPT experience
+    for F-1 students» vinculaba con Camden por «shares» suelto."""
+    from types import SimpleNamespace
+
+    from app.services.ticker_news_lane import fails_strict_name
+
+    cpt = SimpleNamespace(ticker="CPT", name="Camden Property Trust")
+    assert fails_strict_name(cpt, "She shares her CPT experience for F-1 students")
+    assert fails_strict_name(cpt, "CPT CPT stocks for students: what the visa allows")
+    # El contexto del sector REIT sigue valiendo.
+    assert not fails_strict_name(cpt, "CPT CPT apartments REIT raises dividend")

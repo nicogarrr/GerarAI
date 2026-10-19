@@ -118,3 +118,7 @@ def test_cpt_visa_headline_does_not_link_to_camden():
     # pegada de ingesta (mismo criterio conservador que AENA); se pierde ese
     # titular y se conserva la cobertura que nombra a la empresa.
     assert not _ticker_evidence("CPT", "Camden Property Trust", "CPT apartments REIT raises dividend")
+
+
+def test_cpt_shares_verb_is_not_reit_context():
+    assert not _ticker_evidence("CPT", "Camden Property Trust", "She shares her CPT experience for F-1 students")
