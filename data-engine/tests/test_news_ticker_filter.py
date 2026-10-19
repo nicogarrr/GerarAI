@@ -282,3 +282,21 @@ def test_aena_requires_full_name_not_the_bare_word():
     assert fails_strict_name(aena, "AENA Aguas fecales en Ibiza", )
     # Otras empresas no se ven afectadas.
     assert not fails_strict_name(SimpleNamespace(ticker="NVDA", name="NVIDIA Corp"), "NVDA rises")
+
+
+def test_cpt_requires_full_name_or_reit_context():
+    """CPT = Curricular Practical Training (visado estudiantil) colaba en las
+    noticias de Camden Property Trust (Tester 4 nº5, prod 19-oct-2026)."""
+    from types import SimpleNamespace
+
+    from app.services.ticker_news_lane import fails_strict_name
+
+    cpt = SimpleNamespace(ticker="CPT", name="Camden Property Trust")
+    assert fails_strict_name(cpt, "CPT work authorization for F-1 students explained")
+    assert fails_strict_name(cpt, "What is Curricular Practical Training (CPT)?")
+    # «Camden» a secas es un lugar corriente: no basta.
+    assert fails_strict_name(cpt, "Camden market vendors protest rent hike")
+    # Formas verificadas y sigla con contexto REIT sí vinculan.
+    assert not fails_strict_name(cpt, "Camden Property Trust raises guidance")
+    assert not fails_strict_name(cpt, "CPT Camden Property Trust raises guidance")
+    assert not fails_strict_name(cpt, "CPT CPT apartments REIT raises dividend")

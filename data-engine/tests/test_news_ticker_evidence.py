@@ -107,3 +107,14 @@ def test_price_target_phrase_still_counts_as_context():
     assert _ticker_evidence("CB", "Chubb Limited", "Wells Fargo raises CB target price to $300")
     assert _ticker_evidence("CB", "Chubb Limited", "CB target price raised")
     assert _ticker_evidence("CB", "Chubb Limited", "Jefferies sets CB target at $280")
+
+
+def test_cpt_visa_headline_does_not_link_to_camden():
+    """La sigla CPT de visado estudiantil no vincula con Camden (REIT)."""
+    assert not _ticker_evidence("CPT", "Camden Property Trust", "New CPT rules for international students")
+    assert _ticker_evidence("CPT", "Camden Property Trust", "Camden Property Trust reports Q3 results")
+    assert _ticker_evidence("CPT", "Camden Property Trust", "CPT Camden Property apartments REIT raises dividend")
+    # Titular que empieza por la sigla suelta: indistinguible de la etiqueta
+    # pegada de ingesta (mismo criterio conservador que AENA); se pierde ese
+    # titular y se conserva la cobertura que nombra a la empresa.
+    assert not _ticker_evidence("CPT", "Camden Property Trust", "CPT apartments REIT raises dividend")

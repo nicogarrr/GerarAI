@@ -49,6 +49,14 @@ VERIFIED_ALIASES: dict[str, tuple[str, ...]] = {
 # Rio de Janeiro, Adani o aguas fecales de Ibiza): el ticker o «Aena» sueltos no
 # vinculan; hace falta el nombre completo, una forma verificada o el cashtag.
 STRICT_NAME_PATTERNS: dict[str, tuple[str, ...]] = {
+    # CPT = Curricular Practical Training (visado de estudiantes) en titulares
+    # de educación; el REIT es Camden Property Trust. «Camden» a secas no vale:
+    # es un lugar corriente.
+    "CPT": (
+        r"Camden\s+Property(?:\s+Trust)?",
+        r"\$CPT\b",
+        r"\bNYSE\s*:\s*CPT\b",
+    ),
     "AENA": (
         r"Aena\s+S\.?\s?M\.?\s?E\.?",
         r"Aena\s+Aeropuertos",
@@ -63,6 +71,11 @@ STRICT_NAME_PATTERNS: dict[str, tuple[str, ...]] = {
 # «Aena» suelto vale si el texto trae ademas una palabra del sector o de su
 # entorno en Espana; sin ella, es una colision de palabra.
 _STRICT_CONTEXT = {
+    "CPT": re.compile(
+        r"\breit\b|residencial|apartamentos?|apartments?|multifamily|vivienda|alquiler|"
+        r"beneficio|resultados|dividendo|ingresos|\bNYSE\b|\bstocks?\b|\bshares?\b|\bearnings\b",
+        flags=re.IGNORECASE,
+    ),
     "AENA": re.compile(
         r"aeropuert|aeroportuari|pasajeros|tarifas|barajas|el\s+prat|enaire|ferrovial|"
         r"\bBME\b|\bIBEX\b|\bCNMC\b|aerol(?:í|i)neas|\bvuelos\b|"
@@ -78,7 +91,7 @@ def fails_strict_name(company, text: str) -> bool:
     Vale: una forma completa verificada, o «Aena» suelto (fuera del ticker pegado
     delante) junto a una palabra de contexto del sector.
     """
-    ticker = (getattr(company, "ticker", "") or "").upper()
+    ticker = (getattr(company, "ticker", None) or str(company)).upper()
     patterns = STRICT_NAME_PATTERNS.get(ticker)
     if not patterns:
         return False
@@ -257,6 +270,8 @@ def _cites_company_in_title(company, title: str) -> bool:
     # El ticker como primera palabra SI vale como cita («MSFT raises dividend»);
     # el caso de etiqueta pegada falsa lo filtra _only_ticker_prefix_mention.
     text = (title or "").strip()
+    if fails_strict_name(company, text):
+        return False
     return any(
         re.search(rf"(?<![\w]){re.escape(term)}(?![\w])", text, flags=re.IGNORECASE)
         for term in _company_terms(company)
@@ -275,6 +290,8 @@ def _cites_company(company, title: str, summary: str) -> bool:
     ticker = (getattr(company, "ticker", "") or "").upper()
     if not ticker:
         return True
+    if fails_strict_name(company, f"{title or ''} {summary or ''}"):
+        return False
     prefix = re.compile(rf"^\s*{re.escape(ticker)}\s+")
     rest = f"{prefix.sub('', title or '', count=1)} {prefix.sub('', summary or '', count=1)}"
     return any(
@@ -312,6 +329,8 @@ def _name_phrase(name: str | None) -> str | None:
 def company_mentioned(company, text: str, evidence_level) -> bool:
     """True si el texto cita a la empresa: ticker con evidencia, alias verificado
     o nombre completo (>= 2 palabras distintivas). Sin inferir nada mas."""
+    if fails_strict_name(company, text):
+        return False
     if evidence_level(company.ticker, company.name, text) > 0:
         return True
     terms = list(VERIFIED_ALIASES.get(company.ticker.upper(), ()))
