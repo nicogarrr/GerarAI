@@ -139,6 +139,16 @@ METRIC_DEFINITIONS: dict[str, MetricFormula] = {
         ("capital_expenditure", "depreciation_amortization"),
         "decimal",
     ),
+    # FCF antes de gasto de crecimiento (apuntes manuscritos, oct 2026):
+    # la caja que generaria el negocio invirtiendo solo en mantenerse.
+    # La separacion mantenimiento/crecimiento no se publica: estimacion
+    # declarada, misma regla que owner_earnings.
+    "fcf_before_growth_capex": (
+        "FCF_BEFORE_GROWTH_CAPEX_V1",
+        "free_cash_flow + estimated_growth_capex, where estimated_growth_capex = abs(capital_expenditure) - maintenance_capex and maintenance_capex = min(abs(capital_expenditure), depreciation_amortization); the maintenance/growth split is not separately reported - declared estimate",
+        ("free_cash_flow", "capital_expenditure", "depreciation_amortization"),
+        "USD",
+    ),
     # Marco de calidad (apuntes manuscritos, sept 2026): 5 checks
     # trazables. Cada check no evaluable queda declarado como null, nunca
     # cuenta como superado.
@@ -290,6 +300,8 @@ class MetricCalculationService:
             return self._calculate_quality_score(db, company, persist)
         if metric == "quality_moat_score_v2":
             return self._calculate_quality_score_v2(db, company, persist)
+        if metric == "fcf_before_growth_capex":
+            return self._calculate_fcf_before_growth_capex(db, company, persist)
 
         facts = self._coherent_facts(
             db,
@@ -1705,6 +1717,187 @@ class MetricCalculationService:
             wacc_result,
         ]
         return checks, component_results
+
+    def _calculate_fcf_before_growth_capex(
+        self, db: Session, company: Company, persist: bool
+    ) -> MetricResult:
+        """FCF antes de gasto de crecimiento = FCF + capex de crecimiento estimado.
+
+        Estados: ok con los tres inputs (la separacion mantenimiento/crecimiento
+        es siempre una estimacion declarada, nunca un dato reportado); partial
+        cuando falta D&A y el capex de crecimiento no se puede separar - el
+        valor publicado es el FCF reportado, cota inferior declarada porque
+        growth_capex >= 0; unavailable cuando falta FCF o capex (insufficient
+        data).
+        """
+        metric = "fcf_before_growth_capex"
+        definition_version, formula, inputs, unit = METRIC_DEFINITIONS[metric]
+        facts = self._coherent_facts(db, company, inputs)
+        period = self._period_for_result(facts)
+        missing = [input_metric for input_metric in inputs if input_metric not in facts]
+        first = next(iter(facts.values()), None)
+
+        def build(
+            *,
+            status: str,
+            value: Decimal | None,
+            numerator: Decimal | None,
+            trace: dict,
+            confidence: Decimal,
+            fact_list: list[FinancialFact],
+            result_unit: str,
+        ) -> MetricResult:
+            return MetricResult(
+                metric=metric,
+                status=status,
+                period=period,
+                value=value,
+                unit=result_unit,
+                definition_version=definition_version,
+                formula=formula,
+                numerator=numerator,
+                denominator=Decimal("1") if numerator is not None else None,
+                source_fact_ids=[fact.id for fact in fact_list],
+                calculation_trace=trace,
+                confidence=confidence,
+                fiscal_year=first.fiscal_year if first else None,
+                fiscal_quarter=first.fiscal_quarter if first else None,
+            )
+
+        if "free_cash_flow" in missing or "capital_expenditure" in missing:
+            return self._persist_if_requested(
+                db,
+                company,
+                build(
+                    status="unavailable",
+                    value=None,
+                    numerator=None,
+                    trace={
+                        "reason": "missing_inputs",
+                        "missing_inputs": missing,
+                        "available_inputs": sorted(facts),
+                    },
+                    confidence=Decimal("0.00"),
+                    fact_list=list(facts.values()),
+                    result_unit=unit,
+                ),
+                persist,
+            )
+
+        anchor = facts["free_cash_flow"]
+        incoherent = {
+            input_metric: facts[input_metric].period
+            for input_metric in inputs[1:]
+            if input_metric in facts and not self._same_period(facts[input_metric], anchor)
+        }
+        if incoherent:
+            return self._persist_if_requested(
+                db,
+                company,
+                build(
+                    status="unavailable",
+                    value=None,
+                    numerator=None,
+                    trace={
+                        "reason": "incoherent_periods",
+                        "anchor": {"metric": "free_cash_flow", "period": anchor.period},
+                        "incoherent_inputs": incoherent,
+                    },
+                    confidence=Decimal("0.00"),
+                    fact_list=list(facts.values()),
+                    result_unit=unit,
+                ),
+                persist,
+            )
+
+        unique_facts = self._unique_facts(facts)
+        units = {fact.unit for fact in unique_facts if fact.unit}
+        if len(units) > 1:
+            return self._persist_if_requested(
+                db,
+                company,
+                self._mixed_unit_result(
+                    metric, period, unit, definition_version, formula, unique_facts, sorted(units)
+                ),
+                persist,
+            )
+        result_unit = units.pop() if units else unit
+        confidence = min(
+            (Decimal(fact.confidence) for fact in unique_facts), default=Decimal("0.70")
+        )
+        maintenance_rule = (
+            "min(abs(capital_expenditure), depreciation_amortization); "
+            "maintenance capex is not separately reported - declared "
+            "conservative estimate"
+        )
+        fcf = Decimal(facts["free_cash_flow"].value)
+        capex_abs = abs(Decimal(facts["capital_expenditure"].value))
+
+        if "depreciation_amortization" in missing:
+            # Sin D&A no se puede separar el capex de crecimiento. El FCF
+            # reportado es un dato real y una cota inferior (growth_capex >= 0):
+            # se publica como partial con la base declarada, nunca como ok.
+            return self._persist_if_requested(
+                db,
+                company,
+                build(
+                    status="partial",
+                    value=_quantize(fcf),
+                    numerator=_quantize(fcf),
+                    trace={
+                        "method": "fcf_before_growth_capex",
+                        "reason": "growth_capex_not_separable",
+                        "missing_inputs": ["depreciation_amortization"],
+                        "maintenance_capex_rule": maintenance_rule,
+                        "value_basis": (
+                            "reported_fcf_lower_bound: growth capex >= 0, so the "
+                            "reported FCF understates FCF before growth spend"
+                        ),
+                    },
+                    confidence=confidence,
+                    fact_list=unique_facts,
+                    result_unit=result_unit,
+                ),
+                persist,
+            )
+
+        depreciation = Decimal(facts["depreciation_amortization"].value)
+        maintenance_capex = min(capex_abs, depreciation)
+        growth_capex = capex_abs - maintenance_capex
+        value = _quantize(fcf + growth_capex)
+        return self._persist_if_requested(
+            db,
+            company,
+            build(
+                status="ok",
+                value=value,
+                numerator=value,
+                trace={
+                    "method": "fcf_before_growth_capex",
+                    "maintenance_capex": str(_quantize(maintenance_capex)),
+                    "maintenance_capex_rule": maintenance_rule,
+                    "estimated_growth_capex": str(_quantize(growth_capex)),
+                    "estimate": (
+                        "the maintenance/growth capex split is a declared "
+                        "estimate, not separately reported by the company"
+                    ),
+                    "inputs": {
+                        input_metric: {
+                            "fact_id": fact.id,
+                            "value": str(fact.value),
+                            "period": fact.period,
+                            "source_type": fact.source_type,
+                            "metric": fact.metric,
+                        }
+                        for input_metric, fact in facts.items()
+                    },
+                },
+                confidence=confidence,
+                fact_list=unique_facts,
+                result_unit=result_unit,
+            ),
+            persist,
+        )
 
     def _quality_score_result(
         self,

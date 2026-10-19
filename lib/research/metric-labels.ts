@@ -13,6 +13,8 @@ export const METRIC_LABELS: Record<string, string> = {
     incremental_roic: 'ROIC incremental',
     stock_based_compensation: 'Remuneración en acciones',
     owner_earnings: 'Beneficio del propietario',
+    fcf_before_growth_capex: 'FCF antes de gasto de crecimiento (estimado)',
+    estimated_growth_capex: 'capex de crecimiento estimado',
 
     // Hechos canónicos (financial_ingestion_service.py)
     revenue: 'Ingresos',
