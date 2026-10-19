@@ -25,7 +25,6 @@ from app.services.news_service import (
 from app.services.news_story_cluster import (
     StoryGroup,
     absorb,
-    best_text,
     event_signature,
     exact_key,
     find_group,
@@ -174,7 +173,7 @@ def news_events(
                             event=event,
                             company=company,
                             signature=sig,
-                            text_key=exact_key(best_text(event)),
+                            text_key=exact_key(original_headline(event)),
                         )
                     )
                     item = ("story", len(story_groups) - 1)
