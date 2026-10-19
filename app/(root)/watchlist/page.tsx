@@ -303,8 +303,8 @@ export default async function WatchlistPage({
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip p-4 sm:p-6">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
-                    <h1 className="flex items-center gap-2 text-2xl font-bold break-words text-gray-100 sm:gap-3 sm:text-3xl">
-                        <Eye className="h-7 w-7 shrink-0 text-purple-400 sm:h-8 sm:w-8" aria-hidden="true" />
+                    <h1 className="flex items-center gap-2 text-xl font-bold break-words text-gray-100 sm:text-2xl">
+                        <Eye className="h-5 w-5 shrink-0 text-purple-400" aria-hidden="true" />
                         Watchlist
                     </h1>
                     {undervaluedCount + overvaluedCount > 0 ? (
@@ -347,11 +347,11 @@ export default async function WatchlistPage({
                 </Card>
             ) : (
                 <>
-                    <nav aria-label="Páginas de watchlist" className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-400">
+                    <nav aria-label="Páginas de watchlist" className="flex flex-nowrap items-center justify-between gap-2 text-xs text-gray-400">
                         <span>{watchlistItems.length} empresas · Página {page} de {totalPages}</span>
                         {/* Ordenar también sin cabeceras de tabla (móvil/tablet con tarjetas): menú de enlaces, sin JS. */}
                         <details className="relative xl:hidden">
-                            <summary className="min-h-[44px] cursor-pointer list-none rounded px-2 py-2 text-sm text-gray-300 hover:text-gray-100">
+                            <summary className="min-h-[36px] cursor-pointer list-none rounded px-2 py-1.5 text-xs text-gray-300 hover:text-gray-100">
                                 Ordenar: {SORT_LABELS[sort]}{sort !== 'added' ? <span aria-hidden="true" className="text-teal-400"> {dir === 'asc' ? '▲' : '▼'}</span> : null}
                             </summary>
                             <div className="absolute z-10 mt-1 min-w-44 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
@@ -378,7 +378,7 @@ export default async function WatchlistPage({
                         scroll horizontal sin indicio (QA 2026-10-19, tablet 820px). */}
                     <div className="space-y-3 xl:hidden">
                         {displayStocks.map((stock) => (
-                            <article key={stock.symbol} className="min-w-0 rounded-xl border border-gray-700/60 bg-gray-900/60 p-4">
+                            <article key={stock.symbol} className="min-w-0 rounded-xl border border-gray-700/60 bg-gray-900/60 p-3">
                                 <div className="flex min-w-0 items-center gap-3">
                                     <CompanyLogo ticker={stock.quoteSymbol ?? stock.symbol} name={stock.name} className="size-11 shrink-0 rounded-lg" />
                                     <div className="min-w-0 flex-1">
@@ -402,7 +402,7 @@ export default async function WatchlistPage({
                                         </span>
                                     </div>
                                 </div>
-                                <dl className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-gray-800/50 px-2 py-3 text-center">
+                                <dl className="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-gray-800/50 px-2 py-2 text-center">
                                     <div className="col-span-2 min-w-0">
                                         <dt className="text-[11px] text-gray-500">Precio</dt>
                                         <dd className="truncate font-mono text-sm font-medium text-gray-200">{formatPriceCell(stock.price, stock.currency)}</dd>
@@ -430,7 +430,7 @@ export default async function WatchlistPage({
                                         <dd className="text-sm"><AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} /></dd>
                                     </div>
                                 </dl>
-                                <div className="mt-3 flex items-center gap-2">
+                                <div className="mt-2 flex items-center gap-2">
                                     <Link
                                         href={`/research/${stock.symbol}`}
                                         aria-label={`Ver análisis de ${stock.symbol}`}
