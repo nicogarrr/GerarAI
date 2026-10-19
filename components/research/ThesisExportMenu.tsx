@@ -32,7 +32,7 @@ export default function ThesisExportMenu({
       className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-teal-700 px-4 py-2 text-sm font-medium text-teal-200 transition hover:bg-teal-950/40 sm:min-h-0"
       download
       href={hasPublished ? `/api/thesis/${encoded}/pdf` : `/api/thesis/${encoded}/pdf?draft=1`}
-      title={hasPublished ? undefined : `PDF de la v${latestDraftVersion} en borrador, sin cifras de valoración ni margen.`}
+      title={hasPublished ? undefined : `PDF de la v${latestDraftVersion} en borrador, sin veredicto ni cifras.`}
     >
       <FileDown className="h-4 w-4" />
       {hasPublished ? 'Descargar PDF' : `Descargar PDF (borrador v${latestDraftVersion})`}

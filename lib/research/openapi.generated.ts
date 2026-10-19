@@ -19316,6 +19316,7 @@ export interface operations {
         parameters: {
             query?: {
                 published?: boolean;
+                draft?: boolean;
             };
             header?: {
                 "x-cavaai-user"?: string | null;

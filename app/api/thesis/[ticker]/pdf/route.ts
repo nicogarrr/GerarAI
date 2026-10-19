@@ -7,23 +7,6 @@ import { buildMemoPdf } from '@/lib/thesis/memo-pdf';
 const BACKEND_URL = process.env.FMP_BACKEND_URL;
 
 /**
- * Borrador: sin cifras ni margen (regla vigente). Se quita la seccion de
- * valoracion y se marca el documento como borrador sin publicar.
- */
-function asDraftMemo(markdown: string): string {
-  const lines = markdown.split('\n');
-  const out: string[] = [];
-  let skipping = false;
-  for (const line of lines) {
-    if (line.startsWith('## ')) skipping = line.trim() === '## Valoración y escenarios';
-    if (!skipping) out.push(line);
-  }
-  const titleEnd = out.findIndex((line) => line.startsWith('# '));
-  out.splice(titleEnd + 1, 0, '', '> BORRADOR sin publicar. No incluye cifras de valoración ni margen de seguridad.');
-  return out.join('\n');
-}
-
-/**
  * PDF de lectura de la tesis PUBLICADA. Mismo contrato que el .md: el
  * backend compone el memo canonico (published=1) y aqui solo se maqueta;
  * un borrador nunca lleva cifras ni margen (404 si no hay publicada).
@@ -47,7 +30,7 @@ async function getHandler(
     path: `/api/thesis/${encodeURIComponent(upper)}/memo.md`,
   });
   const upstream = await fetch(
-    `${BACKEND_URL}/api/thesis/${encodeURIComponent(upper)}/memo.md${draft ? '' : '?published=1'}`,
+    `${BACKEND_URL}/api/thesis/${encodeURIComponent(upper)}/memo.md?${draft ? 'draft=1' : 'published=1'}`,
     { headers: identity, cache: 'no-store' },
   );
   if (!upstream.ok) {
@@ -56,7 +39,7 @@ async function getHandler(
       { status: upstream.status },
     );
   }
-  const markdown = draft ? asDraftMemo(await upstream.text()) : await upstream.text();
+  const markdown = await upstream.text();
   const pdf = await buildMemoPdf(markdown);
   const version = markdown.match(/^Versión (\d+)/m)?.[1];
   const filename = `tesis-${ticker.toLowerCase()}${version ? `-v${version}` : ''}${draft ? '-borrador' : ''}.pdf`;

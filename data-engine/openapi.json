@@ -56192,7 +56192,7 @@
     },
     "/api/thesis/{ticker}/memo.md": {
       "get": {
-        "description": "Memo Markdown descargable de la ultima tesis persistida.\n\nCon ``published=1`` la version es la ultima PUBLICADA (regla vigente: un\nborrador no ense\u00f1a cifras ni margen); sin el parametro se conserva el\ncomportamiento historico (ultima version, sea cual sea su estado).",
+        "description": "Memo Markdown descargable de la ultima tesis persistida.\n\nCon ``published=1`` la version es la ultima PUBLICADA (regla vigente: un\nborrador no ense\u00f1a cifras ni margen); sin el parametro se conserva el\ncomportamiento historico (ultima version, sea cual sea su estado).\n``draft=1`` devuelve la version de borrador sin veredicto, hipotesis,\nresumen, valoracion ni secciones (ver ``build_memo_markdown``).",
         "operationId": "thesis_memo_api_thesis__ticker__memo_md_get",
         "parameters": [
           {
@@ -56211,6 +56211,16 @@
             "schema": {
               "default": false,
               "title": "Published",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "draft",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Draft",
               "type": "boolean"
             }
           },

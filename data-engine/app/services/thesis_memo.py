@@ -28,7 +28,14 @@ def build_memo_markdown(
     *,
     stale: bool = False,
     latest_data_at: datetime | None = None,
+    draft: bool = False,
 ) -> str:
+    """``draft=True``: memo de un borrador sin publicar, por lista blanca.
+
+    Solo cabecera sin veredicto, catalizadores, criterios de invalidacion y
+    calidad de la evidencia. Sin rating, hipotesis, resumen, valoracion,
+    secciones ni fuentes: pueden llevar cifras o veredicto que la ficha oculta.
+    """
     sections = list(
         db.scalars(
             select(ThesisSection)
@@ -52,9 +59,10 @@ def build_memo_markdown(
     lines: list[str] = []
     lines.append(f"# Memo de tesis — {company.ticker} ({company.name or company.ticker})")
     lines.append("")
+    rating_part = "" if draft else f"rating {label_es(RATING_ES, thesis.rating)} · "
     lines.append(
         f"Versión {thesis.version} · estado {label_es(STATUS_ES, thesis.status)} · "
-        f"rating {label_es(RATING_ES, thesis.rating)} · "
+        f"{rating_part}"
         f"generada {thesis.created_at:%Y-%m-%d %H:%M} UTC · actualizada {thesis.updated_at:%Y-%m-%d %H:%M} UTC"
     )
     if stale:
@@ -62,26 +70,33 @@ def build_memo_markdown(
         lines.append(f"\n> ⚠ Tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).")
     lines.append("")
 
-    lines.append("## Hipótesis")
-    lines.append(thesis.hypothesis or "_Pendiente._")
-    lines.append("")
+    if draft:
+        lines.append(
+            "> BORRADOR sin publicar. No incluye veredicto, hipótesis, resumen, "
+            "valoración ni secciones de la tesis."
+        )
+        lines.append("")
+    else:
+        lines.append("## Hipótesis")
+        lines.append(thesis.hypothesis or "_Pendiente._")
+        lines.append("")
 
-    lines.append("## Resumen ejecutivo")
-    lines.append(thesis.executive_summary or "_Pendiente._")
-    lines.append("")
+        lines.append("## Resumen ejecutivo")
+        lines.append(thesis.executive_summary or "_Pendiente._")
+        lines.append("")
 
-    lines.append("## Valoración y escenarios")
-    lines.append("| Escenario | Valor | Probabilidad |")
-    lines.append("|---|---|---|")
-    lines.append(f"| Bajista | {_money(thesis.bear_value)} | {_prob('bear')} |")
-    lines.append(f"| Base | {_money(thesis.base_value)} | {_prob('base')} |")
-    lines.append(f"| Alcista | {_money(thesis.bull_value)} | {_prob('bull')} |")
-    lines.append(
-        f"\nPrecio actual: {_money(thesis.current_price)} · Valor esperado: "
-        f"{_money(thesis.expected_value)} · Margen de seguridad: "
-        + (percent_es(float(thesis.margin_of_safety)) if thesis.margin_of_safety is not None else "pendiente")
-    )
-    lines.append("")
+        lines.append("## Valoración y escenarios")
+        lines.append("| Escenario | Valor | Probabilidad |")
+        lines.append("|---|---|---|")
+        lines.append(f"| Bajista | {_money(thesis.bear_value)} | {_prob('bear')} |")
+        lines.append(f"| Base | {_money(thesis.base_value)} | {_prob('base')} |")
+        lines.append(f"| Alcista | {_money(thesis.bull_value)} | {_prob('bull')} |")
+        lines.append(
+            f"\nPrecio actual: {_money(thesis.current_price)} · Valor esperado: "
+            f"{_money(thesis.expected_value)} · Margen de seguridad: "
+            + (percent_es(float(thesis.margin_of_safety)) if thesis.margin_of_safety is not None else "pendiente")
+        )
+        lines.append("")
 
     lines.append("## Catalizadores")
     catalysts = thesis.catalysts or []
@@ -114,19 +129,20 @@ def build_memo_markdown(
     )
     lines.append("")
 
-    if sections:
-        lines.append("## Secciones")
-        for section in sections:
-            lines.append(f"### {section.title}")
-            lines.append(section.body or "_Pendiente._")
-            lines.append("")
+    if not draft:
+        if sections:
+            lines.append("## Secciones")
+            for section in sections:
+                lines.append(f"### {section.title}")
+                lines.append(section.body or "_Pendiente._")
+                lines.append("")
 
-    if evidence_rows:
-        lines.append("## Fuentes")
-        for statement, url, tier in evidence_rows:
-            short = (statement or "")[:110].replace("\n", " ")
-            lines.append(f"- [{tier}] {short} — {url}")
-        lines.append("")
+        if evidence_rows:
+            lines.append("## Fuentes")
+            for statement, url, tier in evidence_rows:
+                short = (statement or "")[:110].replace("\n", " ")
+                lines.append(f"- [{tier}] {short} — {url}")
+            lines.append("")
 
     lines.append("---")
     lines.append(

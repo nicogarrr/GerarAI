@@ -31,7 +31,7 @@ describe('QA ficha: tesis en borrador sin callejon sin salida (4)', () => {
         assert.ok(menu.includes('hasPublished'), 'recibe hasPublished');
         assert.ok(menu.includes('pdf?draft=1'), 'sin publicada baja el borrador');
         const pdfRoute = readFileSync('app/api/thesis/[ticker]/pdf/route.ts', 'utf8');
-        assert.ok(pdfRoute.includes('BORRADOR sin publicar') && pdfRoute.includes('## Valoración y escenarios'), 'el borrador sale marcado y sin cifras');
+        assert.ok(pdfRoute.includes("'draft=1'"), 'el borrador lo compone el backend (lista blanca, sin veredicto ni cifras)');
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
         assert.ok(page.includes("hasPublished={data.historyDetail.history.some((entry) => entry.status === 'published')}"), 'la ficha lo alimenta');
     });
