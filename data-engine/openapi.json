@@ -8167,6 +8167,17 @@
             "title": "Valuation Risk Score",
             "type": "integer"
           },
+          "valuation_withheld_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Withheld Reason"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -35473,7 +35484,7 @@
     },
     "/api/news": {
       "get": {
-        "description": "Eventos por pagina (scroll infinito). ``lane`` filtra en SQL:\n``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT.\n``ticker`` limita a los eventos de esa empresa (ficha de accion).\nLas filas etiquetadas con un ticker que no citan a la empresa se omiten.\nEn portada (sin ``ticker``) la misma historia publicada por varios medios\nse agrupa en la fila mas reciente: ``coverage_count``/``coverage`` declaran\nlas fuentes absorbidas (regla determinista, ver news_story_cluster).\n``tickers`` (csv, max 50) limita a esas empresas: carril «Para ti»\n(cartera + watchlist del usuario, que el cliente ya conoce).",
+        "description": "Eventos por pagina (scroll infinito). ``lane`` filtra en SQL:\n``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT.\n``ticker`` limita a los eventos de esa empresa (ficha de accion).\nLas filas etiquetadas con un ticker que no citan a la empresa se omiten.\nEn portada (sin ``ticker``) la misma historia publicada por varios medios\nse agrupa en la fila mas reciente: ``coverage_count``/``coverage`` declaran\nlas fuentes absorbidas (regla determinista, ver news_story_cluster).\n``tickers`` (csv, max 50) limita a esas empresas: carril \u00abPara ti\u00bb\n(cartera + watchlist del usuario, que el cliente ya conoce).",
         "operationId": "news_events_api_news_get",
         "parameters": [
           {
@@ -35534,6 +35545,23 @@
                 }
               ],
               "title": "Ticker"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tickers",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tickers"
             }
           },
           {
@@ -49284,6 +49312,196 @@
           }
         },
         "summary": "Run Saved Screen",
+        "tags": [
+          "screeners"
+        ]
+      }
+    },
+    "/api/screeners/universe-close": {
+      "get": {
+        "description": "Resto del universo con el ultimo cierre almacenado (fecha por fila).\n\nExcluye los valores que ya salen en vivo en /real y las entradas de\nprueba (sin CIK ni ISIN). Cada fila lleva close_date y fuente.",
+        "operationId": "universe_close_api_screeners_universe_close_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sector",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sector"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Universe Close Api Screeners Universe Close Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Universe Close",
         "tags": [
           "screeners"
         ]
