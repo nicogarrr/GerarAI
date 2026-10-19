@@ -177,3 +177,31 @@ def test_evidence_without_url_is_excluded(db):
     db.commit()
     memo = build_memo_markdown(db, company, thesis)
     assert "## Fuentes" not in memo
+
+
+def test_draft_memo_is_a_whitelist_without_verdict_or_figures(db):
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    thesis.status = "draft"
+    thesis.hypothesis = "Valoración indicativa de 999 dólares por acción."
+    thesis.executive_summary = "Margen de seguridad del 40 % según el modelo."
+    db.commit()
+
+    memo = build_memo_markdown(db, company, thesis, draft=True)
+
+    assert memo.startswith("# Memo de tesis — AAPL (Apple)")
+    assert "Versión 2 · estado borrador · generada" in memo
+    assert "BORRADOR sin publicar" in memo
+    # Nada de veredicto ni cifras de valoracion.
+    for forbidden in (
+        "rating", "rating compra", "999", "40 %", "Valoración y escenarios", "Bajista",
+        "Margen de seguridad", "## Hipótesis", "## Resumen ejecutivo", "## Secciones",
+        "Foso competitivo", "Ecosistema cerrado.", "## Fuentes", "sec.gov",
+        "La base instalada monetiza servicios a doble digito.",
+    ):
+        assert forbidden not in memo, forbidden
+    # Lo que si queda.
+    assert "- Próximos resultados (2026-11-05)" in memo
+    assert "## Criterios de invalidación" in memo
+    assert "Confianza de datos 82/100" in memo
+    assert memo.rstrip().endswith("ni recomendación de compra o venta.")

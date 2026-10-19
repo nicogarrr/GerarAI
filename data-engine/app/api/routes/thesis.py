@@ -370,6 +370,7 @@ def derived_thesis_diff(previous, current) -> dict | None:
 def thesis_memo(
     ticker: str,
     published: bool = Query(False),
+    draft: bool = Query(False),
     db: Session = Depends(get_db),
 ) -> PlainTextResponse:
     """Memo Markdown descargable de la ultima tesis persistida.
@@ -377,6 +378,8 @@ def thesis_memo(
     Con ``published=1`` la version es la ultima PUBLICADA (regla vigente: un
     borrador no enseña cifras ni margen); sin el parametro se conserva el
     comportamiento historico (ultima version, sea cual sea su estado).
+    ``draft=1`` devuelve la version de borrador sin veredicto, hipotesis,
+    resumen, valoracion ni secciones (ver ``build_memo_markdown``).
     """
     service = ThesisService()
     if published:
@@ -403,7 +406,9 @@ def thesis_memo(
     company = resolve_company(db, ticker)
     latest_data_at = service.data_freshness(db, thesis.company_id)
     stale = latest_data_at is not None and latest_data_at > thesis.updated_at
-    markdown = build_memo_markdown(db, company, thesis, stale=stale, latest_data_at=latest_data_at)
+    markdown = build_memo_markdown(
+        db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=draft
+    )
     return PlainTextResponse(
         markdown,
         media_type="text/markdown; charset=utf-8",
