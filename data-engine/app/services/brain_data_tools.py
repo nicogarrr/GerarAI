@@ -262,21 +262,36 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     if not (news or theses or comparison or valuation):
         return None
     if news:
+        from app.services.ticker_news_lane import _cites_company
+
         company_ids = select(Position.company_id).where(Position.tenant_id == tenant, Position.quantity > 0)
         rows = db.execute(select(NewsEvent, Company).join(Company, Company.id == NewsEvent.company_id).where(
             NewsEvent.tenant_id == tenant, NewsEvent.company_id.in_(company_ids),
         ).order_by(NewsEvent.date.desc(), NewsEvent.id.desc()).limit(40)).all()
         lines, sources, seen = [], [], set()
         for event, company in rows:
-            key = " ".join(event.title.lower().split())
+            # El feed liga la noticia al ticker aunque trate de otra empresa
+            # (un articulo de AEP etiquetado GOOGL): se descarta lo que no la
+            # cita de verdad. Misma regla que la ruta de empresa.
+            if not _cites_company(company, event.title or "", event.summary or ""):
+                continue
+            # El titular del feed ya trae el ticker pegado delante
+            # ("MSFT The Bet Behind..."): no repetirlo tras "MSFT:".
+            title = re.sub(
+                rf"^\s*{re.escape(company.ticker)}\s*[:\-–]?\s+",
+                "", event.title or "", count=1, flags=re.IGNORECASE,
+            ).strip()
+            if not title:
+                continue
+            key = " ".join(title.lower().split())
             if key in seen:
                 continue
             seen.add(key)
-            lines.append(f"- {company.ticker}: {event.title} ({event.date.date().isoformat()}, {event.source}).")
-            sources.append(_source("news_event", event.id, f"{company.ticker}: {event.title}", event.url or _link(company, "news")))
+            lines.append(f"- {company.ticker}: '{title}' ({event.date.date().isoformat()}, {event.source}).")
+            sources.append(_source("news_event", event.id, f"{company.ticker}: {title}", event.url or _link(company, "news")))
             if len(lines) == 6:
                 break
-        return _response(["Últimas noticias guardadas de tus posiciones abiertas:", *lines] if lines else ["No hay noticias guardadas de tus posiciones abiertas. No he consultado noticias en directo."], sources, "portfolio_news")
+        return _response(["Últimas noticias guardadas de tus posiciones abiertas (titulares en su idioma original):", *lines] if lines else ["No hay noticias guardadas de tus posiciones abiertas que citen de verdad a esas empresas. No he consultado noticias en directo."], sources, "portfolio_news")
     if theses:
         rows = db.execute(select(ThesisVersion, Company).join(Company, Company.id == ThesisVersion.company_id).where(
             ThesisVersion.tenant_id == tenant,
