@@ -1,6 +1,7 @@
 """Traducción del resumen/cuerpo de una noticia: cache, original intacto, fallback honesto."""
 import asyncio
 import json
+from datetime import datetime, timedelta
 from functools import wraps
 from types import SimpleNamespace
 
@@ -172,3 +173,15 @@ async def test_cooldown_reports_reason(db):
     second = await translate_summary(db, row.id, provider=p)
     assert second["status"] == "unavailable"
     assert second["reason"] == "cooldown"
+
+
+@sync_test
+async def test_transient_failure_cools_down_one_minute(db):
+    # Fallo transitorio (proveedor): reintento a 1 min, no 10.
+    row = event(db)
+    await translate_summary(db, row.id, provider=Provider(error=True))
+    db.refresh(row)
+    retry = row.metadata_["summary_translation"]["retry_after"]
+    created = row.metadata_["summary_translation"]["created_at"]
+    delta = datetime.fromisoformat(retry) - datetime.fromisoformat(created)
+    assert delta <= timedelta(minutes=1)

@@ -192,7 +192,10 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
             record = {"fingerprint": digest, "status": "translated" if translated else "unavailable", "text": translated,
                       "target_language": "es", "machine_translation": True, "created_at": now.isoformat()}
             if not translated:
-                record["retry_after"] = (now + timedelta(minutes=10)).isoformat()
+                # Fallo transitorio (proveedor/salida): reintento pronto. Cuota o
+                # presupuesto: espera larga para no martillear hasta que se reponga.
+                transient = failure_reason not in ("quota", "budget")
+                record["retry_after"] = (now + timedelta(minutes=1 if transient else 10)).isoformat()
                 record["failure"] = failure_reason
             event.metadata_ = {**(event.metadata_ or {}), "headline_translation": record}
             db.commit()
@@ -324,7 +327,10 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
             record = {"fingerprint": digest, "status": "translated" if translated else "unavailable", "text": translated,
                       "target_language": "es", "machine_translation": True, "created_at": now.isoformat()}
             if not translated:
-                record["retry_after"] = (now + timedelta(minutes=10)).isoformat()
+                # Fallo transitorio (proveedor/salida): reintento pronto. Cuota o
+                # presupuesto: espera larga para no martillear hasta que se reponga.
+                transient = failure_reason not in ("quota", "budget")
+                record["retry_after"] = (now + timedelta(minutes=1 if transient else 10)).isoformat()
                 record["failure"] = failure_reason
             event.metadata_ = {**(event.metadata_ or {}), "summary_translation": record}
             db.commit()
