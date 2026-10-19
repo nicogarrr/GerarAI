@@ -28,7 +28,7 @@ export function PortfolioValueBreakdown({ summary }: { summary: PortfolioSummary
                     </div>
                     <div className="min-w-0">
                         <dt className="text-sm text-gray-400">Deuda de margen</dt>
-                        <dd className="mt-1 break-words text-lg font-semibold text-amber-300">{formatMoney(marginDebt, baseCurrency)}</dd>
+                        <dd className={`mt-1 break-words text-lg font-semibold ${marginDebt > 0 ? 'text-amber-300' : 'text-gray-100'}`}>{formatMoney(marginDebt, baseCurrency)}</dd>
                     </div>
                 </> : <div className="min-w-0">
                     <dt className="text-sm text-gray-400">Caja / margen neto</dt>
