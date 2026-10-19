@@ -73,6 +73,9 @@ ABSENCE_OR_HYPOTHESIS = [
     "The GPU shortage has faded.",
     "Delivery times were 20 weeks in 2022 but are now normal.",
     "Supply constraints persist though the CEO expects supply to normalize.",
+    # Elipsis de titular truncado: NO corta la frase (objecion auditor, PR #1920).
+    "Chip shortage... The company expects supply to normalize.",
+    "GPU shortage… suppliers say output will ease next quarter.",
 ]
 
 

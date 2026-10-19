@@ -96,7 +96,11 @@ def fold(text: str) -> str:
 
 def extract_themes(text: str) -> set[str]:
     found: set[str] = set()
-    for sentence in re.split(r"[.!?;\n]+", fold(text)):
+    # Un titular truncado con "..." o "…" NO es fin de frase: "Chip shortage...
+    # The company expects supply to normalize" es una sola frase y el alivio
+    # debe alcanzar la mencion (objecion del auditor, PR #1920).
+    flattened = re.sub(r"\.{2,}|…", " ", fold(text))
+    for sentence in re.split(r"[.!?;\n]+", flattened):
         if CONDITIONAL.search(sentence):
             continue
         for match in CONSTRAINT.finditer(sentence):
