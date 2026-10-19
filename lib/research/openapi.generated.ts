@@ -2591,6 +2591,11 @@ export interface paths {
          *     ``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT.
          *     ``ticker`` limita a los eventos de esa empresa (ficha de accion).
          *     Las filas etiquetadas con un ticker que no citan a la empresa se omiten.
+         *     En portada (sin ``ticker``) la misma historia publicada por varios medios
+         *     se agrupa en la fila mas reciente: ``coverage_count``/``coverage`` declaran
+         *     las fuentes absorbidas (regla determinista, ver news_story_cluster).
+         *     ``tickers`` (csv, max 50) limita a esas empresas: carril «Para ti»
+         *     (cartera + watchlist del usuario, que el cliente ya conoce).
          */
         get: operations["news_events_api_news_get"];
         put?: never;
@@ -3867,6 +3872,29 @@ export interface paths {
         put?: never;
         /** Run Saved Screen */
         post: operations["run_saved_screen_api_screeners_screens__screen_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screeners/universe-close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Universe Close
+         * @description Resto del universo con el ultimo cierre almacenado (fecha por fila).
+         *
+         *     Excluye los valores que ya salen en vivo en /real y las entradas de
+         *     prueba (sin CIK ni ISIN). Cada fila lleva close_date y fuente.
+         */
+        get: operations["universe_close_api_screeners_universe_close_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7616,6 +7644,8 @@ export interface components {
             } | null;
             /** Valuation Risk Score */
             valuation_risk_score: number;
+            /** Valuation Withheld Reason */
+            valuation_withheld_reason?: string | null;
             /** Version */
             version: number;
         };
@@ -14200,6 +14230,7 @@ export interface operations {
                 offset?: number;
                 lane?: ("empresa" | "macro") | null;
                 ticker?: string | null;
+                tickers?: string | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -17502,6 +17533,49 @@ export interface operations {
             path: {
                 screen_id: number;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    universe_close_api_screeners_universe_close_get: {
+        parameters: {
+            query?: {
+                sector?: string | null;
+                limit?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
