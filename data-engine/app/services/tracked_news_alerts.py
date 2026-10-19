@@ -144,6 +144,12 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
                     db.rollback()
                 stats["duplicates"] += 1
                 continue
+            from app.services.news_identity import equivalent_news_alert
+
+            if equivalent_news_alert(db, company_id=company.id, url=url, title=event.title, now=now) is not None:
+                # La misma noticia ya avisó por otra vía (revisión de tesis o regla news).
+                stats["duplicates"] += 1
+                continue
             recent = db.scalar(select(ResearchAlert).where(
                 ResearchAlert.tenant_id == tenant_id,
                 ResearchAlert.company_id == company.id,
