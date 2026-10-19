@@ -1122,6 +1122,26 @@ def refresh_bottlenecks(tenant_id: int | None = None, user_id: str | None = None
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=600_000)
+def ingest_sec_bottleneck_filings(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
+    """Pasajes de escasez de filings SEC (EFTS full-text, gratis) como documentos.
+
+    Solo lee de la SEC y escribe Document/DocumentChunk; la deteccion la hace
+    el refresh horario existente sobre lo persistido. Fail-closed por tema.
+    """
+    from app.services.sec_bottleneck_filings import ingest_all
+
+    db = _session(tenant_id, user_id)
+    try:
+        result = _run(ingest_all(db, db.info["tenant_id"]))
+        return {"actor": "ingest_sec_bottleneck_filings", "status": "ok", **result}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("ingest_sec_bottleneck_filings", exc)
+    finally:
+        db.close()
+
+
 DISCOVERY_DEADLINE_SECONDS = 480  # margen de 2 min bajo el time_limit de 10 min
 
 

@@ -20,6 +20,7 @@ from app.workers.dramatiq_app import (
     freeze_propicks_snapshot,
     ingest_class_shares_outstanding,
     ingest_corporate_splits,
+    ingest_sec_bottleneck_filings,
     ingest_spy_daily,
     recompute_fundamental_metrics,
     reconcile_alert_analyses,
@@ -174,6 +175,10 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # Local-only reconciliation covers pre-existing ingested letters/chunks/news.
     _register(scheduler, partial(enqueue_for_all_tenants, refresh_bottlenecks),
               "interval", job_id="bottleneck_refresh", hours=1)
+    # Texto de filings SEC (8-K/10-K/10-Q) -> documentos: cada 6 h; el refresh
+    # horario de cuellos reconcilia lo nuevo como cualquier otro documento.
+    _register(scheduler, partial(enqueue_for_all_tenants, ingest_sec_bottleneck_filings),
+              "interval", job_id="sec_bottleneck_filings", hours=6)
     _register(scheduler, refresh_macro_context.send, "cron", job_id="macro_context_refresh", hour=23, minute=10)
     # Holdings oficiales de ETFs tematicos (UFO, NASA): 1 descarga por ETF y semana.
     _register(scheduler, refresh_etf_holdings, "cron", job_id="etf_holdings_refresh", day_of_week="mon", hour=7, minute=20)

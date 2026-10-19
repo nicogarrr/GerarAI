@@ -187,6 +187,16 @@ def stored_evidence(db: Session, tenant: int) -> Iterator[Evidence]:
                        _identities(news.title, news.url))
 
 
+_SEC_ORIGIN = "sec.gov"
+
+
+def _n_sources(components: list[tuple[set[str], set[str]]]) -> int:
+    """Componentes con origen conocido; los que solo citan a la SEC colapsan en 1."""
+    secular = any(origins and origins <= {_SEC_ORIGIN} for _, origins in components)
+    others = sum(1 for _, origins in components if origins and not origins <= {_SEC_ORIGIN})
+    return others + (1 if secular else 0)
+
+
 def aggregate(evidence: Iterable[Evidence]) -> dict[str, dict]:
     groups: dict[str, list[Evidence]] = {theme: [] for theme in THEMES}
     for item in evidence:
@@ -225,7 +235,10 @@ def aggregate(evidence: Iterable[Evidence]) -> dict[str, dict]:
             "evidence_ids": sorted({i.id for i in items}),
             "first_seen": min(dates) if dates else None,
             "last_seen": max(dates) if dates else None,
-            "n_sources": sum(bool(origins) for _, origins in components),
+            # Conservador (objecion del auditor): TODO sec.gov cuenta como UN
+            # origen. 10 pasajes de 10 filings distintos de la SEC son UNA
+            # fuente (el regulador), no diez; MIN_SOURCES=2 exige otra via.
+            "n_sources": _n_sources(components),
         }
     return result
 
