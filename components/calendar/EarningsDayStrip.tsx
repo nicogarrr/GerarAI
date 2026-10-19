@@ -6,7 +6,9 @@ import type { FollowedEarningsEvent } from '@/lib/actions/catalysts.actions';
 import { formatMarketDate } from '@/lib/format';
 
 const DAYS_SHOWN = 7;
-const LOGOS_SHOWN = 3;
+// Logos grandes (como «Empresas seguidas»): con 112 px de tarjeta caben 2 de 36 px
+// y el «+N»; el resto de eventos se cuenta, no se encoge el logo.
+const LOGOS_SHOWN = 2;
 
 function addUtcDays(isoDate: string, days: number): string {
     const date = new Date(`${isoDate}T00:00:00Z`);
@@ -26,7 +28,7 @@ function DayCard({ isoDate, todayIso, events }: { isoDate: string; todayIso: str
         <Link
             href="/calendar/resultados"
             aria-label={`Resultados del ${formatMarketDate(isoDate, { day: 'numeric', month: 'long' })}: ${events.length === 0 ? 'sin eventos' : `${events.length} ${events.length === 1 ? 'evento' : 'eventos'}`}`}
-            className="flex w-24 shrink-0 flex-col items-center gap-1.5 rounded-2xl border border-gray-800 bg-surface-1 px-2 py-3 transition-colors hover:border-gray-700 hover:bg-gray-900"
+            className="flex w-28 shrink-0 sm:w-32 flex-col items-center gap-1.5 rounded-2xl border border-gray-800 bg-surface-1 px-2 py-3 transition-colors hover:border-gray-700 hover:bg-gray-900"
         >
             <span className="text-2xl font-bold leading-none text-gray-100">
                 {formatMarketDate(isoDate, { day: 'numeric' })}
@@ -39,16 +41,16 @@ function DayCard({ isoDate, todayIso, events }: { isoDate: string; todayIso: str
                     <span className="rounded-md bg-gray-800 px-1.5 py-0.5 text-xs font-medium text-gray-200">
                         {events.length}
                     </span>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center justify-center gap-1.5" title={events.map((event) => event.ticker).join(", ")}>
                         {events.slice(0, LOGOS_SHOWN).map((event) => (
                             <CompanyLogo
                                 key={event.ticker}
                                 ticker={event.ticker}
                                 name={event.company || event.ticker}
-                                className="size-5 rounded-md"
+                                className="size-9 rounded-lg sm:size-10"
                             />
                         ))}
-                        {extra > 0 ? <span className="text-xs text-gray-500">+{extra}</span> : null}
+                        {extra > 0 ? <span className="text-xs font-medium text-gray-400">+{extra}</span> : null}
                     </span>
                 </>
             )}
