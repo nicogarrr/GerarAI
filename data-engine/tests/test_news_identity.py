@@ -10,7 +10,6 @@ from app.services.news_identity import (
     equivalent_news_alert,
     equivalent_news_event,
     news_key,
-    normalize_headline,
     normalize_url,
 )
 from app.services.review_alert_service import ReviewAlertService
