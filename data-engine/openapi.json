@@ -26203,7 +26203,7 @@
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response Insider Feed Route Api Insider Feed Get",
+                  "title": "Response Insider Operations Route Api Insider Operations Get",
                   "type": "object"
                 }
               }
