@@ -866,6 +866,23 @@ async def _free_data_snapshot(ticker: str, cik: str) -> dict[str, Any]:
 
 
 
+def _annual_fiscal_year(end: str, modal_fy_month: str | None) -> int:
+    """Ano fiscal de un cierre anual SEC. Es el ano del ``end`` salvo en los
+    ejercicios de 52/53 semanas que cierran la primera semana de enero
+    (EXEL: 2025-01-03 es el FY2024, 2026-01-02 el FY2025): ahi el cierre cae
+    en el ano siguiente y el dato iba etiquetado un ano de mas."""
+    end_date = date.fromisoformat(str(end)[:10])
+    year = end_date.year
+    if end_date.month == 1 and end_date.day <= 7:
+        try:
+            modal = int(modal_fy_month) if modal_fy_month else None
+        except (TypeError, ValueError):
+            modal = None
+        if modal in (None, 12, 1):
+            year -= 1
+    return year
+
+
 def _fiscal_quarter_from_end(end: str, modal_fy_month: str | None) -> str | None:
     """Trimestre fiscal derivado del cierre del periodo contra el mes modal de
     cierre de ejercicio. El `fp` de companyfacts es el periodo fiscal DE LA
@@ -1372,7 +1389,7 @@ class FinancialIngestionService:
                         and entry.get("_concept")
                         == "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"
                     ):
-                        cash_restricted_years.add(int(str(entry["end"])[:4]))
+                        cash_restricted_years.add(_annual_fiscal_year(str(entry["end"]), modal_fy_month))
                     db.add(
                         FinancialFact(
                             company_id=company.id,
@@ -1380,7 +1397,7 @@ class FinancialIngestionService:
                             value=val,
                             unit=unit,
                             period=f"{entry['end']}:FY",
-                            fiscal_year=int(str(entry["end"])[:4]),
+                            fiscal_year=_annual_fiscal_year(str(entry["end"]), modal_fy_month),
                             fiscal_quarter="FY",
                             source_id=document.id,
                             source_type="SEC",
