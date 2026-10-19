@@ -249,3 +249,22 @@ def test_enrich_curated_record_keeps_name_exchange_currency(db):
     assert company.currency == "GBP"
     assert company.industry == "Financial Services"
     assert company.sector == "Financials"
+
+
+def test_enrich_leaves_unknown_sector_for_ambiguous_finnhub_industry(db):
+    """Auditor #1871: solo entradas con lectura GICS unica entran al mapa.
+    Finnhub "Consumer products" mezcla Staples y Discretionary y "Building"
+    mezcla Building Products con homebuilders: se quitan del mapa y el
+    sector queda honestamente en Unknown."""
+    for ambiguous in ("Consumer products", "Building"):
+        company = _company(db, name="Ambiguous Corp", ticker=f"AMB{ambiguous[0]}", sector="Unknown", industry="Unknown")
+        client = _Client({
+            "name": "Ambiguous Corp",
+            "exchange": "NYSE",
+            "finnhubIndustry": ambiguous,
+            "currency": "USD",
+        })
+        service = CompanyEnrichmentService(settings=_Settings(), client=client)
+        service.enrich(db, company)
+        assert company.industry == ambiguous
+        assert company.sector == "Unknown", f"{ambiguous} no tiene lectura GICS unica: no se clasifica"

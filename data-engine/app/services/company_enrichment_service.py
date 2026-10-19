@@ -25,8 +25,16 @@ _PLACEHOLDER_SECTORS = {None, "", "Unknown", "UNKNOWN"}
 
 # Mapeo declarado (GICS de 11 sectores) de los valores de `finnhubIndustry`
 # observados en nuestro universo. Finnhub no expone sector: esto es una
-# heuristica explicita y revisable, no un dato de la API. Industrias no
-# mapeadas dejan el sector en "Unknown" (honesto, nunca se inventa).
+# heuristica explicita y revisable, no un dato de la API.
+# Regla de inclusion: solo entradas con una lectura GICS unica a nivel de
+# sector. Los dos que senalo el auditor son correctos: "Retail" es el
+# industry group GICS Retailing (sector Consumer Discretionary: ahi esta
+# Amazon) y "Communications" es la industria Finnhub Communications
+# Equipment (CSCO, ANET...), sector Information Technology. Las entradas
+# ambiguas (p. ej. Finnhub "Consumer products", que mezcla Staples y
+# Discretionary, o "Building", que mezcla Building Products y homebuilders)
+# NO se mapean: industria no mapeada -> sector "Unknown" (honesto, nunca
+# se inventa).
 FINNHUB_INDUSTRY_TO_SECTOR: dict[str, str] = {
     "Aerospace & Defense": "Industrials",
     "Airlines": "Industrials",
@@ -36,7 +44,6 @@ FINNHUB_INDUSTRY_TO_SECTOR: dict[str, str] = {
     "Banks": "Financials",
     "Beverages": "Consumer Staples",
     "Biotechnology": "Health Care",
-    "Building": "Industrials",
     "Chemicals": "Materials",
     "Commercial Services & Supplies": "Industrials",
     # Finnhub "Communications" es la industria GICS Communications Equipment
@@ -44,7 +51,6 @@ FINNHUB_INDUSTRY_TO_SECTOR: dict[str, str] = {
     # Communication Services (los servicios llegan como Telecom/Telecommunication).
     "Communications": "Information Technology",
     "Construction": "Industrials",
-    "Consumer products": "Consumer Staples",
     "Distributors": "Consumer Discretionary",
     "Diversified Consumer Services": "Consumer Discretionary",
     "Electrical Equipment": "Industrials",
