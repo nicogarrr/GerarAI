@@ -171,6 +171,8 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'rechazada',
   changes_requested: 'cambios solicitados',
   'changes requested': 'cambios solicitados',
+  draft_failed_audit: 'borrador (auditoría no superada)',
+  superseded: 'sustituida',
   stale: 'desactualizada',
   proposed: 'propuesta',
   unknown: 'desconocido',

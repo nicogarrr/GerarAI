@@ -215,8 +215,11 @@ export default async function WatchlistPage({
                             {page < totalPages ? <Link className="inline-flex min-h-[44px] items-center text-teal-300" href={`/watchlist?page=${page + 1}`}>Siguiente</Link> : null}
                         </div>
                     </nav>
-                    {/* Móvil (<md): cards apiladas con acciones táctiles ≥44px */}
-                    <div className="space-y-3 md:hidden">
+                    {/* Móvil y tablet (<xl): cards apiladas con acciones táctiles ≥44px.
+                        A 820-1280px la tabla de 6 columnas (~805px de mínimo) no cabe
+                        en el contenido con el menú lateral y salía cortada con un
+                        scroll horizontal sin indicio (QA 2026-10-19, tablet 820px). */}
+                    <div className="space-y-3 xl:hidden">
                         {sortedStocks.map((stock) => (
                             <article key={stock.symbol} className="min-w-0 rounded-xl border border-gray-700/60 bg-gray-900/60 p-4">
                                 <div className="flex min-w-0 items-center gap-3">
@@ -283,8 +286,8 @@ export default async function WatchlistPage({
                         ))}
                     </div>
 
-                    {/* Desktop (≥md): tabla completa */}
-                    <div className="hidden overflow-hidden rounded-lg border border-gray-700 bg-gray-900/50 md:block">
+                    {/* Desktop (≥xl): tabla completa */}
+                    <div className="hidden overflow-hidden rounded-lg border border-gray-700 bg-gray-900/50 xl:block">
                         <Table regionLabel="Watchlist: precio, cambio, market cap y PER">
                             <TableCaption className="sr-only">Valoración y métricas de cada símbolo de tu watchlist: precio, cambio de sesión, market cap y PER</TableCaption>
                             <TableHeader className="bg-gray-800/80">
@@ -323,13 +326,16 @@ export default async function WatchlistPage({
                                                     {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} />
                                                 </div>
                                             </Link>
-                                            <details className="relative ml-2 inline-block align-middle">
-                                                <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={`Opciones de ${stock.symbol}`}>Opciones</summary>
-                                                <div className="mt-1 min-w-40 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
-                                                    <Link href={`/research/${stock.symbol}`} className="block min-h-10 px-3 py-2 text-xs text-teal-300">Ver análisis</Link>
-                                                    <WatchlistRemoveButton symbol={stock.symbol} />
-                                                </div>
-                                            </details>
+                                            <div className="ml-2 flex items-center gap-1">
+                                                <details className="relative inline-block align-middle">
+                                                    <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={`Opciones de ${stock.symbol}`}>Opciones</summary>
+                                                    <div className="mt-1 min-w-40 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
+                                                        <Link href={`/research/${stock.symbol}`} className="block min-h-10 px-3 py-2 text-xs text-teal-300">Ver análisis</Link>
+                                                    </div>
+                                                </details>
+                                                {/* Quitar siempre visible (QA 2026-10-19): antes iba dentro de «Opciones» y en escritorio no se descubría; en móvil ya era visible. */}
+                                                <WatchlistRemoveButton symbol={stock.symbol} />
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-medium text-gray-200">
                                             {formatPriceCell(stock.price, stock.currency)}
