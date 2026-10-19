@@ -15,7 +15,7 @@ import { formatRecordValue, type DataRecord } from '@/components/data/RecordView
 import type { InsiderFilingsResult, InsiderSignalsResult } from '@/lib/actions/insider.actions';
 import { loadMoreInsiderFilings } from '@/lib/actions/insider.actions';
 import type { InsiderFilingEntry } from '@/lib/actions/insider.actions';
-import { insiderCodeLabel, insiderName, insiderRole } from '@/lib/insider/format';
+import { insiderCodeLabel, insiderName, insiderRole, signalLabel } from '@/lib/insider/format';
 import { analyzedCountCopy, degradedCopy, persistedSourceCopy, durableReadCopy } from '@/lib/insider-status-copy';
 
 interface InsiderSignalsViewProps {
@@ -307,7 +307,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                     <TableRow key={signalKey(signal)} className="border-gray-700/50">
                                         <TableCell>
                                             <Badge variant={signalTone(signal.signal)}>
-                                                {formatRecordValue(signal.signal)}
+                                                {signalLabel(typeof signal.signal === 'string' ? signal.signal : null)}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-sm text-gray-200">
@@ -358,7 +358,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             {signals.map((signal) => (
                                 <article className="min-w-0 rounded-lg border border-gray-700/50 bg-gray-900/50 p-4 break-words" key={signalKey(signal)}>
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <Badge variant={signalTone(signal.signal)}>{formatRecordValue(signal.signal)}</Badge>
+                                        <Badge variant={signalTone(signal.signal)}>{signalLabel(typeof signal.signal === 'string' ? signal.signal : null)}</Badge>
                                         <span className="ml-auto text-sm font-semibold text-gray-100">{moneyText(signal.value ?? signal.total_value)}</span>
                                     </div>
                                     <div className="mt-3 text-sm font-medium text-gray-200">{formatRecordValue(signal.insider)}</div>

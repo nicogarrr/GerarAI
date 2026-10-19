@@ -136,3 +136,19 @@ const ENTITY_SUFFIX = /\b(inc|corp|corporation|llc|l\.l\.c|lp|l\.p|ltd|plc|s\.a|
 export function isInstitutionalInsiderName(name: string | null | undefined): boolean {
     return ENTITY_SUFFIX.test((name ?? '').trim());
 }
+
+/** Claves de señal del monitor -> etiqueta visible (Tester 6 barrido).
+ *  La clave es el identificador estable del backend; lo que se muestra es la
+ *  etiqueta. Clave nueva desconocida: se muestra cruda (honesta), nunca
+ *  se inventa una lectura. */
+const SIGNAL_LABELS: Record<string, string> = {
+    cluster_buy: 'Cluster de compra',
+    c_suite_buy: 'Compra de alto directivo',
+    big_buy: 'Gran compra',
+};
+
+export function signalLabel(signal: string | null | undefined): string {
+    const key = (signal ?? '').trim();
+    if (!key) return '—';
+    return SIGNAL_LABELS[key] ?? key;
+}
