@@ -248,12 +248,17 @@ def test_ingest_ticker_prefix_uses_word_boundary(db):
 
 
 def test_ingest_title_cut_at_word_boundary(db):
+    # Sin titular de fuente (headline_from_source=False: título generado por
+    # GerarAI), el título guardado es el prefijo del resumen cortado en límite
+    # de palabra. Con titular de fuente se guarda íntegro (ver
+    # test_ingest_stores_full_source_headline_as_title).
     _company(db)
     service = NewsService()
     long_text = " ".join(f"palabra{i:03d}" for i in range(60))
     item = NewsFeedItem(
         ticker="AAPL", title="Titular largo", text=long_text,
         source="feed", url="https://x.test/word-boundary",
+        headline_from_source=False,
     )
     result = service.ingest_news_items(db, [item])
     assert result.created == 1
@@ -263,3 +268,32 @@ def test_ingest_title_cut_at_word_boundary(db):
     if len(event.summary) > len(event.title):
         nxt = event.summary[len(event.title)]
         assert not (event.title[-1].isalnum() and nxt.isalnum()), "corte a media palabra"
+
+
+def test_ingest_stores_full_source_headline_as_title(db):
+    # El titular guardado es el del medio, íntegro, no el prefijo del resumen
+    # cortado a media frase.
+    headline = "Prediction: One Major Catalyst Could Send Alphabet Stock to New Highs"
+    response = NewsService().ingest_news_items(
+        db,
+        [NewsFeedItem(title=headline,
+                      text="Google Cloud's revenue growth keeps accelerating at a scale that has rivals scrambling, and one analyst thinks the rally has more room to run.",
+                      url="https://example.com/googl-1",
+                      headline_from_source=True)],
+    )
+    assert response.created == 1
+    event = db.query(NewsEvent).filter_by(url="https://example.com/googl-1").one()
+    assert event.title == headline
+
+
+def test_ingest_without_url_dedups_against_stored_source_headline(db):
+    # Re-ingesta sin URL del mismo titular: sigue detectando el duplicado aunque
+    # el título guardado sea ahora el del medio y no el compuesto recortado.
+    headline = "Apple stock is at a record high but is it warranted given slowing iPhone 18 demand?"
+    item = NewsFeedItem(title=headline, text="Apple's new crop of iPhones may be falling shy of the sales mark.",
+                        url=None, headline_from_source=True)
+    first = NewsService().ingest_news_items(db, [item])
+    assert first.created == 1
+    second = NewsService().ingest_news_items(db, [item])
+    assert second.created == 0
+    assert second.skipped_duplicates == 1

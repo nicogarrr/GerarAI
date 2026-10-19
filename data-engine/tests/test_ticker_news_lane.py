@@ -310,3 +310,15 @@ def test_google_body_only_mention_is_not_attributed():
     ]
     out = label_google(ConnectorResult(source="rss", items=items), _Msft, _ticker_evidence_level)
     assert [i.title for i in out.items] == ["GitHub Copilot adds model picker"]
+
+
+def test_google_junk_publisher_falls_back_to_aggregator():
+    # «Bitcoin Foundation» no es un medio: republica noticias ajenas bajo un
+    # nombre de organización (visto en prod con una noticia de JPM). Se muestra
+    # el agregador en vez de la etiqueta.
+    result = ConnectorResult(source="rss", items=[
+        _item("SpaceX firma un acuerdo de lanzamiento con la ESA - Bitcoin Foundation"),
+        _item("SpaceX firma otro acuerdo de lanzamiento - CNBC"),
+    ])
+    out = label_google(result, SPCX, _ticker_evidence_level)
+    assert [i.source for i in out.items] == ["Google News", "CNBC"]

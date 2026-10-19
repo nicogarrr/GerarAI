@@ -153,6 +153,7 @@ class NewsService:
         url: str | None,
         *,
         title_is_identity: bool = True,
+        headline: str | None = None,
     ) -> bool:
         if url:
             duplicate_url = db.scalar(select(NewsEvent.id).where(NewsEvent.url == url).limit(1))
@@ -172,11 +173,17 @@ class NewsService:
             db, company_id=company.id if company else None, url=url, title=text
         ) is not None:
             return True
+        # El título guardado puede ser el compuesto recortado (histórico) o el
+        # titular íntegro del medio (nuevo): se casa contra ambos para que una
+        # re-ingesta sin URL siga detectando el duplicado.
+        candidates = {" ".join(text.strip().split())[:180]}
+        if headline:
+            candidates.add(" ".join(headline.strip().split())[:500])
         duplicate_title = db.scalar(
             select(NewsEvent.id)
             .where(
                 NewsEvent.company_id == (company.id if company else None),
-                NewsEvent.title == " ".join(text.strip().split())[:180],
+                NewsEvent.title.in_(candidates),
             )
             .limit(1)
         )
@@ -386,10 +393,14 @@ class NewsService:
             # filings de 2025 aparecia como "100 eventos de hoy" y las
             # urgencias por recencia se disparaban sobre historia antigua.
             date=published_at or datetime.now(UTC),
-            # Titular = prefijo del resumen cortado en límite de palabra:
-            # un corte a media palabra (summary[:180]) dejaba fragmentos
-            # («…del Ber» + «nstein …») al pintar titular + resumen juntos.
-            title=clip_words(summary, 180, ellipsis=""),
+            # Titular: el del medio cuando la fuente lo trae (RSS con
+            # headline_from_source). Antes se guardaba siempre el prefijo del
+            # resumen cortado a 180 (clip de palabra pero a media frase:
+            # «…rivals scrambling, and one»); el titular íntegro ya estaba en
+            # metadata.source_headline y solo el feed lo usaba. Sin titular de
+            # fuente, se mantiene el prefijo cortado en límite de palabra (un
+            # corte a media palabra dejaba fragmentos «…del Ber»).
+            title=(source_headline or "").strip() or clip_words(summary, 180, ellipsis=""),
             source=source,
             url=url,
             summary=summary,
@@ -551,6 +562,7 @@ class NewsService:
             if self._is_duplicate(
                 db, company, text, item.url,
                 title_is_identity=item.headline_from_source or not item.url,
+                headline=item.title if item.headline_from_source else None,
             ):
                 skipped_duplicates += 1
                 continue
