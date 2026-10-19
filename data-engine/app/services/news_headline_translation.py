@@ -92,6 +92,11 @@ _DOWN = re.compile(
 )
 
 
+_NEGATION = re.compile(
+    r"(?i)\b(?:no|not|never|none|neither|nor|cannot|without|n't|nobody|nothing|sin|nunca|ni|tampoco|nadie|nada|ningun[oa]?|jamás)\b|n['’]t\b"
+)
+
+
 def _polarity(text: str) -> frozenset[str]:
     """Direccion que declara un titular (sube/baja). Vacio si no declara ninguna."""
     marks = set()
@@ -120,6 +125,9 @@ def headline_numbers_match(original: str, translated: str) -> bool:
     # Falla cerrado, tenga o no numeros.
     if _polarity(original) != _polarity(translated):
         return False
+    # Negaciones («fall 8%» -> «no caen un 8%»): fallan cerrado en ambos lados.
+    if _NEGATION.search(original) or _NEGATION.search(translated):
+        return False
     if _numbers_are_only_dates(original) and not _has_dimension_marks(translated):
         tokens = lambda t: sorted(token for token, _, _ in numeric_signature(t) if token not in {"dimensions", "ambiguous"})  # noqa: E731
         return not any(token == "ambiguous" for token, _, _ in numeric_signature(original) + numeric_signature(translated)) \
@@ -129,7 +137,11 @@ def headline_numbers_match(original: str, translated: str) -> bool:
     # dos movimientos que intercambiar cifras, las palabras vecinas no aportan
     # garantia. Con sentidos mezclados o sin sentido, firma estricta.
     pol = _polarity(original)
-    if len(pol) == 1 and _relaxed_numbers(original) is not None and _relaxed_numbers(original) == _relaxed_numbers(translated):
+    # Una sola cifra: con dos o mas, una traduccion podria cruzarlas entre
+    # empresas o magnitudes con el mismo sentido («Amazon soars 5%, Apple gains
+    # 8%» -> «Apple se dispara un 5%, Amazon gana un 8%»).
+    relaxed = _relaxed_numbers(original)
+    if len(pol) == 1 and relaxed is not None and len(relaxed[0]) == 1 and relaxed == _relaxed_numbers(translated):
         return True
     return numeric_signature(original) == numeric_signature(translated)
 
