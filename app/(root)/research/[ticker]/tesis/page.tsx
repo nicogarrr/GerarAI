@@ -138,7 +138,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
             />
           </div>
         ) : (
-          <article className="mt-8 space-y-8">
+          <article className="mt-8 min-w-0 max-w-full space-y-8 [overflow-wrap:anywhere]">
             <header className="border-b border-gray-800 pb-6">
               <p className="text-xs uppercase tracking-wide text-gray-500">Tesis de inversión</p>
               <h1 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="mt-2 text-3xl text-gray-50 sm:text-4xl">
