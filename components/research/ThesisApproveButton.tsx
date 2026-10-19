@@ -23,7 +23,9 @@ const NON_APPROVABLE: Record<string, string> = {
  * este boton es hoy la unica via que cambia el estado.
  *
  * Flujo honesto: publicar una version ya publicada o no aprobable solo
- * producia un 409; el boton ahora lo impide y lo explica. El aviso
+ * producia un 409; el boton ahora lo impide y lo explica. Tras publicar,
+ * el boton cambia de estado visual: deshabilitado y «Publicada vX», para
+ * que la vista no siga ofreciendo una accion que ya no existe. El aviso
  * confirma tambien el indexado en la Biblioteca tal como lo devuelve el
  * backend (knowledge_sync), sin suponerlo.
  */
@@ -47,10 +49,12 @@ export default function ThesisApproveButton({
     const alreadyPublished = latestStatus === 'published';
     const notApprovableReason = latestStatus ? NON_APPROVABLE[latestStatus] : undefined;
     const approveBlocked = disabled || alreadyPublished || notApprovableReason !== undefined;
+    // Con la version ya publicada el estado lo dice el propio boton
+    // («Publicada vX»): una leyenda al lado repetiria lo mismo.
     const blockNote = disabled
         ? 'Sin versiones de tesis que aprobar o rechazar.'
         : alreadyPublished
-          ? `La v${latestVersion ?? '?'} ya está publicada.`
+          ? null
           : notApprovableReason !== undefined
             ? `La v${latestVersion ?? '?'} no se puede publicar: ${notApprovableReason}.`
             : null;
@@ -106,7 +110,11 @@ export default function ThesisApproveButton({
                 aria-busy={pending !== null}
             >
                 <CheckCheck aria-hidden="true" className="mr-2 h-4 w-4" />
-                {pending === 'approved' ? 'Aprobando…' : 'Aprobar tesis'}
+                {pending === 'approved'
+                    ? 'Aprobando…'
+                    : alreadyPublished
+                      ? `Publicada v${latestVersion ?? '?'}`
+                      : 'Aprobar tesis'}
             </Button>
             <Button
                 type="button"
