@@ -250,3 +250,26 @@ async def test_headline_429_reports_reason_and_falls_back(db, monkeypatch):
     result2 = await translate_headline(db, row2.id)
     assert result2["status"] == "translated"
     assert result2["text"] == "La empresa anuncia resultados 2026"
+
+
+@sync_test
+async def test_locked_row_returns_busy_instead_of_waiting(db, monkeypatch):
+    """La consulta de lease es sincrona en un handler async: si otra transaccion
+    tiene la fila bloqueada debe devolver busy (skip_locked), no esperar y
+    congelar el event loop del backend."""
+    row = event(db)
+    p = Provider()
+    real = db.scalar
+    seen = []
+
+    def scalar(stmt, *a, **k):
+        fu = getattr(stmt, "_for_update_arg", None)
+        if fu is not None:
+            seen.append(fu.skip_locked)
+            return None  # simula fila bloqueada: skip_locked no devuelve nada
+        return real(stmt, *a, **k)
+
+    monkeypatch.setattr(db, "scalar", scalar)
+    out = await translate_headline(db, row.id, provider=p)
+    assert seen == [True], "el lease debe usar skip_locked"
+    assert out["status"] == "busy" and out["reason"] == "busy" and p.calls == 0
