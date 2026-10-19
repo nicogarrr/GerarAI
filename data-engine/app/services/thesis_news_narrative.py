@@ -76,6 +76,19 @@ _SYSTEM = (
 )
 
 
+_AGGREGATOR_HOSTS = ("news.google.com", "google.com")
+
+
+def _canonical_url(url: str | None) -> str | None:
+    """URL de la fuente; un redirect de Google News no es la fuente: N/D."""
+    if not url:
+        return None
+    host = (urlsplit(url).hostname or "").lower()
+    if host in _AGGREGATOR_HOSTS or host.endswith(".google.com"):
+        return None
+    return url
+
+
 def sin_datos() -> list[dict]:
     return [{"titulo": "Análisis narrativo", "parrafos": ["Sin datos"]}]
 
@@ -166,10 +179,10 @@ def validate_output(raw: dict, headlines: list[dict]) -> list[dict]:
         if quantities:
             raise ValueError("cantidad_en_prosa_llm")
         citations = [
-            f"Evidencia {h['id']}: {h['titulo']}. Medio: {h['medio']}. "
+            f"Evidencia {n}: {h['titulo']}. Medio: {h['medio']}. "
             f"Fecha registrada: {h['fecha']} ({h['origen_fecha']}). "
-            f"Fuente: {h['url'] or 'URL no disponible'}."
-            for h in cited
+            f"Fuente: {_canonical_url(h['url']) or 'N/D (enlace original no disponible)'}."
+            for n, h in enumerate(cited, start=1)
         ]
         sections.append({"titulo": title, "parrafos": [text.strip(), *citations]})
     sections.append({"titulo": "Alcance", "parrafos": [

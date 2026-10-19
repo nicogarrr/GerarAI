@@ -154,6 +154,11 @@ _LAW_FIRM_SOLICITATION = re.compile(
             r"\b(?:investigat\w+|announces?|reminds?|encourages?|urges?)\b[^.]{0,80}\bon behalf of\b[^.]{0,40}\b(?:investors?|shareholders?|stockholders?)\b",
             r"\b(?:securities )?class action (?:lawsuit )?(?:deadline|reminder)\b",
             r"\bshareholder (?:alert|rights alert)\b",
+            # Captacion de demandantes sin nombre de despacho conocido:
+            # "Investors Have Opportunity to Lead ... Securities Fraud Lawsuit with SBS Law".
+            r"\bopportunity to lead\b.{0,120}\b(?:lawsuit|class action)\b",
+            r"\b(?:lawsuit|class action)\b[^.]{0,40}\bwith [A-Z][\w&.,' -]{1,40}\b(?:law|llp|pllc|p\.c\.)\b",
+            r"\b(?:law (?:firm|offices?|group)|llp|pllc)\b[^.]{0,60}\b(?:investors?|shareholders?)\b[^.]{0,60}\b(?:lawsuit|class action|claims?)\b",
         )
     ),
     re.IGNORECASE,

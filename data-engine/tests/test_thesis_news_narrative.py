@@ -74,7 +74,8 @@ def test_real_text_is_not_template_and_labels_and_citations_are_code_owned(conte
     assert result[0]["parrafos"][0] == TEXT
     assert all("INFERIDO" not in s["titulo"] for s in result)
     assert ITEM["url"] in result[0]["parrafos"][1]
-    assert "news:17" in result[0]["parrafos"][1]
+    assert "Evidencia 1:" in result[0]["parrafos"][1]
+    assert "news:17" not in result[0]["parrafos"][1]
     assert provider.calls == 1
     assert context[2] == [(0, 123, False)]
     request = provider.requests[0]
@@ -356,3 +357,11 @@ def test_network_timeout_cancels_provider(context, monkeypatch):
     provider.complete = slow
     assert call(context, provider) == svc.sin_datos()
     assert cancelled == [True]
+
+
+def test_cita_sin_id_crudo_ni_redirect_de_google_news():
+    from app.services.thesis_news_narrative import _canonical_url
+
+    assert _canonical_url("https://news.google.com/rss/articles/CBMi123") is None
+    assert _canonical_url("https://finance.yahoo.com/news/x.html") == "https://finance.yahoo.com/news/x.html"
+    assert _canonical_url(None) is None
