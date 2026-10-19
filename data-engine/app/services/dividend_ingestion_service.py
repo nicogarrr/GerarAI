@@ -53,10 +53,11 @@ class DividendIngestionService(ProviderIngestionService):
         empty Yahoo answer means "no dividends declared", not a failure, so
         it does not trigger the fallback.
         """
+        symbol = self._provider_symbol(company)
         try:
-            payload = await self.yahoo.dividends(company.ticker)
+            payload = await self.yahoo.dividends(symbol)
         except Exception:
-            payload = await self.fmp.dividends(company.ticker)
+            payload = await self.fmp.dividends(symbol)
             rows = payload if isinstance(payload, list) else payload.get("historical", [])
             return [
                 {
