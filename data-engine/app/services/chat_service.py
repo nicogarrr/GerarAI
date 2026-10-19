@@ -522,6 +522,14 @@ _PORTFOLIO_SELF_RE = re.compile(
     r"(?i)\b(?:mi|mis)\s+(?:cartera|posici[oó]n(?:es)?|inversi[oó]n(?:es)?|acciones|holdings)\b"
     r"|\bmy\s+(?:portfolio|positions|holdings)\b"
 )
+# Preguntas de analisis sobre la cartera ("¿qué riesgos tiene mi cartera?"):
+# "mi cartera" solo las mandaba al volcado de posiciones, que contesta otra
+# cosa sin LLM. Siguen por la ruta de sintesis (LLM con datos de cartera).
+_PORTFOLIO_ANALYSIS_RE = re.compile(
+    r"(?i)\b(?:riesgos?|riesgosa|arriesgad\w*|diversific\w*|concentraci[oó]n|"
+    r"exposici[oó]n|vulnerab\w*|debilidades|fortalezas|qu[eé]\s+opinas|"
+    r"c[oó]mo\s+(?:la\s+)?(?:mejorar|veo)|risks?|diversif\w*)\b"
+)
 _ORDER_VERB_RE = re.compile(r"(?i)\b(compra|compro|comprar|vende|vendo|vender|ejecuta|buy|sell)\b")
 # "¿Cuál es mi posición con más peso?" / "¿qué posición pesa menos?": ranking
 # directo de posiciones guardadas, no el volcado de la tabla completa.
@@ -1011,8 +1019,22 @@ class ChatService:
         if (
             company is None
             and not ticker
+            and _PORTFOLIO_SELF_RE.search(question or "")
+            and _PORTFOLIO_ANALYSIS_RE.search(question or "")
+            and not _ORDER_VERB_RE.search(question or "")
+        ):
+            analysis_answer = self._portfolio_analysis(db)
+            if analysis_answer is not None:
+                analysis_answer.context = context_echo
+                return analysis_answer
+        if (
+            company is None
+            and not ticker
             and (
-                _PORTFOLIO_SELF_RE.search(question or "")
+                (
+                    _PORTFOLIO_SELF_RE.search(question or "")
+                    and not _PORTFOLIO_ANALYSIS_RE.search(question or "")
+                )
                 or _PORTFOLIO_QUERY_RE.search(question or "")
             )
             and not _ORDER_VERB_RE.search(question or "")
@@ -1169,6 +1191,98 @@ class ChatService:
             prompt_version="portfolio-overview-v1",
             confidence=0.9,
             llm_trace={"path": "portfolio_overview", "generated": False, "provider_calls": 0},
+        )
+
+    def _portfolio_analysis(self, db: Session, limit: int = 5) -> ChatResponse | None:
+        """Cifras de riesgo CALCULADAS de las posiciones guardadas, sin LLM.
+
+        Concentracion (mayor posicion, top 3), reparto por divisa y por sector y
+        posiciones sin valor. Solo aritmetica sobre lo guardado: no es un
+        analisis de riesgos de mercado ni una recomendacion, y la respuesta lo
+        dice. Sin posiciones devuelve None.
+        """
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return None
+        rows = list(
+            db.execute(
+                select(Position, Company)
+                .join(Company, Company.id == Position.company_id)
+                .where(Position.quantity > 0, Position.tenant_id == tenant_id)
+            ).all()
+        )
+        if not rows:
+            return None
+        bases = {pos.base_currency or "EUR" for pos, _ in rows}
+        if len(bases) > 1:
+            return None
+
+        base = next(iter(bases))
+
+        def _value(pos: Position) -> float:
+            # Solo valor en moneda base: o el convertido, o el nativo cuando la
+            # posicion ya esta en la base. Un nativo en otra divisa sin
+            # convertir NO se suma (mezclaria divisas): cuenta como sin valor.
+            if pos.market_value_base is not None:
+                return float(pos.market_value_base or 0)
+            if (pos.currency or base) == base:
+                return float(pos.market_value or 0)
+            return 0.0
+
+        valued = [(pos, comp, _value(pos)) for pos, comp in rows if _value(pos) > 0]
+        unvalued = [comp.ticker for pos, comp in rows if _value(pos) <= 0]
+        total = sum(v for _, _, v in valued)
+        if total <= 0:
+            return None
+        valued.sort(key=lambda row: row[2], reverse=True)
+        top = valued[:limit]
+        weights = [v / total * 100 for _, _, v in valued]
+        lines = [
+            f"- Mayor posición: {top[0][1].ticker} con {_fmt_number_es(weights[0], 1)} % de la cartera valorada.",
+            f"- Las 3 mayores suman {_fmt_number_es(sum(weights[:3]), 1)} %.",
+        ]
+        lines.append(
+            "- Mayores pesos: "
+            + ", ".join(f"{comp.ticker} {_fmt_number_es(v / total * 100, 1)} %" for _, comp, v in top)
+            + "."
+        )
+        by_currency: dict[str, float] = {}
+        by_sector: dict[str, float] = {}
+        for pos, comp, v in valued:
+            cur = _currency_display(pos.currency)
+            by_currency[cur] = by_currency.get(cur, 0.0) + v
+            sector = comp.sector if comp.sector and comp.sector != "Unknown" else "sin sector"
+            by_sector[sector] = by_sector.get(sector, 0.0) + v
+        lines.append(
+            "- Por divisa de la posición: "
+            + ", ".join(f"{k} {_fmt_number_es(v / total * 100, 1)} %" for k, v in sorted(by_currency.items(), key=lambda kv: -kv[1]))
+            + "."
+        )
+        lines.append(
+            "- Por sector: "
+            + ", ".join(f"{k} {_fmt_number_es(v / total * 100, 1)} %" for k, v in sorted(by_sector.items(), key=lambda kv: -kv[1])[:limit])
+            + "."
+        )
+        if unvalued:
+            lines.append(f"- Sin valor en moneda base (no entran en los porcentajes): {', '.join(sorted(unvalued))}.")
+        as_of = min(pos.as_of for pos, _ in rows)
+        answer = (
+            "Cifras calculadas de tus posiciones guardadas "
+            f"(datos a {_fmt_date_es(as_of.isoformat())}), sin modelo de lenguaje. "
+            "Miden concentración y reparto; no son un análisis de riesgos de mercado ni una recomendación:\n"
+            + "\n".join(lines)
+        )
+        sources = [
+            self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))
+            for pos, comp, _ in top
+        ]
+        return ChatResponse(
+            answer=answer,
+            sources=sources,
+            model="deterministic",
+            prompt_version="portfolio-analysis-v1",
+            confidence=0.9,
+            llm_trace={"path": "portfolio_analysis", "generated": False, "provider_calls": 0},
         )
 
     def _portfolio_ranking(self, db: Session, question: str) -> ChatResponse | None:
