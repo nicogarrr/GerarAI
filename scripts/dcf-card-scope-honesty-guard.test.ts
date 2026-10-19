@@ -74,7 +74,7 @@ void test('el componente prueba con tope declarado y usa los textos del helper',
     assert.match(source, /upside > DCF_MIN_UPSIDE_PCT/, 'el umbral es la constante declarada');
     assert.match(source, /summarizeDcfProbe\(results\)/, 'el alcance se calcula de la sonda real');
     assert.match(source, /\{dcfScopeNote\(/, 'el encabezado declara el alcance real');
-    assert.match(source, /\{dcfEmptyNote\(/, 'el estado vacío declara el alcance real');
+    assert.ok(!source.includes('{dcfEmptyNote('), 'sin candidatas la tarjeta no se pinta: no hay estado vacío');
     assert.ok(!source.includes('Ninguna empresa del universo'), 'desaparece la conclusión categórica sobre el universo');
     assert.ok(!source.includes('Todo el universo del screener'), 'desaparece el alcance de universo en el encabezado');
 });
