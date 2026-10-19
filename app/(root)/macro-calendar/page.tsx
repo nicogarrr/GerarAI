@@ -146,7 +146,16 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                     </ul>
                 )}
                 {digest.items.length > 0 && (
-                    <p className="mt-3 text-xs text-gray-500">Extractos literales del 8-K, en inglés. Sin cifras recalculadas.</p>
+                    /* El pie prometía «Extractos literales» también cuando
+                       ninguna tarjeta tenía extractos («Sin texto completo
+                       disponible», Tester 6): ahora dice lo que hay. */
+                    <p className="mt-3 text-xs text-gray-500">
+                        {digest.items.some((entry) => entry.items.length > 0)
+                            ? digest.items.every((entry) => entry.items.length > 0)
+                                ? 'Extractos literales del 8-K, en inglés. Sin cifras recalculadas.'
+                                : 'Extractos literales del 8-K cuando el texto completo está disponible, en inglés. Sin cifras recalculadas.'
+                            : 'Sin extractos: el texto completo de estos 8-K no estaba disponible; cada tarjeta enlaza el documento oficial en SEC.'}
+                    </p>
                 )}
                 <Pager page={digest.page} size={digest.page_size} total={digest.total} param="k8" other={macroPage} />
             </section>
