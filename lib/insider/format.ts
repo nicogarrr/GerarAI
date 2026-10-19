@@ -12,11 +12,41 @@ export function insiderName(value: string | null | undefined): string {
         .join('');
 }
 
+/**
+ * Cargos Form 4 más comunes -> español (mapa fijo y revisable, Tester 6).
+ * El resto se muestra tal cual: nunca se traduce por inferencia.
+ * Orden de específico a genérico: cada patrón consume su trozo del título
+ * antes de probar el siguiente («Senior Vice President» no dispara también
+ * «Vicepresidente»; «SVP, GC and Government Affairs» da los dos cargos).
+ */
 const TITLE_ABBREVIATIONS: Array<[RegExp, string]> = [
     [/chief\s+executive(\s+officer)?|\bceo\b/i, 'CEO'],
     [/chief\s+financial(\s+officer)?|\bcfo\b/i, 'CFO'],
     [/chief\s+operating(\s+officer)?|\bcoo\b/i, 'COO'],
     [/chief\s+technology(\s+officer)?|\bcto\b/i, 'CTO'],
+    [/chief\s+legal(\s+officer)?|\bclo\b/i, 'Director jurídico'],
+    [/general\s+counsel|\bgc\b/i, 'Asesor jurídico general'],
+    [/chief\s+accounting(\s+officer)?|\bcao\b/i, 'Director de contabilidad'],
+    [/chief\s+commercial(\s+officer)?|\bcco\b/i, 'Director comercial'],
+    [/chief\s+medical(\s+officer)?|\bcmo\b/i, 'Director médico'],
+    [/chief\s+information(\s+officer)?|\bcio\b/i, 'Director de sistemas de información'],
+    [/chief\s+(human\s+resources|people)(\s+officer)?|\bchro\b/i, 'Director de recursos humanos'],
+    [/chief\s+strategy(\s+officer)?|\bcso\b/i, 'Director de estrategia'],
+    [/chief\s+investment(\s+officer)?|\bcio\b/i, 'Director de inversiones'],
+    [/chief\s+marketing(\s+officer)?|\bcmkto\b/i, 'Director de marketing'],
+    [/chief\s+revenue(\s+officer)?|\bcro\b/i, 'Director de ingresos'],
+    [/chief\s+product(\s+officer)?|\bcpo\b/i, 'Director de producto'],
+    [/chief\s+risk(\s+officer)?|\bcro\b/i, 'Director de riesgos'],
+    [/chief\s+compliance(\s+officer)?|\bcco\b/i, 'Director de cumplimiento'],
+    [/chief\s+data(\s+officer)?|\bcdo\b/i, 'Director de datos'],
+    [/senior\s+vice\s+president|\bsvp\b/i, 'Vicepresidente senior'],
+    [/executive\s+vice\s+president|\bevp\b/i, 'Vicepresidente ejecutivo'],
+    [/vice\s+president|\bvp\b/i, 'Vicepresidente'],
+    // Después de los VP: «Vice President» ya se consumió arriba y no llega
+    // aquí como «Presidente»; un «President» suelto sí.
+    [/president/i, 'Presidente'],
+    [/treasurer/i, 'Tesorero'],
+    [/secretary/i, 'Secretario'],
 ];
 
 /** Cargo corto en español a partir del rol y el título que trae el Form 4. */
@@ -26,8 +56,19 @@ export function insiderRole(role: string | null | undefined, officerTitle: strin
     const roleText = (role ?? '').toLowerCase();
     if (roleText.includes('multiple insiders')) return 'Varios insiders';
     if (roleText.includes('officer') || title) {
-        const abbreviated = TITLE_ABBREVIATIONS.filter(([pattern]) => pattern.test(title)).map(([, label]) => label);
-        parts.push(abbreviated.length ? abbreviated.join(' y ') : title || 'Directivo');
+        // Cada patrón consume su trozo antes de probar el siguiente: así un
+        // título compuesto da sus dos cargos sin duplicar el genérico.
+        let rest = title;
+        const matched: Array<{ at: number; label: string }> = [];
+        for (const [pattern, label] of TITLE_ABBREVIATIONS) {
+            if (pattern.test(rest)) {
+                const at = title.search(pattern);
+                matched.push({ at: at < 0 ? Number.MAX_SAFE_INTEGER : at, label });
+                rest = rest.replace(pattern, ' ');
+            }
+        }
+        matched.sort((a, b) => a.at - b.at);
+        parts.push(matched.length ? matched.map((m) => m.label).join(' y ') : title || 'Directivo');
     }
     if (roleText.includes('director')) parts.push('Director');
     if (roleText.includes('10% owner')) parts.push('Accionista 10 %');
