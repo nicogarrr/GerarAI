@@ -155,6 +155,18 @@ def _dedupe_news_rows(rows: list, limit: int, ticker: str | None = None) -> list
             break
     return out
 
+def _filing_published_at(filed: object):
+    """Fecha de presentacion (YYYY-MM-DD) como datetime UTC, o None si no es valida."""
+    from datetime import datetime
+
+    if isinstance(filed, datetime):
+        return filed if filed.tzinfo else filed.replace(tzinfo=UTC)
+    try:
+        return datetime.strptime(str(filed)[:10], "%Y-%m-%d").replace(tzinfo=UTC)
+    except (TypeError, ValueError):
+        return None
+
+
 class ThesisEvidenceService:
     """Reune y persiste el paquete de evidencia best-effort para una tesis."""
 
@@ -544,6 +556,9 @@ class ThesisEvidenceService:
                     title=f"{company.ticker} {form} filed {filed}",
                     source_type="SEC",
                     source_url=url,
+                    # Sin published_at la UI de Fuentes (orden por fecha de
+                    # publicacion) mandaba los filings nuevos al final.
+                    published_at=_filing_published_at(filed),
                     metadata_={
                         "form": form,
                         "filing_date": filed,
