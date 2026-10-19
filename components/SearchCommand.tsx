@@ -9,6 +9,7 @@ import { loadPopularStocks } from "@/lib/popular-stocks-loader";
 import { showErrorToast } from "@/lib/toast";
 import { isNextRedirectError } from "@/lib/types/errors";
 import { flattenNavItems, ROUTE_CATALOG } from "@/lib/constants";
+import { navItemMatchesSearch, navSectionMatchesSearch } from "@/lib/search/nav-search";
 import { parseTickerCommand } from "@/lib/research/ticker-commands";
 import { etiquetaTipoInstrumento } from "@/lib/labels";
 
@@ -415,13 +416,13 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                                 antes desaparecian con el primer caracter y cmdk no
                                 podia filtrarlas, asi que "ir a Temas" por teclado
                                 era imposible. */}
-                            {ROUTE_CATALOG.filter((section) => section.items.length > 1 && flattenNavItems([section]).some(item => !isSearchMode || item.label.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase()))).map((section) => (
+                            {ROUTE_CATALOG.filter((section) => section.items.length > 1 && (!isSearchMode || navSectionMatchesSearch(section, searchTerm, flattenNavItems))).map((section) => (
                                 <CommandGroup
                                     key={section.title}
                                     heading={section.title}
                                     className="[&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-gray-500"
                                 >
-                                    {flattenNavItems([section]).filter(item => !isSearchMode || item.label.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase())).map((item) => (
+                                    {flattenNavItems([section]).filter(item => !isSearchMode || navItemMatchesSearch(section, item, searchTerm)).map((item) => (
                                         <CommandItem
                                             key={item.href}
                                             value={`ir ${item.label}`}
