@@ -67,11 +67,14 @@ describe('ficha en 3 pestañas + Más: mapeo de vistas', () => {
 
     it('los paneles del resumen van plegados por defecto en móvil (feedback Nico)', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        for (const title of ['Últimas noticias', 'Última tesis', 'Modelo fundamental a largo plazo', 'Calidad financiera según la empresa', 'Últimos cambios', 'Por dónde seguir', 'Satélites AST']) {
+        for (const title of ['Últimas noticias', 'Modelo fundamental a largo plazo', 'Calidad financiera según la empresa', 'Últimos cambios', 'Por dónde seguir', 'Satélites AST']) {
             const i = page.indexOf(`title="${title}"`);
             assert.ok(i > 0, `panel ${title} existe`);
             const openTag = page.slice(page.lastIndexOf('<Panel', i), i);
             assert.ok(openTag.includes('collapsible="mobile"'), `panel ${title} plegable en móvil`);
         }
+        // «Última tesis» es lo esencial de la ficha: abierta en móvil, con veredicto y cifras clave.
+        const tesis = page.indexOf('title="Última tesis"');
+        assert.ok(!page.slice(page.lastIndexOf('<Panel', tesis), tesis).includes('collapsible'), 'Última tesis no se pliega');
     });
 });
