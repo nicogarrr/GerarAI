@@ -30,7 +30,7 @@ const asNumber = (value: unknown): number | null =>
 const REASON_COPY: Record<string, string> = {
     sec_bloquea_datacenter:
         'la SEC rechaza las consultas automáticas desde este servidor (HTTP 403)',
-    sec_limita_peticiones: 'la SEC limita temporalmente las peticiones (HTTP 429)',
+    sec_limita_peticiones: 'la SEC limitó las peticiones; reintenta en un minuto',
     fuente_no_disponible: 'la fuente no respondió',
 };
 
