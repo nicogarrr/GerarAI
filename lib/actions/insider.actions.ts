@@ -180,3 +180,58 @@ export async function getInsiderFeed(side: string, days: number): Promise<Inside
         60,
     );
 }
+
+export interface InsiderOperationsSide {
+    trades: number;
+    shares: number;
+    value: number;
+    /** Importe/acciones solo de filas con AMBOS datos; null si hay filas sin importe (declarado). */
+    avg_price: number | null;
+    /** Acciones de filas sin importe: no entran al precio medio. */
+    shares_without_value: number;
+    rows_without_value: number;
+}
+
+export interface InsiderOperationsInsider {
+    insider: string | null;
+    role: string | null;
+    officer_title: string | null;
+    buy: InsiderOperationsSide;
+    sell: InsiderOperationsSide;
+    last_tx: string | null;
+}
+
+export interface InsiderOperationsCompany {
+    ticker: string;
+    company: string;
+    origin: 'cartera' | 'watchlist';
+    period: { from: string | null; to: string | null };
+    filings: number;
+    /** Enmiendas 4/A del periodo: el original sustituido no se puede enlazar (amends_accession sin poblar). */
+    amended_filings: number;
+    totals: { buy: InsiderOperationsSide; sell: InsiderOperationsSide };
+    insiders: InsiderOperationsInsider[];
+    excluded_codes: number;
+    excluded_derivative: number;
+    rows_without_date: number;
+}
+
+export interface InsiderOperationsResult {
+    status: 'ok' | 'unavailable';
+    reason?: string;
+    days: number;
+    as_of?: string;
+    note?: string;
+    companies: InsiderOperationsCompany[];
+    companies_without_data: string[];
+}
+
+/** GET /api/insider/operations — agregado P/S por empresa (cartera + watchlist), Form 4 persistidos. */
+export async function getInsiderOperations(days = 365): Promise<InsiderOperationsResult> {
+    const { id: userId } = await requireAuthenticatedUser();
+    return cachedFetch(
+        `insider:user:${userId}:operations:${days}`,
+        () => researchRequest<InsiderOperationsResult>(`/api/insider/operations?days=${days}`, { fast: true }),
+        60,
+    );
+}

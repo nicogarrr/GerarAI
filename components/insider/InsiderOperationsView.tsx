@@ -1,0 +1,187 @@
+import Link from 'next/link';
+import { formatDate, formatMarketCapUsd, formatNumber, formatPrice } from '@/lib/format';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { InsiderOperationsCompany, InsiderOperationsResult, InsiderOperationsSide } from '@/lib/actions/insider.actions';
+import { insiderName, insiderRole } from '@/lib/insider/format';
+
+/** Vista de operaciones insider (P/S) de cartera + watchlist, del agregado
+ *  backend /api/insider/operations. Solo datos Form 4 persistidos: el
+ *  periodo y lo no verificable se muestran siempre (Nico, 2026-10-19). */
+
+const usdCompact = (value: number) => formatMarketCapUsd(value);
+const usdPrice = (value: number | null) =>
+    value === null ? '—' : formatPrice(value, 'USD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const sharesText = (side: InsiderOperationsSide) =>
+    side.trades === 0 ? '—' : formatNumber(side.shares, { maximumFractionDigits: 0 });
+
+function periodText(period: InsiderOperationsCompany['period']): string {
+    if (!period.from || !period.to) return 'Periodo sin fechas';
+    return `${formatDate(period.from)} – ${formatDate(period.to)}`;
+}
+
+function SideCells({ side, empty }: { side: InsiderOperationsSide; empty?: string }) {
+    if (side.trades === 0) {
+        return <TableCell className="text-right text-sm text-gray-500">{empty ?? '—'}</TableCell>;
+    }
+    return (
+        <TableCell className="text-right text-sm font-semibold tabular-nums text-gray-100">
+            {usdCompact(side.value)}
+            <span className="block text-xs font-normal text-gray-500">
+                {sharesText(side)} acc. · {side.rows_without_value > 0 ? 'precio medio n/d (hay filas sin importe)' : usdPrice(side.avg_price)}
+            </span>
+        </TableCell>
+    );
+}
+
+function CompanyCard({ company }: { company: InsiderOperationsCompany }) {
+    const { totals } = company;
+    return (
+        <Card className="min-w-0 rounded-lg border border-gray-700 bg-gray-800/50 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Link
+                    href={`/insider?ticker=${encodeURIComponent(company.ticker)}`}
+                    className="font-mono text-base font-bold text-teal-300 hover:text-teal-200 hover:underline"
+                >
+                    {company.ticker}
+                </Link>
+                <span className="truncate text-sm text-gray-400">{company.company}</span>
+                <Badge variant={company.origin === 'cartera' ? 'default' : 'outline'}>
+                    {company.origin === 'cartera' ? 'Cartera' : 'Watchlist'}
+                </Badge>
+                <span className="ml-auto text-xs text-gray-500">{periodText(company.period)}</span>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+                Total vendido {usdCompact(totals.sell.value)} · total comprado {usdCompact(totals.buy.value)} ·{' '}
+                {formatNumber(company.filings, { maximumFractionDigits: 0 })}{' '}
+                {company.filings === 1 ? 'filing' : 'filings'}
+            </p>
+
+            <div className="mt-3 hidden md:block">
+                <Table regionLabel={`Operaciones insider de ${company.ticker}`}>
+                    <TableCaption className="sr-only">
+                        Operaciones insider de {company.ticker} en mercado abierto: importe vendido y comprado por
+                        persona, con acciones, precio medio y número de operaciones.
+                    </TableCaption>
+                    <TableHeader>
+                        <TableRow className="border-gray-700 hover:bg-transparent">
+                            <TableHead className="text-xs font-semibold uppercase text-gray-500">Insider</TableHead>
+                            <TableHead className="text-xs font-semibold uppercase text-gray-500">Rol</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">Ventas</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">Compras</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">Ops</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">Última</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {company.insiders.map((row) => (
+                            <TableRow key={`${row.insider ?? 'sin-nombre'}|${row.role ?? ''}|${row.officer_title ?? ''}`} className="border-gray-700/50">
+                                <TableCell className="text-sm text-gray-200">{insiderName(row.insider)}</TableCell>
+                                <TableCell className="text-sm text-gray-400">{insiderRole(row.role, row.officer_title)}</TableCell>
+                                <SideCells side={row.sell} />
+                                <SideCells side={row.buy} />
+                                <TableCell className="text-right text-sm tabular-nums text-gray-300">
+                                    {formatNumber(row.sell.trades + row.buy.trades, { maximumFractionDigits: 0 })}
+                                </TableCell>
+                                <TableCell className="text-right text-sm text-gray-400">
+                                    {row.last_tx ? formatDate(row.last_tx) : '—'}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 md:hidden">
+                {company.insiders.map((row) => (
+                    <article
+                        key={`${row.insider ?? 'sin-nombre'}|${row.role ?? ''}|${row.officer_title ?? ''}`}
+                        className="rounded-lg border border-gray-700/50 bg-gray-900/50 p-3 text-sm"
+                    >
+                        <p className="font-medium text-gray-200">{insiderName(row.insider)}</p>
+                        <p className="text-xs text-gray-500">{insiderRole(row.role, row.officer_title)}</p>
+                        <dl className="mt-2 grid grid-cols-2 gap-2">
+                            <div>
+                                <dt className="text-xs text-gray-500">Ventas</dt>
+                                <dd className="tabular-nums text-gray-100">
+                                    {row.sell.trades === 0 ? '—' : `${usdCompact(row.sell.value)} · ${sharesText(row.sell)} acc. · ${usdPrice(row.sell.avg_price)}`}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-xs text-gray-500">Compras</dt>
+                                <dd className="tabular-nums text-gray-100">
+                                    {row.buy.trades === 0 ? '—' : `${usdCompact(row.buy.value)} · ${sharesText(row.buy)} acc. · ${usdPrice(row.buy.avg_price)}`}
+                                </dd>
+                            </div>
+                        </dl>
+                        <p className="mt-1 text-xs text-gray-500">
+                            {formatNumber(row.sell.trades + row.buy.trades, { maximumFractionDigits: 0 })} ops
+                            {row.last_tx ? ` · última ${formatDate(row.last_tx)}` : ''}
+                        </p>
+                    </article>
+                ))}
+            </div>
+
+            {company.excluded_codes > 0 ||
+            company.excluded_derivative > 0 ||
+            company.rows_without_date > 0 ||
+            company.amended_filings > 0 ||
+            company.totals.buy.rows_without_value + company.totals.sell.rows_without_value > 0 ? (
+                <p className="mt-3 border-t border-gray-700/50 pt-2 text-xs text-gray-500">
+                    {company.excluded_codes > 0
+                        ? `${formatNumber(company.excluded_codes, { maximumFractionDigits: 0 })} operaciones de otros códigos (concesiones, ejercicios…) no suman al agregado. `
+                        : ''}
+                    {company.excluded_derivative > 0
+                        ? `${formatNumber(company.excluded_derivative, { maximumFractionDigits: 0 })} derivadas excluidas. `
+                        : ''}
+                    {company.totals.buy.rows_without_value + company.totals.sell.rows_without_value > 0
+                        ? `${formatNumber(company.totals.buy.rows_without_value + company.totals.sell.rows_without_value, { maximumFractionDigits: 0 })} sin importe en el filing: no se imputa y el precio medio queda n/d. `
+                        : ''}
+                    {company.rows_without_date > 0
+                        ? `${formatNumber(company.rows_without_date, { maximumFractionDigits: 0 })} sin fecha: suman al agregado pero no al periodo. `
+                        : ''}
+                    {company.amended_filings > 0
+                        ? `${formatNumber(company.amended_filings, { maximumFractionDigits: 0 })} enmienda(s) 4/A: el filing original corregido no se puede excluir (la ingesta no enlaza enmiendas) y puede haber doble conteo.`
+                        : ''}
+                </p>
+            ) : null}
+        </Card>
+    );
+}
+
+export default function InsiderOperationsView({ result, days }: { result: InsiderOperationsResult | null; days: number }) {
+    if (!result || result.status !== 'ok') {
+        return (
+            <section aria-label="Operaciones insider de cartera y watchlist" className="rounded-xl border border-gray-800 bg-surface-1 p-5 text-sm text-gray-400">
+                No se pudo leer el agregado de operaciones insider. Reintenta en unos minutos.
+            </section>
+        );
+    }
+    return (
+        <section aria-label="Operaciones insider de cartera y watchlist" className="flex flex-col gap-3">
+            <div>
+                <h2 className="text-sm font-semibold text-gray-100">Operaciones por empresa · cartera y watchlist</h2>
+                <p className="mt-1 text-xs text-gray-500">
+                    Últimos {formatNumber(days, { maximumFractionDigits: 0 })} días. Solo compras y ventas en mercado
+                    abierto (códigos P/S) ya persistidas por el monitor; concesiones y ejercicios no suman. El periodo
+                    de cada empresa va de su primera a su última operación guardada: fuera de ahí no hay dato que mostrar.
+                </p>
+            </div>
+            {result.companies.length === 0 ? (
+                <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center text-sm text-gray-400">
+                    Sin operaciones insider persistidas en los últimos {formatNumber(days, { maximumFractionDigits: 0 })} días
+                    para las empresas de tu cartera y watchlist.
+                </Card>
+            ) : (
+                result.companies.map((company) => <CompanyCard key={company.ticker} company={company} />)
+            )}
+            {result.companies_without_data.length > 0 ? (
+                <p className="text-xs text-gray-500">
+                    Sin Form 4 persistidos en el periodo: {result.companies_without_data.join(', ')}. No es «sin
+                    actividad»: es lo que el monitor aún no ha guardado.
+                </p>
+            ) : null}
+        </section>
+    );
+}
