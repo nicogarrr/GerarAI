@@ -1001,14 +1001,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     <Badge variant="outline">{label(snapshot.latest_thesis.status)}</Badge>
                   ) : null}
                 </div>
-                <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                  <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100" title={per.note ?? undefined}>{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
-                  {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100">{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</dd></div> : null}
-                </dl>
                 {thesisIsPublic(snapshot.latest_thesis.status) ? (
                   <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-300 md:line-clamp-none">{cleanThesisText(snapshot.latest_thesis.executive_summary)}</p>
                 ) : (
-                  <p className="mt-3 text-sm leading-6 text-gray-400">{snapshot.latest_thesis.status === 'insufficient_data' ? `La v${snapshot.latest_thesis.version} es provisional por datos insuficientes: sin veredicto ni cifras.` : `La v${snapshot.latest_thesis.version} está en borrador: sin veredicto ni cifras hasta que se publique.`}</p>
+                  <p className="mt-3 text-sm leading-6 text-gray-400">{snapshot.latest_thesis.status === 'insufficient_data' ? `La v${snapshot.latest_thesis.version} es provisional por datos insuficientes: sin veredicto ni valoración.` : `La v${snapshot.latest_thesis.version} está en borrador: sin veredicto ni valoración hasta que se publique.`}</p>
                 )}
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   {/*
@@ -1030,6 +1026,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 <ThesisGenerateButton ticker={ticker} label="Genera la primera tesis" />
               </div>
             )}
+          <dl className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+            <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
+            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100">{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</dd></div> : null}
+            {per.note ? <p className="basis-full text-xs text-gray-500">{per.note}</p> : null}
+          </dl>
           </Panel>
           {snapshot.model_summary ? <Panel collapsible="mobile" title="Modelo fundamental a largo plazo">
             {snapshot.model_summary ? (

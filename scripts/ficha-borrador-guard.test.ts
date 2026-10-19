@@ -12,6 +12,6 @@ describe('ficha: borrador sin veredicto ni cifras en «Última tesis»', () => {
     it('rating y resumen condicionados a tesis pública; el borrador dice por qué', () => {
         assert.match(page, /thesisIsPublic\(snapshot\.latest_thesis\.status\) && visibleThesisRating/);
         assert.match(page, /thesisIsPublic\(snapshot\.latest_thesis\.status\) \? \(\s*<p[^>]*>\{cleanThesisText\(snapshot\.latest_thesis\.executive_summary\)\}/);
-        assert.match(page, /está en borrador: sin veredicto ni cifras hasta que se publique/);
+        assert.match(page, /está en borrador: sin veredicto ni valoración hasta que se publique/);
     });
 });
