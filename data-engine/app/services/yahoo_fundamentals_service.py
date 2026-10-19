@@ -2,9 +2,15 @@
 
 Solo para tickers de un mapa REVISADO (p.ej. KRKNF -> PNG.V, TSXV, CAD). Reglas
 de veracidad: source_type propio (YAHOO_FUNDAMENTALS), etiqueta "fuente no
-oficial", nunca sobrescribe SEC/ESEF (se rechaza si la Company ya tiene hechos
-de esas fuentes), cada cifra enlaza al documento con su origen y fecha, y no se
-inventa ninguna cifra que Yahoo no devuelva.
+oficial", nunca sobrescribe SEC/ESEF/CNMV, cada cifra enlaza al documento con
+su origen y fecha, y no se inventa ninguna cifra que Yahoo no devuelva.
+
+Complemento, nunca sustituto: si la Company YA tiene hechos oficiales
+(SEC/ESEF/CNMV), Yahoo solo escribe los pares (metrica, ejercicio FY) sin
+hecho oficial — un emisor con cobertura oficial parcial (p.ej. BN, cuyo 40-F
+aporta unos pocos hechos) se completa sin tocar lo oficial. Si no hay nada
+que complementar, se rechaza. En lectura, SOURCE_PRIORITY ya da preferencia
+al hecho oficial a igual metrica y ejercicio.
 """
 
 from __future__ import annotations
@@ -31,6 +37,9 @@ SOURCE_TYPE = "YAHOO_FUNDAMENTALS"
 # y nombres aceptados para la prueba de identidad.
 REVIEWED_MAP: dict[str, dict[str, Any]] = {
     "KRKNF": {"symbol": "PNG.V", "currency": "CAD", "names": ["Kraken Robotics"]},
+    # BN: Brookfield Corporation (40-F con cobertura oficial parcial; reporta
+    # en USD: BN y BN.TO declaran los mismos fundamentales en USD).
+    "BN": {"symbol": "BN", "currency": "USD", "names": ["Brookfield"]},
 }
 
 # metric -> (statement, [filas Yahoo por orden de preferencia], es_por_accion)
@@ -55,7 +64,9 @@ YAHOO_METRIC_MAP: list[tuple[str, str, list[str], bool | str]] = [
     ("free_cash_flow", "cashflow", ["Free Cash Flow"], False),
 ]
 
-NON_OFFICIAL_SOURCE_TYPES = ("SEC", "ESEF", "CNMV")
+# Fuentes OFICIALES que Yahoo nunca sustituye (el nombre historico del
+# modulo era confuso: son las que bloquean/complementan, no las no oficiales).
+OFFICIAL_SOURCE_TYPES = ("SEC", "ESEF", "CNMV")
 
 
 def _dec(value: Any) -> Decimal | None:
@@ -107,16 +118,17 @@ def refresh_from_yahoo(
     if entry is None:
         raise RuntimeError(f"Sin mapa Yahoo revisado para {ticker}")
 
-    official = db.scalar(
-        select(FinancialFact.id).where(
-            FinancialFact.company_id == company.id,
-            FinancialFact.source_type.in_(NON_OFFICIAL_SOURCE_TYPES),
-        ).limit(1)
-    )
-    if official is not None:
-        raise RuntimeError(
-            f"{ticker} ya tiene hechos SEC/ESEF/CNMV: la fuente no oficial no los sustituye"
-        )
+    # Pares (metrica, ejercicio) con hecho OFICIAL anual: Yahoo no los toca.
+    official_pairs = {
+        (metric, fiscal_year)
+        for metric, fiscal_year in db.execute(
+            select(FinancialFact.metric, FinancialFact.fiscal_year).where(
+                FinancialFact.company_id == company.id,
+                FinancialFact.source_type.in_(OFFICIAL_SOURCE_TYPES),
+                FinancialFact.fiscal_quarter == "FY",
+            )
+        ).all()
+    }
 
     data = fetcher(entry["symbol"])
     yname = data.get("name")
@@ -165,13 +177,35 @@ def refresh_from_yahoo(
         else FinancialFact.tenant_id.is_(None),
     )
 
-    imported = 0
+    # Cobertura de Yahoo por metrica, antes de escribir nada.
     coverage: dict[str, list[str]] = {}
-    for metric, statement, labels, per_share in YAHOO_METRIC_MAP:
+    periods_by_metric: dict[str, dict[str, Decimal]] = {}
+    for metric, statement, labels, _per_share in YAHOO_METRIC_MAP:
         by_period = _row_by_period(data.get(statement), labels)
         if by_period:
             coverage[metric] = sorted(by_period, reverse=True)
+            periods_by_metric[metric] = by_period
+
+    # Complemento, nunca sustituto: si TODA la cobertura posible ya tiene
+    # hecho oficial, no hay nada que aportar desde una fuente no oficial.
+    if official_pairs and not any(
+        (metric, int(period[:4])) not in official_pairs
+        for metric, periods in coverage.items()
+        for period in periods
+    ):
+        raise RuntimeError(
+            f"{ticker} ya tiene cobertura oficial SEC/ESEF/CNMV de toda la "
+            "cobertura disponible: nada que complementar desde una fuente no oficial"
+        )
+
+    imported = 0
+    skipped_official = 0
+    for metric, statement, labels, per_share in YAHOO_METRIC_MAP:
+        by_period = periods_by_metric.get(metric, {})
         for period_date, val in sorted(by_period.items(), reverse=True)[:10]:
+            if (metric, int(period_date[:4])) in official_pairs:
+                skipped_official += 1
+                continue
             db.add(
                 FinancialFact(
                     company_id=company.id,
@@ -211,5 +245,6 @@ def refresh_from_yahoo(
         "currency": currency,
         "source_document_id": document.id,
         "facts_imported": imported,
+        "facts_skipped_official": skipped_official,
         "metrics_covered": sorted(coverage),
     }

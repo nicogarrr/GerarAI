@@ -3801,6 +3801,11 @@
             "title": "Facts Imported",
             "type": "integer"
           },
+          "facts_skipped_official": {
+            "default": 0,
+            "title": "Facts Skipped Official",
+            "type": "integer"
+          },
           "latest_periods": {
             "additionalProperties": {
               "anyOf": [

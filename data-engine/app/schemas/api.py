@@ -108,6 +108,8 @@ class FinancialRefreshResponse(BaseModel):
     provider: str
     source_document_id: int
     facts_imported: int
+    # Hechos no escritos por tener ya hecho oficial (complemento Yahoo).
+    facts_skipped_official: int = 0
     statements_imported: int
     latest_periods: dict[str, str | None]
     valuation_input_ready: bool
