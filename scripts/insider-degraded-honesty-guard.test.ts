@@ -43,7 +43,8 @@ test('F30: una excepción cruda nunca llega al usuario', () => {
 
 test('la reason nunca sustituye a la cabecera en el componente', () => {
     assert.match(view, /degradedCopy\(initialTicker, initialResult, countText\)\.header/);
-    assert.match(view, /Es un fallo\s+de lectura, no una ausencia de actividad insider\. Reintenta más tarde\./);
+    assert.match(view, /Es un fallo\s+de lectura, no una ausencia de actividad insider\./);
+    assert.match(view, /Reintenta más tarde\./);
     assert.match(view, /Detalle técnico:/);
     assert.ok(
         !/\{initialTicker\}: \{formatRecordValue\(initialResult\.reason \?\? initialResult\.status\)\}/.test(view),

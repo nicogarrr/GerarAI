@@ -8,7 +8,7 @@ const tabs = readFileSync('components/proPicks/ProPicksTabs.tsx', 'utf8');
 test('el primer render no dispara consultas de overlays', () => {
     assert.match(page, /includeSignalOverlays: false/);
     assert.match(tabs, /if \(activeTab !== 'estrategia'\) return;/);
-    assert.match(tabs, /\[activeTab, currentStrategy, picksByStrategy\]/);
+    assert.match(tabs, /\[activeTab, currentStrategy, cachedStrategyPicks, latestRunAsOf\]/);
     assert.match(action, /options\.includeSignalOverlays === false\s*\? finalists\s*: await attachSignalOverlays/);
     assert.match(action, /return withOptionalBudget\(async \(\) =>/);
     assert.match(action, /\}, finalists, 4_000\)/);

@@ -43,7 +43,7 @@ test('decisional fields removed from columns stay reachable in row detail (audit
   // fiscalBucket/holdingDays/firstBuyDate fuera de columnas, pero accesibles en tarjeta móvil y menú Opciones.
   assert.match(portfolio, /holding\.fiscalBucket === 'largo_plazo'/);
   assert.match(portfolio, /holding\.holdingDays !== null/);
-  assert.match(portfolio, /En cartera desde: \{holding\.firstBuyDate \?\? NA\}/);
+  assert.match(portfolio, /En cartera desde: \{formatDate\(holding\.firstBuyDate\)\}/);
   assert.match(portfolio, /Sin historial de compra registrado/);
 });
 

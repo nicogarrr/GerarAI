@@ -15,7 +15,10 @@ const proxy = readFileSync('app/api/news/[eventId]/translation/summary/route.ts'
 test('provenance siempre que se muestra una traducción y cero relleno', () => {
     assert.ok(component.includes('Traducción automática · español'));
     assert.ok(component.includes('Ver original'));
-    assert.ok(!component.includes('no disponible'), 'nada de meta-texto de fallo: se queda el original');
+    // Al fallar se queda el original; solo se permite el aviso de estado corto del botón.
+    const unavailableMentions = component.split('no disponible').length - 1;
+    assert.ok(unavailableMentions <= 1, 'nada de meta-texto de fallo más allá del aviso de estado');
+    assert.ok(unavailableMentions === 0 || /role="status"[^<]*>\s*Traducción no disponible ahora mismo\./.test(component), 'el aviso va como status del botón');
     assert.ok(!component.includes('Resumen generado'), 'nunca inventar contenido: solo traducir');
 });
 
