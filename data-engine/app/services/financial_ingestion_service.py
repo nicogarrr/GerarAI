@@ -1766,6 +1766,14 @@ class FinancialIngestionService:
             return by_metric.get(metric, {}).get(year)
 
         derived = 0
+        # roe y book_value_growth solo se derivan para motores que los usan
+        # como INPUT PROPIO (insurer/bank, P/B-ROE). Derivarlas para toda
+        # empresa las haria visibles como alias de dividend_growth en el motor
+        # DDM/FCFE (ddm_fcfe.py no filtra is_reported) y cambiaria valoraciones
+        # ya publicadas de pagadores de dividendos con un dato que no pedian.
+        from app.valuation.engines.registry import resolve_engine_key
+
+        derives_equity_ratios = resolve_engine_key(company) in ("insurer", "bank")
         years = sorted({y for metric_facts in by_metric.values() for y in metric_facts})
         for year in years:
             ocf = year_fact("operating_cash_flow", year)
@@ -1773,6 +1781,50 @@ class FinancialIngestionService:
             revenue = year_fact("revenue", year)
             debt = year_fact("total_debt", year)
             cash = year_fact("cash_and_equivalents", year)
+            equity = year_fact("total_equity", year) if derives_equity_ratios else None
+            prev_equity = year_fact("total_equity", year - 1) if derives_equity_ratios else None
+            net_income = year_fact("net_income", year) if derives_equity_ratios else None
+
+            # ROE = beneficio neto / patrimonio medio del ejercicio y
+            # crecimiento del valor contable (YoY): inputs del motor de
+            # aseguradoras/bancos (P/B-ROE). Derivadas de hechos reportados,
+            # is_reported=False; sin las dos puntas del periodo no hay dato.
+            if net_income is not None and equity is not None and prev_equity is not None:
+                avg_equity = (equity.value + prev_equity.value) / 2
+                if avg_equity > 0:
+                    db.add(
+                        FinancialFact(
+                            company_id=company.id,
+                            metric="roe",
+                            value=net_income.value / avg_equity,
+                            unit="decimal",
+                            period=equity.period,
+                            fiscal_year=year,
+                            fiscal_quarter="FY",
+                            source_id=document.id,
+                            source_type="SEC",
+                            is_reported=False,
+                            confidence=Decimal("0.85"),
+                        )
+                    )
+                    derived += 1
+            if equity is not None and prev_equity is not None and prev_equity.value > 0:
+                db.add(
+                    FinancialFact(
+                        company_id=company.id,
+                        metric="book_value_growth",
+                        value=(equity.value / prev_equity.value) - 1,
+                        unit="decimal",
+                        period=equity.period,
+                        fiscal_year=year,
+                        fiscal_quarter="FY",
+                        source_id=document.id,
+                        source_type="SEC",
+                        is_reported=False,
+                        confidence=Decimal("0.85"),
+                    )
+                )
+                derived += 1
 
             fcf: FinancialFact | None = None
             if ocf is not None and capex is not None:
