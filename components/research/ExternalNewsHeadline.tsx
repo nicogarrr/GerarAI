@@ -1,19 +1,28 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { isTranslatable } from '@/lib/news-language';
 
+// Cola con concurrencia 2, como NewsHeadline: antes era serie de 1 y una fila
+// lenta (hasta 12 s de timeout) frenaba las traducciones de las demás filas.
+const queue: Array<() => void> = [];
+let running = 0;
+function drain() { while (running < 2 && queue.length) { running++; queue.shift()!(); } }
 const pending = new Map<string, Promise<string | null>>();
-let tail: Promise<unknown> = Promise.resolve();
-function translate(headline: string) {
+function translate(headline: string): Promise<string | null> {
   const existing = pending.get(headline);
   if (existing) return existing;
-  const job = tail.then(async () => {
-    try {
-      const response = await fetch('/api/news/translate-headline', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({headline}), signal:AbortSignal.timeout(12000)});
-      const data = response.ok ? await response.json() : null;
-      return data?.status === 'translated' && typeof data.text === 'string' ? data.text : null;
-    } catch { return null; }
+  const job = new Promise<string | null>(resolve => {
+    queue.push(() => {
+      fetch('/api/news/translate-headline', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({headline}), signal:AbortSignal.timeout(12000)})
+        .then(async response => {
+          const data = response.ok ? await response.json() : null;
+          resolve(data?.status === 'translated' && typeof data.text === 'string' ? data.text : null);
+        })
+        .catch(() => resolve(null))
+        .finally(() => { running--; drain(); });
+    });
+    drain();
   });
-  tail = job;
   if (pending.size >= 512) pending.delete(pending.keys().next().value!);
   pending.set(headline, job);
   return job;
@@ -24,7 +33,10 @@ export function ExternalNewsHeadline({headline, url, className = ''}: {headline:
   const [text, setText] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!ref.current || headline.length > 500 || headline.length < 3) return;
+    // Regla espejo de needs_translation (lib/news-language.ts), la misma que
+    // NewsHeadline: un titular ya español no dispara petición (el backend
+    // también corta con not_needed, pero así se ahorra el POST por fila).
+    if (!ref.current || headline.length > 500 || headline.length < 3 || !isTranslatable(headline)) return;
     let active = true;
     const observer = new IntersectionObserver(entries => {
       if (!entries.some(entry => entry.isIntersecting)) return;
