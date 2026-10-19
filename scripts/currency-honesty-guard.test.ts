@@ -135,6 +135,11 @@ const ALLOWED: Array<{ file: string; snippet: string; why: string }> = [
         why: "Form 4 / insider trading: importes y precios se declaran y liquidan en USD ante la SEC.",
     },
     {
+        file: 'components/insider/InsiderOperationsView.tsx',
+        snippet: "formatPrice(value, 'USD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })",
+        why: "Mismo bloque Form 4 que InsiderSignalsView/InsiderFeed: las operaciones insider se declaran y liquidan en USD ante la SEC; el precio medio lleva 2 decimales.",
+    },
+    {
         file: 'app/(root)/research/[ticker]/page.tsx',
         snippet: "formatPrice(tx.value, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })",
         why: "Mismo bloque Form 4 que InsiderSignalsView/InsiderFeed: las transacciones insider se declaran y liquidan en USD ante la SEC.",

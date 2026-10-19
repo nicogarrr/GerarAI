@@ -1,0 +1,51 @@
+/**
+ * Guard: la vista de operaciones insider (cartera + watchlist) muestra el
+ * agregado con su periodo y lo no verificable a la vista (Nico, 2026-10-19).
+ *
+ * Contrato: la tabla por empresa tiene Insider | Rol | Ventas | Compras |
+ * Ops | Última con importes USD (convención en-US), acciones en es-ES,
+ * periodo visible por empresa, y las salvedades del backend (códigos
+ * excluidos, importes sin imputar, empresas sin Form 4 persistido) escritas
+ * en la interfaz: nada de ceros que parezcan dato. La página solo la monta
+ * sin ticker (junto al feed), con fetch independiente del feed.
+ *
+ * Ejecutar: node --experimental-strip-types --test scripts/insider-operaciones-vista-guard.test.ts
+ */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const vista = readFileSync('components/insider/InsiderOperationsView.tsx', 'utf8');
+const pagina = readFileSync('app/(root)/insider/page.tsx', 'utf8');
+const acciones = readFileSync('lib/actions/insider.actions.ts', 'utf8');
+
+describe('Insider operaciones: vista del agregado por empresa', () => {
+  it('tabla de referencia con las columnas pedidas y formato honesto', () => {
+    for (const columna of ['Insider', 'Rol', 'Ventas', 'Compras', 'Ops', 'Última']) {
+      assert.ok(vista.includes(columna), `falta la columna ${columna}`);
+    }
+    assert.match(vista, /formatPrice\([^,]+, 'USD'/, 'los importes USD siguen la convención en-US');
+    assert.match(vista, /formatMarketCapUsd\(/, 'totales con formato compacto USD');
+    assert.match(vista, /insiderRole\(row\.role, row\.officer_title\)/, 'el cargo pasa por insiderRole');
+    assert.match(vista, /insiderName\(row\.insider\)/, 'el nombre SEC pasa por insiderName');
+  });
+
+  it('periodo y no verificable, visibles', () => {
+    assert.match(vista, /periodText\(company\.period\)/, 'el periodo de cada empresa se muestra');
+    assert.ok(vista.includes('companies_without_data'), 'las empresas sin Form 4 se declaran');
+    assert.ok(vista.includes('excluded_codes'), 'los códigos excluidos (concesiones/ejercicios) se declaran');
+    assert.ok(vista.includes('rows_without_value'), 'los importes no imputados se declaran');
+    assert.ok(vista.includes('rows_without_date'), 'las filas sin fecha se declaran');
+    assert.ok(vista.includes('amended_filings'), 'las enmiendas 4/A no enlazables se declaran');
+    assert.ok(vista.includes('doble conteo'), 'el aviso de enmiendas advierte el posible doble conteo de 4/A');
+    assert.ok(vista.includes('precio medio n/d'), 'el precio medio parcial no se muestra como dato');
+    assert.match(vista, /No es «sin\s+actividad»: es lo que el monitor aún no ha guardado/);
+    assert.match(vista, /status !== 'ok'/, 'estado de error honesto');
+  });
+
+  it('la página la monta sin ticker, con fetch independiente del feed', () => {
+    assert.match(pagina, /getInsiderOperations\(365\)/, 'la página pide el agregado anual');
+    assert.match(pagina, /<InsiderOperationsView days=\{365\} result=\{operations\} \/>/);
+    assert.match(acciones, /\/api\/insider\/operations\?days=/, 'la acción llama al endpoint nuevo');
+  });
+});

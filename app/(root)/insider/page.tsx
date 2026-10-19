@@ -2,14 +2,17 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Users } from 'lucide-react';
 import InsiderFeed from '@/components/insider/InsiderFeed';
+import InsiderOperationsView from '@/components/insider/InsiderOperationsView';
 import InsiderSignalsView from '@/components/insider/InsiderSignalsView';
 import BackendOffline from '@/components/system/BackendOffline';
 import {
     getInsiderFeed,
     getInsiderFilings,
+    getInsiderOperations,
     getInsiderSignals,
     type InsiderFeedResult,
     type InsiderFilingsResult,
+    type InsiderOperationsResult,
     type InsiderSignalsResult,
 } from '@/lib/actions/insider.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
@@ -45,6 +48,7 @@ export default async function InsiderPage({ searchParams }: PageProps) {
     let signals: InsiderSignalsResult | null = null;
     let filings: InsiderFilingsResult | null = null;
     let feed: InsiderFeedResult | null = null;
+    let operations: InsiderOperationsResult | null = null;
 
     if (ticker) {
         try {
@@ -59,10 +63,18 @@ export default async function InsiderPage({ searchParams }: PageProps) {
     }
 
     if (!ticker) {
-        feed = await getInsiderFeed(side, days).catch((error) => {
-            if (isAuthError(error)) throw error;
-            return null;
-        });
+        // Feed y agregado por empresa son lecturas independientes: que una
+        // falle no puede tumbar la otra (estado honesto por seccion).
+        [feed, operations] = await Promise.all([
+            getInsiderFeed(side, days).catch((error) => {
+                if (isAuthError(error)) throw error;
+                return null;
+            }),
+            getInsiderOperations(365).catch((error) => {
+                if (isAuthError(error)) throw error;
+                return null;
+            }),
+        ]);
     }
 
     return (
@@ -101,7 +113,12 @@ export default async function InsiderPage({ searchParams }: PageProps) {
                 initialResult={signals}
                 initialFilings={filings}
             />
-            {!ticker ? <InsiderFeed days={days} feed={feed} side={side} /> : null}
+            {!ticker ? (
+                <>
+                    <InsiderOperationsView days={365} result={operations} />
+                    <InsiderFeed days={days} feed={feed} side={side} />
+                </>
+            ) : null}
         </main>
     );
 }
