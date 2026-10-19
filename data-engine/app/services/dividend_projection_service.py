@@ -172,6 +172,7 @@ class DividendProjectionService:
                 "source_base": Decimal("0"),
                 "covered": set(),
                 "excluded": set(),
+                "unverified": Decimal("0"),
             }
         )
         # (year, ticker) -> gross_base anual proyectado (para IRPF + deducción)
@@ -256,6 +257,10 @@ class DividendProjectionService:
                     bucket["covered"].add(company.ticker)
                 else:
                     bucket["excluded"].add(company.ticker)
+                    if rate is not None:
+                        # Bruto con FX conocido pero retencion en origen NO verificada:
+                        # se muestra aparte y etiquetado; nunca entra en neto/IRPF.
+                        bucket["unverified"] += amount_native * rate
 
             per_position.append(
                 {
@@ -392,6 +397,8 @@ class DividendProjectionService:
                     "month": key,
                     "gross_base": float(bucket["gross_base"]),
                     "source_withheld_base": float(bucket["source_base"]),
+                    "gross_unverified_base": float(bucket["unverified"]),
+                    "gross_total_base": float(bucket["gross_base"] + bucket["unverified"]),
                     "covered_tickers": sorted(bucket["covered"]),
                     "excluded_tickers": sorted(bucket["excluded"]),
                     "note": (
@@ -415,6 +422,16 @@ class DividendProjectionService:
             "months": months_out,
             "fiscal_by_year": {str(year): data for year, data in sorted(fiscal_years.items())},
             "positions": per_position,
+            "gross_summary": {
+                "label": "BRUTO, retención en origen no verificada en las posiciones sin tipo conocido",
+                "gross_total_base": float(
+                    sum((b["gross_base"] + b["unverified"] for b in (month_totals[k] for k in window)), Decimal("0"))
+                ),
+                "gross_unverified_base": float(
+                    sum((month_totals[k]["unverified"] for k in window), Decimal("0"))
+                ),
+                "net_irpf": "N/D salvo posiciones con retención verificada",
+            },
             "declared_future": declared_future,
             "coverage": {
                 "with_data": len(per_position),

@@ -167,6 +167,13 @@ def test_unknown_country_withholding_is_none_and_excluded(db):
     for m in months_with_excluded:
         assert m["gross_base"] == 0.0
         assert "Subconjunto cubierto" in m["note"]
+        # El bruto con FX conocido se muestra aparte, nunca como neto.
+        assert m["gross_unverified_base"] > 0
+        assert m["gross_total_base"] == m["gross_unverified_base"]
+    summary = out["gross_summary"]
+    assert summary["gross_total_base"] == pytest.approx(pos["gross_base"])
+    assert summary["gross_unverified_base"] == pytest.approx(pos["gross_base"])
+    assert "retención en origen no verificada" in summary["label"]
 
 
 def test_currency_mismatch_records_are_skipped(db):
