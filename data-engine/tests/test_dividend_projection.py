@@ -174,6 +174,8 @@ def test_unknown_country_withholding_is_none_and_excluded(db):
     assert summary["gross_total_base"] == pytest.approx(pos["gross_base"])
     assert summary["gross_unverified_base"] == pytest.approx(pos["gross_base"])
     assert "retención en origen no verificada" in summary["label"]
+    assert summary["excluded_no_fx"] == []
+    assert summary["complete"] is True
 
 
 def test_currency_mismatch_records_are_skipped(db):
@@ -201,6 +203,10 @@ def test_missing_fx_excludes_base_aggregation(db):
     assert all(m["gross_base"] == 0.0 for m in out["months"])
     excluded = [m for m in out["months"] if m["excluded_tickers"]]
     assert excluded and all("Subconjunto cubierto" in m["note"] for m in excluded)
+    summary = out["gross_summary"]
+    assert summary["excluded_no_fx"] == ["NOFX"]
+    assert summary["complete"] is False
+    assert summary["gross_total_base"] == 0.0
 
 
 def test_horizon_24_replicates_both_years(db):

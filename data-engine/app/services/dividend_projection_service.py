@@ -431,6 +431,11 @@ class DividendProjectionService:
                     sum((month_totals[k]["unverified"] for k in window), Decimal("0"))
                 ),
                 "net_irpf": "N/D salvo posiciones con retención verificada",
+                # El total es PARCIAL si falta algún tipo de cambio o hay
+                # posiciones sin dividendos conocidos: nunca es "la cartera".
+                "excluded_no_fx": sorted(set(fx_missing)),
+                "excluded_no_dividends": sorted(sin_datos),
+                "complete": not (set(fx_missing) or set(sin_datos)),
             },
             "declared_future": declared_future,
             "coverage": {
