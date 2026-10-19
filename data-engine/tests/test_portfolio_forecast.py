@@ -166,6 +166,7 @@ def test_forecast_weights_cagrs_and_exclusion(db_session):
     assert by_ticker["AAA"]["weight_scope"] == "total_portfolio"
     assert [item["ticker"] for item in result["excluded"]] == ["CCC"]
     assert result["excluded"][0]["weight"] == pytest.approx(0.1)
+    assert result["excluded"][0]["reason_code"] == "no_published_thesis"
 
 
 def test_forecast_prefers_published_thesis_and_publishable_model(db_session):
@@ -237,6 +238,7 @@ def test_forecast_never_sums_unconverted_native_value(db_session):
     assert "JPY1" in excluded
     assert excluded["JPY1"]["weight"] is None
     assert "N/D" in excluded["JPY1"]["reason"]
+    assert excluded["JPY1"]["reason_code"] == "no_base_value"
 
 
 def test_forecast_mixed_base_currency_is_nd(db_session):

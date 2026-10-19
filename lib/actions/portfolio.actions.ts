@@ -836,6 +836,7 @@ export type PortfolioForecastExcluded = {
   weight: number | null;
   currency: string;
   reason: string;
+  reason_code?: 'no_base_value' | 'no_published_thesis' | 'valuation_basis_unverified' | 'no_computable_intrinsic';
 };
 
 export type PortfolioForecast = {
