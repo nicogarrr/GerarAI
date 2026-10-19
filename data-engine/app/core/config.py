@@ -125,6 +125,10 @@ class Settings(BaseSettings):
     market_price_max_age_days: int = Field(default=3, ge=0, le=30)
 
     database_url: str = "sqlite:///./portfolio_research_os.db"
+    # Defensa de red tras los commits de #1657: una transaccion abierta y
+    # olvidada en un worker no puede bloquear tablas mas de 2 minutos. Solo
+    # Postgres (se pasa via connect_args options); 0 lo desactiva.
+    idle_in_transaction_session_timeout_ms: int = Field(default=120000, ge=0)
     thesis_graph_checkpoint_path: Path = Path("./storage/thesis_graph_checkpoints.db")
     redis_url: str = "redis://localhost:6379/0"
     qdrant_url: str = "http://localhost:6333"
