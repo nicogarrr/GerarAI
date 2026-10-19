@@ -415,7 +415,14 @@ class MetricCalculationService:
             # importe: la divisa es la de los hechos de entrada (EUR en ESEF,
             # CAD en Yahoo), no USD fijo
             units = {f.unit for f in unique_facts if f.unit}
-            unit = units.pop() if len(units) == 1 else unit
+            if len(units) > 1:
+                # divisas mezcladas: N/D declarado, nunca un importe etiquetado USD
+                return self._persist_if_requested(
+                    db, company,
+                    self._mixed_unit_result(metric, period, unit, definition_version, formula, unique_facts, sorted(units)),
+                    persist,
+                )
+            unit = units.pop() if units else unit
         result = MetricResult(
             metric=metric,
             status="ok",
@@ -507,6 +514,26 @@ class MetricCalculationService:
             ):
                 return candidate
         return None
+
+    def _mixed_unit_result(
+        self, metric, period, unit, definition_version, formula, facts, units
+    ) -> MetricResult:
+        return MetricResult(
+            metric=metric,
+            status="unavailable",
+            period=period,
+            value=None,
+            unit=unit,
+            definition_version=definition_version,
+            formula=formula,
+            numerator=None,
+            denominator=None,
+            source_fact_ids=[fact.id for fact in facts],
+            calculation_trace={"reason": "mixed_currency_inputs", "units": units},
+            confidence=Decimal("0.00"),
+            fiscal_year=None,
+            fiscal_quarter=None,
+        )
 
     def _period_for_result(self, facts: dict[str, FinancialFact]) -> str:
         if not facts:
@@ -1443,7 +1470,16 @@ class MetricCalculationService:
         if unit == "USD":
             # importe: la divisa es la de los hechos de entrada, no una fija
             units = {f.unit for f in facts_used if f.unit}
-            unit = units.pop() if len(units) == 1 else unit
+            if len(units) > 1:
+                return self._persist_if_requested(
+                    db, company,
+                    self._mixed_unit_result(
+                        metric, f"FY{min(years)}-FY{max(years)}", unit,
+                        definition_version, formula, facts_used, sorted(units),
+                    ),
+                    persist,
+                )
+            unit = units.pop() if units else unit
         result = MetricResult(
             metric=metric,
             status="ok",

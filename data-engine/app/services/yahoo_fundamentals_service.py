@@ -34,7 +34,7 @@ REVIEWED_MAP: dict[str, dict[str, Any]] = {
 }
 
 # metric -> (statement, [filas Yahoo por orden de preferencia], es_por_accion)
-YAHOO_METRIC_MAP: list[tuple[str, str, list[str], bool]] = [
+YAHOO_METRIC_MAP: list[tuple[str, str, list[str], bool | str]] = [
     ("revenue", "income", ["Total Revenue", "Operating Revenue"], False),
     ("gross_profit", "income", ["Gross Profit"], False),
     ("operating_income", "income", ["Operating Income"], False),
@@ -44,7 +44,7 @@ YAHOO_METRIC_MAP: list[tuple[str, str, list[str], bool]] = [
     ("interest_expense", "income", ["Interest Expense"], False),
     ("depreciation_amortization", "cashflow", ["Depreciation And Amortization", "Depreciation Amortization Depletion"], False),
     ("eps_diluted", "income", ["Diluted EPS"], True),
-    ("shares_diluted", "income", ["Diluted Average Shares"], False),
+    ("shares_diluted", "income", ["Diluted Average Shares"], "shares"),
     ("total_assets", "balance", ["Total Assets"], False),
     ("total_liabilities", "balance", ["Total Liabilities Net Minority Interest"], False),
     ("total_equity", "balance", ["Stockholders Equity", "Common Stock Equity"], False),
@@ -177,7 +177,7 @@ def refresh_from_yahoo(
                     company_id=company.id,
                     metric=metric,
                     value=val,
-                    unit=f"{currency}/share" if per_share else currency,
+                    unit="shares" if per_share == "shares" else (f"{currency}/share" if per_share else currency),
                     period=f"{period_date}:FY",
                     fiscal_year=int(period_date[:4]),
                     fiscal_quarter="FY",
