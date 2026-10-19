@@ -55,11 +55,11 @@ describe('market index units guard (F152)', () => {
 
   it('los fronts solo ponen US$ cuando unit === "usd"', () => {
     assert.equal(screener.includes("formatPrice(i.price, 'USD')}"), false, 'sin formato US$ incondicional en screener');
-    assert.match(screener, /i\.unit === 'usd'/, 'screener ramifica por usd explícito');
-    assert.match(screener, /formatPrice\(i\.price, 'USD'\)/, 'el US$ vive solo en la rama usd');
+    assert.match(screener, /i\.unit !== 'usd'/, 'screener ramifica por usd explícito');
+    assert.match(screener, /currency: 'USD' \}\)\.format\(i\.price\)/, 'el US$ es-ES vive solo en la rama usd');
     assert.match(
       screener,
-      /i\.unit === 'usd'\s*\?\s*formatPrice\(i\.price, 'USD'\)\s*:\s*formatNumber\(i\.price/,
+      /i\.unit !== 'usd'\)[^{]*\{?\s*return formatNumber\(i\.price/,
       'la rama no-usd va como número plano, nunca como dinero',
     );
   });

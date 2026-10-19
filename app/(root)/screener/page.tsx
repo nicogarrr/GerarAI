@@ -180,10 +180,12 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
   // series etiquetadas "usd" (Bitcoin/Oro/Plata) llevan US$; un nivel de
   // índice o una serie sin unidad conocida va como número plano, jamás
   // asumiendo dólares.
-  const formatIndexValue = (i: (typeof validIndices)[number]) =>
-    i.unit === 'usd'
-      ? formatPrice(i.price, 'USD')
-      : formatNumber(i.price, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatIndexValue = (i: (typeof validIndices)[number]) => {
+    if (i.unit !== 'usd') return formatNumber(i.price, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // F152: es-ES - «82.686,78 US$», no el «$82,686.78» anglosajón que
+    // formatPrice fija para USD en el resto de la app.
+    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'USD' }).format(i.price);
+  };
 
   return (
     <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip p-4 sm:p-6">
@@ -384,7 +386,7 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                       <span className="min-w-0 flex-1 truncate text-gray-300">{i.name}</span>
                       <div className="text-right">
                         <span className="font-semibold text-gray-100">{formatIndexValue(i)}{i.unit === 'index' ? ' ptos.' : ''}</span>
-                        <div className="text-[10px] text-gray-500">{quoteObserved(i.priceAsOf)}</div>
+                        <div className="text-[10px] text-gray-500">{quoteObserved(i.priceAsOf, 'daily_candle_open')}</div>
                       </div>
                     </div>
                   ))}
