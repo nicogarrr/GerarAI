@@ -420,7 +420,7 @@ def thesis_memo(
 
 
 def _audio_context(db: Session, ticker: str) -> tuple[str, str]:
-    """(key, texto hablable) de la ultima version de la tesis (borrador incluido)."""
+    """(key, texto hablable) de la ultima version; los borradores usan el memo sin veredicto."""
     service = ThesisService()
     thesis = service.latest(db, ticker)
     if not thesis:
@@ -428,7 +428,12 @@ def _audio_context(db: Session, ticker: str) -> tuple[str, str]:
     company = resolve_company(db, ticker)
     latest_data_at = service.data_freshness(db, thesis.company_id)
     stale = latest_data_at is not None and latest_data_at > thesis.updated_at
-    markdown = build_memo_markdown(db, company, thesis, stale=stale, latest_data_at=latest_data_at)
+    # Un borrador no puede locutar veredicto, margen de seguridad ni valoracion:
+    # mismo modo borrador que memo.md?draft=1.
+    is_draft = (thesis.status or "draft") != "published"
+    markdown = build_memo_markdown(
+        db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=is_draft
+    )
     text = thesis_audio_service.memo_to_speech_text(markdown, ticker=company.ticker, version=thesis.version)
     return thesis_audio_service.audio_key(company.ticker, thesis.version, text), text
 
@@ -444,6 +449,10 @@ def thesis_audio_status(ticker: str, db: Session = Depends(get_db)) -> dict:
 def thesis_audio_generate(ticker: str, db: Session = Depends(get_db)) -> dict:
     """Encola la generacion (idempotente); si ya esta listo devuelve ready."""
     key, text = _audio_context(db, ticker)
+    current = thesis_audio_service.status(key)
+    if current in ("ready", "pending"):
+        # Una sintesis a la vez por tesis: no se reencola mientras haya una en curso.
+        return {"state": current, "key": key}
     state = thesis_audio_service.start(key, text)
     if state == "unavailable":
         raise HTTPException(status_code=503, detail="Servicio de audio no disponible")
