@@ -35,8 +35,8 @@ def _company(db, ticker="KRKNF", name="Kraken Robotics Inc (OTC)"):
 def _fetcher(name="Kraken Robotics Inc.", currency="CAD"):
     cols = [pd.Timestamp("2025-12-31"), pd.Timestamp("2024-12-31")]
     income = pd.DataFrame(
-        {cols[0]: [102.21e6, 8.555e6, 0.01], cols[1]: [float("nan"), 5e6, 0.02]},
-        index=["Total Revenue", "Operating Income", "Diluted EPS"],
+        {cols[0]: [102.21e6, 8.555e6, 0.01, 294.2e6], cols[1]: [float("nan"), 5e6, 0.02, 290e6]},
+        index=["Total Revenue", "Operating Income", "Diluted EPS", "Diluted Average Shares"],
     )
     cash = pd.DataFrame({cols[0]: [-9e6]}, index=["Capital Expenditure"])
     return lambda symbol: {
@@ -58,6 +58,8 @@ def test_writes_labelled_unofficial_facts(db):
     assert rev[0].period == "2025-12-31:FY"
     eps = [f for f in facts if f.metric == "eps_diluted"]
     assert {f.unit for f in eps} == {"CAD/share"}
+    shares = [f for f in facts if f.metric == "shares_diluted"]
+    assert {f.unit for f in shares} == {"shares"}
     capex = [f for f in facts if f.metric == "capital_expenditure"][0]
     assert capex.value < 0
     doc = db.get(Document, rev[0].source_id)

@@ -1149,3 +1149,20 @@ def test_owner_earnings_unit_follows_input_currency():
     finally:
         db.close()
         cleanup_metric_test_artifacts()
+
+
+def test_owner_earnings_mixed_currency_is_unavailable():
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        for metric, val, unit in (("net_income", "200", "CAD"), ("depreciation_amortization", "80", "USD"), ("capital_expenditure", "-120", "USD")):
+            add_fact(db, company, metric, val).unit = unit
+        db.commit()
+        result = MetricCalculationService().calculate(db, company, "owner_earnings", persist=False)
+        assert result.status == "unavailable"
+        assert result.value is None
+        assert result.calculation_trace["reason"] == "mixed_currency_inputs"
+    finally:
+        db.close()
+        cleanup_metric_test_artifacts()
