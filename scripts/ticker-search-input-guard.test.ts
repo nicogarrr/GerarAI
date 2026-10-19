@@ -11,6 +11,12 @@ import { readFileSync } from 'node:fs';
 const component = readFileSync('components/search/TickerSearchInput.tsx', 'utf8');
 
 describe('buscador de ticker unificado (autocompletado inline)', () => {
+    it('AMZ recupera la línea US por nombre verificado, no mediante alias inventado', () => {
+        const action = readFileSync('lib/actions/finnhub.actions.ts', 'utf8');
+        assert.ok(action.includes('encodeURIComponent(listing.description)'));
+        assert.ok(action.includes('foldName(r.description) === foldName(listing.description)'));
+        assert.ok(action.includes('r.symbol.toUpperCase().startsWith(prefix)'));
+    });
     it('reutiliza la búsqueda del buscador global, con gate F215, debounce y deadline', () => {
         assert.ok(component.includes('searchStocksWithStatus'), 'misma acción que SearchCommand/WatchlistAddButton');
         assert.ok(component.includes('createLatestRequestGate'), 'gate de petición más reciente');

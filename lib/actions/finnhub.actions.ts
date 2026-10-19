@@ -357,6 +357,25 @@ const searchStocksOrThrow = async (query?: string): Promise<StockWithWatchlistSt
             }
         }
 
+        // Finnhub busca AMZ por símbolo y devuelve AMZ.DE/AMZ.F, pero omite
+        // AMZN. Consulta acotada por el nombre REAL del primer listado (no se
+        // inventa ningún alias): solo admite el mismo nombre normalizado y un
+        // símbolo que empiece por la query. Beneficia a todos los buscadores.
+        const prefix = trimmed.toUpperCase();
+        if (/^[A-Z]{2,5}$/.test(prefix) && !results.some(r => !r.symbol.includes('.') && r.symbol.toUpperCase().startsWith(prefix))) {
+            const listing = results.find(r => r.symbol.toUpperCase().startsWith(`${prefix}.`) && r.description);
+            if (listing) {
+                try {
+                    const byName = await fetchJSON<FinnhubSearchResponse>(`${FINNHUB_BASE_URL}/search?q=${encodeURIComponent(listing.description)}&token=${token}`, 1800, 1000);
+                    const foldName = (text: string) => foldSearchQuery(text).toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    const verified = (byName.result ?? []).filter(r => r.symbol.toUpperCase().startsWith(prefix) && foldName(r.description) === foldName(listing.description));
+                    results = [...verified, ...results];
+                } catch {
+                    // Enriquecimiento opcional: conserva los listados originales.
+                }
+            }
+        }
+
         // Ticker desnudo sin resultado exacto (ASTS): el search de Finnhub ordena
         // por nombre y puede no devolverlo; el perfil por simbolo es exacto.
         const bare = trimmed.toUpperCase();
