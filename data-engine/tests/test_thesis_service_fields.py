@@ -26,11 +26,25 @@ def _company() -> Company:
 # -- confidence score -----------------------------------------------------------
 
 def test_confidence_score_ladder():
+    """Orden fail-closed y sensibilidad a la evidencia (F7): nada de cuatro
+    constantes identicas para todas las versiones."""
     service = ThesisService()
-    assert service._confidence_score({"status": "insufficient_data"}, {"f": 1}) == 15
-    assert service._confidence_score({"status": "ok"}, {}) == 25
-    assert service._confidence_score({"publishable": True}, {"f": 1}) == 85
-    assert service._confidence_score({"publishable": False}, {"f": 1}) == 55
+    backed = [{"material": True, "source_id": 1}]
+    unsupported = [{"material": True, "source_id": None}]
+    insufficient = service._confidence_score({"status": "insufficient_data"}, {"f": 1}, backed)
+    no_facts = service._confidence_score({"status": "ok"}, {}, backed)
+    not_publishable = service._confidence_score({"publishable": False}, {"f": 1}, backed)
+    publishable = service._confidence_score({"publishable": True}, {"f": 1}, backed)
+    assert insufficient < no_facts < not_publishable < publishable
+    # La cobertura de afirmaciones mueve la cifra dentro del mismo estado.
+    assert service._confidence_score({"publishable": False}, {"f": 1}, unsupported) < not_publishable
+    # Los inputs pendientes penalizan.
+    assert (
+        service._confidence_score({"publishable": True, "missing_inputs": ["a", "b"]}, {"f": 1}, backed)
+        < publishable
+    )
+    # Rango 0-100 siempre.
+    assert 0 <= service._confidence_score({"status": "insufficient_data", "missing_inputs": ["x"] * 50}, {}, unsupported) <= 100
 
 
 # -- hypothesis -------------------------------------------------------------------

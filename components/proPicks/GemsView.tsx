@@ -13,6 +13,10 @@ export default function GemsView() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [reviewing, setReviewing] = useState(false);
+    // Resultado honesto de la última revisión: sin él, cuando la cadena LLM no
+    // está disponible el botón parecía no hacer nada (cada joya volvía con un
+    // discreto «Sin revisión IA» y ya).
+    const [reviewStatus, setReviewStatus] = useState<string | null>(null);
 
     const load = async () => {
         setLoading(true);
@@ -26,9 +30,17 @@ export default function GemsView() {
     const review = async () => {
         setReviewing(true);
         setError(null);
+        setReviewStatus(null);
         const result = await reviewGems();
-        if ('error' in result) setError(result.error);
-        else setGems(result);
+        if ('error' in result) {
+            setError(result.error);
+        } else {
+            setGems(result);
+            const reviewed = result.filter((gem) => gem.review_status === 'reviewed').length;
+            setReviewStatus(reviewed > 0
+                ? `Revisión IA completada: ${reviewed} de ${result.length} joyas revisadas.`
+                : 'La revisión IA no está disponible ahora mismo. La lista es la selección determinista (calidad + valor + insiders + 13F), sin el filtro del modelo; inténtalo de nuevo más tarde.');
+        }
         setReviewing(false);
     };
 
@@ -58,11 +70,15 @@ export default function GemsView() {
                 <Card className="rounded-lg border border-red-700 bg-red-900/20 p-4 text-sm text-red-400">{error}</Card>
             )}
 
+            <p aria-live="polite" role="status" className={reviewStatus ? 'text-sm text-amber-300' : 'sr-only'}>
+                {reviewStatus}
+            </p>
+
             {gems !== null && gems.length === 0 && !error && (
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center">
                     <p className="font-medium text-gray-300">Sin joyas con los datos actuales</p>
                     <p className="mt-2 text-sm text-gray-500">
-                        Ninguna empresa que supera el embudo reúne capitalización de 300 M$ a 10.000 M$, rentabilidad por FCF de al menos 5 % y precio de los últimos 7 días.
+                        Ninguna empresa que supera el embudo reúne capitalización de 300 M$ a 10.000 M$, rentabilidad por FCF de al menos 5 % y precio de los últimos 7 días. No es un fallo: son criterios fijos y la lista cambia cuando llegan datos nuevos.
                     </p>
                     <Button onClick={load} disabled={busy} className="mt-4 h-11 gap-2 bg-teal-600 text-white hover:bg-teal-700">
                         <RefreshCw aria-hidden="true" className="h-4 w-4" />

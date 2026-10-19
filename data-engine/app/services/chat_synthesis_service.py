@@ -534,6 +534,7 @@ class ChatSynthesisService:
         baseline: ChatResponse,
         db: Session | None = None,
         enable_debate: bool | None = None,
+        page: dict | None = None,
     ) -> ChatResponse:
         retrieval_ids = [
             f"{source.get('type')}:{source.get('id')}"
@@ -566,6 +567,7 @@ class ChatSynthesisService:
                                 {
                                     "question": question,
                                     "ticker": ticker,
+                                    "current_page": page,
                                     "allowed_source_ids": retrieval_ids,
                                     "deterministic_sections": [
                                         section.model_dump() for section in baseline.sections
@@ -733,6 +735,7 @@ class ChatSynthesisService:
         baseline: ChatResponse,
         db: Session | None = None,
         history: list[Any] | None = None,
+        page: dict | None = None,
     ) -> ChatResponse:
         """Respuesta natural en espanol para preguntas sin ticker.
 
@@ -862,6 +865,7 @@ class ChatSynthesisService:
                                 "no son fuentes ni datos verificados."
                             ) if history else None,
                             "scope": scope,
+                            "current_page": page,
                             "current_time_context": _clock_context(question),
                             "reviewed_at_utc": datetime.now(UTC).date().isoformat(),
                             "sources_available": bool(doctrine),

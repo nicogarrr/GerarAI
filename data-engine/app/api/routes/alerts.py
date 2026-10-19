@@ -33,6 +33,15 @@ class ManualAlertCreate(BaseModel):
     value: float | str
 
 
+def _is_unverified_stub(company: Company) -> bool:
+    """Ficha creada solo con el ticker y nunca enriquecida (nombre = ticker, bolsa desconocida)."""
+    return (
+        (company.name or "").strip().upper() == (company.ticker or "").strip().upper()
+        and (company.exchange or "UNKNOWN").strip().upper() == "UNKNOWN"
+        and company.company_type == "research_candidate"
+    )
+
+
 @router.post("", response_model=AlertRuleOut, status_code=201)
 def create_alert(
     payload: ManualAlertCreate, db: Session = Depends(get_db)
@@ -42,6 +51,13 @@ def create_alert(
     )
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
+    if _is_unverified_stub(company):
+        # /companies/ensure crea una ficha minima para cualquier ticker con formato valido;
+        # si Finnhub no la reconocio (sigue sin nombre ni bolsa), no se crean alertas sobre ella.
+        raise HTTPException(
+            status_code=422,
+            detail=f"Símbolo no reconocido: {company.ticker}. Comprueba que exista en bolsa.",
+        )
     return AlertRuleService().create(
         db,
         company,
@@ -293,6 +309,9 @@ def list_alerts(
 
             if _is_off_topic(event, company):
                 continue
+        if event and alert.alert_type in ("tracked_news", "news_material_update", "news"):
+            title = (event.title or "").strip()
+            out.event_headline = title or None
         if event:
             # Document type only from a specific form token in the source
             # headline, never from an arbitrary model summary or SEC domain.

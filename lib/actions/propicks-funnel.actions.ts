@@ -86,6 +86,8 @@ export async function generateFunnelRunNow(): Promise<FunnelRunSummary | { error
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const pct = (ratio: number) => round1(ratio * 100);
+/** Cifras de los motivos en formato es-ES (coma decimal), igual que el resto de la UI. */
+const esNum = (n: number) => new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 }).format(n);
 
 /** Bandas identicas a lib/utils/advancedStockScoring.ts getGrade (no exportada). */
 function gradeFor(score: number): string {
@@ -187,7 +189,7 @@ function funnelCandidateToProPick(c: FunnelCandidate, runAsOf: string): ProPick 
     confidenceReasons.push({
       metric: 'quality_moat_score_v2',
       value: facts['quality_moat_score_v2'],
-      text: `Marco de calidad ${facts['quality_moat_score_v2']}/${MOAT_V2_MAX_CHECKS} criterios superados segun fundamentales auditados`,
+      text: `Marco de calidad ${facts['quality_moat_score_v2']}/${MOAT_V2_MAX_CHECKS} criterios superados según fundamentales auditados`,
     });
   }
   if (cfroi !== null && wacc !== null) {
@@ -196,21 +198,21 @@ function funnelCandidateToProPick(c: FunnelCandidate, runAsOf: string): ProPick 
     confidenceReasons.push({
       metric: 'spread_cfroi_wacc',
       value: spread,
-      text: `CFROI ${facts['cfroi_approx']}% vs WACC ${facts['wacc']}%: spread de ${spread} puntos`,
+      text: `CFROI ${esNum(Number(facts['cfroi_approx']))} % vs WACC ${esNum(Number(facts['wacc']))} %: spread de ${esNum(spread)} puntos`,
     });
   }
   if (cagr !== null) {
     confidenceReasons.push({
       metric: 'revenue_cagr',
       value: facts['revenue_cagr'],
-      text: `Ingresos creciendo al ${facts['revenue_cagr']}% anual (5 anos)`,
+      text: `Ingresos creciendo al ${esNum(Number(facts['revenue_cagr']))} % anual (5 años)`,
     });
   }
   if (fcfMargin !== null) {
     confidenceReasons.push({
       metric: 'fcf_margin_5y',
       value: facts['fcf_margin_5y'],
-      text: `Margen FCF medio del ${facts['fcf_margin_5y']}% (5 anos)`,
+      text: `Margen FCF medio del ${esNum(Number(facts['fcf_margin_5y']))} % (5 años)`,
     });
   }
   const topReasons = confidenceReasons.slice(0, 3);

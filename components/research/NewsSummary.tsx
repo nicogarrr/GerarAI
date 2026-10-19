@@ -18,17 +18,23 @@ export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
   const [translated, setTranslated] = useState<string | null>(event.summary_translation?.text ?? null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   if (!original) return null;
   const translatable = nonLatin.test(original) || ENGLISH_MARK.test(original);
   const onTranslate = () => {
     if (busy) return;
     setBusy(true);
+    setUnavailable(false);
     fetch(`/api/news/${event.id}/translation/summary`, { method: 'POST', signal: AbortSignal.timeout(17000) })
       .then(async res => {
         const data = res.ok ? await res.json() : null;
-        if (data?.status === 'translated' && typeof data.text === 'string') setTranslated(data.text);
+        if (data?.status === 'translated' && typeof data.text === 'string') {
+          setTranslated(data.text);
+        } else {
+          setUnavailable(true);
+        }
       })
-      .catch(() => undefined)
+      .catch(() => setUnavailable(true))
       .finally(() => setBusy(false));
   };
   const showingTranslation = translated !== null && !showOriginal;
@@ -43,9 +49,16 @@ export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
           </button>
         </span>
       ) : translatable ? (
-        <button className="mt-0.5 min-h-11 text-xs text-teal-300 hover:text-teal-200 sm:min-h-0" type="button" disabled={busy} onClick={onTranslate}>
-          {busy ? 'Traduciendo…' : 'Traducir'}
-        </button>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
+          <button className="min-h-11 text-teal-300 hover:text-teal-200 sm:min-h-0" type="button" disabled={busy} onClick={onTranslate}>
+            {busy ? 'Traduciendo…' : 'Traducir'}
+          </button>
+          {unavailable ? (
+            <span className="text-gray-500" role="status">
+              Traducción no disponible ahora mismo. Inténtalo de nuevo en un rato.
+            </span>
+          ) : null}
+        </span>
       ) : null}
     </div>
   );

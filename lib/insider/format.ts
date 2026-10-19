@@ -66,3 +66,12 @@ export function insiderCodeLabel(code: string | null | undefined): string {
     if (clean === 'S') return sideLabel('venta');
     return CODE_LABELS[clean] ?? `Código ${clean}`;
 }
+
+/** El Form 4 aplana las personas declarantes; los filtros institucionales
+ *  (Berkshire Hathaway Inc, fondos) no son «insiders» personales. Detecta el
+ *  nombre de entidad para etiquetarlo en la interfaz en vez de mezclarlo. */
+const ENTITY_SUFFIX = /\b(inc|corp|corporation|llc|l\.l\.c|lp|l\.p|ltd|plc|s\.a|partners|capital|fund|holdings|management|advisors?|trust|group)\b\.?/i;
+
+export function isInstitutionalInsiderName(name: string | null | undefined): boolean {
+    return ENTITY_SUFFIX.test((name ?? '').trim());
+}

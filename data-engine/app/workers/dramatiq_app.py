@@ -370,6 +370,12 @@ def _session(tenant_id: int | None, user_id: str | None):
         raise ValueError(f"Active tenant {tenant_id} was not found")
     db.info["tenant_id"] = tenant.id
     db.info["user_id"] = user_id
+    # El SELECT del tenant abre una transaccion (autocommit=False); sin este
+    # commit cada actor arrancaba "idle in transaction" y la mantenia abierta
+    # durante toda la unidad de trabajo, bloqueando escritores (p. ej. el
+    # UPDATE de market_prices). db.info ya esta poblado y expire_on_commit=False
+    # (database.py) mantiene los atributos del tenant utilizables tras el commit.
+    db.commit()
     return db
 
 
@@ -1880,6 +1886,40 @@ def sync_official_closes(
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
+def backfill_company_price_history(
+    company_id: int,
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Backfill de ~1 ano de MarketPrice para una compania recien en cartera.
+
+    market_prices solo acumula hacia adelante (sync_official_closes escribe
+    la ultima semana cada dia); sin este backfill una posicion nueva no tiene
+    pasado y las metricas de cartera miden dias con pinta de anos. Una
+    compania por tarea y una unica llamada a la fuente: ritmo amable.
+    """
+    from app.models.entities import Company
+    from app.services.market_close_sync import backfill_company_history
+
+    db = _session(tenant_id, user_id)
+    try:
+        company = db.get(Company, company_id)
+        if company is None:
+            return {"status": "skipped", "reason": "company_not_found"}
+        return {
+            "actor": "backfill_company_price_history",
+            **backfill_company_history(db, company),
+        }
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error(
+            "backfill_company_price_history", exc, company_id=company_id
+        )
+    finally:
+        db.close()
+
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
 def refresh_sec_filings(
     tenant_id: int | None = None,
@@ -2254,6 +2294,10 @@ def refresh_news(
             companies = sorted(
                 companies, key=lambda c: (c.ticker.upper() not in PRIORITY_TICKERS, c.ticker)
             )
+            # Cierra la transaccion de lectura de _session/_companies ANTES del
+            # bucle de red (GDELT tarda segundos por empresa): la lista ya esta
+            # materializada y expire_on_commit=False mantiene los atributos.
+            db.commit()
             # 300 s: el ultimo query puede entrar con 429+reintentos y 30 items;
             # el margen real hasta los 600 s del TimeLimit es de 5 min.
             deadline = Deadline(300)

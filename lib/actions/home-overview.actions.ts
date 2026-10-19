@@ -1,7 +1,7 @@
 'use server';
 
 import { getWatchlistEntryData, getWatchlistState } from '@/lib/actions/watchlist.actions';
-import { getFairValue, getScreenerStocksReal } from '@/lib/actions/screener.actions';
+import { getFairValueReading, getScreenerStocksReal } from '@/lib/actions/screener.actions';
 import { DCF_MIN_UPSIDE_PCT } from '@/lib/overview/dcf-candidates';
 
 /**
@@ -79,6 +79,8 @@ export type HomeOpportunity = {
     currency: string | null;
     fairValue: number;
     upside: number;
+    /** true = el DCF no es publicable: orientacion del motor, no valoracion final. */
+    orientation?: boolean;
 };
 
 export type HomeOpportunityProbe = {
@@ -104,14 +106,24 @@ export async function getHomeOpportunities(params: {
         try {
             // Precio y divisa del LISTADO REAL (master): getStockQuote con el
             // ticker desnudo resolvia en la linea US y no traia divisa.
-            const [fairValue, listing] = await Promise.all([getFairValue(sym), getWatchlistEntryData(sym)]);
+            const [reading, listing] = await Promise.all([getFairValueReading(sym), getWatchlistEntryData(sym)]);
             const currentPrice = listing.price ?? 0;
-            if (fairValue && currentPrice > 0) {
-                const upside = ((fairValue - currentPrice) / currentPrice) * 100;
+            if (reading && currentPrice > 0) {
+                const upside = ((reading.value - currentPrice) / currentPrice) * 100;
                 return {
                     evaluated: true,
                     opportunity: upside > DCF_MIN_UPSIDE_PCT
-                        ? { symbol: sym, name: sym, price: currentPrice, currency: listing.currency, fairValue, upside }
+                        ? {
+                            symbol: sym,
+                            name: sym,
+                            price: currentPrice,
+                            currency: listing.currency,
+                            fairValue: reading.value,
+                            upside,
+                            // Sin publishable el valor es una orientacion del motor,
+                            // nunca una valoracion final: la ficha lo declara.
+                            orientation: !reading.publishable,
+                        }
                         : null,
                 };
             }

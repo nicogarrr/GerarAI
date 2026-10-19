@@ -1,7 +1,7 @@
 import CompanyChatForm from '@/components/research/CompanyChatForm';
 import ScrollToOnMount from '@/components/research/ScrollToOnMount';
 import { formatResearchMetric } from '@/lib/research/metric-value';
-import { financialFormula, financialPeriod, financialVersion } from '@/lib/research/financial-display';
+import { financialFormula, financialPeriod, financialVersionLabel } from '@/lib/research/financial-display';
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import { healthText, listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
@@ -39,6 +39,7 @@ import { FileUploadInput } from '@/components/forms/FileUploadInput';
 import { CompanyHeaderQuote } from '@/components/research/CompanyHeaderQuote';
 import { CompanyHeaderQuoteSkeleton } from '@/components/research/CompanyHeaderQuoteSkeleton';
 import { ChangesSinceVisit } from '@/components/research/ChangesSinceVisit';
+import { AnalystTargetsSection } from '@/components/research/AnalystTargetsSection';
 import { GuideBrainButton } from '@/components/research/GuideBrainButton';
 import { GuideContextPanel } from '@/components/research/GuideContextPanel';
 import { getGuideContext } from '@/lib/research/assistant-client';
@@ -108,6 +109,7 @@ import { SourceAuditDetail } from '@/components/research/SourceAuditDetail';
 import { dedupeNewsEvents, newsDisplayTitle } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import CitationsList from '@/components/chat/CitationsList';
+import { toChatCitations } from '@/lib/chat/citations';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
 import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, NA } from '@/lib/format';
@@ -169,6 +171,10 @@ const STATUS_LABELS: Record<string, string> = {
   approved: 'aprobada',
   published: 'publicada',
   rejected: 'rechazada',
+  changes_requested: 'cambios solicitados',
+  'changes requested': 'cambios solicitados',
+  draft_failed_audit: 'borrador (auditoría no superada)',
+  superseded: 'sustituida',
   stale: 'desactualizada',
   proposed: 'propuesta',
   unknown: 'desconocido',
@@ -432,7 +438,7 @@ function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
             <Badge className="shrink-0" variant="outline">{label(metric.status)}</Badge>
           </div>
           <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit)}</div>
-          <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period)} · {financialVersion(metric.definition_version)}</div>
+          <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period)} · {financialVersionLabel(metric.definition_version)}</div>
           <div className="mt-2 text-xs leading-5 text-gray-400">{financialFormula(metric.formula)}</div>
         </div>
       ))}
@@ -1174,7 +1180,23 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <div className="min-w-0 max-w-full space-y-6 [overflow-wrap:anywhere]">
         <div className="flex flex-wrap items-center gap-3">
           <ThesisGenerateButton ticker={ticker} />
-          <ThesisApproveButton ticker={ticker} disabled={data.history.length === 0} latestStatus={data.thesis?.status ?? null} latestVersion={data.thesis?.version ?? null} />
+          <ThesisApproveButton
+            ticker={ticker}
+            disabled={data.history.length === 0}
+            latestStatus={data.thesis?.status ?? null}
+            latestVersion={data.thesis?.version ?? null}
+            riskNotes={[
+              ...(snapshot?.model_summary && !snapshot.model_summary.publishable ? ['La valoración es parcial o está bloqueada: no es un valor justo final.'] : []),
+              ...((data.thesis?.missing_inputs?.length ?? 0) > 0 ? [`Faltan ${data.thesis?.missing_inputs?.length} inputs del modelo (ver «Datos pendientes»).`] : []),
+              ...(typeof data.thesis?.red_team_score === 'number' && data.thesis.red_team_score < 40 ? [`El red team puntúa ${data.thesis.red_team_score}/100.`] : []),
+            ]}
+            olderPublishedVersion={
+              data.historyDetail.history
+                .filter((entry) => entry.status === 'published' && entry.version !== data.thesis?.version)
+                .map((entry) => entry.version)
+                .reduce<number | null>((a, b) => (a === null ? b : Math.max(a, b)), null)
+            }
+          />
           <ThesisExportMenu
             hasPublished={data.historyDetail.history.some((entry) => entry.status === 'published')}
             latestDraftVersion={data.historyDetail.history.filter((entry) => entry.status !== 'published').map((entry) => entry.version).reduce((a, b) => Math.max(a, b), 0) || null}
@@ -1504,7 +1526,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     content = (
       <Panel title="Auditorías de fuentes">
         {audits.length ? (
-          <div className="space-y-3">{audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">tesis {audit.thesis_version_id ?? 'desconocida'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>)}</div>
+          <div className="space-y-3">{audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? `tesis v${audit.thesis_version}` : 'versión de tesis no registrada'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>)}</div>
         ) : (
           <EmptyState
             action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>Genera una tesis para auditar fuentes</EmptyLink>}
@@ -1538,7 +1560,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         {response ? (
           <Panel title="Respuesta">
             <div className="whitespace-pre-wrap text-sm leading-7 text-gray-300">{humanizeChatAnswer(response.answer)}</div>
-            <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline">modelo {response.model && response.model !== 'deterministic' ? response.model : 'determinista'}</Badge><Badge variant="outline">{response.sources.length} fuentes</Badge><Badge variant="outline">{response.blocked ? 'datos insuficientes' : 'con evidencia'}</Badge></div>
+            <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline">modelo {response.model && response.model !== 'deterministic' ? response.model : 'determinista'}</Badge><Badge variant="outline">{toChatCitations(response.sources).length} citas · {response.sources.length} fuentes</Badge><Badge variant="outline">{response.blocked ? 'datos insuficientes' : 'con evidencia'}</Badge></div>
             <CitationsList citations={[]} sources={response.sources} />
           </Panel>
         ) : chatFailed ? (
@@ -1589,6 +1611,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
+          <Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense>
           <div className="flex flex-col gap-3 border-t border-gray-900 pt-4">
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><Target className="h-4 w-4" />{holdingBadge}</span><GuideBrainButton ticker={ticker} /><Link className="inline-flex min-h-[44px] items-center gap-1 text-gray-400 transition hover:text-teal-300 sm:min-h-0" href={`/research/${encodeURIComponent(ticker)}?view=changes`}><History className="h-4 w-4" />Qué ha cambiado{recentChangeCount ? <span aria-hidden="true" className="rounded-full bg-gray-800 px-1.5 text-xs font-semibold text-gray-300">{recentChangeCount}</span> : null}</Link></div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">

@@ -656,7 +656,7 @@ class ThesisService:
             bull_value=_dec(valuation.get("bull_value")),
             expected_value=_dec(valuation.get("expected_value")),
             margin_of_safety=_dec(valuation.get("margin_of_safety")),
-            data_confidence_score=self._confidence_score(valuation, facts),
+            data_confidence_score=self._confidence_score(valuation, facts, claims),
             source_coverage_score=audit.source_coverage_score,
             red_team_score=0,
             valuation_risk_score=75 if "speculative" in (company.factor_tags or []) else 45,
@@ -765,14 +765,36 @@ class ThesisService:
                     )
                 )
 
-    def _confidence_score(self, valuation: dict, facts: dict) -> int:
+    def _confidence_score(
+        self,
+        valuation: dict,
+        facts: dict,
+        claims: list[dict] | None = None,
+    ) -> int:
+        """Confianza 0-100 derivada de la evidencia de ESTA generacion.
+
+        Antes devolvia cuatro constantes (15/25/55/85) segun el estado: todas
+        las versiones de una empresa pintaban la misma cifra aunque la
+        evidencia cambiara entre generaciones (QA F7: «red-team/confianza
+        identicos en las 12 versiones» de ASTS). Ahora la puntuacion se mueve
+        con la cobertura real de afirmaciones materiales (fuente vinculada) y
+        los inputs que faltan, manteniendo el orden fail-closed:
+        insufficient_data < sin facts < valoracion no publicable < publicable.
+        """
+        material = [claim for claim in (claims or []) if claim.get("material", True)]
+        backed = sum(1 for claim in material if claim.get("source_id"))
+        coverage = backed / len(material) if material else 0.0
+        missing = len(valuation.get("missing_inputs") or [])
         if valuation.get("status") == "insufficient_data":
-            return 15
-        if not facts:
-            return 25
-        if valuation.get("publishable"):
-            return 85
-        return 55
+            floor, ceiling = 5, 35
+        elif not facts:
+            floor, ceiling = 10, 40
+        elif valuation.get("publishable"):
+            floor, ceiling = 60, 100
+        else:
+            floor, ceiling = 35, 75
+        score = floor + coverage * (ceiling - floor) - 2 * missing
+        return max(0, min(100, round(score)))
 
 
     def _hypothesis(self, company: Company, valuation: dict) -> str:
@@ -1218,9 +1240,12 @@ class ThesisService:
                 f"Motor: {term_es(trace.get('engine', 'unknown'))} "
                 f"(base: {_code_es(trace.get('valuation_basis', 'indicative_assumptions'))}).\n\n"
                 f"{self._range_lines(valuation)}\n\n"
-                f"Supuestos documentados (NO son datos reportados): {supuestos}.\n\n"
+                f"Supuestos del motor de valoración (NO son datos reportados): {supuestos}. "
+                "N/D significa que este motor no los pudo fijar; el modelo a largo plazo "
+                "usa otros supuestos, con su procedencia en la sección 22.\n\n"
                 f"DCF inverso frente a precio de mercado: ver sección 14.\n\n"
-                f"Aún falta antes de publicar:\n{missing or '- nada listado'}\n\n"
+                "Aún falta antes de publicar:\n"
+                f"{missing or '- este motor no lista inputs faltantes; revisa los datos pendientes de la sección 21'}\n\n"
                 f"{trace.get('notice', '')}"
             )
 
@@ -1428,8 +1453,8 @@ class ThesisService:
             "o se aporta como supuesto etiquetado (método + fecha)."
         ),
         "normalized_fcf_or_fcf_margin": (
-            "falta un FCF o margen FCF reportado; si hay un margen INFERIDO "
-            "(base + fuentes https) se usa solo como valor indicativo no publicable."
+            "falta un FCF o margen FCF reportado; si hay un margen estimado con base "
+            "y fuentes https, se usa solo como valor indicativo no publicable."
         ),
         "net_debt": (
             "falta la deuda neta; se deriva de deuda total menos efectivo (mismo "
@@ -1594,16 +1619,16 @@ Drivers obligatorios ausentes: {", ".join(mandatory_missing) if mandatory_missin
 {self._facts_markdown(facts)}
 
 ## 5. Histórico financiero
-Se guarda en `financial_facts` y `financial_statements` una vez ingerido. El constructor de snapshots exige coherencia de periodo.
+Los últimos resultados con su fuente y periodo están en la sección 4. La serie histórica completa está en la pestaña «Financieros» de la ficha.
 
 ## 6. Flujo de caja libre
-Se deriva solo de hechos coherentes del snapshot (mismo ancla fiscal). Los márgenes FCF de arranque están desactivados.
+El flujo de caja libre de la sección 4 solo se muestra si procede de hechos reportados del mismo ejercicio. Sin ese dato la valoración no se presenta como definitiva.
 
 ## 7. Balance
-Deuda neta, caja y acciones deben alinear con el periodo ancla de la cuenta de resultados (o un instante compatible).
+Caja, deuda total y deuda neta de la sección 4 corresponden al mismo ejercicio que la cuenta de resultados cuando están disponibles; si falta alguno, aparece como pendiente en la sección 21.
 
 ## 8. Asignación de capital
-Seguimiento mediante filings, calls, recompras, dilución y dividendos. La dilución por gap de financiación sustituye a las ampliaciones fijas de 100 $ cuando hay datos de caja/capex.
+Recompras, dilución y dividendos se consultan en las pestañas «Dilución y recompras» y «Financieros» de la ficha.
 
 ## 9. Equipo directivo y calls
 {self._earnings_markdown(sources)}
@@ -1613,7 +1638,7 @@ Seguimiento mediante filings, calls, recompras, dilución y dividendos. La diluc
 {self._news_markdown(sources)}
 
 ## 11. Riesgos
-{", ".join(company.special_risks)}
+{", ".join(company.special_risks) or "Sin riesgos específicos registrados para esta empresa."}
 
 ## 12. Competencia y foso
 {self._moat_markdown(company, valuation)}
@@ -1639,7 +1664,7 @@ Pregunta primaria del red team: ¿qué supuesto se rompería primero si el próx
 Invalidadores estructurales: afirmaciones sin respaldo, trazas de cálculo ausentes, filings primarios adversos, snapshots incoherentes o deriva material de supuestos.
 
 ## 18. Qué vigilar
-{", ".join(company.special_sources)}
+{", ".join(company.special_sources) or "Sin fuentes específicas registradas para esta empresa; ver la sección 20."}
 
 ## 19. Auditoría de fuentes
 Superada: {"sí" if audit["passed"] else "no"}

@@ -55,11 +55,15 @@ def test_parse_entity_drift_raises_honestly():
 
 
 def test_parse_period_shapes():
-    assert parse_period("2023-01-01T00:00:00") == {"instant": "2023-01-01"}
+    # Los instantes xBRL-JSON son EXCLUSIVOS a medianoche: «2023-01-01T00:00:00»
+    # es el cierre inclusivo de 2022-12-31 (ver _inclusive_date).
+    assert parse_period("2023-01-01T00:00:00") == {"instant": "2022-12-31"}
     assert parse_period("2022-01-01T00:00:00/2023-01-01T00:00:00") == {
         "start": "2022-01-01",
-        "end": "2023-01-01",
+        "end": "2022-12-31",
     }
+    # date-only ya es fecha inclusiva: se respeta tal cual
+    assert parse_period("2022-12-31") == {"instant": "2022-12-31"}
 
 
 def test_normalize_real_xbrl_json_fixture():
@@ -67,11 +71,11 @@ def test_normalize_real_xbrl_json_fixture():
     facts = normalize_xbrl_json(doc)
     revenue = facts["ifrs-full:Revenue"]["iso4217:EUR"]
     assert revenue[0]["start"] == "2022-01-01"
-    assert revenue[0]["end"] == "2023-01-01"
+    assert revenue[0]["end"] == "2022-12-31"  # instante exclusivo -> fecha inclusiva
     assert revenue[0]["val"] == "7705687000"  # string preserved, never rounded
     assert revenue[0]["lei"] == "95980020140005178328"
     cash = facts["ifrs-full:CashAndCashEquivalents"]["iso4217:EUR"]
-    assert cash[0]["instant"] == "2023-01-01"
+    assert cash[0]["instant"] == "2022-12-31"
     assert "ifrs-full:ProfitLoss" in facts
 
 

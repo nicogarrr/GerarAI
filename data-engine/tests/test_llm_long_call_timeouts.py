@@ -69,10 +69,15 @@ def _chat_chain(**overrides) -> ChatFallbackProvider:
 
 def test_chat_keeps_its_own_short_total_budget() -> None:
     chain = _chat_chain()
-    assert chain.total == 45.0
+    assert chain.total == 20.0
     # Y el primario hereda el timeout largo por llamada individual: el tope
     # de la carrera es quien recorta el chat, no el cliente HTTP.
     assert chain.primary._timeout.read == 120.0  # noqa: SLF001
+
+
+def test_chat_primary_makes_a_single_attempt_per_model() -> None:
+    chain = _chat_chain()
+    assert chain.primary._max_retries == 0  # noqa: SLF001
 
 
 def test_chat_primary_uses_reduced_reasoning_by_default() -> None:

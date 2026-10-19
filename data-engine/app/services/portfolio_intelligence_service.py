@@ -274,6 +274,19 @@ class PortfolioIntelligenceService:
         attribution = self._attribution(db, rows, weights, price_series, cutoff)
         ledger_contribution = self._ledger_contribution(db, rows, cutoff)
         complete_price_series = sum(len(series) >= 2 for series in price_series.values())
+        today_ = date.today()
+        horizon_coverages = {
+            company.id: self._horizon_coverage(price_series.get(company.id, []), cutoff, today_)
+            for _, company in rows
+        }
+        positions_with_full_horizon = sum(
+            1 for _, full in horizon_coverages.values() if full
+        )
+        mean_horizon_coverage = (
+            round(100 * fmean(share for share, _ in horizon_coverages.values()), 1)
+            if rows
+            else 100.0
+        )
         return {
             "as_of": date.today(),
             "base_currency": base_currency,
@@ -338,6 +351,8 @@ class PortfolioIntelligenceService:
             "coverage": {
                 "positions": len(rows),
                 "positions_with_price_history": complete_price_series,
+                "positions_with_full_horizon": positions_with_full_horizon,
+                "price_history_window_percent": mean_horizon_coverage,
                 "price_history_percent": (
                     round(100 * complete_price_series / len(rows), 1) if rows else 100
                 ),
@@ -444,6 +459,36 @@ class PortfolioIntelligenceService:
             else:
                 filled.append(row)
         return filled
+
+    # Tolerancia de anclaje al inicio/fin del horizonte: fines de semana y
+    # festivos cortos no deben marcar una serie como "sin cubrir el horizonte".
+    _HORIZON_ANCHOR_TOLERANCE = timedelta(days=10)
+
+    @classmethod
+    def _horizon_coverage(
+        cls, series: list[Any], cutoff: date, today: date
+    ) -> tuple[float, bool]:
+        """(fraccion del horizonte cubierta, cubre_todo_el_horizonte).
+
+        `len(series) >= 2` solo dice "hay algo"; una serie de 15 sesiones en
+        un horizonte de 5 anos contaba como cobertura completa. Aqui se mide
+        la ventana real: tramo [primera, ultima] dentro de [cutoff, today]
+        sobre la longitud del horizonte, y cobertura completa cuando la serie
+        arranca a lo sumo _HORIZON_ANCHOR_TOLERANCE despues del cutoff y
+        llega hasta hoy con la misma tolerancia.
+        """
+        horizon_days = max((today - cutoff).days, 1)
+        if not series:
+            return 0.0, False
+        first = max(series[0].date, cutoff)
+        last = min(series[-1].date, today)
+        covered_days = max((last - first).days, 0)
+        share = min(covered_days / horizon_days, 1.0)
+        full = (
+            series[0].date <= cutoff + cls._HORIZON_ANCHOR_TOLERANCE
+            and series[-1].date >= today - cls._HORIZON_ANCHOR_TOLERANCE
+        )
+        return round(share, 4), full
 
     @staticmethod
     def _returns(series: list[MarketPrice]) -> dict[date, float]:
@@ -1052,6 +1097,12 @@ class PortfolioIntelligenceService:
             return None
         return float(end_rate / start_rate - 1)
 
+    # Una posicion medida en una ventana mucho menor que la del panel
+    # (p.ej. 3 semanas de precios bajo un encabezado de 1 ano) se marca
+    # como historial parcial y se excluye de los totales agregados: sumar
+    # retornos de horizontes distintos publicaba un total sin sentido.
+    PARTIAL_WINDOW_RATIO = 0.5
+
     def _attribution(
         self,
         db: Session,
@@ -1190,13 +1241,6 @@ class PortfolioIntelligenceService:
                     else None
                 ),
             }
-            for key, value in components.items():
-                if key not in totals:
-                    totals[key] = value
-                elif totals[key] is not None and value is not None:
-                    totals[key] += value
-                else:
-                    totals[key] = None
             positions.append(
                 {
                     "ticker": company.ticker,
@@ -1204,6 +1248,7 @@ class PortfolioIntelligenceService:
                     "total_return": total_return,
                     "period_start": period_start.isoformat() if prices else None,
                     "period_end": period_end.isoformat() if prices else None,
+                    "period_days": (period_end - period_start).days if prices else None,
                     "fx_known": fx_component is not None,
                     "dividends_known": dividends_known,
                     "components": components,
@@ -1211,14 +1256,44 @@ class PortfolioIntelligenceService:
             )
         starts = [p["period_start"] for p in positions if p["period_start"]]
         ends = [p["period_end"] for p in positions if p["period_end"]]
+        window_start = min(starts) if starts else None
+        window_end = max(ends) if ends else None
+        window_days = (
+            (date.fromisoformat(window_end) - date.fromisoformat(window_start)).days
+            if window_start and window_end
+            else 0
+        )
+        # Marca de historial parcial y exclusion de los totales: la ventana
+        # medida de la posicion cubre menos de PARTIAL_WINDOW_RATIO de la
+        # ventana del panel. La fila se muestra con su fecha real; solo sale
+        # del agregado.
+        partial_tickers: list[str] = []
+        for row_ in positions:
+            partial = bool(
+                window_days > 0
+                and row_["period_days"] is not None
+                and row_["period_days"] < self.PARTIAL_WINDOW_RATIO * window_days
+            )
+            row_["partial_history"] = partial
+            if partial:
+                partial_tickers.append(row_["ticker"])
+                continue
+            for key, value in row_["components"].items():
+                if key not in totals:
+                    totals[key] = value
+                elif totals[key] is not None and value is not None:
+                    totals[key] += value
+                else:
+                    totals[key] = None
         return {
             "basis": "adjusted_price_return",
-            "period_start": min(starts) if starts else None,
-            "period_end": max(ends) if ends else None,
+            "period_start": window_start,
+            "period_end": window_end,
             "portfolio_components": dict(totals),
             "incomplete_components": sorted(
                 key for key, value in totals.items() if value is None
             ),
+            "excluded_partial_histories": sorted(partial_tickers),
             "positions": positions,
         }
 

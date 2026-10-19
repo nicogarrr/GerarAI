@@ -28,3 +28,14 @@ describe('alta de alerta: sin doble click', () => {
         assert.match(alerts, /<Button onClick=\{handleCreateAlert\} disabled=\{creating\} aria-busy=\{creating\}/);
     });
 });
+
+describe('alta de alerta: umbral de precio positivo', () => {
+    it('el formulario rechaza precios <= 0 antes de llamar a createAlert', () => {
+        const at = alerts.indexOf('El precio debe ser mayor que 0');
+        assert.ok(at !== -1 && at < alerts.indexOf('setCreating(true);\n            await createAlert({'));
+    });
+    it('la server action también lo rechaza', () => {
+        const action = readFileSync('lib/actions/alerts.actions.ts', 'utf8');
+        assert.match(action, /threshold <= 0/);
+    });
+});

@@ -405,6 +405,10 @@ def run_thesis_job(run_id: int) -> None:
             # Network enrichment belongs to the worker, never the enqueue
             # request (two 15 s Finnhub calls used to precede persistence).
             ensure_company_stub(db, payload["ticker"])
+            # El stub persiste por contrato ("si falla, queda el stub"): se
+            # commitea aqui para no arrastrar su INSERT ni la tx de lectura
+            # durante las llamadas de red de enriquecimiento/SEC que siguen.
+            db.commit()
             financial_refresh = None
             kwargs = {}
             if payload.get("tracked"):
@@ -417,6 +421,9 @@ def run_thesis_job(run_id: int) -> None:
                 company = resolve_company(db, payload["ticker"])
                 if company is None:
                     raise ValueError("No se pudo resolver la empresa para SEC")
+                # Cierra la tx de lectura de resolve_company antes del refresh
+                # de red (largo); expire_on_commit=False mantiene `company`.
+                db.commit()
                 financial_refresh = run_from_any_context(refresh_free_financials(db, company))
                 kwargs["stored_evidence_only"] = True
                 kwargs["refresh_receipt"] = financial_refresh

@@ -1,7 +1,7 @@
 'use client';
 
 import { buildAllocationSlices } from '@/lib/portfolio-allocation';
-import { formatMoney, formatNumber, formatPercent, NA } from '@/lib/format';
+import { formatDate, formatMoney, formatNumber, formatPercent, NA } from '@/lib/format';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -123,6 +123,9 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
       <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-gray-100 flex items-center gap-2">
           Posiciones Actuales
+          <span className="text-xs font-normal text-gray-500">
+            La G/P va en {cashCurrency} (divisa base) con el tipo de cambio de cada compra: no coincide con la variación del precio en la divisa de la acción.
+          </span>
         </CardTitle>
         <Button
           variant="outline"
@@ -216,7 +219,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                           )}
                         </dd>
                       </div>
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">En cartera desde</dt><dd className="text-gray-200">{holding.firstBuyDate ?? NA}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-gray-500">En cartera desde</dt><dd className="text-gray-200">{formatDate(holding.firstBuyDate)}</dd></div>
                     </dl>
                   </div>
                 );
@@ -272,7 +275,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                                 ) : (
                                   <span className="text-gray-500" title="Sin historial de compra registrado">Fiscal: {NA}</span>
                                 )}
-                                <span className="block text-gray-500">En cartera desde: {holding.firstBuyDate ?? NA}</span>
+                                <span className="block text-gray-500">En cartera desde: {formatDate(holding.firstBuyDate)}</span>
                               </div>
                               <Button variant="ghost" size="sm" onClick={() => handleDelete(holding.symbol)} disabled={deleting === holding.symbol} aria-busy={deleting === holding.symbol} className="min-h-10 w-full justify-start gap-2 text-red-300" aria-label={`Eliminar ${holding.symbol} de la cartera`}><Trash2 aria-hidden="true" className="h-4 w-4" />Eliminar posición</Button>
                             </div>

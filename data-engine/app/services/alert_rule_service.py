@@ -129,6 +129,15 @@ class AlertRuleService:
                 f"{company.ticker}: se cumplió la regla «{rule.name}» "
                 f"(valor observado: {observed})."
             )
+            news_event = None
+            if observation.get("kind") == "news_event" and observation.get("news_event_id"):
+                news_event = db.get(NewsEvent, observation["news_event_id"])
+            if news_event is not None:
+                # La alerta cita la noticia concreta (titular de la fuente), no "valor observado: 1".
+                alert_message = (
+                    f"{company.ticker}: noticia nueva para la regla «{rule.name}»: "
+                    f"{news_event.title.strip()}"
+                )
             try:
                 from app.services.jev_triage_service import (
                     classify_urgency_sync,
@@ -144,6 +153,10 @@ class AlertRuleService:
                 "target": rule.target,
                 "observation": observation,
             }
+            if news_event is not None:
+                alert_metadata["news_event_id"] = news_event.id
+                if news_event.url:
+                    alert_metadata["source_url"] = news_event.url
             # Correlación para el digest visual. No suprime la entrega:
             # una similitud de texto no prueba que dos fuentes sean idénticas.
             try:
@@ -299,9 +312,19 @@ class AlertRuleService:
             if since:
                 statement = statement.where(NewsEvent.created_at > since)
             event = db.scalar(statement)
-            return (1 if event else 0), {
+            # Sin titular verificable no hay nada que citar: no dispara.
+            has_title = bool(event and (event.title or "").strip())
+            if has_title:
+                from app.services.news_identity import equivalent_news_alert
+
+                if equivalent_news_alert(
+                    db, company_id=rule.company_id, url=event.url, title=event.title
+                ) is not None:
+                    # Otra vía ya avisó de esta noticia: no se duplica el aviso.
+                    return 0, {"kind": kind, "news_event_id": None, "suppressed": "duplicate_news"}
+            return (1 if has_title else 0), {
                 "kind": kind,
-                "news_event_id": event.id if event else None,
+                "news_event_id": event.id if has_title else None,
             }
         if kind == "earnings_run":
             statement = (

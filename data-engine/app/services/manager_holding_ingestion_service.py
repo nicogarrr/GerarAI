@@ -434,7 +434,7 @@ class ManagerHoldingIngestionService:
             "compared_accessions": {
                 "latest": latest_accession,
                 "previous": previous_accession,
-                "rule": "latest accession per period; amendments supersede base filings in this view, every filing stays stored immutably",
+                "rule": "último filing por periodo; las enmiendas sustituyen a los filings base en esta vista y cada filing se conserva almacenado de forma inmutable",
             },
             "changes": changes,
             "limitations": LIMITATIONS,

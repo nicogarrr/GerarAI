@@ -38,8 +38,21 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
     // F383: los picks iniciales (ranking global del embudo) NO se asocian a
     // ninguna estrategia; cada estrategia, también la inicial, carga los suyos
     // por la ruta strategy-aware. Nunca se exportan picks de otra estrategia.
-    const [picksByStrategy, setPicksByStrategy] = useState<Record<string, ProPick[]>>({});
+    const [picksByStrategy, setPicksByStrategy] = useState<Record<string, { picks: ProPick[]; asOf: string | null }>>({});
     const [strategyPicksError, setStrategyPicksError] = useState<string | null>(null);
+    // Corte del run que alimenta la selección vigente; sube desde Selección IA
+    // cuando una generación/actualización trae un run distinto.
+    const [latestRunAsOf, setLatestRunAsOf] = useState<string | null>(generatedAt ?? null);
+
+    // Un run nuevo invalida los picks cacheados de TODAS las estrategias: se
+    // calculan del último run del embudo, así que el corte viejo ya no es el
+    // vigente. Sin esto, tras «Generar selección ahora» el rebalanceo seguía
+    // mostrando los picks del run anterior (o «0 valores» si no había run).
+    const handleRunUpdated = (asOf: string | null) => {
+        setLatestRunAsOf(asOf);
+        setPicksByStrategy({});
+        setStrategyPicksError(null);
+    };
 
     const availableIds = new Set(strategies.map((s) => s.id));
     const currentMerged = merged.find((s) => s.id === currentStrategy) ?? merged[0];
@@ -82,15 +95,22 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
         setStrategyPicksError(null);
     };
 
-    const strategyPicks = picksByStrategy[currentStrategy];
+    const cachedStrategyPicks = picksByStrategy[currentStrategy];
+    const strategyPicks = cachedStrategyPicks?.picks;
     useEffect(() => {
         // No enriquecer otra pestaña hasta que el usuario la abra.
         if (activeTab !== 'estrategia') return;
-        if (picksByStrategy[currentStrategy] !== undefined) return;
+        // Cache válida solo si viene del mismo run que la selección vigente.
+        if (cachedStrategyPicks !== undefined && cachedStrategyPicks.asOf === latestRunAsOf) return;
         let cancelled = false;
         generateProPicksForStrategy(currentStrategy)
             .then((picks) => {
-                if (!cancelled) setPicksByStrategy((prev) => ({ ...prev, [currentStrategy]: picks }));
+                if (!cancelled) {
+                    setPicksByStrategy((prev) => ({
+                        ...prev,
+                        [currentStrategy]: { picks, asOf: picks[0]?.asOf ?? latestRunAsOf },
+                    }));
+                }
             })
             .catch(() => {
                 if (!cancelled) setStrategyPicksError('No se pudieron cargar los picks de esta estrategia.');
@@ -98,7 +118,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
         return () => {
             cancelled = true;
         };
-    }, [activeTab, currentStrategy, picksByStrategy]);
+    }, [activeTab, currentStrategy, cachedStrategyPicks, latestRunAsOf]);
 
     return (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6 w-full min-w-0">
@@ -128,8 +148,13 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
 
             <TabsContent value="paper" className="mt-6"><PaperTradingView /></TabsContent>
 
-            <TabsContent value="picks" className="mt-6">
-                <EnhancedProPicksContent initialPicks={initialPicks} generatedAt={generatedAt} initialPassedCount={passedCount} />
+            {/* forceMount: Radix desmonta el panel inactivo y EnhancedProPicksContent
+                se sembraba con initialPicks del SSR; al generar/actualizar la
+                selección y volver a la pestaña el estado se perdía (reproducido
+                en prod 2026-10-19). Montado siempre, la selección y los filtros
+                sobreviven al cambio de pestaña. */}
+            <TabsContent value="picks" forceMount className="mt-6">
+                <EnhancedProPicksContent initialPicks={initialPicks} generatedAt={generatedAt} initialPassedCount={passedCount} onRunUpdated={handleRunUpdated} />
             </TabsContent>
 
             <TabsContent value="joyas" className="mt-6">

@@ -210,7 +210,7 @@ export function NewsEventsFlow({
                 <span>{formatTimeAgo(event.date)}</span>
                 <DateNotes event={event} inline />
               </div>
-              <NewsSecondOrder eventId={event.id} summary="Ver contexto">
+              <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary="Ver contexto">
                 <ContextDetail event={event} />
               </NewsSecondOrder>
             </li>
@@ -270,7 +270,7 @@ export function NewsEventsFlow({
                   </td>
                   <td className="py-2.5 text-gray-300">
                     {event.requires_update ? <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-xs text-amber-300">Revisar</span> : null}
-                    <NewsSecondOrder eventId={event.id} summary="Ver contexto">
+                    <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary="Ver contexto">
                       <ContextDetail event={event} />
                     </NewsSecondOrder>
                   </td>

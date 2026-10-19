@@ -1,7 +1,7 @@
 import { FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatNumber } from '@/lib/format';
-import { citationKindLabel, type ChatCitation } from '@/lib/chat/citations';
+import { citationKindLabel, toChatCitations, type ChatCitation } from '@/lib/chat/citations';
 
 interface CitationsListProps {
     citations: ChatCitation[];
@@ -21,29 +21,7 @@ interface CitationsListProps {
  */
 export default function CitationsList({ citations, sources }: CitationsListProps) {
     const derived: ChatCitation[] =
-        citations.length > 0 || !sources
-            ? citations
-            : sources
-                  .filter(
-                      (s) =>
-                          s.type === 'document_chunk' ||
-                          s.type === 'rag_chunk' ||
-                          s.type === 'claim_evidence',
-                  )
-                  .map((s) => ({
-                      chunk_id:
-                          s.type === 'claim_evidence'
-                              ? ((s.document_chunk_id as number | null | undefined) ?? null)
-                              : s.id,
-                      document: typeof s.title === 'string' && s.title ? s.title : 'Documento',
-                      page: typeof s.page_number === 'number' ? s.page_number : null,
-                      locator:
-                          s.type === 'claim_evidence'
-                              ? `claim_evidence:${String(s.id)}`
-                              : `${s.type}:${String(s.id)}`,
-                      source_type:
-                          typeof s.source_type === 'string' ? s.source_type : null,
-                  }));
+        citations.length > 0 || !sources ? citations : toChatCitations(sources);
 
     if (derived.length === 0) return null;
 

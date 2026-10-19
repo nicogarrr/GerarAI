@@ -21,9 +21,13 @@ interface EnhancedProPicksContentProps {
     initialPicks: ProPick[];
     generatedAt?: string;
     initialPassedCount?: number | null;
+    /** Avisa al contenedor cuando la selección visible pasa a venir de otro run
+     *  (generación o actualización): invalida los picks cacheados por estrategia
+     *  para que «Estrategia y rebalanceo» no muestre el run viejo (o 0 valores). */
+    onRunUpdated?: (asOf: string | null) => void;
 }
 
-export default function EnhancedProPicksContent({ initialPicks, generatedAt, initialPassedCount = null }: EnhancedProPicksContentProps) {
+export default function EnhancedProPicksContent({ initialPicks, generatedAt, initialPassedCount = null, onRunUpdated }: EnhancedProPicksContentProps) {
     const [picks, setPicks] = useState<ProPick[]>(initialPicks);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -74,12 +78,17 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
         try {
             const result = await generateEnhancedProPicksWithRun(requestedFilters);
             setPicks(result.picks);
+            if (result.runAsOf !== lastGenerated) onRunUpdated?.(result.runAsOf);
             setLastGenerated(result.runAsOf);
             setPassedCount(result.passedCount);
             setAppliedFilters(requestedFilters);
             setRefreshStatus(result.picks.length
                 ? `Selección consultada: ${result.picks.length} empresas.`
-                : 'Consulta completada: 0 empresas con estos filtros.');
+                // Mensaje honesto del 0: distingue "tus filtros excluyen todo"
+                // de "el embudo no seleccionó nada", que no es fallo del usuario.
+                : result.passedCount
+                    ? `Consulta completada: 0 empresas con estos filtros. El último embudo sí seleccionó ${result.passedCount}; baja la puntuación mínima o amplía el sector para verlas.`
+                    : 'Consulta completada: 0 empresas. El último embudo no seleccionó ninguna con los datos disponibles; no es un fallo de tus filtros.');
         } catch {
             setError('No se pudo actualizar la selección. Los resultados anteriores se conservan.');
         } finally {
@@ -107,7 +116,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
             }
             setRefreshStatus(run.passed_count > 0
                 ? `Selección generada: ${run.passed_count} empresas superan el embudo.`
-                : 'Selección generada: 0 empresas superan el embudo con los datos disponibles.');
+                : `Selección generada: 0 de ${run.universe_size} empresas del universo superan el embudo con los datos disponibles; ninguna cumple todos los criterios ahora mismo.`);
             requestInFlight.current = false;
             setLoading(false);
             await loadPicks();

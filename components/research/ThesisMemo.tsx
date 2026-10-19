@@ -44,6 +44,7 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'rechazada',
   stale: 'desactualizada',
   draft_failed_audit: 'borrador (auditoría no superada)',
+  changes_requested: 'cambios solicitados',
 };
 
 function enumLabel(map: Record<string, string>, value: string | null | undefined): string {
@@ -138,6 +139,17 @@ function ScenarioCell({
  * Las versiones anteriores a los campos profesionales (hypothesis=null)
  * muestran estados honestos "pendiente", nunca datos inventados.
  */
+/** Titulos/parrafos narrativos heredados con la marca «INFERIDO» (prohibida
+ *  en UI por decision de Nico, 17-oct): se normalizan al pintar; las tesis
+ *  nuevas ya se guardan sin la marca. */
+function narrativeTitle(titulo: string): string {
+  const fixed = titulo === 'Lo que cambio' ? 'Lo que cambió' : titulo;
+  return fixed.replace(/\s*-\s*INFERIDO$/u, '').replace(/\s+INFERIDO$/u, '');
+}
+function narrativeParagraph(parrafo: string): string {
+  return parrafo.replace(/^INFERIDO:\s*/u, '');
+}
+
 export default function ThesisMemo({
   thesis,
   ticker,
@@ -288,10 +300,10 @@ export default function ThesisMemo({
           </h3>
           {thesis.narrative_sections.map((section, index) => (
             <div key={`${section.titulo}-${index}`} className="space-y-2">
-              <h4 className="text-sm font-semibold text-gray-200">{section.titulo === 'Lo que cambio' ? 'Lo que cambió' : section.titulo}</h4>
+              <h4 className="text-sm font-semibold text-gray-200">{narrativeTitle(section.titulo)}</h4>
               {section.parrafos.map((parrafo, pIndex) => (
                 <p key={pIndex} className="text-sm leading-6 text-gray-300">
-                  <NarrativeText text={parrafo} />
+                  <NarrativeText text={narrativeParagraph(parrafo)} />
                 </p>
               ))}
             </div>
@@ -313,7 +325,7 @@ export default function ThesisMemo({
         </h3>
         {hideFigures ? (
           <p className="text-sm text-gray-400">
-            Sin cifras de valoración: {modelBlocked ? 'el modelo está bloqueado' : 'la tesis es un borrador'}.
+            Sin cifras de valoración: {modelBlocked ? 'el modelo no es publicable todavía' : 'la tesis es un borrador'}. El memo completo (sección 13) puede incluir un rango indicativo parcial, que no es un valor justo.
           </p>
         ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">

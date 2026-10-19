@@ -238,3 +238,22 @@ def test_correlations_at_min_observations_is_computed():
     matrix, observations = service._correlations(returns, rows)
     assert matrix["AAA"]["BBB"] == pytest.approx(1.0)
     assert observations["AAA"]["BBB"] == shared
+
+
+def test_horizon_coverage_mide_ventana_real_no_dos_filas():
+    service = PortfolioIntelligenceService
+    today = date(2026, 10, 16)
+    cutoff = date(2025, 10, 16)
+    row = lambda d: SimpleNamespace(date=d)
+    # Serie completa: ancla al inicio y llega a hoy (con tolerancia).
+    share, full = service._horizon_coverage([row(cutoff), row(today)], cutoff, today)
+    assert share == pytest.approx(1.0)
+    assert full is True
+    # Serie de 3 semanas al final: ~6% del horizonte, no cobertura completa,
+    # aunque len(series) >= 2 la contaba como "con histórico".
+    short = [row(date(2026, 9, 24)), row(date(2026, 10, 16))]
+    share, full = service._horizon_coverage(short, cutoff, today)
+    assert share == pytest.approx(22 / 365, abs=0.01)
+    assert full is False
+    # Sin filas: 0 y no completa.
+    assert service._horizon_coverage([], cutoff, today) == (0.0, False)
