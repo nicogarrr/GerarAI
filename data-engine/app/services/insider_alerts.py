@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -50,6 +50,11 @@ from app.services.insider_service import (
 )
 
 RULE_VERSION = "insider-v1"
+# Una compra solo avisa mientras es reciente. Sin esta ventana, un backfill o
+# una re-evaluacion convertia compras de 2015 o de hace meses en alertas
+# "nuevas" (161 abiertas en prod, 155 con mas de 30 dias). Misma ventana que
+# el cluster. None desactiva el filtro (tests).
+ALERT_MAX_AGE_DAYS: int | None = CLUSTER_WINDOW_DAYS
 ALERT_TYPE_PREFIX = "insider_"
 
 
@@ -76,7 +81,9 @@ def _tx_as_signal_dict(tx: InsiderTransaction) -> dict:
     }
 
 
-def _candidate_purchases(db: Session, tenant_id: int | None) -> list[InsiderTransaction]:
+def _candidate_purchases(
+    db: Session, tenant_id: int | None, today: date | None = None
+) -> list[InsiderTransaction]:
     rows = db.scalars(
         select(InsiderTransaction).where(
             InsiderTransaction.tenant_id.is_(tenant_id) if tenant_id is None
@@ -86,6 +93,10 @@ def _candidate_purchases(db: Session, tenant_id: int | None) -> list[InsiderTran
             InsiderTransaction.is_derivative.is_(False),
         )
     ).all()
+    if ALERT_MAX_AGE_DAYS is not None:
+        cutoff = (today or datetime.now(UTC).date()) - timedelta(days=ALERT_MAX_AGE_DAYS)
+        # Fecha ilegible = no se puede afirmar que sea reciente: no avisa.
+        rows = [r for r in rows if (d := _parse_date(r.tx_date)) is not None and d >= cutoff]
     return list(rows)
 
 
@@ -280,6 +291,7 @@ def evaluate(
     *,
     tenant_id: int | None = None,
     notifier: Callable[[dict], dict] | None = None,
+    today: date | None = None,
 ) -> dict[str, Any]:
     """Evalua reglas sobre lo persistido y escribe el outbox. Nunca lanza."""
     stats: dict[str, Any] = {
@@ -295,7 +307,7 @@ def evaluate(
         "partial_cluster_totals": 0,
     }
     try:
-        purchases = _candidate_purchases(db, tenant_id)
+        purchases = _candidate_purchases(db, tenant_id, today)
         stats["candidates"] = len(purchases)
         if not purchases:
             return stats

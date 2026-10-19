@@ -1,5 +1,6 @@
 """PR-4: outbox durable de alertas insider (dedupe por fingerprint)."""
 
+import pytest
 from sqlalchemy import select
 
 from app.core.database import SessionLocal, init_db
@@ -307,3 +308,31 @@ def test_spanish_number_and_date_formats():
     assert insider_alerts._es_money(1_390_347) == "$1.39M"
     assert insider_alerts._es_money(250_000) == "$250,000"
     assert insider_alerts._es_date("2026-09-21") == "21 sep 2026"
+
+
+@pytest.fixture(autouse=True)
+def _no_age_window(monkeypatch, request):
+    # Los tests de reglas usan fechas fijas; el de recencia fija su propia ventana.
+    if "recency" not in request.node.name:
+        monkeypatch.setattr(insider_alerts, "ALERT_MAX_AGE_DAYS", None)
+
+
+def test_recency_window_skips_old_purchases_and_unreadable_dates():
+    from datetime import date
+
+    db = _db()
+    try:
+        _cleanup(db)
+        _seed_big_buy(db)
+        tx_date = db.scalars(select(InsiderTransaction.tx_date)).first()
+        from app.services.insider_service import _parse_date
+
+        d = _parse_date(tx_date)
+        old = insider_alerts.evaluate(db, today=date(d.year + 1, d.month, d.day))
+        assert old["candidates"] == 0 and old["alerts_created"] == 0
+        assert db.scalars(select(ResearchAlert)).all() == []
+        fresh = insider_alerts.evaluate(db, today=d)
+        assert fresh["alerts_created"] >= 1
+    finally:
+        _cleanup(db)
+        db.close()
