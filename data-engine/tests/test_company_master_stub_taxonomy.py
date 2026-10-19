@@ -49,3 +49,36 @@ def test_decided_company_is_not_overwritten_and_unknown_ticker_untouched():
     assert apply_master_taxonomy_to_stubs(db) == []
     assert db.query(Company).filter_by(ticker="ASTS").one().valuation_model == "sotp"
     assert db.query(Company).filter_by(ticker="ZZZZ").one().valuation_model == "unassigned"
+
+
+def test_imported_holding_stub_gets_master_taxonomy_and_identity():
+    """KRKNF en prod: importada de IBKR como imported_holding/unassigned con
+    sector "Unknown"; el maestro (Kraken Robotics, Industrials/Marine
+    robotics) la repara. La divisa nunca se toca."""
+    db = _db()
+    db.add(_stub("KRKNF", name="KRKNF", company_type="imported_holding"))
+    db.commit()
+    assert apply_master_taxonomy_to_stubs(db) == ["KRKNF"]
+    db.commit()
+    company = db.query(Company).filter_by(ticker="KRKNF").one()
+    assert company.company_type == "defense_contract_backlog"
+    assert company.sector == "Industrials"
+    assert company.industry == "Marine robotics"
+    assert company.exchange == "OTC"
+    assert company.name == "Kraken Robotics"
+    assert company.currency == "USD"
+
+
+def test_real_identity_fields_are_not_overwritten():
+    """Un campo de identidad con dato real (no placeholder) no se pisa aunque
+    la fila sea un stub reparable."""
+    db = _db()
+    db.add(_stub("KRKNF", name="KRKNF", sector="Industrials", industry="Marine robotics"))
+    db.commit()
+    assert apply_master_taxonomy_to_stubs(db) == ["KRKNF"]
+    db.commit()
+    company = db.query(Company).filter_by(ticker="KRKNF").one()
+    # Taxonomia siempre se aplica al stub; identidad real se respeta.
+    assert company.company_type == "defense_contract_backlog"
+    assert company.sector == "Industrials"
+    assert company.exchange == "OTC"  # placeholder "UNKNOWN" -> maestro
