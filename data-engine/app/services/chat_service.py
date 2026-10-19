@@ -1500,9 +1500,12 @@ class ChatService:
         # empresa. Antes se recuperaba siempre y la seccion "inferences" citaba
         # cada chunk, asi que una respuesta sobre ASTS salia con "Fuentes:
         # Numantia Patrimonio - Carta 2020" sin relacion alguna con ASTS.
+        vector_chat = os.getenv("CAVAAI_ENABLE_VECTOR_CHAT") == "1"
+        # Con el vectorial apagado la doctrina sigue llegando por texto SQL,
+        # pero solo si la pregunta apunta a la biblioteca o a un autor.
         library_context = (
-            retrieve_library_context(db, question)
-            if os.getenv("CAVAAI_ENABLE_VECTOR_CHAT") == "1"
+            retrieve_library_context(db, question, vector=vector_chat)
+            if (vector_chat or _DOCTRINE_CUE_RE.search(question or ""))
             and (company is None or _DOCTRINE_CUE_RE.search(question or ""))
             else []
         )
