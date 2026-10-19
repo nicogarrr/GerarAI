@@ -8,7 +8,7 @@ puntos de la objeción del auditor, 19-oct-2026).
 import re
 from pathlib import Path
 
-SQL = (Path(__file__).resolve().parents[1] / "alembic" / "versions" / "0073_news_generic_headline_titles.py").read_text(encoding="utf-8")
+SQL = (Path(__file__).resolve().parents[1] / "alembic" / "versions" / "0073_news_generic_titles.py").read_text(encoding="utf-8")
 _PAT = r"se\s+abre\s+en\s+una\s+nueva\s+ventana|opens?\s+in\s+a\s+new\s+window"
 
 

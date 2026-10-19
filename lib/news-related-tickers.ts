@@ -17,6 +17,11 @@ export type RelatedTicker = {
     name?: string | null;
     currency?: string | null;
     primary?: boolean;
+    /** 'etf': ETF tematico que tiene el ticker principal (holdings oficiales del emisor). */
+    kind?: 'stock' | 'etf';
+    weight_pct?: number | null;
+    holdings_as_of?: string | null;
+    source_url?: string | null;
     price: number | null;
     /** Fecha del cierre oficial usado (ISO). */
     date: string | null;
@@ -33,6 +38,7 @@ export type RelatedTickerView = {
     dateText: string;
     tone: 'up' | 'down' | 'flat' | 'none';
     title: string;
+    isEtf: boolean;
 };
 
 /**
@@ -42,6 +48,21 @@ export type RelatedTickerView = {
  * se muestra el numero con su divisa tal cual, sin convertir ni sustituir.
  */
 export function relatedTickerView(item: RelatedTicker): RelatedTickerView {
+    if (item.kind === 'etf') {
+        const w = typeof item.weight_pct === 'number' && Number.isFinite(item.weight_pct)
+            ? new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(item.weight_pct)
+            : null;
+        return {
+            ticker: item.ticker,
+            href: '',
+            priceText: w ? `${w} % del ETF` : NA,
+            changeText: '',
+            dateText: '',
+            tone: 'none',
+            isEtf: true,
+            title: `ETF ${item.name ?? item.ticker} · peso del ticker segun holdings oficiales${item.holdings_as_of ? ` al ${item.holdings_as_of}` : ''}`,
+        };
+    }
     const hasPrice = typeof item.price === 'number' && Number.isFinite(item.price);
     let priceText = NA;
     if (hasPrice) {
@@ -64,6 +85,7 @@ export function relatedTickerView(item: RelatedTicker): RelatedTickerView {
         priceText,
         changeText,
         dateText,
+        isEtf: false,
         tone,
         title: `${item.name ?? item.ticker} · ${day}`,
     };

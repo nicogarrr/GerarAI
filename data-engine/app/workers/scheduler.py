@@ -7,6 +7,7 @@ from functools import partial
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+from app.services.etf_holdings import refresh_etf_holdings
 from app.services.thesis_job_service import reconcile_thesis_dispatches
 from app.workers.dramatiq_app import (
     backfill_document_kpis,
@@ -174,6 +175,8 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     _register(scheduler, partial(enqueue_for_all_tenants, refresh_bottlenecks),
               "interval", job_id="bottleneck_refresh", hours=1)
     _register(scheduler, refresh_macro_context.send, "cron", job_id="macro_context_refresh", hour=23, minute=10)
+    # Holdings oficiales de ETFs tematicos (UFO, NASA): 1 descarga por ETF y semana.
+    _register(scheduler, refresh_etf_holdings, "cron", job_id="etf_holdings_refresh", day_of_week="mon", hour=7, minute=20)
     # Cartera real desde IBKR Flex (solo lectura). El actor no hace nada si
     # faltan token, query id o IBKR_FLEX_TENANT_ID; corre una vez al dia, con el
     # extracto del ultimo dia habil ya generado por IBKR.

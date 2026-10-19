@@ -2678,3 +2678,19 @@ class InvestorMovement(TenantOwnedMixin, Base, TimestampMixin):
     source_form: Mapped[str] = mapped_column(String(20), default="")
     source_url: Mapped[str] = mapped_column(String(500), default="")
     note: Mapped[str] = mapped_column(Text, default="")
+
+
+class EtfHolding(Base):
+    """Posicion de un ETF tematico segun el fichero oficial de holdings del
+    emisor (global, no por tenant). Solo tickers de renta variable con peso y
+    fecha de corte (as_of) publicados por el emisor; nada inferido."""
+
+    __tablename__ = "etf_holdings"
+    __table_args__ = (UniqueConstraint("etf", "ticker", name="uq_etf_holding"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    etf: Mapped[str] = mapped_column(String(12), index=True)
+    ticker: Mapped[str] = mapped_column(String(12), index=True)
+    weight_pct: Mapped[Decimal] = mapped_column(Numeric(9, 4))
+    as_of: Mapped[_DateT] = mapped_column(Date)
+    source_url: Mapped[str] = mapped_column(Text)
