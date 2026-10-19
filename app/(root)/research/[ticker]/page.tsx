@@ -1,4 +1,5 @@
 import CompanyChatForm from '@/components/research/CompanyChatForm';
+import ChatAnswerMarkdown from '@/components/research/ChatAnswerMarkdown';
 import ScrollToOnMount from '@/components/research/ScrollToOnMount';
 import { formatResearchMetric } from '@/lib/research/metric-value';
 import { financialFormula, financialPeriod, financialVersionLabel } from '@/lib/research/financial-display';
@@ -1565,8 +1566,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </Panel>
         {response ? (
           <Panel title="Respuesta">
-            <div className="whitespace-pre-wrap text-sm leading-7 text-gray-300">{humanizeChatAnswer(response.answer)}</div>
-            <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline">modelo {response.model && response.model !== 'deterministic' ? response.model : 'determinista'}</Badge><Badge variant="outline">{toChatCitations(response.sources).length} citas · {response.sources.length} fuentes</Badge><Badge variant="outline">{response.blocked ? 'datos insuficientes' : 'con evidencia'}</Badge></div>
+            {/* El motor emite markdown ligero: con texto plano se veían los
+                asteriscos literales. El badge pluraliza (1 cita · 1 fuente). */}
+            <ChatAnswerMarkdown text={humanizeChatAnswer(response.answer)} />
+            <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline">modelo {response.model && response.model !== 'deterministic' ? response.model : 'determinista'}</Badge><Badge variant="outline">{toChatCitations(response.sources).length} {toChatCitations(response.sources).length === 1 ? 'cita' : 'citas'} · {response.sources.length} {response.sources.length === 1 ? 'fuente' : 'fuentes'}</Badge><Badge variant="outline">{response.blocked ? 'datos insuficientes' : 'con evidencia'}</Badge></div>
             <CitationsList citations={[]} sources={response.sources} />
           </Panel>
         ) : chatFailed ? (
