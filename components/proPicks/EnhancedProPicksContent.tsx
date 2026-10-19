@@ -12,7 +12,7 @@ import { generateFunnelRunNow } from '@/lib/actions/propicks-funnel.actions';
 import { allNeutralCategory, categoryDisplay } from '@/lib/propicks/category-display';
 import { CATEGORY_KEYS, categoryNeutralNote } from './category-display';
 import { addToWatchlist } from '@/lib/actions/watchlist.actions';
-import { formatNumber, formatPercent, formatPrice, formatUserDate, formatUserDateTime } from '@/lib/format';
+import { formatCompanyName, formatNumber, formatPercent, formatPrice, formatUserDate, formatUserDateTime } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { t } from '@/lib/i18n/t';
 import { toast } from 'sonner';
@@ -314,14 +314,14 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="line-clamp-1 min-w-0 break-words text-sm text-gray-400">{pick.company}</p>
+                                            <p className="line-clamp-1 min-w-0 break-words text-sm text-gray-400">{formatCompanyName(pick.company)}</p>
                                             {pick.sector && (
                                                 <p className="mt-1 break-words text-xs text-gray-500">{etiquetaSector(pick.sector)}</p>
                                             )}
                                         </div>
                                         <div className={`text-right px-3 py-2 rounded-lg border ${getScoreColor(pick.score)}`}>
                                             <div className="text-2xl font-bold">
-                                                {pick.score}
+                                                {formatNumber(pick.score, { maximumFractionDigits: 1 })}
                                             </div>
                                             <div className="text-xs">Puntuación</div>
                                         </div>
@@ -362,7 +362,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                                         <div className="text-sm font-semibold text-gray-500">n/d*</div>
                                                     ) : (
                                                         <div className={`text-sm font-semibold ${display.value >= 70 ? 'text-green-400' : 'text-gray-400'}`}>
-                                                            {display.value}
+                                                            {formatNumber(display.value, { maximumFractionDigits: 1 })}
                                                         </div>
                                                     )}
                                                 </div>
