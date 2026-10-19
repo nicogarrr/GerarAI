@@ -28,7 +28,7 @@ function DayCard({ isoDate, todayIso, events }: { isoDate: string; todayIso: str
         <Link
             href="/calendar/resultados"
             aria-label={`Resultados del ${formatMarketDate(isoDate, { day: 'numeric', month: 'long' })}: ${events.length === 0 ? 'sin eventos' : `${events.length} ${events.length === 1 ? 'evento' : 'eventos'}`}`}
-            className="flex w-28 shrink-0 sm:w-32 flex-col items-center gap-1.5 rounded-2xl border border-gray-800 bg-surface-1 px-2 py-3 transition-colors hover:border-gray-700 hover:bg-gray-900"
+            className="flex w-28 shrink-0 sm:w-32 2xl:w-auto flex-col items-center gap-1.5 rounded-2xl border border-gray-800 bg-surface-1 px-2 py-3 transition-colors hover:border-gray-700 hover:bg-gray-900"
         >
             <span className="text-2xl font-bold leading-none text-gray-100">
                 {formatMarketDate(isoDate, { day: 'numeric' })}
@@ -47,7 +47,7 @@ function DayCard({ isoDate, todayIso, events }: { isoDate: string; todayIso: str
                                 key={event.ticker}
                                 ticker={event.ticker}
                                 name={event.company || event.ticker}
-                                className="size-9 rounded-lg sm:size-10"
+                                className="size-9 rounded-lg sm:size-10 2xl:size-12"
                             />
                         ))}
                         {extra > 0 ? <span className="text-xs font-medium text-gray-400">+{extra}</span> : null}
@@ -85,7 +85,7 @@ export default async function EarningsDayStrip() {
                     Ver todo
                 </Link>
             </div>
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 2xl:grid 2xl:grid-cols-[repeat(7,minmax(0,1fr))] 2xl:overflow-visible">
                 {days.map((isoDate) => (
                     <DayCard key={isoDate} isoDate={isoDate} todayIso={today} events={byDate.get(isoDate) ?? []} />
                 ))}
