@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { headers } from 'next/headers';
 
 import { getAuth } from '@/lib/better-auth/auth';
@@ -8,6 +9,31 @@ export type AuthenticatedUser = {
   email?: string | null;
   name?: string | null;
 };
+
+/**
+ * Resolución de sesión deduplicada POR PETICIÓN (React cache).
+ *
+ * Antes cada llamada a `requireAuthenticatedUser` ejecutaba
+ * `auth.api.getSession`, que valida la sesión contra MongoDB. Una página
+ * como /watchlist la invoca decenas de veces por render (layout, acciones y
+ * cada fetch a proveedores vía fetchJSON/research-identity), así que una
+ * sola vista provocaba ~100+ lecturas de sesión a Atlas en cadena paralela:
+ * era el tramo dominante del tiempo de render de servidor.
+ *
+ * La sesión es inmutable dentro de la petición: la cookie no cambia durante
+ * el render, así que resolverla una vez por petición no altera la semántica.
+ * Las mutaciones (server actions invocadas desde cliente) son peticiones
+ * independientes y vuelven a validar.
+ */
+const resolveSessionUser = cache(async (): Promise<AuthenticatedUser> => {
+  const auth = await getAuth();
+  const session = await auth.api.getSession({ headers: await headers() });
+  const user = session?.user;
+  if (!user?.id) {
+    throw new AuthenticationError('User not authenticated');
+  }
+  return { id: user.id, email: user.email, name: user.name };
+});
 
 /** Resolve identity server-side; caller-supplied user IDs are never trusted. */
 export async function requireAuthenticatedUser(): Promise<AuthenticatedUser> {
@@ -24,11 +50,5 @@ export async function requireAuthenticatedUser(): Promise<AuthenticatedUser> {
   ) {
     return { id: 'e2e-browser-user', email: 'browser@cavaai.test', name: 'Browser Analyst' };
   }
-  const auth = await getAuth();
-  const session = await auth.api.getSession({ headers: await headers() });
-  const user = session?.user;
-  if (!user?.id) {
-    throw new AuthenticationError('User not authenticated');
-  }
-  return { id: user.id, email: user.email, name: user.name };
+  return resolveSessionUser();
 }
