@@ -175,7 +175,7 @@ def test_stored_reasoning_is_template_only_and_has_no_numbers_or_urls(db):
         assert row.reasoning == svc.compose_reasoning(row.ticker, "beneficiaria" if row.ticker != "AMD" else "afectada",
                                                       {"NVDA": "proveedor_directo", "AMD": "cliente_dependiente",
                                                        "TSM": "alternativa_sustitutiva"}[row.ticker])
-        assert not re.search(r"\d|://|www\.", row.reasoning) and "Hipotesis del modelo" in row.reasoning
+        assert not re.search(r"\d|://|www\.", row.reasoning) and "Hipótesis del modelo" in row.reasoning
     assert "N/D" in svc.compose_reasoning("N/D", "afectada", "proveedor_directo")
 
 
