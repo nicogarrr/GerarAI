@@ -203,6 +203,12 @@ export default function ThesisMemo({
 
       {ticker ? <ThesisAudioPlayer ticker={ticker} version={thesis.version} /> : null}
 
+      {thesis.status !== 'published' && thesis.status !== 'approved' && thesis.status !== 'insufficient_data' ? (
+        <p role="status" className="rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
+          Borrador en revisión: texto sin auditar
+        </p>
+      ) : null}
+
       {thesis.status === 'insufficient_data' ? (
         <div
           role="status"
@@ -320,7 +326,7 @@ export default function ThesisMemo({
         </h3>
         {hideFigures ? (
           <p className="text-sm text-gray-400">
-            Sin cifras de valoración: {modelBlocked ? 'el modelo no es publicable todavía' : 'la tesis es un borrador'}. El memo completo (sección 13) puede incluir un rango indicativo parcial, que no es un valor justo.
+            Sin cifras de valoración: {modelBlocked ? 'el modelo no es publicable todavía' : thesis.status === 'insufficient_data' ? 'faltan datos' : 'la tesis es un borrador'}. El memo completo (sección 13) puede incluir un rango indicativo parcial, que no es un valor justo.
           </p>
         ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
