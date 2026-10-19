@@ -797,6 +797,24 @@ def active_vendor_allows_cold_wait(vendor: str, settings) -> bool:
     return not bool(settings.finnhub_api_key)
 
 
+@router.get("/universe-close")
+def universe_close(
+    sector: str | None = None,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Resto del universo con el ultimo cierre almacenado (fecha por fila).
+
+    Excluye los valores que ya salen en vivo en /real y las entradas de
+    prueba (sin CIK ni ISIN). Cada fila lleva close_date y fuente.
+    """
+    from app.services.screener_universe_service import universe_close_rows
+
+    canonical = _gics_sector(sector) if sector else None
+    live = {sym.upper() for sym, _n, _s in _REAL_UNIVERSE}
+    return universe_close_rows(db, exclude_symbols=live, sector=canonical, limit=limit)
+
+
 @router.get("/real")
 def real_time_screener(
     marketCapMoreThan: float | None = None,
