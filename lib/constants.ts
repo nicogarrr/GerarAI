@@ -9,7 +9,6 @@ import {
   Briefcase,
   Building2,
   CircleHelp,
-  Download,
   FileSearch,
   Filter,
   CalendarDays,
@@ -215,10 +214,9 @@ export const ROUTE_CATALOG: NavSection[] = [
   },
   {
     title: 'Sistema',
-    // /security vive en el menu del avatar y /screener como hijo de Screeners.
+    // /export ya no esta en el menu (sin uso; la ruta sigue existiendo). /security vive en el menu del avatar y /screener como hijo de Screeners.
     // /help es publica y sin hub: no se resalta ninguna seccion al visitarla.
     items: [
-      { href: '/export', label: 'Exportar', icon: Download, hub: '/portfolio' },
       { href: '/help', label: 'Ayuda', icon: CircleHelp, hub: null },
     ],
   },
