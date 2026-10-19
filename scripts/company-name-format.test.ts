@@ -10,4 +10,8 @@ test('formatCompanyName respeta marcas con &, guiones y sufijos /ADR', () => {
   assert.equal(formatCompanyName('Apple Inc'), 'Apple Inc');
   assert.equal(formatCompanyName('IBM'), 'IBM');
   assert.equal(formatCompanyName('COLLPLANT BIOTECHNOLOGIES LT'), 'Collplant Biotechnologies Ltd');
+  assert.equal(formatCompanyName('LT FOODS LTD'), 'LT Foods Ltd');
+  assert.equal(formatCompanyName('LT GROUP INC'), 'LT Group Inc');
+  assert.equal(formatCompanyName('MEGA-LT HOLDINGS'), 'Mega-LT Holdings');
+  assert.equal(formatCompanyName('MEGA-LT'), 'Mega-LT');
 });
