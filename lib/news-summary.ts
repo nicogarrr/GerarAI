@@ -74,6 +74,13 @@ function looksLikeFragment(text: string): boolean {
     if (!trimmed) return true;
     if (TRUNCATED_AT_SOURCE.test(trimmed)) return true;
     const words = trimmed.split(/\s+/);
+    // Pegote de scraping: la cabecera de sección del medio se suelda con la
+    // palabra siguiente en la frontera minúscula→mayúscula («Key
+    // TakeawaysOn Oct. 8», visto en prod 19-oct-2026). No hay forma honesta
+    // de despegarlas: mejor sin resumen. Solo el segundo token: el primero
+    // puede ser una marca legítima (MarketScreener, LinkedIn, WhatsApp) y
+    // una cabecera soldada siempre lleva una palabra delante («Key »).
+    if (words.length > 1 && /^[A-Z][a-z]{3,}(On|The|An?|In|It|As|At|Of|To|By|Is|Or)[a-z]?$/.test(words[1])) return true;
     if (CONTINUATION_START.test(trimmed) || UNIT_START.test(trimmed)) return true;
     if (TERMINAL_PUNCT.test(trimmed)) return false;
     if (words.length < 6) return true;
@@ -87,7 +94,17 @@ export function newsSummaryToShow(headline: string, summary: string | null | und
     const t = norm(text);
     if (!t || t === h) return null;
     let out = text;
-    if (h && t.startsWith(h)) {
+    // Prefijo «TICKER » que la ingesta antepone al titular dentro del resumen
+    // («SPCX <titular> <primera frase>», visto en prod 19-oct-2026 con
+    // Yahoo/TradingKey/Benzinga): sin quitarlo, el resumen repite el titular
+    // entero bajo él mismo. Solo se recorta cuando lo que queda empieza por
+    // el titular (si no, el token forma parte del texto y se respeta).
+    if (h && !t.startsWith(h)) {
+        const m = /^[A-Z][A-Z0-9.]{0,5}\s+/.exec(out);
+        if (m && norm(out.slice(m[0].length)).startsWith(h)) out = out.slice(m[0].length);
+    }
+    const tOut = norm(out);
+    if (h && tOut.startsWith(h)) {
         const idx = out.toLowerCase().indexOf(headline.trim().toLowerCase());
         if (idx === 0) {
             const cutAt = headline.trim().length;

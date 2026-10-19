@@ -90,3 +90,33 @@ test('cabecera de agencia se recorta y el resto vuelve a pasar la higiene', () =
 test('resumen corto pero correcto sigue pintándose', () => {
     assert.equal(newsSummaryToShow('A', 'Resumen completo.'), 'Resumen completo.');
 });
+
+// Tester 4 nº2 (prod 19-oct-2026): Yahoo/Benzinga/TradingKey/SeekingAlpha
+// mostraban un segundo bloque expandido que repetía el titular con prefijo
+// de ticker y pegotes de scraping.
+test('prefijo «TICKER » + titular dentro del resumen se recorta y queda la primera frase', () => {
+    assert.equal(
+        newsSummaryToShow(
+            'Elon Musk says he will give SpaceX shares to every child in America',
+            'SPCX Elon Musk says he will give SpaceX shares to every child in America Elon Musk owns more than 6.4 billion shares of SpaceX.'),
+        'Elon Musk owns more than 6.4 billion shares of SpaceX.');
+});
+
+test('pegote de scraping soldado («TakeawaysOn») no se pinta', () => {
+    assert.equal(
+        newsSummaryToShow(
+            'SpaceX Stock (SPCX) Moved Up by 3.01% on Oct 19: Facts Behind the Movement',
+            'SPCX SpaceX Stock (SPCX) Moved Up by 3.01% on Oct 19: Facts Behind the Movement Key TakeawaysOn Oct. 8, 2026, the company filed.'),
+        null);
+});
+
+test('el prefijo solo se recorta cuando lo que queda es el titular', () => {
+    // «NASA» forma parte del texto, no es un ticker anteponiendo el titular.
+    const out = newsSummaryToShow('Rocket lab shares rise', 'NASA awards Rocket Lab a new launch contract.');
+    assert.equal(out, 'NASA awards Rocket Lab a new launch contract.');
+});
+
+test('marcas con mayúscula interna no cuentan como pegote', () => {
+    const out = newsSummaryToShow('Titular', 'iPhone sales rose in the quarter.');
+    assert.ok(out !== null && out.includes('Phone sales rose'), `falso pegote: ${out}`);
+});
