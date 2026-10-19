@@ -570,6 +570,10 @@ _PAGE_IDENTITY_RE = re.compile(
     r"(?i)\bqu[eé]\s+(?:p[aá]gina|pantalla|secci[oó]n)\s+(?:es\s+esta|estoy\s+viendo|es|ves)\b"
     r"|\bqu[eé]\s+estoy\s+viendo\b|\bd[oó]nde\s+estoy\b"
 )
+_PROMPT_OVERRIDE_RE = re.compile(
+    r"(?i)\b(?:ignora|olvida|descarta)\b[^.?!\n]{0,40}\b(?:instrucciones|reglas)\b"
+    r"|\b(?:tu|el)\s+prompt\b|\bsystem\s+prompt\b"
+)
 _PAGE_CONTENT_RE = re.compile(
     r"(?i)\b(?:en|de|sobre)\s+(?:esta|la\s+presente)\s+(?:p[aá]gina|pantalla|secci[oó]n)\b"
     r"|\b(?:esta|la)\s+(?:p[aá]gina|pantalla)\b[^.?!\n]{0,40}\b(?:hay|muestra|tiene|dice)\b"
@@ -826,7 +830,11 @@ class ChatService:
         # "¿Qué página estoy viendo?": la identidad de la página ya está
         # resuelta en servidor; se responde sin LLM y sin fuentes (la
         # pastilla "Viendo X" es la propia UI, no un documento citable).
-        if page_context is not None and _PAGE_IDENTITY_RE.search(question or ""):
+        if (
+            page_context is not None
+            and _PAGE_IDENTITY_RE.search(question or "")
+            and not _PROMPT_OVERRIDE_RE.search(question or "")
+        ):
             seen = (
                 f"{page_context.label} ({page_context.company.name})"
                 if page_context.company is not None
