@@ -282,7 +282,8 @@ export type PortfolioIntelligence = {
     period_end?: string | null;
     portfolio_components: Record<string, number | null>;
     incomplete_components?: string[];
-    positions: Array<{ ticker: string; weight: number; total_return: number | null; period_start?: string | null; period_end?: string | null; components: Record<string, number | null> }>;
+    excluded_partial_histories?: string[];
+    positions: Array<{ ticker: string; weight: number; total_return: number | null; period_start?: string | null; period_end?: string | null; period_days?: number | null; partial_history?: boolean; components: Record<string, number | null> }>;
   };
   ledger_contribution: {
     positions: Array<{

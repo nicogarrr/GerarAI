@@ -1084,6 +1084,12 @@ class PortfolioIntelligenceService:
             return None
         return float(end_rate / start_rate - 1)
 
+    # Una posicion medida en una ventana mucho menor que la del panel
+    # (p.ej. 3 semanas de precios bajo un encabezado de 1 ano) se marca
+    # como historial parcial y se excluye de los totales agregados: sumar
+    # retornos de horizontes distintos publicaba un total sin sentido.
+    PARTIAL_WINDOW_RATIO = 0.5
+
     def _attribution(
         self,
         db: Session,
@@ -1222,13 +1228,6 @@ class PortfolioIntelligenceService:
                     else None
                 ),
             }
-            for key, value in components.items():
-                if key not in totals:
-                    totals[key] = value
-                elif totals[key] is not None and value is not None:
-                    totals[key] += value
-                else:
-                    totals[key] = None
             positions.append(
                 {
                     "ticker": company.ticker,
@@ -1236,6 +1235,7 @@ class PortfolioIntelligenceService:
                     "total_return": total_return,
                     "period_start": period_start.isoformat() if prices else None,
                     "period_end": period_end.isoformat() if prices else None,
+                    "period_days": (period_end - period_start).days if prices else None,
                     "fx_known": fx_component is not None,
                     "dividends_known": dividends_known,
                     "components": components,
@@ -1243,14 +1243,44 @@ class PortfolioIntelligenceService:
             )
         starts = [p["period_start"] for p in positions if p["period_start"]]
         ends = [p["period_end"] for p in positions if p["period_end"]]
+        window_start = min(starts) if starts else None
+        window_end = max(ends) if ends else None
+        window_days = (
+            (date.fromisoformat(window_end) - date.fromisoformat(window_start)).days
+            if window_start and window_end
+            else 0
+        )
+        # Marca de historial parcial y exclusion de los totales: la ventana
+        # medida de la posicion cubre menos de PARTIAL_WINDOW_RATIO de la
+        # ventana del panel. La fila se muestra con su fecha real; solo sale
+        # del agregado.
+        partial_tickers: list[str] = []
+        for row_ in positions:
+            partial = bool(
+                window_days > 0
+                and row_["period_days"] is not None
+                and row_["period_days"] < self.PARTIAL_WINDOW_RATIO * window_days
+            )
+            row_["partial_history"] = partial
+            if partial:
+                partial_tickers.append(row_["ticker"])
+                continue
+            for key, value in row_["components"].items():
+                if key not in totals:
+                    totals[key] = value
+                elif totals[key] is not None and value is not None:
+                    totals[key] += value
+                else:
+                    totals[key] = None
         return {
             "basis": "adjusted_price_return",
-            "period_start": min(starts) if starts else None,
-            "period_end": max(ends) if ends else None,
+            "period_start": window_start,
+            "period_end": window_end,
             "portfolio_components": dict(totals),
             "incomplete_components": sorted(
                 key for key, value in totals.items() if value is None
             ),
+            "excluded_partial_histories": sorted(partial_tickers),
             "positions": positions,
         }
 
