@@ -52,6 +52,10 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     // Modo guía (asistente de research unificado): con ticker en el selector el
     // Cerebro pregunta a /api/research/assistant en vez de al chat general.
     const [guideTicker, setGuideTicker] = useState('');
+    // El selector de ticker de la guía queda plegado tras un botón: un input
+    // suelto en la cabecera parecía herramienta de desarrollo. Con ticker
+    // activo (o al abrirlo) se muestra siempre.
+    const [showGuideInput, setShowGuideInput] = useState(false);
     const [reviewId, setReviewId] = useState<number | undefined>(undefined);
 
     const [echo, setEcho] = useState<ContextEcho | null>(null);
@@ -268,13 +272,27 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <BrainGlassesIcon className="h-9 w-9 shrink-0 object-contain" />
                     <CardTitle id="global-brain-title" className="text-sm font-medium">Cerebro GerarAI</CardTitle>
-                    <input
-                        value={guideTicker}
-                        onChange={(event) => { setGuideTicker(event.target.value.toUpperCase().replace(/[^A-Z0-9.\-]/g, '').slice(0, 20)); setReviewId(undefined); }}
-                        placeholder="Ticker"
-                        aria-label="Ticker de la guía de investigación"
-                        className="w-20 min-w-0 rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-200 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
-                    />
+                    {showGuideInput || guideTicker ? (
+                        <input
+                            value={guideTicker}
+                            onChange={(event) => { setGuideTicker(event.target.value.toUpperCase().replace(/[^A-Z0-9.\-]/g, '').slice(0, 20)); setReviewId(undefined); }}
+                            onBlur={() => { if (!guideTicker.trim()) setShowGuideInput(false); }}
+                            placeholder="Ticker guía"
+                            title="Guía de investigación: escribe un ticker y el Cerebro responde como guía de research de esa empresa"
+                            aria-label="Ticker de la guía de investigación"
+                            className="w-24 min-w-0 rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-200 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setShowGuideInput(true)}
+                            title="Guía de investigación por empresa"
+                            aria-label="Abrir la guía de investigación por empresa"
+                            className="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-400 hover:border-indigo-400 hover:text-slate-200"
+                        >
+                            Guía
+                        </button>
+                    )}
                     {reviewId ? (
                         <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300">
                             Revisión #{reviewId}

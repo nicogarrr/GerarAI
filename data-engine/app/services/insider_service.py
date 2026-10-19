@@ -13,6 +13,7 @@ envuelto en try/except -> devuelve {"status": "skipped", ...}).
 
 from __future__ import annotations
 
+import logging
 import re
 import time
 from collections.abc import Callable
@@ -34,6 +35,8 @@ FILING_FETCH_TIMEOUT_SECONDS = 15.0
 #: TTL del XML por accession (los filings SEC son inmutables; la caché solo
 #: evita re-descargas en re-evaluaciones).
 FILING_XML_CACHE_TTL_SECONDS = 3600
+
+logger = logging.getLogger(__name__)
 
 _xml_cache: dict[str, tuple[float, str]] = {}
 _xml_cache_fetched_at: dict[str, str] = {}
@@ -523,10 +526,22 @@ def get_signals_for_ticker(
             ).strip()
         if errors:
             result["filing_errors"] = errors
+            # Diagnostico al log del backend (tipo + texto ya redactado, sin
+            # secretos): un 403/429 de la SEC era invisible fuera de la
+            # respuesta y dificultaba distinguir bloqueo de parseo.
+            logger.warning(
+                "insider live scan %s: %d filing error(s), status=%s, reasons=%s: %s",
+                wanted, len(errors), status, sorted(set(failure_reasons)), errors,
+            )
         return result
     except Exception as exc:  # noqa: BLE001 — el endpoint nunca debe romper
+        reason = public_reason(exc)
+        logger.warning(
+            "insider live scan %s: fallo global (%s: %s), reason=%s",
+            wanted, type(exc).__name__, redact_secrets(str(exc))[:200], reason,
+        )
         return {"ticker": wanted, "status": "degraded",
-                "reason": public_reason(exc), "signals": []}
+                "reason": reason, "signals": []}
 
 
 def public_reason(exc: BaseException) -> str:

@@ -15,9 +15,15 @@ Kerry Group (IE) verificado 2026-10-19: filings.xbrl.org NO indexa Irlanda
 propio emisor (ver esef_package_sources). LEI 635400TLVVBNXLFHWC59 via GLEIF
 ("KERRY GROUP PUBLIC LIMITED COMPANY", IE; ISINs IE0004906560 ordinaria y
 US4924601002 ADR) y confirmado dentro del paquete ESEF FY2025
-(xbrli:identifier con esquema ISO 17442 + nombre legal declarado). Ticker
-reviewed KRKNF: es el Company.ticker del universo (OTC US); KYGA (LSE) y KRZ
-(Euronext Dublin) quedan como alias.
+(xbrli:identifier con esquema ISO 17442 + nombre legal declarado).
+
+CORRECCION 2026-10-19 (colision de ticker): la entrada ligaba KRKNF a Kerry
+por la premisa de que KRKNF era Kerry, sin verificarlo. KRKNF es Kraken
+Robotics Inc (TSX-V: PNG, OTCQB: KRKNF; krakenrobotics.com/investors), una
+empresa canadiense distinta que NO presenta ESEF. Tickers reales de Kerry
+verificados contra kerry.com/investors/faq: KYGa.I (Euronext Dublin) y
+KYGa.L (LSE); en EEUU solo ADR OTC KRYAY (CUSIP 492460100, BNY, ratio 1:1)
+y ordinaria OTC KRYAF (otcmarkets.com). Ticker reviewed: KRYAY.
 """
 
 from __future__ import annotations
@@ -47,9 +53,10 @@ REVIEWED_ISSUERS_NL: tuple[ReviewedEsefIssuer, ...] = (
 
 REVIEWED_ISSUERS_IE: tuple[ReviewedEsefIssuer, ...] = (
     ReviewedEsefIssuer(
-        "KRKNF", "Kerry Group Public Limited Company", "635400TLVVBNXLFHWC59",
+        "KRYAY", "Kerry Group Public Limited Company", "635400TLVVBNXLFHWC59",
         "IE0004906560", "IE",
-        ("KERRY GROUP PLC", "KERRY GROUP", "KYGA", "KYGA.L", "KRZ", "KRZ.IR"),
+        ("KERRY GROUP PLC", "KERRY GROUP", "KYGA", "KYGA.L", "KYGA.I",
+         "KRZ", "KRZ.IR", "KRYAF"),
     ),
 )
 
@@ -126,6 +133,86 @@ def resolve_ticker_for_country(country: str, entity_name: str) -> str | None:
     if country == "IE":
         issuer = resolve_issuer_ie(entity_name)
         return issuer.ticker if issuer else None
+    return None
+
+
+def _alias_is_name(alias: str, ticker: str) -> bool:
+    """Un alias solo cuenta como NOMBRE si tiene contenido de nombre: varias
+    palabras («KERRY GROUP PLC») o un token de >=4 letras distinto del ticker
+    y sin punto («INDITEX», «TELEFONICA»). Los aliases tipo ticker de bolsa
+    («ARM.MC», «TEF.MC», «ASML.AS») NO son nombres: su token es el propio
+    ticker y reintroduciria por la puerta de atras la colision global de
+    tickers que la guardia company_mismatch existe para bloquear (caso real:
+    «ARM.MC» rescatando a Arm Holdings como si fuera Arima)."""
+    a = (alias or "").strip()
+    if not a or "." in a:
+        return False
+    if " " in a:
+        return True
+    return len(a) >= 4 and a.upper() != ticker.upper()
+
+
+def reviewed_names_for_ticker(ticker: str) -> set[str]:
+    """Nombres reviewed (legal + alias COMO NOMBRE) ligados a un ticker del
+    manifest ESEF. Los aliases tipo TICKER.XX quedan fuera (_alias_is_name).
+
+    Prueba de identidad para la guardia company_mismatch de refresh_from_esef:
+    el nombre corto comercial de una Company (p.ej. «Inditex») no comparte
+    tokens con el nombre legal del filing («INDUSTRIA DE DISENO TEXTIL, S.A.»),
+    pero si con el alias reviewed («INDITEX»). Ticker desconocido -> conjunto
+    vacio: la guardia decide solo con el entity_name del snapshot."""
+    t = (ticker or "").strip().upper()
+    if not t:
+        return set()
+    names: set[str] = set()
+    for issuer in REVIEWED_ISSUERS:
+        if issuer.ticker.upper() == t:
+            names.add(issuer.legal_name)
+            names.update(a for a in issuer.aliases if _alias_is_name(a, t))
+    for issuer in REVIEWED_ISSUERS_NL + REVIEWED_ISSUERS_IE:
+        if issuer.ticker.upper() == t:
+            names.add(issuer.legal_name)
+            names.update(a for a in issuer.aliases if _alias_is_name(a, t))
+    return names
+
+
+# ISINs de valores conocidos del mismo emisor reviewed (p. ej. ordinaria
+# Euronext + ADR OTC de Kerry son el MISMO issuer con dos securities).
+_REVIEWED_EXTRA_ISINS: dict[str, tuple[str, ...]] = {
+    "KRYAY": ("US4924601002",),  # ADR OTC de Kerry Group (GLEIF), mismo LEI
+}
+
+
+def reviewed_isins_for_ticker(ticker: str) -> frozenset[str]:
+    """Conjunto de ISINs reviewed aceptados para el ticker (emisor ESEF).
+
+    Incluye el ISIN primario del filing mas securities verificadas del mismo
+    emisor (ADR). Conjunto vacio cuando el ticker no es reviewed.
+    """
+    t = (ticker or "").strip().upper()
+    if not t:
+        return frozenset()
+    isins = set(_REVIEWED_EXTRA_ISINS.get(t, ()))
+    for issuer in REVIEWED_ISSUERS:
+        if issuer.ticker.upper() == t and issuer.isin:
+            isins.add(issuer.isin.strip().upper())
+    for issuer in REVIEWED_ISSUERS_NL + REVIEWED_ISSUERS_IE:
+        if issuer.ticker.upper() == t and issuer.isin:
+            isins.add(issuer.isin.strip().upper())
+    return frozenset(isins)
+
+
+def reviewed_isin_for_ticker(ticker: str) -> str | None:
+    """ISIN reviewed del ticker ESEF (prueba de identidad fuerte), o None."""
+    t = (ticker or "").strip().upper()
+    if not t:
+        return None
+    for issuer in REVIEWED_ISSUERS:
+        if issuer.ticker.upper() == t:
+            return issuer.isin
+    for issuer in REVIEWED_ISSUERS_NL + REVIEWED_ISSUERS_IE:
+        if issuer.ticker.upper() == t:
+            return issuer.isin
     return None
 
 

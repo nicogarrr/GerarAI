@@ -193,6 +193,49 @@ ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("dividends_paid",    ["ifrs-full:DividendsPaidClassifiedAsFinancingActivities"],                    "iso4217:EUR"),
 ]
 
+
+
+_NAME_STOPWORDS = frozenset({
+    "INC", "SA", "S.A", "NV", "N.V", "PLC", "COMPANY", "GROUP", "THE", "DE",
+    "LA", "EL", "Y", "S", "A", "HOLDING", "HOLDINGS", "CORP", "CORPORATION",
+    "LTD", "LIMITED", "PUBLIC", "SOCIEDAD", "ANONIMA", "AKTIENGESELLSCHAFT",
+    "AG", "SE", "SPA", "S.P.A", "OYS", "AB", "ASA", "BV", "B.V", "(OTC)",
+})
+
+
+def _name_tokens(name: str | None) -> set[str]:
+    """Tokens significativos de un nombre legal: mayusculas, SIN ACENTOS (la
+    Company puede decir «Telefónica» y el filing «TELEFONICA SA»: sin plegar
+    diacriticos la guardia bloquearia una identidad legitima), sin signos ni
+    formas societarias (SA/NV/PLC/Inc...)."""
+    import unicodedata
+
+    if not name:
+        return set()
+    raw = "".join(
+        c for c in unicodedata.normalize("NFKD", str(name).upper())
+        if not unicodedata.combining(c)
+    )
+    for ch in ".,()/&-":
+        raw = raw.replace(ch, " ")
+    return {w for w in raw.split() if len(w) > 2 and w not in _NAME_STOPWORDS}
+
+
+def _name_identity_ok(company_name: str | None, candidate_name: str | None) -> bool:
+    """Prueba de identidad por nombre entre la Company y un nombre del emisor.
+
+    Pasa si comparten >=2 tokens significativos, o si TODOS los tokens de la
+    Company estan contenidos en el candidato (nombre corto legitimo:
+    «Telefónica» dentro de «TELEFONICA SA», «Kerry Group plc» dentro de
+    «KERRY GROUP PLC»). Un solo token compartido con tokens sueltos a ambos
+    lados NO basta: «Kerry Logistics Network» comparte «KERRY» con
+    «KERRY GROUP PLC» y es otra empresa (objecion del auditor, 2026-10-19).
+    Sin tokens en alguno de los dos lados no hay prueba: mismatch."""
+    a, b = _name_tokens(company_name), _name_tokens(candidate_name)
+    if not a or not b:
+        return False
+    return len(a & b) >= 2 or a <= b
+
 # ESEF: concepts that are disjoint PARTS of one total. A filer that discloses
 # capex disaggregated reports PP&E and intangibles separately, and taking the
 # first alias that reports leaves half the capex out: FCF that is too high and a
@@ -1502,11 +1545,48 @@ class FinancialIngestionService:
         NUNCA se leen como total consolidado). Duraciones anuales (300-380 dias)
         para magnitudes de flujo; instantes para balance. Alias fusionados por
         periodo: gana el primer alias que informa el periodo, nunca se suman.
+
+        Guardia de identidad: Company es GLOBAL y los tickers no son unicos a
+        nivel mundial; un ticker reciclado o compartido (caso real 2026-10-19:
+        KRKNF = Kraken Robotics CA ligado por error a Kerry Group IE) escribiria
+        los hechos de UN EMISOR bajo OTRA Company. Si el nombre de la Company y
+        el entity_name del snapshot no comparten ningun token significativo, se
+        rechaza la escritura (company_mismatch): N/D honesto, nunca hechos
+        cruzados.
         """
         ticker = company.ticker.upper()
         snapshot = esef_connector.read_esef_snapshot(ticker)
         if snapshot is None:
             raise RuntimeError(f"Sin snapshot ESEF local para {ticker}: por ahora solo hay cobertura de emisores IBEX revisados")
+        from app.services.esef_issuer_mapping import (
+            reviewed_isins_for_ticker,
+            reviewed_names_for_ticker,
+        )
+
+        # Carril ISIN (prueba fuerte): la Company captura ISIN del Flex de
+        # IBKR; si ambos lados lo tienen, manda el ISIN sobre el nombre.
+        reviewed_isins = reviewed_isins_for_ticker(ticker)
+        company_isin = (company.isin or "").strip().upper()
+        if company_isin and reviewed_isins:
+            if company_isin not in reviewed_isins:
+                raise RuntimeError(
+                    "company_mismatch: ISIN de la Company "
+                    f"{company_isin} no esta entre los ISINs reviewed "
+                    f"{sorted(reviewed_isins)} para {ticker} "
+                    f"({snapshot.get('entity_name')!r}): no se escriben "
+                    "hechos de una entidad bajo otra"
+                )
+        else:
+            candidates = reviewed_names_for_ticker(ticker) | {
+                n for n in [snapshot.get("entity_name")] if n
+            }
+            if not any(_name_identity_ok(company.name, n) for n in candidates):
+                raise RuntimeError(
+                    "company_mismatch: la Company "
+                    f"{company.name!r} no acredita identidad con el emisor ESEF "
+                    f"{snapshot.get('entity_name')!r} ({snapshot.get('lei')}): "
+                    "no se escriben hechos de una entidad bajo otra"
+                )
 
         facts_data = snapshot.get("facts", {})
         document = self._source_document_esef(db, company, ticker, snapshot)

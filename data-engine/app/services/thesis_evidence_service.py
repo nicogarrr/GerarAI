@@ -124,6 +124,37 @@ def _pending(source: str, detail: str, action: str | None = None) -> dict[str, A
     return payload
 
 
+
+def _news_dedupe_key(title: str | None, ticker: str | None) -> str:
+    """Clave de la misma noticia en distintas agencias: primeras 10 palabras
+    normalizadas del titular, sin el prefijo de ticker."""
+    import re as _re
+    import unicodedata as _ud
+
+    text = _ud.normalize("NFKD", (title or "").lower())
+    text = "".join(ch for ch in text if not _ud.combining(ch))
+    words = _re.findall(r"[a-z0-9]+", text)
+    if ticker and words and words[0] == ticker.lower():
+        words = words[1:]
+    return " ".join(words[:10])
+
+
+def _dedupe_news_rows(rows: list, limit: int, ticker: str | None = None) -> list:
+    """Quita duplicados (mismo titular normalizado) conservando el orden y el
+    de mayor materialidad; devuelve como mucho `limit` filas."""
+    seen: set[str] = set()
+    out: list = []
+    for row in rows:
+        key = _news_dedupe_key(getattr(row, "title", None), ticker)
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        out.append(row)
+        if len(out) >= limit:
+            break
+    return out
+
 class ThesisEvidenceService:
     """Reune y persiste el paquete de evidencia best-effort para una tesis."""
 
@@ -534,13 +565,20 @@ class ThesisEvidenceService:
 
     # -- 4. noticias (solo lectura del pipeline news) --------------------------
     def _collect_news(self, db: Session, company: Company) -> dict[str, Any]:
-        rows = list(
-            db.scalars(
-                select(NewsEvent)
-                .where(NewsEvent.company_id == company.id)
-                .order_by(desc(NewsEvent.materiality_score), desc(NewsEvent.date))
-                .limit(MAX_NEWS_ITEMS)
-            ).all()
+        # Se leen más filas de las necesarias: una misma noticia publicada por
+        # varias agencias (PR Newswire, GlobeNewswire, Morningstar) ocupaba 3 de
+        # los 5 huecos de «noticias materiales» y contaba como 3 eventos.
+        rows = _dedupe_news_rows(
+            list(
+                db.scalars(
+                    select(NewsEvent)
+                    .where(NewsEvent.company_id == company.id)
+                    .order_by(desc(NewsEvent.materiality_score), desc(NewsEvent.date))
+                    .limit(MAX_NEWS_ITEMS * 4)
+                ).all()
+            ),
+            MAX_NEWS_ITEMS,
+            company.ticker,
         )
         if not rows:
             return _pending(

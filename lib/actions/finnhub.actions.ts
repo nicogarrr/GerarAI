@@ -271,6 +271,11 @@ const EXCHANGE_LABEL_BY_SUFFIX: Record<string, string> = {
     V: 'TSXV',
     MX: 'BMV',
     SA: 'B3',
+    SS: 'Shanghai',
+    SZ: 'Shenzhen',
+    JK: 'IDX',
+    HM: 'Hamburg',
+    SN: 'Santiago',
 };
 
 function exchangeFromDisplaySymbol(displaySymbol?: string): string | undefined {
@@ -278,7 +283,23 @@ function exchangeFromDisplaySymbol(displaySymbol?: string): string | undefined {
     const idx = displaySymbol.lastIndexOf('.');
     if (idx < 0) return 'US';
     const suffix = displaySymbol.slice(idx + 1).toUpperCase();
-    return EXCHANGE_LABEL_BY_SUFFIX[suffix];
+    // Sufijo desconocido: se muestra tal cual (el comentario del mapa ya lo
+    // prometía, pero el `|| 'US'` del llamador lo convertía en «US» y
+    // tickers como 300183.SZ o TMAS.JK salían etiquetados como EE. UU.).
+    return EXCHANGE_LABEL_BY_SUFFIX[suffix] ?? suffix;
+}
+
+// Finnhub profile2 devuelve la bolsa en texto largo inglés
+// («NASDAQ NMS - GLOBAL MARKET»); el buscador la muestra literal.
+function normalizeExchangeLabel(exchange?: string): string | undefined {
+    if (!exchange) return undefined;
+    const up = exchange.toUpperCase();
+    if (up.includes('NASDAQ')) return 'NASDAQ';
+    if (up.includes('NYSE AMERICAN')) return 'NYSE American';
+    if (up.includes('NYSE ARCA')) return 'NYSE Arca';
+    if (up.includes('NEW YORK STOCK EXCHANGE')) return 'NYSE';
+    if (up.includes('BATS') || up.includes('CBOE')) return 'Cboe';
+    return exchange;
 }
 
 const searchStocksOrThrow = async (query?: string): Promise<StockWithWatchlistStatus[]> => {    await requireAuthenticatedUser();
@@ -434,7 +455,7 @@ export const getPopularStocks = cache(async (): Promise<PopularStocksResult> => 
             return {
                 symbol,
                 name: (profile.name || profile.ticker) as string,
-                exchange: (profile.exchange as string | undefined) || 'US',
+                exchange: normalizeExchangeLabel(profile.exchange as string | undefined) || 'US',
                 type: 'Common Stock',
                 isInWatchlist: false,
             };

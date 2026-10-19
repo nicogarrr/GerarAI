@@ -15,6 +15,10 @@ import React from "react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+// Las server actions (chat Cerebro) heredan el limite del segmento: sin esto la
+// funcion se corta antes que el backend (respuestas de 25-36 s) y el cliente
+// muestra "No se pudo completar la respuesta". 60 s es el maximo del plan Hobby.
+export const maxDuration = 60;
 
 async function getLayoutUser(): Promise<User> {
     try {

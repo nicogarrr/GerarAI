@@ -44,6 +44,7 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'rechazada',
   stale: 'desactualizada',
   draft_failed_audit: 'borrador (auditoría no superada)',
+  changes_requested: 'cambios solicitados',
 };
 
 function enumLabel(map: Record<string, string>, value: string | null | undefined): string {
@@ -313,7 +314,7 @@ export default function ThesisMemo({
         </h3>
         {hideFigures ? (
           <p className="text-sm text-gray-400">
-            Sin cifras de valoración: {modelBlocked ? 'el modelo está bloqueado' : 'la tesis es un borrador'}.
+            Sin cifras de valoración: {modelBlocked ? 'el modelo no es publicable todavía' : 'la tesis es un borrador'}. El memo completo (sección 13) puede incluir un rango indicativo parcial, que no es un valor justo.
           </p>
         ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
