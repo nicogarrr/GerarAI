@@ -1291,3 +1291,28 @@ def test_fcf_before_growth_capex_mixed_currency_is_unavailable():
     finally:
         db.close()
         cleanup_metric_test_artifacts()
+
+
+def test_fcf_before_growth_capex_rejects_negative_da_and_mixed_periods():
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        add_fact(db, company, "free_cash_flow", "100")
+        add_fact(db, company, "capital_expenditure", "-120")
+        dna = add_fact(db, company, "depreciation_amortization", "-80")
+        db.commit()
+        service = MetricCalculationService()
+        result = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
+        assert result.value is None
+        assert result.calculation_trace["reason"] == "invalid_inputs"
+        dna.value = Decimal("80")
+        dna.period = "FY2024"
+        dna.fiscal_year = 2024
+        db.commit()
+        result = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
+        assert result.value is None
+        assert result.calculation_trace["reason"] == "incoherent_periods"
+    finally:
+        db.close()
+        cleanup_metric_test_artifacts()
