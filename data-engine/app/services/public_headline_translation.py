@@ -5,6 +5,7 @@ import asyncio
 import json
 import re
 import time
+from difflib import SequenceMatcher
 from types import SimpleNamespace
 
 from app.core.config import get_settings
@@ -17,9 +18,43 @@ _cache: dict[tuple[int, str], tuple[float, dict]] = {}
 _slots = asyncio.Semaphore(2)
 
 
+# Marcas de idioma compartidas con el front (lib/news-language.ts). Regla
+# (decisión del auditor, 19-oct-2026): sin marcas claras NO es traducible,
+# salvo una señal latina-inglesa explícita: el titular en Title Case de >=3
+# palabras, convención de la prensa anglosajona («Meta Llama Beats Rivals
+# Again»). Así «Inditex bate previsiones» no gasta presupuesto ni puede
+# mostrar «Traducción automática» sobre texto ya español.
+_ENGLISH_MARK = re.compile(
+    r"\b(the|with|says|shares|stocks|earnings|reports|raises|falls|after|amid|outlook|growth|investors|market|billion|million|revenue|warns|cuts|for|and|as|to|in)\b",
+    re.IGNORECASE,
+)
+_SPANISH_MARK = re.compile(
+    r"\b(el|la|los|las|una?|de|del|que|en|para|por|con|sus|más|años?|empresa|"
+    r"acciones|según|tras|sobre|está|están|han|será|anuncia|sube|baja|informa)\b"
+    r"|[áéíóúñ]|[¿¡]",
+    re.IGNORECASE,
+)
+_TITLE_CASE_WORD = re.compile(r"\b[A-ZÁÉÍÓÚÑ][a-záéíóúñü]{2,}\b")
+
+
+def _normalized(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^\wáéíóúñü]+", " ", text.lower())).strip()
+
+
+def _nearly_identical(original: str, text: str) -> bool:
+    # Si la «traducción» apenas difiere del original, el modelo no tradujo
+    # (p. ej. devolvió el texto ya español): no se marca como traducida.
+    return SequenceMatcher(None, _normalized(original), _normalized(text)).ratio() >= 0.9
+
+
 def needs_translation(text: str) -> bool:
-    return bool(NON_LATIN.search(text) or re.search(
-        r"\b(the|with|says|shares|stocks|earnings|reports|raises|falls|after|amid|outlook|growth|investors|market|billion|million|revenue|warns|cuts|for|and|as|to|in)\b", text, re.I))
+    if NON_LATIN.search(text):
+        return True
+    if _ENGLISH_MARK.search(text):
+        return True
+    if _SPANISH_MARK.search(text):
+        return False
+    return len(_TITLE_CASE_WORD.findall(text)) >= 3
 
 
 def free_provider():
@@ -114,7 +149,8 @@ async def translate_external_headline(db, original: str, *, provider=None) -> di
                 text = payload.get("text") if isinstance(payload, dict) else None
                 if (isinstance(text, str) and 3 <= len(text.strip()) <= 500 and text.strip() != original
                         and not NON_LATIN.search(text) and not response.degraded and not response.warnings
-                        and numeric_signature(original) == numeric_signature(text)):
+                        and numeric_signature(original) == numeric_signature(text)
+                        and not _nearly_identical(original, text.strip())):
                     result = {**result, "status": "translated", "text": text.strip()}
                     break
         except Exception:

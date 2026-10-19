@@ -2,9 +2,8 @@
 import { useState } from 'react';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import { newsSummaryToShow } from '@/lib/news-summary';
+import { isTranslatable } from '@/lib/news-language';
 
-const nonLatin = /[\u0370-\u03ff\u0400-\u052f\u0600-\u06ff\u0900-\u097f\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
-const ENGLISH_MARK = /\b(the|with|says|shares|stocks|earnings|reports|raises|falls|after|amid|outlook|growth|investors|market|billion|million|revenue|warns|cuts|for|and|as|to|in)\b/i;
 
 /** Motivo estable que devuelve el motor (campo `reason` de la API) → texto
  *  honesto para la persona. Medido en prod 19-oct-2026: un fallo devolvía el
@@ -42,7 +41,7 @@ export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   if (!original) return null;
-  const translatable = nonLatin.test(original) || ENGLISH_MARK.test(original);
+  const translatable = isTranslatable(original);
   const onTranslate = () => {
     if (busy) return;
     setBusy(true);
