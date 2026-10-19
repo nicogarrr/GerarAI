@@ -7,6 +7,9 @@ import { ThemeBrainButton } from './_components/ThemeBrainButton';
 import { ThemeOrderToggle } from './_components/ThemeOrderToggle';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getMarketThemes } from '@/lib/actions/market-themes.actions';
+import { getFlowHoldings, getMoneyFlow, getMoneyFlowThemes } from '@/lib/actions/money-flows.actions';
+import type { MoneyFlow } from '@/lib/market/flows';
+import { ThemeFlow } from './_components/ThemeFlow';
 import { NA, formatMarketDate, formatPercent } from '@/lib/format';
 import {
   constituentContribution,
@@ -42,7 +45,19 @@ const TONE_CARD = {
 } as const;
 const TONE_TEXT = { up: 'text-teal-300', down: 'text-red-400', none: 'text-gray-500' } as const;
 
-function ThemeCard({ theme, order }: { theme: MarketTheme; order: ThemeOrder }) {
+type FlowHoldings = { portfolio: Set<string>; watchlist: Set<string>; unavailable: boolean };
+
+function ThemeCard({
+  theme,
+  order,
+  flow,
+  holdings,
+}: {
+  theme: MarketTheme;
+  order: ThemeOrder;
+  flow: MoneyFlow | null;
+  holdings: FlowHoldings;
+}) {
   const main = themeMetric(theme, order);
   const other = order === 'ytd' ? theme.m1 : theme.ytd;
   const tone = themeTone(main.pct);
@@ -138,6 +153,7 @@ function ThemeCard({ theme, order }: { theme: MarketTheme; order: ThemeOrder }) 
               })}
             </tbody>
           </table>
+          {flow ? <ThemeFlow flow={flow} holdings={holdings} /> : null}
           <ThemeBrainButton question={brainQuestion} />
         </div>
       </details>
@@ -157,6 +173,20 @@ export default async function TemasPage({ searchParams }: PageProps) {
 
   const themes = sortThemes(data.themes, order);
 
+  // Flujos de dinero por tema: degradan en silencio (la página se pinta igual
+  // si el endpoint no existe o el backend no responde); jamás un importe
+  // inventado en su lugar.
+  const flowIds = await getMoneyFlowThemes();
+  const [flowPayloads, holdings] = await Promise.all([
+    Promise.all(flowIds.map((item) => getMoneyFlow(item.id))),
+    getFlowHoldings(),
+  ]);
+  const flowsById = new Map<string, MoneyFlow>();
+  flowIds.forEach((item, index) => {
+    const payload = flowPayloads[index];
+    if (payload) flowsById.set(item.id, payload);
+  });
+
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-6xl flex-col gap-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -171,7 +201,13 @@ export default async function TemasPage({ searchParams }: PageProps) {
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {themes.map((theme) => (
-            <ThemeCard key={theme.id} order={order} theme={theme} />
+            <ThemeCard
+              flow={flowsById.get(theme.id) ?? null}
+              holdings={holdings}
+              key={theme.id}
+              order={order}
+              theme={theme}
+            />
           ))}
         </ul>
       )}
