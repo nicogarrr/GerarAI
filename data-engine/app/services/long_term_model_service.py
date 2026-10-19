@@ -1004,11 +1004,20 @@ class LongTermModelService:
                     points.append((item["value"] / denominator_item["value"], item["fact_ids"] + denominator_item["fact_ids"]))
             values = [value for value, _ in points]
             ids = [fact_id for _, point_ids in points[-5:] for fact_id in point_ids]
+            used = min(5, len(values))
+            # Gramatica es-ES: «últimas 1 observaciones» y «últimas 0
+            # observaciones» llegaban tal cual a la UI (F13).
+            if used == 0:
+                basis = f"sin observaciones anuales de {metric}"
+            elif used == 1:
+                basis = f"mediana de la última observación anual de {metric}"
+            else:
+                basis = f"mediana de las últimas {used} observaciones anuales de {metric}"
             return Assumption(
                 value=median(values[-5:]) if values else None,
                 unit="decimal",
                 source_type="financial_facts" if values else "missing",
-                basis=f"mediana de las últimas {min(5, len(values))} observaciones anuales de {metric}",
+                basis=basis,
                 source_fact_ids=_unique_ids(ids=ids),
                 confidence=self._confidence(fact_cache, ids),
             )
