@@ -1,5 +1,6 @@
 'use client';
 
+import { alertThesisHref } from '@/lib/alerts/card-destination';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -479,7 +480,7 @@ function AlertsManager() {
                                         {item.ticker && (
                                             <Link
                                                 className="inline-flex min-h-[44px] items-center text-xs text-teal-400 hover:text-teal-300 hover:underline"
-                                                href={`/research/${item.ticker}?view=thesis`}
+                                                href={alertThesisHref(item.ticker)}
                                             >
                                                 Revisar tesis de {item.ticker}
                                             </Link>

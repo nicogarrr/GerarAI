@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { alertCardDestination } from '../lib/alerts/card-destination.ts';
+import { alertCardDestination, alertThesisHref } from '../lib/alerts/card-destination.ts';
 
 void test('el destino principal prioriza la investigación del ticker', () => {
     assert.deepEqual(
@@ -53,3 +53,12 @@ void test('la tarjeta estira exactamente un enlace y protege el secundario', () 
 });
 
 console.log('alerts-card-stretched-link-guard: ok');
+
+void test('varias clases de acciones ("LEN, LEN.B") enlazan a la primera ficha, sin coma ni espacio', () => {
+    assert.equal(alertThesisHref('LEN, LEN.B'), '/research/LEN?view=thesis');
+    assert.equal(alertThesisHref('BRK.B'), '/research/BRK.B?view=thesis');
+    assert.deepEqual(
+        alertCardDestination({ ticker: 'LEN, LEN.B', sourceUrl: null }),
+        { href: '/research/LEN?view=thesis', external: false },
+    );
+});
