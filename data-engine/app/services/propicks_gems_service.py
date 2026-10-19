@@ -170,7 +170,7 @@ def _smart_money(
             cusip_ticker[ref.cusip[:9]] = ref.ticker_normalized
     if not cusip_ticker:
         return {}, latest
-    shares: dict[tuple[date, str, int], float] = {}
+    shares: dict[tuple[date | None, str, int], float] = {}
     for h in db.scalars(
         select(ManagerHolding)
         .where(ManagerHolding.report_date.in_([latest, prior]))
@@ -222,7 +222,7 @@ def find_gems(
         .where(InsiderTransaction.code.in_(["P", "S"]))
         .execution_options(include_all_tenants=True)
     ).all():
-        if t.value is None:
+        if t.value is None or t.issuer_ticker is None:
             continue
         insider[t.issuer_ticker] = insider.get(t.issuer_ticker, 0.0) + (
             float(t.value) if t.code == "P" else -float(t.value)

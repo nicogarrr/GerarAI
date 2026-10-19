@@ -269,8 +269,8 @@ def brier_report(db: Session) -> dict:
     base = sum(y) / n
     llm = sum((r.confidence - o) ** 2 for r, o in zip(rows, y, strict=True)) / n
     ref = sum((base - o) ** 2 for o in y) / n
-    kept = [r.outcome_return for r in rows if r.decision == "keep"]
-    vetoed = [r.outcome_return for r in rows if r.decision == "veto"]
+    kept = [r.outcome_return for r in rows if r.decision == "keep" and r.outcome_return is not None]
+    vetoed = [r.outcome_return for r in rows if r.decision == "veto" and r.outcome_return is not None]
     return {
         "n": n,
         "enough": n >= MIN_FOR_BRIER,

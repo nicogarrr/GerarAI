@@ -432,13 +432,14 @@ def run_thesis_job(run_id: int) -> None:
                 open_step.status = "succeeded"
                 open_step.finished_at = datetime.now(UTC)
             run.status = "succeeded"
-            run.result_payload = {
+            result_payload = {
                 "thesis_version_id": thesis.id,
                 "version": thesis.version,
                 "status": thesis.status,
             }
             if financial_refresh is not None:
-                run.result_payload["financial_refresh"] = financial_refresh
+                result_payload["financial_refresh"] = financial_refresh
+            run.result_payload = result_payload
             run.error_class = None
             run.error_message = None
             run.finished_at = datetime.now(UTC)
