@@ -34,6 +34,7 @@ from app.schemas import (
     FinancialRefreshResponse,
     ThesisTickersOut,
 )
+from app.services import market_change
 from app.services.async_bridge import run_from_any_context
 from app.services.company_changes_service import changes_since
 from app.services.company_enrichment_service import CompanyEnrichmentService
@@ -48,7 +49,6 @@ from app.services.driver_assumption_service import (
     DriverAssumptionService,
     driver_assumption_payload,
 )
-from app.services import market_change
 from app.services.extended_quote_service import ExtendedQuote, extended_quote_service
 from app.services.fact_source_links import attach_assumption_sources
 from app.services.financial_ingestion_service import FinancialIngestionService
