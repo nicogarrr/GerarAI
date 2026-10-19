@@ -21,6 +21,11 @@ test('research starts user context before awaiting the dashboard', () => {
 
 
 test('watchlist does not wait for the slowest extended quote', () => {
-    assert.match(watchlist, /EXTENDED_QUOTE_BUDGET_MS/);
-    assert.match(watchlist, /withinBudget\(getExtendedQuote\(item\.symbol\), EXTENDED_QUOTE_BUDGET_MS\)/);
+    // Contrato reforzado: la cotización extendida (línea decorativa) ya no se
+    // espera NI con presupuesto en el render de servidor — cada carga en frío
+    // pagaba el tope de 700 ms. La pide el cliente tras el primer pintado.
+    assert.doesNotMatch(watchlist, /getExtendedQuote/);
+    assert.doesNotMatch(watchlist, /EXTENDED_QUOTE_BUDGET_MS/);
+    const client = readFileSync('components/watchlist/ExtendedHoursLine.tsx', 'utf8');
+    assert.match(client, /getExtendedQuote\(symbol\)/);
 });

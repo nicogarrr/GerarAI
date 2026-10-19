@@ -2,12 +2,12 @@ import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus
 import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-analysis-status';
 import type { Metadata } from 'next';
 import { formatMarketCap, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
-import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, getExtendedQuote, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
-import { extendedQuoteLabel, type ExtendedQuote } from '@/lib/market/extended-quote';
+import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
+import ExtendedHoursLine from '@/components/watchlist/ExtendedHoursLine';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -45,19 +45,10 @@ interface WatchlistStock {
     priceAsOf: string | null;
     metricsNotApplicable: boolean;
     monitor: WatchlistMonitorItem | null;
-    extended: ExtendedQuote | null;
     addedAt: Date;
 }
 
 const PAGE_SIZE = 20;
-// La línea pre/post-mercado es decorativa: el TTFB de la página no puede
-// depender de la cotización extendida más lenta (Yahoo en frío: 0,3-1,7 s por
-// símbolo medido en prod). Pasado el plazo esa fila no muestra la línea
-// (igual que cuando falla la lectura), nunca un dato inventado.
-const EXTENDED_QUOTE_BUDGET_MS = 700;
-function withinBudget<T>(read: Promise<T | null>, ms: number): Promise<T | null> {
-    return Promise.race([read, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
-}
 
 export default async function WatchlistPage({
     searchParams,
@@ -77,8 +68,12 @@ export default async function WatchlistPage({
     // (cierres, luego monitor, luego símbolos) y el TTFB sumaba los tres tramos.
     const datedChangesPromise = fetchDatedChanges(pageSymbols);
     const monitorPromise = getWatchlistMonitor(pageSymbols);
+    // La línea pre/post-mercado (decorativa) NO se espera en el render:
+    // la pide el cliente tras el primer pintado (components/watchlist/
+    // ExtendedHoursLine). Antes cada carga en frío pagaba el tope de 700 ms
+    // por símbolo aunque el dato sea secundario.
     const entryPromises = pageItems.map((item) =>
-        Promise.all([getWatchlistEntryData(item.symbol), withinBudget(getExtendedQuote(item.symbol), EXTENDED_QUOTE_BUDGET_MS)]).then(
+        getWatchlistEntryData(item.symbol).then(
             (value) => ({ ok: true as const, value }),
             () => ({ ok: false as const }),
         ),
@@ -92,7 +87,7 @@ export default async function WatchlistPage({
                 // u otro emisor) y contradecía la ficha research (F253/F254).
                 const settled = await entryPromises[index];
                 if (!settled.ok) throw new Error('watchlist entry failed');
-                const [entry, extended] = settled.value;
+                const entry = settled.value;
                 // Mismo cierre datado y mismo % que Movers y Mercado.
                 const dated = entry.priceKind === 'live' ? undefined : datedChanges[item.symbol.trim().toUpperCase()];
                 const data = dated
@@ -121,7 +116,6 @@ export default async function WatchlistPage({
                     peKind: data.peKind,
                     analysis: item.analysis,
                     monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
-                    extended,
                     addedAt: item.addedAt
                 };
             } catch {
@@ -142,7 +136,6 @@ export default async function WatchlistPage({
                     peKind: null,
                     analysis: item.analysis,
                     monitor: null,
-                    extended: null,
                     addedAt: item.addedAt
                 };
             }
@@ -172,19 +165,6 @@ export default async function WatchlistPage({
     // número pelado, nunca un «US$» asumido (F253).
     const formatPriceCell = (price: number | null, currency: string | null) =>
         price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
-    // Pre/post-mercado (Yahoo, via backend propio): segunda linea bajo el
-    // precio con sesion y hora del dato; nada sin sesion extendida.
-    const ExtendedHoursLine = ({ stock }: { stock: WatchlistStock }) => {
-        const quote = stock.extended;
-        if (!quote || quote.price == null || (quote.price_session !== 'pre' && quote.price_session !== 'post')) return null;
-        return (
-            <div className="text-[10px] font-normal text-gray-500">
-                {extendedQuoteLabel(quote)}: {formatPriceCell(quote.price, stock.currency)}
-                {typeof quote.change_percent === 'number' && Number.isFinite(quote.change_percent) ? ` (${formatChangePercent(quote.change_percent)})` : ''}
-            </div>
-        );
-    };
-
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip p-4 sm:p-6">
@@ -271,7 +251,7 @@ export default async function WatchlistPage({
                                         {stock.priceKind === 'close' ? (
                                             <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</dd>
                                         ) : null}
-                                        <ExtendedHoursLine stock={stock} />
+                                        <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} />
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Próx. resultados</dt>
@@ -356,7 +336,7 @@ export default async function WatchlistPage({
                                             {stock.priceKind === 'close' ? (
                                                 <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</div>
                                             ) : null}
-                                            <ExtendedHoursLine stock={stock} />
+                                            <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} />
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {stock.changePercent === null ? (
