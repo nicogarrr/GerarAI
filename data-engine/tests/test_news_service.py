@@ -73,6 +73,45 @@ def test_is_duplicate_by_url_or_normalized_title(db):
     assert service._is_duplicate(db, company, "Different headline", "https://x.test/b") is False
 
 
+def test_ingest_strips_repeated_headline_and_source_signature(db):
+    """El cuerpo que repite el titular y la firma del medio no se duplica en
+    el título guardado (fila «Meta (META) ... Glasses Meta (META) ...
+    Glasses Simply Wall Street» vista en prod)."""
+    _company(db, "META")
+    service = NewsService()
+    item = NewsFeedItem(
+        ticker="META",
+        title="Meta (META) Unveils Next-Gen Smart Glasses at Connect",
+        text=(
+            "Meta (META) Unveils Next-Gen Smart Glasses at Connect: "
+            "the company showed new wearables during its annual event "
+            "Simply Wall Street"
+        ),
+        source="Simply Wall Street",
+        url="https://sws.example/meta-glasses",
+    )
+    result = service.ingest_news_items(db, [item], default_source="feed")
+    assert result.created == 1
+    saved_summary = result.events[0].summary
+    assert saved_summary.count("Unveils Next-Gen Smart Glasses") == 1
+    assert "Simply Wall Street" not in saved_summary
+
+
+def test_ingest_keeps_body_without_repetition_untouched(db):
+    _company(db, "AAPL")
+    service = NewsService()
+    item = NewsFeedItem(
+        ticker="AAPL",
+        title="Apple raises buyback",
+        text="The board authorized an additional program",
+        source="feed",
+        url="https://x.test/buyback",
+    )
+    result = service.ingest_news_items(db, [item], default_source="feed")
+    assert result.created == 1
+    assert "The board authorized an additional program" in result.events[0].summary
+
+
 def test_ingest_skips_duplicates_and_accounts_exactly(db):
     _company(db)
     service = NewsService()

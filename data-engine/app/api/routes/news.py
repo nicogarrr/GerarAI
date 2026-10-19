@@ -15,7 +15,11 @@ from app.services.news_headline_translation import (
     translate_headline,
     translate_summary,
 )
-from app.services.news_service import NewsService
+from app.services.news_service import (
+    NewsService,
+    is_position_change_headline,
+    position_change_cluster_title,
+)
 from app.services.public_headline_translation import translate_external_headline
 from app.services.second_order_news_service import analyze_second_order
 from app.services.ticker_news_lane import (
@@ -93,6 +97,10 @@ def news_events(
     skipped = 0
     scanned = 0
     seen_headlines: set[str] = set()
+    # Agrupación de titulares 13F (boilerplate de MarketBeat y agregadores):
+    # una fila visible por empresa y día con recuento, representada por el
+    # primer evento del grupo. En la ficha de empresa se muestran sin agrupar.
+    clusters: dict[tuple, dict] = {}
     while len(rows) < limit and scanned < _SCAN_LIMIT:
         chunk = db.execute(ordered.limit(_SCAN_CHUNK).offset(scanned)).all()
         if not chunk:
@@ -101,6 +109,7 @@ def news_events(
         for event, company in chunk:
             if _is_off_topic(event, company):
                 continue
+            item = None
             if ticker is None:
                 # Portada (sin filtro de empresa): fuera el spam legal de
                 # bufetes ("SHAREHOLDER ALERT"...) y los titulares literales
@@ -108,19 +117,42 @@ def news_events(
                 # de esa empresa, incluidas las solicitudes de bufetes.
                 if is_law_firm_solicitation(original_headline(event), event.summary):
                     continue
-                dedupe_key = _headline_dedupe_key(event)
-                if dedupe_key:
-                    if dedupe_key in seen_headlines:
-                        continue
-                    seen_headlines.add(dedupe_key)
+                headline = original_headline(event)
+                if is_position_change_headline(headline):
+                    key = (company.id if company else None, event.date.date())
+                    cluster = clusters.get(key)
+                    if cluster is None:
+                        clusters[key] = {"event": event, "company": company, "count": 1}
+                        item = ("cluster", key)
+                    else:
+                        cluster["count"] += 1
+                else:
+                    dedupe_key = _headline_dedupe_key(event)
+                    if dedupe_key:
+                        if dedupe_key in seen_headlines:
+                            continue
+                        seen_headlines.add(dedupe_key)
+                    item = (event, company)
+            else:
+                item = (event, company)
+            if item is None:
+                continue
             if skipped < offset:
                 skipped += 1
             elif len(rows) < limit:
-                rows.append((event, company))
+                rows.append(item)
         if len(chunk) < _SCAN_CHUNK:
             break
     events = []
-    for event, company in rows:
+    for item in rows:
+        cluster_count = 0
+        if isinstance(item[0], str) and item[0] == "cluster":
+            cluster = clusters[item[1]]
+            event, company = cluster["event"], cluster["company"]
+            cluster_count = cluster["count"]
+        else:
+            event, company = item
+        clustered = cluster_count > 1
         # Solo lo persistido en ingesta (F314): recomputar por peticion
         # costaba una evaluacion por noticia y podia divergir de lo
         # persistido. Eventos legacy sin assessment persistido -> nulls
@@ -134,7 +166,13 @@ def news_events(
                 "id": event.id,
                 "ticker": company.ticker if company else None,
                 "date": event.date.isoformat(),
-                "title": event.title,
+                "title": (
+                    position_change_cluster_title(
+                        company.ticker if company else None, event.source, cluster_count
+                    )
+                    if clustered
+                    else event.title
+                ),
                 "original_headline": original_headline(event),
                 "headline_translation": display_translation(event),
                 # Resumen/cuerpo ingerido con su traduccion cacheada (Nico:
@@ -150,7 +188,12 @@ def news_events(
                 "date_source": (event.metadata_ or {}).get("date_source"),
                 # False solo en titulares de display generados por CavaAI
                 # (ausente en filas legacy = titular real de la fuente).
-                "headline_from_source": (event.metadata_ or {}).get("headline_from_source", True),
+                "headline_from_source": (
+                    False
+                    if clustered
+                    else (event.metadata_ or {}).get("headline_from_source", True)
+                ),
+                "cluster_count": cluster_count if clustered else None,
                 # Carril macro GDELT (#564): None en eventos de empresa.
                 "news_lane": (event.metadata_ or {}).get("news_lane"),
                 "macro_theme": (event.metadata_ or {}).get("macro_theme"),
