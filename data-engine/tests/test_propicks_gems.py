@@ -111,3 +111,12 @@ def test_find_gems_rechaza_fundamentales_de_fy_antiguo():
         db.commit()
         results, _ = run_funnel(db)
         assert find_gems(db, results, today=today) == []
+
+
+def test_periodo_es_52_53_week_year_closing_in_january_is_previous_fy():
+    from app.services.propicks_gems_service import _periodo_es
+
+    assert _periodo_es("2025-01-03:FY") == "FY2024"
+    assert _periodo_es("2026-01-02:FY") == "FY2025"
+    assert _periodo_es("2025-12-31:FY") == "FY2025"
+    assert _periodo_es("2025-03-31:Q1") == "Q12025"

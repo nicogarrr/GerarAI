@@ -24,6 +24,7 @@ from app.models import (
 )
 from app.models.entities import InstrumentReference, ManagerHolding
 from app.services.display_es import fecha_es
+from app.services.financial_ingestion_service import _annual_fiscal_year
 from app.services.propicks_funnel_service import FunnelResult
 
 MIN_MARKET_CAP = 3e8        # below this liquidity/quality of data is poor
@@ -81,7 +82,14 @@ def _periodo_es(period: str | None) -> str:
     if ":" in period:
         end, _, fp = period.partition(":")
         if end[:4].isdigit() and fp:
-            return f"{fp}{end[:4]}"
+            year = end[:4]
+            if fp == "FY":
+                # Ejercicios 52/53 semanas que cierran el 1-7 de enero: el FY es el anterior.
+                try:
+                    year = str(_annual_fiscal_year(end, None))
+                except ValueError:
+                    pass
+            return f"{fp}{year}"
     return period
 
 
