@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+from datetime import UTC, datetime, timedelta
 from functools import partial
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -55,7 +57,45 @@ JOB_DEFAULTS = {
 }
 
 
+# Un job por intervalo corto (<= 1 h) dispara una vez poco despues de arrancar el
+# scheduler. APScheduler guarda el siguiente disparo en memoria y los intervalos
+# no disparan al arrancar: con deploys seguidos (cada reinicio reinicia el
+# contador) el rss de 15 min llego a pasar mas de una hora sin correr. Los de
+# 2 h o mas (CelesTrak, universo completo, noticias del universo) no se tocan:
+# son pesados o limitados por la fuente. El escalonado evita una rafaga y nunca
+# supera el propio intervalo del job (el de 1 min no se retrasa). Es un adelanto
+# best-effort, no una garantia de ejecucion unica: un reinicio posterior vuelve a
+# disparar y un job con max_instances=1 puede saltarse el disparo.
+STARTUP_FIRE_MAX_INTERVAL_SECONDS = 3600
+STARTUP_FIRE_JITTER_SECONDS = (30, 300)  # tope; se recorta al intervalo del job
+
+
+def _interval_seconds(trigger_args: dict) -> float:
+    return (
+        trigger_args.get("weeks", 0) * 604800
+        + trigger_args.get("days", 0) * 86400
+        + trigger_args.get("hours", 0) * 3600
+        + trigger_args.get("minutes", 0) * 60
+        + trigger_args.get("seconds", 0)
+    )
+
+
+def _startup_fire_time(trigger_args: dict, now: datetime | None = None) -> datetime | None:
+    seconds = _interval_seconds(trigger_args)
+    if seconds <= 0 or seconds > STARTUP_FIRE_MAX_INTERVAL_SECONDS:
+        return None
+    base = now or datetime.now(UTC)
+    low, high = STARTUP_FIRE_JITTER_SECONDS
+    high = min(high, seconds)
+    low = min(low, high / 2)
+    return base + timedelta(seconds=random.uniform(low, high))
+
+
 def _register(scheduler: BlockingScheduler, func, trigger: str, *, job_id: str, **trigger_args) -> None:
+    if trigger == "interval" and "next_run_time" not in trigger_args:
+        first = _startup_fire_time(trigger_args)
+        if first is not None:
+            trigger_args["next_run_time"] = first
     scheduler.add_job(
         func,
         trigger,

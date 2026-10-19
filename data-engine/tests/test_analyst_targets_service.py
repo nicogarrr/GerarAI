@@ -167,6 +167,8 @@ def test_subunit_currency_is_not_collapsed_to_the_main_currency(monkeypatch) -> 
     # CGEO.L: Yahoo da objetivos en peniques ("GBp"); "GBP" los haria x100.
     _fake_yf(monkeypatch, "GBp")
     assert svc._fetch_sync("CGEO.L")["currency"] == "GBX"
+    _fake_yf(monkeypatch, "ZAc")
+    assert svc._fetch_sync("SOL.JO")["currency"] == "ZAC"
     _fake_yf(monkeypatch, "GBP")
     assert svc._fetch_sync("X.L")["currency"] == "GBP"
     _fake_yf(monkeypatch, "usd")
