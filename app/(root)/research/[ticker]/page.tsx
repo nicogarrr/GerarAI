@@ -356,7 +356,7 @@ const FACTS_MOBILE_PAGE = 10;
 
 /** Un borrador o una tesis en revisión no enseña veredicto ni cifras (regla vigente, igual que el memo y el PDF). */
 function thesisIsPublic(status: string | null | undefined): boolean {
-  return status === 'published' || status === 'approved' || status === 'insufficient_data';
+  return status === 'published' || status === 'approved';
 }
 
 function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; refreshLabel: string; ticker: string }) {
@@ -1002,7 +1002,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 {thesisIsPublic(snapshot.latest_thesis.status) ? (
                   <p className="mt-3 text-sm leading-6 text-gray-300">{cleanThesisText(snapshot.latest_thesis.executive_summary)}</p>
                 ) : (
-                  <p className="mt-3 text-sm leading-6 text-gray-400">La v{snapshot.latest_thesis.version} está en borrador: sin veredicto ni cifras hasta que se publique.</p>
+                  <p className="mt-3 text-sm leading-6 text-gray-400">{snapshot.latest_thesis.status === 'insufficient_data' ? `La v${snapshot.latest_thesis.version} es provisional por datos insuficientes: sin veredicto ni cifras.` : `La v${snapshot.latest_thesis.version} está en borrador: sin veredicto ni cifras hasta que se publique.`}</p>
                 )}
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   {/*
