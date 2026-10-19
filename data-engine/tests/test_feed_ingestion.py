@@ -254,3 +254,57 @@ def test_configured_rss_feeds_stays_pure_without_builtin_wires():
     assert [f.url for f in configured_rss_feeds("https://three.test/rss")] == [
         "https://three.test/rss"
     ]
+
+
+def test_press_wire_feeds_carry_attribution_labels():
+    from app.services.feed_ingestion_service import PRESS_WIRE_RSS_FEEDS, PRESS_WIRE_SOURCES
+
+    labels = {feed.label for feed in PRESS_WIRE_RSS_FEEDS}
+    assert labels == {"PR Newswire", "GlobeNewswire", "Business Wire"}
+    # Las etiquetas nuevas y los <title> de canal históricos están cubiertos.
+    assert labels <= PRESS_WIRE_SOURCES
+    assert "All News Releases" in PRESS_WIRE_SOURCES
+
+
+def test_poll_rss_relabels_items_when_source_label_is_set():
+    from app.services.connectors.base import ConnectorItem, ConnectorResult
+    from app.services.feed_ingestion_service import FeedIngestionService
+
+    class FakeConnector:
+        async def poll(self, url, *, ticker=None, max_items=100):
+            return ConnectorResult(
+                source="rss",
+                items=[
+                    ConnectorItem(source="All News Releases", title="Nota", url="https://x.test/1")
+                ],
+                metadata={"feed_title": "All News Releases"},
+            )
+
+    async def run():
+        service = FeedIngestionService()
+        return await service.poll_rss(
+            "https://feeds.test/rss", connector=FakeConnector(), source_label="PR Newswire"
+        )
+
+    result = run_async(run())
+    assert [item.source for item in result.items] == ["PR Newswire"]
+    # La etiqueta original del canal sobrevive en metadata del poll.
+    assert result.metadata["feed_title"] == "All News Releases"
+
+
+def test_poll_rss_keeps_channel_title_without_source_label():
+    from app.services.connectors.base import ConnectorItem, ConnectorResult
+    from app.services.feed_ingestion_service import FeedIngestionService
+
+    class FakeConnector:
+        async def poll(self, url, *, ticker=None, max_items=100):
+            return ConnectorResult(
+                source="rss",
+                items=[ConnectorItem(source="Apple Newsroom", title="Nota", url="https://x.test/2")],
+            )
+
+    async def run():
+        return await FeedIngestionService().poll_rss("https://feeds.test/rss", connector=FakeConnector())
+
+    result = run_async(run())
+    assert [item.source for item in result.items] == ["Apple Newsroom"]

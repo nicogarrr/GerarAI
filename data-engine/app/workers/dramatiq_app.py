@@ -2142,7 +2142,7 @@ def refresh_rss_feeds(
             for feed in feeds:
                 try:
                     result = _run(
-                        service.poll_rss(feed.url, ticker=feed.ticker)
+                        service.poll_rss(feed.url, ticker=feed.ticker, source_label=feed.label)
                     )
                     if result.errors:
                         errors.extend(

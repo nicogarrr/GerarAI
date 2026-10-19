@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import PurePosixPath
 from urllib.parse import urlparse
 
@@ -22,6 +22,10 @@ from app.services.public_fetch import fetch_public_url_async
 class RSSFeed:
     url: str
     ticker: str | None = None
+    # Etiqueta de atribución para la UI: si está, sustituye al <title> del
+    # canal como `source` del evento («All News Releases» no dice nada; la
+    # agencia sí). El <title> original queda en metadata del poll.
+    label: str | None = None
 
 
 def configured_rss_feeds(value: str | None = None) -> list[RSSFeed]:
@@ -43,7 +47,8 @@ def configured_rss_feeds(value: str | None = None) -> list[RSSFeed]:
                 feeds.extend(configured_rss_feeds(entry))
             elif isinstance(entry, dict) and entry.get("url"):
                 ticker = str(entry["ticker"]).upper() if entry.get("ticker") else None
-                feeds.append(RSSFeed(url=str(entry["url"]), ticker=ticker))
+                label = str(entry["label"]).strip() if entry.get("label") else None
+                feeds.append(RSSFeed(url=str(entry["url"]), ticker=ticker, label=label))
         return _unique_feeds(feeds)
 
     for entry in raw.replace("\n", ",").split(","):
@@ -70,13 +75,31 @@ def configured_rss_feeds(value: str | None = None) -> list[RSSFeed]:
 # - GlobeNewswire devuelve 403 (Akamai) en www.globenewswire.com a clientes
 #   servidor; el espejo rss.globenewswire.com sirve el mismo feed con 200.
 PRESS_WIRE_RSS_FEEDS: tuple[RSSFeed, ...] = (
-    RSSFeed("https://www.prnewswire.com/rss/news-releases-list.rss"),
+    RSSFeed("https://www.prnewswire.com/rss/news-releases-list.rss", label="PR Newswire"),
     RSSFeed(
         "https://rss.globenewswire.com/RssFeed/orgclass/1/feedTitle/"
-        "GlobeNewswire%20-%20News%20about%20Public%20Companies"
+        "GlobeNewswire%20-%20News%20about%20Public%20Companies",
+        label="GlobeNewswire",
     ),
-    RSSFeed("https://feeds.businesswire.com/rss/home/?rss=G1QFDERJXkJeEFpRVQ=="),
-    RSSFeed("https://feeds.businesswire.com/rss/home/?rss=G1QFDERJXkJeGVtQXw=="),
+    RSSFeed("https://feeds.businesswire.com/rss/home/?rss=G1QFDERJXkJeEFpRVQ==", label="Business Wire"),
+    RSSFeed("https://feeds.businesswire.com/rss/home/?rss=G1QFDERJXkJeGVtQXw==", label="Business Wire"),
+)
+
+# Fuentes que son nota de prensa de agencia: las etiquetas actuales y los
+# <title> de canal con que se guardaron los eventos históricos. La portada
+# oculta las que no citan empresa conocida (ruido producto/lifestyle, medido
+# en prod 19-oct-2026: 24/30 eventos de «Todas» eran agencia, 23/30 sin
+# empresa); la ficha de empresa y el carril macro no se tocan.
+PRESS_WIRE_SOURCES: frozenset[str] = frozenset(
+    {
+        "PR Newswire",
+        "GlobeNewswire",
+        "Business Wire",
+        "All News Releases",
+        "GlobeNewswire - News about Public Companies",
+        "Business Wire Communications News",
+        "Business Wire Technology: Telecommunications News",
+    }
 )
 
 
@@ -120,12 +143,19 @@ class FeedIngestionService:
         ticker: str | None = None,
         max_items: int = 100,
         connector: RSSConnector | None = None,
+        source_label: str | None = None,
     ) -> ConnectorResult:
-        return await (connector or RSSConnector()).poll(
+        result = await (connector or RSSConnector()).poll(
             url,
             ticker=ticker,
             max_items=max_items,
         )
+        if source_label and result.items:
+            result = replace(
+                result,
+                items=[replace(item, source=source_label) for item in result.items],
+            )
+        return result
 
     async def poll_gdelt(
         self,

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models import Company, NewsEvent
 from app.schemas import ManualNewsRequest, ManualNewsResponse, NewsIngestRequest, NewsIngestResponse
+from app.services.feed_ingestion_service import PRESS_WIRE_SOURCES
 from app.services.news_headline_translation import (
     display_summary_translation,
     display_translation,
@@ -137,6 +138,17 @@ def news_events(
                 # repetidos. En la ficha de una empresa se muestra todo lo
                 # de esa empresa, incluidas las solicitudes de bufetes.
                 if is_law_firm_solicitation(original_headline(event), event.summary):
+                    continue
+                # Nota de prensa de agencia sin empresa detectada y fuera del
+                # carril macro: anuncios de producto/lifestyle que inundaban
+                # «Todas» (medido en prod 19-oct-2026: 24/30 de agencia,
+                # 23/30 sin empresa). Solo portada; las filas no se borran y
+                # cualquier evento con empresa detectada sigue entrando.
+                if (
+                    company is None
+                    and (event.metadata_ or {}).get("news_lane") != "macro"
+                    and (event.source or "") in PRESS_WIRE_SOURCES
+                ):
                     continue
                 headline = original_headline(event)
                 if is_position_change_headline(headline):
