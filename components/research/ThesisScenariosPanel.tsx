@@ -20,23 +20,11 @@ export function ThesisScenariosPanel({
   adrRatio: number | null | undefined;
 }) {
   const money = scenarioCurrency(currency, adrRatio);
-  if (!data || data.estado !== 'persistido') {
-    return (
-      <Panel title="Escenarios a 5 años">
-        <p className="text-sm text-gray-400">Sin proyección guardada para esta acción.</p>
-      </Panel>
-    );
-  }
+  if (!data || data.estado !== 'persistido') return null;
   const years = Array.from(
     new Set(KEYS.flatMap((key) => data.escenarios[key].proyecciones.map((row) => row.ejercicio))),
   ).sort((a, b) => a - b);
-  if (!years.length) {
-    return (
-      <Panel title="Escenarios a 5 años">
-        <p className="text-sm text-gray-400">Sin proyección guardada para esta acción.</p>
-      </Panel>
-    );
-  }
+  if (!years.length) return null;
   return (
     <Panel title="Escenarios a 5 años">
       <div className="space-y-4">
