@@ -30,3 +30,28 @@ test('legacy internals become Spanish while URLs and numeric precision survive',
   assert.ok(out.includes('https://news.google.com/a_b?x=None'));
   assert.ok(!out.includes('Duplicado'));
 });
+
+test('siglas sueltas de resúmenes legacy se traducen (roe/aum/nav)', () => {
+  // Resumen persistido por el backend antiguo: las claves sin guion bajo
+  // no las tocaba la regla snake_case y llegaban crudas (prod, 19 oct 2026).
+  const out = cleanThesisText('Tesis de CB no publicable todavía: faltan valor contable, roe, aum, nav, book_value_growth.');
+  assert.match(out, /ROE/);
+  assert.match(out, /AUM/);
+  assert.match(out, /NAV/);
+  assert.match(out, /Crecimiento del valor contable/);
+  assert.doesNotMatch(out, /\broe\b/);
+  assert.doesNotMatch(out, /\baum\b/);
+  assert.doesNotMatch(out, /_/);
+});
+
+test('la lista cerrada no inventa traducciones de prosa normal', () => {
+  assert.equal(cleanThesisText('el valor liquidativo sube con la rentabilidad'), 'el valor liquidativo sube con la rentabilidad');
+});
+
+test('las siglas dentro de URLs y query strings no se tocan', () => {
+  // Objeción del auditor a #1830: \b..\b global reescribía tokens en enlaces.
+  const url = 'ver https://x.com/nav/roe?eps=1&aum=x y www.a.com/aum';
+  assert.equal(cleanThesisText(url), url);
+  // Y el caso de prosa sigue traduciendo con la guarda activa.
+  assert.match(cleanThesisText('faltan roe, aum, nav.'), /ROE, AUM, NAV/);
+});
