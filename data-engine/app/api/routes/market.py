@@ -99,6 +99,16 @@ _YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
 from app.services.connectors.yahoo import yahoo_chart_symbol as _yahoo_chart_symbol
 
 
+def _bar_in_open_session(meta: dict, bar_ts, *, now_ts: float | None = None) -> bool:
+    """True si la barra pertenece a la sesion regular en curso (aun sin cierre)."""
+    period = (meta.get("currentTradingPeriod") or {}).get("regular") or {}
+    start, end = period.get("start"), period.get("end")
+    if not all(isinstance(v, (int, float)) for v in (start, end, bar_ts)):
+        return False
+    now_ts = time.time() if now_ts is None else now_ts
+    return start <= now_ts < end and bar_ts >= start
+
+
 def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
     """Cotización puntual via Yahoo chart API con shape Finnhub {c,d,dp,h,l,o,pc}.
 
@@ -130,10 +140,22 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
             (i for i in range(len(closes_raw) - 1, -1, -1) if closes_raw[i] is not None),
             None,
         )
+        meta = result.get("meta") or {}
+        # La barra de la sesion EN CURSO es provisional (Yahoo la rellena con el
+        # ultimo precio): no es un cierre. Se descarta para que "c"/"cd" sean
+        # el ultimo cierre oficial (medido 19-oct-2026: CGEO.L daba 4.205 con
+        # fecha 19-oct a mitad de sesion LSE; el cierre oficial era 4.255 del 16).
+        stamps_raw = result.get("timestamp") or []
+        last_bar_ts = stamps_raw[last_idx] if last_idx is not None and last_idx < len(stamps_raw) else None
+        if last_idx is not None and _bar_in_open_session(meta, last_bar_ts):
+            closes_raw = list(closes_raw)[:last_idx]
+            last_idx = next(
+                (i for i in range(len(closes_raw) - 1, -1, -1) if closes_raw[i] is not None),
+                None,
+            )
         closes = [value for value in closes_raw if value is not None]
         if last_idx is None or not closes or closes[-1] <= 0:
             return None
-        meta = result.get("meta") or {}
         last = float(closes[-1])
         previous = (
             float(closes[-2])

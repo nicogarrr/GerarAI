@@ -216,3 +216,45 @@ def test_spot_metadata_is_not_replaced_by_daily_candle():
     assert quote["live_c"] == 103.25
     assert quote["live_t"] == 1791460800
     assert quote["currency"] == "USD"
+
+
+def _session_payload(*, start, end, stamps, closes):
+    return {"chart": {"result": [{
+        "meta": {"chartPreviousClose": closes[0], "exchangeTimezoneName": "Europe/London",
+                 "currentTradingPeriod": {"regular": {"start": start, "end": end}}},
+        "timestamp": list(stamps),
+        "indicators": {"quote": [{"close": list(closes), "open": list(closes),
+                                  "high": list(closes), "low": list(closes)}]},
+    }]}}
+
+
+def _client_for(payload):
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=payload))
+    return httpx.Client(transport=transport)
+
+
+def test_open_session_bar_is_provisional_and_dropped(monkeypatch):
+    """Sesion LSE abierta: la barra de hoy NO es un cierre. c/cd = ultimo cierre oficial."""
+    start, end = 1792393200, 1792423800  # 19-oct-2026 07:00-15:30 UTC
+    monkeypatch.setattr(market.time, "time", lambda: 1792410000)  # 11:00 UTC, en sesion
+    payload = _session_payload(start=start, end=end, stamps=(1792047600, 1792134000, start),
+                               closes=(4290.0, 4255.0, 4205.0))
+    with _client_for(payload) as client:
+        data = market._fetch_yahoo_quote(client, "CGEO.L")
+    assert data["c"] == 4255.0 and data["pc"] == 4290.0
+    assert data["cd"] == "2026-10-16"
+
+
+def test_closed_session_bar_is_kept(monkeypatch):
+    start, end = 1792393200, 1792423800
+    monkeypatch.setattr(market.time, "time", lambda: end + 600)  # tras el cierre
+    payload = _session_payload(start=start, end=end, stamps=(1792047600, 1792134000, start),
+                               closes=(4290.0, 4255.0, 4220.0))
+    with _client_for(payload) as client:
+        data = market._fetch_yahoo_quote(client, "CGEO.L")
+    assert data["c"] == 4220.0 and data["cd"] == "2026-10-19"
+
+
+def test_bar_in_open_session_needs_all_fields():
+    assert market._bar_in_open_session({}, 100) is False
+    assert market._bar_in_open_session({"currentTradingPeriod": {"regular": {"start": 1, "end": 10}}}, None, now_ts=5) is False
