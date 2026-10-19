@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlalchemy import select
@@ -22,6 +23,13 @@ logger = logging.getLogger(__name__)
 _PLACEHOLDER_EXCHANGES = {None, "", "UNKNOWN", "UNKNOWN_EXCHANGE"}
 
 _PLACEHOLDER_SECTORS = {None, "", "Unknown", "UNKNOWN"}
+
+# Enfriamiento entre intentos de enriquecimiento desde /companies/ensure:
+# una ficha cuya industria Finnhub no esta en el mapa (p. ej. "Holding
+# Companies") nunca se clasifica, y sin marca cada ensure volvia a llamar a
+# Finnhub para siempre. El barrido manual (enrich_all) lo ignora: es el
+# operador quien fuerza.
+ENRICH_RETRY_COOLDOWN = timedelta(days=7)
 
 # Mapeo declarado (GICS de 11 sectores) de los valores de `finnhubIndustry`
 # observados en nuestro universo. Finnhub no expone sector: esto es una
@@ -173,8 +181,28 @@ class CompanyEnrichmentService:
         name = (company.name or "").strip()
         return not name or name.upper() == (company.ticker or "").upper() or "_" in name
 
-    def enrich(self, db: Session, company: Company, persist: bool = True) -> bool:
+    @staticmethod
+    def _in_cooldown(company: Company) -> bool:
+        last = company.enrichment_attempted_at
+        if last is None:
+            return False
+        # SQLite devuelve datetimes naive aunque la columna sea timezone=True.
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=UTC)
+        return datetime.now(UTC) - last < ENRICH_RETRY_COOLDOWN
+
+    def enrich(
+        self,
+        db: Session,
+        company: Company,
+        persist: bool = True,
+        respect_cooldown: bool = False,
+    ) -> bool:
         """Completa SOLO los campos en placeholder; los curados nunca se pisan.
+
+        Con respect_cooldown=True (la via /companies/ensure), un intento
+        reciente (ENRICH_RETRY_COOLDOWN) no llama a Finnhub otra vez: la
+        marca se estampa en cada intento, haya o no cambios.
 
         needs_enrichment dispara por cualquier placeholder (nombre, exchange,
         sector), pero la escritura es campo a campo: una ficha curada con el
@@ -184,8 +212,16 @@ class CompanyEnrichmentService:
         """
         if not self.needs_enrichment(company):
             return False
+        if respect_cooldown and self._in_cooldown(company):
+            return False
+        # Marca de intento ANTES de llamar: tambien cuenta el intento fallido
+        # o sin datos; si no, una ficha inenriquecible reintentaria en cada
+        # ensure dentro del mismo dia.
+        company.enrichment_attempted_at = datetime.now(UTC)
         profile = self._finnhub_profile(company.ticker)
         if not profile:
+            if persist:
+                db.add(company)
             return False
         changed = False
 
@@ -217,7 +253,7 @@ class CompanyEnrichmentService:
                 company.currency = currency
                 changed = True
 
-        if changed and persist:
+        if persist:
             db.add(company)
         return changed
 
@@ -234,7 +270,10 @@ class CompanyEnrichmentService:
             else:
                 not_found += 1
             time.sleep(sleep_between)
-        if enriched:
+        # enriched cubre los cambios y las marcas de intento de los fallidos:
+        # not_found cuenta intentos sin datos, y toda llamada a enrich estampa
+        # enrichment_attempted_at; commit si se llamo a la API al menos una vez.
+        if enriched or not_found:
             db.commit()
         return {
             "total": len(rows),

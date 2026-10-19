@@ -364,7 +364,9 @@ def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db))
         # Finnhub por ensure afectado; si falla, queda como estaba).
         if CompanyEnrichmentService.needs_enrichment(company):
             try:
-                CompanyEnrichmentService().enrich(db, company)
+                # Enfriamiento: una ficha inenriquecible (industria no
+                # mapeada) no llama a Finnhub en cada ensure, para siempre.
+                CompanyEnrichmentService().enrich(db, company, respect_cooldown=True)
             except Exception:  # noqa: BLE001 - el ensure nunca debe fallar por esto
                 logger.warning("enrich fallo para %s", ticker, exc_info=True)
     db.commit()
