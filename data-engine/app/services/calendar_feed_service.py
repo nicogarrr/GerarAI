@@ -98,11 +98,18 @@ def _stamp(value: datetime | None) -> str:
     return moment.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
-def build_ics(calendar: dict, *, now: datetime | None = None) -> str:
+CALNAME_BY_SCOPE = {
+    "watchlist": "Resultados de tu watchlist",
+    "followed": "Resultados de cartera y watchlist",
+}
+
+
+def build_ics(calendar: dict, *, now: datetime | None = None, scope: str = "followed") -> str:
+    calname = CALNAME_BY_SCOPE.get(scope, CALNAME_BY_SCOPE["followed"])
     lines = [
         "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//GerarAI//Calendario de resultados//ES",
         "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-        "X-WR-CALNAME:Resultados de empresas seguidas", "X-WR-TIMEZONE:Europe/Madrid",
+        f"X-WR-CALNAME:{calname}", "X-WR-TIMEZONE:Europe/Madrid",
         "REFRESH-INTERVAL;VALUE=DURATION:PT12H", "X-PUBLISHED-TTL:PT12H",
     ]
     stamp = _stamp(now)
@@ -150,4 +157,4 @@ def feed_for_token(db: Session, token: str, *, today: date | None = None) -> str
     calendar = followed_calendar(
         db, today - timedelta(days=PAST_DAYS), today + timedelta(days=FUTURE_DAYS), scope=scope
     )
-    return build_ics(calendar)
+    return build_ics(calendar, scope=scope)
