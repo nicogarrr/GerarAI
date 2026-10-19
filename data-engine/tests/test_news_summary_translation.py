@@ -247,3 +247,55 @@ async def test_chain_falls_back_after_429(db, monkeypatch):
     assert result["text"] == ES_SUMMARY
     db.refresh(row)
     assert row.metadata_["summary_translation"]["status"] == "translated"
+
+
+class SlowProvider(Provider):
+    def __init__(self, delay, text=ES_SUMMARY):
+        super().__init__(text)
+        self.delay = delay
+
+    async def complete(self, request):
+        self.calls += 1
+        await asyncio.sleep(self.delay)
+        return await super().complete(request)
+
+
+@sync_test
+async def test_total_deadline_cuts_the_chain(db, monkeypatch):
+    # Plazo total por petición: agotado, la cadena se corta y el segundo
+    # eslabón ni se llama (no más de ~15 s con el slot ocupado).
+    import app.services.news_headline_translation as m
+    monkeypatch.setattr(m, "SUMMARY_TOTAL_SECONDS", 0.05)
+    import app.services.public_headline_translation as pub
+    slow = SlowProvider(5)
+    good = Provider()
+    monkeypatch.setattr(pub, "free_provider_chain", lambda: [(slow, "m1"), (good, "m2")])
+    row = event(db)
+    result = await translate_summary(db, row.id)
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "provider_timeout"
+    assert slow.calls == 1
+    assert good.calls == 0
+
+
+@sync_test
+async def test_repeated_chain_failure_escalates_cooldown(db):
+    # Primer fallo de la cadena: 1 min. Si vuelve a fallar entera: 5 min.
+    row = event(db)
+    p = Provider(error=True)
+    await translate_summary(db, row.id, provider=p)
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["chain_failures"] == 1
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta <= timedelta(minutes=1)
+    # Simula que el cooldown ya pasó y se reintenta: vuelve a fallar.
+    past = (datetime.fromisoformat(record["created_at"]) - timedelta(minutes=2)).isoformat()
+    row.metadata_ = {**row.metadata_, "summary_translation": {**record, "status": "unavailable", "retry_after": past}}
+    db.commit()
+    await translate_summary(db, row.id, provider=p)
+    db.refresh(row)
+    record2 = row.metadata_["summary_translation"]
+    assert record2["chain_failures"] == 2
+    delta2 = datetime.fromisoformat(record2["retry_after"]) - datetime.fromisoformat(record2["created_at"])
+    assert delta2 >= timedelta(minutes=5)
