@@ -72,3 +72,73 @@ def test_spanish_skips_and_unscoped_denied():
         with pytest.raises(PermissionError):
             await service.translate_external_headline(SimpleNamespace(info={}), 'Apple reports earnings',provider=p)
     asyncio.run(run())
+
+
+class ChainProvider:
+    """Proveedor de cadena: falla o devuelve salida controlada, y registra el orden."""
+
+    def __init__(self, name, behavior):
+        self.name = name
+        self.behavior = behavior
+        self.calls = []
+
+    async def complete(self, request):
+        self.calls.append(request.model)
+        if self.behavior == 'raise':
+            raise RuntimeError('provider down')
+        if self.behavior == 'bad_numbers':
+            return SimpleNamespace(text=json.dumps({'text': 'Apple anuncia resultados 2027'}), degraded=False, warnings=())
+        return SimpleNamespace(text=json.dumps({'text': 'Apple anuncia resultados 2026'}), degraded=False, warnings=())
+
+
+def test_chain_order_first_valid_wins(monkeypatch):
+    async def run():
+        db = SimpleNamespace(info={'tenant_id': 1})
+        opencode = ChainProvider('opencode-go', 'raise')
+        groq = ChainProvider('groq', 'ok')
+        gemini = ChainProvider('gemini', 'ok')
+        monkeypatch.setattr(service, 'free_provider_chain',
+                            lambda: [(opencode, 'deepseek-v4.1-flash-free'), (groq, 'openai/gpt-oss-120b'), (gemini, 'gemini-3.5-flash-lite')])
+        result = await service.translate_external_headline(db, 'Apple reports earnings 2026')
+        assert result['status'] == 'translated' and result['text'] == 'Apple anuncia resultados 2026'
+        # OpenCode falló, Groq ganó: Gemini ni se llama.
+        assert opencode.calls == ['deepseek-v4.1-flash-free']
+        assert groq.calls == ['openai/gpt-oss-120b']
+        assert gemini.calls == []
+    asyncio.run(run())
+
+
+def test_chain_all_fail_returns_unavailable_never_invented(monkeypatch):
+    async def run():
+        db = SimpleNamespace(info={'tenant_id': 1})
+        chain = [(ChainProvider('opencode-go', 'raise'), 'm1'),
+                 (ChainProvider('groq', 'raise'), 'm2'),
+                 (ChainProvider('gemini', 'raise'), 'm3')]
+        monkeypatch.setattr(service, 'free_provider_chain', lambda: chain)
+        result = await service.translate_external_headline(db, 'Apple reports earnings 2026')
+        assert result['status'] == 'unavailable' and result['text'] is None
+        assert result['original'] == 'Apple reports earnings 2026'
+        assert all(p.calls for p, _ in chain)
+    asyncio.run(run())
+
+
+def test_chain_invalid_output_falls_through(monkeypatch):
+    async def run():
+        db = SimpleNamespace(info={'tenant_id': 1})
+        bad = ChainProvider('opencode-go', 'bad_numbers')
+        good = ChainProvider('groq', 'ok')
+        monkeypatch.setattr(service, 'free_provider_chain', lambda: [(bad, 'm1'), (good, 'm2')])
+        result = await service.translate_external_headline(db, 'Apple reports earnings 2026')
+        # Cifra cambiada por el primero (2027): se rechaza y gana el segundo.
+        assert result['status'] == 'translated' and result['text'] == 'Apple anuncia resultados 2026'
+        assert bad.calls == ['m1'] and good.calls == ['m2']
+    asyncio.run(run())
+
+
+def test_chain_empty_is_unavailable(monkeypatch):
+    async def run():
+        db = SimpleNamespace(info={'tenant_id': 1})
+        monkeypatch.setattr(service, 'free_provider_chain', lambda: [])
+        result = await service.translate_external_headline(db, 'Apple reports earnings 2026')
+        assert result['status'] == 'unavailable' and result['text'] is None
+    asyncio.run(run())
