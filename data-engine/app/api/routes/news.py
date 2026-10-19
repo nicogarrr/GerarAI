@@ -20,6 +20,7 @@ from app.services.news_headline_translation import (
 from app.services.news_service import (
     NewsService,
     is_position_change_headline,
+    is_viewer_link_only,
     position_change_cluster_title,
 )
 from app.services.news_story_cluster import (
@@ -129,6 +130,10 @@ def news_events(
         scanned += len(chunk)
         for event, company in chunk:
             if _is_off_topic(event, company):
+                continue
+            # Filas legacy sin contenido (titular y resumen = enlace del visor):
+            # no se borran, no se muestran.
+            if is_viewer_link_only(event.title, event.summary):
                 continue
             item = None
             if ticker is None:
