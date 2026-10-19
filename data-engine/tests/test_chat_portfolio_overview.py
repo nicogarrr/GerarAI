@@ -127,7 +127,7 @@ def test_ranking_refuses_to_compare_mixed_currencies(db):
 
 def test_risk_question_about_my_portfolio_is_not_answered_with_the_positions_table(db):
     a = _company(db, "AAA", "Alpha")
-    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), market_value=Decimal("300")))
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), currency="EUR", market_value=Decimal("300")))
     db.commit()
     resp = asyncio.run(ChatService().answer(db, "¿Qué riesgos tiene mi cartera?", "portfolio", None))
     assert resp.prompt_version == "portfolio-analysis-v1"
@@ -138,3 +138,17 @@ def test_risk_question_about_my_portfolio_is_not_answered_with_the_positions_tab
     # La pregunta de listado sigue por el volcado de posiciones.
     listing = asyncio.run(ChatService().answer(db, "¿Qué tengo en mi cartera?", "portfolio", None))
     assert listing.prompt_version == "portfolio-overview-v1"
+
+
+def test_analysis_never_sums_unconverted_native_values(db):
+    a = _company(db, "AAA", "Alpha")
+    b = _company(db, "BBB", "Beta")
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("1"), average_cost=Decimal("5"), currency="USD",
+                    base_currency="EUR", market_value=Decimal("1000"), market_value_base=Decimal("900")))
+    db.add(Position(tenant_id=1, company_id=b.id, quantity=Decimal("1"), average_cost=Decimal("5"), currency="USD",
+                    base_currency="EUR", market_value=Decimal("1000")))
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Qué riesgos tiene mi cartera?", "portfolio", None))
+    assert "Mayor posición: AAA" in resp.answer
+    assert "100 %" in resp.answer
+    assert "BBB" in resp.answer.split("Sin valor en moneda base")[1]

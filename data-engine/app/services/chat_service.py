@@ -1217,9 +1217,17 @@ class ChatService:
         if len(bases) > 1:
             return None
 
+        base = next(iter(bases))
+
         def _value(pos: Position) -> float:
-            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
-            return float(raw or 0)
+            # Solo valor en moneda base: o el convertido, o el nativo cuando la
+            # posicion ya esta en la base. Un nativo en otra divisa sin
+            # convertir NO se suma (mezclaria divisas): cuenta como sin valor.
+            if pos.market_value_base is not None:
+                return float(pos.market_value_base or 0)
+            if (pos.currency or base) == base:
+                return float(pos.market_value or 0)
+            return 0.0
 
         valued = [(pos, comp, _value(pos)) for pos, comp in rows if _value(pos) > 0]
         unvalued = [comp.ticker for pos, comp in rows if _value(pos) <= 0]
@@ -1256,8 +1264,8 @@ class ChatService:
             + "."
         )
         if unvalued:
-            lines.append(f"- Sin valor guardado (no entran en los porcentajes): {', '.join(sorted(unvalued))}.")
-        as_of = max(pos.as_of for pos, _ in rows)
+            lines.append(f"- Sin valor en moneda base (no entran en los porcentajes): {', '.join(sorted(unvalued))}.")
+        as_of = min(pos.as_of for pos, _ in rows)
         answer = (
             "Cifras calculadas de tus posiciones guardadas "
             f"(datos a {_fmt_date_es(as_of.isoformat())}), sin modelo de lenguaje. "
