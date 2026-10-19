@@ -1,4 +1,4 @@
-"""Bounded, verified-free OpenCode chain for manual thesis debates."""
+"""Bounded OpenCode -> confirmed-no-billing AI Studio debate chain."""
 from __future__ import annotations
 
 import logging
@@ -7,6 +7,7 @@ import httpx
 
 from app.core.config import Settings, get_settings
 from app.llm.cascade import _FALL_THROUGH, CascadeProvider
+from app.llm.chat_provider import GEMINI_MODELS, _gemini_backup
 from app.llm.contracts import LLMRequest
 from app.llm.errors import LLMError, ProviderHTTPError, ProviderResponseError, ProviderTransportError
 from app.llm.factory import _opencode_go, _pin_to_model
@@ -67,4 +68,15 @@ def create_free_interactive_provider(settings: Settings | None = None, *, client
                                     reasoning_effort="low"))
     for member in members:
         member.interactive_quota_breaker = True
+    # AI Studio is free only with confirmed no billing, not merely by model ID.
+    # Reuse the existing guard; never add Gemini to the OpenCode free registry.
+    if settings.gemini_chat_fallback_enabled:
+        for model in GEMINI_MODELS:
+            gemini = _gemini_backup(settings, client, timeout_seconds=8,
+                                    total_timeout_seconds=9, max_output_tokens=4000)
+            assert gemini is not None
+            from app.llm.routing import TaskModelRouter
+            gemini.interactive_quota_breaker = True
+            gemini.model_router = TaskModelRouter(model, _pin_to_model(model), "gemini")
+            members.append(gemini)
     return FreeInteractiveProvider(members, total_timeout_seconds=28)

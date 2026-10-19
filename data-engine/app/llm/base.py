@@ -177,7 +177,7 @@ class LLMProvider(ABC):
             if response.status_code < 400:
                 return response
             self._log_http_error(response, headers, payload, attempt)
-            if interactive_quota and self.name == "opencode-go" and response.status_code == 429:
+            if interactive_quota and response.status_code == 429:
                 _interactive_quota_breaker[breaker_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
                 raise ProviderHTTPError(self.name, 429)
             if _is_free_tier_origin_error(response):
