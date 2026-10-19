@@ -1351,7 +1351,18 @@ class ThesisService:
             if block.get("detail"):
                 timestamp = block.get("last_refreshed_at")
                 return f"{block['source']}: {block['detail']}" + (f" Fecha: {timestamp}." if timestamp else "")
-            return f"{block.get('source')}, {block.get('facts_imported')} hechos: {metrics}"
+            imported = block.get("facts_imported") or 0
+            already = block.get("already_present") or 0
+            if imported == 0 and already:
+                # Refresco sin novedades: los hechos ya estaban importados.
+                # El copy anterior («0 hechos: <metricas>») se contradecia:
+                # decia 0 hechos y a la vez listaba metricas cubiertas.
+                base = f"{block.get('source')}: {already} hechos ya importados, sin novedades"
+            else:
+                base = f"{block.get('source')}, {imported} hechos importados"
+                if already:
+                    base += f" ({already} ya presentes)"
+            return base + (f". Métricas cubiertas: {metrics}" if metrics else "")
         if key == "market":
             parts = []
             if block.get("price") is not None:
