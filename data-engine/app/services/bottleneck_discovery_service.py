@@ -46,7 +46,7 @@ from app.models import (
     KnowledgeDocument,
     NewsEvent,
 )
-from app.services.bottleneck_service import THEMES, extract_themes, fold
+from app.services.bottleneck_service import MIN_SOURCES, THEMES, extract_themes, fold
 from app.services.budget import BudgetController, BudgetExceededError
 from app.services.llm_output_guard import LLMOutputRejected, complete_guarded
 from app.services.llm_router import route_model
@@ -54,7 +54,6 @@ from app.services.llm_router import route_model
 logger = logging.getLogger(__name__)
 
 TASK = "bottleneck_discovery"
-MIN_SOURCES = 2  # mismo umbral que "detectado" en GET /bottlenecks
 DAILY_QUOTA = 10  # candidatos guardados por tenant y dia UTC
 MAX_EVIDENCE = 8
 MAX_EVIDENCE_TEXT = 700

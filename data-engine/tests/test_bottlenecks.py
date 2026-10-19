@@ -18,7 +18,7 @@ from app.models import (
     NewsEvent,
     Tenant,
 )
-from app.services.bottleneck_service import Evidence, aggregate, extract_themes, refresh_signals
+from app.services.bottleneck_service import MIN_SOURCES, Evidence, aggregate, extract_themes, refresh_signals
 
 
 @pytest.mark.parametrize("text,theme", [
@@ -198,6 +198,9 @@ def test_endpoint_read_only_and_typed_openapi(db):
         assert response.status_code == 200
         assert len(response.json()["signals"]) == 6
         assert all(s["status"] == "N/D" for s in response.json()["signals"])
+        # El umbral vigente viaja en el payload: la UI etiqueta «n de min_sources»
+        # con el numero real, nunca hardcodeado.
+        assert response.json()["min_sources"] == MIN_SOURCES
     assert db.scalars(select(BottleneckSignal)).all() == []
     assert "BottleneckSignalOut" in app.openapi()["components"]["schemas"]
 

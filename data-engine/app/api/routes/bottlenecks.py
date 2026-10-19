@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models import BottleneckDiscovery, BottleneckSignal
 from app.services.bottleneck_discovery_service import NO_DATA, distinct_sources, resolve_evidence
+from app.services.bottleneck_service import MIN_SOURCES as DETECTION_MIN_SOURCES
 from app.services.bottleneck_service import THEMES
 
 router = APIRouter()
@@ -34,6 +35,9 @@ class BottleneckSignalOut(BaseModel):
 
 class BottlenecksOut(BaseModel):
     signals: list[BottleneckSignalOut]
+    # Umbral vigente de "detectado": la UI etiqueta «n de min_sources fuentes
+    # independientes» con el numero real, nunca hardcodeado.
+    min_sources: int = DETECTION_MIN_SOURCES
     method: str = "Extracción determinista de documentos y titulares almacenados"
     limitation: str = "Se requieren al menos dos autores o editores independientes; no implica una recomendación de inversión"
 
@@ -65,7 +69,7 @@ def list_bottlenecks(db: Session = Depends(get_db)) -> BottlenecksOut:
             first_seen=row.first_seen if row else None,
             last_seen=row.last_seen if row else None,
             n_sources=row.n_sources if row else 0,
-            status="detectado" if row and row.n_sources >= 2 else "N/D",
+            status="detectado" if row and row.n_sources >= DETECTION_MIN_SOURCES else "N/D",
         ))
     return BottlenecksOut(signals=signals)
 

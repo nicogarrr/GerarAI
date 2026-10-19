@@ -35,6 +35,12 @@ THEMES = {
     "Centros de datos": r"\b(?:data cent(?:er|re)s?|centros? de datos)\b",
     "Industria aeroespacial": r"\b(?:satellites?|launches?|aerospace|aircraft|satelites?|lanzamientos?|aeroespacial|aviones)\b",
 }
+# Umbral de "detectado": fuentes (autores/editores) independientes necesarias.
+# Unico dueno del numero: la ruta GET /bottlenecks, el descubrimiento y la
+# etiqueta de la UI leen esta constante (Tester 6: un "2 de N" hardcodeado
+# mentiria en cuanto el umbral cambiara).
+MIN_SOURCES = 2
+
 CONSTRAINT = re.compile(
     r"\b(?:shortages?|scarcity|supply constraints?|capacity constraints?|capacity bottlenecks?|"
     r"capacity shortages?|capacity constrained|limited capacity|insufficient capacity|capacity at (?:its )?limit|"

@@ -5294,6 +5294,11 @@ export interface components {
              * @default Extracción determinista de documentos y titulares almacenados
              */
             method: string;
+            /**
+             * Min Sources
+             * @default 2
+             */
+            min_sources: number;
             /** Signals */
             signals: components["schemas"]["BottleneckSignalOut"][];
         };

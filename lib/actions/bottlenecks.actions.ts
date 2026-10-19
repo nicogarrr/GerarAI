@@ -23,6 +23,8 @@ export interface BottleneckSignalView {
 
 export interface BottlenecksState {
   signals: BottleneckSignalView[];
+  /** Umbral vigente de 'detectado' en el backend: la etiqueta N/D lo muestra. */
+  min_sources: number;
   method: string;
   limitation: string;
 }
