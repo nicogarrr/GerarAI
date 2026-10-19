@@ -83,6 +83,10 @@ class DiscoveryOut(BaseModel):
     evidence: list[DiscoveryEvidenceOut]
     model: str
     created_at: datetime
+    # Contexto vivo del tema: un candidato guardado persiste aunque el tema
+    # caiga despues bajo el umbral de deteccion; la UI lo etiqueta.
+    theme_detected: bool
+    theme_last_seen: datetime | None
 
 
 class DiscoveriesOut(BaseModel):
@@ -113,6 +117,10 @@ def list_discoveries(
         BottleneckDiscovery.created_at.desc(), BottleneckDiscovery.id.desc()
     ).limit(limit).offset(offset)).all()
     resolved = resolve_evidence(db, [i for row in rows for i in row.evidence_ids or []])
+    signals = {
+        signal.theme: signal
+        for signal in db.scalars(select(BottleneckSignal).where(BottleneckSignal.tenant_id == tenant))
+    }
     items = []
     for row in rows:
         # Fuentes realmente distintas: varios chunks de un mismo filing cuentan una vez.
@@ -124,9 +132,12 @@ def list_discoveries(
                 resolved[ident] for ident in (row.evidence_ids or []) if ident in resolved
             )
         ]
+        signal = signals.get(row.theme)
         items.append(DiscoveryOut(
             id=row.id, theme=row.theme, ticker=row.ticker, label="INFERIDO", reasoning=row.reasoning,
-            evidence=evidence, model=row.model, created_at=row.created_at))
+            evidence=evidence, model=row.model, created_at=row.created_at,
+            theme_detected=bool(signal and signal.n_sources >= DETECTION_MIN_SOURCES),
+            theme_last_seen=signal.last_seen if signal else None))
     return DiscoveriesOut(items=items, total=total, limit=limit, offset=offset,
                           has_more=offset + len(items) < total)
 
