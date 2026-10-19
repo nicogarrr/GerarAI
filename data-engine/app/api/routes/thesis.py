@@ -435,14 +435,19 @@ def _audio_context(db: Session, ticker: str) -> tuple[str, str]:
         db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=is_draft
     )
     text = thesis_audio_service.memo_to_speech_text(markdown, ticker=company.ticker, version=thesis.version)
-    return thesis_audio_service.audio_key(company.ticker, thesis.version, text), text
+    return thesis_audio_service.audio_key(
+        company.ticker,
+        thesis.version,
+        draft=is_draft,
+        data_day=thesis_audio_service.data_day(latest_data_at),
+    ), text
 
 
 @router.get("/{ticker}/audio/status")
 def thesis_audio_status(ticker: str, db: Session = Depends(get_db)) -> dict:
     """Estado del audio: ready | pending | missing | unavailable | error."""
     key, _ = _audio_context(db, ticker)
-    return {"state": thesis_audio_service.status(key), "key": key}
+    return {**thesis_audio_service.status_info(key), "key": key}
 
 
 @router.post("/{ticker}/audio", status_code=202)

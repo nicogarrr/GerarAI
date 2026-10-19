@@ -1,13 +1,12 @@
 """Audio de la tesis: texto plano del memo -> sidecar TTS local (Piper, EUR 0).
 
 El sidecar (`cavaai-tts`) sintetiza una tesis a la vez y cachea el mp3 por
-clave. La clave lleva ticker, version y un hash del texto: si el memo cambia, el
-audio se regenera. Aqui solo se prepara el texto y se habla con el sidecar; no
+clave. La clave lleva ticker, version, estado y el dia del ultimo dato: si cambian
+los datos (otro dia) el audio se regenera; ademas el sidecar caduca el mp3 a las 24 h. Aqui solo se prepara el texto y se habla con el sidecar; no
 hay LLM ni proveedores de pago.
 """
 from __future__ import annotations
 
-import hashlib
 import os
 import re
 
@@ -40,10 +39,45 @@ def memo_to_speech_text(markdown: str, *, ticker: str, version: int) -> str:
     return ("\n".join([head, *lines]))[:MAX_CHARS]
 
 
-def audio_key(ticker: str, version: int, speech_text: str) -> str:
-    digest = hashlib.sha256(speech_text.encode("utf-8")).hexdigest()[:10]
+_FORMAT = "f2"  # subir al cambiar memo_to_speech_text para invalidar la cache
+
+
+def audio_key(
+    ticker: str,
+    version: int,
+    speech_text: str = "",
+    *,
+    draft: bool = False,
+    data_day: str = "nd",
+) -> str:
+    """Clave estable: ticker + version + estado + dia del ultimo dato + formato.
+
+    No depende del texto (el memo lleva datos vivos y su hash cambiaba entre
+    llamadas). ``data_day`` (YYYYMMDD) cambia solo cuando llegan datos de otro
+    dia, asi que el audio no queda con cifras viejas indefinidamente.
+    """
     safe = re.sub(r"[^A-Za-z0-9]", "", ticker.upper())[:20] or "X"
-    return f"{safe}-v{int(version)}-{digest}"
+    day = re.sub(r"[^0-9a-z]", "", str(data_day).lower())[:8] or "nd"
+    return f"{safe}-v{int(version)}-{'d' if draft else 'p'}-{day}-{_FORMAT}"
+
+
+def data_day(latest_data_at) -> str:
+    return latest_data_at.strftime("%Y%m%d") if latest_data_at is not None else "nd"
+
+
+def status_info(key: str) -> dict:
+    """{state, generated_at?}: generated_at (ISO UTC) cuando el mp3 esta listo."""
+    try:
+        resp = httpx.get(f"{TTS_URL}/status/{key}", timeout=_TIMEOUT)
+        resp.raise_for_status()
+        body = resp.json()
+    except (httpx.HTTPError, ValueError):
+        return {"state": "unavailable"}
+    state = str(body.get("state") or "missing")
+    info = {"state": "error" if state.startswith("error") else state}
+    if body.get("generated_at"):
+        info["generated_at"] = str(body["generated_at"])
+    return info
 
 
 def status(key: str) -> str:

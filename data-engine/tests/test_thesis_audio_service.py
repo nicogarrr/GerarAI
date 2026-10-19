@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from app.services import thesis_audio_service as svc
 
 
@@ -11,12 +13,63 @@ def test_memo_to_speech_text_strips_markdown_and_tables():
     assert not any("|" in line or "http" in line for line in lines)
 
 
-def test_audio_key_changes_with_text_and_version():
-    a = svc.audio_key("BRK.B", 1, "hola")
-    assert a == svc.audio_key("BRK.B", 1, "hola")
-    assert a != svc.audio_key("BRK.B", 1, "hola!")
-    assert a != svc.audio_key("BRK.B", 2, "hola")
-    assert a.startswith("BRKB-v1-")
+def test_audio_key_is_stable_per_version_state_and_data_day():
+    a = svc.audio_key("BRK.B", 1, "texto A", data_day="20261019")
+    assert a == svc.audio_key("BRK.B", 1, "texto B distinto", data_day="20261019")
+    assert a != svc.audio_key("BRK.B", 2, data_day="20261019")
+    assert a != svc.audio_key("BRK.B", 1, draft=True, data_day="20261019")
+    assert a != svc.audio_key("BRK.B", 1, data_day="20261020")
+    assert a.startswith("BRKB-v1-p-20261019-")
+
+
+def test_data_day_truncates_to_the_day():
+    from datetime import datetime
+
+    assert svc.data_day(datetime(2026, 10, 19, 23, 59)) == "20261019"
+    assert svc.data_day(None) == "nd"
+
+
+def test_status_info_returns_generated_at(monkeypatch):
+    class R:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"state": "ready", "generated_at": "2026-10-19T20:00:00+00:00"}
+
+    monkeypatch.setattr(svc.httpx, "get", lambda *a, **k: R())
+    assert svc.status_info("K") == {"state": "ready", "generated_at": "2026-10-19T20:00:00+00:00"}
+
+
+def test_sidecar_expires_cache_after_24h(tmp_path, monkeypatch):
+    import os
+    import sys
+    import time
+    import types
+
+    # El sidecar carga piper/lameenc y un modelo al importarse: se stubbean.
+    fake_piper = types.ModuleType("piper")
+    fake_piper.PiperVoice = type(
+        "PiperVoice",
+        (),
+        {"load": staticmethod(lambda p: types.SimpleNamespace(config=types.SimpleNamespace(sample_rate=22050)))},
+    )
+    monkeypatch.setitem(sys.modules, "piper", fake_piper)
+    monkeypatch.setitem(sys.modules, "lameenc", types.ModuleType("lameenc"))
+    src = (Path(__file__).parent.parent / "tts_sidecar" / "server.py").read_text()
+    src = src.replace('CACHE = "/w/cache"', f'CACHE = r"{tmp_path}"').replace(
+        "ThreadingHTTPServer((\"0.0.0.0\", 8080), H).serve_forever()", "pass"
+    )
+    mod = types.ModuleType("tts_server_under_test")
+    mod.__file__ = "server.py"
+    exec(compile(src.split("ThreadingHTTPServer((")[0], "server.py", "exec"), mod.__dict__)  # noqa: S102
+    path = mod._path("K1")
+    Path(path).write_bytes(b"mp3")
+    assert mod._fresh("K1") is True
+    old = time.time() - 25 * 3600
+    os.utime(path, (old, old))
+    assert mod._fresh("K1") is False
+    assert not os.path.exists(path)
 
 
 def test_status_is_unavailable_when_sidecar_is_down(monkeypatch):
@@ -56,7 +109,7 @@ def test_audio_context_uses_draft_memo_for_unpublished_thesis(monkeypatch):
     key, text = route._audio_context(None, "EXEL")
     assert calls["draft"] is True
     assert "Margen de seguridad" not in text and "Compra" not in text
-    assert key.startswith("EXEL-v3-")
+    assert key.startswith("EXEL-v3-d-")
 
 
 def test_audio_post_does_not_requeue_while_pending(monkeypatch):
