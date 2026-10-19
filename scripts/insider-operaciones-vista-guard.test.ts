@@ -38,7 +38,11 @@ describe('Insider operaciones: vista del agregado por empresa', () => {
     assert.ok(vista.includes('rows_without_date'), 'las filas sin fecha se declaran');
     assert.ok(vista.includes('amended_filings'), 'las enmiendas 4/A no enlazables se declaran');
     assert.ok(vista.includes('doble conteo'), 'el aviso de enmiendas advierte el posible doble conteo de 4/A');
-    assert.ok(vista.includes('precio medio n/d'), 'el precio medio parcial no se muestra como dato');
+    assert.ok(vista.includes('precio medio N/D'), 'el precio medio parcial no se muestra como dato');
+    assert.ok(!vista.includes('n/d'), 'la convención del repo es N/D mayúscula');
+    assert.ok(vista.includes('minMark(totals.sell)'), 'el total vendido mínimo se marca en la cifra');
+    assert.ok(vista.includes('minMark(totals.buy)'), 'el total comprado mínimo se marca en la cifra');
+    assert.ok(vista.includes('avgText(row.sell)') && vista.includes('avgText(row.buy)'), 'móvil declara el medio N/D igual que desktop');
     assert.match(vista, /No es «sin\s+actividad»: es lo que el monitor aún no ha guardado/);
     assert.match(vista, /status !== 'ok'/, 'estado de error honesto');
   });
