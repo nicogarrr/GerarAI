@@ -9012,16 +9012,7 @@ export interface operations {
     calendar_feed_public_api_calendar_feed__filename__get: {
         parameters: {
             query?: never;
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
+            header?: never;
             path: {
                 filename: string;
             };

@@ -190,6 +190,19 @@ from app.api.routes.telegram_link import relay_router  # noqa: E402
 
 app.include_router(relay_router)
 
+# Feed ICS publico (token en la URL, sin identidad firmada): fuera de
+# private_dependencies, con limite por IP. Las rutas /api/calendar/feed
+# GET/POST/DELETE siguen autenticadas dentro de research_api_router.
+from app.api.routes.calendar import public_router as calendar_public_router  # noqa: E402
+from app.core.rate_limit import enforce_public_ip_rate_limit  # noqa: E402
+
+app.include_router(
+    calendar_public_router,
+    prefix="/api/calendar",
+    tags=["calendar"],
+    dependencies=[Depends(enforce_public_ip_rate_limit)],
+)
+
 app.include_router(
     research_api_router,
     prefix="/api",
