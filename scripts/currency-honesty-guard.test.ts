@@ -121,8 +121,8 @@ const ALLOWED: Array<{ file: string; snippet: string; why: string }> = [
     },
     {
         file: 'app/(root)/screener/page.tsx',
-        snippet: "currency: 'USD' }).format(i.price)",
-        why: "F152: el backend etiqueta la serie (unit === 'usd': Bitcoin/oro/plata) y esa rama formatea en es-ES con US$ explícito; un nivel de índice va como número plano.",
+        snippet: "formatPrice(i.price, 'USD')",
+        why: "F152: el backend etiqueta la serie (unit === 'usd': Bitcoin/oro/plata). Solo esa rama; un nivel de índice va como número plano.",
     },
     {
         file: 'components/insider/InsiderSignalsView.tsx',
