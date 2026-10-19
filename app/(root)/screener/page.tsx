@@ -78,7 +78,7 @@ function VistaTabs({ vista }: { vista: Vista }) {
     <nav aria-label="Vista de mercado" className="flex flex-nowrap gap-1.5 overflow-x-auto">
       {VISTAS.map((v) => (
         <Button key={v.id} asChild variant={vista === v.id ? 'default' : 'outline'} size="sm" className="min-h-[36px] shrink-0 rounded-md px-3 text-sm">
-          <Link aria-current={vista === v.id ? 'page' : undefined} href={v.href}>{v.label}</Link>
+          <Link aria-current={vista === v.id ? 'page' : undefined} href={v.href} scroll={false}>{v.label}</Link>
         </Button>
       ))}
     </nav>
@@ -200,12 +200,13 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
         ) : null}
       </div>
 
-      <VistaTabs vista={vista} />
-
-      <SectorSelect
-        options={SECTORES.map((s) => ({ value: s.en, label: etiquetaSector(s.en) }))}
-        value={sector}
-      />
+      <div aria-label="Filtros de mercado" className="flex min-w-0 flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/30 p-2 sm:flex-row sm:items-center sm:justify-between">
+        <VistaTabs vista={vista} />
+        <SectorSelect
+          options={SECTORES.map((s) => ({ value: s.en, label: etiquetaSector(s.en) }))}
+          value={sector}
+        />
+      </div>
 
       <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="min-w-0 border-gray-800 lg:col-span-2">
@@ -360,12 +361,12 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
               <>
                 <div className="space-y-3">
                   {validIndices.map((i) => (
-                    <div key={i.symbol} className="flex min-w-0 items-center justify-between gap-3">
-                      <span className="min-w-0 flex-1 text-gray-300">{i.name}</span>
+                    <div key={i.symbol} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1">
+                      <span className="min-w-0 break-words text-gray-300">{i.name}</span>
                       <div className="text-right">
                         <span className="font-semibold text-gray-100">{formatIndexValue(i)}{i.unit === 'index' ? ' ptos.' : ''}</span>
-                        <div className="text-[10px] text-gray-500">{quoteObserved(i.priceAsOf, 'daily_candle_open')}</div>
                       </div>
+                      <div className="col-span-2 text-right text-[10px] text-gray-500">{quoteObserved(i.priceAsOf, 'daily_candle_open')}</div>
                     </div>
                   ))}
                   {validIndices.length === 0 && <p className="text-sm text-gray-500">Sin datos de índices</p>}

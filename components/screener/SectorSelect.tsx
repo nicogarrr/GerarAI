@@ -14,7 +14,7 @@ export default function SectorSelect({ options, value }: { options: SectorOption
             <select
                 id="screener-sector"
                 value={value}
-                onChange={(event) => router.push(`/screener?sector=${encodeURIComponent(event.target.value)}`)}
+                onChange={(event) => router.push(`/screener?sector=${encodeURIComponent(event.target.value)}`, { scroll: false })}
                 className="h-9 w-full min-w-0 rounded-md border border-gray-700 bg-gray-900 px-3 text-sm text-gray-200 sm:w-auto sm:min-w-[260px]"
             >
                 {options.map((option) => (
