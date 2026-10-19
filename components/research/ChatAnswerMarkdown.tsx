@@ -11,6 +11,9 @@ export default function ChatAnswerMarkdown({ text }: { text: string }) {
   return (
     <div className="text-sm leading-7 text-gray-300 [&>p]:my-1">
       <ReactMarkdown
+        // Nunca imágenes de la respuesta: una URL de imagen del motor sería una
+        // petición remota al cargar la ficha (rastreo/exfiltración por URL).
+        disallowedElements={['img']}
         components={{
           strong: ({ node, ...props }) => <strong className="font-semibold text-gray-100" {...props} />,
           ul: ({ node, ...props }) => <ul className="list-disc space-y-1 pl-5" {...props} />,
