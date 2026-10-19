@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
-import { formatDate, formatNumber, formatPrice } from '@/lib/format';
+import { formatDate, formatMarketCapUsd, formatNumber, formatPrice } from '@/lib/format';
 import type { InsiderFeedResult, InsiderFeedSignal, InsiderFeedTransaction } from '@/lib/actions/insider.actions';
 import { insiderName, insiderRole, isInstitutionalInsiderName, sideLabel } from '@/lib/insider/format';
 
@@ -144,8 +144,8 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
 
             <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {[
-                    ['Compras', `${formatNumber(totals.buy_count, { maximumFractionDigits: 0 })} · ${usd(totals.buy_value)}`],
-                    ['Ventas', `${formatNumber(totals.sell_count, { maximumFractionDigits: 0 })} · ${usd(totals.sell_value)}`],
+                    ['Compras', `${formatNumber(totals.buy_count, { maximumFractionDigits: 0 })} · ${typeof totals.buy_value === 'number' ? formatMarketCapUsd(totals.buy_value) : '—'}`],
+                    ['Ventas', `${formatNumber(totals.sell_count, { maximumFractionDigits: 0 })} · ${typeof totals.sell_value === 'number' ? formatMarketCapUsd(totals.sell_value) : '—'}`],
                     ['Clusters', formatNumber(feed.clusters.length, { maximumFractionDigits: 0 })],
                     ['Compras CEO/CFO', formatNumber(feed.c_suite_buys.length, { maximumFractionDigits: 0 })],
                 ].map(([label, value]) => (

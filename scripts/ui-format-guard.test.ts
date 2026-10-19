@@ -50,7 +50,7 @@ describe('formato numérico es-ES', () => {
   it('usa coma decimal en números, porcentajes e importes', () => {
     assert.equal(formatNumber(-0.8), '-0,8');
     assert.equal(formatPercent(-0.008, { digits: 2 }), '-0,80\u00a0%');
-    assert.equal(formatMoney(1234.5), '1.234,50\u00a0US$');
+    assert.equal(formatMoney(1234.5), '$1,234.50');
     assert.equal(formatMoney(3127.58, 'EUR'), '3.127,58\u00a0€');
     assert.equal(formatMoney(1477.2, 'EUR'), '1.477,20\u00a0€');
   });

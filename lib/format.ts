@@ -113,7 +113,7 @@ export function formatConfidence(value: NumericInput, fallback: string = NA): st
 }
 
 /**
- * Importe monetario con locale es-ES (1.234,56 US$ / 1.234,56 €).
+ * Importe monetario: USD en inglés ($1,234.56, como el resto de la app); otras divisas en es-ES (1.234,56 €).
  */
 export function formatMoney(
   value: NumericInput,
@@ -123,7 +123,7 @@ export function formatMoney(
 ): string {
   const parsed = toFinite(value);
   if (parsed === null) return fallback;
-  return new Intl.NumberFormat(FORMAT_LOCALE, {
+  return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : FORMAT_LOCALE, {
     style: 'currency',
     currency,
     maximumFractionDigits: 2,
@@ -481,4 +481,41 @@ export function marginOfSafetyDisplay(
     const m = typeof margin === 'string' ? Number(margin) : margin;
     if (m === null || m === undefined || Number.isNaN(m)) return NA;
     return formatPercent(m);
+}
+
+
+const KEEP_UPPER = new Set(['ADR', 'ADS', 'ETF', 'REIT', 'SA', 'NV', 'AG', 'SE', 'ASA']);
+const NAME_SUFFIXES: Record<string, string> = {
+  INC: 'Inc', CORP: 'Corp', LTD: 'Ltd', PLC: 'plc', CO: 'Co', LLC: 'LLC', LP: 'LP',
+  HOLDINGS: 'Holdings', GROUP: 'Group', TECHNOLOGIES: 'Technologies',
+};
+
+/**
+ * Nombre de empresa legible: los proveedores a veces lo mandan todo en
+ * mayúsculas («APPLE INC»). Si el nombre ya mezcla mayúsculas y minúsculas se
+ * respeta tal cual; si viene todo en mayúsculas se pasa a «Apple Inc», dejando
+ * las siglas de hasta tres letras (IBM, AMD) sin tocar.
+ */
+export function formatCompanyName(value: string | null | undefined): string {
+  const raw = (value ?? '').trim();
+  if (!raw) return NA;
+  if (raw !== raw.toUpperCase()) return raw;
+  const fixWord = (word: string): string => {
+    if (!word) return word;
+    if (NAME_SUFFIXES[word]) return NAME_SUFFIXES[word];
+    if (KEEP_UPPER.has(word)) return word;
+    if (word.length <= 3 || /[&\d]/.test(word)) return word;
+    return word[0] + word.slice(1).toLowerCase();
+  };
+  return raw
+    .split(/(\s+)/)
+    .map((part) => {
+      if (!part.trim()) return part;
+      // respeta guiones y barras: «COCA-COLA» -> «Coca-Cola», «CORP/ADR» -> «Corp/ADR»
+      return part
+        .split(/([-/.,]+)/)
+        .map((piece, idx) => (idx % 2 ? piece : fixWord(piece)))
+        .join('');
+    })
+    .join('');
 }

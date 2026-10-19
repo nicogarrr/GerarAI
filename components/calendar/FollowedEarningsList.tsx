@@ -34,7 +34,9 @@ export function FollowedEarningsRow({ event }: { event: FollowedEarningsEvent })
                     <span className="font-mono text-xs text-gray-500">{event.ticker}</span>
                     {session ? (
                         <span className="rounded bg-gray-800 px-1.5 py-0.5 text-xs font-medium text-gray-200">{session}</span>
-                    ) : null}
+                    ) : (
+                        <span className="rounded bg-gray-800 px-1.5 py-0.5 text-xs text-gray-400">Hora por confirmar</span>
+                    )}
                     {label ? <span>{label}</span> : null}
                     {event.confirmed === false ? (
                         <span className="rounded border border-amber-800/60 px-1.5 py-0.5 text-xs text-amber-300">Estimada</span>

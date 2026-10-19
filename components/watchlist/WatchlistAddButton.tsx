@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCompanyName } from '@/lib/format';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Loader2, Plus, Search } from 'lucide-react';
@@ -144,7 +145,7 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
                                 className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-gray-800/60"
                             >
                                 <div className="min-w-0">
-                                    <div className="truncate text-sm font-medium text-gray-200">{stock.name}</div>
+                                    <div className="truncate text-sm font-medium text-gray-200">{formatCompanyName(stock.name)}</div>
                                     <div className="truncate text-xs text-gray-500">
                                         {stock.symbol} · {stock.exchange}
                                     </div>
