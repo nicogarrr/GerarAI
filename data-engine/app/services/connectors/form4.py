@@ -405,6 +405,8 @@ def parse_form4_xml(source: str | bytes) -> dict:
                     "value": float(value) if value is not None else None,
                     "date": tx_date.isoformat() if tx_date else None,
                     "is_derivative": is_derivative,
+                    # RSU vs PSU: dos concesiones del mismo tamano no son duplicados.
+                    "security_title": (_text(node, "securityTitle/value") or "").strip() or None,
                     "rule_10b5_1": _rule_10b5_1(node, footnotes),
                 }
             )

@@ -72,3 +72,32 @@ def test_fetch_raises_when_html_has_no_raw_variant():
 def test_fetch_still_rejects_non_sec_hosts():
     with pytest.raises(ValueError, match="sec.gov"):
         fetch_filing_xml("https://example.com/xslF345X06/form4.xml", client=_FakeClient({}))
+
+
+def test_derivative_rows_keep_security_title_so_equal_grants_are_distinguishable():
+    from app.services.connectors.form4 import parse_form4_xml
+    from app.services.insider_persistence import _data_quality
+
+    def row(title: str, shares: str) -> str:
+        return (
+            "<derivativeTransaction>"
+            f"<securityTitle><value>{title}</value></securityTitle>"
+            "<transactionDate><value>2026-05-30</value></transactionDate>"
+            "<transactionCoding><transactionCode>A</transactionCode></transactionCoding>"
+            f"<transactionAmounts><transactionShares><value>{shares}</value></transactionShares>"
+            "<transactionPricePerShare><value>0</value></transactionPricePerShare>"
+            "<transactionAcquiredDisposedCode><value>A</value></transactionAcquiredDisposedCode>"
+            "</transactionAmounts></derivativeTransaction>"
+        )
+
+    xml = (
+        "<ownershipDocument><issuer><issuerCik>0000050863</issuerCik><issuerName>INTEL</issuerName>"
+        "<issuerTradingSymbol>INTC</issuerTradingSymbol></issuer>"
+        "<reportingOwner><reportingOwnerId><rptOwnerCik>1</rptOwnerCik><rptOwnerName>Katouzian Aliyar</rptOwnerName>"
+        "</reportingOwnerId></reportingOwner>"
+        f"<derivativeTable>{row('Restricted Stock Units', '32729')}{row('Performance Stock Units', '32729')}</derivativeTable>"
+        "</ownershipDocument>"
+    )
+    txs = parse_form4_xml(xml)["transactions"]
+    assert [t["security_title"] for t in txs] == ["Restricted Stock Units", "Performance Stock Units"]
+    assert _data_quality(txs[1])["security_title"] == "Performance Stock Units"
