@@ -1218,9 +1218,12 @@ class ThesisService:
                 f"Motor: {term_es(trace.get('engine', 'unknown'))} "
                 f"(base: {_code_es(trace.get('valuation_basis', 'indicative_assumptions'))}).\n\n"
                 f"{self._range_lines(valuation)}\n\n"
-                f"Supuestos documentados (NO son datos reportados): {supuestos}.\n\n"
+                f"Supuestos del motor de valoración (NO son datos reportados): {supuestos}. "
+                "N/D significa que este motor no los pudo fijar; el modelo a largo plazo "
+                "usa otros supuestos, con su procedencia en la sección 22.\n\n"
                 f"DCF inverso frente a precio de mercado: ver sección 14.\n\n"
-                f"Aún falta antes de publicar:\n{missing or '- nada listado'}\n\n"
+                "Aún falta antes de publicar:\n"
+                f"{missing or '- este motor no lista inputs faltantes; revisa los datos pendientes de la sección 21'}\n\n"
                 f"{trace.get('notice', '')}"
             )
 
