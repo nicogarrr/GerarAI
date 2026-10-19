@@ -16,8 +16,8 @@ const carteraSection = {
     ],
 };
 
-const flatten = (sections: { items: { children?: unknown[] }[] }[]) =>
-    sections.flatMap((section) => section.items.flatMap((item) => (item.children ? [item, ...(item.children as never[])] : [item]))) as never[];
+const flatten = (sections: { items: unknown[] }[]) =>
+    sections.flatMap((section) => section.items.flatMap((raw) => { const item = raw as { children?: unknown[] }; return item.children ? [item, ...item.children] : [item]; })) as never[];
 
 test('escribir el nombre de la sección («cartera») encuentra su grupo', () => {
     // QA prod 19 oct: "cartera" devolvía "Sin resultados" aunque Cartera es un
