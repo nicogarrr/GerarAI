@@ -51,6 +51,8 @@ export interface InsiderFilingTransaction {
     code?: string | null;
     /** Derivado (opciones) vs acciones; explica tramos M duplicados. */
     is_derivative?: boolean | null;
+    /** Titulo del valor en el Form 4 (RSU, PSU, opcion...): distingue concesiones del mismo tamano. */
+    security_title?: string | null;
     /** Operacion declarada bajo plan 10b5-1 (checkbox o nota al pie del Form 4). */
     rule_10b5_1?: boolean | null;
     shares?: number | null;

@@ -115,6 +115,9 @@ def insider_filings(
                             "officer_title": tx.officer_title,
                             "code": tx.code,
                             "is_derivative": bool(tx.is_derivative),
+                            "security_title": (tx.data_quality or {}).get("security_title")
+                            if isinstance(tx.data_quality, dict)
+                            else None,
                             "rule_10b5_1": bool(tx.rule_10b5_1),
                             "shares": tx.shares,
                             "price": tx.price,

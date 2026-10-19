@@ -45,7 +45,11 @@ def _data_quality(tx: dict) -> dict:
         flags.append("missing_or_zero_price")
     if tx.get("multi_reporter"):
         flags.append("joint_filing_attribution")
-    return {"flags": flags}
+    quality: dict = {"flags": flags}
+    title = str(tx.get("security_title") or "").strip()
+    if title:
+        quality["security_title"] = title[:120]
+    return quality
 
 
 def persist_filing(
