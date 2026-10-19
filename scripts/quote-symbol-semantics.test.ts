@@ -96,3 +96,10 @@ void test('sin evidencia de listado (fila vacía): sin precio', () => {
     assert.equal(quoteSymbolFor({ exchange: '', currency: '' }, 'ACME'), null);
     assert.equal(quoteSymbolFor({}, 'ACME'), null);
 });
+
+void test('Londres: solo el simbolo de listado explicito (CGEO.L) cotiza; el pelado no', () => {
+    assert.equal(quoteSymbolFor({ exchange: 'LSE', currency: 'GBX' }, 'CGEO.L'), 'CGEO.L');
+    assert.equal(quoteSymbolFor({ exchange: 'LONDON STOCK EXCHANGE', currency: 'GBX' }, 'CGEO.L'), 'CGEO.L');
+    assert.equal(quoteSymbolFor({ exchange: 'LSE', currency: 'GBX' }, 'CGEO'), null);
+    assert.equal(quoteSymbolFor({ exchange: 'LONDON STOCK EXCHANGE', currency: 'USD' }, 'SHEL'), null);
+});
