@@ -93,7 +93,7 @@ def companies_needing_history_backfill(
     pasado: las metricas de cartera median ventanas de dias con pinta de
     anos. Estas son las candidatas a backfill.
     """
-    ids = list({int(id_) for id_ in company_ids})
+    ids = sorted({int(id_) for id_ in company_ids})
     if not ids:
         return []
     today = today or datetime.now(UTC).date()
@@ -140,3 +140,43 @@ def backfill_company_history(
     written = upsert_prices(db, company, bars)
     db.commit()
     return {"status": "ok", "bars_written": written, "period": period}
+
+
+# Escalonado entre backfills: una importacion puede estrenar N companias y
+# N tareas en paralelo contra Yahoo dispararian el rate limit de la fuente.
+BACKFILL_STAGGER_MS = 60_000
+
+
+def _send_backfill(
+    company_id: int, tenant_id: int | None, user_id: str | None, delay_ms: int
+) -> None:
+    from app.workers.dramatiq_app import backfill_company_price_history
+
+    backfill_company_price_history.send_with_options(
+        args=(company_id,),
+        kwargs={"tenant_id": tenant_id, "user_id": user_id},
+        delay=delay_ms,
+    )
+
+
+def enqueue_price_backfills(
+    db: Session,
+    company_ids: Iterable[int],
+    *,
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+    stagger_ms: int = BACKFILL_STAGGER_MS,
+    sender: Callable[[int, "int | None", "str | None", int], None] = _send_backfill,
+    today: date | None = None,
+) -> int:
+    """Encola backfills ESCALONADOS para las companias sin historial profundo.
+
+    Devuelve cuantas tareas se encolaron. El delay incremental (0, stagger,
+    2*stagger, ...) evita que una importacion con N companias nuevas dispare
+    N llamadas simultaneas contra la fuente (rate limit).
+    """
+    enqueued = 0
+    for company_id in companies_needing_history_backfill(db, company_ids, today=today):
+        sender(company_id, tenant_id, user_id, enqueued * stagger_ms)
+        enqueued += 1
+    return enqueued

@@ -927,24 +927,20 @@ class IBKRImportService:
         # importacion ya confirmada.
         price_backfills_enqueued = 0
         try:
-            from app.services.market_close_sync import (
-                companies_needing_history_backfill,
-            )
-            from app.workers.dramatiq_app import backfill_company_price_history
+            from app.services.market_close_sync import enqueue_price_backfills
 
-            for company_id in companies_needing_history_backfill(
-                db, imported_company_ids
-            ):
-                backfill_company_price_history.send(
-                    company_id,
-                    tenant_id=(
-                        db.info["tenant_id"]
-                        if type(db.info.get("tenant_id")) is int
-                        else None
-                    ),
-                    user_id=str(db.info["user_id"]) if db.info.get("user_id") else None,
-                )
-                price_backfills_enqueued += 1
+            # Escalonado interno: N companias nuevas no disparan N llamadas
+            # simultaneas contra Yahoo (delay incremental por tarea).
+            price_backfills_enqueued = enqueue_price_backfills(
+                db,
+                imported_company_ids,
+                tenant_id=(
+                    db.info["tenant_id"]
+                    if type(db.info.get("tenant_id")) is int
+                    else None
+                ),
+                user_id=str(db.info["user_id"]) if db.info.get("user_id") else None,
+            )
         except Exception:  # noqa: BLE001 - cola caida: la importacion ya es valida
             db.rollback()
         return {

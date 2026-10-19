@@ -136,3 +136,49 @@ def test_companies_needing_history_backfill_one_grouped_query(db):
     )
     db.commit()
     assert companies_needing_history_backfill(db, [company.id], today=today) == [company.id]
+
+
+def test_enqueue_price_backfills_staggers_sends_and_skips_covered(db):
+    """Una importacion con N companias nuevas no puede disparar N llamadas
+    simultaneas contra Yahoo: delays incrementales y solo para las que no
+    tienen historial profundo."""
+    from app.services.market_close_sync import enqueue_price_backfills
+
+    for ticker in ("AAA", "BBB", "CCC", "DDD"):
+        db.add(
+            Company(
+                ticker=ticker, name=ticker, exchange="NASDAQ", currency="USD",
+                sector="S", industry="I", company_type="holding",
+                valuation_model="unassigned", special_sources=[], special_risks=[],
+                factor_tags=[],
+            )
+        )
+    db.flush()
+    ids = {
+        c.ticker: c.id
+        for c in db.scalars(select(Company).where(Company.ticker.in_(["AAA", "BBB", "CCC", "DDD"])))
+    }
+    # DDD ya tiene historial profundo: no se encola.
+    db.add(
+        MarketPrice(
+            company_id=ids["DDD"], date=date(2025, 1, 6), open=Decimal("1"),
+            high=Decimal("1"), low=Decimal("1"), close=Decimal("1"),
+            adj_close=Decimal("1"), source="yfinance",
+        )
+    )
+    db.commit()
+
+    sent = []
+    n = enqueue_price_backfills(
+        db,
+        list(ids.values()),
+        stagger_ms=60_000,
+        sender=lambda cid, tenant, user, delay: sent.append((cid, tenant, user, delay)),
+        today=date(2026, 10, 16),
+        tenant_id=7,
+        user_id="u1",
+    )
+    assert n == 3
+    assert [delay for *_ , delay in sent] == [0, 60_000, 120_000]
+    assert {cid for cid, *_ in sent} == {ids["AAA"], ids["BBB"], ids["CCC"]}
+    assert all(tenant == 7 and user == "u1" for _, tenant, user, _ in sent)
