@@ -521,6 +521,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/analyst-targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Analyst Targets
+         * @description Per-firm analyst price targets (Yahoo Finance via yfinance, free and
+         *     unofficial). Every row carries its source and date; a failed or empty
+         *     source is reported as such, never filled in.
+         */
+        get: operations["company_analyst_targets_api_companies__ticker__analyst_targets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/changes-since": {
         parameters: {
             query?: never;
@@ -3706,6 +3728,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/screeners/metric-coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Metric Coverage
+         * @description Metric names with data for at least one company.
+         *
+         *     The screener UI uses this to only suggest metrics that can actually
+         *     match something; see ScreenerService.metric_coverage.
+         */
+        get: operations["metric_coverage_api_screeners_metric_coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/screeners/real": {
         parameters: {
             query?: never;
@@ -4863,6 +4908,71 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** AnalystConsensus */
+        AnalystConsensus: {
+            /** High */
+            high?: number | null;
+            /** Low */
+            low?: number | null;
+            /** Mean */
+            mean?: number | null;
+            /** Median */
+            median?: number | null;
+        };
+        /** AnalystTargetRow */
+        AnalystTargetRow: {
+            /** Action */
+            action?: string | null;
+            /** Date */
+            date: string;
+            /** Firm */
+            firm: string;
+            /** Price Target */
+            price_target: number;
+            /** Prior Target */
+            prior_target?: number | null;
+            /** Rating */
+            rating?: string | null;
+            /**
+             * Source
+             * @default Yahoo Finance (no oficial), agregado de analistas
+             */
+            source: string;
+            /** Upside Percent */
+            upside_percent?: number | null;
+        };
+        /** AnalystTargets */
+        AnalystTargets: {
+            consensus?: components["schemas"]["AnalystConsensus"] | null;
+            /** Fetched At */
+            fetched_at: number;
+            /** Note */
+            note?: string | null;
+            /** Reference Price */
+            reference_price?: number | null;
+            /** Reference Price Source */
+            reference_price_source?: string | null;
+            /**
+             * Rows
+             * @default []
+             */
+            rows: components["schemas"]["AnalystTargetRow"][];
+            /**
+             * Source
+             * @default Yahoo Finance (no oficial), agregado de analistas
+             */
+            source: string;
+            /** Source Url */
+            source_url?: string | null;
+            /**
+             * Status
+             * @default unavailable
+             * @enum {string}
+             */
+            status: "available" | "empty" | "unavailable";
+            /** Symbol */
+            symbol: string;
         };
         /** AssistantCitation */
         AssistantCitation: {
@@ -6806,6 +6916,8 @@ export interface components {
             event_date_source?: string | null;
             /** Event Form */
             event_form?: string | null;
+            /** Event Headline */
+            event_headline?: string | null;
             /** Fingerprint */
             fingerprint: string;
             /** Id */
@@ -8855,6 +8967,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_analyst_targets_api_companies__ticker__analyst_targets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalystTargets"];
                 };
             };
             /** @description Validation Error */
@@ -16950,6 +17102,46 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    metric_coverage_api_screeners_metric_coverage_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

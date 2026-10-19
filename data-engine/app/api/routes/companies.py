@@ -35,6 +35,7 @@ from app.schemas import (
     ThesisTickersOut,
 )
 from app.services import market_change
+from app.services.analyst_targets_service import AnalystTargets, analyst_targets_service
 from app.services.async_bridge import run_from_any_context
 from app.services.company_changes_service import changes_since
 from app.services.company_enrichment_service import CompanyEnrichmentService
@@ -86,6 +87,14 @@ router = APIRouter()
 
 
 MAX_SNAPSHOT_BATCH_TICKERS = 50
+
+
+@router.get("/{ticker}/analyst-targets", response_model=AnalystTargets)
+async def company_analyst_targets(ticker: str) -> AnalystTargets:
+    """Per-firm analyst price targets (Yahoo Finance via yfinance, free and
+    unofficial). Every row carries its source and date; a failed or empty
+    source is reported as such, never filled in."""
+    return await analyst_targets_service.get(ticker)
 
 
 @router.get("/{ticker}/extended-quote", response_model=ExtendedQuote)
