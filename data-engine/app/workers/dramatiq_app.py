@@ -1886,6 +1886,24 @@ def sync_official_closes(
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=600_000)
+def refresh_earnings_calendar(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Fechas de resultados de cartera + watchlist (Yahoo calendarEvents + NASDAQ)."""
+    from app.services.earnings_dates_service import refresh_earnings_dates
+
+    db = _session(tenant_id, user_id)
+    try:
+        return {"actor": "refresh_earnings_calendar", **refresh_earnings_dates(db)}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("refresh_earnings_calendar", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
 def backfill_company_price_history(
     company_id: int,
