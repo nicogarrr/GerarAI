@@ -22,16 +22,29 @@ def last_sec_refresh(db: Session, company: Company) -> datetime | None:
         return None
 
 
+_US_EXCHANGE_RE = re.compile(
+    r"\b(?:NASDAQ(?:GS|GM|CM)?|NEW YORK STOCK EXCHANGE|NYSE(?:ARCA)?|AMEX|ARCA)\b"
+)
+
+
+def sec_eligible(company: Company) -> bool:
+    """Identidad SEC verificable: CIK propio o ticker USD en bolsa US.
+
+    Sin esta guarda un ticker europeo pelado (SAN, COV) resolveria en el
+    registro US a su gemelo homonimo y contaminaria los fundamentales. La
+    usa tanto el refresco por demanda como el backfill programado para no
+    encolar jamas una compania que no pueda tener hechos SEC."""
+    # Do not send a bare European ticker to the US registry as its US namesake.
+    return bool(company.cik) or (
+        company.currency == "USD" and bool(_US_EXCHANGE_RE.search(company.exchange.upper()))
+    )
+
+
 async def refresh_free_financials(db: Session, company: Company, *, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     previous = last_sec_refresh(db, company)
     base = {"provider": "SEC", "last_refreshed_at": previous.isoformat() if previous else None, "facts_imported": 0}
-    # Do not send a bare European ticker to the US registry as its US namesake.
-    us_exchange = bool(re.search(
-        r"\b(?:NASDAQ(?:GS|GM|CM)?|NEW YORK STOCK EXCHANGE|NYSE(?:ARCA)?|AMEX|ARCA)\b",
-        company.exchange.upper(),
-    ))
-    if not company.cik and not (company.currency == "USD" and us_exchange):
+    if not sec_eligible(company):
         return {**base, "status": "skipped", "reason": "emisor_no_sec"}
     stored = int(db.scalar(select(func.count(FinancialFact.id)).where(
         FinancialFact.company_id == company.id, FinancialFact.source_type == "SEC",
