@@ -141,9 +141,7 @@ function TarjetaConcentracion({ top }: { top?: RegimeTopTen }) {
         ) : (
           <>
             <p className="text-sm text-gray-500">Sin datos</p>
-            {top?.detail ?? top?.reason ? (
-              <p className="text-xs text-gray-500">{top.detail ?? top.reason}</p>
-            ) : null}
+            {motivoConcentracionSinDatos(top)}
             {top?.snapshot_as_of ? (
               <p className="text-xs text-gray-500">Snapshot consultado: {formatMarketDate(top.snapshot_as_of)}</p>
             ) : null}
@@ -152,6 +150,27 @@ function TarjetaConcentracion({ top }: { top?: RegimeTopTen }) {
       </CardContent>
     </Card>
   );
+}
+
+// El backend devuelve `reason` (código estable) y `detail` (diagnóstico para
+// operación: puede llevar rutas del servidor o nombres de variables de
+// entorno, p. ej. «SP500_FACTSHEET_DIR sin definir» o snapshots antiguos con
+// «/data/...»). En pantalla solo texto para la persona usuaria.
+const MOTIVO_CONCENTRACION_SIN_DATOS: Record<string, string> = {
+  no_snapshot_in_disk: 'El factsheet del S&P 500 aún no está cargado; aparecerá en la próxima sincronización.',
+  snapshot_dir_not_configured: 'El factsheet del S&P 500 no está disponible en este momento.',
+  snapshot_integrity_failed: 'El factsheet del S&P 500 no pasó la verificación de integridad; sin datos hasta la próxima sincronización.',
+  snapshot_vintage_after_requested_date: 'El factsheet disponible es posterior a la fecha consultada; no describe el índice en esa fecha.',
+  requested_date_invalid: 'Sin fecha de consulta válida no se puede leer el factsheet del S&P 500.',
+  snapshot_too_stale_for_requested_date: 'El último factsheet del S&P 500 es demasiado antiguo para la fecha de hoy; sin datos hasta que se actualice.',
+  index_weights_not_published_by_source: 'El factsheet no publica el peso de los mayores constituyentes.',
+};
+
+function motivoConcentracionSinDatos(top?: RegimeTopTen) {
+  if (!top?.reason && !top?.detail) return null;
+  const motivo = (top.reason && MOTIVO_CONCENTRACION_SIN_DATOS[top.reason])
+    ?? 'El factsheet del S&P 500 no está disponible en este momento.';
+  return <p className="text-xs text-gray-500">{motivo}</p>;
 }
 
 function TarjetaBeta({ beta }: { beta?: RegimeStatusBlock }) {
