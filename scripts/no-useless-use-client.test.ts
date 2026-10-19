@@ -93,6 +93,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'app/(root)/inversores/_components/SyncPortfoliosButton.tsx': 'useState, jsx-onClick',
   'app/(root)/ownership/SyncButton.tsx': 'useTransition, useState, jsx-onClick',
   'app/(root)/temas/_components/ThemeBrainButton.tsx': 'jsx-onClick, browser:window',
+  'app/(root)/temas/_components/ThemeOrderToggle.tsx': 'next-navigation:useRouter',
   'app/global-error.tsx': 'jsx-onClick',
   'components/ErrorBoundary.tsx': 'jsx-onClick, browser:window, jsx-spread',
   'components/GlossaryTerm.tsx': 'importa cliente: components/ui/tooltip.tsx',

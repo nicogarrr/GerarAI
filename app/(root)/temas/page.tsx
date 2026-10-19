@@ -4,6 +4,7 @@ import { TrendingDown, TrendingUp } from 'lucide-react';
 
 import BackendOffline from '@/components/system/BackendOffline';
 import { ThemeBrainButton } from './_components/ThemeBrainButton';
+import { ThemeOrderToggle } from './_components/ThemeOrderToggle';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getMarketThemes } from '@/lib/actions/market-themes.actions';
 import { NA, formatMarketDate, formatPercent } from '@/lib/format';
@@ -155,24 +156,12 @@ export default async function TemasPage({ searchParams }: PageProps) {
   }
 
   const themes = sortThemes(data.themes, order);
-  const link = (target: ThemeOrder, label: string) => (
-    <Link
-      aria-current={order === target ? 'page' : undefined}
-      className={`inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium ${order === target ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-100'}`}
-      href={target === 'ytd' ? '/temas' : '/temas?orden=1m'}
-    >
-      {label}
-    </Link>
-  );
 
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-6xl flex-col gap-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold text-gray-100">Temas</h1>
-        <nav aria-label="Ordenar temas" className="flex gap-1">
-          {link('ytd', 'YTD')}
-          {link('1m', '1M')}
-        </nav>
+        <ThemeOrderToggle order={order} />
       </header>
 
       {themes.length === 0 ? (
