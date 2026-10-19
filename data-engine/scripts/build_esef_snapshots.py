@@ -9,6 +9,12 @@ snapshots de emisores cuyo nombre legal resuelve contra la tabla REVIEWED de
 cnmv_mapping: ningun ticker se asigna por aproximacion; los no resueltos quedan
 listados en el manifest como "unresolved", nunca inventados.
 
+Ademas de los paises del indice se construyen snapshots desde PAQUETES ESEF
+del emisor (tabla reviewed de esef_package_sources) para paises que el indice
+no cubre (Irlanda no tiene filings en filings.xbrl.org): se descarga el zip
+ESMA publicado por el emisor y se parsea el iXBRL con esef_ixbrl, con la
+misma salida normalizada y sha256 real del paquete como procedencia.
+
 Uso:
     python scripts/build_esef_snapshots.py --out data/esef_snapshots \
         --country ES --fetched-at 2026-09-24
@@ -30,9 +36,98 @@ from app.services.connectors.esef import (
     EsefFiling,
     normalize_xbrl_json,
 )
-from app.services.esef_issuer_mapping import resolve_ticker_for_country
+from app.services.esef_issuer_mapping import (
+    resolve_issuer_by_lei,
+    resolve_ticker_for_country,
+)
+from app.services.esef_package_sources import REVIEWED_PACKAGES
 
 SOURCE = "filings.xbrl.org (XBRL International ESEF filing index), xBRL-JSON render"
+
+
+def _write_snapshot(out: Path, payload: dict) -> None:
+    path = out / "snapshots" / f"{payload['lei']}.json"
+    path.write_text(json.dumps(payload))
+    facts = payload.get("facts", {})
+    n = sum(len(u) for c in facts.values() for u in c.values())
+    print(f"{payload['ticker']} ({payload['entity_name']}): {len(facts)} conceptos, "
+          f"{n} entradas, {len(payload.get('periods') or [])} filings, "
+          f"period {payload.get('period_end')} -> {path}")
+
+
+async def _fetch_package(url: str) -> bytes:
+    import httpx
+
+    async with httpx.AsyncClient(
+        timeout=180, follow_redirects=True,
+        headers={"User-Agent": "Mozilla/5.0 (ESEF reviewed snapshot builder)"},
+    ) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.content
+
+
+async def build_package_payloads(fetched_at: str, fetch=None) -> dict[str, dict]:
+    """Snapshots desde paquetes ESEF reviewed del emisor (indice no cubre IE).
+
+    El LEI declarado dentro del documento debe coincidir con el de la tabla;
+    si no, el paquete se descarta entero (nunca se asigna a ojo)."""
+    import hashlib
+    import io
+    import zipfile
+
+    from app.services.connectors.esef_ixbrl import parse_ixbrl_facts
+
+    fetch = fetch or _fetch_package
+    by_lei: dict[str, list] = {}
+    for src_pkg in REVIEWED_PACKAGES:
+        by_lei.setdefault(src_pkg.lei, []).append(src_pkg)
+
+    payloads: dict[str, dict] = {}
+    for lei, sources in sorted(by_lei.items()):
+        issuer = resolve_issuer_by_lei(lei)
+        if issuer is None:
+            continue  # tabla de paquetes sin emisor reviewed: no se construye
+        normalized_docs = []
+        periods = []
+        latest_sha = latest_name = ""
+        for src_pkg in sorted(sources, key=lambda s: s.period_end):
+            blob = await fetch(src_pkg.url)
+            sha = hashlib.sha256(blob).hexdigest()
+            with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+                reports = [n for n in zf.namelist()
+                           if n.lower().endswith(".xhtml") and "reports/" in n.lower()]
+                if not reports:
+                    print(f"paquete sin informe xhtml: {src_pkg.url} (descartado)")
+                    continue
+                name = max(reports, key=lambda n: zf.getinfo(n).file_size)
+                with zf.open(name) as fh:
+                    parsed = parse_ixbrl_facts(fh)
+            if parsed.get("entity_lei") and parsed["entity_lei"] != lei:
+                print(f"LEI del documento {parsed['entity_lei']} != {lei}: "
+                      f"paquete descartado ({src_pkg.url})")
+                continue
+            normalized_docs.append(parsed["facts"])
+            periods.append(src_pkg.period_end)
+            # orden ascendente por period_end: el ultimo procesado es el mas reciente
+            latest_sha, latest_name = sha, name
+        if not normalized_docs:
+            continue
+        facts = merge_facts(normalized_docs)
+        payloads[lei] = {
+            "lei": lei,
+            "ticker": issuer.ticker,
+            "entity_name": issuer.legal_name,
+            "period_end": max(periods),
+            "periods": sorted(periods, reverse=True),
+            "fxo_id": latest_name.rsplit("/", 1)[-1],
+            "sha256": latest_sha,
+            "fetched_at": fetched_at,
+            "package_urls": {s.period_end: s.url for s in sources},
+            "facts": facts,
+        }
+    return payloads
+
 
 
 def latest_filing_per_lei(filings: list[EsefFiling]) -> dict[str, EsefFiling]:
@@ -99,7 +194,8 @@ def merge_facts(normalized_docs: list[dict]) -> dict:
     return merged
 
 
-async def build(out: Path, countries: str | list[str], fetched_at: str, client: EsefClient, max_filings: int = 5) -> dict:
+async def build(out: Path, countries: str | list[str], fetched_at: str, client: EsefClient,
+                max_filings: int = 5, package_fetcher=None) -> dict:
     """Snapshots ESEF para uno o varios paises (p.ej. ["ES", "NL"]) en un
     unico manifest: correr paises por separado sobrescribia el manifest y
     dejaba solo el ultimo pais. Cada pais resuelve contra SU tabla
@@ -112,6 +208,15 @@ async def build(out: Path, countries: str | list[str], fetched_at: str, client: 
         for lei, issuer_filings in filings_per_lei(filings, max_filings).items():
             selected.setdefault(lei, []).extend(issuer_filings)
     (out / "snapshots").mkdir(parents=True, exist_ok=True)
+
+    # Paquetes del emisor solo cuando el llamante pasa fetcher: los tests y
+    # los builds de indice puro no hacen red extra.
+    package_payloads = (
+        await build_package_payloads(fetched_at, fetch=package_fetcher)
+        if package_fetcher is not None else {}
+    )
+    for lei, payload in package_payloads.items():
+        _write_snapshot(out, payload)
 
     issuers: dict[str, dict] = {}
     unresolved: dict[str, str] = {}
@@ -144,8 +249,7 @@ async def build(out: Path, countries: str | list[str], fetched_at: str, client: 
             "fetched_at": fetched_at,
             "facts": facts,
         }
-        path = out / "snapshots" / f"{lei}.json"
-        path.write_text(json.dumps(payload))
+        _write_snapshot(out, payload)
         issuers[lei] = {
             "ticker": ticker,
             "entity_name": name,
@@ -154,9 +258,17 @@ async def build(out: Path, countries: str | list[str], fetched_at: str, client: 
             "fxo_id": latest.fxo_id,
             "sha256": latest.sha256,
         }
-        n = sum(len(u) for c in facts.values() for u in c.values())
-        print(f"{ticker} ({name}): {len(facts)} conceptos, {n} entradas, {len(periods)} filings, period {latest.period_end} -> {path}")
 
+    for lei, payload in package_payloads.items():
+        issuers[lei] = {
+            "ticker": payload["ticker"],
+            "entity_name": payload["entity_name"],
+            "period_end": payload["period_end"],
+            "periods": payload["periods"],
+            "fxo_id": payload["fxo_id"],
+            "sha256": payload["sha256"],
+            "origin": "issuer_package",
+        }
     manifest = {
         "issuers": dict(sorted(issuers.items())),
         "unresolved": dict(sorted(unresolved.items())),
@@ -178,7 +290,8 @@ def main() -> int:
     parser.add_argument("--max-filings", type=int, default=5,
                         help="Filings mas recientes por emisor (historia ~5 ejercicios).")
     args = parser.parse_args()
-    asyncio.run(build(Path(args.out), args.country or ["ES"], args.fetched_at, EsefClient(), args.max_filings))
+    asyncio.run(build(Path(args.out), args.country or ["ES"], args.fetched_at, EsefClient(),
+                      args.max_filings, package_fetcher=_fetch_package))
     return 0
 
 

@@ -1424,6 +1424,7 @@ def refresh_esef_fundamentals(
             scripts_dir = str(_Path(__file__).resolve().parents[2] / "scripts")
             if scripts_dir not in sys.path:
                 sys.path.insert(0, scripts_dir)
+            from build_esef_snapshots import _fetch_package as fetch_esef_package
             from build_esef_snapshots import build as build_esef
 
             from app.services.connectors.esef import EsefClient
@@ -1431,7 +1432,8 @@ def refresh_esef_fundamentals(
             manifest = run_from_any_context(
                 # ES + NL en un unico manifest (ASML reviewed; cada pais
                 # resuelve contra su tabla: CNMV / AFM-ESEF).
-                build_esef(_Path(base), ["ES", "NL"], _date.today().isoformat(), EsefClient())
+                build_esef(_Path(base), ["ES", "NL"], _date.today().isoformat(), EsefClient(),
+                           package_fetcher=fetch_esef_package)
             )
             refresh_esef_fundamentals.send(
                 tenant_id, user_id, phase="ingest", cursor=0
