@@ -151,8 +151,14 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 se sembraba con initialPicks del SSR; al generar/actualizar la
                 selección y volver a la pestaña el estado se perdía (reproducido
                 en prod 2026-10-19). Montado siempre, la selección y los filtros
-                sobreviven al cambio de pestaña. */}
-            <TabsContent value="picks" forceMount className="mt-6">
+                sobreviven al cambio de pestaña.
+                Pero @radix-ui/react-tabs 1.2.1 calcula `hidden: !present`: con
+                forceMount present es siempre true y el panel quedaba VISIBLE en
+                las 5 pestañas (la parrilla de picks encima/debajo del contenido
+                propio, Tester 6). contentProps se expande después, así que este
+                `hidden` explícito manda: montado siempre, visible solo en su
+                pestaña. */}
+            <TabsContent value="picks" forceMount hidden={activeTab !== 'picks'} className="mt-6">
                 <EnhancedProPicksContent initialPicks={initialPicks} generatedAt={generatedAt} initialPassedCount={passedCount} onRunUpdated={handleRunUpdated} />
             </TabsContent>
 

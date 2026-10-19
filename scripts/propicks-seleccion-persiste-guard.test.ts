@@ -39,4 +39,16 @@ describe('ProPicks: la selección persiste al volver a la pestaña «Selección 
   it('el panel monta EnhancedProPicksContent con la semilla del SSR', () => {
     assert.match(tabs, /<EnhancedProPicksContent\s+initialPicks=\{initialPicks\}/);
   });
+
+  it('forceMount lleva un hidden explícito: montado siempre, visible solo en su pestaña', () => {
+    // @radix-ui/react-tabs 1.2.1 calcula `hidden: !present`; con forceMount
+    // present es siempre true y la parrilla de picks quedaba VISIBLE en las
+    // 5 pestañas (Tester 6, 2026-10-19). El `hidden` ligado a activeTab manda
+    // porque contentProps se expande después del cálculo interno.
+    assert.match(
+      tabs,
+      /<TabsContent\s+value="picks"\s+forceMount\s+hidden=\{activeTab !== 'picks'\}/,
+      'forceMount sin hidden explícito deja la parrilla visible en todas las pestañas',
+    );
+  });
 });
