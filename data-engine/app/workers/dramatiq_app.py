@@ -2104,10 +2104,10 @@ def refresh_rss_feeds(
         from app.services.feed_ingestion_service import (
             FeedIngestionService,
             RSSFeed,
-            configured_rss_feeds,
+            all_rss_feeds,
         )
 
-        feeds = [RSSFeed(feed_url, ticker.upper() if ticker else None)] if feed_url else configured_rss_feeds()
+        feeds = [RSSFeed(feed_url, ticker.upper() if ticker else None)] if feed_url else all_rss_feeds()
         if not feeds:
             return {
                 "status": "skipped",

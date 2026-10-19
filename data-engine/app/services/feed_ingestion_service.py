@@ -60,6 +60,32 @@ def configured_rss_feeds(value: str | None = None) -> list[RSSFeed]:
     return _unique_feeds(feeds)
 
 
+# Notas de prensa de agencia (RSS público, gratis). Atribución: el <title>
+# del canal se guarda como `source` del evento (p. ej. «Business Wire
+# Communications News»), visible en la ficha. Verificados el 19-oct-2026 con
+# el UA del poller («CavaAI Feed Poller/1.0»):
+# - Business Wire no publica un feed «todo» gratuito; hay feeds por industria.
+#   Se incluyen Communications y Technology: Telecommunications (ambos
+#   trajeron la nota AST SpaceMobile del 19-oct-2026). Más temas vía RSS_FEEDS.
+# - GlobeNewswire devuelve 403 (Akamai) en www.globenewswire.com a clientes
+#   servidor; el espejo rss.globenewswire.com sirve el mismo feed con 200.
+PRESS_WIRE_RSS_FEEDS: tuple[RSSFeed, ...] = (
+    RSSFeed("https://www.prnewswire.com/rss/news-releases-list.rss"),
+    RSSFeed(
+        "https://rss.globenewswire.com/RssFeed/orgclass/1/feedTitle/"
+        "GlobeNewswire%20-%20News%20about%20Public%20Companies"
+    ),
+    RSSFeed("https://feeds.businesswire.com/rss/home/?rss=G1QFDERJXkJeEFpRVQ=="),
+    RSSFeed("https://feeds.businesswire.com/rss/home/?rss=G1QFDERJXkJeGVtQXw=="),
+)
+
+
+def all_rss_feeds(value: str | None = None) -> list[RSSFeed]:
+    """Agencias de notas de prensa incluidas + RSS_FEEDS configurados, sin duplicados."""
+
+    return _unique_feeds([*PRESS_WIRE_RSS_FEEDS, *configured_rss_feeds(value)])
+
+
 def _unique_feeds(feeds: list[RSSFeed]) -> list[RSSFeed]:
     unique: list[RSSFeed] = []
     seen: set[tuple[str, str | None]] = set()
