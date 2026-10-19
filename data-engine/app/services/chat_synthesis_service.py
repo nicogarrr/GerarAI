@@ -14,10 +14,11 @@ from sqlalchemy.orm import Session
 
 from app.llm import LLMRequest, Message, ResponseFormat, parse_json_response
 from app.llm.base import LLMProvider
+from app.llm.interactive_deadline import complete_with_deadline
 from app.schemas import ChatResponse, SynthesisSection
 from app.services.budget import BudgetController, BudgetExceededError
 from app.services.langfuse_client import LangfuseTracer
-from app.services.llm_output_guard import _english_hits, complete_guarded, inspect_response_text
+from app.services.llm_output_guard import _english_hits, inspect_response_text
 from app.services.prompt_registry import get_prompt
 
 PROMPT_VERSION = get_prompt("chat_source_synthesis", allow_remote=False).version
@@ -559,7 +560,7 @@ class ChatSynthesisService:
                     messages=[
                         Message(
                             "system",
-                            get_prompt("chat_source_synthesis").text,
+                            get_prompt("chat_source_synthesis", allow_remote=False).text,
                         ),
                         Message(
                             "user",
@@ -628,7 +629,7 @@ class ChatSynthesisService:
 
                 bind = getattr(self.provider, "with_candidate_validator", None)
                 provider = bind(_validate_candidate, _record) if bind else self.provider
-                guarded = await complete_guarded(
+                guarded = await complete_with_deadline(
                     provider,
                     request,
                     source="chat_synthesis",
@@ -918,7 +919,7 @@ class ChatSynthesisService:
 
             bind = getattr(self.provider, "with_candidate_validator", None)
             provider = bind(_validate_candidate, _record) if bind else self.provider
-            guarded = await complete_guarded(
+            guarded = await complete_with_deadline(
                 provider,
                 request,
                 source="chat_general",

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 from datetime import date
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.llm.base import LLMProvider
 from app.llm.chat_provider import create_chat_llm_provider
+from app.llm.errors import ProviderTransportError
+from app.llm.interactive_deadline import bounded_chat, remaining_seconds
 from app.models import (
     CashBalance,
     Claim,
@@ -839,6 +842,7 @@ class ChatService:
         payload.update({key: value for key, value in extra.items() if value is not None})
         return payload
 
+    @bounded_chat
     async def answer(
         self,
         db: Session,
@@ -1062,6 +1066,14 @@ class ChatService:
         # synthesize_general (ronda 8 auditor): los conceptos financieros
         # genericos llegan al LLM y solo lo especifico/ambiguo se abstiene.
         baseline = self._deterministic_answer(db, question, scope, ticker)
+        try:
+            remaining_seconds()
+        except ProviderTransportError:
+            # La recuperacion (RAG/Qdrant) agoto el plazo total: responde
+            # con el baseline determinista en vez de un error vacio.
+            baseline.llm_trace = {"fallback": True, "fallback_reason": "chat_total_deadline"}
+            baseline.context = context_echo
+            return baseline
         # Fast-path Jev (4): si la pregunta es una consulta factual simple
         # (baseline_ok, conf >= 0.8), el contexto determinista ya responde y
         # se ahorra la llamada LLM de sintesis. Sin key o ante fallo,
@@ -1074,13 +1086,12 @@ class ChatService:
                     CHAT_NEEDS_LLM_INSTRUCTIONS,
                     jev_choice_or_none,
                 )
-
-                gate = await jev_choice_or_none(
+                gate = await asyncio.wait_for(jev_choice_or_none(
                     name="chat_needs_llm",
                     text=question,
                     instructions=CHAT_NEEDS_LLM_INSTRUCTIONS,
                     criteria=CHAT_NEEDS_LLM_CRITERIA,
-                )
+                ), timeout=min(1.0, remaining_seconds()))
                 if (
                     gate is not None
                     and gate.label == "baseline_ok"

@@ -26,6 +26,7 @@ from app.llm.errors import (
     ProviderTransportError,
 )
 from app.llm.factory import create_llm_provider
+from app.llm.interactive_deadline import remaining_seconds
 from app.llm.model_aliases import VERIFIED_FREE_MODELS
 
 logger = logging.getLogger(__name__)
@@ -119,7 +120,7 @@ class ChatFallbackProvider(LLMProvider):
         if self.primary.name == "opencode-go" and self.primary.model_router.resolve(request) not in VERIFIED_FREE_MODELS:
             raise ProviderRequestError("Chat fallback refuses a primary not verified free")
         try:
-            return await asyncio.wait_for(self._race(request), timeout=self.total)
+            return await asyncio.wait_for(self._race(request), timeout=remaining_seconds(self.total))
         except TimeoutError:
             raise ProviderTransportError(self.name, "timeout", 1) from None
 
@@ -132,7 +133,7 @@ class ChatFallbackProvider(LLMProvider):
         (chat real medido: 94,6 s).
         """
         try:
-            return await asyncio.wait_for(self._backup_chain(request), timeout=self.total)
+            return await asyncio.wait_for(self._backup_chain(request), timeout=remaining_seconds(self.total))
         except TimeoutError:
             raise ProviderTransportError(self.name, "timeout", 1) from None
 
@@ -145,6 +146,7 @@ class ChatFallbackProvider(LLMProvider):
         if not ready:
             raise ProviderHTTPError(self.name, 429)
         for provider, model in ready:
+            logger.info("chat backup attempt provider=%s model=%s", provider.name, model)
             try:
                 return await self._candidate(provider, replace(
                     request, model=model,
@@ -152,6 +154,8 @@ class ChatFallbackProvider(LLMProvider):
                 ), backup=True)
             except _FALL_THROUGH as exc:
                 _note_failure(provider, model, exc)
+                logger.warning("chat backup failed provider=%s model=%s error=%s",
+                               provider.name, model, type(exc).__name__)
                 last = exc
         assert last is not None
         raise last

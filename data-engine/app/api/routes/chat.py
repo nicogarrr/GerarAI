@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.schemas import ChatRequest, ChatResponse
 from app.services.async_bridge import run_from_any_context
@@ -33,6 +34,13 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
                     history=payload.history,
                 )
             )
+        )
+    except TimeoutError:
+        response = ChatResponse(
+            answer="La respuesta tardó demasiado; vuelve a intentarlo en un momento.",
+            sources=[], model="deterministic", confidence=0,
+            llm_trace={"fallback": True, "fallback_reason": "chat_total_deadline",
+                       "deadline_seconds": get_settings().chat_total_timeout_seconds},
         )
     except Exception as exc:
         record_chat_event(
