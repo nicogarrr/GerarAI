@@ -150,12 +150,12 @@ function narrativeParagraph(parrafo: string): string {
   return parrafo.replace(/^INFERIDO:\s*/u, '');
 }
 
-/** La hipótesis que solo repite el resumen no se pinta dos veces. */
+/** Solo se oculta si es igual o está contenida en el resumen; una hipótesis más larga se conserva entera. */
 function hypothesisRepeatsSummary(hypothesis: string | null | undefined, summary: string | null | undefined): boolean {
   const norm = (t: string | null | undefined) => (t ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
   const h = norm(hypothesis);
   const s = norm(summary);
-  return h.length > 0 && s.length > 0 && (h === s || s.includes(h) || h.includes(s));
+  return h.length > 0 && s.length > 0 && s.includes(h);
 }
 
 export default function ThesisMemo({
