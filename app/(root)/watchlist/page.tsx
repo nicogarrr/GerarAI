@@ -215,8 +215,11 @@ export default async function WatchlistPage({
                             {page < totalPages ? <Link className="inline-flex min-h-[44px] items-center text-teal-300" href={`/watchlist?page=${page + 1}`}>Siguiente</Link> : null}
                         </div>
                     </nav>
-                    {/* Móvil (<md): cards apiladas con acciones táctiles ≥44px */}
-                    <div className="space-y-3 md:hidden">
+                    {/* Móvil y tablet (<xl): cards apiladas con acciones táctiles ≥44px.
+                        A 820-1280px la tabla de 6 columnas (~805px de mínimo) no cabe
+                        en el contenido con el menú lateral y salía cortada con un
+                        scroll horizontal sin indicio (QA 2026-10-19, tablet 820px). */}
+                    <div className="space-y-3 xl:hidden">
                         {sortedStocks.map((stock) => (
                             <article key={stock.symbol} className="min-w-0 rounded-xl border border-gray-700/60 bg-gray-900/60 p-4">
                                 <div className="flex min-w-0 items-center gap-3">
@@ -283,8 +286,8 @@ export default async function WatchlistPage({
                         ))}
                     </div>
 
-                    {/* Desktop (≥md): tabla completa */}
-                    <div className="hidden overflow-hidden rounded-lg border border-gray-700 bg-gray-900/50 md:block">
+                    {/* Desktop (≥xl): tabla completa */}
+                    <div className="hidden overflow-hidden rounded-lg border border-gray-700 bg-gray-900/50 xl:block">
                         <Table regionLabel="Watchlist: precio, cambio, market cap y PER">
                             <TableCaption className="sr-only">Valoración y métricas de cada símbolo de tu watchlist: precio, cambio de sesión, market cap y PER</TableCaption>
                             <TableHeader className="bg-gray-800/80">
