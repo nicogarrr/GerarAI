@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime
 from typing import Any, Literal
 
@@ -129,11 +130,10 @@ def normalize_rows(
     return rows[:MAX_ROWS]
 
 
-def _fetch_sync(symbol: str) -> dict[str, Any]:
+def _fetch_records(symbol: str) -> list[dict[str, Any]]:
     import yfinance as yf
 
-    ticker = yf.Ticker(symbol)
-    frame = ticker.upgrades_downgrades
+    frame = yf.Ticker(symbol).upgrades_downgrades
     records: list[dict[str, Any]] = []
     if frame is not None and len(frame) > 0:
         for index, item in frame.iterrows():
@@ -147,23 +147,50 @@ def _fetch_sync(symbol: str) -> dict[str, Any]:
                     "prior_target": item.get("priorPriceTarget"),
                 }
             )
-    consensus: dict[str, Any] = {}
+    return records
+
+
+def _fetch_consensus(symbol: str) -> dict[str, Any]:
+    import yfinance as yf
+
     try:
-        consensus = dict(ticker.analyst_price_targets or {})
+        return dict(yf.Ticker(symbol).analyst_price_targets or {})
     except Exception:  # noqa: BLE001 - el consenso es accesorio
-        consensus = {}
-    currency: str | None = None
+        return {}
+
+
+def _fetch_currency(symbol: str) -> str | None:
+    import yfinance as yf
+
     try:
-        raw_currency = ticker.fast_info.get("currency")
+        raw_currency = yf.Ticker(symbol).fast_info.get("currency")
         if raw_currency:
             raw = str(raw_currency).strip()
             # Yahoo cotiza Londres en peniques ("GBp") y Johannesburgo en centavos
             # ("ZAc"): los objetivos vienen en esa subunidad. Poner .upper() daba
             # "GBP" y los precios salian x100. Se distingue con un codigo propio.
-            currency = _SUBUNIT_CURRENCY.get(raw) or raw.upper() or None
+            return _SUBUNIT_CURRENCY.get(raw) or raw.upper() or None
     except Exception:  # noqa: BLE001 - la divisa es declarativa; sin ella, None
-        currency = None
-    return {"records": records, "consensus": consensus, "currency": currency}
+        pass
+    return None
+
+
+def _fetch_sync(symbol: str) -> dict[str, Any]:
+    # Las tres lecturas de Yahoo son independientes y cada una paga sus
+    # propios round-trips (cookie/crumb + endpoint): en serie la celda
+    # "Obj. analistas" de la watchlist tardaba ~8 s en asentar (medido en
+    # prod con CGEO.L, 19 oct 2026). En paralelo el total es el maximo de
+    # las tres, no la suma. Tickers separados: una sola instancia comparte
+    # estado de sesion y no es segura entre hilos.
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        records = pool.submit(_fetch_records, symbol)
+        consensus = pool.submit(_fetch_consensus, symbol)
+        currency = pool.submit(_fetch_currency, symbol)
+        return {
+            "records": records.result(),
+            "consensus": consensus.result(),
+            "currency": currency.result(),
+        }
 
 
 class AnalystTargetsService:

@@ -1,6 +1,7 @@
 'use server';
 
 import { getWatchlistEntryData, getWatchlistState } from '@/lib/actions/watchlist.actions';
+import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { getFairValueReading, getScreenerStocksReal } from '@/lib/actions/screener.actions';
 import { DCF_MIN_UPSIDE_PCT } from '@/lib/overview/dcf-candidates';
 
@@ -51,19 +52,29 @@ export type HomeWatchlistPreview = {
 export async function getHomeWatchlistPreview(limit: number): Promise<HomeWatchlistPreview> {
     const { items, unavailable } = await getWatchlistState();
     if (unavailable) return { unavailable: true, total: 0, items: [] };
-    const preview = await mapPool(items.slice(0, limit), SERVER_CONCURRENCY, async (item): Promise<HomeWatchlistItem> => {
+    const pageItems = items.slice(0, limit);
+    // Mismo cierre datado y mismo % que watchlist, Movers y Mercado
+    // (/api/market/changes sobre market_prices): antes la vista previa del
+    // inicio se quedaba con el cierre de la cadena viva Finnhub->Yahoo y
+    // mostraba otra fecha y otro cambio para el mismo símbolo (CGEO.L:
+    // "Cierre 19 oct 0,00%" en inicio frente a "Cierre 16 oct -0,82%" en
+    // watchlist, 19 oct 2026). Misma regla que la página de watchlist: la
+    // cotización viva manda solo cuando es realmente 'live'.
+    const datedChanges = await fetchDatedChanges(pageItems.map((item) => item.symbol));
+    const preview = await mapPool(pageItems, SERVER_CONCURRENCY, async (item): Promise<HomeWatchlistItem> => {
         try {
             // Precio y divisa del LISTADO REAL (master), nunca del ticker
             // desnudo (F253/F254).
             const data = await getWatchlistEntryData(item.symbol);
+            const dated = data.priceKind === 'live' ? undefined : datedChanges[data.symbol];
             return {
                 symbol: data.symbol,
                 name: data.name,
-                price: data.price,
+                price: dated ? dated.price : data.price,
                 currency: data.currency,
-                changePercent: data.changePercent,
-                priceKind: data.priceKind,
-                priceAsOf: data.priceAsOf,
+                changePercent: dated ? dated.changePercent : data.changePercent,
+                priceKind: dated ? 'close' : data.priceKind,
+                priceAsOf: dated ? dated.date : data.priceAsOf,
             };
         } catch {
             return { symbol: item.symbol, name: item.symbol, price: null, currency: null, changePercent: null, priceKind: null, priceAsOf: null };

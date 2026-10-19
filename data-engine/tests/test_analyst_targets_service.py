@@ -173,3 +173,52 @@ def test_subunit_currency_is_not_collapsed_to_the_main_currency(monkeypatch) -> 
     assert svc._fetch_sync("X.L")["currency"] == "GBP"
     _fake_yf(monkeypatch, "usd")
     assert svc._fetch_sync("AAPL")["currency"] == "USD"
+
+
+def test_fetch_sync_runs_the_three_yahoo_reads_concurrently(monkeypatch) -> None:
+    """Las tres lecturas (upgrades_downgrades, analyst_price_targets,
+    fast_info) son independientes; en serie la celda "Obj. analistas"
+    tardaba ~8 s en asentar (medido en prod, CGEO.L 19 oct 2026). Barrera
+    de 3: si alguna lectura se ejecutara en serie, la barrera romperia por
+    timeout y el test fallaria."""
+    import sys
+    import threading
+    import types
+
+    barrier = threading.Barrier(3)
+
+    class _Frame:
+        def __len__(self) -> int:
+            return 0
+
+    class _FastInfo:
+        def get(self, key):
+            assert key == "currency"
+            return "GBp"
+
+    class _Ticker:
+        def __init__(self, symbol: str) -> None:
+            self.symbol = symbol
+
+        @property
+        def upgrades_downgrades(self):
+            barrier.wait(timeout=5)
+            return _Frame()
+
+        @property
+        def analyst_price_targets(self):
+            barrier.wait(timeout=5)
+            return {"mean": 5000.0, "current": 4255.0}
+
+        @property
+        def fast_info(self):
+            barrier.wait(timeout=5)
+            return _FastInfo()
+
+    fake = types.SimpleNamespace(Ticker=_Ticker)
+    monkeypatch.setitem(sys.modules, "yfinance", fake)
+
+    data = svc._fetch_sync("CGEO.L")
+    assert data["records"] == []
+    assert data["consensus"] == {"mean": 5000.0, "current": 4255.0}
+    assert data["currency"] == "GBX"

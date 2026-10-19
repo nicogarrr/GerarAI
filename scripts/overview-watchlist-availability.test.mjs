@@ -14,8 +14,15 @@ test('inicio preserves watchlist availability instead of silently returning an e
 });
 
 test('inicio watchlist etiqueta los cierres con su fecha, como /watchlist', () => {
-    assert.match(source, /priceKind: data\.priceKind/);
-    assert.match(source, /priceAsOf: data\.priceAsOf/);
+    // Contrato F358 ampliado (19 oct 2026, CGEO.L): la vista previa del
+    // inicio usa el MISMO cierre datado que /watchlist, Movers y Mercado
+    // (/api/market/changes) salvo cotización realmente viva — antes se
+    // quedaba con el cierre de la cadena Yahoo y mostraba otra fecha y
+    // otro cambio para el mismo símbolo.
+    assert.match(source, /fetchDatedChanges\(pageItems\.map/);
+    assert.match(source, /data\.priceKind === 'live' \? undefined : datedChanges\[data\.symbol\]/);
+    assert.match(source, /priceKind: dated \? 'close' : data\.priceKind/);
+    assert.match(source, /priceAsOf: dated \? dated\.date : data\.priceAsOf/);
     assert.match(source, /stock\.priceKind === 'close'/);
     assert.match(source, /formatMarketDate\(stock\.priceAsOf\)/);
     assert.match(source, /'Cierre sin fecha de la fuente'/);
