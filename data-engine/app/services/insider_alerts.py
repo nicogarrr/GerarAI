@@ -181,7 +181,28 @@ def _build_alerts(
                 "data_quality": first.data_quality,
             },
         }
-        if value >= BIG_BUY_THRESHOLD_USD:
+        is_c_suite = any(_is_c_suite(_tx_as_signal_dict(t)) for t in group)
+        is_big = value >= BIG_BUY_THRESHOLD_USD
+        if is_c_suite:
+            # Una compra = una alerta: si el CEO/CFO supera el umbral de gran
+            # compra, antes salian DOS tarjetas criticas del mismo Form 4
+            # (INTC, Tan Lip Bu, 9.999.985 $: una big_buy y otra c_suite_buy).
+            # La unica alerta es la c_suite (nombra el cargo) y hereda la
+            # severidad alta de la gran compra; metadata declara el solape.
+            alerts.append(
+                {
+                    **base,
+                    "rule": "c_suite_buy",
+                    "severity": "high" if is_big else "medium",
+                    "title": f"Compra C-suite — {first.issuer_ticker or '?'}",
+                    "message": (
+                        f"{first.insider or 'Insider'} ({first.officer_title or first.role or 'directivo'}) "
+                        f"{_purchase_phrase(group, value)}"
+                    ),
+                    "metadata": {**base["metadata"], "also_big_buy": is_big},
+                }
+            )
+        elif is_big:
             alerts.append(
                 {
                     **base,
@@ -189,19 +210,6 @@ def _build_alerts(
                     "severity": "high",
                     "title": f"Compra insider grande — {first.issuer_ticker or '?'}",
                     "message": f"{first.insider or 'Insider'} {_purchase_phrase(group, value)}",
-                }
-            )
-        if any(_is_c_suite(_tx_as_signal_dict(t)) for t in group):
-            alerts.append(
-                {
-                    **base,
-                    "rule": "c_suite_buy",
-                    "severity": "medium",
-                    "title": f"Compra C-suite — {first.issuer_ticker or '?'}",
-                    "message": (
-                        f"{first.insider or 'Insider'} ({first.officer_title or first.role or 'directivo'}) "
-                        f"{_purchase_phrase(group, value)}"
-                    ),
                 }
             )
 

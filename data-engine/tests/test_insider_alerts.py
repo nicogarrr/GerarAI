@@ -55,25 +55,29 @@ def test_big_buy_and_c_suite_alerts_created_and_deduped():
             row.alert_type
             for row in db.scalars(select(ResearchAlert)).all()
         }
-        assert "insider_big_buy" in created_types
+        # Una compra grande de un CEO = UNA alerta (c_suite con severidad alta
+        # y also_big_buy), no dos tarjetas del mismo Form 4.
+        assert "insider_big_buy" not in created_types
         assert "insider_c_suite_buy" in created_types
         assert first["alerts_created"] == len(created_types)
-        assert first["alerts_created"] >= 2
+        assert first["alerts_created"] >= 1
 
         second = insider_alerts.evaluate(db)
         assert second["alerts_created"] == 0
-        assert second["alerts_existing"] >= 2
+        assert second["alerts_existing"] >= 1
         total = len(db.scalars(select(ResearchAlert)).all())
         assert total == len(created_types)
 
-        big = db.scalar(
-            select(ResearchAlert).where(ResearchAlert.alert_type == "insider_big_buy")
+        c_suite = db.scalar(
+            select(ResearchAlert).where(ResearchAlert.alert_type == "insider_c_suite_buy")
         )
-        assert "puede ser en mercado abierto o privada" in big.message
-        assert "XML" not in big.message
-        assert big.metadata_["rule_version"] == insider_alerts.RULE_VERSION
-        assert big.metadata_["tx_fingerprint"]
-        assert big.channels == ["in_app"]
+        assert "puede ser en mercado abierto o privada" in c_suite.message
+        assert "XML" not in c_suite.message
+        assert c_suite.severity == "high"
+        assert c_suite.metadata_["also_big_buy"] is True
+        assert c_suite.metadata_["rule_version"] == insider_alerts.RULE_VERSION
+        assert c_suite.metadata_["tx_fingerprint"]
+        assert c_suite.channels == ["in_app"]
     finally:
         _cleanup(db)
         db.close()
