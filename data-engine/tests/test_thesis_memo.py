@@ -48,8 +48,10 @@ def _full_thesis(db: Session, company_id: int) -> ThesisVersion:
         hypothesis="La base instalada monetiza servicios a doble digito.",
         current_price=200, bear_value=150, base_value=220, bull_value=300,
         expected_value=235, margin_of_safety=0.15,
-        scenario_probabilities={"bear": 20, "base": 55, "bull": 25},
+        # Fracciones persistidas por el motor (la ficha las lee con formatPercent fromRatio).
+        scenario_probabilities={"bear": 0.20, "base": 0.55, "bull": 0.25},
         catalysts=[
+            {"label": "Próximos resultados", "date": "2026-11-05"},
             {"title": "Resultados Q4", "date": "2026-10-30"},
             "Ciclo de renovacion de iPhone",
         ],
@@ -86,15 +88,18 @@ def test_full_thesis_renders_every_section(db):
     memo = build_memo_markdown(db, company, thesis)
 
     assert memo.startswith("# Memo de tesis — AAPL (Apple)")
-    assert "Versión 2 · estado `published` · rating `buy`" in memo
+    assert "Versión 2 · estado publicada · rating compra" in memo
     assert "La base instalada monetiza servicios a doble digito." in memo
     # Valuation table: money formatting + probabilities.
-    assert "| Bajista | $150.00 | 20 |" in memo
-    assert "| Base | $220.00 | 55 |" in memo
-    assert "| Alcista | $300.00 | 25 |" in memo
+    assert "| Bajista | $150.00 | 20 % |" in memo
+    assert "| Base | $220.00 | 55 % |" in memo
+    assert "| Alcista | $300.00 | 25 % |" in memo
     assert "Precio actual: $200.00 · Valor esperado: $235.00 · Margen de seguridad: 15,0 %" in memo
     # Catalysts: dict form renders title + date; string form renders verbatim.
+    assert "- Próximos resultados (2026-11-05)" in memo
     assert "- Resultados Q4 (2026-10-30)" in memo
+    # El dict crudo de Python no puede aparecer jamas en el documento.
+    assert "{'label'" not in memo
     assert "- Ciclo de renovacion de iPhone" in memo
     assert "- Crecimiento de servicios < 5%" in memo
     # Evidence quality scores.

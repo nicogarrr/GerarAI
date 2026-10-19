@@ -81,6 +81,47 @@ def number_es(value: object, unit: object = None) -> str:
     return f"{text} {unit}" if unit else text
 
 
+# Estados y ratings persistidos (enums internos) -> español de UI. Mismo
+# vocabulario que la ficha (STATUS_LABELS / RATING_LABELS del front).
+STATUS_ES: dict[str, str] = {
+    "draft": "borrador",
+    "review": "en revisión",
+    "final": "final",
+    "approved": "aprobada",
+    "published": "publicada",
+    "rejected": "rechazada",
+    "changes_requested": "cambios pedidos",
+    "stale": "desactualizada",
+    "superseded": "sustituida",
+    "insufficient_data": "datos insuficientes",
+    "draft_failed_audit": "borrador (auditoría no superada)",
+}
+
+RATING_ES: dict[str, str] = {
+    "buy": "compra",
+    "accumulate": "acumular",
+    "overweight": "sobreponderar",
+    "hold": "mantener",
+    "underweight": "infraponderar",
+    "trim": "recortar",
+    "sell": "venta",
+    "avoid": "evitar",
+    "watch": "seguimiento",
+    "attractive": "atractiva",
+    "expensive": "cara",
+    "incomplete_price": "precio incompleto",
+    "blocked": "bloqueada",
+    "insufficient_data": "datos insuficientes",
+}
+
+
+def label_es(mapping: dict[str, str], value: str | None) -> str:
+    """Enum interno -> etiqueta es-ES; desconocido se muestra legible, nunca inventado."""
+    if not value:
+        return "desconocido"
+    return mapping.get(value, value.replace("_", " "))
+
+
 def percent_es(value: float, decimals: int = 1) -> str:
     """Fracción (-0,649) -> «-64,9 %»: coma decimal y espacio antes del signo."""
     return f"{value * 100:.{decimals}f}".replace(".", ",") + " %"
