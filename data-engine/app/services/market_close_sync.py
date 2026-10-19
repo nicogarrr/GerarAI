@@ -166,7 +166,7 @@ def enqueue_price_backfills(
     tenant_id: int | None = None,
     user_id: str | None = None,
     stagger_ms: int = BACKFILL_STAGGER_MS,
-    sender: Callable[[int, "int | None", "str | None", int], None] = _send_backfill,
+    sender: Callable[[int, int | None, str | None, int], None] = _send_backfill,
     today: date | None = None,
 ) -> int:
     """Encola backfills ESCALONADOS para las companias sin historial profundo.
