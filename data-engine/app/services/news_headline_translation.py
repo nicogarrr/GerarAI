@@ -82,6 +82,26 @@ def _numbers_are_only_dates(text: str) -> bool:
     return not re.search(r"\d", _DATE_ONLY.sub(" ", text))
 
 
+_UP = re.compile(
+    r"(?i)\b(?:rises?|rose|risen|rising|raise[sd]?|up|gains?|gained|beats?|surges?[d]?|jumps?(?:ed)?|climbs?(?:ed)?|grow[s]?|grew|growth|increase[sd]?|hike[sd]?|boosts?(?:ed)?|soars?(?:ed)?|rall(?:y|ies|ied)|rebounds?(?:ed)?|higher|tops?|topped|exceed[s]?|improve[sd]?|advance[sd]?|lifts?(?:ed)?"
+    r"|sub(?:e|en|ir|ida|ió|ieron|ido|iendo)|suben|aument\w*|crec\w*|gan(?:a|an|ó|aron|ancias?)|alza|repunt\w*|dispar\w*|supera\w*|rebot\w*|avanz\w*|mejor(?:a|an|ó|aron|ar|as)|elev\w*|incrementa\w*|escal\w*|trepa\w*|más altos?|más altas?)\b"
+)
+_DOWN = re.compile(
+    r"(?i)\b(?:falls?|fell|fallen|falling|down|drops?|dropped|cuts?|slash\w*|miss(?:es|ed)?|declin\w*|slump\w*|plung\w*|tumbl\w*|lower[sd]?|reduc\w*|sink[s]?|sank|dips?|dipped|lose[s]?|lost|loss(?:es)?|shrink\w*|retreat\w*|slid\w*|slips?|slipped"
+    r"|baj(?:a|an|ó|aron|ar|ada|adas|as|e|en)|cae|caen|caída|caídas|cay(?:ó|eron)|descen\w*|recort\w*|desplom\w*|hunde\w*|pierd\w*|pérdidas?|retroced\w*|disminu\w*|tumba\w*|más bajos?|más bajas?)\b"
+)
+
+
+def _polarity(text: str) -> frozenset[str]:
+    """Direccion que declara un titular (sube/baja). Vacio si no declara ninguna."""
+    marks = set()
+    if _UP.search(text):
+        marks.add("+")
+    if _DOWN.search(text):
+        marks.add("-")
+    return frozenset(marks)
+
+
 def headline_numbers_match(original: str, translated: str) -> bool:
     """Los numeros del titular sobreviven a la traduccion. Falla cerrado.
 
@@ -93,6 +113,11 @@ def headline_numbers_match(original: str, translated: str) -> bool:
       estricta con la palabra anterior y posterior, para que una traduccion
       que invierta el sentido («falls 8%» -> «suben un 8%») no pase.
     """
+    # Direccion: un titular que dice subir/bajar no puede traducirse con la
+    # direccion contraria ni sin ella («Q3 profit falls» -> «el beneficio sube»).
+    # Falla cerrado, tenga o no numeros.
+    if _polarity(original) != _polarity(translated):
+        return False
     if _numbers_are_only_dates(original) and not _has_dimension_marks(translated):
         tokens = lambda t: sorted(token for token, _, _ in numeric_signature(t) if token not in {"dimensions", "ambiguous"})  # noqa: E731
         return not any(token == "ambiguous" for token, _, _ in numeric_signature(original) + numeric_signature(translated)) \

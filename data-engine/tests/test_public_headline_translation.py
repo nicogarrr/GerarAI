@@ -208,3 +208,14 @@ def test_headline_numbers_dates_relaxed_everything_else_strict():
     assert not ok("Revenue 12 million USD", "Ingresos 12 billion USD")
     assert not ok("FCF 12 USD", "FCF 12 EUR")
     assert not ok("growth -12%", "crecimiento 12%")
+
+
+def test_headline_direction_must_survive_translation():
+    from app.services.news_headline_translation import headline_numbers_match as ok
+
+    assert not ok("Dividend raised on Oct 28", "Dividendo recortado el 28 de octubre")
+    assert not ok("Q3 profit falls", "El beneficio del Q3 sube")
+    assert not ok("Dividend raised on Oct 28", "Dividendo el 28 de octubre")  # sin direccion: no se acepta
+    assert ok("Dividend raised on Oct 28", "Dividendo aumentado el 28 de octubre")
+    assert ok("Q3 profit falls", "El beneficio del Q3 baja")
+    assert ok("Apple Announces Oct. 28 Event", "Apple anuncia un evento el 28 de octubre")
