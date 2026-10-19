@@ -267,6 +267,27 @@ def _band_es(band: object) -> str:
     return " / ".join(_pct_es(v) for v in band)
 
 
+def _notice_es(trace: dict) -> str:
+    """Aviso de valoración en español. Los motores guardan el aviso en inglés
+    (trazas técnicas); el memo nunca debe mostrar texto en inglés crudo."""
+    raw = str(trace.get("notice") or "").strip()
+    if not raw:
+        return ""
+    if raw.startswith("INDICATIVE RANGE"):
+        return (
+            "RANGO INDICATIVO: usa un margen FCF supuesto porque no hay un "
+            "balance coherente. No es un valor justo final; resuelve los "
+            "inputs que faltan antes de publicar."
+        )
+    if raw.startswith("Valuation computed"):
+        return (
+            "Valoración calculada con inputs que no se pueden rastrear hasta "
+            "una fuente fechada: las cifras son una orientación, no una "
+            "valoración final."
+        )
+    return ""
+
+
 class ThesisService:
     def __init__(self) -> None:
         self.valuation_service = ValuationService()
@@ -1209,9 +1230,9 @@ class ThesisService:
                 f"margen FCF base {_pct_es(assumed.get('fcf_margin_base'))} "
                 f"(banda {_band_es(assumed.get('fcf_margin_band'))})"
                 + ("; suelo de ingresos de 1 $ (sin ingresos coherentes)" if assumed.get("revenue_floor_used") else "")
-                + f"; crecimiento de ingresos {assumed.get('revenue_growth')}"
-                + f"; WACC {assumed.get('wacc')}"
-                + f"; terminal {assumed.get('terminal_growth')}"
+                + f"; crecimiento de ingresos {_pct_es(assumed.get('revenue_growth'))}"
+                + f"; WACC {_pct_es(assumed.get('wacc'))}"
+                + f"; terminal {_pct_es(assumed.get('terminal_growth'))}"
             )
             return (
                 "**RANGO INDICATIVO PARCIAL — no es un valor justo final**\n\n"
@@ -1221,7 +1242,7 @@ class ThesisService:
                 f"Supuestos documentados (NO son datos reportados): {supuestos}.\n\n"
                 f"DCF inverso frente a precio de mercado: ver sección 14.\n\n"
                 f"Aún falta antes de publicar:\n{missing or '- nada listado'}\n\n"
-                f"{trace.get('notice', '')}"
+                f"{_notice_es(trace)}"
             )
 
         return "\n".join(
