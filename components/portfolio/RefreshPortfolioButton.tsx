@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { updateAllPortfolioPrices } from '@/lib/actions/portfolio.actions';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
@@ -45,24 +45,15 @@ export default function RefreshPortfolioButton({ userId }: RefreshPortfolioButto
     return (
         <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={handleFullRefresh}
             disabled={isRefreshing}
             aria-busy={isRefreshing}
+            aria-label={isRefreshing ? 'Actualizando lecturas' : 'Actualizar lecturas'}
             title="Vuelve a leer posiciones y KPIs del servidor, sin caché. No fuerza cotizaciones nuevas: los precios son los últimos que guardó el servidor."
-            className="border-gray-600 hover:bg-gray-700 text-gray-200"
+            className="h-11 w-11 shrink-0 border-gray-600 text-gray-200 hover:bg-gray-700 sm:h-9 sm:w-9"
         >
-            {isRefreshing ? (
-                <>
-                    <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />
-                    Actualizando...
-                </>
-            ) : (
-                <>
-                    <RefreshCw aria-hidden="true" className="mr-2 h-4 w-4" />
-                    Actualizar Todo
-                </>
-            )}
+            <RefreshCw aria-hidden="true" className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
         </Button>
     );
 }

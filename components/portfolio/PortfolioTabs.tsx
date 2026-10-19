@@ -1,7 +1,6 @@
 'use client';
 
 import { formatDate, formatMoney, formatPercent } from '@/lib/format';
-import { t } from '@/lib/i18n/t';
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -21,9 +20,7 @@ const PortfolioNavChart = dynamic(() => import('./PortfolioNavChart'), {
 });
 import PortfolioScores from '@/components/portfolio/PortfolioScores';
 import PortfolioTearsheet from '@/components/portfolio/PortfolioTearsheet';
-import AddTransactionButton from '@/components/portfolio/AddTransactionButton';
 import RefreshPortfolioButton from '@/components/portfolio/RefreshPortfolioButton';
-import ImportIBKRButton from '@/components/portfolio/ImportIBKRButton';
 import PortfolioForecast from '@/components/portfolio/PortfolioForecast';
 import PortfolioDividends from '@/components/portfolio/PortfolioDividends';
 import { Wallet, LayoutDashboard, Briefcase, TrendingUp, TrendingDown, History, Brain, Gauge, Activity, Coins } from 'lucide-react';
@@ -121,23 +118,16 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-[1600px] flex-col overflow-x-clip p-4 pb-24 sm:p-4 sm:pb-24 lg:p-6 lg:pb-24">
                 {/* Header */}
                 <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex w-full items-center gap-3">
                         <div className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 flex items-center justify-center">
                             <Wallet aria-hidden="true" className="h-5 w-5 text-white" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                             <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Mi Cartera</h1>
 
                             <p className="mt-0.5 text-xs text-gray-500">Precios con ~15 min de retardo durante el horario de mercado (Yahoo Finance)</p>
                         </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
-                        <Link className="inline-flex min-h-[44px] col-span-2 items-center justify-center gap-2 rounded-md border border-gray-700 px-3 py-2.5 text-sm text-gray-300 transition hover:border-teal-700 hover:text-teal-300 sm:col-span-1 sm:min-h-0 sm:h-9 sm:w-auto" href="/portfolio/intelligence">
-                            <Activity aria-hidden="true" className="h-4 w-4" /> {t('portfolio.tabs.intelligence')}
-                        </Link>
                         <RefreshPortfolioButton userId={userId} />
-                                            <ImportIBKRButton userId={userId} />
-                                            <AddTransactionButton userId={userId} />
                     </div>
                 </div>
 
@@ -152,7 +142,7 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
                 {/* Con teclado no hay barra de scroll: la region enfocable deja las
                     pestañas alcanzables con las flechas (WCAG 2.1.1). */}
                 <div role="region" aria-label="Secciones de la cartera" tabIndex={0} className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-                    <TabsList className="bg-[#0a0a0a] border border-gray-800 p-1 rounded-xl mb-6 flex h-auto w-full flex-wrap gap-1 sm:h-9 sm:w-max sm:max-w-none sm:flex-nowrap">
+                    <TabsList className="bg-[#0a0a0a] border border-gray-800 p-1 rounded-xl mb-6 flex h-auto w-max max-w-none flex-nowrap gap-1 sm:h-9">
                     <TabsTrigger
                         value="resumen"
                         className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
@@ -200,23 +190,6 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
 
                 {/* Tab: Resumen */}
                 <TabsContent value="resumen" className="mt-0">
-                    {/* Salida cruzada a las otras dos páginas de riesgo: el
-                        resumen es pesos y precio; el riesgo medido está en
-                        Inteligencia y las concentraciones en Exposiciones.
-                        Sin frase de arquitectura: un subtítulo de una línea y
-                        los dos enlaces (quick win UX 2). */}
-                    <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-gray-700/50 bg-surface-1 p-4">
-                        <p className="min-w-0 flex-1 basis-60 text-sm font-medium text-gray-300">
-                            Riesgo y exposiciones, en detalle:
-                        </p>
-                        <Link className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-3 py-2 text-sm text-gray-300 transition hover:border-teal-700 hover:text-teal-300 sm:min-h-0 sm:py-1.5" href="/portfolio/intelligence">
-                            <Activity aria-hidden="true" className="h-4 w-4" /> Riesgo y rendimiento
-                        </Link>
-                        <Link className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-3 py-2 text-sm text-gray-300 transition hover:border-teal-700 hover:text-teal-300 sm:min-h-0 sm:py-1.5" href="/risk">
-                            <Gauge aria-hidden="true" className="h-4 w-4" /> Exposiciones
-                        </Link>
-                    </div>
-
                     {/* Métricas en fila */}
                     <div className="mb-6">
                         <PortfolioSummary summary={summary} />
@@ -292,6 +265,23 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
                     <div className="mt-6">
                         <PortfolioTearsheet tearsheet={tearsheet} />
                     </div>
+                    {/* Salida cruzada a las otras dos páginas de riesgo: el
+                        resumen es pesos y precio; el riesgo medido está en
+                        Inteligencia y las concentraciones en Exposiciones.
+                        Sin frase de arquitectura: un subtítulo de una línea y
+                        los dos enlaces (quick win UX 2). */}
+                    <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-gray-700/50 bg-surface-1 p-3">
+                        <p className="min-w-0 flex-1 basis-60 text-sm font-medium text-gray-300">
+                            Riesgo y exposiciones, en detalle:
+                        </p>
+                        <Link className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-3 py-2 text-sm text-gray-300 transition hover:border-teal-700 hover:text-teal-300 sm:min-h-0 sm:py-1.5" href="/portfolio/intelligence">
+                            <Activity aria-hidden="true" className="h-4 w-4" /> Riesgo y rendimiento
+                        </Link>
+                        <Link className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-3 py-2 text-sm text-gray-300 transition hover:border-teal-700 hover:text-teal-300 sm:min-h-0 sm:py-1.5" href="/risk">
+                            <Gauge aria-hidden="true" className="h-4 w-4" /> Exposiciones
+                        </Link>
+                    </div>
+
                 </TabsContent>
 
                 {/* Tab: Posiciones */}
