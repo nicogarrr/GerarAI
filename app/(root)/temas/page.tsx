@@ -188,6 +188,7 @@ export default async function TemasPage({ searchParams }: PageProps) {
           <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-gray-400">Metodología</summary>
           <ul className="list-disc space-y-1 pl-5 leading-5">
             <li>Cada tema es una cesta curada; su rentabilidad es la media simple (mismo peso) de los valores con dato.</li>
+            <li>Las cestas son listas fijas curadas a mano (no hay una fuente gratuita fiable de pertenencia), con sesgo de valores de EE. UU. y de supervivencia: es la cesta de hoy, no la histórica. Algunos valores aparecen en más de una cesta (p. ej. GOOGL en 3), así que los temas no son independientes entre sí.</li>
             <li>Un tema sólo publica una métrica si al menos el 70 % de sus valores tiene dato.</li>
             <li>Caliente: los 3 primeros del orden elegido. Giro: YTD y 1M con signo contrario y 1M relevante; el giro sustituye a Caliente.</li>
             <li>Aporta: peso × rentabilidad del valor, en puntos porcentuales.</li>
