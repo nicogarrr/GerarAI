@@ -107,6 +107,8 @@ async def ingest_uk_pdmr(db: Session, tenant: int, *, client: Any = None) -> dic
                     "transaction_nature": mapped["transaction_nature"],
                     "value_unknown": mapped["value_unknown"],
                     **({"price_from_pence": True} if mapped["price_from_pence"] else {}),
+                **({"value_raw_gbx_unverified": mapped["value_raw"]}
+                   if mapped["value_raw"] is not None else {}),
                 },
             )
         )

@@ -28,8 +28,18 @@ PARSER_VERSION = "tracefour-1"
 FORM = "PDMR"
 TIMEOUT_SECONDS = 30
 
-_BUY_HINTS = ("acquisition", "purchase", "subscription", "award", "grant", "exercise")
-_SELL_HINTS = ("disposal", "sale", "sell", "transfer out")
+_BUY_HINTS = ("acquisition", "acquire", "purchase")
+_SELL_HINTS = ("disposal", "sale", "sell")
+# Flujos mecanicos que NO son senal de compra/venta (fail-closed, objecion del
+# auditor con los casos reales del feed): dividendos/DRIP, suscripcion y
+# placing, awards/grants/exercise/vesting, traspasos entre cuentas propias
+# (bed & ISA), planes de compra de empleados no discrecionales, adquisiciones
+# nocionales y ofertas de recompra complejas.
+_NEUTRAL_HINTS = (
+    "dividend", "drip", "subscription", "placing", "award", "grant",
+    "exercise", "vest", "bed & isa", "bed and isa", "stock purchase plan",
+    "savings plan", "dcsp", "notional", "tender offer",
+)
 
 
 async def fetch_pdmr_feed(client: httpx.AsyncClient | None = None) -> list[dict[str, Any]]:
@@ -47,21 +57,30 @@ async def fetch_pdmr_feed(client: httpx.AsyncClient | None = None) -> list[dict[
 
 
 def map_transaction_code(nature: str | None) -> str | None:
-    """Compra/venta al estilo Form 4 ('P'/'S'); lo ambiguo queda None (nunca se adivina)."""
+    """Compra/venta al estilo Form 4 ('P'/'S'); fail-closed: lo mecanico o
+    ambiguo queda None (nunca una senal falsa)."""
     text = (nature or "").lower()
-    if any(hint in text for hint in _SELL_HINTS):
+    if not text.strip() or any(hint in text for hint in _NEUTRAL_HINTS):
+        return None
+    has_buy = any(hint in text for hint in _BUY_HINTS)
+    has_sell = any(hint in text for hint in _SELL_HINTS)
+    if has_buy and has_sell:
+        return None  # movimiento mixto (p. ej. venta + compra en ISA)
+    if has_sell:
         return "S"
-    if any(hint in text for hint in _BUY_HINTS):
+    if has_buy:
         return "P"
     return None
 
 
 def normalize_price(price: Any, currency: str | None) -> tuple[float | None, str | None, bool]:
-    """Divisa declarada siempre. Si viene en peniques (GBX/GBp), a libras.
-
-    Devuelve (precio, divisa, normalizado_desde_peniques). Un precio sin
-    divisa se devuelve tal cual con divisa None: la UI lo muestra como N/D
-    de divisa, nunca asume GBP.
+    """Divisa declarada siempre; nunca se asume (93/307 movimientos del feed
+    real llegan SIN divisa: 158 GBP, 47 USD, 9 EUR y el resto sin informar,
+    medido el 20/10/2026). Si el PRECIO viene en peniques (GBX/GBp), a libras:
+    conversion NO VERIFICADA contra datos reales (ningun movimiento del feed
+    la usa hoy); solo al precio, nunca a totalValue (no hay prueba de su
+    unidad). Un precio sin divisa se devuelve tal cual con divisa None: la UI
+    declara "divisa no informada", nunca asume GBP.
     """
     if not isinstance(price, (int, float)):
         return None, currency, False
@@ -82,8 +101,12 @@ def map_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
         return None
     price, currency, from_pence = normalize_price(entry.get("pricePerShare"), entry.get("currency"))
     value = entry.get("totalValue")
+    value_raw: float | None = None
     if isinstance(value, (int, float)) and from_pence:
-        value = round(float(value) / 100.0, 6)
+        # totalValue en GBX sin verificar: NO se divide; se guarda el bruto
+        # solo en data_quality y el importe queda N/D.
+        value_raw = float(value)
+        value = None
     return {
         "filing_id": filing_id,
         "accession_number": filing_id,
@@ -99,7 +122,8 @@ def map_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
         "price": price,
         "currency": currency,
         "value": float(value) if isinstance(value, (int, float)) else None,
-        "value_unknown": bool(entry.get("valueUnknown")),
+        "value_raw": value_raw,
+        "value_unknown": bool(entry.get("valueUnknown")) or value_raw is not None,
         "tx_date": entry.get("transactionDate"),
         "publication_at": entry.get("publicationAt"),
         "source_url": entry.get("rawArtefactUrl"),

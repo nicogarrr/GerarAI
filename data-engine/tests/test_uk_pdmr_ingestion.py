@@ -178,3 +178,86 @@ def test_actor_runs_and_reports(monkeypatch):
     monkeypatch.setattr("app.services.uk_pdmr_ingestion.ingest_uk_pdmr", fake_ingest)
     result = dramatiq_app.ingest_uk_pdmr_filings(tenant_id=1, user_id="owner")
     assert result["status"] == "ok" and result["saved"] == 2
+
+
+def test_transaction_code_fail_closed_with_real_feed_cases():
+    """Casos REALES del feed tracefour (20/10/2026): flujos mecanicos nunca son senal."""
+    real_cases = {
+        "Purchase of Ordinary Shares": "P",
+        "Purchase of Ordinary Shares with Dividend Proceeds": None,
+        "Direct subscription for new ordinary shares in Softcat plc": None,
+        "Subscription for Placing Shares": None,
+        "Purchase - Equity Issue Subscription": None,
+        "Sale and purchase (Bed & ISA": None,
+        "Sale of ordinary shares of 5 pence each as part of a 'bed & ISA' transfer between own accounts": None,
+        "Sale of shares Purchase of shares into ISA": None,
+        "Purchase and sale of shares by Robert Ware and sale of shares by Deborah Ware": None,
+        "Participation in Tender Offer (sale of shares) and Share Capital Restructuring": None,
+        "Non-discretionary purchase of shares through the Bunzl Employee Stock Purchase Plan (U.S": None,
+        "SALE OF 10,000 SHARES UNDER EMPLOYEE STOCK PURCHASE PLAN AT GBP 46.15383 PER SHARE": None,
+        "Acquisition of notional ADS within Ms Martinez-Davis's GSK Executive Supplemental Savings Plan account": None,
+        "Acquisition of Shares/units via the DCSP": None,
+        "Disposal of shares": "S",
+        "Open market sale": "S",
+        "APURCHASE OF 350,000 ORDINARY SHARES OF £0.01 EACH IN GREENCORE GROUP PLC": "P",
+        "On 30 September 2026, Wendy Sarah Shapland, spouse of Darren Shapland, purchased 10,000 ordinary shares of the Company at a price of 574.864 pence per share": "P",
+        "Market sale of 150,000 Ordinary Shares of 0.02p each": "S",
+    }
+    for nature, expected in real_cases.items():
+        assert map_transaction_code(nature) == expected, nature
+
+
+def test_gbx_value_never_divided_unverified():
+    """GBX sin verificar: el precio se convierte con marca, totalValue NO se divide."""
+    entry = {
+        "filingId": "gbx-1|1", "publicationAt": "2026-10-19T06:00:08Z",
+        "issuerName": "PENNYSAVER PLC", "pdmrName": "John Seller", "capacity": "CFO",
+        "transactionNature": "Disposal of shares", "isin": "GB00CGEO0001",
+        "transactionDate": "2026-10-15", "volume": 5567, "pricePerShare": 890,
+        "currency": "GBX", "totalValue": 4954630,
+        "rawArtefactUrl": "https://data.fca.org.uk/artefacts/NSM/RNS/gbx-1.html",
+        "valueUnknown": False,
+    }
+    mapped = map_entry(entry)
+    assert mapped["price"] == 8.9 and mapped["price_from_pence"] is True
+    assert mapped["value"] is None and mapped["value_raw"] == 4954630
+    assert mapped["value_unknown"] is True
+
+
+def _client_with(entries):
+    from unittest.mock import AsyncMock as AM
+
+    return type("C", (), {"get": AM(return_value=type(
+        "R", (), {"status_code": 200, "raise_for_status": lambda self: None,
+                  "json": lambda self: {"data": entries}})())})()
+
+
+_NO_CURRENCY_ENTRY = {
+    "filingId": "nocur-1|1", "publicationAt": "2026-10-19T06:00:08Z",
+    "issuerName": "CGEO HOLDINGS", "pdmrName": "Jane Director", "capacity": "CEO",
+    "transactionNature": "Acquisition of shares", "isin": "GB00CGEO0001",
+    "transactionDate": "2026-10-18", "volume": 100, "pricePerShare": 1.5,
+    "currency": None, "totalValue": 150.0,
+    "rawArtefactUrl": "https://data.fca.org.uk/artefacts/NSM/RNS/nocur-1.html",
+    "valueUnknown": False,
+}
+
+
+def test_ingest_keeps_missing_currency_as_none(db):
+    """Sin divisa informada (93/307 en el feed real): None, nunca USD/GBP asumido."""
+    assert asyncio.run(ingest_uk_pdmr(db, 1, client=_client_with([_NO_CURRENCY_ENTRY])))["saved"] == 1
+    tx = db.scalar(select(InsiderTransaction).where(InsiderTransaction.accession_number == "nocur-1|1"))
+    assert tx.data_quality["currency"] is None
+
+
+def test_feed_currency_defaults_only_for_form4(db):
+    """_tx_dict: USD solo en Form 4/4A; PDMR sin divisa queda None."""
+    from app.models import InsiderFiling
+    from app.services.insider_feed import _tx_dict
+
+    assert asyncio.run(ingest_uk_pdmr(db, 1, client=_client_with([_NO_CURRENCY_ENTRY])))["saved"] == 1
+    tx = db.scalar(select(InsiderTransaction).where(InsiderTransaction.accession_number == "nocur-1|1"))
+    filing = db.scalar(select(InsiderFiling).where(InsiderFiling.accession_number == "nocur-1|1"))
+    assert _tx_dict(tx, filing, 1)["currency"] is None
+    tx.form = "4"
+    assert _tx_dict(tx, filing, 1)["currency"] == "USD"

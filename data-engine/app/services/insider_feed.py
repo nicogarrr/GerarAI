@@ -62,9 +62,12 @@ def _tx_dict(row: InsiderTransaction, filing: InsiderFiling, line: int) -> dict[
         "acquired_disposed": row.acquired_disposed,
         "shares": row.shares,
         "price": row.price,
-        # Divisa declarada por transaccion (PDMR UK via tracefour la trae; SEC = USD).
-        "currency": (row.data_quality or {}).get("currency", "USD")
-        if isinstance(row.data_quality, dict) else "USD",
+        # Divisa declarada por transaccion. SEC Form 4: siempre USD (se
+        # declara y liquida en USD). PDMR UK: la que traiga la fuente; si
+        # falta (93/307 en el feed real), None -> UI: "divisa no informada".
+        "currency": ((row.data_quality or {}).get("currency")
+        if isinstance(row.data_quality, dict) else None)
+        or ("USD" if row.form in ("4", "4/A") else None),
         "value": row.value,
         "date": row.tx_date or filing.filing_date,
         "is_derivative": bool(row.is_derivative),
