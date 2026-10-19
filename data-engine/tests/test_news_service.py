@@ -92,9 +92,9 @@ def test_ingest_strips_repeated_headline_and_source_signature(db):
     )
     result = service.ingest_news_items(db, [item], default_source="feed")
     assert result.created == 1
-    saved = result.events[0]
-    assert saved.title.count("Unveils Next-Gen Smart Glasses") == 1
-    assert "Simply Wall Street" not in saved.title
+    saved_summary = result.events[0].summary
+    assert saved_summary.count("Unveils Next-Gen Smart Glasses") == 1
+    assert "Simply Wall Street" not in saved_summary
 
 
 def test_ingest_keeps_body_without_repetition_untouched(db):
@@ -109,7 +109,7 @@ def test_ingest_keeps_body_without_repetition_untouched(db):
     )
     result = service.ingest_news_items(db, [item], default_source="feed")
     assert result.created == 1
-    assert "The board authorized an additional program" in result.events[0].title
+    assert "The board authorized an additional program" in result.events[0].summary
 
 
 def test_ingest_skips_duplicates_and_accounts_exactly(db):

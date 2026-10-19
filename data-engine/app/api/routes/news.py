@@ -15,15 +15,17 @@ from app.services.news_headline_translation import (
     translate_headline,
     translate_summary,
 )
-from app.services.news_service import NewsService
+from app.services.news_service import (
+    NewsService,
+    is_position_change_headline,
+    position_change_cluster_title,
+)
 from app.services.public_headline_translation import translate_external_headline
 from app.services.second_order_news_service import analyze_second_order
 from app.services.ticker_news_lane import (
     _only_ticker_prefix_mention,
     fails_strict_name,
     is_law_firm_solicitation,
-    is_position_change_headline,
-    position_change_cluster_title,
 )
 
 router = APIRouter()
