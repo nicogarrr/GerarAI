@@ -54,7 +54,14 @@ def position_change_cluster_title(ticker: str | None, source: str, count: int) -
     donde = f" en {ticker}" if ticker else ""
     return f"{count} movimientos de inversores institucionales{donde} · {source}"
 from app.services.thesis_graph_service import ThesisGraphService
-from app.services.ticker_news_lane import is_competitor_only, is_law_firm_solicitation
+from app.services.ticker_news_lane import (
+    STRICT_NAME_PATTERNS as STRICT_TICKERS,
+)
+from app.services.ticker_news_lane import (
+    fails_strict_name,
+    is_competitor_only,
+    is_law_firm_solicitation,
+)
 
 _NAME_NOISE = {"inc", "corp", "corporation", "co", "company", "ltd", "plc", "sa", "nv", "ag", "the", "group", "holdings", "holding", "limited", "sme", "s.a."}
 
@@ -132,6 +139,11 @@ def _ticker_evidence_level(ticker: str, name: str | None, text: str) -> int:
         return EVIDENCE_STRONG
     if re.search(rf"\b(?:NYSE|NASDAQ|AMEX|BME|LSE|EPA|ETR)\s*:\s*{tk}\b", text, flags=re.IGNORECASE):
         return EVIDENCE_STRONG
+    # Siglas que chocan con una palabra o sigla corriente (AENA, CB cornerback,
+    # CPT visado estudiantil): vale una forma completa verificada o la sigla
+    # con contexto del sector; la proximidad financiera suelta no basta.
+    if ticker.upper() in STRICT_TICKERS:
+        return 0 if fails_strict_name(ticker, text) else EVIDENCE_NAME
     if not re.search(rf"(?<![\w$]){tk}(?![\w])", text):
         return 0
     for token in re.findall(r"[A-Za-z][A-Za-z.&'-]+", name or ""):
