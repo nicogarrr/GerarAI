@@ -64,6 +64,30 @@ test.beforeAll(async () => {
     body: bodyNar,
   });
   if (!resNar.ok) throw new Error(`ensure E2ENAR fallo: ${resNar.status} ${await resNar.text()}`);
+
+  // Arranque limpio para el boton de generacion: la corrida E2E levanta el
+  // scheduler del backend pero no un worker que consuma la cola, y cualquier
+  // run de tesis encolado para MSFT (p.ej. por una corrida anterior con la
+  // misma BD) acaba dispatch_failed; el boton lo refleja ocupado
+  // honestamente («Generando en segundo plano…») y el spec asume estado
+  // ocioso. Se borran los runs GenerateThesisWorkflow de MSFT en la BD E2E.
+  execFileSync("python3", [
+    "-c",
+    `
+import sqlite3
+db = sqlite3.connect("data-engine/cavaai_ui_e2e.db")
+cur = db.cursor()
+ids = [r[0] for r in cur.execute(
+    "SELECT id FROM workflow_runs WHERE workflow_name = 'GenerateThesisWorkflow' "
+    "AND json_extract(input_payload, '$.ticker') = 'MSFT'"
+)]
+for rid in ids:
+    cur.execute("DELETE FROM workflow_step_runs WHERE run_id = ?", (rid,))
+    cur.execute("DELETE FROM workflow_runs WHERE id = ?", (rid,))
+db.commit()
+db.close()
+`,
+  ]);
 });
 
 test.describe("research thesis workspace", () => {
