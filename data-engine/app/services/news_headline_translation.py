@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import re
 import time
 from datetime import UTC, datetime, timedelta
@@ -28,6 +29,8 @@ _slots = asyncio.Semaphore(2)
 # Plazo total por petición: sin él, una cadena de 4 eslabones con timeout de
 # 8/12 s cada uno puede ocupar un slot 32/48 s y el resto de usuarios recibe
 # "busy". El plazo corta la cadena entera.
+logger = logging.getLogger(__name__)
+
 HEADLINE_TOTAL_SECONDS = 10
 HEADLINE_ATTEMPT_SECONDS = 8
 SUMMARY_TOTAL_SECONDS = 15
@@ -146,7 +149,15 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
             if not budget.can_spend(db, 0.01):
                 return _result(event, "unavailable", reason="budget")
             # Atomic row lease also prevents duplicate calls across worker processes.
-            event = db.scalar(select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update().execution_options(populate_existing=True))
+            # skip_locked: esta consulta es SINCRONA dentro de un handler async; un
+            # FOR UPDATE que espera el lock de otra transaccion (ingesta) congelaria
+            # el event loop de TODO el backend (medido: 76-156 s sin atender nada).
+            locked = db.scalar(select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update(skip_locked=True).execution_options(populate_existing=True))
+            if locked is None:
+                logger.warning("headline translation: fila %s bloqueada por otra transaccion; busy", event_id)
+                db.rollback()
+                return _result(event, "busy", reason="busy")
+            event = locked
             cached = cached_translation(event)
             if cached and cached.get("status") == "translated":
                 db.rollback()
@@ -304,7 +315,12 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
             budget = BudgetController()
             if not budget.can_spend(db, 0.02):
                 return _summary_result(event, "unavailable", reason="budget")
-            event = db.scalar(select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update().execution_options(populate_existing=True))
+            locked = db.scalar(select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update(skip_locked=True).execution_options(populate_existing=True))
+            if locked is None:
+                logger.warning("summary translation: fila %s bloqueada por otra transaccion; busy", event_id)
+                db.rollback()
+                return _summary_result(event, "busy", reason="busy")
+            event = locked
             cached = cached_summary_translation(event)
             if cached and cached.get("status") == "translated":
                 db.rollback()
