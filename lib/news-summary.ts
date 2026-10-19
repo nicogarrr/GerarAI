@@ -15,8 +15,16 @@ export function newsSummaryToShow(headline: string, summary: string | null | und
     let out = text;
     if (h && t.startsWith(h)) {
         const idx = out.toLowerCase().indexOf(headline.trim().toLowerCase());
-        if (idx === 0) out = out.slice(headline.trim().length).replace(/^[\s:.\-–,]+/, '');
-        else return null;
+        if (idx === 0) {
+            const cutAt = headline.trim().length;
+            // Titulares antiguos recortados a media palabra en la ingesta: si el
+            // corte cae dentro de una palabra, el resto empieza con un fragmento
+            // («…del Bernstein» + «nstein …») y se descarta la palabra partida.
+            const wordChar = /[\p{L}\p{N}]/u;
+            const midWord = wordChar.test(out.charAt(cutAt - 1)) && wordChar.test(out.charAt(cutAt));
+            out = out.slice(cutAt).replace(/^[\s:.\-–,]+/, '');
+            if (midWord) out = out.replace(/^\S+\s+/, '');
+        } else return null;
         if (!out) return null;
     }
     if (!/[.!?…"”)\]]$/.test(out) && out.length >= 150) {
