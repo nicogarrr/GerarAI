@@ -85,39 +85,143 @@ def test_status_is_unavailable_when_sidecar_is_down(monkeypatch):
     assert svc.fetch_mp3("K") is None
 
 
-def test_audio_context_uses_draft_memo_for_unpublished_thesis(monkeypatch):
+def _fake_route(monkeypatch, service_cls, memo_return="# Memo"):
+    """ThesisService/resolve_company/build_memo_markdown stubbeados; devuelve los kwargs del memo."""
     from types import SimpleNamespace
 
     from app.api.routes import thesis as route
 
     calls = {}
 
+    def fake_memo(db, company, thesis, **kwargs):
+        calls.update(kwargs)
+        return memo_return
+
+    monkeypatch.setattr(route, "ThesisService", service_cls)
+    monkeypatch.setattr(route, "resolve_company", lambda db, t: SimpleNamespace(ticker="EXEL"))
+    monkeypatch.setattr(route, "build_memo_markdown", fake_memo)
+    return route, calls
+
+
+def test_audio_context_default_uses_latest_published_not_newer_draft(monkeypatch):
+    """v13 borrador no tapa a v11 publicada: por defecto suena la publicada."""
+    from types import SimpleNamespace
+
+    seen = {}
+
     class FakeService:
-        def latest(self, db, ticker):
-            return SimpleNamespace(status="draft", version=3, company_id=1, updated_at=0)
+        def latest_published(self, db, ticker):
+            seen["latest_published"] = ticker
+            return SimpleNamespace(status="published", version=11, company_id=1, updated_at=0)
+
+        def by_version(self, db, ticker, version):
+            raise AssertionError("por defecto no se pide por version")
 
         def data_freshness(self, db, company_id):
             return None
 
-    def fake_memo(db, company, thesis, **kwargs):
-        calls.update(kwargs)
-        return "# Memo\n\nVersión 3 sin veredicto."
-
-    monkeypatch.setattr(route, "ThesisService", FakeService)
-    monkeypatch.setattr(route, "resolve_company", lambda db, t: SimpleNamespace(ticker="EXEL"))
-    monkeypatch.setattr(route, "build_memo_markdown", fake_memo)
+    route, calls = _fake_route(monkeypatch, FakeService, "# Memo\n\nVersión 11.")
     key, text = route._audio_context(None, "EXEL")
+    assert seen["latest_published"] == "EXEL"
+    assert calls["draft"] is False
+    assert key.startswith("EXEL-v11-p-")
+    assert "versión 11" in text.lower()
+
+
+def test_audio_context_default_404_without_published(monkeypatch):
+    """Sin ninguna publicada no se locuta el borrador: 404."""
+    import pytest
+    from fastapi import HTTPException
+
+    class FakeService:
+        def latest_published(self, db, ticker):
+            return None
+
+        def data_freshness(self, db, company_id):
+            return None
+
+    route, _ = _fake_route(monkeypatch, FakeService)
+    with pytest.raises(HTTPException) as excinfo:
+        route._audio_context(None, "EXEL")
+    assert excinfo.value.status_code == 404
+    assert excinfo.value.detail == "No published thesis for ticker"
+
+
+def test_audio_status_is_missing_without_published(monkeypatch):
+    """La ficha ve «sin audio» (missing), no un error, cuando no hay publicada."""
+    from fastapi import HTTPException
+
+    from app.api.routes import thesis as route
+
+    def no_published(db, ticker, version=None):
+        raise HTTPException(status_code=404, detail="No published thesis for ticker")
+
+    monkeypatch.setattr(route, "_audio_context", no_published)
+    assert route.thesis_audio_status("EXEL", None, None) == {"state": "missing", "key": None}
+
+
+def test_audio_status_explicit_version_missing_404(monkeypatch):
+    """?version=N inexistente: 404, no missing silencioso."""
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.routes import thesis as route
+
+    def no_version(db, ticker, version=None):
+        raise HTTPException(status_code=404, detail=f"No thesis version {version} for ticker")
+
+    monkeypatch.setattr(route, "_audio_context", no_version)
+    with pytest.raises(HTTPException) as excinfo:
+        route.thesis_audio_status("EXEL", 99, None)
+    assert excinfo.value.status_code == 404
+
+
+def test_audio_context_explicit_draft_version_keeps_draft_memo(monkeypatch):
+    """?version=N de un borrador: modo borrador (sin veredicto ni cifras), clave -d-."""
+    from types import SimpleNamespace
+
+    class FakeService:
+        def by_version(self, db, ticker, version):
+            assert version == 13
+            return SimpleNamespace(status="draft", version=13, company_id=1, updated_at=0)
+
+        def latest_published(self, db, ticker):
+            raise AssertionError("version explicita no consulta la publicada")
+
+        def data_freshness(self, db, company_id):
+            return None
+
+    route, calls = _fake_route(monkeypatch, FakeService, "# Memo\n\nVersión 13 sin veredicto.")
+    key, text = route._audio_context(None, "EXEL", 13)
     assert calls["draft"] is True
     assert "Margen de seguridad" not in text and "Compra" not in text
-    assert key.startswith("EXEL-v3-d-")
+    assert key.startswith("EXEL-v13-d-")
+
+
+def test_audio_context_explicit_version_missing_404(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+
+    class FakeService:
+        def by_version(self, db, ticker, version):
+            return None
+
+        def data_freshness(self, db, company_id):
+            return None
+
+    route, _ = _fake_route(monkeypatch, FakeService)
+    with pytest.raises(HTTPException) as excinfo:
+        route._audio_context(None, "EXEL", 99)
+    assert excinfo.value.status_code == 404
+    assert "99" in excinfo.value.detail
 
 
 def test_audio_post_does_not_requeue_while_pending(monkeypatch):
     from app.api.routes import thesis as route
 
-    monkeypatch.setattr(route, "_audio_context", lambda db, t: ("K", "txt"))
+    monkeypatch.setattr(route, "_audio_context", lambda db, t, v=None: ("K", "txt"))
     monkeypatch.setattr(route.thesis_audio_service, "status", lambda k: "pending")
     monkeypatch.setattr(
         route.thesis_audio_service, "start", lambda k, t: (_ for _ in ()).throw(AssertionError("requeued"))
     )
-    assert route.thesis_audio_generate("EXEL", None) == {"state": "pending", "key": "K"}
+    assert route.thesis_audio_generate("EXEL", None, None) == {"state": "pending", "key": "K"}

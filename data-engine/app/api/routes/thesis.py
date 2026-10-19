@@ -419,12 +419,24 @@ def thesis_memo(
     )
 
 
-def _audio_context(db: Session, ticker: str) -> tuple[str, str]:
-    """(key, texto hablable) de la ultima version; los borradores usan el memo sin veredicto."""
+def _audio_context(db: Session, ticker: str, version: int | None = None) -> tuple[str, str]:
+    """(key, texto hablable) de la version que corresponde locutar.
+
+    Por defecto suena la ultima tesis PUBLICADA vigente: un borrador nunca
+    se locuta solo por ser la ultima version (v13 borrador no tapa a v11
+    publicada). Sin publicada hay 404. Con ``version=N`` se pide una version
+    concreta; si no esta publicada se mantiene el modo borrador del memo
+    (sin veredicto ni cifras).
+    """
     service = ThesisService()
-    thesis = service.latest(db, ticker)
-    if not thesis:
-        raise HTTPException(status_code=404, detail="No thesis for ticker")
+    if version is None:
+        thesis = service.latest_published(db, ticker)
+        if not thesis:
+            raise HTTPException(status_code=404, detail="No published thesis for ticker")
+    else:
+        thesis = service.by_version(db, ticker, version)
+        if not thesis:
+            raise HTTPException(status_code=404, detail=f"No thesis version {version} for ticker")
     company = resolve_company(db, ticker)
     latest_data_at = service.data_freshness(db, thesis.company_id)
     stale = latest_data_at is not None and latest_data_at > thesis.updated_at
@@ -444,16 +456,39 @@ def _audio_context(db: Session, ticker: str) -> tuple[str, str]:
 
 
 @router.get("/{ticker}/audio/status")
-def thesis_audio_status(ticker: str, db: Session = Depends(get_db)) -> dict:
-    """Estado del audio: ready | pending | missing | unavailable | error."""
-    key, _ = _audio_context(db, ticker)
+def thesis_audio_status(
+    ticker: str,
+    version: int | None = Query(None, ge=1),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Estado del audio: ready | pending | missing | unavailable | error.
+
+    Por defecto, de la ultima tesis PUBLICADA; si no hay ninguna devuelve
+    ``missing`` (no 404) para que la ficha muestre «sin audio» en vez de un
+    error. ``?version=N`` consulta una version concreta (404 si no existe).
+    """
+    try:
+        key, _ = _audio_context(db, ticker, version)
+    except HTTPException as exc:
+        if version is None and exc.status_code == 404:
+            return {"state": "missing", "key": None}
+        raise
     return {**thesis_audio_service.status_info(key), "key": key}
 
 
 @router.post("/{ticker}/audio", status_code=202)
-def thesis_audio_generate(ticker: str, db: Session = Depends(get_db)) -> dict:
-    """Encola la generacion (idempotente); si ya esta listo devuelve ready."""
-    key, text = _audio_context(db, ticker)
+def thesis_audio_generate(
+    ticker: str,
+    version: int | None = Query(None, ge=1),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Encola la generacion (idempotente); si ya esta listo devuelve ready.
+
+    Por defecto genera la ultima PUBLICADA (404 si no hay: nunca se locuta
+    un borrador por omision). ``?version=N`` genera esa version; una no
+    publicada suena en modo borrador, sin veredicto ni cifras.
+    """
+    key, text = _audio_context(db, ticker, version)
     current = thesis_audio_service.status(key)
     if current in ("ready", "pending"):
         # Una sintesis a la vez por tesis: no se reencola mientras haya una en curso.
@@ -465,9 +500,17 @@ def thesis_audio_generate(ticker: str, db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/{ticker}/audio")
-def thesis_audio(ticker: str, db: Session = Depends(get_db)) -> Response:
-    """El mp3 cacheado de la ultima version; 404 si aun no esta generado."""
-    key, _ = _audio_context(db, ticker)
+def thesis_audio(
+    ticker: str,
+    version: int | None = Query(None, ge=1),
+    db: Session = Depends(get_db),
+) -> Response:
+    """El mp3 cacheado; 404 si aun no esta generado o la version no existe.
+
+    Misma seleccion que POST: ultima PUBLICADA por defecto, ``?version=N``
+    para una concreta.
+    """
+    key, _ = _audio_context(db, ticker, version)
     data = thesis_audio_service.fetch_mp3(key)
     if data is None:
         raise HTTPException(status_code=404, detail="Audio no generado")
