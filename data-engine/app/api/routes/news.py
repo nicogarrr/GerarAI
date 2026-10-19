@@ -21,6 +21,14 @@ from app.services.news_service import (
     is_position_change_headline,
     position_change_cluster_title,
 )
+from app.services.news_story_cluster import (
+    StoryGroup,
+    absorb,
+    best_text,
+    event_signature,
+    exact_key,
+    find_group,
+)
 from app.services.public_headline_translation import translate_external_headline
 from app.services.second_order_news_service import analyze_second_order
 from app.services.ticker_news_lane import (
@@ -52,15 +60,6 @@ def _is_off_topic(event: NewsEvent, company: Company | None) -> bool:
     return _only_ticker_prefix_mention(company, event.title or "", event.summary or "")
 
 
-def _headline_dedupe_key(event: NewsEvent) -> str:
-    """Titular mostrado, normalizado (minusculas, espacios colapsados).
-
-    Dos filas con el mismo titular literal son el mismo evento re-publicado:
-    en la portada solo se muestra la mas reciente.
-    """
-    return " ".join(original_headline(event).strip().lower().split())
-
-
 @router.post("/manual", response_model=ManualNewsResponse)
 def manual_news(payload: ManualNewsRequest, db: Session = Depends(get_db)) -> ManualNewsResponse:
     return NewsService().analyze_manual_news(db, payload.text, payload.source, payload.url)
@@ -82,7 +81,10 @@ def news_events(
     """Eventos por pagina (scroll infinito). ``lane`` filtra en SQL:
     ``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT.
     ``ticker`` limita a los eventos de esa empresa (ficha de accion).
-    Las filas etiquetadas con un ticker que no citan a la empresa se omiten."""
+    Las filas etiquetadas con un ticker que no citan a la empresa se omiten.
+    En portada (sin ``ticker``) la misma historia publicada por varios medios
+    se agrupa en la fila mas reciente: ``coverage_count``/``coverage`` declaran
+    las fuentes absorbidas (regla determinista, ver news_story_cluster)."""
     stmt = select(NewsEvent, Company).outerjoin(Company, NewsEvent.company_id == Company.id)
     if ticker:
         stmt = stmt.where(Company.ticker == ticker.strip().upper())
@@ -102,11 +104,11 @@ def news_events(
     rows: list = []
     skipped = 0
     scanned = 0
-    seen_headlines: set[str] = set()
     # Agrupación de titulares 13F (boilerplate de MarketBeat y agregadores):
     # una fila visible por empresa y día con recuento, representada por el
     # primer evento del grupo. En la ficha de empresa se muestran sin agrupar.
     clusters: dict[tuple, dict] = {}
+    story_groups: list[StoryGroup] = []
     while len(rows) < limit and scanned < _SCAN_LIMIT:
         chunk = db.execute(ordered.limit(_SCAN_CHUNK).offset(scanned)).all()
         if not chunk:
@@ -133,12 +135,24 @@ def news_events(
                     else:
                         cluster["count"] += 1
                 else:
-                    dedupe_key = _headline_dedupe_key(event)
-                    if dedupe_key:
-                        if dedupe_key in seen_headlines:
-                            continue
-                        seen_headlines.add(dedupe_key)
-                    item = (event, company)
+                    # Misma historia reescrita por otro medio (o traducida): se
+                    # agrupa en la fila más reciente y queda como cobertura
+                    # («N fuentes») en vez de repetirse en portada. La dedup
+                    # literal queda absorbida por la firma (Jaccard 1.0).
+                    sig = event_signature(event, company)
+                    group = find_group(story_groups, event, company, sig)
+                    if group is not None:
+                        absorb(group, event)
+                        continue
+                    story_groups.append(
+                        StoryGroup(
+                            event=event,
+                            company=company,
+                            signature=sig,
+                            text_key=exact_key(best_text(event)),
+                        )
+                    )
+                    item = ("story", len(story_groups) - 1)
             else:
                 item = (event, company)
             if item is None:
@@ -152,10 +166,15 @@ def news_events(
     events = []
     for item in rows:
         cluster_count = 0
+        story_coverage: list[dict] = []
         if isinstance(item[0], str) and item[0] == "cluster":
             cluster = clusters[item[1]]
             event, company = cluster["event"], cluster["company"]
             cluster_count = cluster["count"]
+        elif isinstance(item[0], str) and item[0] == "story":
+            group = story_groups[item[1]]
+            event, company = group.event, group.company
+            story_coverage = group.coverage
         else:
             event, company = item
         clustered = cluster_count > 1
@@ -200,6 +219,11 @@ def news_events(
                     else (event.metadata_ or {}).get("headline_from_source", True)
                 ),
                 "cluster_count": cluster_count if clustered else None,
+                # Misma historia en otros medios, agrupada (portada). La fila
+                # representante es la más reciente; coverage lista fuente/URL
+                # absorbidas, en orden de llegada (más reciente primero).
+                "coverage_count": len(story_coverage) + 1 if story_coverage else None,
+                "coverage": story_coverage or None,
                 # Carril macro GDELT (#564): None en eventos de empresa.
                 "news_lane": (event.metadata_ or {}).get("news_lane"),
                 "macro_theme": (event.metadata_ or {}).get("macro_theme"),
