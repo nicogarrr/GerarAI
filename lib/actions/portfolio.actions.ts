@@ -875,6 +875,9 @@ export type DividendProjectionMonth = {
   month: string;
   gross_base: number;
   source_withheld_base: number;
+  /** Bruto con FX conocido de posiciones sin retención verificada (nunca neto). */
+  gross_unverified_base?: number;
+  gross_total_base?: number;
   covered_tickers: string[];
   excluded_tickers: string[];
   note: string | null;
@@ -939,6 +942,7 @@ export type PortfolioDividendProjection = {
   months: DividendProjectionMonth[];
   fiscal_by_year: Record<string, DividendProjectionFiscalYear>;
   positions: DividendProjectionPosition[];
+  gross_summary?: { label: string; gross_total_base: number; gross_unverified_base: number; net_irpf: string };
   declared_future: DividendProjectionDeclaredFuture[];
   coverage: {
     with_data: number;
