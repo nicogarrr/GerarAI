@@ -141,6 +141,13 @@ class NewsService:
             # URL (o no hay dedup posible); casar por título aquí descartaría
             # filings reales como falsos duplicados.
             return False
+        from app.services.news_identity import equivalent_news_event
+
+        # Misma URL con otra query/fragmento, o mismo titular con otra puntuación: es la misma noticia.
+        if equivalent_news_event(
+            db, company_id=company.id if company else None, url=url, title=text
+        ) is not None:
+            return True
         duplicate_title = db.scalar(
             select(NewsEvent.id)
             .where(

@@ -314,6 +314,14 @@ class AlertRuleService:
             event = db.scalar(statement)
             # Sin titular verificable no hay nada que citar: no dispara.
             has_title = bool(event and (event.title or "").strip())
+            if has_title:
+                from app.services.news_identity import equivalent_news_alert
+
+                if equivalent_news_alert(
+                    db, company_id=rule.company_id, url=event.url, title=event.title
+                ) is not None:
+                    # Otra vía ya avisó de esta noticia: no se duplica el aviso.
+                    return 0, {"kind": kind, "news_event_id": None, "suppressed": "duplicate_news"}
             return (1 if has_title else 0), {
                 "kind": kind,
                 "news_event_id": event.id if has_title else None,
