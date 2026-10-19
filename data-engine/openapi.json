@@ -54985,7 +54985,7 @@
     },
     "/api/thesis/{ticker}/debate": {
       "post": {
-        "description": "Debate bull/bear sobre la \u00faltima tesis y persiste el veredicto.\n\nEl debate en s\u00ed nunca lanza (degrada a veredicto determinista); si el\nupsert de la secci\u00f3n falla, se devuelve el debate con persisted=False.",
+        "description": "Debate bull/bear sobre la \u00faltima tesis y persiste el veredicto.\n\nSin LLM gratuito se devuelve 503, nunca se persiste un debate inventado.\nSi el upsert falla, se devuelve el debate con persisted=False.",
         "operationId": "debate_thesis_endpoint_api_thesis__ticker__debate_post",
         "parameters": [
           {

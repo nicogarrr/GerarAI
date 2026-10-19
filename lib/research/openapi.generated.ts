@@ -4485,8 +4485,8 @@ export interface paths {
          * Debate Thesis Endpoint
          * @description Debate bull/bear sobre la última tesis y persiste el veredicto.
          *
-         *     El debate en sí nunca lanza (degrada a veredicto determinista); si el
-         *     upsert de la sección falla, se devuelve el debate con persisted=False.
+         *     Sin LLM gratuito se devuelve 503, nunca se persiste un debate inventado.
+         *     Si el upsert falla, se devuelve el debate con persisted=False.
          */
         post: operations["debate_thesis_endpoint_api_thesis__ticker__debate_post"];
         delete?: never;

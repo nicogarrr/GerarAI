@@ -3,6 +3,7 @@
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
 import { sanitizeDebate, type SanitizedDebate } from '@/lib/research/debate-sanitize';
+import { debateErrorMessage } from '@/lib/research/debate-error';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 
 export interface ThesisJobPhase {
@@ -89,7 +90,7 @@ export type ThesisDebateOutcome =
 const DEBATE_TIMEOUT_MS = 55_000;
 
 /**
- * POST /api/thesis/{ticker}/debate — debate bull/bear (degrada a determinista).
+ * POST /api/thesis/{ticker}/debate — debate bull/bear (503 si no hay LLM gratuito disponible).
  * Devuelve un resultado tipado en lugar de lanzar: un throw en una server action
  * llega a produccion como el error React #441 sin mensaje. La salida del LLM se
  * sanea y valida antes de salir del servidor.
@@ -107,14 +108,7 @@ export async function runThesisDebate(ticker: string): Promise<ThesisDebateOutco
         if (!debate) return { ok: false, error: 'El debate devolvió una respuesta no válida; se descarta.' };
         return { ok: true, debate };
     } catch (exc) {
-        const name = exc instanceof Error ? exc.name : '';
-        return {
-            ok: false,
-            error:
-                name === 'TimeoutError' || name === 'AbortError'
-                    ? 'El debate tardó demasiado; reinténtalo.'
-                    : 'No se pudo generar el debate; reinténtalo.',
-        };
+        return { ok: false, error: debateErrorMessage(exc) };
     }
 }
 

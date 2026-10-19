@@ -149,3 +149,16 @@ def _reset_chat_quota_cooldowns():
     reset_quota_cooldowns()
     yield
     reset_quota_cooldowns()
+
+
+@pytest.fixture(autouse=True)
+def isolate_llm_free_tier_breaker():
+    """Quota cooldowns persist in production, never across hermetic test cases."""
+    from app.llm import base
+    base._free_tier_breaker.clear()
+    base._free_tier_breaker_status.clear()
+    base._interactive_quota_breaker.clear()
+    yield
+    base._free_tier_breaker.clear()
+    base._free_tier_breaker_status.clear()
+    base._interactive_quota_breaker.clear()

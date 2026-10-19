@@ -189,6 +189,7 @@ async def debate_thesis(
     portfolio_weight: float = 0.0,
     use_jev: bool = True,
     skip_jev_gate: bool = False,
+    strict_provider: bool = False,
     db: Any | None = None,
 ) -> dict[str, Any]:
     """Debate bull -> bear -> veredicto. Nunca lanza excepcion.
@@ -259,7 +260,9 @@ async def debate_thesis(
             db=db,
         )
         model = model or resp.model
-    except Exception:
+    except Exception as exc:
+        if strict_provider:
+            raise exc
         degraded = True
         bull_case = _deterministic_side(ticker, thesis, "bull")
 
@@ -278,7 +281,9 @@ async def debate_thesis(
             db=db,
         )
         model = model or resp.model
-    except Exception:
+    except Exception as exc:
+        if strict_provider:
+            raise exc
         degraded = True
         bear_case = _deterministic_side(ticker, thesis, "bear")
 
@@ -321,10 +326,14 @@ async def debate_thesis(
             match = re.search(r"(bullish|bearish|neutral)", judge_text.lower())
             verdict = match.group(1) if match else None
             verdict_rationale = judge_text.strip()[:600]
-        except Exception:
+        except Exception as exc:
+            if strict_provider:
+                raise exc
             verdict = None
 
     if verdict not in {"bullish", "bearish", "neutral"}:
+        if strict_provider:
+            raise ValueError("invalid debate verdict")
         degraded = True
         fallback = _deterministic_verdict(ticker, thesis, bull_case, bear_case)
         verdict = fallback["verdict"]
