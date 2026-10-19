@@ -38,3 +38,10 @@ test('documentos: tier en castellano y ausencia de fecha explícita', () => {
   assert.ok(page.includes('etiquetaTierFuente(document.source_tier)'));
   assert.ok(page.includes("'fecha desconocida'"));
 });
+
+test('auditFixLabel: lista de entradas faltantes sin claves crudas ni comodines', () => {
+  assert.equal(
+    auditFixLabel('Faltan entradas de valoración (variables del modelo): asset_value, aum, segment_*_operating_metric, segment_*_valuation_multiple'),
+    'Faltan entradas de valoración (variables del modelo): valor de los activos, activos bajo gestión (AUM), métrica operativa por segmento, múltiplo de valoración por segmento',
+  );
+});
