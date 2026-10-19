@@ -321,3 +321,15 @@ def test_company_without_records_is_synced_on_demand_before_answering(db, monkey
     response = asyncio.run(ChatService().answer(db, "¿Qué dividendo paga Coca-Cola y cuándo es el próximo?", "portfolio", None))
     assert calls == ["KO"]
     assert "$0.51" in response.answer
+
+
+def test_per_without_verified_eps_explains_what_is_missing(db):
+    a = company(db, "AAPL")
+    db.add(MarketPrice(company_id=a.id, date=date.today(), close=Decimal("200"), source="yahoo"))
+    db.info.pop("tenant_id", None)
+    db.commit()
+    db.info["tenant_id"] = 1
+    response = asyncio.run(ChatService().answer(db, "¿Precio actual de AAPL y su PER?", "portfolio", None))
+    assert "PER: sin dato calculable guardado" in response.answer
+    assert "hace falta un precio reciente y un BPA anual positivo" in response.answer
+    assert response.llm_trace["provider_calls"] == 0

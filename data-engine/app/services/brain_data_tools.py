@@ -61,7 +61,7 @@ def _company_data(db: Session, company: Company) -> tuple[list[str], list[dict]]
     ratio = load_screener_ratios(db, {company.ticker}).get(company.ticker, {}) if price else {}
     pe = ratio.get("pe")
     if pe is None:
-        lines.append("PER: no calculable con precio reciente y BPA anual positivo, verificado y en la misma moneda.")
+        lines.append("PER: sin dato calculable guardado; hace falta un precio reciente y un BPA anual positivo, verificado y en la misma moneda.")
     else:
         fact = ratio.get("ratioProvenance", {}).get("facts", {}).get("pe", {})
         lines.append(f"PER sobre BPA anual: {_number(pe)} veces (ejercicio {fact.get('year')}); "
