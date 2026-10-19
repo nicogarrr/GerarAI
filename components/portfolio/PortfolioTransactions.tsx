@@ -1,5 +1,6 @@
 'use client';
 
+import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { formatMoney, formatNumber, formatPrice, formatUserDate, isValidCurrencyCode, NA } from '@/lib/format';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -104,6 +105,7 @@ export default function PortfolioTransactions({ transactions, userId }: Props) {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
+                            <CompanyLogo ticker={tx.symbol} name={tx.symbol} className="size-7 shrink-0 rounded-md" />
                             <Link
                               href={`/research/${tx.symbol}`}
                               className="font-bold text-gray-200 hover:text-teal-300 transition-colors"

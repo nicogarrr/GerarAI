@@ -1,5 +1,6 @@
 'use client';
 
+import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { formatDate, formatMoney, formatNumber, formatPercent, NA } from '@/lib/format';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -162,8 +163,9 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <div className="flex items-center justify-between gap-2">
                       <Link
                         href={`/research/${holding.symbol}`}
-                        className="font-mono text-lg font-bold text-teal-400 hover:text-teal-300"
+                        className="flex items-center gap-2 font-mono text-lg font-bold text-teal-400 hover:text-teal-300"
                       >
+                        <CompanyLogo ticker={holding.symbol} name={holding.symbol} className="size-8 shrink-0 rounded-lg" />
                         {holding.symbol}
                       </Link>
                       <Button
@@ -266,6 +268,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <TableRow key={holding.symbol} className="border-gray-700 hover:bg-gray-800/50">
                       <TableCell>
                         <div className="flex items-center gap-2">
+                          <CompanyLogo ticker={holding.symbol} name={holding.symbol} className="size-8 shrink-0 rounded-lg" />
                           <Link href={`/research/${holding.symbol}`} className="font-mono font-bold text-teal-400 hover:text-teal-300 transition-colors">{holding.symbol}</Link><TrackedAnalysisStatus analysis={holding.analysis} />
                           <details className="relative">
                             <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={`Opciones de ${holding.symbol}`}>Opciones</summary>
