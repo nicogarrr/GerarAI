@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, select
+from sqlalchemy import desc, false, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -77,6 +77,7 @@ def news_events(
     offset: Annotated[int, Query(ge=0)] = 0,
     lane: Literal["empresa", "macro"] | None = None,
     ticker: Annotated[str | None, Query(max_length=20)] = None,
+    tickers: Annotated[str | None, Query(max_length=1000)] = None,
 ) -> list[dict]:
     """Eventos por pagina (scroll infinito). ``lane`` filtra en SQL:
     ``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT.
@@ -84,10 +85,22 @@ def news_events(
     Las filas etiquetadas con un ticker que no citan a la empresa se omiten.
     En portada (sin ``ticker``) la misma historia publicada por varios medios
     se agrupa en la fila mas reciente: ``coverage_count``/``coverage`` declaran
-    las fuentes absorbidas (regla determinista, ver news_story_cluster)."""
+    las fuentes absorbidas (regla determinista, ver news_story_cluster).
+    ``tickers`` (csv, max 50) limita a esas empresas: carril «Para ti»
+    (cartera + watchlist del usuario, que el cliente ya conoce)."""
     stmt = select(NewsEvent, Company).outerjoin(Company, NewsEvent.company_id == Company.id)
     if ticker:
         stmt = stmt.where(Company.ticker == ticker.strip().upper())
+    elif tickers:
+        # Carril «Para ti»: el cliente manda los tickers de su cartera y
+        # watchlist (los conoce él; el backend no tiene la watchlist). Lista
+        # acotada y saneada; los eventos sin empresa (macro) no aplican.
+        wanted = [
+            token.strip().upper()
+            for token in tickers.split(",")
+            if 0 < len(token.strip()) <= 20 and token.strip().replace(".", "").isalnum()
+        ][:50]
+        stmt = stmt.where(Company.ticker.in_(wanted)) if wanted else stmt.where(false())
     if lane == "empresa":
         stmt = stmt.where(NewsEvent.company_id.is_not(None))
     elif lane == "macro":
