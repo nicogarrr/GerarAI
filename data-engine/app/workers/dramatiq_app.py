@@ -48,6 +48,18 @@ def _is_transient(exc: Exception) -> bool:
     import redis.exceptions as redis_exc
     from sqlalchemy import exc as sa_exc
 
+    from app.llm.errors import ProviderHTTPError, ProviderTransportError
+
+    # Errores de la cadena LLM: el transporte (timeout, corte) siempre es
+    # transitorio — los proveedores gratuitos tienen ventanas de saturacion —
+    # y el HTTP solo cuando es 429/5xx (un 4xx de auth o cuota no mejora
+    # reintentando). Sin esto, un solo timeout dejaba la extraccion de
+    # principios «fallida» para siempre con max_retries=2 sin usar.
+    if isinstance(exc, ProviderTransportError):
+        return True
+    if isinstance(exc, ProviderHTTPError):
+        return exc.status_code == 429 or exc.status_code >= 500
+
     transient_types = (
         ConnectionError,
         TimeoutError,

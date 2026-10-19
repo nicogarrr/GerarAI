@@ -54,6 +54,20 @@ def test_permanent_errors_are_not_retried(exc):
     assert _is_transient(exc) is False
 
 
+def test_llm_transport_error_is_transient():
+    """Un timeout del proveedor LLM (cadena gratuita) debe reintentarse."""
+    from app.llm.errors import ProviderTransportError
+
+    assert _is_transient(ProviderTransportError("opencode-go", "timeout", 1)) is True
+
+
+@pytest.mark.parametrize("status,expected", [(429, True), (500, True), (503, True), (400, False), (402, False), (403, False), (404, False)])
+def test_llm_http_error_retry_only_on_429_or_5xx(status, expected):
+    from app.llm.errors import ProviderHTTPError
+
+    assert _is_transient(ProviderHTTPError("opencode-go", status)) is expected
+
+
 def test_handler_reraises_transient_so_dramatiq_retries():
     with pytest.raises(ConnectionError):
         _handle_actor_error("some_actor", ConnectionError("db down"), ticker="MSFT")
