@@ -1,7 +1,7 @@
 import CompanyChatForm from '@/components/research/CompanyChatForm';
 import ScrollToOnMount from '@/components/research/ScrollToOnMount';
 import { formatResearchMetric } from '@/lib/research/metric-value';
-import { financialFormula, financialPeriod, financialVersion } from '@/lib/research/financial-display';
+import { financialFormula, financialPeriod, financialVersionLabel } from '@/lib/research/financial-display';
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import { healthText, listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
@@ -169,6 +169,8 @@ const STATUS_LABELS: Record<string, string> = {
   approved: 'aprobada',
   published: 'publicada',
   rejected: 'rechazada',
+  changes_requested: 'cambios solicitados',
+  'changes requested': 'cambios solicitados',
   stale: 'desactualizada',
   proposed: 'propuesta',
   unknown: 'desconocido',
@@ -432,7 +434,7 @@ function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
             <Badge className="shrink-0" variant="outline">{label(metric.status)}</Badge>
           </div>
           <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit)}</div>
-          <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period)} · {financialVersion(metric.definition_version)}</div>
+          <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period)} · {financialVersionLabel(metric.definition_version)}</div>
           <div className="mt-2 text-xs leading-5 text-gray-400">{financialFormula(metric.formula)}</div>
         </div>
       ))}
@@ -1504,7 +1506,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     content = (
       <Panel title="Auditorías de fuentes">
         {audits.length ? (
-          <div className="space-y-3">{audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">tesis {audit.thesis_version_id ?? 'desconocida'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>)}</div>
+          <div className="space-y-3">{audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? `tesis v${audit.thesis_version}` : 'versión de tesis no registrada'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>)}</div>
         ) : (
           <EmptyState
             action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>Genera una tesis para auditar fuentes</EmptyLink>}
