@@ -1,14 +1,6 @@
-import { Suspense, type ReactNode } from "react";
-import { HubNav } from "../inversores/_components/HubNav";
+import type { ReactNode } from "react";
 
-// Quién compra: Insiders (Form 4), 13F e Inversores comparten una sola barra.
-export default function QuienCompraLayout({ children }: { children: ReactNode }) {
-  return (
-    <>
-      <Suspense fallback={null}>
-        <HubNav />
-      </Suspense>
-      {children}
-    </>
-  );
+// La navegación de Descubrir (SectionNav) ya incluye esta sección: sin barra propia.
+export default function Layout({ children }: { children: ReactNode }) {
+  return <>{children}</>;
 }

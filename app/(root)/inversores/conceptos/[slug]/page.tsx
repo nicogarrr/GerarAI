@@ -24,7 +24,7 @@ export default async function ConceptPage({ params }: Props) {
       className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-8 overflow-x-clip py-6"
     >
       <Link
-        className="text-sm text-lime-300 hover:underline"
+        className="text-sm text-teal-300 hover:underline"
         href="/inversores/conceptos"
       >
         Conceptos
@@ -48,7 +48,7 @@ export default async function ConceptPage({ params }: Props) {
       <p className="text-xs text-gray-500">
         Síntesis editorial ·{" "}
         <a
-          className="text-lime-300 hover:underline"
+          className="text-teal-300 hover:underline"
           href={concept.source.url}
           rel="noreferrer"
           target="_blank"
@@ -58,7 +58,7 @@ export default async function ConceptPage({ params }: Props) {
       </p>
       {concept.investors.map((investor) => (
         <Link
-          className="text-sm text-lime-300 hover:underline"
+          className="text-sm text-teal-300 hover:underline"
           href={`/inversores/${investor}`}
           key={investor}
         >

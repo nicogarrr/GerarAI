@@ -43,7 +43,7 @@ export default async function VideosPage({
       <header className="flex flex-wrap justify-between gap-3">
         <h1 className="text-3xl font-semibold text-gray-100">Vídeos</h1>
         <Link
-          className="inline-flex min-h-11 items-center text-sm text-lime-300 hover:underline"
+          className="inline-flex min-h-11 items-center text-sm text-teal-300 hover:underline"
           href="/inversores/canales"
         >
           Canales de inversión
@@ -54,7 +54,7 @@ export default async function VideosPage({
           <li key={item.slug}>
             <Link
               aria-current={detail?.slug === item.slug ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-xl border p-4 ${detail?.slug === item.slug ? "border-lime-300/60" : "border-gray-800 hover:border-gray-600"}`}
+              className={`flex items-center gap-3 rounded-xl border p-4 ${detail?.slug === item.slug ? "border-teal-300/60" : "border-gray-800 hover:border-gray-600"}`}
               href={`/inversores/videos?inversor=${item.slug}${paged.page > 1 ? `&pagina=${paged.page}` : ""}`}
             >
               <InvestorAvatar slug={item.slug} name={item.name} />
@@ -72,7 +72,7 @@ export default async function VideosPage({
       {detail ? (
         <section className="flex flex-col gap-3">
           <Link
-            className="text-lg font-medium text-gray-100 hover:text-lime-300"
+            className="text-lg font-medium text-gray-100 hover:text-teal-300"
             href={`/inversores/${detail.slug}`}
           >
             {detail.name}

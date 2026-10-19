@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 const PAGE_SIZE = 8;
-const LINK = 'text-sm text-lime-300 hover:underline';
+const LINK = 'text-sm text-teal-300 hover:underline';
 
 type PageProps = {
     params: Promise<{ id: string }>;

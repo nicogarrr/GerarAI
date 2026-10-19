@@ -25,7 +25,7 @@ export function InvestorLetters({
           Cartas
         </h2>
         <Link
-          className="text-sm text-lime-300 hover:underline"
+          className="text-sm text-teal-300 hover:underline"
           href={
             letters[0]?.author
               ? `/inversores/cartas?autor=${encodeURIComponent(authorKey(letters[0].author))}`
@@ -51,7 +51,7 @@ export function InvestorLetters({
               key={letter.id}
             >
               <Link
-                className="text-sm text-gray-200 hover:text-lime-300"
+                className="text-sm text-gray-200 hover:text-teal-300"
                 href={`/inversores/cartas/${letter.id}`}
               >
                 {letter.title}
