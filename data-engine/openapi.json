@@ -2813,6 +2813,10 @@
             "title": "Reasoning",
             "type": "string"
           },
+          "recent_insider_activity": {
+            "title": "Recent Insider Activity",
+            "type": "boolean"
+          },
           "theme": {
             "title": "Theme",
             "type": "string"
@@ -2850,7 +2854,8 @@
           "theme_detected",
           "theme_last_seen",
           "in_portfolio",
-          "in_watchlist"
+          "in_watchlist",
+          "recent_insider_activity"
         ],
         "title": "DiscoveryOut",
         "type": "object"

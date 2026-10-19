@@ -6034,6 +6034,8 @@ export interface components {
             model: string;
             /** Reasoning */
             reasoning: string;
+            /** Recent Insider Activity */
+            recent_insider_activity: boolean;
             /** Theme */
             theme: string;
             /** Theme Detected */
