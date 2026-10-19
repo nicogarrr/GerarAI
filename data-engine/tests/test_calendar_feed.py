@@ -115,3 +115,70 @@ def test_fold_keeps_utf8_intact():
     parts = svc._fold(line)
     assert all(len(p.encode()) <= 75 for p in parts)
     assert "".join(p[1:] if i else p for i, p in enumerate(parts)) == line
+
+
+def test_public_feed_http_without_identity_and_authenticated_routes_stay_401(monkeypatch):
+    """Regresion #1774: el GET publico colgaba de private_dependencies y daba 401.
+    Con la app real: token valido sin identidad = 200 (+cabeceras), token
+    invalido = 404, y GET/POST/DELETE /api/calendar/feed siguen exigiendo firma."""
+    from fastapi.testclient import TestClient
+
+    import main
+
+    init_db()
+    db = SessionLocal()
+    try:
+        ta, _ = _setup(db)
+        db.info["tenant_id"] = ta.id
+        token, _row = svc.create_token(db, "followed")
+    finally:
+        db.close()
+    from app.core.config import get_settings
+
+    # Auth exigida como en produccion (conftest la desactiva por defecto).
+    monkeypatch.setattr(get_settings(), "research_auth_required", True)
+    client = TestClient(main.app)
+    ok = client.get(f"/api/calendar/feed/{token}.ics")
+    assert ok.status_code == 200
+    assert ok.headers["content-type"].startswith("text/calendar")
+    assert ok.headers["x-robots-tag"] == "noindex"
+    assert ok.headers["referrer-policy"] == "no-referrer"
+    assert ok.headers["cache-control"] == "private, max-age=300"
+    assert "BEGIN:VCALENDAR" in ok.text and "FOTHER" not in ok.text
+    for bad in ("gfc_unknowntoken.ics", "gfc_" + "a" * 100 + ".ics", "x.ics", f"{token}"):
+        r = client.get(f"/api/calendar/feed/{bad}")
+        assert r.status_code == 404, bad
+    assert client.get("/api/calendar/feed").status_code == 401
+    assert client.post("/api/calendar/feed", json={}).status_code == 401
+    assert client.delete("/api/calendar/feed").status_code == 401
+
+
+def test_public_feed_ip_rate_limit_returns_429_after_limit(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.core import rate_limit as rl
+
+    monkeypatch.setattr(rl, "PUBLIC_FEED_LIMIT_PER_MINUTE", 3)
+    req = SimpleNamespace(client=SimpleNamespace(host="203.0.113.77"), headers={})
+    for _ in range(3):
+        asyncio.run(rl.enforce_public_ip_rate_limit(req))
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(rl.enforce_public_ip_rate_limit(req))
+    assert exc.value.status_code == 429
+
+
+def test_public_client_ip_uses_last_xff_only_behind_private_proxy():
+    from types import SimpleNamespace
+
+    from app.core.rate_limit import public_client_ip
+
+    def req(peer, xff=None):
+        return SimpleNamespace(client=SimpleNamespace(host=peer), headers={"x-forwarded-for": xff} if xff else {})
+
+    # Tras Caddy (peer privado): ultima entrada, las anteriores son falsificables.
+    assert public_client_ip(req("172.18.0.2", "1.1.1.1, 76.76.21.9")) == "76.76.21.9"
+    assert public_client_ip(req("172.18.0.2")) == "172.18.0.2"
+    assert public_client_ip(req("172.18.0.2", "basura")) == "172.18.0.2"
+    # Acceso directo (peer publico): la cabecera se ignora.
+    assert public_client_ip(req("8.8.4.4", "9.9.9.9")) == "8.8.4.4"

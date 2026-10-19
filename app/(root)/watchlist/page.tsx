@@ -2,7 +2,8 @@ import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus
 import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-analysis-status';
 import type { Metadata } from 'next';
 import { formatMarketCap, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
-import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
+import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type WatchlistEntryData, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
+import { getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -49,6 +50,9 @@ interface WatchlistStock {
     metricsNotApplicable: boolean;
     quoteSymbol: string | null;
     monitor: WatchlistMonitorItem | null;
+    /** true = la cadena de cotización agotó su presupuesto (3 s): las celdas
+        sin dato lo dicen como espera, nunca como fallo de la fuente. */
+    timedOut: boolean;
     addedAt: Date;
 }
 
@@ -96,13 +100,40 @@ export default async function WatchlistPage({
     // la pide el cliente tras el primer pintado (components/watchlist/
     // ExtendedHoursLine). Antes cada carga en frío pagaba el tope de 700 ms
     // por símbolo aunque el dato sea secundario.
-    const entryPromises = pageItems.map((item) =>
-        getWatchlistEntryData(item.symbol).then(
-            (value) => ({ ok: true as const, value }),
-            () => ({ ok: false as const }),
-        ),
-    );
-    const [datedChanges, monitorData] = await Promise.all([datedChangesPromise, monitorPromise]);
+    // Presupuesto por símbolo: en una instancia fría la cadena de cotización
+    // (Finnhub con cuota free compartida -> respaldo Yahoo con 5 s de timeout
+    // por símbolo) medida en prod estiraba el documento a 7-9 s. Pasado el
+    // presupuesto la fila usa el CIERRE DATADO de fetchDatedChanges (misma
+    // fuente que Movers y Mercado, etiquetado «Cierre <fecha>», F358), nunca
+    // un «sin datos» fabricado ni una espera ilimitada. Las lecturas siguen
+    // en vuelo y calientan las cachés para la siguiente carga.
+    const ENTRY_DATA_BUDGET_MS = 3000;
+    // El master (nombre, bolsa, divisa) se resuelve en oleada propia, fuera
+    // del presupuesto: es lectura rápida del backend y así la fila conserva
+    // nombre y divisa reales aunque la cotización agote los 3 s.
+    const basicsPromises = pageItems.map((item) => getResearchCompanyBasics(item.symbol.trim().toUpperCase()));
+    const entryPromises = pageItems.map((item, index) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const basicsPromise = basicsPromises[index];
+        return Promise.race([
+            basicsPromise.then((basics) => getWatchlistEntryData(item.symbol, basics)),
+            new Promise<null>((resolve) => {
+                timer = setTimeout(() => resolve(null), ENTRY_DATA_BUDGET_MS);
+            }),
+        ]).then(
+            (value) => {
+                // Sin clearTimeout el temporizador colgado mantiene la
+                // instancia serverless despierta tras responder.
+                if (timer) clearTimeout(timer);
+                return { ok: true as const, value };
+            },
+            () => {
+                if (timer) clearTimeout(timer);
+                return { ok: false as const };
+            },
+        );
+    });
+    const [datedChanges, monitorData, basicsList] = await Promise.all([datedChangesPromise, monitorPromise, Promise.all(basicsPromises)]);
     const watchlistStocks: WatchlistStock[] = await Promise.all(
         pageItems.map(async (item, index) => {
             try {
@@ -111,7 +142,29 @@ export default async function WatchlistPage({
                 // u otro emisor) y contradecía la ficha research (F253/F254).
                 const settled = await entryPromises[index];
                 if (!settled.ok) throw new Error('watchlist entry failed');
-                const entry = settled.value;
+                // null = presupuesto agotado: entrada vacía con priceKind null
+                // para que el cierre datado (etiquetado) ocupe la celda, pero
+                // CON nombre y divisa del master (un cierre en € no sale en $).
+                const timedOut = settled.value === null;
+                const basics: ResearchCompanyBasics | null = basicsList[index] ?? null;
+                const entry: WatchlistEntryData = settled.value ?? {
+                    symbol: item.symbol.trim().toUpperCase(),
+                    name: basics?.name || item.symbol,
+                    exchange: basics?.exchange || null,
+                    currency: basics?.currency || null,
+                    price: null,
+                    change: null,
+                    changePercent: null,
+                    marketCap: null,
+                    marketCapDerived: false,
+                    peRatio: null,
+                    peKind: null,
+                    peSource: null,
+                    priceKind: null,
+                    priceAsOf: null,
+                    quoteSymbol: null,
+                    metricsNotApplicable: false,
+                };
                 // Mismo cierre datado y mismo % que Movers y Mercado.
                 const dated = entry.priceKind === 'live' ? undefined : datedChanges[item.symbol.trim().toUpperCase()];
                 const data = dated
@@ -142,6 +195,7 @@ export default async function WatchlistPage({
                     quoteSymbol: data.quoteSymbol,
                     analysis: item.analysis,
                     monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
+                    timedOut,
                     addedAt: item.addedAt
                 };
             } catch {
@@ -164,6 +218,7 @@ export default async function WatchlistPage({
                     quoteSymbol: null,
                     analysis: item.analysis,
                     monitor: null,
+                    timedOut: false,
                     addedAt: item.addedAt
                 };
             }
@@ -337,7 +392,7 @@ export default async function WatchlistPage({
                                         {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} />
                                         {stock.price === null ? (
                                             <Badge variant="outline" className="mt-1 border-gray-700 text-gray-400">
-                                                sin datos
+                                                {stock.timedOut ? 'sin datos: la lectura tardó más de 3 s, recarga' : 'sin datos'}
                                             </Badge>
                                         ) : null}
                                     </div>
@@ -364,12 +419,12 @@ export default async function WatchlistPage({
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Market Cap</dt>
                                         <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.timedOut ? 'La lectura tardó más de 3 s; recarga para verla.' : stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
                                         </dd>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">{stock.peKind === 'fy' ? 'PER (FY)' : 'PER (TTM)'}</dt>
-                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined)}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
+                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined)}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null ? (stock.timedOut ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La lectura tardó más de 3 s; recarga para verla.</span> : stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null) : null}</dd>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</dt>
@@ -434,7 +489,7 @@ export default async function WatchlistPage({
                                                         {stock.symbol}
                                                         {stock.price === null ? (
                                                             <Badge variant="outline" className="border-gray-700 font-normal text-gray-400">
-                                                                sin datos
+                                                                {stock.timedOut ? 'sin datos: la lectura tardó más de 3 s, recarga' : 'sin datos'}
                                                             </Badge>
                                                         ) : null}
                                                         {stock.monitor && stock.price !== null && stock.monitor.low_52w !== null && stock.monitor.low_52w_sessions >= 120 && stock.price <= stock.monitor.low_52w * 1.02 ? (
@@ -477,7 +532,7 @@ export default async function WatchlistPage({
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.timedOut ? 'La lectura tardó más de 3 s; recarga para verla.' : stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {stock.peRatio !== null && stock.peRatio !== undefined && Number.isFinite(stock.peRatio) ? (
@@ -487,7 +542,7 @@ export default async function WatchlistPage({
                                                 // una app de «datos, no recomendaciones». Color
                                                 // neutro, como en la vista de tarjetas.
                                                 <Badge variant="outline" className="border-gray-700 font-mono text-gray-300" title={stock.peSource ?? undefined}>
-                                                    {formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}
+                                                    {formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio === null ? (stock.timedOut ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La lectura tardó más de 3 s; recarga para verla.</span> : stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null) : null}
                                                 </Badge>
                                             ) : (
                                                 <span className="text-gray-500">{NA}</span>

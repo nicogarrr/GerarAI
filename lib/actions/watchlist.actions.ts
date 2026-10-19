@@ -7,7 +7,7 @@ import { researchRequest, jsonBody } from '@/lib/research/client';
 import { requestCache } from '@/lib/cache/requestCache';
 import { classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
 import { getStockQuote, getStockValuationBasics } from '@/lib/actions/finnhub.actions';
-import { getResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
+import { getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { isUsQuoteLine, quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { hasPriorClose } from '@/lib/market/session-change';
 import { sessionDateEt } from '@/lib/market/quote-freshness';
@@ -169,9 +169,15 @@ export type WatchlistEntryData = {
     quoteSymbol: string | null;
 };
 
-export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEntryData> {
+export async function getWatchlistEntryData(
+    symbol: string,
+    precomputedBasics?: ResearchCompanyBasics | null,
+): Promise<WatchlistEntryData> {
     const normalized = symbol.trim().toUpperCase();
-    const basics = await getResearchCompanyBasics(normalized);
+    // La página de watchlist resuelve el master en su propia oleada para
+    // conservar nombre/divisa aunque la cotización agote su presupuesto;
+    // el resto de consumidores (inicio) la leen aquí como siempre.
+    const basics = precomputedBasics !== undefined ? precomputedBasics : await getResearchCompanyBasics(normalized);
     const quoteSymbol = quoteSymbolFor(basics, normalized);
     const base: WatchlistEntryData = {
         symbol: normalized,

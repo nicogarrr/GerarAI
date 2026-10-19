@@ -105,6 +105,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/UserDropdown.tsx': 'useRouter, jsx-onClick, importa cliente: components/ui/dropdown-menu.tsx, importa cliente: components/ui/avatar.tsx',
   'components/alerts/AlertsManager.tsx': 'useSearchParams, useState, useEffect, browser:window, jsx-onOpenChange, jsx-onChange, jsx-onValueChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/select.tsx, importa cliente: components/ui/label.tsx',
   'components/brain/GlobalBrain.tsx': 'usePathname, useState, useEffect, browser:window, useRef, browser:navigator, browser:document, jsx-onClick, jsx-spread, jsx-onSubmit, jsx-onChange, libreria cliente: react-markdown',
+  'components/calendar/CompanyLogo.tsx': 'useState: cae al mosaico de iniciales cuando la imagen del ticker da 404',
   'components/calendar/CalendarTabs.tsx': 'usePathname',
   'components/corporate-actions/CorporateActionsView.tsx': 'useState, jsx-onClick, libreria cliente: sonner, importa cliente: components/data/RecordViews.tsx',
   'components/data/RecordViews.tsx': 'useState, jsx-onClick, useEffect',

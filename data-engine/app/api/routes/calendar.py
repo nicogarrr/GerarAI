@@ -13,6 +13,10 @@ from app.services import catalyst_calendar_service as catalyst_service
 from app.services.connectors import earnings_calendar as calendar_connector
 
 router = APIRouter()
+# Feed ICS publico: se monta en main.py FUERA de private_dependencies (los
+# clientes de calendario no pueden firmar). Solo este GET; el resto de /feed
+# sigue en `router`, autenticado.
+public_router = APIRouter()
 
 
 async def _empty_connector() -> dict:
@@ -164,7 +168,7 @@ async def catalysts_calendar(
 
 
 class FeedCreate(BaseModel):
-    scope: str = "followed"
+    scope: str = "watchlist"
 
 
 def _feed_state(row) -> dict:
@@ -209,7 +213,7 @@ def calendar_feed_revoke(db: Session = Depends(get_db)) -> dict:
     return {"revoked": revoke_tokens(db)}
 
 
-@router.get("/feed/{filename}")
+@public_router.get("/feed/{filename}")
 def calendar_feed_public(filename: str) -> Response:
     """Feed ICS publico: el unico secreto es el token del nombre de fichero.
 
@@ -222,7 +226,7 @@ def calendar_feed_public(filename: str) -> Response:
 
     token = filename[:-4] if filename.endswith(".ics") else ""
     not_found = HTTPException(status_code=404, detail="Feed no encontrado")
-    if not token.startswith("gfc_") or len(token) > 80:
+    if not token.startswith("gfc_") or len(token) > 80 or not token.isascii():
         raise not_found
     db = SessionLocal()
     try:
