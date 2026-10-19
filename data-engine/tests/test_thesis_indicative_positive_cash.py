@@ -36,5 +36,7 @@ def test_positive_ocf_keeps_partial_indicative_range(monkeypatch):
     thesis = response.json()
     assert thesis["status"] == "draft"
     assert thesis["base_value"] is not None
-    assert "parcial-indicativa" in thesis["executive_summary"]
+    # B6: la etiqueta de indicativa viaja en la hipotesis; la cifra NO se oculta.
+    assert "Valoración indicativa sobre supuestos" in thesis["executive_summary"]
+    assert "margen de seguridad del -97,9 %" in thesis["executive_summary"]
     assert "RANGO INDICATIVO PARCIAL" in thesis["thesis_markdown"]

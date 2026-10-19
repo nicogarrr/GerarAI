@@ -147,3 +147,44 @@ def test_hypothesis_states_margin_basis_of_reverse_dcf() -> None:
     }
     hypothesis = service._hypothesis(_company(), valuation)
     assert "31,9 % anual con un margen FCF del 20,2 %." in hypothesis
+
+def test_hypothesis_partial_keeps_number_but_labels_it_indicative() -> None:
+    """B6: un -95 % sobre supuestos no se oculta; se etiqueta como indicativo."""
+    service = ThesisService()
+    valuation = {
+        "current_price": 40.66,
+        "base_value": 1.95,
+        "expected_value": 1.95,
+        "margin_of_safety": -0.952,
+        "status": "partial",
+        "publishable": False,
+    }
+    hypothesis = service._hypothesis(_company(), valuation)
+    assert hypothesis.startswith("Valoración indicativa sobre supuestos: ")
+    assert "margen de seguridad del -95,2 %" in hypothesis
+    assert "1.95" in hypothesis
+
+
+def test_hypothesis_not_publishable_flag_alone_labels_indicative() -> None:
+    service = ThesisService()
+    valuation = {
+        "current_price": 120.0,
+        "base_value": 100.0,
+        "margin_of_safety": -0.2,
+        "publishable": False,
+    }
+    hypothesis = service._hypothesis(_company(), valuation)
+    assert hypothesis.startswith("Valoración indicativa sobre supuestos: ")
+
+
+def test_hypothesis_publishable_has_no_indicative_prefix() -> None:
+    service = ThesisService()
+    valuation = {
+        "current_price": 120.0,
+        "base_value": 100.0,
+        "margin_of_safety": -0.2,
+        "status": "ok",
+        "publishable": True,
+    }
+    hypothesis = service._hypothesis(_company(), valuation)
+    assert not hypothesis.startswith("Valoración indicativa")
