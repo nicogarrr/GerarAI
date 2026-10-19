@@ -70,9 +70,33 @@ class Base(DeclarativeBase):
     pass
 
 
+def _engine_connect_args(database_url: str, idle_timeout_ms: int) -> dict:
+    """connect_args por motor.
+
+    El timeout idle-in-transaction es SOLO Postgres (parametro de sesion
+    via `options`, valido en psycopg2 y psycopg3): defensa de red para que
+    una transaccion abierta y olvidada (worker colgado entre queries) no
+    bloquee UPDATEs durante minutos. sqlite lleva check_same_thread y el
+    resto de motores no recibe nada.
+    """
+    if database_url.startswith("sqlite"):
+        return {"check_same_thread": False}
+    scheme = database_url.split(":", 1)[0].lower()
+    if scheme.startswith("postgresql") and idle_timeout_ms > 0:
+        return {
+            "options": f"-c idle_in_transaction_session_timeout={int(idle_timeout_ms)}"
+        }
+    return {}
+
+
 settings = get_settings()
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, connect_args=connect_args, pool_pre_ping=True)
+engine = create_engine(
+    settings.database_url,
+    connect_args=_engine_connect_args(
+        settings.database_url, settings.idle_in_transaction_session_timeout_ms
+    ),
+    pool_pre_ping=True,
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 

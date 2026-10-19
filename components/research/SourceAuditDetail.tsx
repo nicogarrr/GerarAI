@@ -5,6 +5,15 @@ import type { ResearchSourceAudit } from '@/lib/actions/research.actions';
 
 const MAX_ITEMS = 5;
 
+const WEAK_CLAIM_ES: ReadonlyArray<[RegExp, string]> = [
+  [/^SEC\/FMP reconciliation missing for reported financial facts\.?$/i, 'Falta conciliar con SEC/FMP las cifras financieras reportadas.'],
+];
+
+export function weakClaimEs(text: string): string {
+  for (const [pattern, es] of WEAK_CLAIM_ES) if (pattern.test(text.trim())) return es;
+  return text;
+}
+
 function ClaimList({ title, items }: { title: string; items: string[] }) {
   if (!items.length) return null;
   return (
@@ -21,6 +30,7 @@ function ClaimList({ title, items }: { title: string; items: string[] }) {
 export function SourceAuditDetail({ audit, ticker }: { audit: ResearchSourceAudit; ticker: string }) {
   const date = formatGeneratedDate(audit.created_at);
   const hasReason = audit.required_fixes.length + audit.unsupported_claims.length + audit.data_conflicts.length > 0;
+  const onlyWeak = !audit.passed && !hasReason && audit.weak_claims.length > 0;
   return (
     <>
       <p className="mt-3 text-xs text-gray-500">
@@ -30,10 +40,11 @@ export function SourceAuditDetail({ audit, ticker }: { audit: ResearchSourceAudi
         </Link>
       </p>
       {audit.required_fixes.length ? <p className="mt-3 text-sm text-amber-300">{audit.required_fixes.map(auditFixLabel).join(' · ')}</p> : null}
-      {!audit.passed && !hasReason ? <p className="mt-3 text-sm text-amber-300">Motivo del bloqueo no registrado en esta auditoría. Regenera la tesis para obtenerlo.</p> : null}
+      {onlyWeak ? <p className="mt-3 text-sm text-amber-300">Bloqueada por afirmaciones de baja confianza (detalle abajo).</p> : null}
+      {!audit.passed && !hasReason && !onlyWeak ? <p className="mt-3 text-sm text-amber-300">Motivo del bloqueo no registrado en esta auditoría. Regenera la tesis para obtenerlo.</p> : null}
       <ClaimList title="Afirmaciones sin fuente" items={audit.unsupported_claims} />
       <ClaimList title="Datos en conflicto" items={audit.data_conflicts} />
-      <ClaimList title="Baja confianza" items={audit.weak_claims} />
+      <ClaimList title="Baja confianza" items={audit.weak_claims.map(weakClaimEs)} />
     </>
   );
 }

@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.entities import Base, Company, MarketPrice, ResearchAlert
+from app.models.entities import Base, Company, MarketPrice, NewsEvent, ResearchAlert
 from app.services.alert_rule_service import AlertRuleService
 
 
@@ -125,3 +125,39 @@ def test_matches_numeric_and_never_on_none():
     assert AlertRuleService._matches("hold", "==", "hold") is True
     assert AlertRuleService._matches(None, ">", 0) is False
     assert AlertRuleService._matches(Decimal("1"), "??", 0) is False
+
+
+def _news(db: Session, company: Company, *, title: str, url: str | None = "https://example.com/n") -> NewsEvent:
+    event = NewsEvent(company_id=company.id, title=title, source="rss", url=url, summary="")
+    db.add(event)
+    db.commit()
+    return event
+
+
+def test_news_rule_cites_the_headline_and_stores_source(db):
+    company = _company(db)
+    service = AlertRuleService()
+    rule = service.create(db, company, rule_type="news", operator=">", value=0)
+    event = _news(db, company, title="Apple supera previsiones")
+
+    result = service.evaluate(db, rule)
+
+    assert result["status"] == "triggered"
+    alert = db.query(ResearchAlert).one()
+    assert "Apple supera previsiones" in alert.message
+    assert "valor observado" not in alert.message
+    assert alert.metadata_["news_event_id"] == event.id
+    assert alert.metadata_["source_url"] == "https://example.com/n"
+
+
+def test_news_rule_does_not_fire_without_a_verifiable_headline(db):
+    company = _company(db)
+    service = AlertRuleService()
+    rule = service.create(db, company, rule_type="news", operator=">", value=0)
+    _news(db, company, title="   ")
+
+    result = service.evaluate(db, rule)
+
+    assert result["status"] == "evaluated"
+    assert result["matched"] is False
+    assert db.query(ResearchAlert).count() == 0

@@ -286,6 +286,30 @@ def parse_extended_chart(ticker: str, node: dict[str, Any], now: int, daily_node
                             and result.timestamp is not None and result.timestamp <= daily_time):
                         result.price, result.timestamp = daily_price, daily_time
                         result.trading_date = day.isoformat()
+    # En premercado, la referencia de la variacion y del «Cierre anterior»
+    # es el ultimo cierre completado. Cuando esta funcion ya lo verifico
+    # (print de cierre o vela diaria fechada), manda sobre meta.previousClose:
+    # Yahoo lo mantiene obsoleto tras el fin de semana (el jueves, un lunes
+    # en premercado) y la cabecera restaba contra un cierre distinto del
+    # «Cierre regular» fechado que pinta al lado (ASTS 19-oct: -$3.26 con
+    # cierre 40,66 visible; el cambio real contra ese cierre era +$0.54).
+    # En sesion regular y post previousClose ya viene fresco de la propia
+    # sesion y no se toca. Si previousClose coincide con el cierre
+    # verificado, solo se recalcula la variacion contra la referencia fechada.
+    if (
+        result.session == "pre"
+        and result.price is not None
+        and result.regular_close is not None
+        and result.regular_close > 0
+    ):
+        if result.previous_close is None or not math.isclose(
+            result.previous_close, result.regular_close, rel_tol=1e-6, abs_tol=1e-5
+        ):
+            result.previous_close = result.regular_close
+            result.previous_close_timestamp = result.regular_close_timestamp
+            result.previous_close_date = result.regular_close_date
+        result.change = result.price - result.regular_close
+        result.change_percent = result.change / result.regular_close * 100
     return result
 
 

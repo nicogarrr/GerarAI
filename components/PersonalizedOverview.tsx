@@ -25,8 +25,8 @@ import {
     type TriggeredAlertDelivery,
 } from '@/lib/actions/alerts.actions';
 import { holdingDisplayMode } from '@/lib/portfolio/holding-display';
-import { alertCardDestination } from '@/lib/alerts/card-destination';
-import { alertCardCopy } from '@/lib/alerts/card-copy';
+import { alertCardDestination, alertThesisHref } from '@/lib/alerts/card-destination';
+import { alertCardCopy, alertSummaryIsSourceHeadline } from '@/lib/alerts/card-copy';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { t } from '@/lib/i18n/t';
 import { buildPortfolioInsight } from '@/lib/portfolio-insight';
@@ -55,6 +55,9 @@ interface UndervaluedStock {
     currency: string | null;
     fairValue: number;
     upside: number;
+    /** true = el DCF no es publicable (inputs sin trazabilidad datada):
+     *  la ficha lo muestra como orientacion del motor, no como valoracion final. */
+    orientation?: boolean;
 }
 
 /** El universo del screener es todo lo que devuelve /api/screeners/real por
@@ -470,7 +473,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     <p className="mt-2 text-sm break-words font-semibold text-gray-100">{copy.heading}</p>
                                     {/* tracked_news lleva el titular crudo de la fuente: misma
                                         traducción bajo demanda que en /alerts (#1493). */}
-                                    {item.alert_type === 'tracked_news' ? (
+                                    {alertSummaryIsSourceHeadline(item) ? (
                                         <ExternalNewsHeadline headline={copy.summary} url={item.sourceUrl} className="mt-1 text-sm break-words text-gray-300" />
                                     ) : (
                                         <p className="mt-1 text-sm break-words text-gray-300">{copy.summary}</p>
@@ -481,7 +484,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                             {item.ticker && (
                                                 <Link
                                                     className="inline-flex min-h-[44px] items-center text-xs text-teal-400 after:absolute after:inset-0 after:rounded-lg after:content-[''] hover:text-teal-300 hover:underline"
-                                                    href={`/research/${item.ticker}?view=thesis`}
+                                                    href={alertThesisHref(item.ticker)}
                                                 >
                                                     Revisar tesis de {item.ticker}
                                                 </Link>
@@ -639,7 +642,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     // La ficha DCF muestra el precio en la divisa del
                                     // listado y el valor justo SIN símbolo: el modelo
                                     // (/api/valuation/{ticker}) sí trae `currency` pero
-                                    // getFairValue no la propaga, así que se declara N/D
+                                    // getFairValueReading no la propaga, así que se declara N/D
                                     // en la etiqueta en vez de suponer dólares.
                                     const priceLabel = isValidCurrencyCode(op.currency) ? 'Precio' : 'Precio (divisa N/D)';
                                     return (
@@ -663,6 +666,9 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                                     />
                                                 </div>
                                                 <p className="text-xs text-gray-500 mt-2 text-right">Valor justo (divisa N/D): {formatNumber(op.fairValue)}</p>
+                                                {op.orientation ? (
+                                                    <p className="text-xs text-amber-500/90 mt-1 text-right">Orientación del motor, no valoración final</p>
+                                                ) : null}
                                             </div>
                                         </Link>
                                     );

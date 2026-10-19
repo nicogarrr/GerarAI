@@ -12,6 +12,30 @@ from app.services.materiality_service import MaterialityService, apply_recency_p
 from app.services.review_alert_service import ReviewAlertService
 from app.services.source_hierarchy_service import classify_source
 from app.services.text_clip import clip_words
+
+# Boilerplate de movimiento de posición institucional reescrito por agregadores
+# (patrón 13F de MarketBeat: «X Shares Purchased by Y», «Stock: Z Raises
+# Stake»...). Cada fila es un hecho distinto pero de muy bajo valor unitario:
+# en portada se agrupan por empresa y día (una fila con recuento).
+POSITION_CHANGE_HEADLINE_RE = re.compile(
+    r"(?:\bshares\s+(?:purchased|sold|bought|acquired)\b"
+    r"|\b(?:buys|sells|purchases|acquires|bought|acquired)\b[\w\s,.$()]*\bshares\b"
+    r"|\b(?:raises|lowers|boosts|cuts|increases|reduces|trims|grows|lifts)\b[\w\s,.$()]*\b(?:stake|position|holdings)\b"
+    r"|\b(?:stake|position|holdings)\s+(?:raised|lowered|boosted|cut|increased|reduced|lifted|trimmed)\b)",
+    re.IGNORECASE,
+)
+
+
+def is_position_change_headline(headline: str) -> bool:
+    """Titular boilerplate de cambio de posición institucional (spam 13F)."""
+    return bool(headline) and bool(POSITION_CHANGE_HEADLINE_RE.search(headline))
+
+
+def position_change_cluster_title(ticker: str | None, source: str, count: int) -> str:
+    """Etiqueta generada para la fila agrupada (no verbatim de la fuente:
+    la fila se marca headline_from_source=False)."""
+    donde = f" en {ticker}" if ticker else ""
+    return f"{count} movimientos de inversores institucionales{donde} · {source}"
 from app.services.thesis_graph_service import ThesisGraphService
 from app.services.ticker_news_lane import is_competitor_only, is_law_firm_solicitation
 
@@ -141,6 +165,13 @@ class NewsService:
             # URL (o no hay dedup posible); casar por título aquí descartaría
             # filings reales como falsos duplicados.
             return False
+        from app.services.news_identity import equivalent_news_event
+
+        # Misma URL con otra query/fragmento, o mismo titular con otra puntuación: es la misma noticia.
+        if equivalent_news_event(
+            db, company_id=company.id if company else None, url=url, title=text
+        ) is not None:
+            return True
         duplicate_title = db.scalar(
             select(NewsEvent.id)
             .where(
@@ -219,9 +250,36 @@ class NewsService:
             requires_update = assessment.requires_update or bool(
                 semantic_impact and semantic_impact.affected_claim_ids and materiality_score >= 7
             )
+        # El impacto semantico puede subir la nota por encima del tope de
+        # relevancia: la misma regla conservadora se reaplica (solo baja, no descarta).
+        from app.services.materiality_service import (
+            UNRELATED_NEWS_MAX_MATERIALITY,
+            is_unrelated_generic_news,
+        )
+
+        if (
+            is_unrelated_generic_news(text, company, source, url)
+            and materiality_score > UNRELATED_NEWS_MAX_MATERIALITY
+        ):
+            materiality_score = UNRELATED_NEWS_MAX_MATERIALITY
+            requires_update = False
+            materiality_reasons.append(
+                f"sin mención de la empresa en fuente genérica => max {UNRELATED_NEWS_MAX_MATERIALITY}"
+            )
         # La politica de recencia tambien cubre la urgencia derivada del
         # impacto semantico: un filing antiguo nunca es urgente por recencia.
         requires_update = apply_recency_policy(requires_update, published_at, materiality_reasons)
+        # Relevancia: una noticia que solo menciona de pasada a la empresa (titular sin ella y < 3
+        # menciones) se guarda, pero no abre revision de tesis ni alerta "material". Filings
+        # (sec/ir) quedan fuera: su titular es generico y la fuente es primaria.
+        if requires_update and company and connector not in ("sec", "ir"):
+            from app.services.news_relevance import company_is_central
+
+            if not company_is_central(
+                company.ticker, company.name, headline=source_headline, text=text,
+            ):
+                requires_update = False
+                materiality_reasons.append("relevancia: la empresa solo se menciona de pasada")
 
         summary = clip_words(" ".join(text.strip().split()), 320)
         # Tipo de noticia con Jev (earnings/filing/macro/opinion): 1 llamada
@@ -328,7 +386,10 @@ class NewsService:
             # filings de 2025 aparecia como "100 eventos de hoy" y las
             # urgencias por recencia se disparaban sobre historia antigua.
             date=published_at or datetime.now(UTC),
-            title=summary[:180],
+            # Titular = prefijo del resumen cortado en límite de palabra:
+            # un corte a media palabra (summary[:180]) dejaba fragmentos
+            # («…del Ber» + «nstein …») al pintar titular + resumen juntos.
+            title=clip_words(summary, 180, ellipsis=""),
             source=source,
             url=url,
             summary=summary,
@@ -456,7 +517,19 @@ class NewsService:
                 continue
             # F175: el ticker solo prefija el texto si el título no lo trae ya;
             # si no, el titular guardado salía «COST COST 8-K».
-            parts = [item.title, item.text]
+            # Cuerpo sin el titular repetido ni la firma de la fuente: feeds
+            # (Simply Wall Street, MarketBeat) repiten el titular al inicio de
+            # la descripción y la cierran con el nombre del medio; sin limpiar,
+            # el titular guardado salía duplicado («Meta (META) ... Glasses
+            # Meta (META) ... Glasses Simply Wall Street»).
+            body = (item.text or "").strip()
+            headline_txt = (item.title or "").strip()
+            if headline_txt and body.casefold().startswith(headline_txt.casefold()):
+                body = body[len(headline_txt):].lstrip(" \t\r\n:–—-|·")
+            source_name = (item.source or "").strip()
+            if source_name and body.casefold().endswith(source_name.casefold()):
+                body = body[: -len(source_name)].rstrip(" \t\r\n:–—-|·")
+            parts = [item.title, body]
             # Límite de palabra: «COSTCO Wholesale...» no empieza por el
             # ticker «COST» a efectos de prefijo.
             if item.ticker and not re.match(

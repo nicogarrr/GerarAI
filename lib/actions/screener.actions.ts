@@ -258,6 +258,11 @@ export type RealScreenerResponse = {
   as_of: number;
   count: number;
   screener: RealScreenerRow[];
+  /** true = sin datos todavía y un refresco en vuelo (carga fría), no un filtro
+   *  sin resultados. */
+  refreshing?: boolean;
+  /** Tamaño del universo seguido, para declarar el alcance real del listado. */
+  universe_size?: number;
 };
 
 /**
@@ -266,6 +271,19 @@ export type RealScreenerResponse = {
  */
 export const getScreenerStocksReal = cache(
   async (filters: RealScreenerFilters = {}): Promise<RealScreenerRow[]> => {
+    return (await getScreenerStocksRealWithStatus(filters)).rows;
+  },
+);
+
+/** Versión con estado: además de las filas devuelve `refreshing` (carga fría
+ *  con refresco en vuelo, distinto de «filtro sin resultados») y el tamaño
+ *  del universo seguido, para que la pantalla declare su alcance real. */
+export const getScreenerStocksRealWithStatus = cache(
+  async (filters: RealScreenerFilters = {}): Promise<{
+    rows: RealScreenerRow[];
+    refreshing: boolean;
+    universeSize: number | null;
+  }> => {
     await requireAuthenticatedUser();
     const params = new URLSearchParams();
     if (filters.marketCapMoreThan) {
@@ -281,9 +299,11 @@ export const getScreenerStocksReal = cache(
       { cache: 'no-store' },
     );
     const rows = data?.screener ?? [];
+    const refreshing = data?.refreshing === true;
+    const universeSize = typeof data?.universe_size === 'number' ? data.universe_size : null;
     // Precio, variación y fecha salen de los mismos cierres datados que Movers.
     const dated = await fetchDatedChanges(rows.map((row) => row.symbol));
-    return rows.map((row) => {
+    const mapped = rows.map((row) => {
       const d = dated[row.symbol.toUpperCase()];
       if (!d) return row;
       return {
@@ -295,14 +315,27 @@ export const getScreenerStocksReal = cache(
         priceDate: d.date,
       };
     });
+    return { rows: mapped, refreshing, universeSize };
   },
 );
 
 
-/** Fair value determinista del Research OS (backend /api/valuation/{ticker}).
- *  Devuelve null si no hay valoracion publicable (nunca datos inventados). */
-export const getFairValue = cache(
-  async (symbol: string): Promise<number | null> => {
+export type FairValueReading = {
+  value: number;
+  /** true = valoracion final publicable; false = orientacion del motor: el
+   *  numero existe pero algun input no es trazable a fuente datada (el
+   *  backend devuelve publishable=false y los publication_blockers). */
+  publishable: boolean;
+};
+
+/** Lectura del valor del motor (backend /api/valuation/{ticker}).
+ *  Devuelve el valor esperado/base aunque no sea publicable, CON su etiqueta:
+ *  una valoracion no publicable es una orientacion valida si se declara, y
+ *  descartarla dejaba la tarjeta DCF del inicio siempre vacia (los megacaps
+ *  llevan publication_blockers por inputs sin trazabilidad datada).
+ *  null solo cuando no hay ningun valor computado o la peticion falla. */
+export const getFairValueReading = cache(
+  async (symbol: string): Promise<FairValueReading | null> => {
     await requireAuthenticatedUser();
     try {
       const data = await researchRequest<{
@@ -310,8 +343,9 @@ export const getFairValue = cache(
         base_value?: number | null;
         publishable?: boolean;
       }>(`/api/valuation/${encodeURIComponent(symbol)}`, { cache: 'no-store' });
-      if (!data?.publishable) return null;
-      return data.expected_value ?? data.base_value ?? null;
+      const value = data?.expected_value ?? data?.base_value ?? null;
+      if (value == null || !(value > 0)) return null;
+      return { value, publishable: data?.publishable === true };
     } catch {
       return null;
     }

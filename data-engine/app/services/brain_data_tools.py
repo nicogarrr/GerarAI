@@ -13,7 +13,15 @@ from urllib.parse import quote
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Company, DividendRecord, MarketPrice, NewsEvent, Position, ThesisVersion
+from app.models import (
+    Company,
+    DividendRecord,
+    InsiderTransaction,
+    MarketPrice,
+    NewsEvent,
+    Position,
+    ThesisVersion,
+)
 from app.schemas import ChatResponse
 from app.services.investment_plan_service import InvestmentPlanService
 from app.services.portfolio_fx_service import PortfolioFXService
@@ -61,7 +69,7 @@ def _company_data(db: Session, company: Company) -> tuple[list[str], list[dict]]
     ratio = load_screener_ratios(db, {company.ticker}).get(company.ticker, {}) if price else {}
     pe = ratio.get("pe")
     if pe is None:
-        lines.append("PER: no calculable con precio reciente y BPA anual positivo, verificado y en la misma moneda.")
+        lines.append("PER: sin dato calculable guardado; hace falta un precio reciente y un BPA anual positivo, verificado y en la misma moneda.")
     else:
         fact = ratio.get("ratioProvenance", {}).get("facts", {}).get("pe", {})
         lines.append(f"PER sobre BPA anual: {_number(pe)} veces (ejercicio {fact.get('year')}); "
@@ -147,6 +155,67 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     return _response([head, *lines, total, *tail], sources, "portfolio_dividends")
 
 
+def _company_news_answer(db: Session, company: Company, tenant: int) -> ChatResponse:
+    """Noticias GUARDADAS de una empresa concreta (mencionada en la pregunta).
+
+    Antes, "que noticias hay de ASTS y como afectan a mi cartera" caia en el
+    volcado de cartera por llevar "mi cartera": la respuesta eran titulares de
+    OTRAS posiciones (el spam 13F de AMZN) y cero de ASTS. Con empresa nombrada
+    la respuesta se acota a ella: solo noticias que la citan de verdad, sin el
+    ticker pegado del feed y sin duplicados. Si la tiene en cartera se declara
+    la posicion (es lo que "como me afecta" permite decir con datos guardados,
+    sin inventar un impacto por noticia).
+    """
+    from app.services.ticker_news_lane import _cites_company
+
+    rows = db.scalars(select(NewsEvent).where(
+        NewsEvent.tenant_id == tenant, NewsEvent.company_id == company.id,
+    ).order_by(NewsEvent.date.desc(), NewsEvent.id.desc()).limit(60)).all()
+    lines, sources, seen = [], [], set()
+    for event in rows:
+        if not _cites_company(company, event.title or "", event.summary or ""):
+            continue
+        title = re.sub(
+            rf"^\s*{re.escape(company.ticker)}\s*[:\-\u2013]?\s+",
+            "", event.title or "", count=1, flags=re.IGNORECASE,
+        ).strip()
+        if not title:
+            continue
+        key = " ".join(title.lower().split())
+        if key in seen:
+            continue
+        seen.add(key)
+        lines.append(f"- '{title}' ({event.date.date().isoformat()}, {event.source}).")
+        sources.append(_source("news_event", event.id, f"{company.ticker}: {title}", event.url or _link(company, "news")))
+        if len(lines) == 6:
+            break
+    holding_lines: list[str] = []
+    position = db.scalars(select(Position).where(
+        Position.tenant_id == tenant, Position.company_id == company.id, Position.quantity > 0,
+    ).limit(1)).first()
+    if position is not None:
+        def _value(pos: Position) -> float:
+            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
+            return float(raw or 0)
+        total = sum(
+            _value(row) for row in db.scalars(select(Position).where(
+                Position.tenant_id == tenant, Position.quantity > 0)).all()
+        )
+        weight = f", el {_number(_value(position) / total * 100)} % de tu cartera" if total > 0 else ""
+        holding_lines.append(
+            f"Tienes {_number(position.quantity)} acciones de {company.ticker} en cartera{weight}. "
+            "No calculo el impacto de cada noticia: eso pediria un analisis nuevo."
+        )
+    if not lines:
+        head = (f"No hay noticias guardadas de {company.ticker} que citen de verdad a la empresa. "
+                "No he consultado noticias en directo.")
+        return _response([head, *holding_lines], [], "company_news")
+    return _response(
+        [f"Ultimas noticias guardadas de {company.ticker} · {company.name}:", *lines, *holding_lines],
+        sources, "company_news",
+    )
+
+
 def _plan_answer(db: Session) -> ChatResponse:
     """Plan de inversion guardado y su desviacion actual; solo las cifras del plan, sin ordenes."""
     drift = InvestmentPlanService().drift_analysis(db)
@@ -210,6 +279,68 @@ def _thesis_valuation_answer(db: Session, question: str, tenant: int) -> ChatRes
     return _response(lines, [_source("thesis_version", published.id, f"Tesis {company.ticker} v{published.version}", _link(company, "thesis"))], "thesis_valuation")
 
 
+def _insider_tx_line(tx: InsiderTransaction, ticker: str) -> str:
+    side = "compró" if tx.code == "P" else "vendió"
+    parts = [f"- {ticker}: {tx.insider or 'Insider'} {side}"]
+    if tx.shares is not None:
+        parts.append(f"{_number(tx.shares)} acciones")
+    if tx.value is not None:
+        parts.append(f"por {_money(tx.value, 'USD')}")
+    when = tx.tx_date or "fecha no declarada"
+    return " ".join(parts) + f" ({when}, SEC Form 4)."
+
+
+def _recent_insider_txs(db: Session, tenant: int, ticker: str, limit: int) -> list[InsiderTransaction]:
+    return list(db.scalars(select(InsiderTransaction).where(
+        InsiderTransaction.tenant_id == tenant,
+        InsiderTransaction.issuer_ticker == ticker,
+        InsiderTransaction.code.in_(["P", "S"]),
+    ).order_by(InsiderTransaction.tx_date.desc(), InsiderTransaction.id.desc()).limit(limit)).all())
+
+
+def _insider_source(tx: InsiderTransaction, ticker: str) -> dict:
+    return _source("insider_transaction", tx.id, f"Form 4 {ticker} · {tx.tx_date}",
+                   tx.source_url or f"/insider?ticker={ticker}")
+
+
+def _insider_answer(db: Session, question: str, tenant: int) -> ChatResponse | None:
+    """Operaciones insider GUARDADAS (Form 4 SEC): compras/ventas P/S con fecha y fuente; nada en directo."""
+    portfolio = bool(re.search(r"(?i)\bmi\s+cartera\b|\bmis\s+(?:posiciones|acciones|empresas)\b", question))
+    company = None if portfolio else _company_in_question(db, question)
+    if company is not None:
+        txs = _recent_insider_txs(db, tenant, company.ticker, 5)
+        if not txs:
+            return _response(
+                [f"No tengo operaciones insider guardadas de {company.ticker}. No he consultado la SEC en directo."],
+                [], "company_insider")
+        lines = [f"**Operaciones insider guardadas de {company.ticker} · {company.name}** "
+                 "(compras/ventas código P/S del Form 4; no es el historial completo):"]
+        lines.extend(_insider_tx_line(tx, company.ticker) for tx in txs)
+        return _response(lines, [_insider_source(tx, company.ticker) for tx in txs], "company_insider")
+    if not portfolio:
+        return None
+    rows = db.execute(select(Position, Company).join(Company, Company.id == Position.company_id).where(
+        Position.tenant_id == tenant, Position.quantity > 0)).all()
+    if not rows:
+        return _response(["No hay posiciones abiertas en tu cartera."], [], "portfolio_insider")
+    lines, sources, without = [], [], []
+    for _position, comp in sorted(rows, key=lambda r: r[1].ticker):
+        txs = _recent_insider_txs(db, tenant, comp.ticker, 3)
+        if not txs:
+            without.append(comp.ticker)
+            continue
+        lines.append(f"**{comp.ticker}**")
+        lines.extend(_insider_tx_line(tx, comp.ticker) for tx in txs)
+        sources.extend(_insider_source(tx, comp.ticker) for tx in txs)
+    if not lines:
+        return _response(
+            ["No tengo operaciones insider guardadas de tus posiciones. No he consultado la SEC en directo."],
+            [], "portfolio_insider")
+    head = "Operaciones insider guardadas de tus posiciones abiertas (últimas compras/ventas código P/S del Form 4 SEC):"
+    tail = [f"Sin operaciones insider guardadas: {', '.join(without)}."] if without else []
+    return _response([head, *lines, *tail], sources, "portfolio_insider")
+
+
 def dividend_ticker_without_records(db: Session, question: str) -> str | None:
     """Ticker nombrado en una pregunta de dividendos sin ningun DividendRecord del tenant.
 
@@ -253,30 +384,51 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
         if answer is not None:
             return answer
     dividends = bool(re.search(r"(?i)\bdividend\w*|\bcobrar\w*", question))
-    if not (news or theses or comparison or valuation or dividends):
+    insider = bool(re.search(r"(?i)\binsiders?\b", question))
+    if not (news or theses or comparison or valuation or dividends or insider):
         return None
     if re.search(r"(?i)\b(?:compra|comprar|vende|vender|ejecuta|buy|sell)\b", question):
         return None
+    if insider and not (news or theses or comparison or valuation or dividends):
+        return _insider_answer(db, question, tenant)
     if dividends and not (news or theses or comparison or valuation):
         return _dividend_answer(db, question, tenant)
     if not (news or theses or comparison or valuation):
         return None
     if news:
+        mentioned = _company_in_question(db, question)
+        if mentioned is not None:
+            return _company_news_answer(db, mentioned, tenant)
+        from app.services.ticker_news_lane import _cites_company
+
         company_ids = select(Position.company_id).where(Position.tenant_id == tenant, Position.quantity > 0)
         rows = db.execute(select(NewsEvent, Company).join(Company, Company.id == NewsEvent.company_id).where(
             NewsEvent.tenant_id == tenant, NewsEvent.company_id.in_(company_ids),
         ).order_by(NewsEvent.date.desc(), NewsEvent.id.desc()).limit(40)).all()
         lines, sources, seen = [], [], set()
         for event, company in rows:
-            key = " ".join(event.title.lower().split())
+            # El feed liga la noticia al ticker aunque trate de otra empresa
+            # (un articulo de AEP etiquetado GOOGL): se descarta lo que no la
+            # cita de verdad. Misma regla que la ruta de empresa.
+            if not _cites_company(company, event.title or "", event.summary or ""):
+                continue
+            # El titular del feed ya trae el ticker pegado delante
+            # ("MSFT The Bet Behind..."): no repetirlo tras "MSFT:".
+            title = re.sub(
+                rf"^\s*{re.escape(company.ticker)}\s*[:\-–]?\s+",
+                "", event.title or "", count=1, flags=re.IGNORECASE,
+            ).strip()
+            if not title:
+                continue
+            key = " ".join(title.lower().split())
             if key in seen:
                 continue
             seen.add(key)
-            lines.append(f"- {company.ticker}: {event.title} ({event.date.date().isoformat()}, {event.source}).")
-            sources.append(_source("news_event", event.id, f"{company.ticker}: {event.title}", event.url or _link(company, "news")))
+            lines.append(f"- {company.ticker}: '{title}' ({event.date.date().isoformat()}, {event.source}).")
+            sources.append(_source("news_event", event.id, f"{company.ticker}: {title}", event.url or _link(company, "news")))
             if len(lines) == 6:
                 break
-        return _response(["Últimas noticias guardadas de tus posiciones abiertas:", *lines] if lines else ["No hay noticias guardadas de tus posiciones abiertas. No he consultado noticias en directo."], sources, "portfolio_news")
+        return _response(["Últimas noticias guardadas de tus posiciones abiertas (titulares en su idioma original):", *lines] if lines else ["No hay noticias guardadas de tus posiciones abiertas que citen de verdad a esas empresas. No he consultado noticias en directo."], sources, "portfolio_news")
     if theses:
         rows = db.execute(select(ThesisVersion, Company).join(Company, Company.id == ThesisVersion.company_id).where(
             ThesisVersion.tenant_id == tenant,

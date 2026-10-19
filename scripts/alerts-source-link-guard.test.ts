@@ -31,7 +31,7 @@ describe('alerts source link guard (F172)', () => {
         assert.ok(src.includes('target="_blank"'), 'documento externo en pestaña nueva');
         assert.ok(src.includes('item.sourceUrl &&'), 'el enlace solo se muestra con URL conocida');
         assert.ok(
-            src.includes('href={`/research/${item.ticker}?view=thesis`}'),
+            src.includes("href={alertThesisHref(item.ticker)}"),
             'el enlace a la investigación se conserva',
         );
     });

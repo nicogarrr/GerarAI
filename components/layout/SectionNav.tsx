@@ -8,15 +8,18 @@ import {flattenNavItems, sectionForRoute} from '@/lib/constants';
  * de cada item): una sola fuente para menu, migas, buscador y este subnav, en
  * vez de un mapa de rutas paralelo que se quedaba desactualizado.
  *
- * Dos huecos a proposito:
+ * Tres huecos a proposito:
  * - /discover ya ES la portada del hub: mostrar su propio indice como subnav
  *   repite la pagina.
  * - /inversores tiene su HubNav propio en app/(root)/inversores/layout.tsx:
  *   pintar aqui tambien el grupo apilaba dos barras seguidas (doble subnav).
+ * - /insider y /ownership comparten ese mismo HubNav (layout «Quien compra»):
+ *   la barra del hub Descubrir encima de la suya era la doble navegacion de
+ *   Insider (y de 13F).
  */
 export default function SectionNav(){
  const pathname=usePathname();
- if(pathname==='/discover'||pathname.startsWith('/inversores'))return null;
+ if(pathname==='/discover'||pathname.startsWith('/inversores')||pathname.startsWith('/insider')||pathname.startsWith('/ownership'))return null;
  const section=sectionForRoute(pathname);
  if(!section)return null;
  const items=flattenNavItems().filter((item)=>item.hub===section&&!(item.href===pathname&&item.subnavHideSelf));

@@ -170,6 +170,16 @@ def run_saved_screen(screen_id: int, db: Session = Depends(get_db)) -> dict:
     return ScreenerService().run_saved(db, screen)
 
 
+@router.get("/metric-coverage")
+def metric_coverage(db: Session = Depends(get_db)) -> dict:
+    """Metric names with data for at least one company.
+
+    The screener UI uses this to only suggest metrics that can actually
+    match something; see ScreenerService.metric_coverage.
+    """
+    return {"metrics_with_data": ScreenerService().metric_coverage(db)}
+
+
 @router.post("/run")
 def run_ad_hoc_screen(payload: AdHocScreen, db: Session = Depends(get_db)) -> dict:
     try:
@@ -671,6 +681,7 @@ def _real_response_payload(
     limit: int,
     *,
     as_of: float | None = None,
+    refreshing: bool = False,
 ) -> dict:
     filtered = [
         item
@@ -688,6 +699,12 @@ def _real_response_payload(
         "as_of": as_of if as_of is not None else time.time(),
         "count": len(limited),
         "screener": limited,
+        # Carga fría: sin items y con un refresh en vuelo la respuesta vacía no
+        # es «filtro sin resultados»; el front lo distingue con este flag.
+        "refreshing": bool(refreshing),
+        # Tamaño del universo seguido: el subtítulo declara el alcance real en
+        # vez de prometer «large caps» a secas con 4 filas de Salud o 2 de Energía.
+        "universe_size": len(_REAL_UNIVERSE),
     }
 
 
@@ -806,6 +823,7 @@ def real_time_screener(
         vendor.name, marketCapMoreThan, sector, limit, tenant_id
     )
     now = time.monotonic()
+    refreshing = False
     with _real_cache_lock:
         cached = _real_response_cache.get(key)
         bucket = _real_items_cache.get(tenant_id) or {}
@@ -818,9 +836,15 @@ def real_time_screener(
     if cached and now - float(cached.get("at", 0.0)) < _QUOTE_TTL:
         # El as_of guardado es el de la captura real de los datos; reescribirlo
         # con time.time() al servir LKG stale afirmaba una frescura falsa.
+        # `refreshing` no se congela con la caché: refleja el refresh en vuelo
+        # AHORA (una respuesta cacheada de la carga fría no diría la verdad).
+        with _real_refresh_state_lock:
+            inflight = _real_refresh_futures.get(tenant_id)
         payload = {
             **cached["payload"],
             "screener": [dict(item) for item in cached["payload"]["screener"]],
+            "refreshing": bool(inflight is not None and not inflight.done()),
+            "universe_size": len(_REAL_UNIVERSE),
         }
         if not _real_items_are_fresh(vendor.name, now, tenant_id):
             _schedule_real_refresh(vendor.name, tenant_id)
@@ -829,6 +853,7 @@ def real_time_screener(
     items = list(cached_items) if has_lkg else []
     if not _real_items_are_fresh(vendor.name, now, tenant_id):
         future = _schedule_real_refresh(vendor.name, tenant_id)
+        refreshing = future is not None and not future.done()
         if not has_lkg and not items and (
             active_vendor_allows_cold_wait(vendor.name, settings)
         ):
@@ -845,7 +870,8 @@ def real_time_screener(
                 items_at_wall = float(bucket.get("at_wall") or 0.0) or items_at_wall
 
     payload = _real_response_payload(
-        items, vendor.name, marketCapMoreThan, sector, limit, as_of=items_at_wall
+        items, vendor.name, marketCapMoreThan, sector, limit, as_of=items_at_wall,
+        refreshing=refreshing,
     )
     if items:
         with _real_cache_lock:

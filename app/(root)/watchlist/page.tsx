@@ -7,6 +7,7 @@ import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
+import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
 import ExtendedHoursLine from '@/components/watchlist/ExtendedHoursLine';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,6 +42,7 @@ interface WatchlistStock {
     marketCapDerived: boolean;
     peRatio: number | null;
     peKind: 'ttm' | 'fy' | null;
+    peSource: string | null;
     priceKind: 'live' | 'close' | null;
     priceAsOf: string | null;
     metricsNotApplicable: boolean;
@@ -53,14 +55,34 @@ const PAGE_SIZE = 20;
 export default async function WatchlistPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string }>;
+    searchParams: Promise<{ page?: string; sort?: string; dir?: string }>;
 }) {
-    const [{ items: watchlistItems, unavailable }, { page: pageParam }] = await Promise.all([getWatchlistState(), searchParams]);
-    const requestedPage = /^\d+$/.test(pageParam ?? '') ? Number(pageParam) : 1;
+    const [{ items: watchlistItems, unavailable }, query] = await Promise.all([getWatchlistState(), searchParams]);
+    const requestedPage = /^\d+$/.test(query.page ?? '') ? Number(query.page) : 1;
     const totalPages = Math.max(1, Math.ceil(watchlistItems.length / PAGE_SIZE));
     const page = Math.min(totalPages, Math.max(1, Number.isSafeInteger(requestedPage) ? requestedPage : 1));
-    const pageItems = watchlistItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-    const pageSymbols = pageItems.map((item) => item.symbol);
+
+    // Orden por columna via URL (?sort=…&dir=…): estado persistente y
+    // compartible sin JS, cabeceras con aria-sort. Los N/D van SIEMPRE al
+    // final, en cualquier dirección: un dato ausente nunca «gana» la
+    // ordenación (QA 2026-10-19: no había forma de ordenar la watchlist).
+    const SORT_KEYS = ['added', 'symbol', 'price', 'change', 'marketCap', 'pe', 'earnings'] as const;
+    type SortKey = (typeof SORT_KEYS)[number];
+    const sort: SortKey = (SORT_KEYS as readonly string[]).includes(query.sort ?? '') ? (query.sort as SortKey) : 'added';
+    const dir: 'asc' | 'desc' = query.dir === 'asc' ? 'asc' : 'desc';
+    const SORT_LABELS: Record<SortKey, string> = {
+        added: 'Recientes', symbol: 'Símbolo', price: 'Precio', change: 'Cambio sesión',
+        marketCap: 'Market Cap', pe: 'PER', earnings: 'Próx. resultados',
+    };
+    // Ordenar por métrica exige cotizar TODA la lista, no solo la página
+    // visible: es una acción explícita del usuario y el coste se asume aquí.
+    const metricSort = sort !== 'added' && sort !== 'symbol';
+    const orderedItems = sort === 'symbol'
+        ? [...watchlistItems].sort((a, b) => (dir === 'asc' ? a.symbol.localeCompare(b.symbol) : b.symbol.localeCompare(a.symbol)))
+        : watchlistItems;
+    const fetchItems = metricSort ? orderedItems : orderedItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const pageItems = fetchItems;
+    const pageSymbols = fetchItems.map((item) => item.symbol);
 
     // Cotizar solo la página visible, no toda la lista. Los cierres datados,
     // el monitor denso (52 sem, próximos resultados, tesis) y la lectura por
@@ -114,6 +136,7 @@ export default async function WatchlistPage({
                     marketCapDerived: data.marketCapDerived,
                     peRatio: data.peRatio,
                     peKind: data.peKind,
+                    peSource: data.peSource,
                     analysis: item.analysis,
                     monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
                     addedAt: item.addedAt
@@ -134,6 +157,7 @@ export default async function WatchlistPage({
                     marketCapDerived: false,
                     peRatio: null,
                     peKind: null,
+                    peSource: null,
                     analysis: item.analysis,
                     monitor: null,
                     addedAt: item.addedAt
@@ -142,7 +166,48 @@ export default async function WatchlistPage({
         })
     );
 
-    const sortedStocks = [...watchlistStocks].sort((a, b) => Number(a.price === null) - Number(b.price === null));
+    const metricValue = (stock: WatchlistStock): number | string | null => {
+        switch (sort) {
+            case 'price': return stock.price;
+            case 'change': return stock.changePercent;
+            case 'marketCap': return stock.marketCap;
+            case 'pe': return stock.peRatio;
+            case 'earnings': return stock.monitor?.next_earnings_date ?? null;
+            default: return null;
+        }
+    };
+    const sortedStocks = [...watchlistStocks].sort((a, b) => {
+        if (!metricSort) {
+            // Orden del backend (recientes primero) o por símbolo ya aplicado
+            // a los items; aquí solo se hunden las filas sin precio.
+            return Number(a.price === null) - Number(b.price === null);
+        }
+        const va = metricValue(a);
+        const vb = metricValue(b);
+        if (va === null && vb === null) return 0;
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        const cmp = typeof va === 'string' && typeof vb === 'string' ? va.localeCompare(vb) : Number(va) - Number(vb);
+        return dir === 'asc' ? cmp : -cmp;
+    });
+    const displayStocks = metricSort ? sortedStocks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : sortedStocks;
+
+    const sortHref = (key: SortKey) => {
+        if (key === 'added') return '/watchlist';
+        const nextDir = sort === key ? (dir === 'asc' ? 'desc' : 'asc') : key === 'symbol' ? 'asc' : 'desc';
+        return `/watchlist?sort=${key}&dir=${nextDir}`;
+    };
+    const pageHref = (target: number) => {
+        const params = new URLSearchParams();
+        if (sort !== 'added') { params.set('sort', sort); params.set('dir', dir); }
+        if (target > 1) params.set('page', String(target));
+        const qs = params.toString();
+        return qs ? `/watchlist?${qs}` : '/watchlist';
+    };
+    const ariaSortFor = (key: SortKey): 'ascending' | 'descending' | undefined =>
+        sort === key ? (dir === 'asc' ? 'ascending' : 'descending') : undefined;
+    const sortIndicator = (key: SortKey) =>
+        sort === key ? <span aria-hidden="true" className="text-teal-400">{dir === 'asc' ? '▲' : '▼'}</span> : null;
     // Solo cuentan tickers con tesis PUBLICADA de K (expected_value real);
     // sin valoracion no se juzga caro/barato.
     const undervaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'infravalorada').length;
@@ -163,6 +228,14 @@ export default async function WatchlistPage({
 
     // La divisa la fija el listado real; sin divisa verificada se muestra el
     // número pelado, nunca un «US$» asumido (F253).
+    // Cuando el calendario de resultados (NASDAQ) cae, el backend devuelve
+    // earningsStatus != 'ok' y todas las fechas llegan null: un N/D pelado
+    // parecería «sin fecha anunciada». Se explica la causa como en el cap.
+    const earningsNote = monitorData.earningsStatus === 'unavailable'
+        ? 'Calendario de resultados no disponible ahora mismo.'
+        : monitorData.earningsStatus === 'partial'
+          ? 'Calendario de resultados incompleto: puede faltar alguna fecha.'
+          : null;
     const formatPriceCell = (price: number | null, currency: string | null) =>
         price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
 
@@ -180,6 +253,9 @@ export default async function WatchlistPage({
                         </p>
                     ) : null}
                 </div>
+                {/* Alta directa desde la página (QA 2026-10-19: antes solo se
+                    podía añadir desde la ficha research o el screener). */}
+                <WatchlistAddButton followedSymbols={watchlistItems.map((item) => item.symbol)} />
             </div>
 
             {unavailable ? (
@@ -198,26 +274,50 @@ export default async function WatchlistPage({
                             Busca la empresa en la búsqueda universal (o con Ctrl+K desde cualquier pantalla) y
                             pulsa &ldquo;Añadir a Watchlist&rdquo; para monitorizarla aquí.
                         </p>
-                        <Link
-                            href="/search"
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-teal-400/20 px-5 text-sm text-teal-400 transition-colors hover:text-teal-300"
-                        >
-                            Ir a buscar acciones
-                        </Link>
+                        <div className="flex flex-wrap items-center justify-center gap-3">
+                            <WatchlistAddButton followedSymbols={[]} />
+                            <Link
+                                href="/search"
+                                className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-teal-400/20 px-5 text-sm text-teal-400 transition-colors hover:text-teal-300"
+                            >
+                                Ir a buscar acciones
+                            </Link>
+                        </div>
                     </CardContent>
                 </Card>
             ) : (
                 <>
                     <nav aria-label="Páginas de watchlist" className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-400">
                         <span>{watchlistItems.length} empresas · Página {page} de {totalPages}</span>
+                        {/* Ordenar también sin cabeceras de tabla (móvil/tablet con tarjetas): menú de enlaces, sin JS. */}
+                        <details className="relative xl:hidden">
+                            <summary className="min-h-[44px] cursor-pointer list-none rounded px-2 py-2 text-sm text-gray-300 hover:text-gray-100">
+                                Ordenar: {SORT_LABELS[sort]}{sort !== 'added' ? <span aria-hidden="true" className="text-teal-400"> {dir === 'asc' ? '▲' : '▼'}</span> : null}
+                            </summary>
+                            <div className="absolute z-10 mt-1 min-w-44 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
+                                {SORT_KEYS.map((key) => (
+                                    <Link
+                                        key={key}
+                                        href={sortHref(key)}
+                                        aria-current={sort === key ? 'true' : undefined}
+                                        className={`block min-h-10 px-3 py-2 text-xs ${sort === key ? 'text-teal-300' : 'text-gray-300 hover:text-gray-100'}`}
+                                    >
+                                        {SORT_LABELS[key]}{sort === key && key !== 'added' ? <span aria-hidden="true"> {dir === 'asc' ? '▲' : '▼'}</span> : null}
+                                    </Link>
+                                ))}
+                            </div>
+                        </details>
                         <div className="flex gap-3">
-                            {page > 1 ? <Link className="inline-flex min-h-[44px] items-center text-teal-300" href={`/watchlist?page=${page - 1}`}>Anterior</Link> : null}
-                            {page < totalPages ? <Link className="inline-flex min-h-[44px] items-center text-teal-300" href={`/watchlist?page=${page + 1}`}>Siguiente</Link> : null}
+                            {page > 1 ? <Link className="inline-flex min-h-[44px] items-center text-teal-300" href={pageHref(page - 1)}>Anterior</Link> : null}
+                            {page < totalPages ? <Link className="inline-flex min-h-[44px] items-center text-teal-300" href={pageHref(page + 1)}>Siguiente</Link> : null}
                         </div>
                     </nav>
-                    {/* Móvil (<md): cards apiladas con acciones táctiles ≥44px */}
-                    <div className="space-y-3 md:hidden">
-                        {sortedStocks.map((stock) => (
+                    {/* Móvil y tablet (<xl): cards apiladas con acciones táctiles ≥44px.
+                        A 820-1280px la tabla de 6 columnas (~805px de mínimo) no cabe
+                        en el contenido con el menú lateral y salía cortada con un
+                        scroll horizontal sin indicio (QA 2026-10-19, tablet 820px). */}
+                    <div className="space-y-3 xl:hidden">
+                        {displayStocks.map((stock) => (
                             <article key={stock.symbol} className="min-w-0 rounded-xl border border-gray-700/60 bg-gray-900/60 p-4">
                                 <div className="flex min-w-0 items-center gap-3">
                                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gray-800 text-sm font-bold text-gray-300" aria-hidden="true">
@@ -255,7 +355,7 @@ export default async function WatchlistPage({
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Próx. resultados</dt>
-                                        <dd className="font-mono text-sm text-gray-300">{stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}</dd>
+                                        <dd className="font-mono text-sm text-gray-300">{stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}</dd>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Market Cap</dt>
@@ -265,7 +365,7 @@ export default async function WatchlistPage({
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">{stock.peKind === 'fy' ? 'PER (FY)' : 'PER (TTM)'}</dt>
-                                        <dd className="font-mono text-sm text-gray-300" title={stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>{formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
+                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined)}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
                                     </div>
                                 </dl>
                                 <div className="mt-3 flex items-center gap-2">
@@ -283,23 +383,35 @@ export default async function WatchlistPage({
                         ))}
                     </div>
 
-                    {/* Desktop (≥md): tabla completa */}
-                    <div className="hidden overflow-hidden rounded-lg border border-gray-700 bg-gray-900/50 md:block">
+                    {/* Desktop (≥xl): tabla completa */}
+                    <div className="hidden overflow-hidden rounded-lg border border-gray-700 bg-gray-900/50 xl:block">
                         <Table regionLabel="Watchlist: precio, cambio, market cap y PER">
                             <TableCaption className="sr-only">Valoración y métricas de cada símbolo de tu watchlist: precio, cambio de sesión, market cap y PER</TableCaption>
                             <TableHeader className="bg-gray-800/80">
                                 <TableRow className="border-gray-700 hover:bg-gray-800/80">
-                                    <TableHead className="text-gray-300">Símbolo</TableHead>
-                                    <TableHead className="text-right text-gray-300">Precio</TableHead>
-                                    <TableHead className="text-right text-gray-300">Cambio sesión</TableHead>
-                                    <TableHead className="text-right text-gray-300">Market Cap</TableHead>
-                                    <TableHead className="text-right text-gray-300">PER</TableHead>
-                                    <TableHead className="text-right text-gray-300">Próx. resultados</TableHead>
+                                    <TableHead className="text-gray-300" aria-sort={ariaSortFor('symbol')}>
+                                        <Link href={sortHref('symbol')} className="inline-flex min-h-[44px] items-center gap-1 hover:text-gray-100">Símbolo{sortIndicator('symbol')}</Link>
+                                    </TableHead>
+                                    <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('price')}>
+                                        <Link href={sortHref('price')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Precio{sortIndicator('price')}</Link>
+                                    </TableHead>
+                                    <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('change')}>
+                                        <Link href={sortHref('change')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Cambio sesión{sortIndicator('change')}</Link>
+                                    </TableHead>
+                                    <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('marketCap')}>
+                                        <Link href={sortHref('marketCap')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Market Cap{sortIndicator('marketCap')}</Link>
+                                    </TableHead>
+                                    <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('pe')}>
+                                        <Link href={sortHref('pe')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">PER{sortIndicator('pe')}</Link>
+                                    </TableHead>
+                                    <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('earnings')}>
+                                        <Link href={sortHref('earnings')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Próx. resultados{sortIndicator('earnings')}</Link>
+                                    </TableHead>
 
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {sortedStocks.map((stock) => (
+                                {displayStocks.map((stock) => (
                                     <TableRow key={stock.symbol} className="border-gray-800 transition-colors hover:bg-gray-800/30">
                                         <TableCell>
                                             <Link href={`/research/${stock.symbol}`} className="group flex items-center gap-3">
@@ -323,13 +435,16 @@ export default async function WatchlistPage({
                                                     {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} />
                                                 </div>
                                             </Link>
-                                            <details className="relative ml-2 inline-block align-middle">
-                                                <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={`Opciones de ${stock.symbol}`}>Opciones</summary>
-                                                <div className="mt-1 min-w-40 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
-                                                    <Link href={`/research/${stock.symbol}`} className="block min-h-10 px-3 py-2 text-xs text-teal-300">Ver análisis</Link>
-                                                    <WatchlistRemoveButton symbol={stock.symbol} />
-                                                </div>
-                                            </details>
+                                            <div className="ml-2 flex items-center gap-1">
+                                                <details className="relative inline-block align-middle">
+                                                    <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={`Opciones de ${stock.symbol}`}>Opciones</summary>
+                                                    <div className="mt-1 min-w-40 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
+                                                        <Link href={`/research/${stock.symbol}`} className="block min-h-10 px-3 py-2 text-xs text-teal-300">Ver análisis</Link>
+                                                    </div>
+                                                </details>
+                                                {/* Quitar siempre visible (QA 2026-10-19): antes iba dentro de «Opciones» y en escritorio no se descubría; en móvil ya era visible. */}
+                                                <WatchlistRemoveButton symbol={stock.symbol} />
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-medium text-gray-200">
                                             {formatPriceCell(stock.price, stock.currency)}
@@ -360,15 +475,15 @@ export default async function WatchlistPage({
                                                 // KO 26x o ASML 55x, una recomendación implícita en
                                                 // una app de «datos, no recomendaciones». Color
                                                 // neutro, como en la vista de tarjetas.
-                                                <Badge variant="outline" className="border-gray-700 font-mono text-gray-300">
+                                                <Badge variant="outline" className="border-gray-700 font-mono text-gray-300" title={stock.peSource ?? undefined}>
                                                     {formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}
                                                 </Badge>
                                             ) : (
                                                 <span className="text-gray-500">{NA}</span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono text-sm text-gray-300" title={stock.monitor?.next_earnings_source ?? undefined}>
-                                            {stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}
+                                        <TableCell className="text-right font-mono text-sm text-gray-300" title={stock.monitor?.next_earnings_source ?? (!stock.monitor?.next_earnings_date ? earningsNote ?? undefined : undefined)}>
+                                            {stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}
                                         </TableCell>
 
                                     </TableRow>

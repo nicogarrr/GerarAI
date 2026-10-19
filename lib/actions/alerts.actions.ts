@@ -75,6 +75,13 @@ export async function createAlert(input: CreateAlertInput): Promise<Alert> {
     if (!/^[A-Z0-9.\-]{1,20}$/.test(symbol)) {
         throw new ValidationError('A valid ticker is required', 'symbol');
     }
+    if (input.type === 'price_above' || input.type === 'price_below') {
+        const threshold = Number(input.condition.value);
+        // Un umbral de precio <= 0 nunca es una regla util y antes se guardaba tal cual (p. ej. -5).
+        if (!Number.isFinite(threshold) || threshold <= 0) {
+            throw new ValidationError('El precio debe ser mayor que 0', 'value');
+        }
+    }
     await researchRequest('/api/companies/ensure', {
         method: 'POST',
         body: jsonBody({ ticker: symbol }),
@@ -160,6 +167,8 @@ export interface TriggeredAlertDelivery {
     eventDate: string | null;
     eventDateSource: string | null;
     eventForm: string | null;
+    /** Titular de la noticia de origen; null si no consta. */
+    eventHeadline?: string | null;
     createdAt: string;
 }
 
@@ -179,6 +188,7 @@ type ResearchAlertRow = {
     event_date?: string | null;
     event_date_source?: string | null;
     event_form?: string | null;
+    event_headline?: string | null;
     created_at: string;
 };
 
@@ -204,6 +214,7 @@ export async function getRecentTriggeredAlerts(limit = 20): Promise<TriggeredAle
         eventDate: row.event_date ?? null,
         eventDateSource: row.event_date_source ?? null,
         eventForm: row.event_form ?? null,
+        eventHeadline: row.event_headline ?? null,
         createdAt: row.created_at,
     }));
 }

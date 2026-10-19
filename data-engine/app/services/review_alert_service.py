@@ -80,6 +80,9 @@ class ReviewAlertService:
         )
         db.add(review)
         db.flush()
+        if self._news_already_alerted(db, review_type, company_id, news_event_id):
+            # La revision de tesis se crea igual; solo se evita un segundo aviso de la misma noticia.
+            return review
         self.emit_alert(
             db,
             company_id=company_id,
@@ -98,6 +101,22 @@ class ReviewAlertService:
             metadata=metadata,
         )
         return review
+
+    @staticmethod
+    def _news_already_alerted(
+        db: Session, review_type: str, company_id: int | None, news_event_id: int | None
+    ) -> bool:
+        from app.models.entities import NewsEvent
+        from app.services.news_identity import NEWS_ALERT_TYPES, equivalent_news_alert
+
+        if review_type not in NEWS_ALERT_TYPES or news_event_id is None:
+            return False
+        event = db.get(NewsEvent, news_event_id)
+        if event is None:
+            return False
+        return equivalent_news_alert(
+            db, company_id=company_id, url=event.url, title=event.title
+        ) is not None
 
     def create_from_change(
         self,

@@ -30,7 +30,12 @@ export default function ExtendedHoursLine({ symbol, currency }: { symbol: string
     }, [symbol]);
 
     if (!quote || quote.price == null || (quote.price_session !== 'pre' && quote.price_session !== 'post')) return null;
-    const priceText = currency ? formatPrice(quote.price, currency) : formatNumber(quote.price);
+    // El ticker pelado puede resolver al gemelo US (ASML -> ADR en USD) mientras
+    // la fila es el listado europeo en EUR: otra divisa = otro valor, no se pinta
+    // un precio USD con simbolo de euro.
+    if (quote.currency && currency && quote.currency.toUpperCase() !== currency.toUpperCase()) return null;
+    const shownCurrency = currency ?? quote.currency ?? null;
+    const priceText = shownCurrency ? formatPrice(quote.price, shownCurrency) : formatNumber(quote.price);
     const changeText =
         typeof quote.change_percent === 'number' && Number.isFinite(quote.change_percent)
             ? ` (${formatPercent(quote.change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' })})`

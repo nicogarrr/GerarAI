@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import type { InsiderFeedResult, InsiderFeedSignal, InsiderFeedTransaction } from '@/lib/actions/insider.actions';
-import { insiderName, insiderRole, sideLabel } from '@/lib/insider/format';
+import { insiderName, insiderRole, isInstitutionalInsiderName, sideLabel } from '@/lib/insider/format';
 
 const SIDES = [
     ['all', 'Todas'],
@@ -63,6 +63,9 @@ function SignalLine({ signal, children }: { signal: InsiderFeedSignal; children?
             {signal.insider ? <span className="text-gray-100">{insiderName(signal.insider)}</span> : null}
             {signal.role || signal.officer_title ? (
                 <span className="text-gray-400">{insiderRole(signal.role, signal.officer_title)}</span>
+            ) : null}
+            {isInstitutionalInsiderName(signal.insider) ? (
+                <span className="rounded-full bg-indigo-950/60 px-2 py-0.5 text-xs font-semibold text-indigo-300">Institucional</span>
             ) : null}
             {children}
             <span className="tabular-nums text-gray-300">{usd(signal.value ?? signal.total_value)}</span>
@@ -169,6 +172,10 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
             {bigBuys.length > 0 ? (
                 <section className="rounded-xl border border-gray-800 bg-surface-1 p-4">
                     <h2 className="text-sm font-semibold text-gray-100">Grandes compras</h2>
+                    <p className="mt-1 text-xs text-gray-500">
+                        Compras código P de más de 1 M$. Las marcadas «Institucional» son fondos o accionistas
+                        de más del 10 % (p. ej. Berkshire), no insiders personales.
+                    </p>
                     <ul className="mt-3 divide-y divide-gray-900 text-sm">
                         {bigBuys.map((buy) => (
                             <SignalLine key={`big-${buy.accession_number}-${buy.tx_line}`} signal={buy} />

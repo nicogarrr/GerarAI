@@ -275,3 +275,38 @@ def test_yahoo_ticker_feed_only_keeps_items_that_cite_the_company():
         "Alphabet's Google expands cloud region",
         "YouTube adds new creator tools",
     ]
+
+
+def test_yahoo_body_only_mention_is_not_attributed_tieto_msft():
+    """QA 19 oct 2026: «The Bet Behind Tieto's Rally» entró al carril de MSFT con
+    materialidad 10 porque el cuerpo decía «AI partnership with Microsoft»."""
+
+    class _Msft:
+        ticker = "MSFT"
+        name = "Microsoft Corporation"
+
+    items = [
+        _item(
+            "The Bet Behind Tieto's Rally",
+            "One concrete shift for Tieto was its deepening AI partnership with Microsoft, "
+            "aimed at integrating new tools into long standing client contracts.",
+        ),
+        _item("Microsoft expands Azure region in Spain", "Microsoft said on Monday."),
+    ]
+    out = label_yahoo(ConnectorResult(source="rss", items=items), _Msft, _ticker_evidence_level)
+    assert [i.title for i in out.items] == ["Microsoft expands Azure region in Spain"]
+
+
+def test_google_body_only_mention_is_not_attributed():
+    """Mismo criterio en el carril de Google: el cuerpo no atribuye, solo el titular."""
+
+    class _Msft:
+        ticker = "MSFT"
+        name = "Microsoft Corporation"
+
+    items = [
+        _item("The Bet Behind Tieto's Rally", "…deepening AI partnership with Microsoft…"),
+        _item("GitHub Copilot adds model picker - The Verge", "The developer tool."),
+    ]
+    out = label_google(ConnectorResult(source="rss", items=items), _Msft, _ticker_evidence_level)
+    assert [i.title for i in out.items] == ["GitHub Copilot adds model picker"]

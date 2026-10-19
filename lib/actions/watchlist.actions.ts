@@ -95,6 +95,20 @@ export async function addToWatchlist(symbol: string, company?: string): Promise<
     }
 }
 
+/**
+ * Alta desde el buscador de la propia /watchlist: el símbolo puede venir con
+ * sufijo de mercado (SAN.MC de Finnhub) y la watchlist guarda el ticker
+ * canónico del master (SAN). El POST del backend NO resuelve alias (guarda
+ * el literal), así que la canonicalización se hace aquí vía research; si el
+ * master no conoce el símbolo se usa el literal, como hasta ahora.
+ */
+export async function addToWatchlistCanonical(symbol: string, company?: string): Promise<WatchlistMutationResult> {
+    const normalized = symbol.trim().toUpperCase();
+    const basics = await getResearchCompanyBasics(normalized);
+    const canonical = basics?.ticker?.trim().toUpperCase() || normalized;
+    return addToWatchlist(canonical, company ?? basics?.name);
+}
+
 // Eliminar de watchlist
 export async function removeFromWatchlist(symbol: string): Promise<WatchlistMutationResult> {
     try {
@@ -142,6 +156,8 @@ export type WatchlistEntryData = {
     peRatio: number | null;
     /** 'ttm' = Finnhub peTTM (línea US); 'fy' = respaldo backend cierre/EPS diluido FY. */
     peKind: 'ttm' | 'fy' | null;
+    /** Procedencia del PER visible: Finnhub (TTM, línea US) o la cadena del backend («PER: cierre … / eps_diluido FY…»). Null sin PER. */
+    peSource: string | null;
     // F358: frescura del precio: 'live' = sesión en curso; 'close' = último
     // cierre fechado (con fecha en priceAsOf si se conoce). Un cierre NUNCA
     // se pinta como cotización actual.
@@ -167,6 +183,7 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         marketCapDerived: false,
         peRatio: null,
         peKind: null,
+        peSource: null,
         priceKind: null,
         priceAsOf: null,
         metricsNotApplicable: false,
@@ -212,6 +229,7 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
     const backendCap = backend && typeof backend.market_cap === 'number' ? backend.market_cap : null;
     const backendPer = backend && typeof backend.per === 'number' && Number.isFinite(backend.per) ? backend.per : null;
     const backendDerived = (backend?.sources ?? []).some((src) => src.toLowerCase().includes('derivada'));
+    const backendPerSource = (backend?.sources ?? []).find((src) => src.startsWith('PER:')) ?? null;
 
     return {
         ...base,
@@ -241,6 +259,9 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         marketCapDerived: marketCapM === null && backendCap !== null && backendDerived,
         peRatio: peRatio ?? backendPer,
         peKind: peRatio !== null ? 'ttm' : backendPer !== null ? 'fy' : null,
+        // Trazabilidad del número: sin fuente visible un PER erróneo (QA
+        // 2026-10-19: AENA 2,0x por EPS FY mal cargado) parece dato oficial.
+        peSource: peRatio !== null ? 'PER TTM (Finnhub)' : backendPerSource,
         priceKind,
         priceAsOf,
         metricsNotApplicable: !usListing,

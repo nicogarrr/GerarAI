@@ -225,7 +225,13 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                 <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-sm text-amber-200">
                     <p>
                         {degradedCopy(initialTicker, initialResult, countText).header} Es un fallo
-                        de lectura, no una ausencia de actividad insider. Reintenta más tarde.
+                        de lectura, no una ausencia de actividad insider.
+                        {initialFilings && initialFilings.status === 'ok' && initialFilings.filings.length > 0
+                            /* Con filings guardados debajo, «reintenta más tarde» a pelo
+                               contradecía la lista visible: el aviso declara que la lectura
+                               en vivo falló y que debajo está la copia guardada. */
+                            ? ` Debajo se muestran los ${countText(initialFilings.total ?? initialFilings.filings.length)} filings guardados; la actualización en vivo desde EDGAR se reintentará en el próximo ciclo del monitor.`
+                            : ' Reintenta más tarde.'}
                     </p>
                     {degradedCopy(initialTicker, initialResult, countText).detail ? (
                         <p className="mt-2 text-xs text-amber-300/80">

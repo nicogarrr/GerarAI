@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import math
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -20,6 +20,19 @@ from app.models import PortfolioMoveDigest, ResearchAlert
 VERSION = "daily-digest-alert-v1"
 
 _MAX_LINEAS = 16
+
+
+def last_session_date(today: date) -> date:
+    """Ultimo dia laborable anterior a `today` (lun -> vie, sab/dom -> vie).
+
+    El resumen diario pedia siempre "ayer": domingo y lunes caian en un dia sin
+    mercado y la alerta decia "sin datos de cierre" para todas las posiciones.
+    No conoce festivos de bolsa: ahi sigue diciendo "sin datos", sin inventar.
+    """
+    d = today - timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
 
 
 def _fingerprint(tenant_id: int, as_of: date) -> str:

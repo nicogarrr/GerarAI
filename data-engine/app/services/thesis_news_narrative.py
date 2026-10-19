@@ -77,7 +77,7 @@ _SYSTEM = (
 
 
 def sin_datos() -> list[dict]:
-    return [{"titulo": "Análisis narrativo INFERIDO", "parrafos": ["Sin datos"]}]
+    return [{"titulo": "Análisis narrativo", "parrafos": ["Sin datos"]}]
 
 
 def news_context(items: list[dict], now: datetime) -> list[dict]:
@@ -171,8 +171,8 @@ def validate_output(raw: dict, headlines: list[dict]) -> list[dict]:
             f"Fuente: {h['url'] or 'URL no disponible'}."
             for h in cited
         ]
-        sections.append({"titulo": f"{title} - INFERIDO", "parrafos": [f"INFERIDO: {text.strip()}", *citations]})
-    sections.append({"titulo": "Alcance - INFERIDO", "parrafos": [
+        sections.append({"titulo": title, "parrafos": [text.strip(), *citations]})
+    sections.append({"titulo": "Alcance", "parrafos": [
         "Inferencia a partir de noticias, no recomendación de inversión. "
         "Los titulares acreditan publicación, no veracidad; las fechas registradas pueden ser de ingesta."
     ]})

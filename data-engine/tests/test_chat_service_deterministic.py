@@ -141,3 +141,55 @@ def test_document_sources_preserve_stored_urls_without_inventing_missing_links(d
     db.commit()
     response = ChatService()._deterministic_answer(db, "revenue", "company", "AAPL")
     assert "url" not in next(source for source in response.sources if source["type"] == "document_chunk")
+
+
+def test_thesis_status_source_entry_is_spanish_not_snake_case(db):
+    company = _company(db)
+    db.add(FinancialFact(
+        company_id=company.id, metric="revenue", value=Decimal("1000000"),
+        unit="USD", period="2025-12-31:FY", fiscal_year=2025, fiscal_quarter="FY",
+        source_type="sec_xbrl",
+    ))
+    db.add(ThesisVersion(
+        company_id=company.id, version=3, status="insufficient_data",
+        thesis_markdown="...", executive_summary="...", rating="insufficient_data",
+    ))
+    db.commit()
+    response = ChatService()._deterministic_answer(db, "AAPL tesis?", "company", "AAPL")
+    thesis_sources = [s for s in response.sources if s["type"] == "thesis_version"]
+    assert thesis_sources, "la tesis debe viajar como fuente"
+    for source in thesis_sources:
+        assert source.get("status") == "datos insuficientes"
+        assert "insufficient_data" not in str(source.get("status"))
+
+
+def test_library_doctrine_not_cited_in_company_answers(db, monkeypatch):
+    """Cartas de la biblioteca fuera de las fuentes de una respuesta de empresa."""
+    monkeypatch.setenv("CAVAAI_ENABLE_VECTOR_CHAT", "1")
+    from app.services import chat_service as cs
+
+    fake = {"type": "knowledge_chunk", "id": 999, "chunk_id": 999, "knowledge_document_id": 1,
+            "title": "Numantia Patrimonio - Carta 2020", "author": "Numantia Patrimonio",
+            "year": 2020, "url": "https://example.com/carta", "source_type": "letter",
+            "page_number": 3, "chunk_index": 0, "text": "Doctrina value...",
+            "evidence_role": "investment_doctrine_not_company_fact"}
+    monkeypatch.setattr(cs, "retrieve_library_context", lambda db_, q, limit=3: [fake])
+    _company(db)
+    resp = ChatService()._deterministic_answer(db, "Resume lo que tengo de AAPL", "company", "AAPL")
+    assert all(src.get("type") != "knowledge_chunk" for src in resp.sources)
+
+
+def test_library_doctrine_kept_for_doctrine_questions(db, monkeypatch):
+    monkeypatch.setenv("CAVAAI_ENABLE_VECTOR_CHAT", "1")
+    from app.services import chat_service as cs
+
+    calls = []
+
+    def fake_retrieve(db_, q, limit=3):
+        calls.append(q)
+        return []
+
+    monkeypatch.setattr(cs, "retrieve_library_context", fake_retrieve)
+    _company(db)
+    ChatService()._deterministic_answer(db, "¿Qué diría Buffett de AAPL?", "company", "AAPL")
+    assert calls, "una pregunta de doctrina sobre una empresa sí consulta la biblioteca"

@@ -224,6 +224,36 @@ def _only_ticker_prefix_mention(company, title: str, summary: str) -> bool:
     )
 
 
+def _company_terms(company) -> list[str]:
+    """Terminos que identifican a la empresa en texto libre: ticker, alias
+    verificados y palabras distintivas (4+ letras) del nombre."""
+    ticker = (getattr(company, "ticker", "") or "").upper()
+    terms = [ticker, *VERIFIED_ALIASES.get(ticker, ())] if ticker else []
+    terms += [
+        w for w in re.split(r"\W+", getattr(company, "name", "") or "")
+        if len(w) >= 4 and w.lower() not in _NAME_NOISE
+    ]
+    return terms
+
+
+def _cites_company_in_title(company, title: str) -> bool:
+    """True si el TITULAR cita a la empresa (ticker, alias o palabra del nombre).
+
+    Una mencion solo en el cuerpo no basta para el carril por ticker: el feed
+    de Yahoo por ticker inserta articulos «relacionados» sobre OTRAS empresas
+    que la mencionan de pasada (19 oct 2026: «The Bet Behind Tieto's Rally»
+    atribuido a MSFT por «AI partnership with Microsoft» en el cuerpo, con
+    materialidad 10). Fail-closed: sin cita en el titular, no entra al carril.
+    """
+    # El ticker como primera palabra SI vale como cita («MSFT raises dividend»);
+    # el caso de etiqueta pegada falsa lo filtra _only_ticker_prefix_mention.
+    text = (title or "").strip()
+    return any(
+        re.search(rf"(?<![\w]){re.escape(term)}(?![\w])", text, flags=re.IGNORECASE)
+        for term in _company_terms(company)
+    )
+
+
 def _cites_company(company, title: str, summary: str) -> bool:
     """True si titular o resumen citan a la empresa (sin contar el ticker pegado delante).
 
@@ -238,13 +268,9 @@ def _cites_company(company, title: str, summary: str) -> bool:
         return True
     prefix = re.compile(rf"^\s*{re.escape(ticker)}\s+")
     rest = f"{prefix.sub('', title or '', count=1)} {prefix.sub('', summary or '', count=1)}"
-    terms = [ticker, *VERIFIED_ALIASES.get(ticker, ())]
-    terms += [
-        w for w in re.split(r"\W+", getattr(company, "name", "") or "")
-        if len(w) >= 4 and w.lower() not in _NAME_NOISE
-    ]
     return any(
-        re.search(rf"(?<![\w]){re.escape(term)}(?![\w])", rest, flags=re.IGNORECASE) for term in terms
+        re.search(rf"(?<![\w]){re.escape(term)}(?![\w])", rest, flags=re.IGNORECASE)
+        for term in _company_terms(company)
     )
 
 
@@ -255,7 +281,7 @@ def label_yahoo(result: ConnectorResult, company=None, evidence_level=None) -> C
         for item in result.items
         if not is_data_page_headline(item.title)
         and not is_law_firm_solicitation(item.title, item.summary)
-        and (company is None or _cites_company(company, item.title, item.summary or ""))
+        and (company is None or _cites_company_in_title(company, item.title))
         and not (company is not None and _only_ticker_prefix_mention(company, item.title, item.summary or ""))
         and not (
             company is not None
@@ -293,10 +319,12 @@ def label_google(result: ConnectorResult, company, evidence_level) -> ConnectorR
     """Fuente = medio real (sufijo ' - Medio' del titular) y filtro de evidencia."""
     kept: list[ConnectorItem] = []
     for item in result.items:
-        text = f"{item.title} {item.summary}"
+        # Solo el titular decide la atribucion (ver _cites_company_in_title):
+        # el cuerpo puede mencionar a la empresa de pasada en un articulo
+        # que trata de otra (Tieto -> MSFT, 19 oct 2026).
         if is_data_page_headline(item.title) or is_law_firm_solicitation(item.title, item.summary):
             continue
-        if not company_mentioned(company, text, evidence_level):
+        if not company_mentioned(company, item.title, evidence_level):
             continue
         match = _PUBLISHER_RE.match(item.title)
         if match:
