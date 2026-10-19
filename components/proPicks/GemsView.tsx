@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { formatMarketCapUsd, formatPercent } from '@/lib/format';
+import { formatCompanyName, formatMarketCapUsd, formatPercent } from '@/lib/format';
 import { getGems, reviewGems, type GemItem } from '@/lib/actions/propicks-gems.actions';
 import { gemReasonLabel, gemReasonValue } from './gemsFormat';
 
@@ -94,7 +94,7 @@ export default function GemsView() {
                             <div className="min-w-0">
                                 <h4 className="text-lg font-bold text-gray-100">{gem.ticker}</h4>
                                 <p className="truncate text-xs text-gray-500">
-                                    {gem.name}{gem.market_cap ? ` · ${formatMarketCapUsd(gem.market_cap)}` : ''}
+                                    {formatCompanyName(gem.name)}{gem.market_cap ? ` · ${formatMarketCapUsd(gem.market_cap)}` : ''}
                                 </p>
                             </div>
                             <span className="shrink-0 rounded bg-gray-900 px-2 py-1 text-sm font-bold text-teal-300">
