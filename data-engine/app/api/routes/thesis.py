@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.database import get_db
 from app.models import Claim, ClaimEvidence, ThesisDiff, ThesisSection, ThesisVersion
 from app.schemas import ThesisGenerateRequest, ThesisGraphOut, ThesisOut
+from app.services import thesis_audio_service
 from app.services.company_resolver import resolve_company
 from app.services.driver_assumption_service import DriverAssumptionService, driver_assumption_payload
 from app.services.provenance import Coverage, SourceKind, provenance
@@ -415,6 +416,51 @@ def thesis_memo(
         headers={
             "Content-Disposition": f'attachment; filename="tesis-{company.ticker.lower()}-v{thesis.version}.md"'
         },
+    )
+
+
+def _audio_context(db: Session, ticker: str) -> tuple[str, str]:
+    """(key, texto hablable) de la ultima version de la tesis (borrador incluido)."""
+    service = ThesisService()
+    thesis = service.latest(db, ticker)
+    if not thesis:
+        raise HTTPException(status_code=404, detail="No thesis for ticker")
+    company = resolve_company(db, ticker)
+    latest_data_at = service.data_freshness(db, thesis.company_id)
+    stale = latest_data_at is not None and latest_data_at > thesis.updated_at
+    markdown = build_memo_markdown(db, company, thesis, stale=stale, latest_data_at=latest_data_at)
+    text = thesis_audio_service.memo_to_speech_text(markdown, ticker=company.ticker, version=thesis.version)
+    return thesis_audio_service.audio_key(company.ticker, thesis.version, text), text
+
+
+@router.get("/{ticker}/audio/status")
+def thesis_audio_status(ticker: str, db: Session = Depends(get_db)) -> dict:
+    """Estado del audio: ready | pending | missing | unavailable | error."""
+    key, _ = _audio_context(db, ticker)
+    return {"state": thesis_audio_service.status(key), "key": key}
+
+
+@router.post("/{ticker}/audio", status_code=202)
+def thesis_audio_generate(ticker: str, db: Session = Depends(get_db)) -> dict:
+    """Encola la generacion (idempotente); si ya esta listo devuelve ready."""
+    key, text = _audio_context(db, ticker)
+    state = thesis_audio_service.start(key, text)
+    if state == "unavailable":
+        raise HTTPException(status_code=503, detail="Servicio de audio no disponible")
+    return {"state": state, "key": key}
+
+
+@router.get("/{ticker}/audio")
+def thesis_audio(ticker: str, db: Session = Depends(get_db)) -> Response:
+    """El mp3 cacheado de la ultima version; 404 si aun no esta generado."""
+    key, _ = _audio_context(db, ticker)
+    data = thesis_audio_service.fetch_mp3(key)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Audio no generado")
+    return Response(
+        content=data,
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "private, max-age=3600", "Content-Disposition": f'inline; filename="{key}.mp3"'},
     )
 
 
