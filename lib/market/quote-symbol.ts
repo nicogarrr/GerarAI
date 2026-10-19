@@ -61,3 +61,18 @@ export function quoteSymbolFor(company: ListingBasics, ticker: string): string |
     // US) ni sufijo adivinado (EUR->.MC podría cotizar un homónimo español).
     return null;
 }
+
+/**
+ * true solo para la LINEA US del emisor (la unica cuyas metricas Finnhub y
+ * cuya unidad USD son de ESTE listado). Se deriva de la bolsa/divisa, NO de
+ * `quoteSymbol === ticker`: un ticker que ya es simbolo de listado no-US
+ * (CGEO.L) tambien cumple esa igualdad y cotiza en peniques (GBX).
+ */
+export function isUsQuoteLine(company: ListingBasics, ticker: string): boolean {
+    const symbol = quoteSymbolFor(company, ticker);
+    if (!symbol || symbol !== ticker.trim().toUpperCase()) return false;
+    const exchange = (company?.exchange || '').toUpperCase();
+    if (exchange.includes('LONDON') || exchange === 'LSE') return false;
+    if (EXCHANGE_YAHOO_SUFFIX[exchange]) return false;
+    return true;
+}

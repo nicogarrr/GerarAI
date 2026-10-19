@@ -103,3 +103,27 @@ void test('Londres: solo el simbolo de listado explicito (CGEO.L) cotiza; el pel
     assert.equal(quoteSymbolFor({ exchange: 'LSE', currency: 'GBX' }, 'CGEO'), null);
     assert.equal(quoteSymbolFor({ exchange: 'LONDON STOCK EXCHANGE', currency: 'USD' }, 'SHEL'), null);
 });
+
+void test('isUsQuoteLine: CGEO.L cumple symbol===ticker pero NO es linea US (GBX, sin metricas Finnhub)', async () => {
+    // @ts-expect-error TS5097
+    const { isUsQuoteLine } = await import('../lib/market/quote-symbol.ts');
+    assert.equal(isUsQuoteLine({ exchange: 'LSE', currency: 'GBX' }, 'CGEO.L'), false);
+    assert.equal(isUsQuoteLine({ exchange: 'NYSE', currency: 'USD' }, 'KO'), true);
+    assert.equal(isUsQuoteLine({ exchange: 'UNKNOWN', currency: 'USD' }, 'ABC'), true);
+    assert.equal(isUsQuoteLine({ exchange: 'BME', currency: 'EUR' }, 'ALM'), false);
+    assert.equal(isUsQuoteLine(null, 'KO'), false);
+});
+
+void test('CGEO.L va por el respaldo backend: PER no aplicable y consumidores usan isUsQuoteLine, no la igualdad', async () => {
+    // @ts-expect-error TS5097
+    const { perState } = await import('../lib/research/per.ts');
+    const s = perState({ quoteSymbol: 'CGEO.L', ticker: 'CGEO.L', peTTM: 9, providerAvailable: true, usLine: false });
+    assert.equal(s.value, null);
+    assert.match(String(s.note), /fuera de EE\. UU\./);
+    const { readFileSync } = await import('node:fs');
+    const wl = readFileSync(new URL('../lib/actions/watchlist.actions.ts', import.meta.url), 'utf8');
+    const per = readFileSync(new URL('../lib/actions/company-per.actions.ts', import.meta.url), 'utf8');
+    assert.match(wl, /const usListing = isUsQuoteLine\(basics, normalized\)/);
+    assert.doesNotMatch(wl, /usListing = quoteSymbol === normalized/);
+    assert.match(per, /isUsQuoteLine\(listing, normalized\)/);
+});

@@ -8,7 +8,7 @@ import { requestCache } from '@/lib/cache/requestCache';
 import { classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
 import { getStockQuote, getStockValuationBasics } from '@/lib/actions/finnhub.actions';
 import { getResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
-import { quoteSymbolFor } from '@/lib/market/quote-symbol';
+import { isUsQuoteLine, quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { hasPriorClose } from '@/lib/market/session-change';
 import { sessionDateEt } from '@/lib/market/quote-freshness';
 import type { ExtendedQuote } from '@/lib/market/extended-quote';
@@ -193,7 +193,9 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
     };
     if (!quoteSymbol) return base;
 
-    const usListing = quoteSymbol === normalized;
+    // Linea US derivada de bolsa/divisa, no de quoteSymbol === ticker (CGEO.L
+    // cumple la igualdad y cotiza en GBX: sus metricas no son las de Finnhub).
+    const usListing = isUsQuoteLine(basics, normalized);
     base.metricsNotApplicable = !usListing;
     const [quote, light, backend] = await Promise.all([
         getStockQuote(quoteSymbol),

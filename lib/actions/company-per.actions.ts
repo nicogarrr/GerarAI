@@ -1,7 +1,7 @@
 'use server';
 
 import { getStockFinancialDataLight } from '@/lib/actions/finnhub.actions';
-import { quoteSymbolFor } from '@/lib/market/quote-symbol';
+import { isUsQuoteLine, quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { perState, type PerState } from '@/lib/research/per';
 
 export async function getCompanyPer(
@@ -10,8 +10,9 @@ export async function getCompanyPer(
 ): Promise<PerState> {
     const normalized = ticker.trim().toUpperCase();
     const quoteSymbol = quoteSymbolFor(listing, normalized);
-    if (!quoteSymbol || quoteSymbol !== normalized) {
-        return perState({ quoteSymbol, ticker: normalized, peTTM: undefined, providerAvailable: false });
+    const usLine = isUsQuoteLine(listing, normalized);
+    if (!quoteSymbol || !usLine) {
+        return perState({ quoteSymbol, ticker: normalized, peTTM: undefined, providerAvailable: false, usLine });
     }
     const light = await getStockFinancialDataLight(normalized).catch(() => null);
     return perState({
@@ -19,5 +20,6 @@ export async function getCompanyPer(
         ticker: normalized,
         peTTM: light?.metrics?.metric?.peTTM,
         providerAvailable: light !== null,
+        usLine,
     });
 }
