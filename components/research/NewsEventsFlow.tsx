@@ -333,7 +333,11 @@ export function NewsEventsFlow({
                     <EmptyState
                       action={<EmptyLink href="/research/sources">Importa una fuente o analiza una noticia manual</EmptyLink>}
                       className="rounded-none border-0 p-6"
-                      title="Sin eventos de noticias todavía."
+                      title={
+                        lane === 'para-ti' && !portfolioTickers.length && !watchlistTickers.length
+                          ? 'Sin empresas en tu cartera ni watchlist.'
+                          : 'Sin eventos de noticias todavía.'
+                      }
                     />
                   </td>
                 </tr>
