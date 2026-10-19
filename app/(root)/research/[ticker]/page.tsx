@@ -1122,21 +1122,23 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             </ul>
           </div>
         ) : null}
-        {moatScore ? (
-          <Panel collapsible="mobile"
-            actions={
-              <Link
-                className="text-sm text-teal-300 hover:text-teal-200"
-                href={`/research/${encodeURIComponent(ticker)}?view=moat`}
-              >
-                Ver la evaluación del foso
-              </Link>
-            }
-            title="Calidad financiera según la empresa"
-          >
+        <Panel collapsible="mobile"
+          actions={moatScore ? (
+            <Link
+              className="text-sm text-teal-300 hover:text-teal-200"
+              href={`/research/${encodeURIComponent(ticker)}?view=moat`}
+            >
+              Ver la evaluación del foso
+            </Link>
+          ) : undefined}
+          title="Calidad financiera según la empresa"
+        >
+          {moatScore ? (
             <MoatPanel company={company} metric={moatScore} />
-          </Panel>
-        ) : null}
+          ) : (
+            <EmptyState title="Sin evaluación de calidad generada todavía: aparece con el refresco de las métricas financieras de la empresa." />
+          )}
+        </Panel>
         {/*
             Los cuatro saltos que se piden antes que nada al abrir una ficha.
             Están aquí, en el resumen, y no repartidos por las 16 píldoras
