@@ -154,6 +154,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/pwa/InstallApp.tsx': 'browser:window, useState, useEffect, jsx-onClick',
   'components/research/AssistantRedirect.tsx': 'useEffect, useRouter, browser:window',
   'components/research/ChangesSinceVisit.tsx': 'useState, useEffect, browser:window',
+  'components/research/ChatAnswerMarkdown.tsx': 'importa cliente: react-markdown (renderer del chat de empresa; la página es server component)',
   'components/research/CompanyChatForm.tsx': 'useFormStatus',
   'components/research/CompanyHeaderQuote.tsx': 'useState, useEffect, browser:document, browser:window, importa cliente: components/research/CompanyTechnicalWorkspace.tsx',
   'components/research/CompanyMarketChart.tsx': 'browser:window, browser:getComputedStyle, browser:document, useRef, useState, jsx-onHover, jsx-onState, useEffect',
