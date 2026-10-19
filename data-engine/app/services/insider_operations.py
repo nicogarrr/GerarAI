@@ -78,8 +78,8 @@ def _without_data_reason(ticker: str, company: Any, has_filings: bool) -> dict[s
     Reglas deterministas sobre lo que sabemos (no consulta la red): un emisor
     sin registro SEC (sufijo de bolsa extranjera u OTC sin CIK) no presenta
     Form 4; sus directivos declaran en su regimen local (MAR en Londres, SEDI
-    en Canada). Un emisor SEC con CIK y cero Form 4 propios se declara tal cual,
-    sin afirmar la causa.
+    en Canada). Con CIK nunca se afirma 'extranjero' (BRK.B, BF.B llevan punto y son
+    NYSE con CIK): cero Form 4 propios se declara tal cual, sin afirmar la causa.
     """
     exchange = (getattr(company, "exchange", None) or "").strip().upper()
     cik = (getattr(company, "cik", None) or "").strip()
@@ -88,7 +88,7 @@ def _without_data_reason(ticker: str, company: Any, has_filings: bool) -> dict[s
             "no_open_market_trades",
             "Hay Form 4 pero ninguna compra/venta en mercado abierto (P/S) en el periodo.",
         )
-    elif "." in ticker or (not cik and exchange not in _US_EXCHANGES):
+    elif not cik and ("." in ticker or exchange not in _US_EXCHANGES):
         reason, label = (
             "foreign_issuer_no_form4",
             "No presenta Form 4: emisor extranjero sin registro SEC. Sus directivos "

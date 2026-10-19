@@ -248,3 +248,17 @@ def test_without_data_detail_says_why_never_a_generic_no_data(db):
     assert _without_data_reason("BN", us, False)["reason"] == "no_form4_as_issuer"
     assert _without_data_reason("XYZ", nocik, False)["reason"] == "cik_unresolved"
     assert _without_data_reason("BN", us, True)["reason"] == "no_open_market_trades"
+
+
+def test_dotted_us_tickers_with_cik_are_never_called_foreign(db):
+    from app.services.insider_operations import _without_data_reason
+
+    for tk, name in (("BRK.B", "Berkshire Hathaway B"), ("BF.B", "Brown-Forman B")):
+        co = _company(db, tk, name)
+        co.exchange = "NYSE"
+        co.cik = "0000000001"
+        assert _without_data_reason(tk, co, False)["reason"] == "no_form4_as_issuer"
+    # Sin CIK y con sufijo: sigue siendo extranjero sin registro SEC.
+    uk = _company(db, "CGEO.L", "Georgia Capital")
+    uk.exchange = "LSE"
+    assert _without_data_reason("CGEO.L", uk, False)["reason"] == "foreign_issuer_no_form4"
