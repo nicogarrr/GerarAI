@@ -52,3 +52,9 @@ void test('la cabecera de la ficha de empresa muestra el logo a la izquierda del
   assert.match(ficha, /import \{ CompanyLogo \} from '@\/components\/calendar\/CompanyLogo'/);
   assert.match(ficha, /<CompanyLogo ticker=\{ticker\} name=\{company\.name \|\| ticker\}/);
 });
+
+void test('Catalizadores muestra el logo de cada empresa en su fila (mismo componente que Empresas seguidas)', () => {
+  const catalysts = readFileSync('app/(root)/calendar/page.tsx', 'utf8');
+  assert.match(catalysts, /import \{ CompanyLogo \} from '@\/components\/calendar\/CompanyLogo'/);
+  assert.match(catalysts, /<CompanyLogo ticker=\{event\.ticker\} name=\{event\.ticker\}/);
+});

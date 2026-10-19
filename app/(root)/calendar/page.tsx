@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CalendarDays } from 'lucide-react';
 import AlertsManager from '@/components/alerts/AlertsManager';
+import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { Badge } from '@/components/ui/badge';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getCatalystCalendar, type CatalystCalendar, type CatalystEvent } from '@/lib/actions/catalysts.actions';
@@ -134,8 +135,10 @@ export default async function CalendarPage({
                                 {events.map((event, index) => (
                                     <li
                                         key={`${event.type}-${event.ticker}-${event.date}-${event.title}-${index}`}
-                                        className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm"
+                                        className="flex items-start gap-3"
                                     >
+                                        <CompanyLogo ticker={event.ticker} name={event.ticker} className="size-10 shrink-0 rounded-lg" />
+                                        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
                                         <span className="font-mono font-semibold text-teal-300">{event.ticker}</span>
                                         <span className="text-gray-100">
                                             {event.type === 'corporate_action' ? event.title : (TYPE_LABEL[event.type] ?? event.title)}
@@ -145,6 +148,7 @@ export default async function CalendarPage({
                                             <Badge variant="outline" className="border-gray-700 font-normal text-gray-400">Watchlist</Badge>
                                         ) : null}
                                         <span className="ml-auto text-xs text-gray-500">Fuente: {event.source}</span>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
