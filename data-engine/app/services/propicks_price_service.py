@@ -11,6 +11,7 @@ suficiente no se escribe metrica.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -106,6 +107,14 @@ def fetch_history_yfinance(
             close = row.get("Close")
             adj = row.get("Adj Close", close)
             if close is None or adj is None:
+                continue
+            # yfinance devuelve NaN en dias sin cierre: un NaN guardado hacia
+            # que el calculo de momentum lanzase InvalidOperation y el job
+            # entero abortase sin escribir nada.
+            try:
+                if not (math.isfinite(float(close)) and math.isfinite(float(adj))):
+                    continue
+            except (TypeError, ValueError):
                 continue
             bars.append(
                 PriceBar(
@@ -203,7 +212,11 @@ def compute_momentum_metrics(
         ).all()
         # F370: solo barras hasta as_of; un as_of historico no puede usar datos
         # posteriores etiquetados con la fecha pedida.
-        series = [(d, Decimal(str(p))) for d, p in rows if p is not None and p > 0]
+        series = [
+            (d, Decimal(str(p)))
+            for d, p in rows
+            if p is not None and Decimal(str(p)).is_finite() and p > 0
+        ]
         if len(series) < MIN_BARS_6M:
             stats["skipped"] += 1
             continue
