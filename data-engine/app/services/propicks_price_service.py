@@ -23,7 +23,9 @@ from sqlalchemy.orm import Session
 
 from app.models import CalculatedMetric, Company, MarketPrice, ProPickCandidate, ProPickRun
 
-MOMENTUM_WINDOWS: dict[str, int] = {"momentum_6m": 126, "momentum_12m": 252}
+# Dias de CALENDARIO (momentum_from_series resta timedelta(days=...)): 126/252
+# eran dias de bolsa y salian como ~4 y ~8 meses etiquetados 6m/12m.
+MOMENTUM_WINDOWS: dict[str, int] = {"momentum_6m": 182, "momentum_12m": 365}
 MIN_BARS_6M = 60   # ventanas minimas honestas (~3 meses de barras)
 MIN_BARS_12M = 200
 METRIC_VERSION = "v1"
@@ -206,7 +208,7 @@ def compute_momentum_metrics(
             stats["skipped"] += 1
             continue
         for metric, days in MOMENTUM_WINDOWS.items():
-            if len(series) < (MIN_BARS_12M if days > 126 else MIN_BARS_6M):
+            if len(series) < (MIN_BARS_12M if days > 182 else MIN_BARS_6M):
                 continue
             value = momentum_from_series(series, days)
             if value is None:
@@ -251,6 +253,7 @@ def compute_momentum_metrics(
                     )
                 )
             stats[metric] += 1
+    db.flush()
     return stats
 
 
@@ -308,7 +311,7 @@ def refresh_propicks_prices(
     *,
     top_n: int = 40,
     max_companies: int = 500,
-    period: str = "1y",
+    period: str = "2y",  # 12m de momentum exige > 365 dias de historia
     fetcher: Callable[..., dict[str, list[PriceBar]]] = fetch_history_yfinance,
     as_of: date | None = None,
 ) -> dict[str, Any]:
