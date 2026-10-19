@@ -77,8 +77,8 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-teal-400" />
-              <CardTitle className="text-lg">Filtros Avanzados</CardTitle>
+              <Filter className="h-4 w-4 text-teal-400" />
+              <CardTitle className="text-sm font-semibold">Filtros</CardTitle>
             </div>
             <div className="flex items-center gap-1">
               {activeFilterCount > 0 && (
@@ -86,10 +86,12 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
                   {activeFilterCount} {activeFilterCount === 1 ? 'filtro' : 'filtros'}
                 </span>
               )}
-              <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={resetFilters}>
-                <X className="h-4 w-4 mr-1" />
-                Limpiar
-              </Button>
+              {activeFilterCount > 0 && (
+                <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={resetFilters}>
+                  <X className="h-4 w-4 mr-1" />
+                  Limpiar
+                </Button>
+              )}
               <Button
                 aria-expanded={open}
                 aria-controls="propicks-filtros-cuerpo"
