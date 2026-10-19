@@ -2,8 +2,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import { newsDisplayTitle } from '@/lib/news-display';
+import { isTranslatable } from '@/lib/news-language';
 
-const nonLatin = /[\u0370-\u03ff\u0400-\u052f\u0600-\u06ff\u0900-\u097f\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
 const queue: Array<() => void> = [];
 let running = 0;
 function drain() { while (running < 2 && queue.length) { running++; queue.shift()!(); } }
@@ -22,7 +22,7 @@ export function NewsHeadline({ event }: { event: ResearchNewsEvent }) {
   const original = event.original_headline ?? event.title;
   const [translated, setTranslated] = useState<string | null>(event.headline_translation?.text ?? null);
   const ref = useRef<HTMLDivElement>(null);
-  const needsTranslation = event.headline_from_source !== false && (nonLatin.test(original) || /\b(the|with|says|shares|stocks|earnings|reports|raises|falls|after|amid|outlook|growth|investors|market|billion|million|revenue|warns|cuts|for|and|as|to|in)\b/i.test(original));
+  const needsTranslation = event.headline_from_source !== false && isTranslatable(original);
   useEffect(() => {
     if (!needsTranslation || translated || !ref.current) return;
     let active = true;

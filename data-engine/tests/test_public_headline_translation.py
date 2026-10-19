@@ -142,3 +142,52 @@ def test_chain_empty_is_unavailable(monkeypatch):
         result = await service.translate_external_headline(db, 'Apple reports earnings 2026')
         assert result['status'] == 'unavailable' and result['text'] is None
     asyncio.run(run())
+
+
+def test_needs_translation_language_marks():
+    n = service.needs_translation
+    # Español claro: sin botón / not_needed.
+    assert not n('La empresa anuncia resultados')
+    assert not n('CPT eleva el dividendo tras superar las expectativas de ingresos')
+    # Objeción del auditor (19-oct-2026): titulares españoles sin marcas de
+    # lista tampoco son traducibles; no gasta presupuesto del proveedor.
+    assert not n('Inditex bate previsiones')
+    assert not n('Iberdrola eleva beneficio')
+    assert not n('BBVA gana 5.000 millones')
+    # Inglés con marcas: se ofrece.
+    assert n('Apple reports earnings after the bell')
+    # Acentos: el front usa lookarounds Unicode para igualar el \b de Python
+    # (objeción del auditor, 19-oct-2026); estas cadenas fijan la paridad.
+    assert not n('Las compañías del Ibex suben')
+    assert not n('Energías renovables lideran el Ibex')
+    assert not n('Las economías emergentes crecen')
+    assert not n('Ñandú Capital invierte')
+    # Sin marcas de ningún idioma: solo con señal latina-inglesa explícita
+    # (Title Case de >=3 palabras, convención de prensa anglosajona).
+    assert n('Meta Llama Beats Rivals Again')
+    assert n('Müller Sachs Group Holdings')
+    # Alfabetos no latinos siempre.
+    assert n('Εταιρεία ανακοινώνει αποτελέσματα')
+
+
+def test_nearly_identical_output_is_not_marked_translated():
+    async def run():
+        original = 'Apple reports earnings after the bell'
+        # El modelo devuelve el texto sin traducir (idéntico): no se acepta.
+        service._cache.clear()
+        identical = await service.translate_external_headline(
+            SimpleNamespace(info={'tenant_id': 1}), original, provider=Provider(text=original))
+        assert identical['status'] == 'unavailable'
+        # Casi idéntico (solo cambia puntuación/mayúsculas): tampoco.
+        service._cache.clear()
+        near = await service.translate_external_headline(
+            SimpleNamespace(info={'tenant_id': 1}), original,
+            provider=Provider(text='Apple reports earnings after the bell.'))
+        assert near['status'] == 'unavailable'
+        # Una traducción real sí se acepta.
+        service._cache.clear()
+        real = await service.translate_external_headline(
+            SimpleNamespace(info={'tenant_id': 1}), original,
+            provider=Provider(text='Apple informa de resultados tras el cierre'))
+        assert real['status'] == 'translated'
+    asyncio.run(run())
