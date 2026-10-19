@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, Users } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import InsiderFeed from '@/components/insider/InsiderFeed';
 import InsiderOperationsView from '@/components/insider/InsiderOperationsView';
 import InsiderSignalsView from '@/components/insider/InsiderSignalsView';
@@ -88,15 +88,8 @@ export default async function InsiderPage({ searchParams }: PageProps) {
                     Volver a {ticker}
                 </Link>
             ) : null}
-            <header className="flex flex-col gap-3 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                    <p className="text-sm font-semibold uppercase text-teal-300">Insider</p>
-                    <h1 className="mt-1 text-3xl font-bold text-gray-100">Señales Insider</h1>
-                </div>
-                <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
-                    <Users className="h-4 w-4 text-teal-300" />
-                    Form 4
-                </div>
+            <header className="border-b border-gray-800 pb-4">
+                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Señales insider</h1>
             </header>
 
             <InsiderSignalsView
