@@ -1132,3 +1132,20 @@ def test_peer_benchmark_with_three_peers_and_peer_without_data():
         finally:
             db.close()
         cleanup_metric_test_artifacts()
+
+
+def test_owner_earnings_unit_follows_input_currency():
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        for metric, val in (("net_income", "200"), ("depreciation_amortization", "80"), ("capital_expenditure", "-120")):
+            fact = add_fact(db, company, metric, val)
+            fact.unit = "CAD"
+        db.commit()
+        result = MetricCalculationService().calculate(db, company, "owner_earnings", persist=False)
+        assert result.status == "ok"
+        assert result.unit == "CAD"
+    finally:
+        db.close()
+        cleanup_metric_test_artifacts()
