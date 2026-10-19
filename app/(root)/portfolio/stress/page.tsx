@@ -1,3 +1,4 @@
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import HistoricalStressView from '@/components/historical-stress/HistoricalStressView';
@@ -27,7 +28,7 @@ export default async function HistoricalStressPage({ searchParams }: { searchPar
                 <Link className="text-sm text-teal-300" href="/portfolio/intelligence">Inteligencia de cartera</Link>
                 <h1 className="mt-3 text-3xl font-bold text-gray-100">Estrés histórico</h1>
                 <form method="get" className="mt-4 flex flex-wrap items-end gap-3">
-                    <label className="text-sm text-gray-400">Compañía<input className="mt-1 block w-40 rounded border border-gray-700 bg-surface-1 px-3 py-2 text-gray-100" name="ticker" maxLength={20} defaultValue={ticker} placeholder="AAPL" /></label>
+                    <label className="text-sm text-gray-400">Compañía<TickerSearchInput className="mt-1 block w-40 rounded border border-gray-700 bg-surface-1 px-3 py-2 text-gray-100" name="ticker" maxLength={20} defaultValue={ticker} placeholder="AAPL" /></label>
                     <button className="rounded bg-teal-800 px-4 py-2 text-sm text-white" type="submit">Analizar</button>
                     <Link className="px-2 py-2 text-sm text-teal-300" href="/portfolio/stress">Mi cartera</Link>
                 </form>

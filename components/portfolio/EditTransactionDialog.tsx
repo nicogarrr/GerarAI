@@ -11,6 +11,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pencil } from 'lucide-react';
@@ -114,10 +115,11 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="symbol" className="text-gray-300">Símbolo</Label>
-                        <Input
+                        <TickerSearchInput
                             id="symbol"
                             value={formData.symbol}
-                            onChange={(e) => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })}
+                            onValueChange={(value) => setFormData({ ...formData, symbol: value.toUpperCase() })}
+                            onSelect={(stock) => setFormData({ ...formData, symbol: stock.symbol })}
                             required
                             className="bg-gray-800 border-gray-700 text-gray-100"
                         />

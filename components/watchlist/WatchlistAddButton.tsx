@@ -1,11 +1,8 @@
 'use client';
 
-import { createLatestRequestGate } from '@/lib/latest-request';
-import { withFetchDeadline } from '@/lib/upstream/fetch-deadline';
-import { formatCompanyName } from '@/lib/format';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Loader2, Plus, Search } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     Dialog,
@@ -16,8 +13,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { searchStocksWithStatus } from '@/lib/actions/finnhub.actions';
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { addToWatchlistCanonical } from '@/lib/actions/watchlist.actions';
 import { showErrorToast } from '@/lib/toast';
 
@@ -32,64 +28,12 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [term, setTerm] = useState('');
-    const [stocks, setStocks] = useState<StockWithWatchlistStatus[]>([]);
-    const [searching, setSearching] = useState(false);
-    const [searchFailed, setSearchFailed] = useState(false);
     const [adding, setAdding] = useState<string | null>(null);
     const [added, setAdded] = useState<Set<string>>(new Set());
-    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const searchGateRef = useRef(createLatestRequestGate());
-
     const followed = new Set([...followedSymbols.map((s) => s.toUpperCase()), ...added]);
 
-    const runSearch = useCallback(async (query: string) => {
-        const ticket = searchGateRef.current.begin();
-        setSearching(true);
-        setSearchFailed(false);
-        setStocks([]);
-        try {
-            const result = await withFetchDeadline(() => searchStocksWithStatus(query), 6000);
-            if (!searchGateRef.current.isLatest(ticket)) return;
-            setSearchFailed(result.status === 'error');
-            setStocks(result.stocks);
-        } catch {
-            if (searchGateRef.current.isLatest(ticket)) {
-                setSearchFailed(true);
-                setStocks([]);
-            }
-        } finally {
-            if (searchGateRef.current.isLatest(ticket)) setSearching(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        const gate = searchGateRef.current;
-        gate.invalidate();
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        const query = term.trim();
-        if (!open || !query) return;
-        timeoutRef.current = setTimeout(() => void runSearch(query), 300);
-        return () => {
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            gate.invalidate();
-        };
-    }, [term, open, runSearch]);
-
-    const handleTermChange = (value: string) => {
-        searchGateRef.current.invalidate();
-        setSearching(false);
-        setStocks([]);
-        setTerm(value);
-        if (!value.trim()) {
-            setStocks([]);
-            setSearchFailed(false);
-            setSearching(false);
-        }
-    };
-
     const handleAdd = async (stock: StockWithWatchlistStatus) => {
-        if (adding) return;
+        if (adding || followed.has(stock.symbol.toUpperCase())) return;
         setAdding(stock.symbol);
         try {
             const res = await addToWatchlistCanonical(stock.symbol, stock.name);
@@ -114,11 +58,7 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
     };
 
     return (
-        <Dialog open={open} onOpenChange={(value) => {
-            searchGateRef.current.invalidate();
-            setSearching(false);
-            setOpen(value);
-        }}>
+        <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button
                     variant="outline"
@@ -135,70 +75,17 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
                         Busca por símbolo o empresa y añádela a tu seguimiento.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="relative">
-                    <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                    <Input
-                        autoFocus
-                        value={term}
-                        onChange={(event) => handleTermChange(event.target.value)}
-                        placeholder="Buscar acciones (p. ej. SAN o Santander)"
-                        aria-label="Buscar acciones para añadir a la watchlist"
-                        className="border-gray-700 bg-gray-950 pl-9 text-gray-200"
-                    />
-                </div>
-                <div role="status" className="min-h-12">
-                    {searching ? (
-                        <p className="flex items-center gap-2 px-1 py-3 text-sm text-gray-500">
-                            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> Buscando…
-                        </p>
-                    ) : searchFailed ? (
-                        <p className="px-1 py-3 text-sm text-amber-300">
-                            La búsqueda no está disponible ahora mismo; inténtalo de nuevo en un momento.
-                        </p>
-                    ) : term.trim() && stocks.length === 0 ? (
-                        <p className="px-1 py-3 text-sm text-gray-500">Sin resultados para «{term.trim()}».</p>
-                    ) : null}
-                </div>
-                <ul className="max-h-80 space-y-1 overflow-y-auto">
-                    {stocks.map((stock) => {
-                        const isFollowed = followed.has(stock.symbol.toUpperCase());
-                        return (
-                            <li
-                                key={stock.symbol}
-                                className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-gray-800/60"
-                            >
-                                <div className="min-w-0">
-                                    <div className="truncate text-sm font-medium text-gray-200">{formatCompanyName(stock.name)}</div>
-                                    <div className="truncate text-xs text-gray-500">
-                                        {stock.symbol} · {stock.exchange}
-                                    </div>
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    disabled={isFollowed || adding !== null}
-                                    aria-busy={adding === stock.symbol}
-                                    onClick={() => void handleAdd(stock)}
-                                    className="min-h-[44px] shrink-0 gap-1.5 px-3 text-sm text-teal-300 hover:text-teal-200"
-                                >
-                                    {adding === stock.symbol ? (
-                                        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-                                    ) : isFollowed ? (
-                                        <>
-                                            <Check aria-hidden="true" className="h-4 w-4 text-teal-400" />
-                                            Siguiendo
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Plus aria-hidden="true" className="h-4 w-4" />
-                                            Añadir
-                                        </>
-                                    )}
-                                </Button>
-                            </li>
-                        );
-                    })}
-                </ul>
+                <TickerSearchInput
+                    value={term}
+                    onValueChange={setTerm}
+                    onSelect={(stock) => void handleAdd(stock)}
+                    disabledSymbols={[...followed]}
+                    disabled={adding !== null}
+                    placeholder="Buscar acciones (p. ej. SAN o Santander)"
+                    ariaLabel="Buscar acciones para añadir a la watchlist"
+                    className="w-full border-gray-700 bg-gray-950 text-gray-200"
+                />
+                {adding ? <p role="status" className="text-sm text-gray-400">Añadiendo {adding}…</p> : null}
             </DialogContent>
         </Dialog>
     );

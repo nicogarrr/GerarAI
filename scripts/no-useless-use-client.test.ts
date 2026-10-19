@@ -103,6 +103,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/PersonalizedOverview.tsx': 'jsx-onClick, useState, useEffect, jsx-onRetry',
   'components/PublicMobileNav.tsx': 'useState, useRef, useEffect, browser:HTMLElement, browser:document, browser:window, jsx-onClick',
   'components/SearchCommand.tsx': 'useRouter, useState, useRef, browser:HTMLElement, browser:document, useEffect, browser:window, jsx-onClick, jsx-onOpenChange, jsx-onCloseAutoFocus, jsx-onValueChange, jsx-onSelect, jsx-onMouseEnter, jsx-onFocus, importa cliente: components/ui/command.tsx',
+  'components/search/TickerSearchInput.tsx': 'useState, useCallback, useRef, useEffect, browser:fetch, jsx-onChange, jsx-onClick',
   'components/UserDropdown.tsx': 'useRouter, jsx-onClick, importa cliente: components/ui/dropdown-menu.tsx, importa cliente: components/ui/avatar.tsx',
   'components/alerts/AlertsManager.tsx': 'useSearchParams, useState, useEffect, browser:window, jsx-onOpenChange, jsx-onChange, jsx-onValueChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/select.tsx, importa cliente: components/ui/label.tsx',
   'components/brain/GlobalBrain.tsx': 'usePathname, useState, useEffect, browser:window, useRef, browser:navigator, browser:document, jsx-onClick, jsx-spread, jsx-onSubmit, jsx-onChange, libreria cliente: react-markdown',

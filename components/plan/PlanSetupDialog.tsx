@@ -1,4 +1,5 @@
 'use client';
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -212,13 +213,24 @@ export default function PlanSetupDialog({
                                     <option value="sector">Sector</option>
                                     <option value="asset_class">Clase de activo</option>
                                 </select>
+                                {row.kind === 'ticker' ? (
+                                <TickerSearchInput
+                                    ariaLabel={`Objetivo ${index + 1}`}
+                                    value={row.label}
+                                    onValueChange={(value) => updateRow(index, { label: value })}
+                                    onSelect={(stock) => updateRow(index, { label: stock.symbol })}
+                                    placeholder="Buscar por ticker o empresa"
+                                    className="border-gray-700 bg-gray-800 text-gray-100"
+                                />
+                                ) : (
                                 <Input
                                     aria-label={`Objetivo ${index + 1}`}
                                     value={row.label}
                                     onChange={(e) => updateRow(index, { label: e.target.value })}
-                                    placeholder={row.kind === 'ticker' ? 'SAN.MC' : 'Etiqueta'}
+                                    placeholder="Etiqueta"
                                     className="border-gray-700 bg-gray-800 text-gray-100"
                                 />
+                                )}
                                 <Input
                                     aria-label={`Porcentaje objetivo ${index + 1}`}
                                     inputMode="decimal"

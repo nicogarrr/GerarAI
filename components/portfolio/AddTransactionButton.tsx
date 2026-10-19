@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,26 +13,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, TrendingUp, Loader2 } from 'lucide-react';
+import { Plus, TrendingUp } from 'lucide-react';
 import { addTransaction } from '@/lib/actions/portfolio.actions';
-import { searchStocksWithStatus } from '@/lib/actions/finnhub.actions';
-import { createLatestRequestGate } from '@/lib/latest-request';
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
-import { formatCompanyName, parseLocalizedNumber, todayLocal } from '@/lib/format';
+import { parseLocalizedNumber, todayLocal } from '@/lib/format';
 
 type Props = {
   userId: string;
 };
-
-interface StockResult {
-  symbol: string;
-  name: string;
-  exchange: string;
-  type: string;
-}
 
 // Divisa probable segun el sufijo de mercado del ticker (B5): al elegir
 // SAN.MC la moneda no puede quedarse en USD por defecto. El usuario puede
@@ -55,13 +47,7 @@ export default function AddTransactionButton({ userId }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<StockResult[]>([]);
-  const [showResults, setShowResults] = useState(false);
-  const [searchError, setSearchError] = useState(false);
-  const searchGateRef = useRef(createLatestRequestGate());
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState({
     symbol: '',
@@ -74,82 +60,7 @@ export default function AddTransactionButton({ userId }: Props) {
     notes: '',
   });
 
-  // Búsqueda inteligente con debounce
-  const handleSearch = useCallback(async (query: string) => {
-    // Sello de petición más reciente: una respuesta tardía de una query
-    // vieja no pisa resultados ni errores de la nueva (race F215).
-    const ticket = searchGateRef.current.begin();
-    if (query.length < 1) {
-      setSearchResults([]);
-      setShowResults(false);
-      setSearchError(false);
-      return;
-    }
 
-    setSearchLoading(true);
-    try {
-      const result = await searchStocksWithStatus(query);
-      if (!searchGateRef.current.isLatest(ticket)) return;
-      if (result.status === 'error') {
-        // Fallo del proveedor: no fingir "sin resultados" (F215).
-        setSearchError(true);
-        setShowResults(false);
-      } else {
-        setSearchError(false);
-        setSearchResults(result.stocks.slice(0, 8));
-        setShowResults(true);
-      }
-    } catch (error) {
-      if (!searchGateRef.current.isLatest(ticket)) return;
-      console.error('Error searching stocks:', error);
-      setSearchError(true);
-      setShowResults(false);
-    }
-    setSearchLoading(false);
-  }, []);
-
-  useEffect(() => {
-    // La query cambió: invalida YA cualquier búsqueda en vuelo. No esperar
-    // al debounce: una respuesta tardía de la query anterior no puede
-    // pintar resultados ni errores sobre la nueva (ni repintar tras borrar).
-    searchGateRef.current.invalidate();
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (searchQuery.length >= 1) {
-      searchTimeoutRef.current = setTimeout(() => {
-        handleSearch(searchQuery);
-      }, 300);
-    } else {
-      setSearchResults([]);
-      setShowResults(false);
-      setSearchError(false);
-      setSearchLoading(false);
-    }
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [searchQuery, handleSearch]);
-
-  const selectStock = (stock: StockResult) => {
-    setFormData((prev) => ({
-      ...prev,
-      symbol: stock.symbol,
-      companyName: stock.name,
-      // Solo se sobrescribe la divisa si el usuario aun tiene el default USD:
-      // una eleccion manual previa se respeta.
-      currency:
-        prev.currency === 'USD'
-          ? (defaultCurrencyFor(stock.symbol) ?? prev.currency)
-          : prev.currency,
-    }));
-    setSearchQuery(stock.symbol);
-    setShowResults(false);
-  };
 
   const [fieldErrors, setFieldErrors] = useState<TransactionFormErrors>({});
 
@@ -217,53 +128,36 @@ export default function AddTransactionButton({ userId }: Props) {
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Buscador Inteligente */}
-          <div className="space-y-2 relative">
+          {/* Buscador con autocompletado: el componente compartido de la app
+              (misma búsqueda del buscador global, gate F215 y debounce). */}
+          <div className="space-y-2">
             <Label htmlFor="symbol" className="text-gray-300">Buscar Acción</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-              <Input
-                id="symbol"
-                placeholder="Buscar por nombre o símbolo (ej: Apple, AAPL)"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  if (e.target.value !== formData.symbol) {
-                    setFormData({ ...formData, symbol: '', companyName: '' });
-                  }
-                }}
-                className="bg-gray-800 border-gray-700 text-gray-100 pl-10"
-              />
-              {searchLoading && (
-                <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 animate-spin" />
-              )}
-            </div>
-
-            {/* Dropdown de resultados */}
-            {searchError && (
-              <p className="mt-1 text-xs text-red-400">
-                No se pudo buscar ahora mismo (fallo del proveedor de datos). Inténtalo de nuevo en unos segundos.
-              </p>
-            )}
-            {showResults && searchResults.length > 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto">
-                {searchResults.map((stock, index) => (
-                  <button
-                    key={`${stock.symbol}-${index}`}
-                    type="button"
-                    onClick={() => selectStock(stock)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 border-b border-gray-700 last:border-0"
-                  >
-                    <TrendingUp className="h-4 w-4 text-teal-400" />
-                    <div>
-                      <div className="text-white font-medium">{stock.symbol}</div>
-                      <div className="text-sm text-gray-400 line-clamp-2 break-words">{formatCompanyName(stock.name)}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
+            <TickerSearchInput
+              id="symbol"
+              placeholder="Buscar por nombre o símbolo (ej: Apple, AAPL)"
+              value={searchQuery}
+              onValueChange={(value) => {
+                setSearchQuery(value);
+                if (value !== formData.symbol) {
+                  setFormData({ ...formData, symbol: '', companyName: '' });
+                }
+              }}
+              onSelect={(stock) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  symbol: stock.symbol,
+                  companyName: stock.name,
+                  // Solo se sobrescribe la divisa si el usuario aun tiene el default USD:
+                  // una eleccion manual previa se respeta.
+                  currency:
+                    prev.currency === 'USD'
+                      ? (defaultCurrencyFor(stock.symbol) ?? prev.currency)
+                      : prev.currency,
+                }));
+                setSearchQuery(stock.symbol);
+              }}
+              className="bg-gray-800 border-gray-700 text-gray-100 w-full"
+            />
             {fieldErrors.symbol && (
               <p role="alert" className="text-sm text-red-400">{fieldErrors.symbol}</p>
             )}

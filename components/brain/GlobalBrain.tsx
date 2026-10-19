@@ -1,4 +1,5 @@
 'use client';
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
@@ -294,14 +295,14 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                     <BrainGlassesIcon className="h-9 w-9 shrink-0 object-contain" />
                     <CardTitle id="global-brain-title" className="text-sm font-medium">Cerebro GerarAI</CardTitle>
                     {showGuideInput || guideTicker ? (
-                        <input
+                        <TickerSearchInput
                             value={guideTicker}
-                            onChange={(event) => { setGuideTicker(event.target.value.toUpperCase().replace(/[^A-Z0-9.\-]/g, '').slice(0, 20)); setReviewId(undefined); }}
+                            onValueChange={(value) => { setGuideTicker(value); setReviewId(undefined); }}
+                            onSelect={(stock) => { setGuideTicker(stock.symbol); setReviewId(undefined); }}
                             onBlur={() => { if (!guideTicker.trim()) setShowGuideInput(false); }}
                             placeholder="Ticker guía"
-                            title="Guía de investigación: escribe un ticker y el Cerebro responde como guía de research de esa empresa"
-                            aria-label="Ticker de la guía de investigación"
-                            className="w-24 min-w-0 rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-200 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
+                            ariaLabel="Ticker de la guía de investigación"
+                            className="w-full min-w-0 rounded-full border border-slate-700 bg-slate-900 px-2 text-slate-200"
                         />
                     ) : (
                         <button
