@@ -411,6 +411,11 @@ class MetricCalculationService:
         )
         if trace.get("tax_rate_source") == "statutory_fallback":
             confidence = min(confidence, Decimal("0.70"))
+        if unit == "USD":
+            # importe: la divisa es la de los hechos de entrada (EUR en ESEF,
+            # CAD en Yahoo), no USD fijo
+            units = {f.unit for f in unique_facts if f.unit}
+            unit = units.pop() if len(units) == 1 else unit
         result = MetricResult(
             metric=metric,
             status="ok",
@@ -1435,6 +1440,10 @@ class MetricCalculationService:
             default=Decimal("0.70"),
         )
         years = sorted(yearly)
+        if unit == "USD":
+            # importe: la divisa es la de los hechos de entrada, no una fija
+            units = {f.unit for f in facts_used if f.unit}
+            unit = units.pop() if len(units) == 1 else unit
         result = MetricResult(
             metric=metric,
             status="ok",
