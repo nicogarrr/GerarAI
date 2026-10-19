@@ -44,10 +44,18 @@ class _Settings:
     finnhub_api_key = "test-key"
 
 
-def _company(db: Session, *, name: str, exchange: str = "NASDAQ", ticker: str = "XYZ") -> Company:
+def _company(
+    db: Session,
+    *,
+    name: str,
+    exchange: str = "NASDAQ",
+    ticker: str = "XYZ",
+    sector: str = "Tech",
+    industry: str = "Tech",
+) -> Company:
     company = Company(
         ticker=ticker, name=name, exchange=exchange, currency="USD",
-        sector="Tech", industry="Tech", company_type="holding",
+        sector=sector, industry=industry, company_type="holding",
         valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
     )
     db.add(company)
@@ -64,6 +72,17 @@ def test_needs_enrichment_detects_placeholders(db):
     ) is True
     assert CompanyEnrichmentService.needs_enrichment(
         _company(db, name="Real Name", ticker="T5")
+    ) is False
+
+
+def test_needs_enrichment_detects_placeholder_sector(db):
+    # Buen nombre/exchange pero sector sin clasificar: antes era "already_ok"
+    # y nunca se clasificaba (CF Industries / INVA en ProPicks).
+    assert CompanyEnrichmentService.needs_enrichment(
+        _company(db, name="CF Industries Holdings, Inc.", ticker="CF", sector="Unknown", industry="Unknown")
+    ) is True
+    assert CompanyEnrichmentService.needs_enrichment(
+        _company(db, name="CF Industries Holdings, Inc.", ticker="CF2", sector="Materials", industry="Chemicals")
     ) is False
 
 
@@ -98,6 +117,34 @@ def test_enrich_without_api_name_changes_nothing(db):
     service = CompanyEnrichmentService(settings=_Settings(), client=client)
     assert service.enrich(db, company) is False
     assert company.name == "XYZ"
+
+
+def test_enrich_classifies_placeholder_sector_from_industry(db):
+    company = _company(db, name="CF Industries Holdings, Inc.", sector="Unknown", industry="Unknown")
+    client = _Client({
+        "name": "CF Industries Holdings, Inc.",
+        "exchange": "NYSE",
+        "finnhubIndustry": "Chemicals",
+        "currency": "USD",
+    })
+    service = CompanyEnrichmentService(settings=_Settings(), client=client)
+    assert service.enrich(db, company) is True
+    assert company.industry == "Chemicals"
+    assert company.sector == "Materials"  # mapeo GICS declarado, no inventado
+
+
+def test_enrich_leaves_unknown_sector_when_industry_unmapped(db):
+    company = _company(db, name="Innventure, Inc.", sector="Unknown", industry="Unknown")
+    client = _Client({
+        "name": "Innventure, Inc.",
+        "exchange": "NASDAQ",
+        "finnhubIndustry": "Holding Companies",  # no mapeada: honesto, no se inventa
+        "currency": "USD",
+    })
+    service = CompanyEnrichmentService(settings=_Settings(), client=client)
+    service.enrich(db, company)
+    assert company.industry == "Holding Companies"
+    assert company.sector == "Unknown"
 
 
 def test_enrich_ignores_na_industry(db):

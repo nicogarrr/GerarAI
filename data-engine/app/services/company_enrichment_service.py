@@ -147,12 +147,18 @@ class CompanyEnrichmentService:
     # -- criterio de enriquecimiento --------------------------------------
     @staticmethod
     def needs_enrichment(company: Company) -> bool:
+        # Sector en placeholder tambien dispara: antes solo miraba nombre y
+        # exchange, asi que una ficha con nombre/exchange correctos y sector
+        # "Unknown" quedaba "already_ok" para siempre (p.ej. CF Industries o
+        # INVA en ProPicks, "Sin clasificar"). enrich() solo toca campos en
+        # placeholder y nunca inventa: industria no mapeada -> sector Unknown.
         name = (company.name or "").strip()
         return (
             not name
             or name.upper() == (company.ticker or "").upper()
             or "_" in name
             or company.exchange in _PLACEHOLDER_EXCHANGES
+            or company.sector in _PLACEHOLDER_SECTORS
         )
 
     # -- aplicacion ---------------------------------------------------------
