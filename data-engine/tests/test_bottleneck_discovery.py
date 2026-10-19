@@ -721,3 +721,32 @@ def test_distinct_sources_collapses_chunks_of_one_document():
     ]
     assert [e.id for e in svc.distinct_sources(chunks)] == [
         "document_chunk:1", "document_chunk:3", "news_event:9"]
+
+
+def test_reasoning_uses_curated_company_profile(db):
+    """La hipotesis es especifica por empresa con datos curados de `companies`
+    (nombre · industria); nunca texto libre del modelo."""
+    text = svc.compose_reasoning("SIFI", "beneficiaria", "proveedor_directo",
+                                 company_name="SIFCO Industries", sector="Industrials",
+                                 industry="Aerospace & Defense")
+    assert "SIFI (SIFCO Industries · Aerospace & Defense)" in text
+    # Sin ficha curada util: se omite el detalle (nombre = ticker o "Unknown").
+    plain = svc.compose_reasoning("XYZ", "afectada", "cliente_dependiente",
+                                  company_name="XYZ", sector="Unknown", industry="Unknown")
+    assert "XYZ (" not in plain
+    # Sin industria curada se usa el sector.
+    sec = svc.compose_reasoning("ABC", "afectada", "cliente_dependiente",
+                                company_name="Acme", sector="Utilities", industry="Unknown")
+    assert "ABC (Acme · Utilities)" in sec
+
+
+def test_run_persists_company_profile_in_reasoning(db):
+    company = db.scalar(select(Company).where(Company.ticker == "NVDA"))
+    company.name = "NVIDIA Corp."
+    company.industry = "Semiconductors"
+    db.commit()
+    result = run(db, Provider(out(cand(ticker="NVDA", exposicion="beneficiaria", canal="proveedor_directo"))))
+    assert result["saved"] == 1
+    row = db.scalar(select(svc.BottleneckDiscovery).where(svc.BottleneckDiscovery.ticker == "NVDA"))
+    assert "NVIDIA Corp. · Semiconductors" in row.reasoning
+    # Los demas (nombre = ticker, industria Unknown) conservan el texto anterior.

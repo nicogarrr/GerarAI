@@ -16,7 +16,7 @@ export function InvestorConcepts({ slug }: { slug: string }) {
           Conceptos
         </h2>
         <Link
-          className="text-sm text-lime-300 hover:underline"
+          className="text-sm text-teal-300 hover:underline"
           href="/inversores/conceptos"
         >
           Ver todos

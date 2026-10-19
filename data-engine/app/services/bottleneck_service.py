@@ -62,17 +62,24 @@ NEGATION = re.compile(rf"\b(?:{_NEG_WORDS})\b(?:\W+\w+){{0,6}}\W*$")
 # Alivio ANTES ("resolved shortage", "end of the shortage").
 RELIEF_BEFORE = re.compile(
     r"\b(?:easing|eased|resolved|eliminated|falling|shrinking|reduced|reduction in|end of|"
-    r"overcome|alleviated|mitigated|cleared|resuelta|resuelto|fin de|superada|superado|"
+    r"overcome|alleviated|mitigated|cleared|fading|resuelta|resuelto|fin de|superada|superado|"
     r"disminucion de|reduccion de|alivio de)\b(?:\W+\w+){0,3}\W*$"
 )
 # Negacion o alivio DESPUES ("shortages are not expected", "did not materialize",
 # "shortage already resolved", "ya resuelta"), con cualquier adverbio intermedio.
 AFTER_CUES = re.compile(
     rf"\b(?:{_NEG_WORDS}|easing|eased|easy|easier|resolved|ended|over|behind us|subsided|"
-    r"alleviated|mitigated|cleared|disappeared|vanished|normali[sz]ed|overcome|unlikely|"
+    r"alleviated|mitigated|cleared|disappeared|vanished|normali[sz]\w*|overcome|unlikely|"
     r"improving|improved|falling|fell|shrinking|resuelt[ao]s?|superad[ao]s?|terminad[ao]s?|"
-    r"disminuy\w+|reducid[ao]s?|mejor\w+|normalizad[ao]s?|improbable|descartad[ao]s?)\b"
+    r"disminuy\w+|reducid[ao]s?|mejor\w+|normalizad[ao]s?|improbable|descartad[ao]s?)\b|"
+    # Alivio aun sin consumar: "will ease", "expected to ease", "ease as...",
+    # "has faded" y "now/back to normal" (auditoria #1920).
+    r"\b(?:ease|ease[sd]|fading|faded|fades|now normal|back to normal)\b"
 )
+# Contraste pasado->presente en la misma frase: "were 20 weeks in 2022 but are
+# now normal" habla de una restriccion pasada, no actual (auditoria #1920).
+PAST_CONTRAST = re.compile(r"\bbut\b(?:\W+\w+){0,6}\W+now\b")
+
 # Hipotesis, escenario o riesgo: no es evidencia de una restriccion real.
 CONDITIONAL = re.compile(
     r"\b(?:if|unless|whether|should|could|would|may|might|in case|in the event|"
@@ -89,13 +96,22 @@ def fold(text: str) -> str:
 
 def extract_themes(text: str) -> set[str]:
     found: set[str] = set()
-    for sentence in re.split(r"[.!?;\n]+", fold(text)):
+    # Un titular truncado con "..." o "…" NO es fin de frase: "Chip shortage...
+    # The company expects supply to normalize" es una sola frase y el alivio
+    # debe alcanzar la mencion (objecion del auditor, PR #1920).
+    flattened = re.sub(r"\.{2,}|…", " ", fold(text))
+    for sentence in re.split(r"[.!?;\n]+", flattened):
         if CONDITIONAL.search(sentence):
             continue
         for match in CONSTRAINT.finditer(sentence):
             before = sentence[max(0, match.start() - 80):match.start()]
             after = sentence[match.end():match.end() + 80]
-            if NEGATION.search(before) or RELIEF_BEFORE.search(before) or AFTER_CUES.search(after):
+            if (
+                NEGATION.search(before)
+                or RELIEF_BEFORE.search(before)
+                or AFTER_CUES.search(after)
+                or PAST_CONTRAST.search(after)
+            ):
                 continue
             # Co-occurrence within 100 characters, never across sentences.
             local = sentence[max(0, match.start() - 100):match.end() + 100]
@@ -160,7 +176,14 @@ def stored_evidence(db: Session, tenant: int) -> Iterator[Evidence]:
     for news in db.scalars(select(NewsEvent).where(NewsEvent.tenant_id == tenant)):
         host, _ = _url_identity(news.url)
         # source often names an aggregator (GDELT/RSS/manual), not a publisher.
-        yield Evidence(f"news_event:{news.id}", news.title, news.date, host,
+        # El texto analizado es titular + resumen: la ingesta ya guarda
+        # `summary` (coste 0) y la mencion de la escasez suele estar solo en
+        # el cuerpo resumido; con solo el titular este carril la perdia entera.
+        # La IDENTIDAD del hecho (copias sindicadas) se sigue derivando del
+        # titular, para no romper la deduplicacion por hash existente.
+        summary = (news.summary or "").strip()
+        text = news.title if not summary else f"{news.title}. {summary}"
+        yield Evidence(f"news_event:{news.id}", text, news.date, host,
                        _identities(news.title, news.url))
 
 

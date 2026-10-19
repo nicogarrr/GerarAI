@@ -164,6 +164,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/CompanyTechnicalWorkspace.tsx': 'dynamic-ssr-false, importa cliente: components/research/CompanyTechnicalChart.tsx',
   'components/research/ExternalNewsHeadline.tsx': 'useState, useRef, useEffect, browser:new IntersectionObserver, browser:IntersectionObserver',
   'components/research/GuideBrainButton.tsx': 'jsx-onClick, browser:window',
+  'components/research/CompanyActionsMenu.tsx': 'popover de Radix (estado de apertura en cliente)',
+  'components/ui/mobile-collapse.tsx': 'useState: bloque plegable en móvil',
   'components/research/GuideContextPanel.tsx': 'jsx-onClick, browser:window, importa cliente: components/ui/panel.tsx',
   'components/research/NewsHeadline.tsx': 'useState, useRef, useEffect, browser:new IntersectionObserver, browser:IntersectionObserver',
   'components/research/NewsSecondOrder.tsx': 'useState, jsx-onToggle',

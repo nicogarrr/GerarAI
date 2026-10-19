@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Building2, ExternalLink, FileText } from 'lucide-react';
+import { ExternalLink, FileText } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -15,7 +15,6 @@ import {
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { form13fValueToUsd } from '@/lib/form13f-value';
 import { formatMarketCapUsd, formatDate, formatUserDateTime, formatNumber, NA } from '@/lib/format';
-import { t } from '@/lib/i18n/t';
 
 import SyncButton from './SyncButton';
 import { ownershipManagerName } from '@/lib/ownership-display';
@@ -105,31 +104,10 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 overflow-x-clip">
-            <header className="flex flex-col gap-3 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                    <p className="text-sm font-semibold uppercase text-teal-300">{t('ownership.title')}</p>
-                    <h1 className="mt-1 text-3xl font-bold text-gray-100">Propiedad institucional (13F)</h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                        Posiciones declaradas ante la SEC. Los 13F pueden publicarse con hasta 45 días de retraso.
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
-                        <Building2 aria-hidden="true" className="h-4 w-4 text-teal-300" />
-                        SEC 13F
-                    </div>
-                    <SyncButton />
-                </div>
+            <header className="flex items-center justify-between gap-3 border-b border-gray-800 pb-4">
+                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Propiedad institucional (13F)</h1>
+                <SyncButton />
             </header>
-
-            {limitations.length ? (
-                <section className="rounded-xl border border-amber-900/60 bg-amber-950/20 p-4">
-                    <h2 className="text-sm font-semibold text-amber-200">Límites de este dato</h2>
-                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-400">
-                        {limitations.map((item) => <li key={item}>{ownershipLimitations(item)}</li>)}
-                    </ul>
-                </section>
-            ) : null}
 
             {!managers.length ? (
                 <EmptyState
@@ -145,7 +123,6 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                             key={manager.cik}
                         >
                             {ownershipManagerName(manager.cik, manager.name)}
-                            <span className="ml-2 text-xs text-gray-500">CIK {manager.cik}</span>
                         </a>
                     ))}
                 </section>
@@ -279,6 +256,16 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                         </p>
                     </section>
                 )
+            ) : null}
+            {limitations.length ? (
+                <details className="rounded-lg border border-gray-800 bg-surface-1 px-4 py-3 text-sm text-gray-500">
+                    <summary className="cursor-pointer select-none text-xs font-medium text-gray-400 hover:text-gray-300">
+                        Límites de este dato
+                    </summary>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5">
+                        {limitations.map((item) => <li key={item}>{ownershipLimitations(item)}</li>)}
+                    </ul>
+                </details>
             ) : null}
         </main>
     );

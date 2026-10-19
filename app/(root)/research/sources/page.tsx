@@ -83,18 +83,16 @@ export default async function ResearchSourcesPage({
 
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
-      <header className="flex flex-col gap-4 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Button asChild className="mb-4" size="sm" variant="ghost">
-            <Link href="/research">
+      <header className="flex items-center justify-between gap-3 border-b border-gray-800 pb-4">
+        <div className="flex items-center gap-3">
+          <Button asChild size="sm" variant="ghost">
+            <Link href="/research" aria-label="Volver a Research">
               <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-              Research
             </Link>
           </Button>
-          <p className="text-sm font-semibold uppercase text-teal-300">Evidencia</p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-100">Fuentes</h1>
+          <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Fuentes</h1>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-surface-1 px-4 py-3 text-sm text-gray-300">
+        <div className="rounded-lg border border-gray-800 bg-surface-1 px-3 py-1.5 text-xs text-gray-400">
           {documentsTotal !== null
             ? ticker
               ? `${formatNumber(documentsTotal, { maximumFractionDigits: 0 })} documentos de ${ticker}`
@@ -103,149 +101,6 @@ export default async function ResearchSourcesPage({
           · {formatNumber(audits.length, { maximumFractionDigits: 0 })} auditorías{ticker ? ' (global)' : ''}
         </div>
       </header>
-
-      <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <MutationForm action={importResearchSource} className="rounded-lg border border-gray-800 bg-surface-1 p-5" showSuccessInline resetOnSuccess successMessage="Fuente importada">
-          <div className="mb-4 flex items-center gap-2">
-            <UploadCloud aria-hidden="true" className="h-5 w-5 text-teal-300" />
-            <h2 className="text-lg font-semibold text-gray-100">Importar fuente manual</h2>
-          </div>
-          <div className="grid gap-3">
-            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-              <label className="text-sm font-semibold text-gray-400" htmlFor="ticker">Ticker</label>
-              <Input id="ticker" name="ticker" placeholder="p. ej. ASTS" required />
-            </div>
-            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-              <label className="text-sm font-semibold text-gray-400" htmlFor="manual-source-type">Tipo de fuente</label>
-              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">
-                <option value="manual_upload">Texto aportado por el usuario</option>
-                <option value="manual_transcript">Transcripción</option>
-                <option value="company_ir">Relaciones con inversores</option>
-              </select>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-              <label className="text-sm font-semibold text-gray-400" htmlFor="period">Periodo</label>
-              <Input id="period" name="period" placeholder="p. ej. Q2 2026" />
-            </div>
-            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-              <label className="text-sm font-semibold text-gray-400" htmlFor="title">Título</label>
-              <Input id="title" name="title" placeholder="Transcript de la llamada de resultados del Q2" required />
-            </div>
-            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-              <label className="text-sm font-semibold text-gray-400" htmlFor="source_url">URL</label>
-              <Input id="source_url" name="source_url" placeholder="https://..." />
-            </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-semibold text-gray-400" htmlFor="text">Texto</label>
-              <Textarea
-                className="min-h-[260px] border-gray-800 bg-black/30 text-gray-200 focus-visible:ring-teal-500"
-                id="text"
-                name="text"
-                placeholder="Pega el transcript, la nota de RI, el artículo o el extracto del filing"
-                required
-              />
-            </div>
-            <Button className="w-full sm:w-fit" type="submit">
-              <UploadCloud aria-hidden="true" className="h-4 w-4" />
-              Importar fuente
-            </Button>
-          </div>
-        </MutationForm>
-
-        <section className="grid gap-6">
-          <MutationForm action={importResearchDocumentFile} className="rounded-lg border border-gray-800 bg-surface-1 p-5" showSuccessInline resetOnSuccess successMessage="Documento importado">
-            <div className="mb-4 flex items-center gap-2">
-              <UploadCloud aria-hidden="true" className="h-5 w-5 text-teal-300" />
-              <h2 className="text-lg font-semibold text-gray-100">Subir documento</h2>
-            </div>
-            <div className="grid gap-3">
-              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-sm font-semibold text-gray-400" htmlFor="file-ticker">Ticker</label>
-                <Input id="file-ticker" name="ticker" placeholder="p. ej. ASTS" required />
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-sm font-semibold text-gray-400" htmlFor="file-title">Título</label>
-                <Input id="file-title" name="title" placeholder="Informe anual, presentación, transcript..." required />
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-type">Tipo de fuente</label>
-                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-url">URL de la fuente</label>
-                <Input id="file-source-url" name="source_url" placeholder="https://..." />
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-sm font-semibold text-gray-400" htmlFor="file">Archivo</label>
-                <Input accept=".txt,.md,.html,.htm,.pdf,.docx,.xlsx,.csv,.tsv" id="file" name="file" required type="file" />
-              </div>
-              <Button className="w-full sm:w-fit" type="submit">
-              <UploadCloud aria-hidden="true" className="h-4 w-4" />
-              Subir documento
-              </Button>
-            </div>
-          </MutationForm>
-
-          <MutationForm action={importResearchDocumentUrl} className="rounded-lg border border-gray-800 bg-surface-1 p-5" showSuccessInline resetOnSuccess successMessage="URL importada">
-            <div className="mb-4 flex items-center gap-2">
-              <FileText aria-hidden="true" className="h-5 w-5 text-teal-300" />
-              <h2 className="text-lg font-semibold text-gray-100">Ingerir desde URL</h2>
-            </div>
-            <div className="grid gap-3">
-              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-sm font-semibold text-gray-400" htmlFor="url-ticker">Ticker</label>
-                <Input id="url-ticker" name="ticker" placeholder="p. ej. ASTS" required />
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-sm font-semibold text-gray-400" htmlFor="url-title">Título</label>
-                <Input id="url-title" name="title" placeholder="Nota de prensa de RI o página del filing" required />
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-sm font-semibold text-gray-400" htmlFor="url-source-type">Tipo de fuente</label>
-                <select id="url-source-type" name="source_type" defaultValue="url" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-sm font-semibold text-gray-400" htmlFor="url">URL</label>
-                <Input id="url" name="url" placeholder="https://..." required type="url" />
-              </div>
-              <Button className="w-full sm:w-fit" type="submit" variant="outline">
-              <UploadCloud aria-hidden="true" className="h-4 w-4" />
-              Ingerir URL
-              </Button>
-            </div>
-          </MutationForm>
-        </section>
-
-        <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <ShieldCheck aria-hidden="true" className="h-5 w-5 text-teal-300" />
-            <h2 className="text-lg font-semibold text-gray-100">Auditorías de fuentes</h2>
-          </div>
-          <div className="grid gap-3">
-            {audits.slice(0, 8).map((audit) => (
-              <div key={audit.id} className="rounded-md border border-gray-800 bg-black/30 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className={audit.passed ? 'font-semibold text-teal-300' : 'font-semibold text-amber-300'}>
-                    {auditStatusLabel(audit.passed)}
-                  </span>
-                  <span className="text-sm text-gray-500" title={auditScoreText(audit.passed, audit.source_coverage_score, (value) => formatNumber(value, { maximumFractionDigits: 2 }))}>Citas: {formatNumber(audit.source_coverage_score, { maximumFractionDigits: 2 })}/100</span>
-                </div>
-                {audit.required_fixes.length ? (
-                  <div className="mt-2 text-xs text-amber-200">{audit.required_fixes.map(auditFixLabel).join(' ')}</div>
-                ) : null}
-              </div>
-            ))}
-            {!audits.length ? (
-              <div className="rounded-md border border-dashed border-gray-800 p-4 text-center text-sm text-gray-500">
-                <p>Sin auditorías todavía.</p>
-                <Link className="mt-3 inline-flex items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href="/research/MSFT?view=thesis">
-                  Genera una tesis para disparar la primera auditoría
-                </Link>
-              </div>
-            ) : null}
-          </div>
-        </section>
-      </section>
 
       <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2">
@@ -257,7 +112,7 @@ export default async function ResearchSourcesPage({
             Filtrar por ticker
           </label>
           <Input
-            className="w-full max-w-xs border-gray-800 bg-black/30 text-gray-200"
+            className="min-w-0 flex-1 border-gray-800 bg-black/30 text-gray-200 sm:max-w-xs sm:flex-none"
             defaultValue={ticker}
             id="sources-ticker"
             name="ticker"
@@ -365,6 +220,151 @@ export default async function ResearchSourcesPage({
           </nav>
         ) : null}
       </section>
+
+        <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <ShieldCheck aria-hidden="true" className="h-5 w-5 text-teal-300" />
+            <h2 className="text-lg font-semibold text-gray-100">Auditorías de fuentes</h2>
+          </div>
+          <div className="grid gap-3">
+            {audits.slice(0, 8).map((audit) => (
+              <div key={audit.id} className="rounded-md border border-gray-800 bg-black/30 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className={audit.passed ? 'font-semibold text-teal-300' : 'font-semibold text-amber-300'}>
+                    {auditStatusLabel(audit.passed)}
+                  </span>
+                  <span className="text-sm text-gray-500" title={auditScoreText(audit.passed, audit.source_coverage_score, (value) => formatNumber(value, { maximumFractionDigits: 2 }))}>Citas: {formatNumber(audit.source_coverage_score, { maximumFractionDigits: 2 })}/100</span>
+                </div>
+                {audit.required_fixes.length ? (
+                  <div className="mt-2 text-xs text-amber-200">{audit.required_fixes.map(auditFixLabel).join(' ')}</div>
+                ) : null}
+              </div>
+            ))}
+            {!audits.length ? (
+              <div className="rounded-md border border-dashed border-gray-800 p-4 text-center text-sm text-gray-500">
+                <p>Sin auditorías todavía.</p>
+                <Link className="mt-3 inline-flex items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href="/research/MSFT?view=thesis">
+                  Genera una tesis para disparar la primera auditoría
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Añadir fuentes</h2>
+        <details className="rounded-lg border border-gray-800 bg-surface-1">
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-gray-200 hover:text-gray-100">Pegar texto manualmente</summary>
+          <div className="border-t border-gray-800 p-4">
+        <MutationForm action={importResearchSource} className="" showSuccessInline resetOnSuccess successMessage="Fuente importada">
+          <div className="grid gap-3">
+            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+              <label className="text-sm font-semibold text-gray-400" htmlFor="ticker">Ticker</label>
+              <Input id="ticker" name="ticker" placeholder="p. ej. ASTS" required />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+              <label className="text-sm font-semibold text-gray-400" htmlFor="manual-source-type">Tipo de fuente</label>
+              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">
+                <option value="manual_upload">Texto aportado por el usuario</option>
+                <option value="manual_transcript">Transcripción</option>
+                <option value="company_ir">Relaciones con inversores</option>
+              </select>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+              <label className="text-sm font-semibold text-gray-400" htmlFor="period">Periodo</label>
+              <Input id="period" name="period" placeholder="p. ej. Q2 2026" />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+              <label className="text-sm font-semibold text-gray-400" htmlFor="title">Título</label>
+              <Input id="title" name="title" placeholder="Transcript de la llamada de resultados del Q2" required />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+              <label className="text-sm font-semibold text-gray-400" htmlFor="source_url">URL</label>
+              <Input id="source_url" name="source_url" placeholder="https://..." />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-semibold text-gray-400" htmlFor="text">Texto</label>
+              <Textarea
+                className="min-h-[260px] border-gray-800 bg-black/30 text-gray-200 focus-visible:ring-teal-500"
+                id="text"
+                name="text"
+                placeholder="Pega el transcript, la nota de RI, el artículo o el extracto del filing"
+                required
+              />
+            </div>
+            <Button className="w-full sm:w-fit" type="submit">
+              <UploadCloud aria-hidden="true" className="h-4 w-4" />
+              Importar fuente
+            </Button>
+          </div>
+        </MutationForm>
+
+          </div>
+        </details>
+        <details className="rounded-lg border border-gray-800 bg-surface-1">
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-gray-200 hover:text-gray-100">Subir un documento</summary>
+          <div className="border-t border-gray-800 p-4">
+          <MutationForm action={importResearchDocumentFile} className="" showSuccessInline resetOnSuccess successMessage="Documento importado">
+            <div className="grid gap-3">
+              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+                <label className="text-sm font-semibold text-gray-400" htmlFor="file-ticker">Ticker</label>
+                <Input id="file-ticker" name="ticker" placeholder="p. ej. ASTS" required />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+                <label className="text-sm font-semibold text-gray-400" htmlFor="file-title">Título</label>
+                <Input id="file-title" name="title" placeholder="Informe anual, presentación, transcript..." required />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+                <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-type">Tipo de fuente</label>
+                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+                <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-url">URL de la fuente</label>
+                <Input id="file-source-url" name="source_url" placeholder="https://..." />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+                <label className="text-sm font-semibold text-gray-400" htmlFor="file">Archivo</label>
+                <Input accept=".txt,.md,.html,.htm,.pdf,.docx,.xlsx,.csv,.tsv" id="file" name="file" required type="file" />
+              </div>
+              <Button className="w-full sm:w-fit" type="submit">
+              <UploadCloud aria-hidden="true" className="h-4 w-4" />
+              Subir documento
+              </Button>
+            </div>
+          </MutationForm>
+          </div>
+        </details>
+        <details className="rounded-lg border border-gray-800 bg-surface-1">
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-gray-200 hover:text-gray-100">Ingerir desde una URL</summary>
+          <div className="border-t border-gray-800 p-4">
+          <MutationForm action={importResearchDocumentUrl} className="" showSuccessInline resetOnSuccess successMessage="URL importada">
+            <div className="grid gap-3">
+              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+                <label className="text-sm font-semibold text-gray-400" htmlFor="url-ticker">Ticker</label>
+                <Input id="url-ticker" name="ticker" placeholder="p. ej. ASTS" required />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+                <label className="text-sm font-semibold text-gray-400" htmlFor="url-title">Título</label>
+                <Input id="url-title" name="title" placeholder="Nota de prensa de RI o página del filing" required />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+                <label className="text-sm font-semibold text-gray-400" htmlFor="url-source-type">Tipo de fuente</label>
+                <select id="url-source-type" name="source_type" defaultValue="url" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+                <label className="text-sm font-semibold text-gray-400" htmlFor="url">URL</label>
+                <Input id="url" name="url" placeholder="https://..." required type="url" />
+              </div>
+              <Button className="w-full sm:w-fit" type="submit" variant="outline">
+              <UploadCloud aria-hidden="true" className="h-4 w-4" />
+              Ingerir URL
+              </Button>
+            </div>
+          </MutationForm>
+          </div>
+        </details>
+      </section>
+
     </main>
   );
 }

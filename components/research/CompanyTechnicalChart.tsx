@@ -5,6 +5,7 @@ import type { AutoscaleInfo, IChartApi, IPriceLine, ISeriesApi, Time, UTCTimesta
 import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
 import { formatMarketDate, formatMoney, formatNumber, isValidCurrencyCode } from '@/lib/format';
 import { getCompanyChartHistory, type CompanyChartHistory, type CompanyChartBar } from '@/lib/actions/company-chart.actions';
+import MobileCollapse from '@/components/ui/mobile-collapse';
 import { CHART_RANGES, type CompanyChartRange } from '@/lib/market/chart-ranges';
 import { adx, cleanBars, dailyPivots, fibonacci, rangeBars, sma, structure } from '@/lib/market/technical';
 
@@ -59,8 +60,8 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                     </div>
                     {visible.length > 0 ? <p className="mt-1 text-[11px] text-gray-500">{formatMarketDate(visible[0].date)} – {formatMarketDate(visible.at(-1)!.date)} · {visible.length} {hourly ? 'velas horarias' : 'sesiones'}{range === 'Máx' ? ' · Máximo disponible del proveedor' : ''}{hourly ? ' · Ventana sobre la última vela disponible' : ''}</p> : null}
                 </div>
-                <aside className="min-w-0 border-t border-gray-800 p-4 xl:border-l xl:border-t-0" data-testid="technical-reading">
-                    <h2 className="text-base font-semibold text-gray-100">Lectura técnica</h2>
+                <MobileCollapse title="Lectura técnica"><aside className="min-w-0 border-t border-gray-800 p-4 xl:border-l xl:border-t-0" data-testid="technical-reading">
+                    <h2 className="hidden text-base font-semibold text-gray-100 md:block">Lectura técnica</h2>
                     <div id={`technical-panel-${snapshot.ticker}`} className="mt-3 space-y-4 text-xs text-gray-400">
                         {last ? <p className="text-[11px] text-gray-500">Cierres diarios hasta {formatMarketDate(last.date)}</p> : null}
                         <>
@@ -86,7 +87,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                             <p className="mt-3 text-[11px] text-gray-500">Desde el máximo al mínimo del tramo visible.</p>
                         </div>
                     </div>
-                </aside>
+                </aside></MobileCollapse>
             </div>
         </section>
     );

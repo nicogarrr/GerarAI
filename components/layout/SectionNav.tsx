@@ -19,7 +19,7 @@ import {flattenNavItems, sectionForRoute} from '@/lib/constants';
  */
 export default function SectionNav(){
  const pathname=usePathname();
- if(pathname==='/discover'||pathname.startsWith('/inversores')||pathname.startsWith('/insider')||pathname.startsWith('/ownership'))return null;
+ if(pathname==='/discover')return null;
  const section=sectionForRoute(pathname);
  if(!section)return null;
  const items=flattenNavItems().filter((item)=>item.hub===section&&!(item.href===pathname&&item.subnavHideSelf));

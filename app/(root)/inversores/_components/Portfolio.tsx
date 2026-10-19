@@ -225,7 +225,7 @@ export function Portfolio({
                   className="h-1.5 overflow-hidden rounded-full bg-gray-900"
                 >
                   <div
-                    className="h-full rounded-full bg-lime-300/70"
+                    className="h-full rounded-full bg-teal-300/70"
                     style={{
                       width: `${Math.min(100, Math.max(0, weight.value))}%`,
                     }}
