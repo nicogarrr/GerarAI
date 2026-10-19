@@ -19,6 +19,8 @@ void test('los importes del contexto de cartera usan la moneda base del backend'
 void test('sin moneda base no se inventa símbolo: NA honesto', () => {
   const page = source('app/(root)/research/page.tsx');
   assert.ok(!page.includes('Contexto de cartera'), 'contexto retirado del índice');
-  const type = source('lib/actions/research.actions.ts');
-  assert.ok(type.includes('base_currency?: string'), 'el tipo declara base_currency');
+  // El resumen de cartera del índice llega via getPortfolioSummary
+  // (portfolio.actions): el dashboard ya no duplica /api/portfolio/summary.
+  const type = source('lib/actions/portfolio.actions.ts');
+  assert.ok(type.includes('base_currency: string'), 'el tipo declara base_currency');
 });

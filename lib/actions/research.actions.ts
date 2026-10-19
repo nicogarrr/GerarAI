@@ -21,23 +21,6 @@ type ResearchCompany = {
   special_risks: string[];
 };
 
-type ResearchPortfolioSummary = {
-  total_value: number;
-  equity_value: number;
-  /** Moneda base de la cartera; ausente si el backend no respondió. */
-  base_currency?: string;
-  cash: Record<string, number>;
-  top_1_weight: number;
-  top_5_weight: number;
-  alerts: Array<{
-    severity: string;
-    ticker: string | null;
-    message: string;
-    metric_value: number;
-    threshold: number;
-  }>;
-};
-
 type ResearchWorkflow = {
   name: string;
   input: string;
@@ -712,6 +695,8 @@ async function postForm<T>(path: string, fallback: T, body: FormData): Promise<T
 const COMPANIES_PAGE_SIZE = 500;
 
 async function getAllResearchCompanies(): Promise<ResearchCompany[]> {
+  // paginateAll pide las páginas en oleadas paralelas (ver lib/paginate-all.ts):
+  // con ~2.100 fichas el índice deja de esperar 5 páginas en cadena.
   return paginateAll(
     (offset) =>
       getJson<ResearchCompany[]>(
@@ -752,26 +737,18 @@ export async function getResearchSettings(): Promise<ResearchSettings> {
  * trabajo y latencia regalados en cada visita.
  */
 export async function getResearchDashboard() {
-  const [companies, portfolio, workflows, settings, thesisTickers] = await Promise.all([
+  // Solo lo que el índice materializa: el registro completo y los tickers
+  // con tesis. Antes pedía también /api/portfolio/summary (duplicada: la
+  // página ya la lee para el orden por relevancia), /api/workflows y
+  // /api/settings sin que ninguna tarjeta los usara: latencia y carga de
+  // backend regaladas en cada visita.
+  const [companies, thesisTickers] = await Promise.all([
     getAllResearchCompanies(),
-    getJson<ResearchPortfolioSummary>('/api/portfolio/summary', {
-      total_value: 0,
-      equity_value: 0,
-      cash: {},
-      top_1_weight: 0,
-      top_5_weight: 0,
-      alerts: [],
-    }),
-    getResearchWorkflows(),
-    getResearchSettings(),
     getResearchThesisTickers(),
   ]);
 
   return {
     companies,
-    portfolio,
-    workflows,
-    settings,
     thesisTickers,
   };
 }
