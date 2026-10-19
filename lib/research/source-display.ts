@@ -6,6 +6,8 @@ export const SOURCE_LABELS: Record<string, string> = {
   yahoo_finance_intraday: 'Yahoo Finance · intradía',
   yahoo_finance: 'Yahoo Finance',
   yfinance: 'Yahoo Finance',
+  yahoo_fundamentals: 'Yahoo Finance (fuente no oficial)',
+  YAHOO_FUNDAMENTALS: 'Yahoo Finance (fuente no oficial)',
   manual_upload: 'Subida manual',
   company_ir: 'Relaciones con inversores',
   manual_transcript: 'Transcripción manual',
