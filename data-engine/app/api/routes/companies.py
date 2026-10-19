@@ -358,6 +358,17 @@ def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db))
             company.industry = payload.industry.strip()
         if payload.domicile_country and not company.domicile_country:
             company.domicile_country = payload.domicile_country.strip()
+        # La ficha ya existia con identidad en placeholder (p.ej. sector
+        # "Unknown"): un ensure posterior es tambien oportunidad de
+        # clasificarla, no solo el barrido manual. Best-effort (1 llamada
+        # Finnhub por ensure afectado; si falla, queda como estaba).
+        if CompanyEnrichmentService.needs_enrichment(company):
+            try:
+                # Enfriamiento: una ficha inenriquecible (industria no
+                # mapeada) no llama a Finnhub en cada ensure, para siempre.
+                CompanyEnrichmentService().enrich(db, company, respect_cooldown=True)
+            except Exception:  # noqa: BLE001 - el ensure nunca debe fallar por esto
+                logger.warning("enrich fallo para %s", ticker, exc_info=True)
     db.commit()
     db.refresh(company)
     return company

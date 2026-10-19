@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlalchemy import select
@@ -23,10 +24,25 @@ _PLACEHOLDER_EXCHANGES = {None, "", "UNKNOWN", "UNKNOWN_EXCHANGE"}
 
 _PLACEHOLDER_SECTORS = {None, "", "Unknown", "UNKNOWN"}
 
+# Enfriamiento entre intentos de enriquecimiento desde /companies/ensure:
+# una ficha cuya industria Finnhub no esta en el mapa (p. ej. "Holding
+# Companies") nunca se clasifica, y sin marca cada ensure volvia a llamar a
+# Finnhub para siempre. El barrido manual (enrich_all) lo ignora: es el
+# operador quien fuerza.
+ENRICH_RETRY_COOLDOWN = timedelta(days=7)
+
 # Mapeo declarado (GICS de 11 sectores) de los valores de `finnhubIndustry`
 # observados en nuestro universo. Finnhub no expone sector: esto es una
-# heuristica explicita y revisable, no un dato de la API. Industrias no
-# mapeadas dejan el sector en "Unknown" (honesto, nunca se inventa).
+# heuristica explicita y revisable, no un dato de la API.
+# Regla de inclusion: solo entradas con una lectura GICS unica a nivel de
+# sector. Los dos que senalo el auditor son correctos: "Retail" es el
+# industry group GICS Retailing (sector Consumer Discretionary: ahi esta
+# Amazon) y "Communications" es la industria Finnhub Communications
+# Equipment (CSCO, ANET...), sector Information Technology. Las entradas
+# ambiguas (p. ej. Finnhub "Consumer products", que mezcla Staples y
+# Discretionary, o "Building", que mezcla Building Products y homebuilders)
+# NO se mapean: industria no mapeada -> sector "Unknown" (honesto, nunca
+# se inventa).
 FINNHUB_INDUSTRY_TO_SECTOR: dict[str, str] = {
     "Aerospace & Defense": "Industrials",
     "Airlines": "Industrials",
@@ -36,7 +52,6 @@ FINNHUB_INDUSTRY_TO_SECTOR: dict[str, str] = {
     "Banks": "Financials",
     "Beverages": "Consumer Staples",
     "Biotechnology": "Health Care",
-    "Building": "Industrials",
     "Chemicals": "Materials",
     "Commercial Services & Supplies": "Industrials",
     # Finnhub "Communications" es la industria GICS Communications Equipment
@@ -44,7 +59,6 @@ FINNHUB_INDUSTRY_TO_SECTOR: dict[str, str] = {
     # Communication Services (los servicios llegan como Telecom/Telecommunication).
     "Communications": "Information Technology",
     "Construction": "Industrials",
-    "Consumer products": "Consumer Staples",
     "Distributors": "Consumer Discretionary",
     "Diversified Consumer Services": "Consumer Discretionary",
     "Electrical Equipment": "Industrials",
@@ -147,34 +161,85 @@ class CompanyEnrichmentService:
     # -- criterio de enriquecimiento --------------------------------------
     @staticmethod
     def needs_enrichment(company: Company) -> bool:
+        # Sector en placeholder tambien dispara: antes solo miraba nombre y
+        # exchange, asi que una ficha con nombre/exchange correctos y sector
+        # "Unknown" quedaba "already_ok" para siempre (p.ej. CF Industries o
+        # INVA en ProPicks, "Sin clasificar"). enrich() solo toca campos en
+        # placeholder y nunca inventa: industria no mapeada -> sector Unknown.
         name = (company.name or "").strip()
         return (
             not name
             or name.upper() == (company.ticker or "").upper()
             or "_" in name
             or company.exchange in _PLACEHOLDER_EXCHANGES
+            or company.sector in _PLACEHOLDER_SECTORS
         )
 
     # -- aplicacion ---------------------------------------------------------
-    def enrich(self, db: Session, company: Company, persist: bool = True) -> bool:
-        """Actualiza name/exchange/industry/currency si la API tiene datos mejores."""
+    @staticmethod
+    def _name_is_placeholder(company: Company) -> bool:
+        name = (company.name or "").strip()
+        return not name or name.upper() == (company.ticker or "").upper() or "_" in name
+
+    @staticmethod
+    def _in_cooldown(company: Company) -> bool:
+        last = company.enrichment_attempted_at
+        if last is None:
+            return False
+        # SQLite devuelve datetimes naive aunque la columna sea timezone=True.
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=UTC)
+        return datetime.now(UTC) - last < ENRICH_RETRY_COOLDOWN
+
+    def enrich(
+        self,
+        db: Session,
+        company: Company,
+        persist: bool = True,
+        respect_cooldown: bool = False,
+    ) -> bool:
+        """Completa SOLO los campos en placeholder; los curados nunca se pisan.
+
+        Con respect_cooldown=True (la via /companies/ensure), un intento
+        reciente (ENRICH_RETRY_COOLDOWN) no llama a Finnhub otra vez: la
+        marca se estampa en cada intento, haya o no cambios.
+
+        needs_enrichment dispara por cualquier placeholder (nombre, exchange,
+        sector), pero la escritura es campo a campo: una ficha curada con el
+        sector en «Unknown» (Georgia Capital, LSE, GBP) no puede acabar con el
+        nombre/bolsa/divisa del proveedor (auditor 2026-10-19: Finnhub devuelve
+        GBX para LSE y pisar currency rompe los importes).
+        """
         if not self.needs_enrichment(company):
             return False
+        if respect_cooldown and self._in_cooldown(company):
+            return False
+        # Marca de intento ANTES de llamar: tambien cuenta el intento fallido
+        # o sin datos; si no, una ficha inenriquecible reintentaria en cada
+        # ensure dentro del mismo dia.
+        company.enrichment_attempted_at = datetime.now(UTC)
         profile = self._finnhub_profile(company.ticker)
         if not profile:
+            if persist:
+                db.add(company)
             return False
         changed = False
 
-        name = (profile.get("name") or "").strip()
-        if name and name != company.name:
-            company.name = name
-            changed = True
-        exchange = (profile.get("exchange") or "").strip()
-        if exchange:
-            company.exchange = exchange
-            changed = True
+        if self._name_is_placeholder(company):
+            name = (profile.get("name") or "").strip()
+            if name and name != company.name:
+                company.name = name
+                changed = True
+        if company.exchange in _PLACEHOLDER_EXCHANGES:
+            exchange = (profile.get("exchange") or "").strip()
+            if exchange:
+                company.exchange = exchange
+                changed = True
+        # industry no es visible en la UI: solo se actualiza cuando el sector
+        # esta en placeholder y la industria es la pista para clasificarlo.
+        # Con sector ya clasificado, el perfil no la pisa.
         industry = (profile.get("finnhubIndustry") or "").strip()
-        if industry and industry.upper() not in {"N/A", "UNKNOWN"}:
+        if company.sector in _PLACEHOLDER_SECTORS and industry and industry.upper() not in {"N/A", "UNKNOWN"}:
             company.industry = industry
             changed = True
         if company.sector in _PLACEHOLDER_SECTORS:
@@ -182,12 +247,13 @@ class CompanyEnrichmentService:
             if sector:
                 company.sector = sector
                 changed = True
-        currency = (profile.get("currency") or "").strip()
-        if currency:
-            company.currency = currency
-            changed = True
+        if not (company.currency or "").strip():
+            currency = (profile.get("currency") or "").strip()
+            if currency:
+                company.currency = currency
+                changed = True
 
-        if changed and persist:
+        if persist:
             db.add(company)
         return changed
 
@@ -204,7 +270,10 @@ class CompanyEnrichmentService:
             else:
                 not_found += 1
             time.sleep(sleep_between)
-        if enriched:
+        # enriched cubre los cambios y las marcas de intento de los fallidos:
+        # not_found cuenta intentos sin datos, y toda llamada a enrich estampa
+        # enrichment_attempted_at; commit si se llamo a la API al menos una vez.
+        if enriched or not_found:
             db.commit()
         return {
             "total": len(rows),

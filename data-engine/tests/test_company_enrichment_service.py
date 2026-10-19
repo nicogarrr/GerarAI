@@ -5,11 +5,13 @@ placeholder names/exchanges get enriched from the market-data API, good
 records are never touched, and unusable API payloads change nothing.
 """
 
+from datetime import timedelta
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.entities import Base, Company
+from app.models.entities import Base, Company, utcnow
 from app.services.company_enrichment_service import CompanyEnrichmentService
 
 
@@ -44,10 +46,18 @@ class _Settings:
     finnhub_api_key = "test-key"
 
 
-def _company(db: Session, *, name: str, exchange: str = "NASDAQ", ticker: str = "XYZ") -> Company:
+def _company(
+    db: Session,
+    *,
+    name: str,
+    exchange: str = "NASDAQ",
+    ticker: str = "XYZ",
+    sector: str = "Tech",
+    industry: str = "Tech",
+) -> Company:
     company = Company(
         ticker=ticker, name=name, exchange=exchange, currency="USD",
-        sector="Tech", industry="Tech", company_type="holding",
+        sector=sector, industry=industry, company_type="holding",
         valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
     )
     db.add(company)
@@ -67,8 +77,21 @@ def test_needs_enrichment_detects_placeholders(db):
     ) is False
 
 
+def test_needs_enrichment_detects_placeholder_sector(db):
+    # Buen nombre/exchange pero sector sin clasificar: antes era "already_ok"
+    # y nunca se clasificaba (CF Industries / INVA en ProPicks).
+    assert CompanyEnrichmentService.needs_enrichment(
+        _company(db, name="CF Industries Holdings, Inc.", ticker="CF", sector="Unknown", industry="Unknown")
+    ) is True
+    assert CompanyEnrichmentService.needs_enrichment(
+        _company(db, name="CF Industries Holdings, Inc.", ticker="CF2", sector="Materials", industry="Chemicals")
+    ) is False
+
+
 def test_enrich_applies_profile_and_marks_changed(db):
-    company = _company(db, name="XYZ", exchange="UNKNOWN")
+    # Sector en placeholder: el perfil se aplica entero (nombre, exchange,
+    # industria y el sector que se deriva de ella).
+    company = _company(db, name="XYZ", exchange="UNKNOWN", sector="Unknown", industry="Unknown")
     client = _Client({
         "name": "Xylem Robotics Inc",
         "exchange": "NASDAQ NMS - GLOBAL MARKET",
@@ -80,7 +103,28 @@ def test_enrich_applies_profile_and_marks_changed(db):
     assert company.name == "Xylem Robotics Inc"
     assert company.exchange == "NASDAQ NMS - GLOBAL MARKET"
     assert company.industry == "Technology"
+    assert company.sector == "Information Technology"
     assert "profile2" in client.calls[0]
+
+
+def test_enrich_keeps_industry_when_sector_classified(db):
+    # Decision deliberada (auditor #1871 v2, 2026-10-19): con el sector ya
+    # clasificado, la industria NO se pisa aunque el proveedor traiga otra.
+    # La industria solo se escribe como pista para clasificar un sector en
+    # placeholder; fuera de ese caso, el dato curado manda.
+    company = _company(db, name="XYZ", exchange="UNKNOWN", sector="Tech", industry="Tech")
+    client = _Client({
+        "name": "Xylem Robotics Inc",
+        "exchange": "NASDAQ NMS - GLOBAL MARKET",
+        "finnhubIndustry": "Technology",
+        "currency": "USD",
+    })
+    service = CompanyEnrichmentService(settings=_Settings(), client=client)
+    assert service.enrich(db, company) is True  # nombre/exchange si cambian
+    assert company.name == "Xylem Robotics Inc"
+    assert company.exchange == "NASDAQ NMS - GLOBAL MARKET"
+    assert company.industry == "Tech"
+    assert company.sector == "Tech"
 
 
 def test_enrich_never_touches_good_record_and_skips_api(db):
@@ -98,6 +142,34 @@ def test_enrich_without_api_name_changes_nothing(db):
     service = CompanyEnrichmentService(settings=_Settings(), client=client)
     assert service.enrich(db, company) is False
     assert company.name == "XYZ"
+
+
+def test_enrich_classifies_placeholder_sector_from_industry(db):
+    company = _company(db, name="CF Industries Holdings, Inc.", sector="Unknown", industry="Unknown")
+    client = _Client({
+        "name": "CF Industries Holdings, Inc.",
+        "exchange": "NYSE",
+        "finnhubIndustry": "Chemicals",
+        "currency": "USD",
+    })
+    service = CompanyEnrichmentService(settings=_Settings(), client=client)
+    assert service.enrich(db, company) is True
+    assert company.industry == "Chemicals"
+    assert company.sector == "Materials"  # mapeo GICS declarado, no inventado
+
+
+def test_enrich_leaves_unknown_sector_when_industry_unmapped(db):
+    company = _company(db, name="Innventure, Inc.", sector="Unknown", industry="Unknown")
+    client = _Client({
+        "name": "Innventure, Inc.",
+        "exchange": "NASDAQ",
+        "finnhubIndustry": "Holding Companies",  # no mapeada: honesto, no se inventa
+        "currency": "USD",
+    })
+    service = CompanyEnrichmentService(settings=_Settings(), client=client)
+    service.enrich(db, company)
+    assert company.industry == "Holding Companies"
+    assert company.sector == "Unknown"
 
 
 def test_enrich_ignores_na_industry(db):
@@ -173,3 +245,86 @@ def test_enrich_does_not_overwrite_existing_sector(db):
     service = CompanyEnrichmentService(settings=_Settings(), client=_Client(profile))
     service.enrich(db, company)
     assert company.sector == "Energy"
+
+
+def test_enrich_curated_record_keeps_name_exchange_currency(db):
+    """Auditor 2026-10-19 (#1871): ficha curada con SOLO el sector en Unknown.
+    Finnhub devuelve nombre/bolsa/divisa del proveedor (GBX para LSE) y antes
+    los pisaba todos: los campos curados no se tocan, solo se clasifica."""
+    company = _company(
+        db,
+        name="Georgia Capital PLC",
+        exchange="LSE",
+        ticker="CGEO",
+        sector="Unknown",
+        industry="Unknown",
+    )
+    company.currency = "GBP"
+    db.commit()
+    client = _Client({
+        "name": "GEORGIA CAPITAL PLC",
+        "exchange": "London Stock Exchange",
+        "finnhubIndustry": "Financial Services",
+        "currency": "GBX",
+    })
+    service = CompanyEnrichmentService(settings=_Settings(), client=client)
+    assert service.enrich(db, company) is True
+    assert company.name == "Georgia Capital PLC"
+    assert company.exchange == "LSE"
+    assert company.currency == "GBP"
+    assert company.industry == "Financial Services"
+    assert company.sector == "Financials"
+
+
+def test_enrich_leaves_unknown_sector_for_ambiguous_finnhub_industry(db):
+    """Auditor #1871: solo entradas con lectura GICS unica entran al mapa.
+    Finnhub "Consumer products" mezcla Staples y Discretionary y "Building"
+    mezcla Building Products con homebuilders: se quitan del mapa y el
+    sector queda honestamente en Unknown."""
+    for ambiguous in ("Consumer products", "Building"):
+        company = _company(db, name="Ambiguous Corp", ticker=f"AMB{ambiguous[0]}", sector="Unknown", industry="Unknown")
+        client = _Client({
+            "name": "Ambiguous Corp",
+            "exchange": "NYSE",
+            "finnhubIndustry": ambiguous,
+            "currency": "USD",
+        })
+        service = CompanyEnrichmentService(settings=_Settings(), client=client)
+        service.enrich(db, company)
+        assert company.industry == ambiguous
+        assert company.sector == "Unknown", f"{ambiguous} no tiene lectura GICS unica: no se clasifica"
+
+
+def test_enrich_cooldown_skips_recent_attempt(db):
+    """Auditor #1871 v2: /companies/ensure llamaba a Finnhub en cada ensure
+    de una ficha con industria no mapeada, indefinidamente. La marca de
+    intento (estampada haya o no cambios) frena el reintento dentro del
+    enfriamiento; el barrido manual no la respeta."""
+    company = _company(db, name="Innventure, Inc.", sector="Unknown", industry="Unknown")
+    client = _Client({
+        "name": "Innventure, Inc.",
+        "exchange": "NASDAQ",
+        "finnhubIndustry": "Holding Companies",  # no mapeada: nunca clasifica
+        "currency": "USD",
+    })
+    service = CompanyEnrichmentService(settings=_Settings(), client=client)
+    service.enrich(db, company)
+    assert company.sector == "Unknown"
+    assert company.enrichment_attempted_at is not None
+    calls_after_first = len(client.calls)
+    # Via ensure (respect_cooldown=True): sin nueva llamada a Finnhub.
+    assert service.enrich(db, company, respect_cooldown=True) is False
+    assert len(client.calls) == calls_after_first
+    # Via barrido manual: fuerza, si reintenta.
+    service.enrich(db, company)
+    assert len(client.calls) > calls_after_first
+
+
+def test_enrich_cooldown_expired_retries(db):
+    company = _company(db, name="Innventure, Inc.", sector="Unknown", industry="Unknown")
+    company.enrichment_attempted_at = utcnow() - timedelta(days=8)
+    db.commit()
+    client = _Client({"name": "Innventure, Inc.", "finnhubIndustry": "Holding Companies"})
+    service = CompanyEnrichmentService(settings=_Settings(), client=client)
+    service.enrich(db, company, respect_cooldown=True)
+    assert len(client.calls) == 1  # enfriamiento vencido: si reintenta

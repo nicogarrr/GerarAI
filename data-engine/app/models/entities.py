@@ -194,6 +194,13 @@ class Company(Base, TimestampMixin):
     special_sources: Mapped[list[str]] = mapped_column(JSON, default=list)
     special_risks: Mapped[list[str]] = mapped_column(JSON, default=list)
     factor_tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Ultimo intento de enriquecimiento Finnhub (haya o no cambiado nada):
+    # /companies/ensure no reintenta dentro del enfriamiento (antes llamaba
+    # a Finnhub en cada ensure de una ficha con industria no mapeada,
+    # indefinidamente). El barrido manual lo ignora y fuerza.
+    enrichment_attempted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     positions: Mapped[list["Position"]] = relationship(back_populates="company")
     thesis_versions: Mapped[list["ThesisVersion"]] = relationship(back_populates="company")
