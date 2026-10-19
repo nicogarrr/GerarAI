@@ -8,7 +8,7 @@ import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
 import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
-import ExtendedHoursLine from '@/components/watchlist/ExtendedHoursLine';
+import ExtendedHoursLine from '@/components/common/ExtendedHoursLine';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from "@/components/ui/card";

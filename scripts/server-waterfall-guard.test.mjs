@@ -26,6 +26,6 @@ test('watchlist does not wait for the slowest extended quote', () => {
     // pagaba el tope de 700 ms. La pide el cliente tras el primer pintado.
     assert.doesNotMatch(watchlist, /getExtendedQuote/);
     assert.doesNotMatch(watchlist, /EXTENDED_QUOTE_BUDGET_MS/);
-    const client = readFileSync('components/watchlist/ExtendedHoursLine.tsx', 'utf8');
+    const client = readFileSync('components/common/ExtendedHoursLine.tsx', 'utf8');
     assert.match(client, /getExtendedQuote\(symbol\)/);
 });
