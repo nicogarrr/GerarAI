@@ -658,6 +658,32 @@ def test_mention_pattern_matches_ticker_and_name_without_suffix():
     assert not pattern.search(svc.fold("El mercado de chips se tensiona"))
 
 
+def test_mention_pattern_skips_short_tickers():
+    # Ticker de 2 letras: no se prueba como palabra suelta ("bn" en un texto
+    # tematico no es evidencia de Brookfield); solo casa el nombre completo.
+    pattern = svc._mention_pattern("BN", "Brookfield Corporation")
+    assert pattern.search(svc.fold("Brookfield reporta resultados"))
+    assert not pattern.search(svc.fold("un parrafo con bn suelto"))
+    # Sin nombre util y ticker corto no hay patron fiable: mejor None.
+    assert svc._mention_pattern("BN", None) is None
+    short_name = svc._mention_pattern("BN", "BN Inc.")
+    assert short_name is None or not short_name.search(svc.fold("bn cae hoy"))
+
+
+def test_mention_pattern_skips_common_word_tickers():
+    # NOW/META/ZETA son palabras comunes: en minusculas (fold) serian falsos
+    # positivos sobre evidencia tematica, asi que casan por nombre, no ticker.
+    pattern = svc._mention_pattern("NOW", "ServiceNow, Inc.")
+    assert pattern.search(svc.fold("ServiceNow cierra un acuerdo"))
+    assert not pattern.search(svc.fold("act now before the deadline"))
+    meta = svc._mention_pattern("META", "Meta Platforms, Inc.")
+    assert meta.search(svc.fold("Meta Platforms presenta gafas"))
+    assert not meta.search(svc.fold("la meta del proyecto es clara"))
+    zeta = svc._mention_pattern("ZETA", "Zeta Global Holdings Corp.")
+    assert zeta.search(svc.fold("Zeta Global crece en marketing"))
+    assert not zeta.search(svc.fold("la funcion zeta de Riemann"))
+
+
 def test_cites_other_company_only_detects_cross_ticker_evidence():
     patterns = _patterns(("AAPL", "Apple Inc."), ("MSFT", "Microsoft Corporation"))
     # La evidencia habla de Apple, no de Microsoft: cruce detectado.

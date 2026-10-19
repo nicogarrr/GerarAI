@@ -181,22 +181,62 @@ _CORP_SUFFIXES = {
     "international", "technologies", "technology",
 }
 
+_MIN_TICKER_LEN = 3
+
+# Palabras comunes (ES/EN) que ademas son tickers reales. Todo el texto llega
+# en minusculas (fold), asi que "now" la palabra y NOW (ServiceNow) son
+# indistinguibles: estos tickers solo casan por nombre de empresa, o la
+# evidencia tematica generaria falsos cruces. No necesita ser exhaustiva.
+_COMMON_WORD_TICKERS = {
+    # ingles
+    "all", "and", "any", "are", "big", "box", "can", "car", "cat", "day",
+    "eat", "eye", "far", "fly", "for", "fox", "fun", "gold", "good", "grow",
+    "has", "hope", "hot", "how", "ice", "job", "joy", "key", "king", "life",
+    "like", "live", "love", "low", "man", "map", "mark", "meta", "mind",
+    "net", "new", "now", "one", "open", "pay", "play", "plug", "race",
+    "real", "red", "rio", "run", "see", "shop", "sky", "snow", "spot",
+    "sun", "tech", "tell", "ten", "tree", "two", "usa", "via", "way",
+    "wish", "work", "you", "zeta",
+    # espanol
+    "mar", "mas", "mes", "mil", "oro", "sol", "sur",
+}
+
+
+def _name_tokens(name: str | None) -> list[str]:
+    """Tokens del nombre ya sin puntuacion pegada ("sciences," -> "sciences")."""
+    out: list[str] = []
+    for tok in fold(name or "").split():
+        tok = tok.strip(".,;:()\"'¡!¿?-/")
+        if tok:
+            out.append(tok)
+    return out
+
 
 def _mention_pattern(ticker: str, name: str | None) -> re.Pattern[str] | None:
     """Regex para detectar si un texto habla de la empresa (ticker o nombre).
 
     El nombre se prueba completo y sin sufijos societarios finales
-    ("CV Sciences, Inc." -> "cv sciences"); formas de menos de 4 caracteres
-    se ignoran porque producen falsos positivos (el ticker ya se prueba).
+    ("CV Sciences, Inc." -> "cv sciences"); la puntuacion pegada se quita
+    ANTES de mirar sufijos, porque si no "sciences," no casa con el sufijo
+    real y la coma queda atrapada en el patron ("cv sciences,").
+
+    El ticker solo se prueba si tiene >= 3 caracteres y no es una palabra
+    comun (NOW, META, ZETA...): como el texto llega en minusculas, un
+    ticker-palabra descartaria evidencia legitima por falso cruce.
+    Formas de menos de 4 caracteres del nombre se ignoran igual que antes.
     """
     folded_ticker = fold(ticker)
-    parts = {re.escape(folded_ticker)}
-    folded_name = fold(name or "").strip()
-    tokens = folded_name.split()
-    while tokens and tokens[-1].strip(".") in _CORP_SUFFIXES:
+    parts: set[str] = set()
+    if (
+        len(folded_ticker) >= _MIN_TICKER_LEN
+        and folded_ticker not in _COMMON_WORD_TICKERS
+    ):
+        parts.add(re.escape(folded_ticker))
+    full_tokens = _name_tokens(name)
+    tokens = list(full_tokens)
+    while tokens and tokens[-1] in _CORP_SUFFIXES:
         tokens.pop()
-    for variant in {folded_name, " ".join(tokens)}:
-        variant = variant.strip()
+    for variant in {" ".join(full_tokens), " ".join(tokens)}:
         if len(variant) >= 4 and variant != folded_ticker:
             parts.add(re.escape(variant))
     if not parts:
