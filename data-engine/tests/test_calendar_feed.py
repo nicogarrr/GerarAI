@@ -160,9 +160,25 @@ def test_public_feed_ip_rate_limit_returns_429_after_limit(monkeypatch):
     from app.core import rate_limit as rl
 
     monkeypatch.setattr(rl, "PUBLIC_FEED_LIMIT_PER_MINUTE", 3)
-    req = SimpleNamespace(client=SimpleNamespace(host="203.0.113.77-test"))
+    req = SimpleNamespace(client=SimpleNamespace(host="203.0.113.77"), headers={})
     for _ in range(3):
         asyncio.run(rl.enforce_public_ip_rate_limit(req))
     with pytest.raises(HTTPException) as exc:
         asyncio.run(rl.enforce_public_ip_rate_limit(req))
     assert exc.value.status_code == 429
+
+
+def test_public_client_ip_uses_last_xff_only_behind_private_proxy():
+    from types import SimpleNamespace
+
+    from app.core.rate_limit import public_client_ip
+
+    def req(peer, xff=None):
+        return SimpleNamespace(client=SimpleNamespace(host=peer), headers={"x-forwarded-for": xff} if xff else {})
+
+    # Tras Caddy (peer privado): ultima entrada, las anteriores son falsificables.
+    assert public_client_ip(req("172.18.0.2", "1.1.1.1, 76.76.21.9")) == "76.76.21.9"
+    assert public_client_ip(req("172.18.0.2")) == "172.18.0.2"
+    assert public_client_ip(req("172.18.0.2", "basura")) == "172.18.0.2"
+    # Acceso directo (peer publico): la cabecera se ignora.
+    assert public_client_ip(req("8.8.4.4", "9.9.9.9")) == "8.8.4.4"

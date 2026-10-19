@@ -199,17 +199,43 @@ async def enforce_rate_limit(
 PUBLIC_FEED_LIMIT_PER_MINUTE = 60
 
 
+def public_client_ip(request: Request) -> str:
+    """IP real para el limite publico.
+
+    Detras de Caddy el peer del socket es la IP privada del proxy (todo el
+    mundo compartiria un cubo). Solo si el peer es privado/loopback se usa la
+    ULTIMA entrada de X-Forwarded-For: la anade el proxy de confianza con la
+    IP que ve; las anteriores las puede falsificar el cliente. Un peer
+    publico (acceso directo) usa su propia IP e ignora la cabecera.
+    """
+    import ipaddress
+
+    peer = request.client.host if request.client else "unknown"
+    try:
+        peer_ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return peer
+    if not (peer_ip.is_private or peer_ip.is_loopback):
+        return peer
+    forwarded = request.headers.get("x-forwarded-for", "")
+    last = forwarded.split(",")[-1].strip() if forwarded else ""
+    try:
+        return str(ipaddress.ip_address(last))
+    except ValueError:
+        return peer
+
+
 async def enforce_public_ip_rate_limit(request: Request) -> None:
     """Limite por IP para rutas publicas sin identidad (feed ICS).
 
-    La IP es el peer del socket, nunca una cabecera falsificable. En
+    La IP sale de public_client_ip (peer del socket; tras proxy privado, la ultima entrada de X-Forwarded-For). En
     produccion falla cerrado (503) si Redis no responde, como el limite
     principal.
     """
     settings = get_settings()
     if not settings.rate_limit_enabled:
         return
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = public_client_ip(request)
     digest = hashlib.sha256(f"public-feed:{client_ip}".encode()).hexdigest()
     try:
         count, retry_after = await _record_hit(
