@@ -1,6 +1,6 @@
 """F2: ingesta de precios ProPicks + momentum (yahoo symbol, upsert, metricas)."""
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import create_engine, select
@@ -199,3 +199,26 @@ def test_fetch_history_descarta_barras_nan(monkeypatch):
     monkeypatch.setitem(sys.modules, "yfinance", fake)
     out = fetch_history_yfinance(["AAA"], period="1y")
     assert [b.day.isoformat() for b in out["AAA"]] == ["2026-10-14", "2026-10-16"]
+
+
+def test_upsert_descarta_la_barra_de_hoy_con_sesion_abierta():
+    """La foto intradia de hoy no es un cierre: no se escribe a media sesión."""
+    company_bar = PriceBar(day=date(2026, 10, 19), close=Decimal("10"), adj_close=Decimal("9.5"), volume=100)
+    old_bar = PriceBar(day=date(2026, 10, 16), close=Decimal("9"), adj_close=Decimal("8.5"), volume=100)
+    # Lunes 19 oct 2026, 11:00 ET = sesión abierta.
+    during = datetime(2026, 10, 19, 15, 0, tzinfo=UTC)
+    # Lunes 19 oct 2026, 17:00 ET = sesión cerrada (>16:30 ET).
+    after = datetime(2026, 10, 19, 21, 0, tzinfo=UTC)
+    with _db() as db:
+        company = _company("INTR")
+        db.add(company)
+        db.flush()
+        assert upsert_prices(db, company, [company_bar, old_bar], now=during) == 1
+        db.commit()
+        rows = db.scalars(select(MarketPrice).where(MarketPrice.company_id == company.id)).all()
+        assert [row.date for row in rows] == [date(2026, 10, 16)]
+        # Con la sesión cerrada, la barra del día sí es el cierre oficial.
+        assert upsert_prices(db, company, [company_bar], now=after) == 1
+        db.commit()
+        days = {row.date for row in db.scalars(select(MarketPrice).where(MarketPrice.company_id == company.id)).all()}
+        assert days == {date(2026, 10, 16), date(2026, 10, 19)}
