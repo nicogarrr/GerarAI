@@ -1,5 +1,7 @@
 'use client';
 
+import { createLatestRequestGate } from '@/lib/latest-request';
+import { withFetchDeadline } from '@/lib/upstream/fetch-deadline';
 import { formatCompanyName } from '@/lib/format';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -37,30 +39,47 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
     const [added, setAdded] = useState<Set<string>>(new Set());
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    const searchGateRef = useRef(createLatestRequestGate());
+
     const followed = new Set([...followedSymbols.map((s) => s.toUpperCase()), ...added]);
 
     const runSearch = useCallback(async (query: string) => {
+        const ticket = searchGateRef.current.begin();
         setSearching(true);
+        setSearchFailed(false);
+        setStocks([]);
         try {
-            const result = await searchStocksWithStatus(query);
+            const result = await withFetchDeadline(() => searchStocksWithStatus(query), 6000);
+            if (!searchGateRef.current.isLatest(ticket)) return;
             setSearchFailed(result.status === 'error');
             setStocks(result.stocks);
+        } catch {
+            if (searchGateRef.current.isLatest(ticket)) {
+                setSearchFailed(true);
+                setStocks([]);
+            }
         } finally {
-            setSearching(false);
+            if (searchGateRef.current.isLatest(ticket)) setSearching(false);
         }
     }, []);
 
     useEffect(() => {
+        const gate = searchGateRef.current;
+        gate.invalidate();
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         const query = term.trim();
-        if (!query) return;
+        if (!open || !query) return;
         timeoutRef.current = setTimeout(() => void runSearch(query), 300);
         return () => {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            gate.invalidate();
         };
-    }, [term, runSearch]);
+    }, [term, open, runSearch]);
 
     const handleTermChange = (value: string) => {
+        searchGateRef.current.invalidate();
+        setSearching(false);
+        setStocks([]);
         setTerm(value);
         if (!value.trim()) {
             setStocks([]);
@@ -95,7 +114,11 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(value) => {
+            searchGateRef.current.invalidate();
+            setSearching(false);
+            setOpen(value);
+        }}>
             <DialogTrigger asChild>
                 <Button
                     variant="outline"
