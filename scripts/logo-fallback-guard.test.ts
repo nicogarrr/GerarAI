@@ -84,6 +84,11 @@ describe('CompanyLogo: la caja blanca vacía no puede volver', () => {
   it('el logo listo llena el contenedor sin marco ni padding', () => {
     assert.ok(vista.includes('analysis.bbox'), 'recorta el margen horneado');
     assert.ok(vista.includes('ready?.background'), 'rellena con el color del logo');
+    assert.match(
+      vista,
+      /ready && !ready\.background \? 'bg-white'/,
+      'logo con transparencia (background null) cae a bg-white: un glifo oscuro sobre fondo oscuro no se lee (AAPL)',
+    );
     const ramaLista = vista.split('ready\n?')[1] ?? '';
     assert.ok(!ramaLista.includes('p-1'), 'sin padding en la imagen lista');
     assert.ok(vista.includes("object-contain"), 'sin deformar ni recortar el logo');

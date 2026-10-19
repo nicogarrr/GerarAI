@@ -95,7 +95,9 @@ export function CompanyLogo({ ticker, name, className }: Props) {
 
     return (
         <span
-            className={`relative inline-block shrink-0 overflow-hidden ${className ?? ''}`}
+            className={`relative inline-block shrink-0 overflow-hidden ${className ?? ''} ${
+                ready && !ready.background ? 'bg-white' : ''
+            }`}
             style={ready?.background ? { background: ready.background } : undefined}
         >
             {loading ? <NameAvatar name={name || ticker} className="absolute inset-0 size-full" /> : null}
