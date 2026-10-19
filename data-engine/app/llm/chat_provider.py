@@ -146,16 +146,28 @@ class ChatFallbackProvider(LLMProvider):
         if not ready:
             raise ProviderHTTPError(self.name, 429)
         for provider, model in ready:
+            member_request = replace(
+                request, model=model,
+                messages=(*request.messages, Message("system", _BACKUP_PROMPT)),
+            )
             logger.info("chat backup attempt provider=%s model=%s", provider.name, model)
             try:
-                return await self._candidate(provider, replace(
-                    request, model=model,
-                    messages=(*request.messages, Message("system", _BACKUP_PROMPT)),
-                ), backup=True)
+                return await self._candidate(provider, member_request, backup=True)
             except _FALL_THROUGH as exc:
+                logger.warning("chat backup failed provider=%s model=%s error=%s detail=%.200s",
+                               provider.name, model, type(exc).__name__, exc)
+                # 503 de capacidad (Gemini "high demand"): un reintento corto
+                # dentro del plazo restante antes de pasar al siguiente miembro.
+                if isinstance(exc, ProviderHTTPError) and exc.status_code == 503:
+                    try:
+                        await asyncio.sleep(min(0.5, remaining_seconds(self.total)))
+                        logger.info("chat backup retry provider=%s model=%s", provider.name, model)
+                        return await self._candidate(provider, member_request, backup=True)
+                    except _FALL_THROUGH as retry_exc:
+                        logger.warning("chat backup retry failed provider=%s model=%s error=%s detail=%.200s",
+                                       provider.name, model, type(retry_exc).__name__, retry_exc)
+                        exc = retry_exc
                 _note_failure(provider, model, exc)
-                logger.warning("chat backup failed provider=%s model=%s error=%s",
-                               provider.name, model, type(exc).__name__)
                 last = exc
         assert last is not None
         raise last
@@ -298,6 +310,10 @@ def _groq_backup(
         total_timeout_seconds=total_timeout_seconds,
         max_retries=0,
         max_output_tokens=max_output_tokens,
+        # gpt-oss es modelo de razonamiento: sin el bump, un max_tokens de
+        # 600 (chat general) lo consumia el razonamiento y la respuesta
+        # llegaba truncada (finish_reason=length) -> "Candidate rejected".
+        hidden_reasoning_models=frozenset({GROQ_MODEL}),
         client=client,
     )
 
@@ -324,6 +340,8 @@ def _gemini_backup(
         total_timeout_seconds=total_timeout_seconds,
         max_retries=0,
         max_output_tokens=max_output_tokens,
+        # Gemini 3.x tambien razona: mismo bump de max_tokens que Groq.
+        hidden_reasoning_models=frozenset(GEMINI_MODELS),
         client=client,
     )
     return provider

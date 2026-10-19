@@ -26,8 +26,8 @@ def run_async(fn):
     return wrapped
 
 
-def response(text="válida", *, model="m", provider="p"):
-    return LLMResponse(Message("assistant", text), Usage(), model, provider, finish_reason="stop")
+def response(text="válida", *, model="m", provider="p", finish="stop"):
+    return LLMResponse(Message("assistant", text), Usage(), model, provider, finish_reason=finish)
 
 
 class Fake:
@@ -191,3 +191,116 @@ async def test_cjk_retry_respects_total_deadline():
         await provider.complete_cjk_retry(chat_request())
     assert time.monotonic() - start < 1
     assert groq.cancelled
+
+
+@run_async
+async def test_groq_and_gemini_payloads_bump_max_tokens_for_reasoning():
+    """gpt-oss/Gemini 3.x razonan: max_tokens=600 (chat general) se eleva al
+    minimo de razonamiento oculto en vez de truncar la respuesta visible."""
+    from app.core.config import Settings
+    from app.llm.chat_provider import create_chat_llm_provider
+
+    settings = Settings(_env_file=None, llm_enabled=True, llm_provider="opencode-go",
+                        opencode_go_api_key="fake", groq_chat_fallback_enabled=True,
+                        groq_api_key="fake", groq_free_plan_confirmed=True,
+                        groq_zdr_confirmed=True, gemini_api_key="fake",
+                        gemini_chat_fallback_enabled=True, gemini_free_plan_confirmed=True)
+    provider = create_chat_llm_provider(settings)
+    assert isinstance(provider, ChatFallbackProvider)
+    request = LLMRequest([Message("user", "hola")], task="chat", max_tokens=600)
+    groq_payload = provider.backup._build_payload(request, GROQ_MODEL)
+    assert groq_payload["max_tokens"] >= 1024
+    gemini_payload = provider.backup2._build_payload(request, GEMINI_MODEL)
+    assert gemini_payload["max_tokens"] >= 1024
+
+
+@run_async
+async def test_length_finish_reason_falls_through_to_gemini():
+    """Un respaldo truncado (finish_reason=length) no se acepta: cae al siguiente."""
+    primary = Fake(ProviderHTTPError("opencode-go", 429))
+    groq = Fake(response(model=GROQ_MODEL, provider="groq", finish="length"), name="groq")
+    gemini = Fake(response(model=GEMINI_MODEL, provider="gemini"), name="gemini")
+    provider = ChatFallbackProvider(primary, groq, total=1, delay=.05, backup2=gemini)
+    out = await provider.complete(chat_request())
+    assert out.provider == "gemini"
+
+
+def _general_baseline():
+    from app.schemas import ChatResponse
+    return ChatResponse(answer="baseline", sections=[], sources=[])
+
+
+@run_async
+async def test_real_general_flow_accepts_clean_groq_spanish():
+    """Flujo general real (prompt chat_general, max_tokens=600): la prosa
+    limpia en castellano del respaldo Groq se ACEPTA (fontaneria bien)."""
+    from app.services.chat_synthesis_service import ChatSynthesisService
+
+    clean = ("El margen operativo es la parte de los ingresos que queda tras "
+             "pagar los costes de operar el negocio. Sirve para comparar la "
+             "eficiencia de empresas de un mismo sector.")
+    primary = Fake(ProviderHTTPError("opencode-go", 429))
+    groq = Fake(response(clean, model=GROQ_MODEL, provider="groq"), name="groq")
+    provider = ChatFallbackProvider(primary, groq, total=2, delay=.05)
+    result = await ChatSynthesisService(provider).synthesize_general(
+        question="qué es el margen operativo", baseline=_general_baseline())
+    assert result.model == GROQ_MODEL
+    assert "margen operativo" in result.answer
+
+
+@run_async
+async def test_real_general_flow_rejects_cjk_leak_and_uses_gemini():
+    """La firma conocida de gpt-oss (fuga CJK) se rechaza y cae a Gemini."""
+    from app.services.chat_synthesis_service import ChatSynthesisService
+
+    leaked = ("El margen operativo es la parte de los ingresos que queda tras "
+              "pagar los costes del negocio。Mide la eficiencia.")
+    clean = ("El margen operativo es la parte de los ingresos que queda tras "
+             "pagar los costes de operar el negocio.")
+    primary = Fake(ProviderHTTPError("opencode-go", 429))
+    groq = Fake(response(leaked, model=GROQ_MODEL, provider="groq"), name="groq")
+    gemini = Fake(response(clean, model=GEMINI_MODEL, provider="gemini"), name="gemini")
+    provider = ChatFallbackProvider(primary, groq, total=2, delay=.05, backup2=gemini)
+    result = await ChatSynthesisService(provider).synthesize_general(
+        question="qué es el margen operativo", baseline=_general_baseline())
+    assert result.model == GEMINI_MODEL
+
+
+class FlakyFake(Fake):
+    """Fallos en cola por (modelo): cada llamada consume el siguiente."""
+
+    def __init__(self, failures, **kwargs):
+        super().__init__(**kwargs)
+        self.failures = failures
+
+    async def complete(self, request):
+        self.calls.append(request)
+        queue = self.failures.get(request.model, [])
+        if queue:
+            raise queue.pop(0)
+        return response(model=request.model, provider=self.name)
+
+
+@run_async
+async def test_gemini_503_retried_once_then_success():
+    primary = Fake(ProviderHTTPError("opencode-go", 429))
+    groq = Fake(ProviderHTTPError("groq", 429), name="groq")
+    gemini = FlakyFake({GEMINI_MODEL: [ProviderHTTPError("gemini", 503)]}, name="gemini")
+    provider = ChatFallbackProvider(primary, groq, total=2, delay=.05, backup2=gemini)
+    out = await provider.complete(chat_request())
+    assert out.provider == "gemini"
+    assert [c.model for c in gemini.calls] == [GEMINI_MODEL, GEMINI_MODEL]
+
+
+@run_async
+async def test_gemini_503_persistent_falls_to_next_model():
+    primary = Fake(ProviderHTTPError("opencode-go", 429))
+    groq = Fake(ProviderHTTPError("groq", 429), name="groq")
+    gemini = FlakyFake(
+        {GEMINI_MODEL: [ProviderHTTPError("gemini", 503), ProviderHTTPError("gemini", 503)]},
+        name="gemini",
+    )
+    provider = ChatFallbackProvider(primary, groq, total=2, delay=.05, backup2=gemini)
+    out = await provider.complete(chat_request())
+    assert out.model == "gemini-3.8-flash"
+    assert [c.model for c in gemini.calls] == [GEMINI_MODEL, GEMINI_MODEL, "gemini-3.8-flash"]
