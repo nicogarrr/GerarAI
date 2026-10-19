@@ -128,7 +128,12 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
 
             <TabsContent value="paper" className="mt-6"><PaperTradingView /></TabsContent>
 
-            <TabsContent value="picks" className="mt-6">
+            {/* forceMount: Radix desmonta el panel inactivo y EnhancedProPicksContent
+                se sembraba con initialPicks del SSR; al generar/actualizar la
+                selección y volver a la pestaña el estado se perdía (reproducido
+                en prod 2026-10-19). Montado siempre, la selección y los filtros
+                sobreviven al cambio de pestaña. */}
+            <TabsContent value="picks" forceMount className="mt-6">
                 <EnhancedProPicksContent initialPicks={initialPicks} generatedAt={generatedAt} initialPassedCount={passedCount} />
             </TabsContent>
 

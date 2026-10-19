@@ -72,7 +72,7 @@ def build_snapshot(db: Session, as_of: date, generated_at: datetime | None = Non
     # tenants (fuga). Marcador honesto hasta la beta tenant-scoped.
     metrics["portfolio_beta"] = {
         "status": "no_disponible",
-        "reason": "beta por tenant pendiente de aislamiento por tenant; el snapshot macro es global y no mezcla carteras",
+        "reason": "La beta de tu cartera aún no está disponible; el snapshot macro es global y no mezcla carteras.",
     }
     checksum = hashlib.sha256(json.dumps({"metrics": metrics, "probabilities": probabilities}, sort_keys=True).encode()).hexdigest()
     previous = db.scalar(
@@ -129,7 +129,7 @@ def latest_snapshot(db: Session) -> dict:
         # maquinaria de betas por posición queda en regime_quant sin exponer.
         "portfolio_beta": snapshot.metrics.get(
             "portfolio_beta",
-            {"status": "no_disponible", "reason": "beta por tenant no expuesta hasta aislamiento por tenant"},
+            {"status": "no_disponible", "reason": "La beta de tu cartera aún no está disponible."},
         ),
         "note": "Probabilidades filtradas sin etiqueta económica; métricas faltantes indican sin datos.",
     }

@@ -525,6 +525,23 @@ def create_transaction(
                 enqueue_tracked_analysis(db, company.ticker)
             except Exception:
                 db.rollback()  # Never roll back the already committed purchase record.
+            try:
+                from app.services.market_close_sync import enqueue_price_backfills
+
+                # Una compra puede estrenar la compania en market_prices, que
+                # solo acumula hacia adelante: sin backfill no tiene pasado.
+                enqueue_price_backfills(
+                    db,
+                    [company.id],
+                    tenant_id=(
+                        db.info["tenant_id"]
+                        if type(db.info.get("tenant_id")) is int
+                        else None
+                    ),
+                    user_id=str(db.info["user_id"]) if db.info.get("user_id") else None,
+                )
+            except Exception:  # noqa: BLE001 - la cola nunca rompe la compra
+                db.rollback()
         return _transaction_payload(transaction, company)
     except PortfolioOversellError as exc:
         db.rollback()

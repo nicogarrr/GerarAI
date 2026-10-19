@@ -62,7 +62,7 @@ export default function GemsView() {
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center">
                     <p className="font-medium text-gray-300">Sin joyas con los datos actuales</p>
                     <p className="mt-2 text-sm text-gray-500">
-                        Ninguna empresa que supera el embudo reúne capitalización de 300 M$ a 10.000 M$, rentabilidad por FCF de al menos 5 % y precio de los últimos 7 días.
+                        Ninguna empresa que supera el embudo reúne capitalización de 300 M$ a 10.000 M$, rentabilidad por FCF de al menos 5 % y precio de los últimos 7 días. No es un fallo: son criterios fijos y la lista cambia cuando llegan datos nuevos.
                     </p>
                     <Button onClick={load} disabled={busy} className="mt-4 h-11 gap-2 bg-teal-600 text-white hover:bg-teal-700">
                         <RefreshCw aria-hidden="true" className="h-4 w-4" />

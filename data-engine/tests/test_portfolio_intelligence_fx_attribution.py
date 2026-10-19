@@ -315,3 +315,35 @@ def test_attribution_no_ledger_or_share_facts_is_nd_not_zero(db):
     assert out["period_start"] == "2026-01-02"
     assert out["period_end"] == "2026-06-01"
     assert out["basis"] == "adjusted_price_return"
+
+
+def test_attribution_partial_window_is_flagged_and_excluded_from_totals(db):
+    """A position measured over a much shorter window than the panel's (3
+    weeks under a 5-month header) is marked partial and excluded from the
+    aggregated totals: summing returns over different horizons published a
+    meaningless total."""
+    _eur_portfolio(db)
+    c1 = _company(db, "FULL")
+    c2 = _company(db, "SHORT")
+    p1 = _position(db, c1, as_of=date(2026, 6, 1), fx_rate="0.95")
+    p2 = _position(db, c2, as_of=date(2026, 6, 1), fx_rate="0.95")
+    s1 = _prices(db, c1, [(date(2026, 1, 2), 100), (date(2026, 6, 1), 120)])
+    s2 = _prices(db, c2, [(date(2026, 5, 25), 50), (date(2026, 6, 1), 51)])
+
+    svc = PortfolioIntelligenceService()
+    out = svc._attribution(
+        db,
+        [(p1, c1), (p2, c2)],
+        {c1.id: 0.5, c2.id: 0.5},
+        {c1.id: s1, c2.id: s2},
+        CUTOFF,
+    )
+    rows = {row["ticker"]: row for row in out["positions"]}
+    assert rows["FULL"]["partial_history"] is False
+    assert rows["SHORT"]["partial_history"] is True
+    assert out["excluded_partial_histories"] == ["SHORT"]
+    # El agregado de sizing solo incluye la posicion de ventana completa:
+    # 0.20 * 0.5 = 0.10, sin el 0.02 * 0.5 de la parcial.
+    assert out["portfolio_components"]["sizing"] == pytest.approx(0.10)
+    assert out["period_start"] == "2026-01-02"
+    assert out["period_end"] == "2026-06-01"

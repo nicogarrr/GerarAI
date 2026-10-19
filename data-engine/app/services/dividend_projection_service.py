@@ -365,7 +365,7 @@ class DividendProjectionService:
             # es un impuesto adicional: es anticipo de la cuota IRPF, asi que
             # el coste fiscal total es IRPF + extranjero - deduccion DI.
             net = year_gross - irpf_total - source_total + deduction_total
-            note = "Escenario condicionado (ver `fiscal_conditions`); no es el neto final."
+            note = "Escenario condicionado (ver «Método y condiciones»); no es el neto final."
             if excluded:
                 note = ("Subconjunto cubierto: hay posiciones excluidas sin tipo de cambio o sin "
                         "retención verificada (sin datos, no cero). " + note)

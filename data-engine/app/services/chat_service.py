@@ -355,6 +355,12 @@ def _natural_company_answer(
     )
     if lead:
         parts = [lead, *[p for p in parts if not lead.startswith(p)]]
+    if re.search(r"comp[aá]r|\bvs\.?\b|versus|frente a|respecto a", (question or "").lower()):
+        parts.insert(
+            1 if lead else 0,
+            f"No puedo comparar dos empresas en una misma respuesta: te contesto solo sobre "
+            f"{company.ticker}. Pregunta por la otra empresa por separado.",
+        )
     return "\n\n".join(parts)
 
 
@@ -404,11 +410,19 @@ def _answer_lead(
         if bits:
             return f"Sobre los riesgos de {ticker}, lo guardado señala: " + "; ".join(bits) + "."
         return f"No tengo riesgos documentados guardados de {ticker}."
-    if re.search(r"tesis|valoraci|margen de seguridad|rating", text):
+    if re.search(
+        r"tesis|valoraci|valor intr[ií]nseco|valor justo|valor esperado|margen de seguridad|rating|"
+        r"infravalor|sobrevalor",
+        text,
+    ):
         if thesis is None or thesis_line is None:
             return f"No tengo ninguna tesis guardada de {ticker}."
         summary = " ".join((thesis.executive_summary or "").split())
-        return thesis_line + (f" Resumen: {_short(summary, 320)}" if summary else "")
+        draft_note = (
+            " Es un borrador: cualquier rango de valor que aparezca es indicativo, no un valor intrínseco final."
+            if (thesis.status or "").strip() != "published" else ""
+        )
+        return thesis_line + draft_note + (f" Resumen: {_short(summary, 320)}" if summary else "")
     if focus_metrics:
         wanted = [f for f in facts if f.metric in focus_metrics]
         if not wanted:
@@ -518,6 +532,10 @@ _POSITION_QUERY_RE = re.compile(
     r"(?i)\b(?:peso|posici[oó]n|acciones)\b[^.!?\n]{0,40}\b(?:cartera|tengo|mis)\b"
     r"|\b(?:peso|posici[oó]n)\s+(?:de|en|que)\b"
     r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+)?(?:tengo|vale|valen|tienen)\b"
+    # "cuánto pesa ASTS (en mi cartera)" / "qué peso tiene ASTS": la forma
+    # verbal de peso tambien es pregunta de posicion.
+    r"|\bcu[aá]nt[oa]\s+pesa[n]?\b"
+    r"|\bqu[eé]\s+peso\s+tiene[n]?\b"
 )
 # Cuando la misma frase pide ademas caja o patrimonio se adjunta ese bloque.
 _RANK_HIGH_RE = re.compile(r"(?i)\b(?:m[aá]s\s+(?:alto|caro|grande)|mayor|m[aá]xim[oa])\b")
@@ -550,6 +568,10 @@ def _history_is_portfolio(history: list[ChatTurn] | None) -> bool:
     return False
 
 
+_PAGE_IDENTITY_RE = re.compile(
+    r"(?i)\bqu[eé]\s+(?:p[aá]gina|pantalla|secci[oó]n)\s+(?:es\s+esta|estoy\s+viendo|es|ves)\b"
+    r"|\bqu[eé]\s+estoy\s+viendo\b|\bd[oó]nde\s+estoy\b"
+)
 _PAGE_CONTENT_RE = re.compile(
     r"(?i)\b(?:en|de|sobre)\s+(?:esta|la\s+presente)\s+(?:p[aá]gina|pantalla|secci[oó]n)\b"
     r"|\b(?:esta|la)\s+(?:p[aá]gina|pantalla)\b[^.?!\n]{0,40}\b(?:hay|muestra|tiene|dice)\b"
@@ -803,6 +825,29 @@ class ChatService:
                 llm_trace={"path": "small_talk"},
                 context=context_echo,
             )
+        # "¿Qué página estoy viendo?": la identidad de la página ya está
+        # resuelta en servidor; se responde sin LLM y sin fuentes (la
+        # pastilla "Viendo X" es la propia UI, no un documento citable).
+        if page_context is not None and _PAGE_IDENTITY_RE.search(question or ""):
+            seen = (
+                f"{page_context.label} ({page_context.company.name})"
+                if page_context.company is not None
+                else page_context.label
+            )
+            pointer = (
+                f" Pregúntame por {page_context.ticker}: precio, financieros, tesis o noticias guardadas."
+                if page_context.ticker
+                else ""
+            )
+            return ChatResponse(
+                answer=f"Estás viendo {seen}.{pointer}",
+                sources=[],
+                model="deterministic",
+                prompt_version="page-identity-v1",
+                confidence=0.9,
+                llm_trace={"path": "page_identity", "generated": False, "provider_calls": 0},
+                context=context_echo,
+            )
         from app.services.brain_data_tools import (
             answer_data_question,
             dividend_ticker_without_records,
@@ -974,6 +1019,10 @@ class ChatService:
             except Exception:  # noqa: BLE001 — Jev nunca rompe el chat
                 pass
         synthesis = ChatSynthesisService(self.provider)
+        # La página visible viaja al LLM: sin ella "esta página/esta empresa"
+        # no tenía referente y el modelo lo inventaba (y citaba fuentes
+        # ajenas para apoyarlo).
+        page_payload = context_echo
         if ticker:
             response = await synthesis.synthesize(
                 question=question,
@@ -981,6 +1030,7 @@ class ChatService:
                 baseline=baseline,
                 db=db,
                 enable_debate=enable_debate,
+                page=page_payload,
             )
         else:
             response = await synthesis.synthesize_general(
@@ -988,6 +1038,7 @@ class ChatService:
                 baseline=baseline,
                 db=db,
                 history=history,
+                page=page_payload,
             )
         response.context = context_echo
         return response

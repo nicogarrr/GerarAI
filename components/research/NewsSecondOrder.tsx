@@ -28,7 +28,7 @@ const PER_GROUP = 8;
  * Único desplegable por fila de noticia: el contexto de la fuente (children,
  * server-rendered) y los efectos de segundo orden (carga perezosa al abrir).
  */
-export function NewsSecondOrder({ eventId, summary, children }: { eventId: number; summary: string; children?: ReactNode }) {
+export function NewsSecondOrder({ eventId, summary, subjectTicker, children }: { eventId: number; summary: string; subjectTicker?: string | null; children?: ReactNode }) {
   const [load, setLoad] = useState<Load>({ state: 'idle' });
 
   async function fetchOnce() {
@@ -49,7 +49,13 @@ export function NewsSecondOrder({ eventId, summary, children }: { eventId: numbe
       {children}
       {load.state === 'loading' ? <p className="mt-1" role="status">Calculando…</p> : null}
       {load.state === 'error' ? <p className="mt-1">No disponible ahora. Vuelve a abrir para reintentar.</p> : null}
-      {load.state === 'ready' && load.data.status === 'sin_datos' ? <p className="mt-1">Sin empresas del universo expuestas a esta noticia.</p> : null}
+      {load.state === 'ready' && load.data.status === 'sin_datos' ? (
+        <p className="mt-1">
+          {subjectTicker
+            ? `Ninguna otra empresa del universo aparece expuesta; el análisis excluye a propósito a la propia ${subjectTicker}.`
+            : 'Sin empresas del universo expuestas a esta noticia.'}
+        </p>
+      ) : null}
       {load.state === 'ready' && load.data.status !== 'sin_datos' ? (
         <div className="mt-1 space-y-3 rounded-md border border-gray-800 p-2">
           <p className="font-medium text-gray-300">Hipótesis no verificadas · {load.data.mode === 'llm' ? 'modelo' : 'reglas'}</p>
