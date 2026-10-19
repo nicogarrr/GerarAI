@@ -4,6 +4,7 @@ import ScrollToOnMount from '@/components/research/ScrollToOnMount';
 import { formatResearchMetric } from '@/lib/research/metric-value';
 import { financialFormula, financialPeriod, financialVersionLabel } from '@/lib/research/financial-display';
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
+import { collapseVersionHistory } from '@/lib/research/version-history';
 import { healthText, listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
 import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
@@ -1217,10 +1218,17 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             <EmptyState title="Aún no hay historial de versiones." />
           ) : (
             <div className="space-y-3">
-              {data.historyDetail.history.map((entry) => (
+              {/* Versiones seguidas con el mismo resumen («Sin cambios
+                  materiales…» ×4) se colapsan en una tarjeta con el rango. */}
+              {collapseVersionHistory(data.historyDetail.history).map((group) => {
+                const entry = group[0];
+                return (
                 <div className="rounded-lg border border-gray-800 p-4" key={entry.id}>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">v{entry.version}</Badge>
+                    {group.length > 1 ? (
+                      <Badge variant="outline">{group.length} versiones seguidas con el mismo resumen (v{entry.version}–v{group[group.length - 1].version})</Badge>
+                    ) : null}
                     <Badge variant={entry.status === 'published' ? 'default' : 'outline'}>{label(entry.status)}</Badge>
                     <Badge variant="outline">{label(entry.rating)}</Badge>
                     {entry.diff?.rating_changed ? <Badge>rating cambiado</Badge> : null}
@@ -1238,7 +1246,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     <span>confianza datos {entry.data_confidence_score}/100</span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
           <p className="mt-3 text-xs text-gray-500">
