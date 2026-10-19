@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
-import { getPublicShorts, refreshPublicShorts } from '@/lib/actions/data-health.actions';
+import { getPublicShorts, refreshPublicShorts } from '@/lib/actions/public-shorts.actions';
 import { formatNumber, formatUserDateTime } from '@/lib/format';
 import { MutationForm } from '@/components/forms/MutationForm';
 import { Button } from '@/components/ui/button';

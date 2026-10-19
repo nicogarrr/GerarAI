@@ -23,13 +23,20 @@ test('sin pendientes o sin datos no inventa texto', () => {
     assert.equal(openReviewsLabel(null), null);
 });
 
-test('la tarjeta del índice usa el contador', () => {
+// Decisión de Nico (2026-10-20, revisión de diseño del índice /research):
+// contadores de pendientes FUERA de las tarjetas (una tarjeta = un solo
+// estado; el contador de revisiones/alertas generaba señales contradictorias
+// tipo «cobertura 100/100 + ámbar») y /research/data-health se elimina entera.
+// Se conserva el motivo de no valorable, en gris neutro (sin ámbar), para no
+// suavizar la causa.
+test('la tarjeta del índice no usa contadores de pendientes', () => {
     const page = readFileSync('app/(root)/research/page.tsx', 'utf8');
-    assert.match(page, /openReviewsLabel\(snapshot\.counts\)/);
+    assert.doesNotMatch(page, /openReviewsLabel\(snapshot\.counts\)/);
 });
 
-test('la tarjeta conserva el motivo no valorable y muestra pendientes aparte', () => {
+test('la tarjeta conserva el motivo no valorable en gris neutro', () => {
     const page = readFileSync('app/(root)/research/page.tsx', 'utf8');
-    assert.match(page, />No valorable: falta evidencia<\/span>/);
-    assert.match(page, /\{pending \? <span[^>]*>\{pending\}<\/span> : null\}/);
+    assert.match(page, /<span[^>]*text-gray-500[^>]*>\s*No valorable: falta evidencia\s*<\/span>/);
+    assert.doesNotMatch(page, />No valorable: falta evidencia<\/span>.{0,120}amber/);
+    assert.doesNotMatch(page, /\{pending \? <span[^>]*>\{pending\}<\/span> : null\}/);
 });
