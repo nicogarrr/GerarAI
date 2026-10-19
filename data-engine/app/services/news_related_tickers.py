@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, MarketPrice
+from app.services.etf_holdings import etfs_for_tickers
 from app.services.market_change import OFFICIAL_CLOSE_SOURCES, common_sessions
 
 MAX_RELATED = 6
@@ -194,6 +195,12 @@ def related_for_events(
     lista [principal, *relacionadas] con cierre/variacion; vacio si no hay
     ninguna relacionada distinta de la principal (la tira seria redundante)."""
     by_name, by_ticker = _cached_index(db)
+    try:
+        etf_by_ticker = etfs_for_tickers(
+            db, {p.ticker for _, p, _ in items if p is not None and p.ticker}
+        )
+    except Exception:  # noqa: BLE001 - complemento: sin ETFs, la tira sigue
+        etf_by_ticker = {}
     per_event: dict[int, list[Company]] = {}
     ids: set[int] = set()
     for event_id, primary, text in items:
@@ -202,7 +209,7 @@ def related_for_events(
             for c in mentioned_companies(text, by_name, by_ticker)
             if primary is None or c.id != primary.id
         ][:MAX_RELATED]
-        if not others:
+        if not others and not (primary is not None and primary.ticker in etf_by_ticker):
             continue
         chain = ([primary] if primary is not None else []) + others
         per_event[event_id] = chain
@@ -221,4 +228,6 @@ def related_for_events(
             }
             for c in chain
         ]
+        primary_ticker = next((c.ticker for c in chain if c.id == primary_ids.get(event_id)), None)
+        result[event_id].extend(etf_by_ticker.get(primary_ticker, []))
     return result

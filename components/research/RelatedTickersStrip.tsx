@@ -17,7 +17,11 @@ export function RelatedTickersStrip({ items }: { items?: RelatedTicker[] | null 
         const view = relatedTickerView(item);
         return (
           <li key={item.ticker} title={view.title} className="flex items-baseline gap-1.5">
-            <Link prefetch={false} href={view.href} className="font-medium text-gray-200 hover:text-teal-200">{view.ticker}</Link>
+            {view.isEtf ? (
+              <span className="font-medium text-sky-300">{view.ticker}</span>
+            ) : (
+              <Link prefetch={false} href={view.href} className="font-medium text-gray-200 hover:text-teal-200">{view.ticker}</Link>
+            )}
             <span className="text-gray-400">{view.priceText}</span>
             <span className={TONE[view.tone]}>{view.changeText}</span>
             {view.dateText ? <span className="text-gray-500">cierre {view.dateText}</span> : null}

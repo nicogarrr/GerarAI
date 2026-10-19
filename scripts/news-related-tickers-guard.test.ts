@@ -54,3 +54,12 @@ void test('el backend usa solo cierres oficiales y evidencia explicita', () => {
   assert.ok(service.includes('common_sessions'));
   assert.ok(!service.includes('httpx') && !service.includes('requests'), 'sin red');
 });
+
+void test('ETF: peso del ETF segun holdings, sin precio ni variacion inventados', () => {
+  const v = relatedTickerView({ ticker: 'NASA', name: 'Tema Space Innovators ETF', kind: 'etf', weight_pct: 5.5, holdings_as_of: '2026-10-16', price: null, date: null, change_pct: null });
+  assert.equal(v.isEtf, true);
+  assert.equal(v.priceText, '5,5 % del ETF');
+  assert.equal(v.changeText, '');
+  assert.equal(v.href, '');
+  assert.ok(v.title.includes('2026-10-16'));
+});
