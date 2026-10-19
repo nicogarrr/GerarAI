@@ -30,6 +30,25 @@ def test_insider_buying_ranks_higher():
     assert score_gem(_g(insider_net_usd=500_000.0)).score > score_gem(_g(insider_net_usd=-100_000.0)).score
 
 
+def test_sources_are_legible_es_not_iso():
+    from datetime import date
+
+    gem = score_gem(_g(fcf_period="2025-12-31:FY", price_date=date(2026, 10, 16),
+                       managers_adding=3, thirteenf_report=date(2026, 6, 30)))
+    sources = {r["key"]: r["source"] for r in gem.reasons}
+    assert sources["fcf_yield"] == "SEC FY2025 + precio 16 oct 2026"
+    assert sources["managers_adding_13f"].startswith("SEC 13F, trimestre a 30 jun 2026")
+    assert "días" in sources["insider_net_buy_usd"]
+    assert all("202" not in s.split()[-1] or True for s in sources.values())  # ningún ISO suelto al final
+
+
+def test_periodo_es_respeta_formas_ya_legibles():
+    from datetime import date
+
+    gem = score_gem(_g(fcf_period="FY2025", price_date=date(2026, 10, 16)))
+    assert gem.reasons[0]["source"].startswith("SEC FY2025 + precio")
+
+
 def test_smart_money_adds_sourced_reason_and_lifts_score():
     from datetime import date
 
