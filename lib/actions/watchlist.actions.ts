@@ -142,6 +142,8 @@ export type WatchlistEntryData = {
     peRatio: number | null;
     /** 'ttm' = Finnhub peTTM (línea US); 'fy' = respaldo backend cierre/EPS diluido FY. */
     peKind: 'ttm' | 'fy' | null;
+    /** Procedencia del PER visible: Finnhub (TTM, línea US) o la cadena del backend («PER: cierre … / eps_diluido FY…»). Null sin PER. */
+    peSource: string | null;
     // F358: frescura del precio: 'live' = sesión en curso; 'close' = último
     // cierre fechado (con fecha en priceAsOf si se conoce). Un cierre NUNCA
     // se pinta como cotización actual.
@@ -167,6 +169,7 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         marketCapDerived: false,
         peRatio: null,
         peKind: null,
+        peSource: null,
         priceKind: null,
         priceAsOf: null,
         metricsNotApplicable: false,
@@ -212,6 +215,7 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
     const backendCap = backend && typeof backend.market_cap === 'number' ? backend.market_cap : null;
     const backendPer = backend && typeof backend.per === 'number' && Number.isFinite(backend.per) ? backend.per : null;
     const backendDerived = (backend?.sources ?? []).some((src) => src.toLowerCase().includes('derivada'));
+    const backendPerSource = (backend?.sources ?? []).find((src) => src.startsWith('PER:')) ?? null;
 
     return {
         ...base,
@@ -241,6 +245,9 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         marketCapDerived: marketCapM === null && backendCap !== null && backendDerived,
         peRatio: peRatio ?? backendPer,
         peKind: peRatio !== null ? 'ttm' : backendPer !== null ? 'fy' : null,
+        // Trazabilidad del número: sin fuente visible un PER erróneo (QA
+        // 2026-10-19: AENA 2,0x por EPS FY mal cargado) parece dato oficial.
+        peSource: peRatio !== null ? 'PER TTM (Finnhub)' : backendPerSource,
         priceKind,
         priceAsOf,
         metricsNotApplicable: !usListing,
