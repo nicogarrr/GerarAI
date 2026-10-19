@@ -108,8 +108,8 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2"><Filter aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Ejecutar un filtro ad-hoc</h2></div>
         <form className="space-y-4" method="get">
-          <CriterionFields availableMetrics={metricCoverage ?? undefined} initialLeft={query.left ?? ''} initialOperator={operator} initialRight={query.right ?? ''} required />
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"><RankingFields availableMetrics={metricCoverage ?? undefined} initialDirection={query.direction} initialFormula={query.ranking} /><SubmitButton /></div>
+          <CriterionFields availableMetrics={metricCoverage ?? undefined} customMetrics={metrics} initialLeft={query.left ?? ''} initialOperator={operator} initialRight={query.right ?? ''} required />
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"><RankingFields availableMetrics={metricCoverage ?? undefined} customMetrics={metrics} initialDirection={query.direction} initialFormula={query.ranking} /><SubmitButton /></div>
         </form>
       </section>
 
@@ -142,8 +142,8 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
               <div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="screen-name">Nombre del filtro *</label><Input className="min-h-11" id="screen-name" name="name" placeholder="Calidad a precio razonable" required /></div>
               <div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="screen-desc">Qué buscas (opcional)</label><Input className="min-h-11" id="screen-desc" name="description" placeholder="Empresas rentables con retorno superior al coste de capital" /></div>
             </div>
-            <div className="mt-4 space-y-4">{([['', true], ['_2', false], ['_3', false]] as const).map(([suffix, required], index) => <CriterionFields availableMetrics={metricCoverage ?? undefined} key={suffix || 'one'} number={index + 1} required={required} suffix={suffix} />)}</div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(150px,190px)]"><FormulaField availableMetrics={metricCoverage ?? undefined} hint="Opcional: ordenarás las coincidencias por esta expresión." name="ranking_formula" title="Métrica para ordenar" /><div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="saved-order">Dirección del orden</label><select className="min-h-11 w-full rounded-md border border-gray-700 bg-black px-3 text-sm text-gray-200" id="saved-order" name="ranking_direction" defaultValue="desc"><option value="desc">Mayor primero</option><option value="asc">Menor primero</option></select></div></div>
+            <div className="mt-4 space-y-4">{([['', true], ['_2', false], ['_3', false]] as const).map(([suffix, required], index) => <CriterionFields availableMetrics={metricCoverage ?? undefined} customMetrics={metrics} key={suffix || 'one'} number={index + 1} required={required} suffix={suffix} />)}</div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(150px,190px)]"><FormulaField availableMetrics={metricCoverage ?? undefined} customMetrics={metrics} name="ranking_formula" title="Métrica para ordenar" /><div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="saved-order">Dirección del orden</label><select className="min-h-11 w-full rounded-md border border-gray-700 bg-black px-3 text-sm text-gray-200" id="saved-order" name="ranking_direction" defaultValue="desc"><option value="desc">Mayor primero</option><option value="asc">Menor primero</option></select></div></div>
             <label className="mt-4 flex items-center gap-2 text-sm text-gray-300"><input name="alerts_enabled" type="checkbox" />Avisar de nuevas coincidencias</label>
             <Button className="mt-4" type="submit"><Save aria-hidden="true" className="h-4 w-4" />Guardar filtro</Button>
           </MutationForm>
