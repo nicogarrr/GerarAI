@@ -56,4 +56,21 @@ def tracked_statuses(db: Session, tickers: list[str]) -> dict[str, dict]:
                 'as_of': (run.finished_at or run.started_at or run.created_at).isoformat(),
                 'thesis_status': (run.result_payload or {}).get('status'),
             }
+    # Motivo del «faltan datos»: los inputs pendientes del último modelo
+    # fundamental persistido (QA Tester 6, 19-oct-2026: la watchlist decía
+    # «Análisis: faltan datos» sin explicar qué falta).
+    insufficient = [t for t, state in out.items()
+                    if state.get('thesis_status') == 'insufficient_data']
+    if insufficient:
+        from app.models import Company
+        from app.services.thesis_service import latest_missing_inputs
+        company_ids = {
+            c.ticker: c.id
+            for c in db.scalars(
+                select(Company).where(Company.ticker.in_(insufficient))).all()
+        }
+        for ticker in insufficient:
+            company_id = company_ids.get(ticker)
+            if company_id is not None:
+                out[ticker]['missing_inputs'] = latest_missing_inputs(db, company_id)
     return out
