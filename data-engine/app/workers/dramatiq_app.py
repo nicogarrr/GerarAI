@@ -1158,6 +1158,22 @@ def ingest_uk_pdmr_filings(tenant_id: int | None = None, user_id: str | None = N
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
+def ingest_ca_insider_yahoo(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
+    """Insiders de Canada via Yahoo quoteSummary (FUENTE NO OFICIAL; SEDI es la verdad)."""
+    from app.services.ca_insider_ingestion import ingest_ca_insiders
+
+    db = _session(tenant_id, user_id)
+    try:
+        result = _run(ingest_ca_insiders(db, db.info["tenant_id"]))
+        return {"actor": "ingest_ca_insider_yahoo", "status": "ok", **result}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("ingest_ca_insider_yahoo", exc)
+    finally:
+        db.close()
+
+
 DISCOVERY_DEADLINE_SECONDS = 480  # margen de 2 min bajo el time_limit de 10 min
 
 

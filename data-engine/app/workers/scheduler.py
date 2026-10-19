@@ -18,6 +18,7 @@ from app.workers.dramatiq_app import (
     dispatch_tracked_news_alerts,
     evaluate_alert_rules,
     freeze_propicks_snapshot,
+    ingest_ca_insider_yahoo,
     ingest_class_shares_outstanding,
     ingest_corporate_splits,
     ingest_sec_bottleneck_filings,
@@ -180,6 +181,9 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # horario de cuellos reconcilia lo nuevo como cualquier otro documento.
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_sec_bottleneck_filings),
               "interval", job_id="sec_bottleneck_filings", hours=6)
+    # Insiders Canada (Yahoo quoteSummary, no oficial): 2 GET por corrida cada 6 h.
+    _register(scheduler, partial(enqueue_for_all_tenants, ingest_ca_insider_yahoo),
+              "interval", job_id="ca_insider_yahoo", hours=6)
     _register(scheduler, refresh_macro_context.send, "cron", job_id="macro_context_refresh", hour=23, minute=10)
     # Holdings oficiales de ETFs tematicos (UFO, NASA): 1 descarga por ETF y semana.
     _register(scheduler, refresh_etf_holdings, "cron", job_id="etf_holdings_refresh", day_of_week="mon", hour=7, minute=20)

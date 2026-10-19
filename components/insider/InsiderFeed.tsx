@@ -99,6 +99,7 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
                 <span className={`font-medium ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>{sideLabel(tx.side)}</span>
                 {tx.rule_10b5_1 ? <span className="text-xs text-gray-500">Plan 10b5-1</span> : null}
                 {tx.form === 'PDMR' ? <span className="text-xs text-gray-500">PDMR (Reino Unido)</span> : null}
+                {tx.form === 'CA-INSIDER' ? <span className="text-xs text-gray-500">Canadá · fuente no oficial (Yahoo)</span> : null}
                 <span className="ml-auto tabular-nums text-xs text-gray-500">{tx.date ? formatDate(tx.date) : '—'}</span>
             </div>
             <div className="mt-1.5 text-sm font-medium text-gray-100">{insiderName(tx.insider)}</div>
@@ -137,6 +138,13 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
             ) : null}
             {tx.form === 'PDMR' ? (
                 <p className="mt-1.5 text-xs text-gray-500">Fuente: tracefour (CC BY 4.0) · documento original en FCA NSM</p>
+            ) : null}
+            {tx.form === 'CA-INSIDER' ? (
+                <p className="mt-1.5 text-xs text-gray-500">
+                    Fuente no oficial (Yahoo); la verdad oficial es{' '}
+                    <a className="underline hover:text-teal-300" href="https://www.sedi.ca" rel="noopener noreferrer" target="_blank">SEDI</a>
+                    {' '}(consulta manual)
+                </p>
             ) : null}
         </article>
     );
