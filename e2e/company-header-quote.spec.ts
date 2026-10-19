@@ -24,6 +24,7 @@ test("cabecera de la ficha con precio, variación y gráfico técnico (desktop)"
   await expect(strip.getByText('$334.20', { exact: true })).toBeVisible();
   await expect(strip.getByText('N/D', { exact: true })).toBeVisible();
   await expect(header(page).getByText('Fixture local · 17:00 (Madrid)', { exact: true })).toBeVisible();
+  await header(page).getByText('Más detalle', { exact: true }).click();
   await expect(header(page).getByText('Sesión regular del 2026-09-09 · 17:00 (Madrid)', { exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/header-quote-desktop.png" });
 });

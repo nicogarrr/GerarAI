@@ -62,6 +62,7 @@ test.describe("company research workspace", () => {
     await expect(quote.getByText('$336.56', { exact: true })).toBeVisible();
     await expect(quote.getByTestId('company-metric-strip')).toBeVisible();
     await expect(quote.getByText('Fixture local · 17:00 (Madrid)', { exact: true })).toBeVisible();
+    await quote.getByText('Más detalle', { exact: true }).click();
     await expect(quote.getByText('Sesión regular del 2026-09-09 · 17:00 (Madrid)', { exact: true })).toBeVisible();
     // Vista general compacta: la cabecera de tesis resume el estado; el
     // modelo vive en su modulo (pestaña Números).

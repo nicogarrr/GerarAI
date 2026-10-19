@@ -141,7 +141,7 @@ export function CompanyHeaderQuote({
                         </>
                     ) : NA}
                 </div>
-                {showPrice && quote && quote.session !== 'cerrado' && (quote.change != null || quote.change_percent != null) ? (
+                {showPrice && quote && quote.session !== 'cerrado' && (quote.change != null || quote.change_percent != null) && signBase !== 0 ? (
                     <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${signBase > 0 ? 'bg-emerald-500/10 text-emerald-300' : signBase < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
                         {[
                             quote.change != null ? (currency === 'USD' ? new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', signDisplay:'exceptZero', minimumFractionDigits:2, maximumFractionDigits:2}).format(quote.change) : formatNumber(quote.change, { signDisplay: 'exceptZero', maximumFractionDigits: 2 })) : null,
@@ -157,16 +157,22 @@ export function CompanyHeaderQuote({
                                 formatPercent(quote.close_change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }),
                             ].filter(Boolean).join(' · ')}
                         </div>
-                        <p className="mt-1 text-xs text-gray-500">Último cierre vs anterior · {quoteSessionDate(quote.close_change_date)} vs {quoteSessionDate(quote.close_change_previous_date)} (cierres oficiales)</p>
                     </div>
                 ) : null}
+                {useFallback ? <p className="mt-1 text-xs text-gray-500">Cotización en vivo no disponible ahora{snapshot.historySource ? ` · ${snapshot.historySource}` : ''}</p> : null}
+                {showPrice ? <p className="mt-1 text-xs text-gray-500">{quote!.source} · {quoteTime(quote!.timestamp)} (Madrid)</p> : null}
+                <details className="mt-1 text-gray-500" data-testid="quote-detail">
+                    <summary className="inline-flex min-h-[44px] cursor-pointer items-center text-xs text-gray-400 sm:min-h-0">Más detalle</summary>
+                    <div className="mt-1 space-y-1">
+                        {showPrice && quote?.session === 'cerrado' && quote.close_change_percent != null && quote.close_change_date && quote.close_change_previous_date ? <p className="text-xs text-gray-500">Último cierre vs anterior · {quoteSessionDate(quote.close_change_date)} vs {quoteSessionDate(quote.close_change_previous_date)} (cierres oficiales)</p> : null}
                 {duplicatedClose || useFallback ? null : (
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="text-xs text-gray-500">
                         Cierre regular: {loading ? <span aria-hidden="true" className="inline-block h-3 w-24 animate-pulse rounded bg-gray-800 align-middle" /> : showPrice && quote?.regular_close != null && (quote.regular_close_timestamp || quote.regular_close_date) ? `${headerMoney(quote.regular_close, currency)} · ${quote.regular_close_timestamp ? `${quoteDate(quote.regular_close_timestamp)} · ${quoteTime(quote.regular_close_timestamp)}` : quoteSessionDate(quote.regular_close_date)}` : NA}
                     </p>
                 )}
-                {useFallback ? <p className="mt-1 text-xs text-gray-500">Cotización en vivo no disponible ahora{snapshot.historySource ? ` · ${snapshot.historySource}` : ''}</p> : null}
-                {showPrice ? <p className="mt-1 text-xs text-gray-500">{quote!.source} · {quoteTime(quote!.timestamp)} (Madrid)</p> : null}
+                {hasDatedMetrics ? <p className="text-xs text-gray-500">Sesión regular del {formatMarketDate(quote!.metrics_session)} · {quoteTime(quote!.metrics_timestamp)} (Madrid)</p> : null}
+                    </div>
+                </details>
             </div>
             <div className="min-w-0 max-w-full">
                 <dl className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800" data-testid="company-metric-strip">
@@ -189,7 +195,6 @@ export function CompanyHeaderQuote({
                         </div>
                     ))}
                 </dl>
-                {hasDatedMetrics ? <p className="mt-2 text-xs text-gray-500">Sesión regular del {formatMarketDate(quote!.metrics_session)} · {quoteTime(quote!.metrics_timestamp)} (Madrid)</p> : null}
             </div>
             <CompanyTechnicalWorkspace snapshot={snapshot} />
         </div>
