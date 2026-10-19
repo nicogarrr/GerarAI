@@ -113,7 +113,7 @@ def score_gem(g: GemInputs) -> Gem | None:
     return Gem(g.ticker, g.name, round(score, 2), g.market_cap, reasons)
 
 
-def _latest_fcf_and_shares(db: Session) -> dict[int, tuple[float, float, str]]:
+def _latest_fcf_and_shares(db: Session, min_fiscal_year: int) -> dict[int, tuple[float, float, str]]:
     rows = db.execute(
         select(
             FinancialFact.company_id, FinancialFact.metric, FinancialFact.fiscal_year,
@@ -122,6 +122,10 @@ def _latest_fcf_and_shares(db: Session) -> dict[int, tuple[float, float, str]]:
         .where(FinancialFact.metric.in_(["free_cash_flow", "shares_diluted"]))
         .where(FinancialFact.fiscal_quarter.in_(["FY", ""]))
         .where(FinancialFact.fiscal_year.isnot(None))
+        # Un FY de hace más de 2 años no es un dato actual: VOYA entraba en
+        # joyas con FCF de FY2016 contra precio de hoy. Sin FY reciente la
+        # empresa se queda sin fcf_yield y no entra (fail-closed, N/D).
+        .where(FinancialFact.fiscal_year >= min_fiscal_year)
         .order_by(FinancialFact.fiscal_year.desc(), FinancialFact.created_at.desc())
         .execution_options(include_all_tenants=True)
     ).all()
@@ -201,7 +205,7 @@ def find_gems(
         for c in db.scalars(select(Company).where(Company.id.in_(list(passed)))).all()
         if (c.currency or "").upper() == "USD"  # facts and prices share currency
     }
-    base = _latest_fcf_and_shares(db)
+    base = _latest_fcf_and_shares(db, today.year - 2)
     prices: dict[int, MarketPrice] = {}
     for p in db.scalars(
         select(MarketPrice)
