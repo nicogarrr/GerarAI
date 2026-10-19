@@ -65,6 +65,19 @@ def resolve_engine_key(company: Company) -> str:
     industry = (getattr(company, "industry", None) or "").lower()
     if "insurance" in industry and "broker" not in industry:
         return "insurer"
+    # El cambio de motor por identidad SOLO entra para tickers verificados a
+    # mano (identidad comprobada 19 oct 2026 en prod). Mover por industria a
+    # bancos/gestoras/REITs haria que motores fail-closed reemplazaran un DCF
+    # que hoy da valor: se amplia solo cuando el motor tenga datos suficientes.
+    ticker = (getattr(company, "ticker", "") or "").upper()
+    verified_engines = {
+        "CB": "insurer",  # Chubb: aseguradora (combined ratio, book value)
+        "KKR": "holding_company",  # gestora: AUM/NAV, no FCF generico
+        "CPT": "reit",  # Camden Property Trust: FFO/AFFO
+        "BN": "holding_company",  # Brookfield (ya entraba por company_type)
+    }
+    if ticker in verified_engines:
+        return verified_engines[ticker]
     if "reit" in company_type:
         return "reit"
     return "standard_dcf"
