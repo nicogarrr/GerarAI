@@ -234,3 +234,14 @@ def test_feed_exposes_rule_10b5_1():
     finally:
         _cleanup(db)
         db.close()
+
+
+def test_primary_ticker_collapses_share_class_lists():
+    from app.services.insider_feed import primary_ticker
+
+    assert primary_ticker("LEN, LEN.B") == "LEN"
+    assert primary_ticker("GTX,GTXAP") == "GTX"
+    assert primary_ticker("len") == "LEN"
+    assert primary_ticker("BRK.B") == "BRK.B"
+    assert primary_ticker(None) is None
+    assert primary_ticker("") == ""

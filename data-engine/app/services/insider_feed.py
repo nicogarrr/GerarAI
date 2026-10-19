@@ -28,9 +28,22 @@ def _side(code: str | None, acquired_disposed: str | None) -> str | None:
     return None
 
 
+def primary_ticker(raw: str | None) -> str | None:
+    """Un Form 4 de un emisor con varias clases trae "LEN, LEN.B" (o "GTX,GTXAP").
+
+    Sin normalizar, el mismo emisor aparece como dos empresas ("LEN" y
+    "LEN, LEN.B") y sus compras no suman en cluster. Se usa el primer simbolo
+    de la lista (el que declara el emisor como principal).
+    """
+    if not raw:
+        return raw
+    first = str(raw).replace(";", ",").split(",")[0].strip().upper()
+    return first or raw
+
+
 def _tx_dict(row: InsiderTransaction, filing: InsiderFiling, line: int) -> dict[str, Any]:
     return {
-        "ticker": row.issuer_ticker or filing.issuer_ticker,
+        "ticker": primary_ticker(row.issuer_ticker or filing.issuer_ticker),
         "issuer_name": filing.issuer_name,
         "insider": row.insider,
         "insider_cik": row.insider_cik,
@@ -121,7 +134,11 @@ def build_feed(
         )
     )
     if wanted:
-        stmt = stmt.where(InsiderFiling.issuer_ticker == wanted)
+        stmt = stmt.where(
+            (InsiderFiling.issuer_ticker == wanted)
+            | InsiderFiling.issuer_ticker.like(f"{wanted},%")
+            | InsiderFiling.issuer_ticker.like(f"{wanted}, %")
+        )
     rows = db.execute(stmt).all()
 
     txs = [_tx_dict(tx, filing, i) for i, (tx, filing) in enumerate(rows)]
