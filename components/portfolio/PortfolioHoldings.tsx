@@ -152,6 +152,9 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
             La G/P va en {cashCurrency} (divisa base) con el tipo de cambio de cada compra: no coincide con la variación del precio en la divisa de la acción.
           </span>
         </CardTitle>
+        <div className="flex flex-wrap items-center gap-2">
+        <AddTransactionButton userId={userId} />
+        <ImportIBKRButton userId={userId} />
         <Button
           variant="outline"
           size="sm"
@@ -163,6 +166,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
           <RefreshCw aria-hidden="true" className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />
           Actualizar Precios
         </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {currentHoldings.length === 0 && !showCash ? (
