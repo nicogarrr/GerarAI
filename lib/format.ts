@@ -484,6 +484,7 @@ export function marginOfSafetyDisplay(
 }
 
 
+const KEEP_UPPER = new Set(['ADR', 'ADS', 'ETF', 'REIT', 'SA', 'NV', 'AG', 'SE', 'ASA']);
 const NAME_SUFFIXES: Record<string, string> = {
   INC: 'Inc', CORP: 'Corp', LTD: 'Ltd', PLC: 'plc', CO: 'Co', LLC: 'LLC', LP: 'LP',
   HOLDINGS: 'Holdings', GROUP: 'Group', TECHNOLOGIES: 'Technologies',
@@ -499,16 +500,22 @@ export function formatCompanyName(value: string | null | undefined): string {
   const raw = (value ?? '').trim();
   if (!raw) return NA;
   if (raw !== raw.toUpperCase()) return raw;
+  const fixWord = (word: string): string => {
+    if (!word) return word;
+    if (NAME_SUFFIXES[word]) return NAME_SUFFIXES[word];
+    if (KEEP_UPPER.has(word)) return word;
+    if (word.length <= 3 || /[&\d]/.test(word)) return word;
+    return word[0] + word.slice(1).toLowerCase();
+  };
   return raw
     .split(/(\s+)/)
     .map((part) => {
       if (!part.trim()) return part;
-      const m = /^([^.,]+)([.,]*)$/.exec(part);
-      const word = m ? m[1] : part;
-      const tail = m ? m[2] : '';
-      if (NAME_SUFFIXES[word]) return NAME_SUFFIXES[word] + tail;
-      if (word.length <= 3) return part;
-      return word[0] + word.slice(1).toLowerCase() + tail;
+      // respeta guiones y barras: «COCA-COLA» -> «Coca-Cola», «CORP/ADR» -> «Corp/ADR»
+      return part
+        .split(/([-/.,]+)/)
+        .map((piece, idx) => (idx % 2 ? piece : fixWord(piece)))
+        .join('');
     })
     .join('');
 }
