@@ -30,3 +30,16 @@ def test_only_verbatim_company_chunk_with_document_url(db):
     ev.source_url = 'https://example.com/unrelated'
     db.commit()
     assert all(not r['excerpts'] for r in moat_checklist(db, company))
+
+
+def test_quote_from_other_company_is_not_evidence(db):
+    company = _company(db)
+    claim = _claim(db, company.id, 'pricing power')
+    doc = Document(company_id=None, title='Other entity', source_type='sec_filing', source_url='https://example.com/report')
+    db.add(doc); db.flush()
+    quote = 'Our competitors challenged our pricing power significantly.'
+    chunk = DocumentChunk(document_id=doc.id, chunk_index=0, text=quote)
+    db.add(chunk); db.flush()
+    db.add(ClaimEvidence(claim_id=claim.id, document_id=doc.id, document_chunk_id=chunk.id, quote=quote, summary='summary'))
+    db.commit()
+    assert all(not r['excerpts'] for r in moat_checklist(db, company))
