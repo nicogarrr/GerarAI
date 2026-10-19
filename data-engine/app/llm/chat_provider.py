@@ -286,6 +286,9 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
         settings,
         client=client,
         reasoning_effort=settings.opencode_go_chat_reasoning_effort,
+        # Un intento por modelo: un 429 del free tier no se repite (el
+        # reintento duplicaba la espera); la carrera ya tiene respaldo Groq.
+        max_retries=0,
     )
     if not settings.groq_chat_fallback_enabled or primary.name == "disabled":
         return primary
