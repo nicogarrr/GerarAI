@@ -452,3 +452,20 @@
     text-shadow: none !important;
   }
 }
+
+/* Micro-animación de la burbuja del Cerebro: respiración suave solo unos
+   segundos tras cargar (la clase se quita desde React). */
+@keyframes brain-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.07); }
+}
+
+.brain-breathe {
+    animation: brain-breathe 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .brain-breathe {
+        animation: none;
+    }
+}
