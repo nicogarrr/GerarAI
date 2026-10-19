@@ -6183,7 +6183,7 @@ export interface components {
         FeedCreate: {
             /**
              * Scope
-             * @default followed
+             * @default watchlist
              */
             scope: string;
         };
