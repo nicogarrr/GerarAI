@@ -32,7 +32,7 @@ import { formatDate, formatNumber, formatUserDateTime } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { reviewResearchExpectations } from '@/lib/actions/research.actions';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
-import { alertCardCopy } from '@/lib/alerts/card-copy';
+import { alertCardCopy, alertSummaryIsSourceHeadline } from '@/lib/alerts/card-copy';
 import { etiquetaCanal, etiquetaEstadoEntrega } from '@/lib/alerts/delivery-labels';
 
 const ALERT_TYPE_LABELS: Record<AlertType, string> = {
@@ -472,7 +472,7 @@ function AlertsManager() {
                                             : `Creada ${formatUserDateTime(item.createdAt)}`}
                                     </time>
                                 </div>
-                                {item.alert_type === 'tracked_news' ? <ExternalNewsHeadline headline={alertCardCopy(item).summary} url={item.sourceUrl} className="mt-1 text-sm text-gray-300" /> : <p className="mt-1 text-sm text-gray-300">{alertCardCopy(item).summary}</p>}
+                                {alertSummaryIsSourceHeadline(item) ? <ExternalNewsHeadline headline={alertCardCopy(item).summary} url={item.sourceUrl} className="mt-1 text-sm text-gray-300" /> : <p className="mt-1 text-sm text-gray-300">{alertCardCopy(item).summary}</p>}
                                 <details className="mt-2 text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">Ver aviso original</summary><p className="whitespace-pre-wrap break-words">{alertCardCopy(item).technical}</p></details>
                                 {(item.ticker || item.sourceUrl) && (
                                     <span className="mt-1 inline-flex flex-wrap gap-x-3">

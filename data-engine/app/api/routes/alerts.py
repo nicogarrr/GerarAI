@@ -293,6 +293,9 @@ def list_alerts(
 
             if _is_off_topic(event, company):
                 continue
+        if event and alert.alert_type in ("tracked_news", "news_material_update", "news"):
+            title = (event.title or "").strip()
+            out.event_headline = title or None
         if event:
             # Document type only from a specific form token in the source
             # headline, never from an arbitrary model summary or SEC domain.

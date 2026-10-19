@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 // @ts-expect-error TS5097: explicit extension for node strip-types.
-import { alertCardCopy } from '../lib/alerts/card-copy.ts';
+import { alertCardCopy, alertSummaryIsSourceHeadline } from '../lib/alerts/card-copy.ts';
 
 const base = {
   id: 1, title: 'Review required: news material update',
@@ -51,4 +51,21 @@ test('tracked news card shows the source headline from the alert title', () => {
 test('tracked news card without headline keeps the generic summary (no invented content)', () => {
   const card = alertCardCopy({ ...base, alert_type: 'tracked_news', title: 'Noticia sobre ASML', eventForm: null });
   assert.equal(card.summary, 'Noticia sobre Visa.');
+});
+
+test('news_material_update y regla news muestran el titular de la noticia de origen, no relleno', () => {
+  for (const alert_type of ['news_material_update', 'news']) {
+    const a = { ...base, alert_type, eventForm: null, eventHeadline: 'RKLB sufre su peor semana' };
+    const card = alertCardCopy(a);
+    assert.equal(card.summary, 'RKLB sufre su peor semana');
+    assert.equal(alertSummaryIsSourceHeadline(a), true);
+    assert.doesNotMatch(card.summary, /marcada para revisión|impacto aún/);
+  }
+});
+
+test('noticia sin titular verificable: texto honesto, sin la frase de relleno', () => {
+  const a = { ...base, alert_type: 'news_material_update', eventForm: null, eventHeadline: null };
+  const card = alertCardCopy(a);
+  assert.match(card.summary, /no trae titular verificable/);
+  assert.equal(alertSummaryIsSourceHeadline(a), false);
 });

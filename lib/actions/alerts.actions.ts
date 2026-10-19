@@ -160,6 +160,8 @@ export interface TriggeredAlertDelivery {
     eventDate: string | null;
     eventDateSource: string | null;
     eventForm: string | null;
+    /** Titular de la noticia de origen; null si no consta. */
+    eventHeadline?: string | null;
     createdAt: string;
 }
 
@@ -179,6 +181,7 @@ type ResearchAlertRow = {
     event_date?: string | null;
     event_date_source?: string | null;
     event_form?: string | null;
+    event_headline?: string | null;
     created_at: string;
 };
 
@@ -204,6 +207,7 @@ export async function getRecentTriggeredAlerts(limit = 20): Promise<TriggeredAle
         eventDate: row.event_date ?? null,
         eventDateSource: row.event_date_source ?? null,
         eventForm: row.event_form ?? null,
+        eventHeadline: row.event_headline ?? null,
         createdAt: row.created_at,
     }));
 }
