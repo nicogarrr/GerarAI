@@ -621,8 +621,8 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                 </CardContent>
             </Card>
 
-            {/* 4 · Oportunidades por valor intrínseco. Sin candidatas (y sin error) el bloque no se pinta: una tarjeta que solo dice «ninguna» no aporta. */}
-            {(opportunitiesLoading || opportunitiesError || opportunities.length > 0) && (
+            {/* 4 · Oportunidades por valor intrínseco. Mientras carga, o sin candidatas y sin error, el bloque no se pinta (así no aparece y desaparece): una tarjeta que solo dice «ninguna» no aporta. */}
+            {!opportunitiesLoading && (opportunitiesError || opportunities.length > 0) && (
             <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-x-2 pb-2 border-b border-gray-700/50">
                     <CardTitle className="text-lg text-gray-100 flex items-center gap-2">
