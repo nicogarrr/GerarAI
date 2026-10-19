@@ -9,7 +9,14 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from app.models.entities import Base, Company, FinancialFact, MarketPrice, Tenant
+from app.models.entities import (
+    Base,
+    Company,
+    CorporateAction,
+    FinancialFact,
+    MarketPrice,
+    Tenant,
+)
 from app.services.derived_market_cap_service import refresh_derived_market_cap
 
 TODAY = date(2026, 10, 19)
@@ -179,3 +186,86 @@ def test_watchlist_metrics_endpoint_honest_nulls(db):
     assert payload == {"market_cap": None, "per": None,
                        "currency": "EUR", "sources": []}
     assert watchlist_metrics("UNKNOWN", db)["market_cap"] is None
+def _split(db, company, effective, ratio):
+    db.add(CorporateAction(
+        company_id=company.id, action_type="split", ratio=Decimal(str(ratio)),
+        effective_date=effective, description="test split",
+    ))
+
+
+def test_derived_cap_adjusted_for_split_after_period(db):
+    """Caso real AENA (medido en prod 19-oct-2026): split 10:1 tras el
+    FY2025; precio post-split x acciones derivadas pre-split daba el cap
+    10x bajo (3,93B en vez de ~39,3B). El recuento se expresa en acciones
+    actuales multiplicando por el factor acumulado, como el PER."""
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=3))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    _split(db, company, TODAY - timedelta(days=2), 10)
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result["status"] == "ok"
+    assert result["split_factor"] == 10
+    assert "ajustadas por split x10" in result["shares_basis"]
+    assert result["market_cap"] == pytest.approx(
+        25.70 * (1_972_000_000 / 12.89) * 10, rel=1e-6)
+    fact = db.scalar(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "market_cap"))
+    assert fact.is_adjusted is True
+
+
+def test_reported_shares_adjusted_for_split_after_dei(db):
+    """Conteo reportado (SEC dei) con split posterior: tambien se expresa
+    en acciones actuales, como la serie de long_term_model_service."""
+    company = _company(db)
+    _price(db, company, Decimal("60"), TODAY - timedelta(days=1))
+    db.add(FinancialFact(
+        company_id=company.id, metric="shares_outstanding",
+        value=Decimal("150000000"), unit="shares", period="2026-06-30:DEI",
+        source_type="SEC", is_reported=True, tenant_id=1,
+    ))
+    _split(db, company, date(2026, 8, 1), 4)
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result["status"] == "ok"
+    assert result["market_cap"] == pytest.approx(60 * 600_000_000)
+    assert "reported_shares_outstanding" in result["shares_basis"]
+    assert "ajustadas por split x4" in result["shares_basis"]
+
+
+def test_split_before_period_not_applied(db):
+    """Split anterior al cierre del ejercicio del hecho: el recuento ya es
+    post-split, factor 1 y nada que declarar."""
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=1))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    _split(db, company, date(2024, 1, 15), 10)
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result["status"] == "ok"
+    assert result["split_factor"] == 1.0
+    assert "ajustadas por split" not in result["shares_basis"]
+    assert result["market_cap"] == pytest.approx(
+        25.70 * (1_972_000_000 / 12.89), rel=1e-6)
+    fact = db.scalar(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "market_cap"))
+    assert fact.is_adjusted is False
+
+
+def test_endpoint_declares_split_adjusted_derived_cap(db):
+    from app.api.routes.watchlist import watchlist_metrics
+
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=3))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    _split(db, company, TODAY - timedelta(days=2), 10)
+    db.commit()
+    payload = watchlist_metrics("aena", db)
+    assert payload["market_cap"] == pytest.approx(
+        25.70 * (1_972_000_000 / 12.89) * 10, rel=1e-6)
+    assert any("acciones ajustadas por split" in src for src in payload["sources"])
