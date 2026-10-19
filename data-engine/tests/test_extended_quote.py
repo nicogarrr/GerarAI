@@ -456,3 +456,21 @@ def test_daily_listing_guard_accepts_normalized_share_class():
     daily["meta"]["symbol"] = "BRK-A"
     q = parse_extended_chart("BRK.B", minute, START + 200, daily)
     assert q.previous_close_date is None
+
+
+def test_subunit_currency_normalized_for_frontend_iso_gate():
+    """Yahoo declara "GBp" (peniques) en la LSE; el frontend exige /^[A-Z]{3}$/
+    y sin normalizar toda la cabecera salia N/D pese a tener precio (CGEO.L,
+    medido en prod 19 oct 2026). La salida debe ser GBX, la divisa que ya usa
+    toda la app."""
+    node = chart()
+    node['meta']['currency'] = 'GBp'
+    q = parse_extended_chart('CGEO.L', node, START + 60)
+    assert q.currency == 'GBX'
+    q = parse_extended_chart('CGEO.L', node, START + 60)
+    node['meta']['currency'] = 'ZAc'
+    q = parse_extended_chart('AGL.JO', node, START + 60)
+    assert q.currency == 'ZAC'
+    node['meta']['currency'] = 'USD'
+    q = parse_extended_chart('MSFT', node, START + 60)
+    assert q.currency == 'USD'

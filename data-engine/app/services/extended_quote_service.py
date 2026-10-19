@@ -15,6 +15,21 @@ from app.services.connectors.yahoo import YahooFinanceClient, yahoo_chart_symbol
 SessionName = Literal["pre", "regular", "post", "cerrado"]
 SOURCE = "Yahoo Finance (no oficial), retraso posible"
 
+# Subunidades que Yahoo distingue solo por mayusculas/minusculas (mismo
+# mapa que analyst_targets_service). Sin normalizar, "GBp" no pasa la
+# validacion de divisa del frontend (/^[A-Z]{3}$/) y la cabecera de la
+# ficha entera salia N/D pese a tener precio (CGEO.L, 19 oct 2026).
+_SUBUNIT_CURRENCY = {"GBp": "GBX", "ZAc": "ZAC"}
+
+
+def _display_currency(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    return _SUBUNIT_CURRENCY.get(raw) or raw
+
 
 class ExtendedQuote(BaseModel):
     ticker: str
@@ -93,7 +108,7 @@ def parse_extended_chart(ticker: str, node: dict[str, Any], now: int, daily_node
         return "cerrado"
 
     session = session_at(now)
-    result = ExtendedQuote(ticker=ticker, fetched_at=now, session=session, currency=meta.get("currency"))
+    result = ExtendedQuote(ticker=ticker, fetched_at=now, session=session, currency=_display_currency(meta.get("currency")))
     quotes = (node.get("indicators") or {}).get("quote") or []
     candles = quotes[0] if quotes else {}
     timestamps = node.get("timestamp") or []
