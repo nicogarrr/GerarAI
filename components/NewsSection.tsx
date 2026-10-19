@@ -51,13 +51,6 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                     </Link>
                 </div>
 
-                {news.length > 0 && (
-                    <p className="mb-3 text-xs leading-5 text-gray-500">
-                        {symbols?.length
-                            ? 'La insignia con ticker marca tus posiciones; el resto son compañías mencionadas o mercado general.'
-                            : 'La insignia indica la compañía mencionada en el titular, no una posición tuya.'}
-                    </p>
-                )}
                 {news.length === 0 ? (
                     <div className="flex items-center justify-center px-4 py-12 text-center text-sm text-gray-500">
                         <p>No hay noticias disponibles en este momento.</p>
@@ -76,7 +69,7 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                 className="relative min-w-0 p-4 bg-surface-2 hover:bg-surface-1 rounded-lg border border-gray-800 transition-all duration-200 group"
                             >
                             <div className="mb-2 flex justify-end">
-                                {badge.kind === 'general' ? <span className="text-xs text-gray-400">Mercado general</span> : <Link href={`/research/${encodeURIComponent(badge.ticker)}`} className="text-xs text-teal-300">{badge.kind === 'mentioned' ? <>Menciona {badge.ticker}</> : badge.ticker}</Link>}
+                                {badge.kind === 'general' ? <span className="text-xs text-gray-400">Mercado general</span> : <Link href={`/research/${encodeURIComponent(badge.ticker)}`} className="text-xs text-teal-300">{badge.kind === 'mentioned' ? <>Mencionada · {badge.ticker}</> : badge.ticker}</Link>}
                             </div>
                             <div>
                                 <div className="flex flex-col min-[420px]:flex-row gap-3 sm:gap-4">
