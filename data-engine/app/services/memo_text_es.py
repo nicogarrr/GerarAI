@@ -7,6 +7,7 @@ lugar de guiones bajos: nunca se inventa su significado.
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 TERMS_ES: dict[str, str] = {
@@ -93,3 +94,25 @@ def money_thesis(value: float, currency: str | None) -> str:
         number = f"{value:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
         return f"{number} {currency}"
     return f"{value:,.2f}"
+
+
+_MESES_ES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+
+
+def date_es(value: object) -> str:
+    """Fecha ISO («2026-10-17» o datetime ISO) -> «17 de octubre de 2026».
+
+    Una frase en español nunca lleva la fecha en formato ISO. Si el valor no
+    es una fecha reconocible se devuelve tal cual: nunca se inventa un día.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return text
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text
+    return f"{parsed.day} de {_MESES_ES[parsed.month - 1]} de {parsed.year}"

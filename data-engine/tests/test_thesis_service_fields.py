@@ -191,6 +191,13 @@ def test_card_summary_partial_es_indicativo():
     assert "beta" in text
 
 
+def _fecha_es(iso: str) -> str:
+    """Esperado es-ES independiente del SUT: tabla de meses propia del test."""
+    meses = ("enero", "febrero", "marzo", "abril", "mayo", "junio",
+             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
+    y, m, d = (int(part) for part in iso[:10].split("-"))
+    return f"{d} de {meses[m - 1]} de {y}"
+
 def test_card_summary_anade_titulares_verbatim_con_atribucion():
     # Un titular demuestra que el medio lo publico, no que sea cierto: la
     # tarjeta cita verbatim SOLO el titular original (source_headline), con
@@ -198,6 +205,7 @@ def test_card_summary_anade_titulares_verbatim_con_atribucion():
     service = ThesisService()
     valuation = {"status": "ok", "trace": {"engine": "dcf_v2"}}
     today = datetime.now(UTC).date().isoformat()
+    today_es = _fecha_es(today)
     news = [
         {"title": "META Meta presenta Muse (resumen interno)",
          "source_headline": "Meta presenta Muse, su nuevo modelo",
@@ -210,8 +218,8 @@ def test_card_summary_anade_titulares_verbatim_con_atribucion():
     ]
     text = service._card_summary(_company(), valuation, "hipotesis", news)
     assert text.startswith("hipotesis Titulares recientes: ")
-    assert f'"Meta presenta Muse, su nuevo modelo" (TechCrunch, publicado el {today})' in text
-    assert f'"RKLB retrasa su lanzamiento" (SpaceNews, publicado el {today})' in text
+    assert f'"Meta presenta Muse, su nuevo modelo" (TechCrunch, publicado el {today_es})' in text
+    assert f'"RKLB retrasa su lanzamiento" (SpaceNews, publicado el {today_es})' in text
     assert "Tercero" not in text
 
 
@@ -225,7 +233,7 @@ def test_card_summary_sin_titular_original_no_atribuye_cita():
          "date": "2026-09-20", "date_source": "gdelt_first_seen"},
     ]
     text = service._card_summary(_company(), valuation, "hipotesis", news)
-    assert "Noticias relevantes: Resumen compuesto por la app (GDELT, visto en GDELT el 2026-09-20)." in text
+    assert "Noticias relevantes: Resumen compuesto por la app (GDELT, visto en GDELT el 20 de septiembre de 2026)." in text
     assert '"Resumen' not in text
     assert "Titulares" not in text
 
@@ -242,7 +250,8 @@ def test_card_summary_fecha_antigua_no_dice_recientes():
     text = service._card_summary(_company(), valuation, "hipotesis", news)
     assert "Titulares materiales destacados: " in text
     assert "recientes" not in text
-    assert "publicado el 2020-01-15" in text
+    assert "publicado el 15 de enero de 2020" in text
+    assert "2020-01-15" not in text
 
 
 def test_card_summary_grupo_mixto_no_dice_recientes():

@@ -33,7 +33,7 @@ from app.llm import (
 from app.models.entities import Company
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
-from app.services.memo_text_es import percent_es
+from app.services.memo_text_es import date_es, percent_es
 from app.services.text_clip import clip_words
 from app.valuation.engines.base import margin_of_safety_reference
 
@@ -147,7 +147,9 @@ def _fragment_templates(
         source = str(item.get("source") or "").strip()
         if not headline or not source:
             continue
-        day = str(item.get("date") or "")[:10]
+        # Fecha en es-ES dentro de la frase, nunca ISO (date_es deja el
+        # valor intacto si no lo reconoce).
+        day = date_es(str(item.get("date") or "")[:10])
         date_source = item.get("date_source")
         if day and date_source == "source":
             fragments[f"titular_{index}"] = f'{source} publico el {day} "{headline}".'
