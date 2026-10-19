@@ -18,27 +18,37 @@ from app.models import (
     NewsEvent,
     Tenant,
 )
-from app.services.bottleneck_service import MIN_SOURCES, Evidence, aggregate, extract_themes, refresh_signals
+from app.services.bottleneck_service import (
+    MIN_SOURCES,
+    Evidence,
+    aggregate,
+    extract_themes,
+    refresh_signals,
+    stored_evidence,
+)
 
 
-@pytest.mark.parametrize("text,theme", [
-    ("Chip supply constraints persist", "Semiconductores"),
-    ("Escasez de cobre", "Minerales"),
-    ("Electricity capacity is ample", None),
-    ("Capacidad limitada de la red electrica", "Energía"),
-    ("GPU delivery times have increased to 20 weeks", "Semiconductores"),
-    ("Longer lead times for aircraft", "Industria aeroespacial"),
-    ("Shipping backlog grows", "Transporte"),
-    ("Data centers face limited capacity", "Centros de datos"),
-    ("No chip shortages", None),
-    ("No significant shortage of chips", None),
-    ("Chip shortages are easing", None),
-    ("Escasez de liquidez. La industria de chips crece", None),
-    ("Escasez de talento", None),
-    ("Chip capacity expands", None),
-    ("Normal lead times for chips", None),
-    ("Reduced shipping backlog", None),
-])
+@pytest.mark.parametrize(
+    "text,theme",
+    [
+        ("Chip supply constraints persist", "Semiconductores"),
+        ("Escasez de cobre", "Minerales"),
+        ("Electricity capacity is ample", None),
+        ("Capacidad limitada de la red electrica", "Energía"),
+        ("GPU delivery times have increased to 20 weeks", "Semiconductores"),
+        ("Longer lead times for aircraft", "Industria aeroespacial"),
+        ("Shipping backlog grows", "Transporte"),
+        ("Data centers face limited capacity", "Centros de datos"),
+        ("No chip shortages", None),
+        ("No significant shortage of chips", None),
+        ("Chip shortages are easing", None),
+        ("Escasez de liquidez. La industria de chips crece", None),
+        ("Escasez de talento", None),
+        ("Chip capacity expands", None),
+        ("Normal lead times for chips", None),
+        ("Reduced shipping backlog", None),
+    ],
+)
 def test_extraction(text, theme):
     assert extract_themes(text) == ({theme} if theme else set())
 
@@ -72,8 +82,10 @@ def test_absence_never_opens_detectado_through_aggregate(text):
 
 
 def test_auditor_mixed_sources_do_not_reach_threshold():
-    rows = [evidence("a", "p-a", "Chip shortages are not expected."),
-            evidence("b", "p-b", "The chip shortage did not materialize.")]
+    rows = [
+        evidence("a", "p-a", "Chip shortages are not expected."),
+        evidence("b", "p-b", "The chip shortage did not materialize."),
+    ]
     result = aggregate(rows)["Semiconductores"]
     assert result["n_sources"] == 0 and result["evidence_ids"] == []
 
@@ -89,7 +101,9 @@ def test_absence_stored_in_db_stays_nd_in_endpoint_model(db):
 
 def test_real_constraints_still_detected_end_to_end(db):
     for i, text in enumerate(["Chip shortages persist", "Escasez de chips durante el trimestre"]):
-        db.add(NewsEvent(title=text, url=f"https://real{i}.example/n", date=datetime(2026, 10, 3, tzinfo=UTC)))
+        db.add(
+            NewsEvent(title=text, url=f"https://real{i}.example/n", date=datetime(2026, 10, 3, tzinfo=UTC))
+        )
     db.commit()
     refresh_signals(db)
     db.commit()
@@ -101,9 +115,12 @@ def evidence(id, origin, text="Chip shortages persist", day=1, keys=()):
 
 
 def test_independence_dates_and_duplicate_sources():
-    rows = [evidence("k:1", "fund-a", keys=("doc:1",)),
-            evidence("k:2", "fund-a", day=3, keys=("doc:1",)),
-            evidence("n:1", "publisher-b", day=5), evidence("n:2", None, day=2)]
+    rows = [
+        evidence("k:1", "fund-a", keys=("doc:1",)),
+        evidence("k:2", "fund-a", day=3, keys=("doc:1",)),
+        evidence("n:1", "publisher-b", day=5),
+        evidence("n:2", None, day=2),
+    ]
     result = aggregate(rows)["Semiconductores"]
     assert result["n_sources"] == 2
     assert result["evidence_ids"] == ["k:1", "k:2", "n:1", "n:2"]
@@ -114,9 +131,11 @@ def test_independence_dates_and_duplicate_sources():
 
 
 def test_syndicated_copies_and_transitive_links():
-    rows = [evidence("1", "a", keys=("url:a",)),
-            evidence("2", "b", keys=("url:b",)),
-            evidence("3", "c", keys=("url:a", "url:b"))]
+    rows = [
+        evidence("1", "a", keys=("url:a",)),
+        evidence("2", "b", keys=("url:b",)),
+        evidence("3", "c", keys=("url:a", "url:b")),
+    ]
     assert aggregate(rows)["Semiconductores"]["n_sources"] == 1
     assert aggregate(list(reversed(rows)))["Semiconductores"]["n_sources"] == 1
 
@@ -134,21 +153,43 @@ def db():
 
 
 def seed(db):
-    doc = Document(title="Filing", source_type="filing", source_url="https://chips.example/filing",
-                   published_at=datetime(2026, 10, 1, tzinfo=UTC))
-    letter = KnowledgeDocument(title="Carta", document_type="fund_letter", author="Fondo A",
-                               publication_date=date(2026, 10, 2), status="ready")
+    doc = Document(
+        title="Filing",
+        source_type="filing",
+        source_url="https://chips.example/filing",
+        published_at=datetime(2026, 10, 1, tzinfo=UTC),
+    )
+    letter = KnowledgeDocument(
+        title="Carta",
+        document_type="fund_letter",
+        author="Fondo A",
+        publication_date=date(2026, 10, 2),
+        status="ready",
+    )
     unknown = KnowledgeDocument(title="Sin fecha", document_type="fund_letter", author="Fondo B")
     db.add_all([doc, letter, unknown])
     db.flush()
-    db.add_all([DocumentChunk(document_id=doc.id, chunk_index=0, text="Chip shortages persist"),
-                KnowledgeChunk(knowledge_document_id=letter.id, chunk_index=0,
-                               content="Escasez de chips durante el trimestre"),
-                KnowledgeChunk(knowledge_document_id=unknown.id, chunk_index=0, content="Chip shortages"),
-                NewsEvent(title="GPU delivery times extend to 40 weeks", url="https://chips.example/news",
-                          date=datetime(2026, 10, 3, tzinfo=UTC)),
-                NewsEvent(title="Chip shortages persist", url="https://copy.example/syndicated",
-                          date=datetime(2026, 10, 4, tzinfo=UTC))])
+    db.add_all(
+        [
+            DocumentChunk(document_id=doc.id, chunk_index=0, text="Chip shortages persist"),
+            KnowledgeChunk(
+                knowledge_document_id=letter.id,
+                chunk_index=0,
+                content="Escasez de chips durante el trimestre",
+            ),
+            KnowledgeChunk(knowledge_document_id=unknown.id, chunk_index=0, content="Chip shortages"),
+            NewsEvent(
+                title="GPU delivery times extend to 40 weeks",
+                url="https://chips.example/news",
+                date=datetime(2026, 10, 3, tzinfo=UTC),
+            ),
+            NewsEvent(
+                title="Chip shortages persist",
+                url="https://copy.example/syndicated",
+                date=datetime(2026, 10, 4, tzinfo=UTC),
+            ),
+        ]
+    )
     db.commit()
 
 
@@ -165,7 +206,10 @@ def test_persistence_idempotency_status_and_reconciliation(db):
     original_id = row.id
     refresh_signals(db)
     db.commit()
-    assert db.scalar(select(BottleneckSignal).where(BottleneckSignal.theme == "Semiconductores")).id == original_id
+    assert (
+        db.scalar(select(BottleneckSignal).where(BottleneckSignal.theme == "Semiconductores")).id
+        == original_id
+    )
     for chunk in db.scalars(select(KnowledgeChunk)):
         db.delete(chunk)
     refresh_signals(db)
@@ -213,16 +257,22 @@ def test_worker_commits_and_hourly_job(db, monkeypatch):
     seed(db)
     result = getattr(dramatiq_app.refresh_bottlenecks, "fn")(1, "owner")  # noqa: B009
     assert result["status"] == "ok"
-    assert db.scalar(select(BottleneckSignal).where(BottleneckSignal.theme == "Semiconductores")).n_sources == 2
+    assert (
+        db.scalar(select(BottleneckSignal).where(BottleneckSignal.theme == "Semiconductores")).n_sources == 2
+    )
     job = scheduler.build_scheduler().get_job("bottleneck_refresh")
     assert job is not None and job.trigger.interval.total_seconds() == 3600
 
 
 def test_publisher_subdomains_tracking_and_cross_lane_copy(db):
     seed(db)
-    db.add(NewsEvent(title="Chips face capacity constraints this month",
-                     url="https://markets.chips.example/story?utm_source=other",
-                     date=datetime(2026, 10, 5, tzinfo=UTC)))
+    db.add(
+        NewsEvent(
+            title="Chips face capacity constraints this month",
+            url="https://markets.chips.example/story?utm_source=other",
+            date=datetime(2026, 10, 5, tzinfo=UTC),
+        )
+    )
     db.commit()
     refresh_signals(db)
     db.commit()
@@ -264,14 +314,20 @@ def test_rebuild_clears_removed_evidence(db):
     db.commit()
     refresh_signals(db)
     db.commit()
-    assert all(s.evidence_ids == [] and s.first_seen is None and s.last_seen is None
-               and s.status == "N/D" for s in list_bottlenecks(db).signals)
+    assert all(
+        s.evidence_ids == [] and s.first_seen is None and s.last_seen is None and s.status == "N/D"
+        for s in list_bottlenecks(db).signals
+    )
 
 
 def test_chunk_parent_must_share_tenant(db):
-    foreign = Document(tenant_id=2, title="Foreign", source_type="filing",
-                       published_at=datetime(2026, 10, 1, tzinfo=UTC),
-                       source_url="https://foreign.example/filing")
+    foreign = Document(
+        tenant_id=2,
+        title="Foreign",
+        source_type="filing",
+        published_at=datetime(2026, 10, 1, tzinfo=UTC),
+        source_url="https://foreign.example/filing",
+    )
     db.info.clear()
     db.add(foreign)
     db.flush()
@@ -308,3 +364,40 @@ def test_run_endpoint_enqueues_manual_sweep_without_calling_any_model(db, monkey
         assert client.get("/api/bottlenecks/discoveries").status_code == 200
     assert sent == [(1, "owner")]
     assert db.scalars(select(BottleneckSignal)).all() == []
+
+
+def test_news_summary_counts_as_evidence_text(db):
+    """El carril de noticias analiza tambien el resumen guardado (coste 0):
+    la escasez que solo aparece en el cuerpo resumido ya no se pierde."""
+    db.add(
+        NewsEvent(
+            title="Semiconductors weekly recap",
+            summary="GPU delivery times extend to 40 weeks as capacity constraints persist.",
+            url="https://pub-summary.example/n1",
+            date=datetime(2026, 10, 6, tzinfo=UTC),
+        )
+    )
+    db.commit()
+    texts = [e.text for e in stored_evidence(db, db.info["tenant_id"])]
+    assert any("40 weeks" in t for t in texts)
+    refresh_signals(db)
+    db.commit()
+    signal = db.scalar(select(BottleneckSignal).where(BottleneckSignal.theme == "Semiconductores"))
+    assert signal.n_sources == 1  # una fuente: aun no detectado, pero ya cuenta
+
+
+def test_news_summary_negation_stays_fail_closed(db):
+    """El resumen pasa por las mismas guardas (negacion/alivio/hipotesis)."""
+    db.add(
+        NewsEvent(
+            title="Chips outlook",
+            summary="No chip shortages expected this quarter, suppliers say.",
+            url="https://pub-neg.example/n1",
+            date=datetime(2026, 10, 6, tzinfo=UTC),
+        )
+    )
+    db.commit()
+    refresh_signals(db)
+    db.commit()
+    signal = db.scalar(select(BottleneckSignal).where(BottleneckSignal.theme == "Semiconductores"))
+    assert signal.n_sources == 0

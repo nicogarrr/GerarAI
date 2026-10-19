@@ -160,7 +160,14 @@ def stored_evidence(db: Session, tenant: int) -> Iterator[Evidence]:
     for news in db.scalars(select(NewsEvent).where(NewsEvent.tenant_id == tenant)):
         host, _ = _url_identity(news.url)
         # source often names an aggregator (GDELT/RSS/manual), not a publisher.
-        yield Evidence(f"news_event:{news.id}", news.title, news.date, host,
+        # El texto analizado es titular + resumen: la ingesta ya guarda
+        # `summary` (coste 0) y la mencion de la escasez suele estar solo en
+        # el cuerpo resumido; con solo el titular este carril la perdia entera.
+        # La IDENTIDAD del hecho (copias sindicadas) se sigue derivando del
+        # titular, para no romper la deduplicacion por hash existente.
+        summary = (news.summary or "").strip()
+        text = news.title if not summary else f"{news.title}. {summary}"
+        yield Evidence(f"news_event:{news.id}", text, news.date, host,
                        _identities(news.title, news.url))
 
 
