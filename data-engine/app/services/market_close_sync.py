@@ -9,15 +9,15 @@ que Movers, Mercado y watchlist consideran cierre."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from datetime import UTC, datetime
+from collections.abc import Callable, Iterable
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.entities import Company
+from app.models.entities import Company, MarketPrice
 from app.services.propicks_price_service import (
     PriceBar,
     fetch_history_yfinance,
@@ -76,3 +76,67 @@ def sync_official_closes(
         "bars_written": written,
         "partial_session_skipped": skip_today,
     }
+
+
+# Historial minimo que se considera suficiente para no re-descargar.
+BACKFILL_MIN_HISTORY_DAYS = 300
+BACKFILL_PERIOD = "1y"
+
+
+def companies_needing_history_backfill(
+    db: Session, company_ids: Iterable[int], *, today: date | None = None
+) -> list[int]:
+    """Ids sin historial profundo en MarketPrice (una sola query agrupada).
+
+    MarketPrice solo acumula hacia adelante (sync_official_closes escribe la
+    ultima semana cada dia), asi que una compania recien creada no tiene
+    pasado: las metricas de cartera median ventanas de dias con pinta de
+    anos. Estas son las candidatas a backfill.
+    """
+    ids = list({int(id_) for id_ in company_ids})
+    if not ids:
+        return []
+    today = today or datetime.now(UTC).date()
+    threshold = today - timedelta(days=BACKFILL_MIN_HISTORY_DAYS)
+    earliest = dict(
+        db.execute(
+            select(MarketPrice.company_id, func.min(MarketPrice.date))
+            .where(MarketPrice.company_id.in_(ids))
+            .group_by(MarketPrice.company_id)
+        ).all()
+    )
+    return [
+        id_
+        for id_ in ids
+        if earliest.get(id_) is None or earliest[id_] > threshold
+    ]
+
+
+def backfill_company_history(
+    db: Session,
+    company: Company,
+    *,
+    period: str = BACKFILL_PERIOD,
+    fetcher: Callable[..., dict[str, list[PriceBar]]] = fetch_history_yfinance,
+    today: date | None = None,
+) -> dict[str, Any]:
+    """Descarga ~1 ano de historia de UNA compania (una llamada, ritmo amable).
+
+    Idempotente: upsert por (company_id, date). Sin simbolo Yahoo, con
+    historial ya suficiente o con fuente sin barras: skip declarado, sin
+    inventar barras.
+    """
+    symbol = yahoo_symbol(company)
+    if symbol is None:
+        return {"status": "skipped", "reason": "sin simbolo Yahoo"}
+    if company.id not in companies_needing_history_backfill(
+        db, [company.id], today=today
+    ):
+        return {"status": "skipped", "reason": "historico suficiente"}
+    history = fetcher([symbol], period=period)
+    bars = history.get(symbol) or []
+    if not bars:
+        return {"status": "skipped", "reason": "fuente sin barras"}
+    written = upsert_prices(db, company, bars)
+    db.commit()
+    return {"status": "ok", "bars_written": written, "period": period}

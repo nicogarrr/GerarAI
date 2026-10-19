@@ -58,3 +58,81 @@ def test_skips_session_in_progress(db):
     rows = db.scalars(select(MarketPrice)).all()
     assert out["partial_session_skipped"] is True
     assert [r.date for r in rows] == [date(2026, 10, 15)]
+
+
+def test_backfill_writes_history_when_company_has_no_past(db):
+    from app.services.market_close_sync import backfill_company_history
+
+    _company(db)
+    company = db.scalars(select(Company)).one()
+    out = backfill_company_history(
+        db, company, fetcher=lambda symbols, period: _bars(), today=date(2026, 10, 16)
+    )
+    assert out["status"] == "ok" and out["bars_written"] == 2
+    rows = db.scalars(select(MarketPrice)).all()
+    assert len(rows) == 2
+
+
+def test_backfill_skips_when_history_is_sufficient(db):
+    from app.services.market_close_sync import backfill_company_history
+
+    _company(db)
+    company = db.scalars(select(Company)).one()
+    db.add(
+        MarketPrice(
+            company_id=company.id, date=date(2025, 1, 6), open=Decimal("1"),
+            high=Decimal("1"), low=Decimal("1"), close=Decimal("1"),
+            adj_close=Decimal("1"), source="yfinance",
+        )
+    )
+    db.commit()
+    calls = []
+    out = backfill_company_history(
+        db, company,
+        fetcher=lambda symbols, period: calls.append(symbols) or _bars(),
+        today=date(2026, 10, 16),
+    )
+    assert out == {"status": "skipped", "reason": "historico suficiente"}
+    assert calls == []  # sin llamada a la fuente cuando no hace falta
+
+
+def test_backfill_skips_when_source_has_no_bars(db):
+    from app.services.market_close_sync import backfill_company_history
+
+    _company(db)
+    company = db.scalars(select(Company)).one()
+    out = backfill_company_history(
+        db, company, fetcher=lambda symbols, period: {}, today=date(2026, 10, 16)
+    )
+    assert out == {"status": "skipped", "reason": "fuente sin barras"}
+    assert db.scalars(select(MarketPrice)).all() == []
+
+
+def test_companies_needing_history_backfill_one_grouped_query(db):
+    from app.services.market_close_sync import companies_needing_history_backfill
+
+    _company(db)
+    company = db.scalars(select(Company)).one()
+    today = date(2026, 10, 16)
+    assert companies_needing_history_backfill(db, [company.id], today=today) == [company.id]
+    db.add(
+        MarketPrice(
+            company_id=company.id, date=date(2025, 1, 6), open=Decimal("1"),
+            high=Decimal("1"), low=Decimal("1"), close=Decimal("1"),
+            adj_close=Decimal("1"), source="yfinance",
+        )
+    )
+    db.commit()
+    assert companies_needing_history_backfill(db, [company.id], today=today) == []
+    # Historia reciente pero superficial (solo la ultima semana del sync
+    # diario) sigue necesitando backfill.
+    db.query(MarketPrice).delete()
+    db.add(
+        MarketPrice(
+            company_id=company.id, date=date(2026, 10, 10), open=Decimal("1"),
+            high=Decimal("1"), low=Decimal("1"), close=Decimal("1"),
+            adj_close=Decimal("1"), source="yfinance",
+        )
+    )
+    db.commit()
+    assert companies_needing_history_backfill(db, [company.id], today=today) == [company.id]
