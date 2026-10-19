@@ -14,7 +14,17 @@ async function medirSalto(
   page: import("@playwright/test").Page,
   destino: import("@playwright/test").Locator,
   urlEsperada: RegExp,
+  layoutEstable?: import("@playwright/test").Locator,
 ) {
+  // La cabecera de la ficha llega por streaming: el Suspense de la cotización
+  // muestra un fallback bajo (h-40) y al resolverse lo sustituye la cotización
+  // + el gráfico, mucho más alto. Medir `antes` con el fallback falseaba la
+  // comparación: al crecer la cabecera, el anclaje de scroll del navegador
+  // desplaza scrollY para mantener visible lo que el usuario ve (el salto de
+  // ~487px en móvil / ~76px en desktop era ESO, no el clic), y `después`
+  // reflejaba el layout definitivo. Esperando a que el layout sea el final,
+  // `antes` y `después` se miden contra la misma página.
+  if (layoutEstable) await expect(layoutEstable).toBeVisible();
   await page.evaluate((y) => window.scrollTo(0, y), SCROLL_PX);
   // Un usuario real pulsa la pestaña que VE. El hover provoca el mismo
   // scroll-into-view de Playwright que el clic, así `antes` se mide en la
@@ -29,6 +39,9 @@ async function medirSalto(
   await expect(page).toHaveURL(urlEsperada);
   // La vista nueva renderiza en servidor: espera a que llegue contenido.
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+  // La cabecera vuelve a suspender al cambiar de vista: misma espera antes
+  // de medir `después` para no capturar el fallback de streaming.
+  if (layoutEstable) await expect(layoutEstable).toBeVisible();
   const despues = await page.evaluate(() => ({
     y: window.scrollY,
     max: document.documentElement.scrollHeight - window.innerHeight,
@@ -47,6 +60,7 @@ test("ficha: las pestañas de módulo conservan la posición de scroll (desktop)
     page,
     page.getByRole("navigation", { name: /Módulos de/ }).getByRole("link", { name: "Tesis", exact: true }),
     /\/research\/MSFT\?view=thesis/,
+    page.getByTestId("company-technical-chart"),
   );
 });
 
@@ -58,6 +72,7 @@ test("ficha: los 3 pasos conservan la posición de scroll (móvil)", async ({ pa
     page,
     page.getByRole("navigation", { name: "Etapas del research", exact: true }).getByRole("link", { name: "2 · Valorar", exact: true }),
     /\/research\/MSFT\?view=valorar/,
+    page.getByTestId("company-technical-chart"),
   );
 });
 
