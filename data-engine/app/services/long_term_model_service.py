@@ -8,6 +8,7 @@ rate) are returned as policy inputs so callers can distinguish them from facts.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -230,7 +231,9 @@ def _derived_fcf(ocf: FinancialFact | None, capex: FinancialFact | None) -> Deci
 def _is_annual(fact: FinancialFact) -> bool:
     quarter = (fact.fiscal_quarter or "").upper()
     period = (fact.period or "").upper()
-    return not quarter.startswith("Q") and not period.startswith("Q")
+    # Periodos «2022-12-31:Q1»: el trimestre va tras los dos puntos, no al inicio.
+    period_is_quarter = period.startswith("Q") or bool(re.search(r":Q[1-4]$", period))
+    return not quarter.startswith("Q") and not period_is_quarter
 
 
 def _has_fy_marker(fact: FinancialFact) -> bool:

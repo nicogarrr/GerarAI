@@ -153,6 +153,56 @@ def test_currency_symbol_only_for_eur_unknown_preserved():
     assert _currency_display("XYZ") == "XYZ"
 
 
+def test_posicion_con_mas_peso_respuesta_directa(db):
+    a = _company(db, "GOOGL", "Alphabet")
+    b = _company(db, "JPM", "JPMorgan")
+    _position(db, a, 15, 360, 300)
+    _position(db, b, 7, 310, 100)
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Cuál es mi posición con más peso?", "portfolio", None))
+    assert resp.llm_trace["path"] == "portfolio_ranking"
+    assert "GOOGL" in resp.answer
+    assert "el 75 % de tu cartera" in resp.answer
+    # Respuesta directa: no el volcado de la tabla completa.
+    assert "acciones, coste medio" not in resp.answer
+
+
+def test_posicion_que_pesa_menos_respuesta_directa(db):
+    a = _company(db, "GOOGL", "Alphabet")
+    b = _company(db, "JPM", "JPMorgan")
+    _position(db, a, 15, 360, 300)
+    _position(db, b, 7, 310, 100)
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Qué posición pesa menos?", "portfolio", None))
+    assert resp.llm_trace["path"] == "portfolio_ranking"
+    assert resp.answer.startswith("Tu posición con el peso más bajo es JPM")
+
+
+def test_rentabilidad_cartera_simple_sobre_coste(db):
+    a = _company(db, "AAA", "Alpha")
+    b = _company(db, "BBB", "Beta")
+    _position(db, a, 10, 5, 300)   # coste 50, valor 300
+    _position(db, b, 2, 50, 100)   # coste 100, valor 100
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Qué rentabilidad tiene mi cartera?", "portfolio", None))
+    assert resp.llm_trace["path"] == "portfolio_performance"
+    assert "+166,67 %" in resp.answer
+    assert "no TWR" in resp.answer
+    assert "no cuenta caja, dividendos ni ventas cerradas" in resp.answer
+
+
+def test_rentabilidad_posicion_concreta_y_no_tenida(db):
+    a = _company(db, "AMZN", "Amazon.com")
+    b = _company(db, "KO", "Coca-Cola")
+    _position(db, a, 10, 100, 1250)  # coste 1000, valor 1250 -> +25 %
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Qué rentabilidad tiene AMZN?", "portfolio", None))
+    assert resp.llm_trace["path"] == "portfolio_performance"
+    assert "tu posición en AMZN" in resp.answer
+    assert "+25 %" in resp.answer
+    resp_ko = asyncio.run(ChatService().answer(db, "¿Qué rentabilidad tiene KO?", "portfolio", None))
+    assert resp_ko.llm_trace["path"] == "portfolio_performance"
+    assert "No tienes ninguna posición abierta en KO" in resp_ko.answer
 def test_cuanto_pesa_ticker_sin_posicion_lo_dice_sin_inventar(db):
     a = _company(db, "ASTS", "AST SpaceMobile")
     b = _company(db, "BBB", "Beta")
