@@ -193,3 +193,47 @@ def test_esef_row_carries_eligibility_denominator(db):
     sec = [r for r in result["sources"] if r["source"] == "SEC"]
     if sec:  # fuentes sin cota: sin denominador de elegibilidad
         assert sec[0]["eligible"] is None
+
+
+def test_sec_backfill_connector_states_aggregate_into_one_line(db):
+    """Objecion del auditor: el backfill SEC crea una ConnectorState por
+    compania intentada (potencialmente ~2.000); una linea por fila llenaria
+    el panel de salud de "empty/degraded" repetidas. Debe agregarse en una
+    sola linea con contadores y sin tragarse los demas conectores."""
+    now = datetime.now(UTC)
+    db.add_all([
+        ConnectorState(tenant_id=1, connector="sec-fundamentals-backfill",
+                       company_id=1, feed_url="companyfacts",
+                       last_started_at=now, last_success_at=now,
+                       metadata_={"status": "ok", "reason": None}),
+        ConnectorState(tenant_id=1, connector="sec-fundamentals-backfill",
+                       company_id=2, feed_url="companyfacts",
+                       last_started_at=now, consecutive_errors=3,
+                       last_error="timeout",
+                       metadata_={"status": "error", "reason": "timeout"}),
+        ConnectorState(tenant_id=1, connector="insider-monitor",
+                       last_started_at=now, last_success_at=now),
+    ])
+    db.commit()
+    rows = [row for row in inventory(db)["connectors"]
+            if row["source"].startswith("sec-fundamentals-backfill")]
+    assert len(rows) == 1
+    row = rows[0]
+    assert "2 empresas" in row["source"]
+    assert "ok 1" in row["source"] and "error 1" in row["source"]
+    assert row["status"] == "degraded" and row["errors"] == 1
+    assert row["last_success"] is not None and row["last_attempt"] is not None
+    # El resto de conectores siguen saliendo como siempre.
+    assert any(r["source"] == "insider-monitor" for r in inventory(db)["connectors"])
+
+
+def test_sec_backfill_aggregate_observed_when_only_ok(db):
+    now = datetime.now(UTC)
+    db.add(ConnectorState(tenant_id=1, connector="sec-fundamentals-backfill",
+                          company_id=1, feed_url="companyfacts",
+                          last_started_at=now, last_success_at=now,
+                          metadata_={"status": "ok"}))
+    db.commit()
+    row = [r for r in inventory(db)["connectors"]
+           if r["source"].startswith("sec-fundamentals-backfill")][0]
+    assert row["status"] == "observed" and row["errors"] == 0

@@ -11,6 +11,7 @@ from app.services.thesis_job_service import reconcile_thesis_dispatches
 from app.workers.dramatiq_app import (
     backfill_document_kpis,
     backfill_finnhub_profiles,
+    backfill_sec_fundamentals,
     consolidate_memory,
     dispatch_insider_alerts,
     dispatch_tracked_news_alerts,
@@ -416,6 +417,12 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # limit gratuito). Retoma donde lo dejo via Document finnhub_profile.
     _register(scheduler, partial(enqueue_for_all_tenants, backfill_finnhub_profiles),
               "cron", job_id="finnhub_profile_backfill_daily", hour=4, minute=50, jitter=300)
+    # Backfill diario presupuestado de fundamentales SEC (100 companias/run;
+    # universo US completo en dias-semanas segun su tamano real, luego
+    # refresco rodante con frescura 7d). Anti-atasco: pre-filtro de identidad
+    # SEC y rotacion por ultimo intento persistido.
+    _register(scheduler, partial(enqueue_for_all_tenants, backfill_sec_fundamentals),
+              "cron", job_id="sec_fundamentals_backfill_daily", hour=3, minute=40, jitter=300)
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="tracked"),
               "cron", job_id="splits_tracked_weekly", day_of_week="sun", hour=5, minute=10, jitter=600)
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_corporate_splits, scope="universe"),

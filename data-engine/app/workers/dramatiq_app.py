@@ -1347,6 +1347,32 @@ def backfill_finnhub_profiles(
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("backfill_finnhub_profiles", exc, tenant_id=tenant_id)
+@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
+def backfill_sec_fundamentals(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+    max_companies: int = 100,
+) -> dict[str, Any]:
+    """Backfill presupuestado de fundamentales SEC (companyfacts) para el
+    universo US del tenant. Medido en prod (19 oct 2026): solo 164/2.135
+    companias tenian fundamentales SEC porque la ingesta era solo por
+    demanda (ficha/tesis); ESEF y Finnhub profiles ya tenian su carril
+    programado y SEC no. Anti-atasco: candidatas prefiltradas por la
+    guarda de identidad sec_eligible y rotacion por ultimo intento
+    persistido (skipped/error no se reintentan hasta 3d). Fallos contados,
+    nunca inventados. Coste 0 EUR."""
+    from app.services.sec_fundamentals_backfill import backfill_sec_fundamentals as _run
+
+    db = _session(tenant_id, user_id)
+    try:
+        return {"actor": "backfill_sec_fundamentals", **_run(db, max_companies=max_companies)}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("backfill_sec_fundamentals", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
 @dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=600_000)
 def seed_company_fundamentals(
     tenant_id: int | None = None,

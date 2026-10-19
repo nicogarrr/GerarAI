@@ -49,6 +49,12 @@ LAYERS = (
 )
 
 
+# Nombre del connector con el que sec_fundamentals_backfill persiste sus
+# marcas de intento (una por compania). Literal a proposito: ese servicio
+# importa utc() de este modulo, y una importacion cruzada seria circular.
+SEC_BACKFILL_CONNECTOR = "sec-fundamentals-backfill"
+
+
 def utc(value: datetime | None) -> datetime | None:
     return value.replace(tzinfo=UTC) if value and value.tzinfo is None else value
 
@@ -104,7 +110,41 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
                        "last_success": utc(state.last_success_at).isoformat() if state.last_success_at else None,
                        "last_attempt": utc(state.last_started_at).isoformat() if state.last_started_at else None,
                        "status": "degraded" if state.consecutive_errors else "observed" if state.last_success_at else "empty",
-                       "errors": state.consecutive_errors} for state in states]
+                       "errors": state.consecutive_errors} for state in states
+                      if state.connector != SEC_BACKFILL_CONNECTOR]
+        backfill = [state for state in states if state.connector == SEC_BACKFILL_CONNECTOR]
+        if backfill:
+            # El backfill SEC guarda una marca por compania intentada
+            # (potencialmente todo el universo US): una linea por fila
+            # llenaria el panel de "empty/degraded" repetidas. Se agrega en
+            # una sola linea con contadores por resultado (objecion del
+            # auditor). El estado por compania se lee de la metadata que
+            # escribe sec_fundamentals_backfill; los fallbacks cubren
+            # marcas escritas sin metadata.
+            def _outcome(state: ConnectorState) -> str:
+                meta = (state.metadata_ or {}).get("status")
+                if meta in ("ok", "skipped", "error"):
+                    return meta
+                if state.consecutive_errors:
+                    return "error"
+                return "ok" if state.last_success_at else "skipped"
+
+            counts = {"ok": 0, "skipped": 0, "error": 0}
+            for state in backfill:
+                counts[_outcome(state)] += 1
+            attempts = [stamp for s in backfill if (stamp := utc(s.last_started_at)) is not None]
+            successes = [stamp for s in backfill if (stamp := utc(s.last_success_at)) is not None]
+            last_attempt = max(attempts, default=None)
+            last_success = max(successes, default=None)
+            status = ("degraded" if counts["error"] else
+                      "observed" if counts["ok"] else "empty")
+            connectors.append({
+                "source": (f"{SEC_BACKFILL_CONNECTOR} · {len(backfill)} empresas "
+                           f"(ok {counts['ok']} · omitidas {counts['skipped']} · error {counts['error']})"),
+                "last_success": last_success.isoformat() if last_success else None,
+                "last_attempt": last_attempt.isoformat() if last_attempt else None,
+                "status": status,
+                "errors": counts["error"]})
     except Exception:  # noqa: BLE001
         db.rollback()
         connectors = []
