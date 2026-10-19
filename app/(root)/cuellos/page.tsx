@@ -13,6 +13,7 @@ import {
   type DiscoveryView,
 } from '@/lib/actions/bottlenecks.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
+import { BOTTLENECK_TO_THEMES } from '@/lib/market/theme-bottleneck-map';
 import { NA, formatUserDate } from '@/lib/format';
 
 export const metadata: Metadata = {
@@ -74,6 +75,14 @@ function SignalCard({ signal, minSources }: { signal: Awaited<ReturnType<typeof 
           </ul>
         </details>
       ) : detected ? <p className="mt-2 text-xs text-gray-500">Evidencias guardadas no disponibles para consultar.</p> : null}
+      {BOTTLENECK_TO_THEMES[signal.theme]?.length ? (
+        <p className="mt-3 border-t border-gray-800 pt-2 text-xs text-gray-400">
+          Temas relacionados:{' '}
+          <Link className="text-teal-300 underline hover:text-teal-200" href="/temas">
+            {BOTTLENECK_TO_THEMES[signal.theme].map((theme) => theme.name).join(' · ')}
+          </Link>
+        </p>
+      ) : null}
     </li>
   );
 }
