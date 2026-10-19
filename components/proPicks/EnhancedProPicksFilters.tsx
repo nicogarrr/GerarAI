@@ -1,11 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Filter, X } from 'lucide-react';
+import { ChevronDown, Filter, X } from 'lucide-react';
 import { etiquetaSector } from '@/lib/labels';
 
 export interface ProPicksFilters {
@@ -45,6 +46,10 @@ const sectors = [
 ];
 
 export default function EnhancedProPicksFilters({ filters, disabled = false, neutralSorts = [], onFiltersChange, onApply }: Props) {
+  // Móvil: colapsado por defecto para que los picks sean lo primero que se
+  // ve (Tester 4: el panel ocupaba toda la primera pantalla). En escritorio
+  // (lg) el cuerpo siempre visible y el toggle oculto.
+  const [open, setOpen] = useState(false);
   const updateFilter = <K extends keyof ProPicksFilters>(key: K, value: ProPicksFilters[K]) => {
     onFiltersChange({ ...filters, [key]: value });
   };
@@ -63,18 +68,32 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
     <Card className="w-full min-w-0 border-gray-700 bg-gray-800/50">
       <fieldset disabled={disabled} className="contents">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Filter className="h-5 w-5 text-teal-400" />
               <CardTitle className="text-lg">Filtros Avanzados</CardTitle>
             </div>
-            <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={resetFilters}>
-              <X className="h-4 w-4 mr-1" />
-              Limpiar
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={resetFilters}>
+                <X className="h-4 w-4 mr-1" />
+                Limpiar
+              </Button>
+              <Button
+                aria-expanded={open}
+                aria-controls="propicks-filtros-cuerpo"
+                aria-label={open ? 'Ocultar filtros' : 'Mostrar filtros'}
+                className="min-h-[44px] lg:hidden"
+                onClick={() => setOpen((v) => !v)}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                <ChevronDown aria-hidden="true" className={`h-5 w-5 transition-transform ${open ? 'rotate-180' : ''}`} />
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className={`space-y-6 ${open ? '' : 'hidden'} lg:block`} id="propicks-filtros-cuerpo">
           {/* Cantidad de Resultados */}
           <div className="space-y-3">
             <Label className="text-sm font-medium text-gray-200">
