@@ -3,10 +3,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FileSearch } from 'lucide-react';
 
-import { getResearchCompanySnapshots, getResearchDashboard } from '@/lib/actions/research.actions';
-import { getPortfolioSummary } from '@/lib/actions/portfolio.actions';
+import { getResearchCompanySnapshots, getResearchDashboard, getResearchPortfolioPositions } from '@/lib/actions/research.actions';
+import { portfolioMembership } from '@/lib/research/portfolio-membership';
 import { getWatchlist } from '@/lib/actions/watchlist.actions';
-import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import WorkProductButton from '@/components/work-products/WorkProductButton';
@@ -152,9 +151,8 @@ export default async function ResearchPage({
     // dashboard. Antes eran dos tramos secuenciales (dashboard, luego
     // resumen+watchlist) y el TTFB sumaba ambos.
     const userContext = (async () => {
-        const userId = (await requireAuthenticatedUser()).id;
         return Promise.all([
-            getPortfolioSummary(userId).catch(() => null),
+            getResearchPortfolioPositions().catch(() => []),
             getWatchlist().catch(() => [] as Array<{ symbol: string }>),
         ]);
     })();
@@ -174,13 +172,8 @@ export default async function ResearchPage({
     // Contexto del usuario para el orden por relevancia. Degradación
     // honesta: una lectura fallida degrada su bucket a «resto», nunca
     // fabrica pertenencia a cartera o watchlist.
-    const [portfolioSummary, watchlist] = await userContext;
-    const portfolioTickers = new Set(
-        (portfolioSummary?.holdings ?? [])
-            .filter((holding) => holding.quantity !== 0)
-            .map((holding) => holding.symbol?.trim().toUpperCase())
-            .filter((symbol): symbol is string => Boolean(symbol)),
-    );
+    const [portfolioPositions, watchlist] = await userContext;
+    const portfolioTickers = portfolioMembership(portfolioPositions);
     const watchlistTickers = new Set(watchlist.map((item) => item.symbol.trim().toUpperCase()));
 
     // Quick win UX 6: tesis > cartera > watchlist > resto; empate por

@@ -1,5 +1,6 @@
 'use server';
 
+import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { revalidatePath } from 'next/cache';
 import { AppError, ExternalAPIError, ValidationError, getSafeErrorMessage } from '@/lib/types/errors';
 import { sourcesPageInfo } from '@/lib/research/sources-inventory';
@@ -1322,4 +1323,17 @@ export async function submitThesisHumanInput(ticker: string, formData: FormData)
   });
   // Saving a human assumption never silently triggers thesis generation.
   revalidatePath(`/research/${normalizedTicker}`);
+}
+
+
+/** Index relevance needs membership, not prices, FX totals or data quality. */
+export async function getResearchPortfolioPositions(): Promise<Array<{ ticker: string; quantity: number }>> {
+  await requireAuthenticatedUser();
+  return paginateAll(
+    (offset) => researchRequest<Array<{ ticker: string; quantity: number }>>(
+      `/api/portfolio/positions?limit=2000&offset=${offset}`, { fast: true },
+    ),
+    2000,
+    (position) => position.ticker,
+  );
 }
