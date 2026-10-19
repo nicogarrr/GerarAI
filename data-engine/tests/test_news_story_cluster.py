@@ -176,3 +176,62 @@ def test_ficha_empresa_no_agrupa():
     body = _client(events).get("/api/news?ticker=JPM").json()
     assert len(body) == 2
     assert all(row["coverage_count"] is None for row in body)
+
+
+def _client_untagged(events):
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine)
+    db = factory()
+    db.add(Tenant(id=1, external_id="t"))
+    for event in events:
+        db.add(event)
+    db.commit()
+
+    app = FastAPI()
+    app.include_router(news_module.router, prefix="/api/news")
+
+    def _override_db():
+        yield db
+
+    app.dependency_overrides[get_db] = _override_db
+    return TestClient(app)
+
+
+def test_misma_nota_con_y_sin_traduccion_cacheada_se_agrupa():
+    """Caso Mariachi (prod 19-oct-2026): dos copias del mismo titular EN; una
+    con traducción ES cacheada y otra sin ella. Antes no se agrupaban porque
+    la firma solo miraba el idioma cacheado; ahora la firma es bilingüe."""
+    title = "Mariachi Singer Aaron Nicholas Reimagine Islands in the Stream as a Vibrant Anthem"
+    metadata_con_traduccion = {
+        "connector": "rss",
+        "date_source": "source",
+        "headline_translation": {
+            "status": "translated",
+            "text": "El cantante de mariachi Aaron Nicholas reimagina Islands in the Stream como un vibrante himno",
+            "fingerprint": fingerprint(title),
+        },
+    }
+    events = [
+        _event(None, title, "https://prn.example/1", source="PR Newswire",
+               date=NOW - timedelta(minutes=5)),
+        _event(None, title, "https://prn.example/2", source="PR Newswire",
+               date=NOW, metadata_=metadata_con_traduccion),
+    ]
+    body = _client_untagged(events).get("/api/news").json()
+    assert len(body) == 1
+    assert body[0]["coverage_count"] == 2
+
+
+def test_historias_distintas_sin_empresa_no_se_agrupan_con_firma_bilingue():
+    """Control: dos notas de agencia distintas y sin empresa no se juntan."""
+    events = [
+        _event(None, "Mariachi Singer Aaron Nicholas Reimagine Islands in the Stream",
+               "https://prn.example/10", source="PR Newswire", date=NOW),
+        _event(None, "World Food Championships Crown 10 Category Champions at WFC2026",
+               "https://prn.example/11", source="PR Newswire", date=NOW),
+    ]
+    body = _client_untagged(events).get("/api/news").json()
+    assert len(body) == 2

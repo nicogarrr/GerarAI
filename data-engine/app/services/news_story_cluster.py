@@ -172,7 +172,7 @@ def find_group(groups: list[StoryGroup], event: NewsEvent, company: Company | No
     """Grupo del mismo emisor (o mismo carril) cuya firma declara la misma historia."""
     lane = (event.metadata_ or {}).get("news_lane")
     key = (company.id if company else None, "macro" if lane == "macro" else "empresa")
-    text_key = exact_key(best_text(event))
+    text_key = exact_key(original_headline(event))
     for group in groups:
         if group.key != key:
             continue
@@ -184,4 +184,16 @@ def find_group(groups: list[StoryGroup], event: NewsEvent, company: Company | No
 
 
 def event_signature(event: NewsEvent, company: Company | None) -> set[str]:
-    return signature(best_text(event), _company_tokens(company.ticker if company else None, company))
+    """Firma de comparación: tokens del titular original Y de su traducción
+    española cacheada cuando existe. Medido en prod (19-oct-2026): dos copias
+    de la misma nota de prensa no se agrupaban porque una ya tenía traducción
+    cacheada y la otra no — firmas en idiomas disjuntos. Unir ambos idiomas
+    mantiene el criterio (el solape EN↔EN o ES↔ES sigue siendo de la misma
+    historia) y no junta historias distintas: dos titulares sin parentesco no
+    ganan tokens compartidos por tener traducción."""
+    company_tokens = _company_tokens(company.ticker if company else None, company)
+    sig = signature(original_headline(event), company_tokens)
+    cached = display_translation(event)
+    if cached and isinstance(cached.get("text"), str) and cached["text"].strip():
+        sig |= signature(cached["text"], company_tokens)
+    return sig
