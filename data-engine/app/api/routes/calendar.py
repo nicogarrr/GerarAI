@@ -164,7 +164,7 @@ async def catalysts_calendar(
 
 
 class FeedCreate(BaseModel):
-    scope: str = "followed"
+    scope: str = "watchlist"
 
 
 def _feed_state(row) -> dict:
