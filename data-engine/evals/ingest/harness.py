@@ -211,6 +211,7 @@ def _fact_rows(db, company_id: int) -> list[dict]:
                 "source_type": row.source_type,
                 "source_id": row.source_id,
                 "is_reported": bool(row.is_reported),
+                "accession": row.accession_number,
             }
         )
     return out
@@ -307,7 +308,9 @@ def _provenance(db, facts: list[dict]) -> dict[str, dict]:
             ),
             "title": getattr(document, "title", None),
             "source_type": getattr(document, "source_type", None),
-            "accession": metadata.get("accession"),
+            # La ingesta persiste el accn por hecho (filing anclado); el
+            # metadata del Document queda como respaldo para hechos sonda.
+            "accession": fact.get("accession") or metadata.get("accession"),
             "metric": fact["metric"],
             "fact_value": fact["value"],
             "unit": fact["unit"],
@@ -464,7 +467,64 @@ def run_sec_companyfacts(case: dict) -> dict:
     finally:
         ingestion.SECClient = original_client
     observation["requests"] = requests
+    # Verificacion de indice fiel: el fixture submissions ES el indice que la
+    # ingesta tuvo a la vista. Cada accession citado por un hecho OFICIAL se
+    # evalua contra ese indice (listado o ancla anual); lo no listado queda
+    # registrado como NO verificado, nunca se supone.
+    index_accns, anchor_accns = _submissions_index(submissions)
+    cited = sorted(
+        {
+            prov.get("accession")
+            for prov in observation["provenance"].values()
+            if prov.get("origin") == "OFICIAL" and prov.get("accession")
+        }
+    )
+    observation["index_verification"] = {
+        accn: (
+            {
+                "verified": True,
+                "status": (
+                    "annual_anchor" if accn in anchor_accns else "listed_in_submissions"
+                ),
+                "reason": None,
+            }
+            if accn in index_accns
+            else {
+                "verified": False,
+                "status": "not_in_index",
+                "reason": "el accession no aparece en el indice submissions servido",
+            }
+        )
+        for accn in cited
+    }
     return observation
+
+
+def _submissions_index(submissions: dict) -> tuple[set[str], set[str]]:
+    """(accessions listados, anclas anuales) del indice submissions servido."""
+    from app.services.connectors.sec import ANNUAL_REPORT_FORMS
+
+    filings = submissions.get("filings", {}) or {}
+    index_accns: set[str] = set()
+    anchor_accns: set[str] = set()
+
+    def _absorb(recent: dict) -> None:
+        forms = recent.get("form", []) or []
+        for pos, accession in enumerate(recent.get("accessionNumber", []) or []):
+            if not accession:
+                continue
+            index_accns.add(str(accession))
+            form = str(forms[pos]) if pos < len(forms) else ""
+            if form in ANNUAL_REPORT_FORMS:
+                anchor_accns.add(str(accession))
+
+    _absorb(filings.get("recent", {}) or {})
+    for extra in filings.get("files", []) or []:
+        if isinstance(extra, dict):
+            accession = extra.get("accessionNumber")
+            if accession:
+                index_accns.add(str(accession))
+    return index_accns, anchor_accns
 
 
 # --------------------------------------------------------------------------

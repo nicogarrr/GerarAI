@@ -513,6 +513,10 @@ class FinancialFact(TenantOwnedMixin, Base, TimestampMixin):
     is_reported: Mapped[bool] = mapped_column(Boolean, default=True)
     is_adjusted: Mapped[bool] = mapped_column(Boolean, default=False)
     confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), default=Decimal("0.80"))
+    # Filing SEC (accn) del que salio el hecho reportado: la ingesta lo conoce
+    # al anclar cada fila a su filing y lo persiste para que la procedencia
+    # OFICIAL sea auditable por accession. NULL en derivadas y no-SEC.
+    accession_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     # Procedencia del dato: el documento (filing SEC/ESEF, pagina del proveedor)
     # del que salio la cifra. La carga eager se pide SOLO en el endpoint de

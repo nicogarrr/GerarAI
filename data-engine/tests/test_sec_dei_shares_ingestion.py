@@ -61,19 +61,26 @@ class _FakeSECDei:
             },
             "dei": {
                 "EntityCommonStockSharesOutstanding": {"units": {"shares": [
-                    {"fy": 2025, "fp": "FY", "form": "10-K",
+                    {"fy": 2025, "fp": "FY", "form": "10-K", "accn": "0000731766-26-000011",
                      "end": "2026-02-20", "val": 907675839, "filed": "2026-03-02"},
-                    {"fy": 2026, "fp": "Q1", "form": "10-Q",
+                    {"fy": 2026, "fp": "Q1", "form": "10-Q", "accn": "0000731766-26-000022",
                      "end": "2026-04-30", "val": 908144404, "filed": "2026-05-05"},
-                    {"fy": 2026, "fp": "Q2", "form": "10-Q",
+                    {"fy": 2026, "fp": "Q2", "form": "10-Q", "accn": "0000731766-26-000033",
                      "end": "2026-07-31", "val": 900000000, "filed": "2026-08-10"},
-                    {"fy": 2026, "fp": "Q2", "form": "10-Q/A",
+                    {"fy": 2026, "fp": "Q2", "form": "10-Q/A", "accn": "0000731766-26-000034",
                      "end": "2026-07-31", "val": 897594847, "filed": "2026-08-20"},
-                    {"fy": 2026, "fp": "FY", "form": "8-K",
+                    {"fy": 2026, "fp": "FY", "form": "8-K", "accn": "0000731766-26-000055",
                      "end": "2026-09-30", "val": 999999999, "filed": "2026-10-01"},
                 ]}},
             },
         }}
+
+    async def index_accessions(self, cik):
+        # El carril DEI solo entra verificado contra el indice submissions.
+        return {
+            "0000731766-26-000011", "0000731766-26-000022",
+            "0000731766-26-000033", "0000731766-26-000034",
+        }
 
 
 def _shares(db, company):
@@ -101,6 +108,9 @@ def test_dei_ecso_ingested_as_dei_instants(db, monkeypatch):
         assert fact.is_reported is True
         assert fact.unit == "shares"
         assert fact.source_type == "SEC"
+        assert fact.accession_number is not None
+    # La enmienda gana y su filing queda registrado:
+    assert facts["2026-07-31:DEI"].accession_number == "0000731766-26-000034"
     # El 8-K nunca entra:
     assert all(f.value != Decimal("999999999") for f in facts.values())
 
