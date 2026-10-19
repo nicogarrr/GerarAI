@@ -48,6 +48,10 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     const pathname = usePathname();
     const page = brainPageContext(pathname);
     const [isOpen, setIsOpen] = useState(false);
+    // Pista de apertura: la etiqueta "Pregunta al Cerebro" se ve unos
+    // segundos al cargar y se pliega sola (vuelve con hover/foco). Sin ella
+    // el botón flotante era un cerebro suelto que nadie tocaba (Tester Nico).
+    const [showHint, setShowHint] = useState(true);
     const [isMaximized, setIsMaximized] = useState(false);
     // Modo guía (asistente de research unificado): con ticker en el selector el
     // Cerebro pregunta a /api/research/assistant en vez de al chat general.
@@ -71,6 +75,11 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     // cliente, así el SSR siempre pinta el saludo y no hay desajuste de
     // hidratación) y se guarda recortada tras cada cambio.
     const restoredRef = useRef(false);
+
+    useEffect(() => {
+        const t = setTimeout(() => setShowHint(false), 4000);
+        return () => clearTimeout(t);
+    }, []);
 
     function applyOpenBrainDetail(detail?: OpenBrainDetail | null) {
         if (!detail) return;
@@ -241,17 +250,29 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
 
     // Burbuja fija: en móvil queda POR ENCIMA de la BottomNav (min-h-14 +
     // safe-area), nunca la tapa; en escritorio vuelve a la esquina habitual.
+    // `viewportFit: "cover"` + barra de inicio de iOS: sin el inset la
+    // burbuja queda bajo la barra en modo standalone.
     if (!isOpen) {
         return (
-            <Button
-                onClick={() => setIsOpen(true)}
-                aria-label="Abrir el cerebro"
-                // `viewportFit: "cover"` + barra de inicio de iOS: sin el inset la
-                // burbuja queda bajo la barra en modo standalone.
-                className="hidden md:flex fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.5rem+env(safe-area-inset-right))] h-14 w-14 p-0 rounded-none shadow-none bg-transparent hover:bg-transparent text-white z-50"
-            >
-                <BrainGlassesIcon className="h-14 w-14 shrink-0 object-contain" />
-            </Button>
+            <div className="group fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.5rem+env(safe-area-inset-right))] z-50 hidden items-center gap-2 md:flex">
+                <span
+                    aria-hidden="true"
+                    className={`whitespace-nowrap rounded-full border border-indigo-500/30 bg-slate-950/90 px-3 py-1 text-xs text-indigo-200 shadow-lg motion-safe:transition-all motion-safe:duration-500 ${showHint
+                        ? 'translate-x-0 opacity-100'
+                        : 'pointer-events-none translate-x-2 opacity-0'
+                        } group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100`}
+                >
+                    Pregunta al Cerebro
+                </span>
+                <Button
+                    onClick={() => setIsOpen(true)}
+                    aria-label="Abrir el cerebro"
+                    title="Pregunta al Cerebro"
+                    className="h-14 w-14 p-0 rounded-none shadow-none bg-transparent hover:bg-transparent text-white"
+                >
+                    <BrainGlassesIcon className={`h-14 w-14 shrink-0 object-contain ${showHint ? 'brain-breathe' : ''}`} />
+                </Button>
+            </div>
         );
     }
 
