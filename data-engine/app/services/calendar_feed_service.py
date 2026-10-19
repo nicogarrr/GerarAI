@@ -17,6 +17,7 @@ import hashlib
 import hmac
 import secrets
 from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -104,7 +105,9 @@ CALNAME_BY_SCOPE = {
 }
 
 
-def build_ics(calendar: dict, *, now: datetime | None = None, scope: str = "followed") -> str:
+def build_ics(
+    calendar: dict, *, now: datetime | None = None, scope: str = "followed", min_date: date | None = None
+) -> str:
     calname = CALNAME_BY_SCOPE.get(scope, CALNAME_BY_SCOPE["followed"])
     lines = [
         "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//GerarAI//Calendario de resultados//ES",
@@ -116,6 +119,9 @@ def build_ics(calendar: dict, *, now: datetime | None = None, scope: str = "foll
     for day in calendar["days"]:
         for event in day["events"]:
             start = date.fromisoformat(event["date"])
+            # Nada anterior a hoy-7 d (Europe/Madrid), tampoco filas manuales.
+            if min_date is not None and start < min_date:
+                continue
             title = f"{event['company']} ({event['ticker']}): resultados"
             if event["confirmed"] is False:
                 title += " (fecha estimada)"
@@ -153,8 +159,8 @@ def feed_for_token(db: Session, token: str, *, today: date | None = None) -> str
     tenant_id, scope = row.tenant_id, row.scope
     db.commit()
     db.info["tenant_id"] = tenant_id
-    today = today or datetime.now(UTC).date()
+    today = today or datetime.now(ZoneInfo("Europe/Madrid")).date()
     calendar = followed_calendar(
         db, today - timedelta(days=PAST_DAYS), today + timedelta(days=FUTURE_DAYS), scope=scope
     )
-    return build_ics(calendar, scope=scope)
+    return build_ics(calendar, scope=scope, min_date=today - timedelta(days=PAST_DAYS))

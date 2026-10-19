@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -192,3 +192,21 @@ def test_ics_calname_follows_scope():
     assert "X-WR-CALNAME:Resultados de tu watchlist" in svc.build_ics(cal, scope="watchlist")
     assert "X-WR-CALNAME:Resultados de cartera y watchlist" in svc.build_ics(cal, scope="followed")
     assert "X-WR-CALNAME:Resultados de cartera y watchlist" in svc.build_ics(cal)
+
+
+def test_ics_drops_events_older_than_seven_days_even_manual_rows():
+    from datetime import date as d
+
+    def ev(day, ticker):
+        return {"date": day, "company": ticker, "ticker": ticker, "confirmed": True, "session": None,
+                "fiscal_label": None, "source": "x", "source_url": "https://example.com/r"}
+
+    today = d(2026, 10, 19)
+    cal = {"days": [
+        {"events": [ev("2026-10-11", "OLDX")]},   # hoy-8: fuera
+        {"events": [ev("2026-10-12", "EDGE")]},   # hoy-7: dentro
+        {"events": [ev("2026-10-20", "NEXT")]},
+    ]}
+    ics = svc.build_ics(cal, min_date=today - timedelta(days=svc.PAST_DAYS))
+    assert "OLDX" not in ics and "EDGE" in ics and "NEXT" in ics
+    assert "OLDX" in svc.build_ics(cal)  # sin min_date no filtra (compat)
