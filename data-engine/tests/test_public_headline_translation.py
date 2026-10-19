@@ -219,3 +219,44 @@ def test_headline_direction_must_survive_translation():
     assert ok("Dividend raised on Oct 28", "Dividendo aumentado el 28 de octubre")
     assert ok("Q3 profit falls", "El beneficio del Q3 baja")
     assert ok("Apple Announces Oct. 28 Event", "Apple anuncia un evento el 28 de octubre")
+
+
+def test_headline_with_percent_and_single_direction_is_accepted_but_not_swapped():
+    from app.services.news_headline_translation import headline_numbers_match as ok
+
+    assert ok("Amazon Soars 5%", "Amazon se dispara un 5%")
+    assert ok("Tesla shares fall 8%", "Las acciones de Tesla caen un 8%")
+    # Direccion invertida, cifra cambiada o dimension cambiada: se rechaza.
+    assert not ok("Tesla shares fall 8%", "Las acciones de Tesla suben un 8%")
+    assert not ok("Tesla shares fall 8%", "Las acciones de Tesla caen un 5%")
+    assert not ok("Tesla shares fall $8", "Las acciones de Tesla caen 8 euros")
+    # Dos movimientos: las cifras no pueden intercambiarse entre empresas.
+    assert not ok("Amazon falls 5% while Apple rises 8%", "Amazon sube un 8% mientras Apple cae un 5%")
+
+
+def test_headline_relaxed_route_rejects_crossed_figures_negations_and_clauses():
+    from app.services.news_headline_translation import headline_numbers_match as ok
+
+    # Una sola clausula, una cifra, un sentido: se acepta.
+    assert ok("Amazon Soars 5%", "Amazon se dispara un 5%")
+    assert ok("Tesla shares fall 8%", "Las acciones de Tesla caen un 8%")
+    # Dos cifras con el mismo sentido o cifras cruzadas: se rechaza.
+    assert not ok("Amazon soars 5%, Apple gains 8%", "Apple se dispara un 5%, Amazon gana un 8%")
+    assert not ok("Shares fall 8% after revenue drops 5%", "Las acciones caen un 5% tras bajar los ingresos un 8%")
+    # Dos clausulas con conector: la entidad podria cruzarse.
+    assert not ok("Amazon soars while Apple gains 5%", "Apple se dispara mientras Amazon gana un 5%")
+    assert not ok("Amazon Soars 5% as Morgan Stanley Names It a Top Pick", "Morgan Stanley se dispara un 5% mientras nombra a Amazon")
+    # Negaciones en la ruta relajada.
+    assert not ok("Tesla shares fall 8%", "Las acciones de Tesla no caen un 8%")
+    assert not ok("Tesla shares do not fall 8%", "Las acciones de Tesla caen un 8%")
+    assert not ok("Tesla shares don't fall 8%", "Las acciones de Tesla no caen un 8%")
+
+
+def test_negation_does_not_block_headlines_the_strict_route_already_accepted():
+    from app.services.news_headline_translation import headline_numbers_match as ok
+
+    # Sin cifras ni fechas la ruta estricta (firma vacia) y la polaridad deciden, como en main.
+    assert ok("Fed not expected to cut rates", "Se espera que la Fed no recorte los tipos")
+    assert ok("Ford says no layoffs planned", "Ford dice que no hay despidos previstos")
+    assert ok("stocks rise without Fed help", "las acciones suben sin ayuda de la Fed")
+    assert ok("Dividend does not rise on Oct 28", "El dividendo no aumenta el 28 de octubre")
