@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import BottleneckDiscovery, BottleneckSignal
+from app.models import BottleneckDiscovery, BottleneckSignal, Company, Position, WatchItem
 from app.services.bottleneck_discovery_service import NO_DATA, distinct_sources, resolve_evidence
 from app.services.bottleneck_service import MIN_SOURCES as DETECTION_MIN_SOURCES
 from app.services.bottleneck_service import THEMES
@@ -87,6 +87,9 @@ class DiscoveryOut(BaseModel):
     # caiga despues bajo el umbral de deteccion; la UI lo etiqueta.
     theme_detected: bool
     theme_last_seen: datetime | None
+    # Conexion con lo que el tenant ya tiene: posicion abierta o en seguimiento.
+    in_portfolio: bool
+    in_watchlist: bool
 
 
 class DiscoveriesOut(BaseModel):
@@ -121,6 +124,14 @@ def list_discoveries(
         signal.theme: signal
         for signal in db.scalars(select(BottleneckSignal).where(BottleneckSignal.tenant_id == tenant))
     }
+    portfolio_tickers = set(db.scalars(
+        select(Company.ticker).join(Position, Position.company_id == Company.id).where(
+            Position.tenant_id == tenant, Position.quantity != 0
+        )
+    ))
+    watchlist_tickers = {symbol.upper() for symbol in db.scalars(
+        select(WatchItem.symbol).where(WatchItem.tenant_id == tenant)
+    )}
     items = []
     for row in rows:
         # Fuentes realmente distintas: varios chunks de un mismo filing cuentan una vez.
@@ -137,7 +148,10 @@ def list_discoveries(
             id=row.id, theme=row.theme, ticker=row.ticker, label="INFERIDO", reasoning=row.reasoning,
             evidence=evidence, model=row.model, created_at=row.created_at,
             theme_detected=bool(signal and signal.n_sources >= DETECTION_MIN_SOURCES),
-            theme_last_seen=signal.last_seen if signal else None))
+            theme_last_seen=signal.last_seen if signal else None,
+
+            in_portfolio=row.ticker in portfolio_tickers,
+            in_watchlist=row.ticker.upper() in watchlist_tickers))
     return DiscoveriesOut(items=items, total=total, limit=limit, offset=offset,
                           has_more=offset + len(items) < total)
 

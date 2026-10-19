@@ -102,6 +102,16 @@ function DiscoveryCard({ item }: { item: DiscoveryView }) {
             Tema ya no detectado
           </Badge>
         ) : null}
+        {item.in_portfolio ? (
+          <Badge className="border-teal-500/50 text-teal-300" variant="outline">
+            En tu cartera
+          </Badge>
+        ) : null}
+        {item.in_watchlist ? (
+          <Badge className="border-sky-500/50 text-sky-300" variant="outline">
+            En tu lista de seguimiento
+          </Badge>
+        ) : null}
       </div>
       <p className="mt-2 text-sm leading-relaxed text-gray-300">{item.reasoning}</p>
       {item.evidence.length > 0 ? (

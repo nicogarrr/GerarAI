@@ -2792,6 +2792,14 @@
             "title": "Id",
             "type": "integer"
           },
+          "in_portfolio": {
+            "title": "In Portfolio",
+            "type": "boolean"
+          },
+          "in_watchlist": {
+            "title": "In Watchlist",
+            "type": "boolean"
+          },
           "label": {
             "const": "INFERIDO",
             "title": "Label",
@@ -2840,7 +2848,9 @@
           "model",
           "created_at",
           "theme_detected",
-          "theme_last_seen"
+          "theme_last_seen",
+          "in_portfolio",
+          "in_watchlist"
         ],
         "title": "DiscoveryOut",
         "type": "object"

@@ -6021,6 +6021,10 @@ export interface components {
             evidence: components["schemas"]["DiscoveryEvidenceOut"][];
             /** Id */
             id: number;
+            /** In Portfolio */
+            in_portfolio: boolean;
+            /** In Watchlist */
+            in_watchlist: boolean;
             /**
              * Label
              * @constant

@@ -449,3 +449,43 @@ def test_news_summary_negation_stays_fail_closed(db):
     db.commit()
     signal = db.scalar(select(BottleneckSignal).where(BottleneckSignal.theme == "Semiconductores"))
     assert signal.n_sources == 0
+
+
+def test_discoveries_flag_portfolio_and_watchlist(db):
+    """El candidato declara si el tenant ya lo tiene en cartera o seguimiento."""
+    from datetime import date as dt_date
+    from decimal import Decimal
+
+    from app.models import BottleneckDiscovery, Company, Portfolio, Position, WatchItem
+
+    db.add_all([
+        Company(id=90, ticker="NVDA", name="NVIDIA", exchange="NASDAQ",
+                company_type="large_cap", valuation_model="dcf"),
+        Company(id=91, ticker="BHP", name="BHP", exchange="ASX",
+                company_type="large_cap", valuation_model="dcf"),
+    ])
+    db.flush()
+    db.add(Portfolio(id=90, name="Main"))
+    db.flush()
+    db.add(Position(portfolio_id=90, company_id=90, quantity=Decimal("3")))
+    db.add(WatchItem(symbol="bhp"))  # minusculas: la comparacion ignora mayusculas
+    db.add_all([
+        BottleneckDiscovery(theme="Semiconductores", ticker="NVDA", reasoning="h",
+                            evidence_ids=[], model="m", day=dt_date(2026, 10, 9),
+                            created_at=datetime(2026, 10, 9, tzinfo=UTC), n_sources=2),
+        BottleneckDiscovery(theme="Minerales", ticker="BHP", reasoning="h",
+                            evidence_ids=[], model="m", day=dt_date(2026, 10, 9),
+                            created_at=datetime(2026, 10, 9, tzinfo=UTC), n_sources=0),
+        BottleneckDiscovery(theme="Energía", ticker="XOM", reasoning="h",
+                            evidence_ids=[], model="m", day=dt_date(2026, 10, 9),
+                            created_at=datetime(2026, 10, 9, tzinfo=UTC), n_sources=0),
+    ])
+    db.commit()
+    app = FastAPI()
+    app.include_router(router, prefix="/api/bottlenecks")
+    app.dependency_overrides[get_db] = lambda: db
+    with TestClient(app) as client:
+        items = {i["ticker"]: i for i in client.get("/api/bottlenecks/discoveries").json()["items"]}
+    assert items["NVDA"]["in_portfolio"] is True and items["NVDA"]["in_watchlist"] is False
+    assert items["BHP"]["in_portfolio"] is False and items["BHP"]["in_watchlist"] is True
+    assert items["XOM"]["in_portfolio"] is False and items["XOM"]["in_watchlist"] is False
