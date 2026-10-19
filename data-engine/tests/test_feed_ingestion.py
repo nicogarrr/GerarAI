@@ -229,3 +229,28 @@ def test_review_theses_is_scheduled_once_not_inside_daily_research():
 
     source = inspect.getsource(dramatiq_app.run_daily_research.fn)
     assert "review_theses)" not in source.split("jobs: list", 1)[1].split("]", 1)[0]
+
+
+def test_press_wire_feeds_are_builtin_and_merge_with_env_without_duplicates():
+    from app.services.feed_ingestion_service import PRESS_WIRE_RSS_FEEDS, all_rss_feeds
+
+    assert len(PRESS_WIRE_RSS_FEEDS) >= 3
+    for feed in PRESS_WIRE_RSS_FEEDS:
+        assert feed.url.startswith("https://")
+        assert feed.ticker is None  # detección de empresa por contenido
+
+    feeds = all_rss_feeds('TEST|https://two.test/rss')
+    urls = [feed.url for feed in feeds]
+    assert urls[: len(PRESS_WIRE_RSS_FEEDS)] == [f.url for f in PRESS_WIRE_RSS_FEEDS]
+    assert ("https://two.test/rss", "TEST") in [(f.url, f.ticker) for f in feeds]
+
+    # Un feed de agencia repetido en RSS_FEEDS no se pide dos veces.
+    repeated = all_rss_feeds(PRESS_WIRE_RSS_FEEDS[0].url)
+    assert [f.url for f in repeated].count(PRESS_WIRE_RSS_FEEDS[0].url) == 1
+
+
+def test_configured_rss_feeds_stays_pure_without_builtin_wires():
+    assert configured_rss_feeds("") == []
+    assert [f.url for f in configured_rss_feeds("https://three.test/rss")] == [
+        "https://three.test/rss"
+    ]
