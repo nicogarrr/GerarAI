@@ -81,6 +81,11 @@ export interface InsiderFilingsResult {
     /** Total persistido del ticker; `count` son los de esta página. */
     total?: number;
     filings: InsiderFilingEntry[];
+    /**
+     * Causa real cuando está vacío: true = emisor extranjero (FPI, exento de
+     * Form 4 en la SEC); false = emisor de EE. UU.; null/undefined = se desconoce.
+     */
+    foreign_issuer?: boolean | null;
 }
 
 /** GET /api/insider/filings — filings Form 4/4-A persistidos (lectura durable). */

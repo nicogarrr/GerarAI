@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -9,10 +10,30 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.entities import InsiderFiling, InsiderTransaction
+from app.models.entities import Company, InsiderFiling, InsiderTransaction
 from app.services import insider_feed, insider_operations, insider_service
 
 router = APIRouter()
+
+_US_DOMICILES = {
+    "us", "usa", "u.s.", "u.s.a.", "united states", "united states of america",
+    "estados unidos", "eeuu", "ee. uu.",
+}
+
+
+def _foreign_issuer(db: Session, ticker: str) -> bool | None:
+    """True si la ficha curada declara domicilio fuera de EE. UU. (los FPI estan
+    exentos de la Seccion 16: no presentan Form 4); None si no hay ficha o
+    domicilio: nunca se afirma la causa sin dato."""
+    company = db.scalar(select(Company).where(Company.ticker == ticker))
+    domicile = (company.domicile_country or "").strip() if company else ""
+    if not domicile:
+        return None
+    folded = "".join(
+        c for c in unicodedata.normalize("NFKD", domicile.lower())
+        if not unicodedata.combining(c)
+    )
+    return folded not in _US_DOMICILES
 
 
 @router.get("/signals")
@@ -136,6 +157,8 @@ def insider_filings(
             # Total persistido del ticker (count = filings de esta pagina).
             "total": total,
             "filings": items,
+            # Causa real cuando esta vacio: FPI exento de Form 4 (None = se desconoce).
+            "foreign_issuer": _foreign_issuer(db, wanted),
         }
     except Exception as exc:  # noqa: BLE001 — best-effort por contrato del modulo
         return {
@@ -144,6 +167,7 @@ def insider_filings(
             "reason": type(exc).__name__,
             "count": 0,
             "filings": [],
+            "foreign_issuer": None,
         }
 
 @router.get("/operations")

@@ -1389,7 +1389,14 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         )}
         <Panel title="Insiders (Form 4 · SEC EDGAR)">
           {insiderFilings === null || insiderFilings.status !== 'ok' || insiderFilings.filings.length === 0 ? (
-            <EmptyState title="Sin operaciones insider persistidas para este ticker." />
+            insiderFilings?.foreign_issuer ? (
+              <EmptyState
+                description="Los emisores privados extranjeros están exentos de la Sección 16 de la SEC: no presentan Form 4. Sus insiders declaran en el registro de su país (p. ej. SEDI en Canadá, NSM/FCA en Reino Unido), no en EDGAR."
+                title="Sin Form 4: emisor extranjero"
+              />
+            ) : (
+              <EmptyState title="Sin operaciones insider persistidas para este ticker." />
+            )
           ) : (
             <ul className="space-y-3">
               {insiderFilings.filings.map((filing) => (
