@@ -16,6 +16,10 @@ def _fn(name: str):
 
 
 class _Db:
+    def commit(self) -> None:
+        # refresh_news cierra la transaccion de lectura antes del bucle de red.
+        pass
+
     def close(self) -> None:
         pass
 
