@@ -1,6 +1,7 @@
 """Traducción del resumen/cuerpo de una noticia: cache, original intacto, fallback honesto."""
 import asyncio
 import json
+from datetime import datetime, timedelta
 from functools import wraps
 from types import SimpleNamespace
 
@@ -125,3 +126,176 @@ async def test_provider_error_falls_back(db):
     assert result["status"] == "unavailable" and result["text"] is None
     assert row.summary == EN_SUMMARY
     assert cached_summary_translation(row)["status"] == "unavailable"
+
+
+@sync_test
+async def test_provider_error_reports_reason(db):
+    # Un fallo del proveedor devuelve "unavailable" con reason clasificada y la
+    # persiste en metadata para diagnóstico sin acceso a logs.
+    row = event(db)
+    p = Provider(error=True)
+    result = await translate_summary(db, row.id, provider=p)
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "provider"
+    assert result["text"] is None
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["status"] == "unavailable"
+    assert record["failure"] == "provider"
+
+
+@sync_test
+async def test_rejected_output_reports_bad_output_reason(db):
+    # El proveedor responde pero la salida no pasa las validaciones: la causa no
+    # es el proveedor, es la salida rechazada.
+    row = event(db)
+    p = Provider("Texto sin numeros")  # el original tiene 12%: la firma no casa
+    result = await translate_summary(db, row.id, provider=p)
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "bad_output"
+    db.refresh(row)
+    assert row.metadata_["summary_translation"]["failure"] == "bad_output"
+
+
+@sync_test
+async def test_translated_result_has_no_reason(db):
+    row = event(db)
+    result = await translate_summary(db, row.id, provider=Provider())
+    assert result["status"] == "translated"
+    assert "reason" not in result
+
+
+@sync_test
+async def test_cooldown_reports_reason(db):
+    row = event(db)
+    p = Provider(error=True)
+    await translate_summary(db, row.id, provider=p)
+    second = await translate_summary(db, row.id, provider=p)
+    assert second["status"] == "unavailable"
+    assert second["reason"] == "cooldown"
+
+
+class TimeoutProvider(Provider):
+    async def complete(self, request):
+        raise TimeoutError("provider timed out")
+
+
+@sync_test
+async def test_timeout_failure_cools_down_one_minute(db):
+    # Timeout del proveedor: único fallo con reintento a 1 min (cada reintento
+    # consume cuota diaria; el resto de fallos espera 10 min).
+    row = event(db)
+    await translate_summary(db, row.id, provider=TimeoutProvider())
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["failure"] == "provider_timeout"
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta <= timedelta(minutes=1)
+
+
+@sync_test
+async def test_provider_failure_cools_down_one_minute(db):
+    # Fallo genérico de proveedor: cooldown corto (1 min); solo bad_output espera 10.
+    row = event(db)
+    await translate_summary(db, row.id, provider=Provider(error=True))
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["failure"] == "provider"
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta <= timedelta(minutes=1)
+
+
+@sync_test
+async def test_bad_output_cools_down_ten_minutes(db):
+    # Salida rechazada: 10 min (reintentar no cambia el resultado).
+    row = event(db)
+    await translate_summary(db, row.id, provider=Provider("Texto sin numeros"))
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["failure"] == "bad_output"
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta >= timedelta(minutes=10)
+
+
+class RateLimitedProvider(Provider):
+    async def complete(self, request):
+        from app.llm import ProviderHTTPError
+        raise ProviderHTTPError("fake", 429)
+
+
+@sync_test
+async def test_rate_limited_reports_reason_and_short_cooldown(db):
+    row = event(db)
+    result = await translate_summary(db, row.id, provider=RateLimitedProvider())
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "provider_rate_limited"
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["failure"] == "provider_rate_limited"
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta <= timedelta(minutes=1)
+
+
+@sync_test
+async def test_chain_falls_back_after_429(db, monkeypatch):
+    # La cadena gratuita: un 429 del primer eslabón pasa al siguiente, que traduce.
+    import app.services.public_headline_translation as pub
+    monkeypatch.setattr(pub, "free_provider_chain", lambda: [(RateLimitedProvider(), "m1"), (Provider(), "m2")])
+    row = event(db)
+    result = await translate_summary(db, row.id)
+    assert result["status"] == "translated"
+    assert result["text"] == ES_SUMMARY
+    db.refresh(row)
+    assert row.metadata_["summary_translation"]["status"] == "translated"
+
+
+class SlowProvider(Provider):
+    def __init__(self, delay, text=ES_SUMMARY):
+        super().__init__(text)
+        self.delay = delay
+
+    async def complete(self, request):
+        self.calls += 1
+        await asyncio.sleep(self.delay)
+        return await super().complete(request)
+
+
+@sync_test
+async def test_total_deadline_cuts_the_chain(db, monkeypatch):
+    # Plazo total por petición: agotado, la cadena se corta y el segundo
+    # eslabón ni se llama (no más de ~15 s con el slot ocupado).
+    import app.services.news_headline_translation as m
+    monkeypatch.setattr(m, "SUMMARY_TOTAL_SECONDS", 0.05)
+    import app.services.public_headline_translation as pub
+    slow = SlowProvider(5)
+    good = Provider()
+    monkeypatch.setattr(pub, "free_provider_chain", lambda: [(slow, "m1"), (good, "m2")])
+    row = event(db)
+    result = await translate_summary(db, row.id)
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "provider_timeout"
+    assert slow.calls == 1
+    assert good.calls == 0
+
+
+@sync_test
+async def test_repeated_chain_failure_escalates_cooldown(db):
+    # Primer fallo de la cadena: 1 min. Si vuelve a fallar entera: 5 min.
+    row = event(db)
+    p = Provider(error=True)
+    await translate_summary(db, row.id, provider=p)
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["chain_failures"] == 1
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta <= timedelta(minutes=1)
+    # Simula que el cooldown ya pasó y se reintenta: vuelve a fallar.
+    past = (datetime.fromisoformat(record["created_at"]) - timedelta(minutes=2)).isoformat()
+    row.metadata_ = {**row.metadata_, "summary_translation": {**record, "status": "unavailable", "retry_after": past}}
+    db.commit()
+    await translate_summary(db, row.id, provider=p)
+    db.refresh(row)
+    record2 = row.metadata_["summary_translation"]
+    assert record2["chain_failures"] == 2
+    delta2 = datetime.fromisoformat(record2["retry_after"]) - datetime.fromisoformat(record2["created_at"])
+    assert delta2 >= timedelta(minutes=5)
