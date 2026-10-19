@@ -19,7 +19,7 @@ test('EPS dimensional mismatch is not displayed as a valid figure', () => {
 test('mobile and desktop facts both call the audit with ticker and use N/D', () => {
   const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
   assert.match(page, /const audit = factDisplayAudit\(ticker, fact\)/);
-  assert.match(page, /audit \? 'N\/D' : metricValue/);
+  assert.match(page, /audit \? 'N\/D' : <FactValueLink/);
   assert.match(page, /factDisplayAudit\(ticker, fact\) \? <span/);
   assert.match(page, /<FactTable ticker=\{ticker\}/);
 });
