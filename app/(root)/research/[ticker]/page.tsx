@@ -106,6 +106,7 @@ import { isBackendUnavailableError } from '@/lib/backend-offline';
 import QuickAlertButton from '@/components/research/QuickAlertButton';
 import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
+import { groupReviews } from '@/lib/research/review-groups';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
 import { SourceAuditDetail } from '@/components/research/SourceAuditDetail';
@@ -1333,7 +1334,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </div>
         </Panel>
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <Panel title="Revisiones abiertas"><div className="space-y-2">{data.reviews.length ? data.reviews.map((review) => <div className="rounded-lg border border-gray-800 p-3 text-sm text-gray-300" key={review.id}>{review.title}</div>) : <EmptyState title="Sin revisiones abiertas." />}</div></Panel>
+          <Panel title="Revisiones abiertas"><div className="space-y-2">{data.reviews.length ? groupReviews(data.reviews).map((group) => <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-gray-800 p-3 text-sm text-gray-300" key={group.ids[0]}><span className="min-w-0 flex-1">{group.title}</span>{group.count > 1 ? <Badge variant="outline">×{group.count}</Badge> : null}{group.latest ? <span className="text-xs text-gray-500">última {formatUserDateTime(group.latest)}</span> : null}</div>) : <EmptyState title="Sin revisiones abiertas." />}</div></Panel>
           <Panel title="Alertas"><div className="space-y-2">{data.alerts.length ? data.alerts.map((alert) => <div className="rounded-lg border border-gray-800 p-3 text-sm" key={alert.id}><Badge variant="outline">{label(alert.severity)}</Badge><p className="mt-2 text-gray-300">{alert.message}</p><p className="mt-2 text-xs text-gray-500">Registrada el {formatUserDateTime(alert.created_at)} (Madrid)</p>{safeHttpUrl(alert.source_url) ? <a className="mt-2 inline-block text-xs text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(alert.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">Ver fuente</a> : null}</div>) : <EmptyState title="Sin alertas." />}</div></Panel>
         </div>
         <GuideContextPanel ticker={ticker} context={guideContext} />
