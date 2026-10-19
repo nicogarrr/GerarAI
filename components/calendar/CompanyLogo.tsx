@@ -28,6 +28,7 @@ export function CompanyLogo({ ticker, name, className }: Props) {
             src={`https://financialmodelingprep.com/image-stock/${encodeURIComponent(ticker)}.png`}
             alt=""
             loading="lazy"
+            referrerPolicy="no-referrer"
             onError={() => setFailed(true)}
             className={`bg-white object-contain p-1 ${className ?? ''}`}
         />
