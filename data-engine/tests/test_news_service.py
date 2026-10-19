@@ -206,3 +206,21 @@ def test_ingest_ticker_prefix_uses_word_boundary(db):
     assert response.created == 1
     summary = response.events[0].summary
     assert summary.startswith("COST COSTCO Wholesale files 8-K")
+
+
+def test_ingest_title_cut_at_word_boundary(db):
+    _company(db)
+    service = NewsService()
+    long_text = " ".join(f"palabra{i:03d}" for i in range(60))
+    item = NewsFeedItem(
+        ticker="AAPL", title="Titular largo", text=long_text,
+        source="feed", url="https://x.test/word-boundary",
+    )
+    result = service.ingest_news_items(db, [item])
+    assert result.created == 1
+    event = db.query(NewsEvent).filter_by(url="https://x.test/word-boundary").one()
+    assert len(event.title) <= 180
+    assert event.summary.startswith(event.title)
+    if len(event.summary) > len(event.title):
+        nxt = event.summary[len(event.title)]
+        assert not (event.title[-1].isalnum() and nxt.isalnum()), "corte a media palabra"

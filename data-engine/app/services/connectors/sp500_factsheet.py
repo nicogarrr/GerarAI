@@ -225,7 +225,7 @@ def read_factsheet(requested: date | None) -> dict[str, Any]:
             "available": False,
             "index": INDEX_NAME,
             "reason": REASON_INTEGRITY if problems else REASON_NO_SNAPSHOT,
-            "detail": "; ".join(problems) if problems else f"sin factsheet en {root}",
+            "detail": "; ".join(problems) if problems else "Sin factsheet del S&P 500 disponible",
             "snapshot_dir": str(root),
             "integrity_problems": problems,
         }

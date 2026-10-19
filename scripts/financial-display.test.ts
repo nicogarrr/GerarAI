@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
-import { financialDefinition, financialFormula, financialPeriod, financialSegment, financialVersion, loadedFinancialRange } from '../lib/research/financial-display.ts';
+import { financialDefinition, financialFormula, financialPeriod, financialSegment, financialVersion, financialVersionLabel, loadedFinancialRange } from '../lib/research/financial-display.ts';
 
 test('periodos mantienen el cierre fiscal y no inventan fechas para unknown', () => {
   assert.equal(financialPeriod('2025-09-27:FY'), 'Ejercicio al 27/09/2025');
   assert.equal(financialPeriod('2026-06-30:Q2'), 'T2 al 30/06/2026');
-  assert.equal(financialPeriod('unknown'), 'Periodo sin identificar');
+  assert.equal(financialPeriod('unknown'), 'Periodo no informado por la fuente');
   assert.equal(financialPeriod('FY2021-FY2025'), 'Ejercicio 2021-Ejercicio 2025');
   assert.equal(financialPeriod('custom period'), 'custom period');
 });
@@ -42,4 +42,9 @@ test('financial definitions and dated facts do not expose raw provider captions'
   assert.equal(financialDefinition('Gross Margin'), 'Margen bruto');
   assert.equal(financialDefinition('Cash And Equivalents'), 'Efectivo y equivalentes');
   assert.equal(financialPeriod('2026-01-25:FY'), 'Ejercicio al 25/01/2026');
+});
+
+test('financialVersionLabel no muestra claves internas', () => {
+  assert.equal(financialVersionLabel('CAPEX_TO_DA_5Y_V1'), 'cálculo v1');
+  assert.equal(financialVersionLabel('MARCO_V2'), 'Marco de calidad · versión 2');
 });

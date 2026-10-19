@@ -58,3 +58,127 @@ def test_skips_session_in_progress(db):
     rows = db.scalars(select(MarketPrice)).all()
     assert out["partial_session_skipped"] is True
     assert [r.date for r in rows] == [date(2026, 10, 15)]
+
+
+def test_backfill_writes_history_when_company_has_no_past(db):
+    from app.services.market_close_sync import backfill_company_history
+
+    _company(db)
+    company = db.scalars(select(Company)).one()
+    out = backfill_company_history(
+        db, company, fetcher=lambda symbols, period: _bars(), today=date(2026, 10, 16)
+    )
+    assert out["status"] == "ok" and out["bars_written"] == 2
+    rows = db.scalars(select(MarketPrice)).all()
+    assert len(rows) == 2
+
+
+def test_backfill_skips_when_history_is_sufficient(db):
+    from app.services.market_close_sync import backfill_company_history
+
+    _company(db)
+    company = db.scalars(select(Company)).one()
+    db.add(
+        MarketPrice(
+            company_id=company.id, date=date(2025, 1, 6), open=Decimal("1"),
+            high=Decimal("1"), low=Decimal("1"), close=Decimal("1"),
+            adj_close=Decimal("1"), source="yfinance",
+        )
+    )
+    db.commit()
+    calls = []
+    out = backfill_company_history(
+        db, company,
+        fetcher=lambda symbols, period: calls.append(symbols) or _bars(),
+        today=date(2026, 10, 16),
+    )
+    assert out == {"status": "skipped", "reason": "historico suficiente"}
+    assert calls == []  # sin llamada a la fuente cuando no hace falta
+
+
+def test_backfill_skips_when_source_has_no_bars(db):
+    from app.services.market_close_sync import backfill_company_history
+
+    _company(db)
+    company = db.scalars(select(Company)).one()
+    out = backfill_company_history(
+        db, company, fetcher=lambda symbols, period: {}, today=date(2026, 10, 16)
+    )
+    assert out == {"status": "skipped", "reason": "fuente sin barras"}
+    assert db.scalars(select(MarketPrice)).all() == []
+
+
+def test_companies_needing_history_backfill_one_grouped_query(db):
+    from app.services.market_close_sync import companies_needing_history_backfill
+
+    _company(db)
+    company = db.scalars(select(Company)).one()
+    today = date(2026, 10, 16)
+    assert companies_needing_history_backfill(db, [company.id], today=today) == [company.id]
+    db.add(
+        MarketPrice(
+            company_id=company.id, date=date(2025, 1, 6), open=Decimal("1"),
+            high=Decimal("1"), low=Decimal("1"), close=Decimal("1"),
+            adj_close=Decimal("1"), source="yfinance",
+        )
+    )
+    db.commit()
+    assert companies_needing_history_backfill(db, [company.id], today=today) == []
+    # Historia reciente pero superficial (solo la ultima semana del sync
+    # diario) sigue necesitando backfill.
+    db.query(MarketPrice).delete()
+    db.add(
+        MarketPrice(
+            company_id=company.id, date=date(2026, 10, 10), open=Decimal("1"),
+            high=Decimal("1"), low=Decimal("1"), close=Decimal("1"),
+            adj_close=Decimal("1"), source="yfinance",
+        )
+    )
+    db.commit()
+    assert companies_needing_history_backfill(db, [company.id], today=today) == [company.id]
+
+
+def test_enqueue_price_backfills_staggers_sends_and_skips_covered(db):
+    """Una importacion con N companias nuevas no puede disparar N llamadas
+    simultaneas contra Yahoo: delays incrementales y solo para las que no
+    tienen historial profundo."""
+    from app.services.market_close_sync import enqueue_price_backfills
+
+    for ticker in ("AAA", "BBB", "CCC", "DDD"):
+        db.add(
+            Company(
+                ticker=ticker, name=ticker, exchange="NASDAQ", currency="USD",
+                sector="S", industry="I", company_type="holding",
+                valuation_model="unassigned", special_sources=[], special_risks=[],
+                factor_tags=[],
+            )
+        )
+    db.flush()
+    ids = {
+        c.ticker: c.id
+        for c in db.scalars(select(Company).where(Company.ticker.in_(["AAA", "BBB", "CCC", "DDD"])))
+    }
+    # DDD ya tiene historial profundo: no se encola.
+    db.add(
+        MarketPrice(
+            company_id=ids["DDD"], date=date(2025, 1, 6), open=Decimal("1"),
+            high=Decimal("1"), low=Decimal("1"), close=Decimal("1"),
+            adj_close=Decimal("1"), source="yfinance",
+        )
+    )
+    db.commit()
+
+    sent = []
+    n = enqueue_price_backfills(
+        db,
+        list(ids.values()),
+        stagger_ms=60_000,
+        sender=lambda cid, tenant, user, delay: sent.append((cid, tenant, user, delay)),
+        today=date(2026, 10, 16),
+        tenant_id=7,
+        user_id="u1",
+    )
+    assert n == 3
+    assert [delay for *_ , delay in sent] == [0, 60_000, 120_000]
+    assert {cid for cid, *_ in sent} == {ids["AAA"], ids["BBB"], ids["CCC"]}
+    assert all(tenant == 7 and user == "u1" for _, tenant, user, _ in sent)

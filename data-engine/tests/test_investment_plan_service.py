@@ -169,3 +169,47 @@ def test_drift_cash_uses_balance_date_like_portfolio_summary(db):
     assert drift["cash_base"] == pytest.approx(900)
     assert drift["base_currency"] == "EUR"
     assert service.plan_metrics(db)["base_currency"] == "EUR"
+
+
+def test_drift_weights_group_each_sector_with_its_tickers(db):
+    """Un ticker de un sector ya listado no puede quedar bajo otro grupo."""
+    service = InvestmentPlanService()
+    _plan(
+        service, db,
+        target_allocations=[{"kind": "ticker", "label": "AAPL", "target_pct": 100, "band_pct": 5}],
+    )
+    from app.models.entities import CashBalance, Company, Position
+
+    companies = [
+        Company(ticker="GOOGL", name="Alphabet", exchange="NASDAQ", currency="USD",
+                sector="Comms", industry="x", company_type="holding",
+                valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[]),
+        Company(ticker="AAPL", name="Apple", exchange="NASDAQ", currency="USD",
+                sector="Tech", industry="x", company_type="holding",
+                valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[]),
+        Company(ticker="V", name="Visa", exchange="NYSE", currency="USD",
+                sector="Fin", industry="x", company_type="holding",
+                valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[]),
+        Company(ticker="MSFT", name="Microsoft", exchange="NASDAQ", currency="USD",
+                sector="Tech", industry="x", company_type="holding",
+                valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[]),
+    ]
+    for comp in companies:
+        db.add(comp)
+    db.flush()
+    for comp in companies:
+        db.add(
+            Position(
+                company_id=comp.id, quantity=Decimal("10"), market_price=Decimal("100"),
+                currency="EUR", market_value_base=Decimal("1000"), as_of=date(2026, 9, 20),
+            )
+        )
+    db.add(CashBalance(currency="EUR", balance=Decimal("1000"), as_of=date(2026, 9, 20)))
+    db.commit()
+
+    drift = service.drift_analysis(db)
+    keys = list(drift["current_weights"].keys())
+    assert keys == ["Comms", "ticker:GOOGL", "Tech", "ticker:AAPL", "ticker:MSFT",
+                    "Fin", "ticker:V", "asset_class:Cash"]
+    # El detalle de la sugerencia no lleva signo "+": "por debajo" ya lo dice.
+    assert drift["suggestions"][0]["detail"].startswith("AAPL está 80.0 puntos por debajo")

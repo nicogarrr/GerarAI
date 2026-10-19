@@ -16,7 +16,7 @@ export function PaperCalibrationView({ data }: { data?: PaperCalibration }) {
     return <section className="min-w-0 space-y-3 rounded-lg border border-gray-700 p-4 text-sm text-gray-300" aria-label="Calibración del LLM">
         <h3 className="font-semibold text-gray-100">Calibración del LLM</h3>
         {!data ? <p>Calibración no disponible. No se puede evaluar la convicción con estos datos.</p> : <>
-            <p>{data.cerradas_con_resultado} propuestas LLM cerradas con resultado de {data.propuestas_llm} registradas.</p>
+            <p>{data.cerradas_con_resultado} propuestas LLM cerradas con resultado, de {data.propuestas_llm} registradas.</p>
             {data.muestra_insuficiente && <p role="status" className="text-amber-200">Muestra insuficiente: {data.cerradas_con_resultado} cerradas; mínimo {data.minimo_cerradas}. Resultados orientativos, no validan la capacidad predictiva.</p>}
             {data.aviso && <p className="text-gray-400">{data.aviso}</p>}
             <dl className="grid grid-cols-2 gap-2">
