@@ -18,6 +18,19 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
   const name = workspace.screens.find(screen => screen.id === Number(screenId))?.name ?? 'Filtro guardado';
   const result = await runSavedScreen(Number(screenId));
   const newMatches = new Set(result.new_match_company_ids ?? []);
+  // Explicación honesta del 0 coincidencias: si el filtro no coincide por
+  // FALTA DE DATO (p.ej. roic >= wacc sin cobertura de wacc), se dice qué
+  // métrica falta y en cuántas empresas; no se inventa el dato que falta.
+  // Solo campos de CRITERIOS (el ranking nunca decide pertenencia).
+  const missingFreq = new Map<string, number>();
+  for (const row of result.results) {
+    for (const criterion of row.criteria) {
+      for (const field of criterion.missing_fields ?? []) {
+        missingFreq.set(field, (missingFreq.get(field) ?? 0) + 1);
+      }
+    }
+  }
+  const topMissing = [...missingFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
       <ScreenBreadcrumbName name={name} />
@@ -37,6 +50,18 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
           coincidencias y emite las alertas de nueva coincidencia configuradas.
         </p>
       </header>
+      {result.metrics_without_data && result.metrics_without_data.length > 0 ? (
+        <p className="rounded-md border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200" role="alert">
+          Ninguna empresa tiene dato de: {result.metrics_without_data.join(', ')}. Revisa el nombre de la métrica; el filtro no puede coincidir con ella.
+        </p>
+      ) : null}
+      {result.match_count === 0 && result.company_count > 0 && topMissing.length > 0 ? (
+        <p className="rounded-md border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200" role="alert">
+          Sin coincidencias por falta de dato, no por incumplimiento:{' '}
+          {topMissing.map(([field, count]) => `${field} (sin dato en ${formatNumber(count, { maximumFractionDigits: 0 })} de ${formatNumber(result.company_count, { maximumFractionDigits: 0 })} empresas)`).join(', ')}.
+          El filtro no inventa el dato que falta.
+        </p>
+      ) : null}
       <section className="grid gap-3">
         {result.results.filter(row => row.matched).map((row) => (
           <article
