@@ -110,7 +110,7 @@ def fetch_yahoo_dates(symbols: dict[str, str]) -> dict[str, dict[str, Any]]:
     except Exception as exc:  # noqa: BLE001
         logger.warning("earnings_dates yahoo crumb: %s", exc)
         return result
-    with client:
+    try:
         for ticker, symbol in symbols.items():
             try:
                 response = client.get(
@@ -132,6 +132,8 @@ def fetch_yahoo_dates(symbols: dict[str, str]) -> dict[str, dict[str, Any]]:
             except Exception as exc:  # noqa: BLE001
                 logger.info("earnings_dates yahoo %s: %s", symbol, exc)
             time.sleep(YAHOO_PAUSE_S)
+    finally:
+        client.close()
     return result
 
 
@@ -259,6 +261,11 @@ def _aware(value: datetime) -> datetime:
 # Una fecha automatica que el refresco lleva dias sin renovar ya no es fiable
 # (el proveedor pudo moverla): se omite y el ticker aparece como "sin fecha".
 STALE_AFTER = timedelta(days=3)
+
+
+def is_fresh(row: EarningsDate, now: datetime | None = None) -> bool:
+    """Manual no caduca; una fila automatica sin renovar en STALE_AFTER si."""
+    return row.source == "manual" or _aware(row.fetched_at) >= (now or datetime.now(UTC)) - STALE_AFTER
 
 
 def followed_calendar(

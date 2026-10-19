@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models import Company, EarningsDate, FinancialFact, MarketPrice, ThesisVersion, WatchItem
 from app.services.connectors.earnings_calendar import fetch_earnings_range
+from app.services.earnings_dates_service import is_fresh
 from app.services.fundamentals_seed_service import enqueue_fundamentals_seed
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
 
@@ -159,6 +160,8 @@ async def watchlist_monitor(
     ).scalars().all()
     for row in stored:
         target = items.get(row.ticker)
+        if not is_fresh(row):
+            continue  # fecha automatica sin renovar: no se muestra
         if target is not None and target["next_earnings_date"] is None:
             target["next_earnings_date"] = row.event_date.isoformat()
             target["next_earnings_source"] = row.source_label
