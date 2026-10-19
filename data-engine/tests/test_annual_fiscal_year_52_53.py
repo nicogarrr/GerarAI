@@ -16,3 +16,13 @@ def test_regular_year_ends_keep_the_end_year():
     assert _annual_fiscal_year("2025-01-26", "1") == 2025
     # Cierre de enero temprano pero ejercicio con otro mes modal: no se mueve.
     assert _annual_fiscal_year("2025-01-03", "6") == 2025
+
+
+def test_esef_annual_rows_use_the_same_fiscal_year_rule():
+    import inspect
+
+    from app.services import financial_ingestion_service as svc
+
+    source = inspect.getsource(svc)
+    assert "fiscal_year=int(period_date[:4])" not in source
+    assert "fiscal_year=_annual_fiscal_year(period_date, None)" in source
