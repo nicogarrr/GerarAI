@@ -140,20 +140,14 @@ def test_period_ending_after_as_of_raises_lookahead() -> None:
 
 
 def test_unknown_period_does_not_raise_it_is_absence_of_proof() -> None:
-    assert_period_no_lookahead(
-        as_of=date(2020, 1, 1), bounds=PeriodBounds(), label="ingresos"
-    )
+    assert_period_no_lookahead(as_of=date(2020, 1, 1), bounds=PeriodBounds(), label="ingresos")
 
 
 def test_publication_after_as_of_raises_even_when_period_is_past() -> None:
     with pytest.raises(LookaheadError, match="aun no era publico"):
-        assert_publication_no_lookahead(
-            as_of=date(2025, 6, 1), published_on=date(2026, 1, 5), label="FY2024"
-        )
+        assert_publication_no_lookahead(as_of=date(2025, 6, 1), published_on=date(2026, 1, 5), label="FY2024")
     assert_publication_no_lookahead(as_of=date(2025, 6, 1), published_on=None, label="x")
-    assert_publication_no_lookahead(
-        as_of=date(2025, 6, 1), published_on=date(2025, 6, 1), label="x"
-    )
+    assert_publication_no_lookahead(as_of=date(2025, 6, 1), published_on=date(2025, 6, 1), label="x")
 
 
 def test_combined_guard_reports_period_violation_first_then_source() -> None:
