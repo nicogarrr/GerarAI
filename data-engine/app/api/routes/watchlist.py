@@ -124,6 +124,10 @@ async def watchlist_monitor(
                    ThesisVersion.expected_value.isnot(None))
             .order_by(desc(ThesisVersion.version)).limit(1)
         ).scalar_one_or_none()
+        from app.schemas.api import valuation_uses_inferred_inputs
+
+        if thesis is not None and valuation_uses_inferred_inputs(thesis.valuation_basis):
+            thesis = None
         fair_value = float(thesis.expected_value) if thesis is not None else None
         price = float(last_close.close) if last_close is not None else None
         side = None
