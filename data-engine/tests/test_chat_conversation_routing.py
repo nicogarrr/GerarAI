@@ -41,7 +41,7 @@ def test_long_whitespace_input_is_not_small_talk_and_does_not_backtrack_quadrati
 
 
 def _db_with_company():
-    from app.models.entities import Base, Company
+    from app.models.entities import Company
 
     db = _db()
     db.add(Company(
