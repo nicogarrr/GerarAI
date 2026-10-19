@@ -229,3 +229,22 @@ def test_operations_coalesces_tx_date_with_filing_date(db):
     assert inva["totals"]["sell"]["trades"] == 1
     assert inva["rows_without_date"] == 1
     assert inva["period"] == {"from": None, "to": None}
+
+
+def test_without_data_detail_says_why_never_a_generic_no_data(db):
+    from app.services.insider_operations import _without_data_reason
+
+    us = _company(db, "BN", "Brookfield Corporation")
+    us.cik = "0001001085"
+    uk = _company(db, "CGEO.L", "Georgia Capital PLC")
+    uk.exchange = "LSE"
+    otc = _company(db, "KRKNF", "Kraken Robotics")
+    otc.exchange = "OTC PINK"
+    nocik = _company(db, "XYZ", "Xyz Inc")
+
+    assert _without_data_reason("CGEO.L", uk, False)["reason"] == "foreign_issuer_no_form4"
+    assert _without_data_reason("KRKNF", otc, False)["reason"] == "foreign_issuer_no_form4"
+    assert "No presenta Form 4" in _without_data_reason("KRKNF", otc, False)["label"]
+    assert _without_data_reason("BN", us, False)["reason"] == "no_form4_as_issuer"
+    assert _without_data_reason("XYZ", nocik, False)["reason"] == "cik_unresolved"
+    assert _without_data_reason("BN", us, True)["reason"] == "no_open_market_trades"

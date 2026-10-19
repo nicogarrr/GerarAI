@@ -161,5 +161,6 @@ def insider_operations_route(
             "days": days,
             "companies": [],
             "companies_without_data": [],
+            "companies_without_data_detail": [],
         }
 
