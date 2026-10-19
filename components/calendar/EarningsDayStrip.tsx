@@ -1,0 +1,93 @@
+import Link from 'next/link';
+
+import { CompanyLogo } from '@/components/calendar/CompanyLogo';
+import { getFollowedEarnings } from '@/lib/actions/catalysts.actions';
+import type { FollowedEarningsEvent } from '@/lib/actions/catalysts.actions';
+import { formatMarketDate } from '@/lib/format';
+
+const DAYS_SHOWN = 7;
+const LOGOS_SHOWN = 3;
+
+function addUtcDays(isoDate: string, days: number): string {
+    const date = new Date(`${isoDate}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+}
+
+function dayLabel(isoDate: string, todayIso: string): string {
+    if (isoDate === todayIso) return 'Hoy';
+    if (isoDate === addUtcDays(todayIso, 1)) return 'Mañana';
+    return formatMarketDate(isoDate, { weekday: 'short' }).replace('.', '');
+}
+
+function DayCard({ isoDate, todayIso, events }: { isoDate: string; todayIso: string; events: FollowedEarningsEvent[] }) {
+    const extra = events.length - LOGOS_SHOWN;
+    return (
+        <Link
+            href="/calendar/resultados"
+            aria-label={`Resultados del ${formatMarketDate(isoDate, { day: 'numeric', month: 'long' })}: ${events.length === 0 ? 'sin eventos' : `${events.length} ${events.length === 1 ? 'evento' : 'eventos'}`}`}
+            className="flex w-24 shrink-0 flex-col items-center gap-1.5 rounded-2xl border border-gray-800 bg-surface-1 px-2 py-3 transition-colors hover:border-gray-700 hover:bg-gray-900"
+        >
+            <span className="text-2xl font-bold leading-none text-gray-100">
+                {formatMarketDate(isoDate, { day: 'numeric' })}
+            </span>
+            <span className="text-xs text-gray-400 first-letter:uppercase">{dayLabel(isoDate, todayIso)}</span>
+            {events.length === 0 ? (
+                <span className="mt-1 text-xs text-gray-600">Sin eventos</span>
+            ) : (
+                <>
+                    <span className="rounded-md bg-gray-800 px-1.5 py-0.5 text-xs font-medium text-gray-200">
+                        {events.length}
+                    </span>
+                    <span className="flex items-center gap-1">
+                        {events.slice(0, LOGOS_SHOWN).map((event) => (
+                            <CompanyLogo
+                                key={event.ticker}
+                                ticker={event.ticker}
+                                name={event.company || event.ticker}
+                                className="size-5 rounded-md"
+                            />
+                        ))}
+                        {extra > 0 ? <span className="text-xs text-gray-500">+{extra}</span> : null}
+                    </span>
+                </>
+            )}
+        </Link>
+    );
+}
+
+/**
+ * Tira de días de Inicio al estilo Quartr: próximos 7 días con el número de
+ * resultados de cartera + watchlist y sus logos. Si el backend no responde,
+ * la tira se omite entera: nunca bloquea ni rompe la home.
+ */
+export default async function EarningsDayStrip() {
+    let calendar;
+    try {
+        calendar = await getFollowedEarnings();
+    } catch {
+        return null;
+    }
+    if (calendar.followed_count === 0) return null;
+
+    // Mismo criterio de «hoy» que la página /calendar/resultados: Europe/Madrid.
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
+    const byDate = new Map(calendar.days.map((day) => [day.date, day.events]));
+    const days = Array.from({ length: DAYS_SHOWN }, (_, index) => addUtcDays(today, index));
+
+    return (
+        <section aria-label="Calendario de resultados" className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-3">
+                <h2 className="text-lg font-semibold text-gray-100">Calendario</h2>
+                <Link href="/calendar/resultados" className="text-sm text-teal-300 hover:text-teal-200">
+                    Ver todo
+                </Link>
+            </div>
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+                {days.map((isoDate) => (
+                    <DayCard key={isoDate} isoDate={isoDate} todayIso={today} events={byDate.get(isoDate) ?? []} />
+                ))}
+            </div>
+        </section>
+    );
+}
