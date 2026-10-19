@@ -355,7 +355,10 @@ class NewsService:
             # filings de 2025 aparecia como "100 eventos de hoy" y las
             # urgencias por recencia se disparaban sobre historia antigua.
             date=published_at or datetime.now(UTC),
-            title=summary[:180],
+            # Titular = prefijo del resumen cortado en límite de palabra:
+            # un corte a media palabra (summary[:180]) dejaba fragmentos
+            # («…del Ber» + «nstein …») al pintar titular + resumen juntos.
+            title=clip_words(summary, 180, ellipsis=""),
             source=source,
             url=url,
             summary=summary,
