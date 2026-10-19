@@ -6,7 +6,15 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models import Company, FinancialFact, MarketPrice, NewsEvent, Position, ThesisVersion
+from app.models import (
+    Company,
+    FinancialFact,
+    InsiderTransaction,
+    MarketPrice,
+    NewsEvent,
+    Position,
+    ThesisVersion,
+)
 from app.models.entities import Base
 from app.services.brain_data_tools import answer_data_question
 from app.services.chat_service import ChatService
@@ -333,3 +341,60 @@ def test_per_without_verified_eps_explains_what_is_missing(db):
     assert "PER: sin dato calculable guardado" in response.answer
     assert "hace falta un precio reciente y un BPA anual positivo" in response.answer
     assert response.llm_trace["provider_calls"] == 0
+def insider_tx(db, ticker, code, value, tx_date, tenant=1, insider="Cook Timothy D"):
+    row = InsiderTransaction(
+        tenant_id=tenant, fingerprint=f"{ticker}-{code}-{tx_date}-{value}-{tenant}",
+        filing_id=0, accession_number=f"0001-{tx_date}", form="4",
+        issuer_ticker=ticker, insider=insider, role="officer", officer_title="CEO",
+        multi_reporter=False, code=code, shares=100.0, price=50.0, value=value,
+        tx_date=tx_date, source_url=f"https://www.sec.gov/Archives/{ticker}-{tx_date}.xml",
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def test_insider_by_ticker_lists_sec_dated_trades_and_hides_other_tenant(db):
+    a = company(db, "AAPL")
+    insider_tx(db, "AAPL", "P", 5000.0, "2026-10-01", insider="Cook Timothy D")
+    insider_tx(db, "AAPL", "S", 9000.0, "2026-10-10", insider="Jain Ajit")
+    db.info["tenant_id"] = 2
+    insider_tx(db, "AAPL", "P", 1.0, "2026-10-11", tenant=2)  # otro tenant, invisible
+    db.commit()
+    db.info["tenant_id"] = 1
+    response = answer_data_question(db, "¿Qué operaciones insider hay de AAPL?")
+    assert response is not None
+    assert "Cook Timothy D compró" in response.answer
+    assert "Jain Ajit vendió" in response.answer
+    assert "SEC Form 4" in response.answer
+    assert "2026-10-10" in response.answer
+    assert "$9,000.00" in response.answer
+    assert "2026-10-11" not in response.answer  # del tenant 2
+    assert response.llm_trace["path"] == "company_insider"
+    assert all(source["url"].startswith("https://www.sec.gov/") for source in response.sources)
+
+
+def test_insider_by_ticker_without_records_is_honest(db):
+    company(db, "MSFT")
+    db.commit()
+    response = answer_data_question(db, "¿Hay compras insider de MSFT?")
+    assert response is not None
+    assert "No tengo operaciones insider guardadas de MSFT" in response.answer
+    assert "No he consultado la SEC en directo" in response.answer
+
+
+def test_insider_portfolio_aggregates_positions_and_declares_missing(db):
+    a = company(db, "AAPL")
+    b = company(db, "MSFT")
+    db.add_all([
+        Position(tenant_id=1, company_id=a.id, quantity=Decimal("3")),
+        Position(tenant_id=1, company_id=b.id, quantity=Decimal("2")),
+    ])
+    insider_tx(db, "AAPL", "P", 5000.0, "2026-10-01")
+    db.commit()
+    response = answer_data_question(db, "¿Qué compras y ventas insider hay en mis empresas?")
+    assert response is not None
+    assert "posiciones abiertas" in response.answer
+    assert "AAPL" in response.answer and "compró" in response.answer
+    assert "Sin operaciones insider guardadas: MSFT." in response.answer
+    assert response.llm_trace["path"] == "portfolio_insider"

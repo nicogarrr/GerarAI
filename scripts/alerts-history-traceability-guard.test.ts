@@ -32,7 +32,7 @@ describe('alerts history traceability guard (F146)', () => {
     it('la tarjeta enlaza a la investigación cuando hay ticker', () => {
         const src = readSource('components/alerts/AlertsManager.tsx');
         assert.ok(
-            src.includes('href={`/research/${item.ticker}?view=thesis`}'),
+            src.includes("href={alertThesisHref(item.ticker)}"),
             'el historial debe enlazar a la investigacion del ticker (pestaña tesis) cuando la alerta tiene ticker',
         );
         assert.ok(src.includes('item.ticker &&'), 'el enlace solo se muestra con ticker presente (nunca inventado)');

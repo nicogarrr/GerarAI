@@ -59,6 +59,8 @@ _BRACKETS_2025 = ((0, 6_000, Decimal("0.19")), (6_000, 50_000, Decimal("0.21")),
 
 # Mapeo de casillas verificado: Renta 2025 (Orden HAC/277/2026).
 CASILLAS_BASIS = "orden-hac-277-2026-renta-2025"
+# Version legible para la UI: el slug interno no se muestra a personas.
+CASILLAS_BASIS_DISPLAY = "Orden HAC/277/2026 (Renta 2025)"
 CASILLAS_YEARS = {2025}
 
 # Casilla 0029: ingresos íntegros de rendimientos del capital mobiliario
@@ -150,7 +152,7 @@ def build_casillas(dividends: list[dict], realized: list[dict], fiscal_year: int
             "basis": None,
             "unavailable_reason": (
                 f"Mapeo de casillas verificado solo para la Renta 2025 "
-                f"({CASILLAS_BASIS}); el ejercicio {fiscal_year} usa otra "
+                f"({CASILLAS_BASIS_DISPLAY}); el ejercicio {fiscal_year} usa otra "
                 "orden ministerial y no se muestran números sin verificar."
             ),
         }

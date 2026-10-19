@@ -88,10 +88,10 @@ def score_gem(g: GemInputs) -> Gem | None:
     ]
     if g.roic_spread is not None:
         parts["roic_spread"] = _clip(g.roic_spread / SPREAD_FULL)
-        reasons.append({"key": "roic_spread", "value": g.roic_spread, "source": "metricas calculadas"})
+        reasons.append({"key": "roic_spread", "value": g.roic_spread, "source": "Métricas calculadas"})
     if g.leverage is not None:
         parts["balance_sheet"] = 1.0 - _clip(g.leverage / 3.0)
-        reasons.append({"key": "net_debt_to_ebitda", "value": g.leverage, "source": "metricas calculadas"})
+        reasons.append({"key": "net_debt_to_ebitda", "value": g.leverage, "source": "Métricas calculadas"})
     if g.insider_net_usd is not None:
         parts["insiders"] = _clip(g.insider_net_usd / INSIDER_FULL_USD)
         if g.insider_net_usd > 0:
@@ -105,7 +105,7 @@ def score_gem(g: GemInputs) -> Gem | None:
                 {
                     "key": "managers_adding_13f",
                     "value": g.managers_adding,
-                    "source": f"SEC 13F, trimestre {g.thirteenf_report} (retraso hasta 45 dias, solo largos)",
+                    "source": f"SEC 13F, trimestre {g.thirteenf_report} (retraso hasta 45 días; solo largos)",
                 }
             )
     total_w = sum(GEM_WEIGHTS[k] for k in parts)

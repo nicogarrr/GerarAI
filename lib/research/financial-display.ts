@@ -3,7 +3,7 @@ import { METRIC_LABELS } from './metric-labels.ts';
 
 /** Conserva la fecha de cierre: no convierte un ejercicio irregular en año natural. */
 export function financialPeriod(value: string): string {
-  if (value === 'unknown') return 'Periodo sin identificar';
+  if (value === 'unknown') return 'Periodo no informado por la fuente';
   const dated = /^(\d{4})-(\d{2})-(\d{2}):(FY|Q[1-4])$/.exec(value);
   if (dated) return `${dated[4] === 'FY' ? 'Ejercicio' : `T${dated[4][1]}`} al ${dated[3]}/${dated[2]}/${dated[1]}`;
   return value.replace(/\bFY(?=\d)/g, 'Ejercicio ').replace(/\bQ([1-4])\b/g, 'T$1');
@@ -29,6 +29,7 @@ const PHRASES: [string, string][] = [
   ['count of passed checks:', 'número de criterios superados:'],
   ['each check traceable with its value and threshold', 'cada criterio incluye su valor y umbral en el desglose'],
   ['1.0 = maintenance-only investment, higher = growth or capital intensity', '1,0 = inversión solo de mantenimiento; un valor mayor indica crecimiento o intensidad de capital'],
+  ['over up to 5 most recent fiscal years, minimum 3', 'de los últimos 5 ejercicios como máximo, con un mínimo de 3'],
   ['V1 checks', 'criterios de la versión 1'],
   ['mean of annual', 'media anual de'], ['where', 'donde'], ['plus', 'más'],
 ];
@@ -86,4 +87,12 @@ export function loadedFinancialRange(metrics: Array<{ series: Array<{ period: st
   if (!years.length) return null;
   const first = Math.min(...years), last = Math.max(...years);
   return first === last ? String(first) : `${first}–${last}`;
+}
+
+/** Como financialVersion, pero sin mostrar claves internas: una versión no catalogada se muestra como "cálculo vN". */
+export function financialVersionLabel(value: string): string {
+  const known = financialVersion(value);
+  if (known !== value) return known;
+  const match = /_V(\d+)$/i.exec(value);
+  return match ? `cálculo v${match[1]}` : 'cálculo sin versión';
 }

@@ -815,6 +815,13 @@ def run_esef_snapshot(case: dict) -> dict:
     try:
         with session_scope() as db:
             company = make_company(db, ticker, industry="Construction")
+            # La guardia company_mismatch exige identidad acreditada entre la
+            # Company y el emisor del snapshot: el fixture es el MISMO emisor
+            # sintetico, asi que su nombre legal es el del snapshot (o el
+            # declarado en scenario_args). Sin esto la guardia bloquea todos
+            # los casos ESEF del eval como si fueran emisores cruzados.
+            company.name = args.get("company_name", "Synthetic Holdings PLC")
+            db.commit()
             try:
                 result = asyncio.run(
                     FinancialIngestionService().refresh_from_esef(db=db, company=company)

@@ -93,3 +93,21 @@ def test_company_answer_leads_with_what_was_asked(db):
     assert thesis.startswith("No tengo ninguna tesis guardada de CHAT")
     generic = _natural_company_answer(**base, question="cuéntame de la empresa")
     assert generic.startswith("CHAT cotiza")
+
+
+def test_company_answer_handles_intrinsic_value_and_comparison(db):
+    from app.services.chat_service import _natural_company_answer
+
+    c = _company(db)
+    _fact(db, c, "revenue", 130, 2025)
+    facts = ChatService.__new__(ChatService)._key_facts(db, c)
+    base = dict(company=c, facts=facts, thesis=None, news=[], missing_metrics=[], claims=[],
+                contradiction_claims=[], price_line="CHAT cotiza a $10.")
+    answer = _natural_company_answer(
+        **base, question="¿Cuál es el valor intrínseco y qué ingresos usa el modelo? Compáralo con Microsoft."
+    )
+    # «valor intrínseco» se contesta desde la tesis, no con la cifra de ingresos.
+    assert answer.startswith("No tengo ninguna tesis guardada de CHAT")
+    assert "No puedo comparar dos empresas" in answer
+    plain = _natural_company_answer(**base, question="¿Y los ingresos?")
+    assert "No puedo comparar" not in plain

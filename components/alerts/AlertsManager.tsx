@@ -1,5 +1,6 @@
 'use client';
 
+import { alertThesisHref } from '@/lib/alerts/card-destination';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -121,6 +122,10 @@ function AlertsManager() {
             const parsedValue = parseLocalizedNumber(String(formData.condition.value));
             if (!isValueless && parsedValue === null) {
                 toast.error('Introduce un valor numérico válido');
+                return;
+            }
+            if ((formData.type === 'price_above' || formData.type === 'price_below') && (parsedValue === null || parsedValue <= 0)) {
+                toast.error('El precio debe ser mayor que 0');
                 return;
             }
             const numericValue: string | number = isValueless
@@ -479,7 +484,7 @@ function AlertsManager() {
                                         {item.ticker && (
                                             <Link
                                                 className="inline-flex min-h-[44px] items-center text-xs text-teal-400 hover:text-teal-300 hover:underline"
-                                                href={`/research/${item.ticker}?view=thesis`}
+                                                href={alertThesisHref(item.ticker)}
                                             >
                                                 Revisar tesis de {item.ticker}
                                             </Link>

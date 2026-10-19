@@ -219,9 +219,36 @@ class NewsService:
             requires_update = assessment.requires_update or bool(
                 semantic_impact and semantic_impact.affected_claim_ids and materiality_score >= 7
             )
+        # El impacto semantico puede subir la nota por encima del tope de
+        # relevancia: la misma regla conservadora se reaplica (solo baja, no descarta).
+        from app.services.materiality_service import (
+            UNRELATED_NEWS_MAX_MATERIALITY,
+            is_unrelated_generic_news,
+        )
+
+        if (
+            is_unrelated_generic_news(text, company, source, url)
+            and materiality_score > UNRELATED_NEWS_MAX_MATERIALITY
+        ):
+            materiality_score = UNRELATED_NEWS_MAX_MATERIALITY
+            requires_update = False
+            materiality_reasons.append(
+                f"sin mención de la empresa en fuente genérica => max {UNRELATED_NEWS_MAX_MATERIALITY}"
+            )
         # La politica de recencia tambien cubre la urgencia derivada del
         # impacto semantico: un filing antiguo nunca es urgente por recencia.
         requires_update = apply_recency_policy(requires_update, published_at, materiality_reasons)
+        # Relevancia: una noticia que solo menciona de pasada a la empresa (titular sin ella y < 3
+        # menciones) se guarda, pero no abre revision de tesis ni alerta "material". Filings
+        # (sec/ir) quedan fuera: su titular es generico y la fuente es primaria.
+        if requires_update and company and connector not in ("sec", "ir"):
+            from app.services.news_relevance import company_is_central
+
+            if not company_is_central(
+                company.ticker, company.name, headline=source_headline, text=text,
+            ):
+                requires_update = False
+                materiality_reasons.append("relevancia: la empresa solo se menciona de pasada")
 
         summary = clip_words(" ".join(text.strip().split()), 320)
         # Tipo de noticia con Jev (earnings/filing/macro/opinion): 1 llamada
@@ -328,7 +355,10 @@ class NewsService:
             # filings de 2025 aparecia como "100 eventos de hoy" y las
             # urgencias por recencia se disparaban sobre historia antigua.
             date=published_at or datetime.now(UTC),
-            title=summary[:180],
+            # Titular = prefijo del resumen cortado en límite de palabra:
+            # un corte a media palabra (summary[:180]) dejaba fragmentos
+            # («…del Ber» + «nstein …») al pintar titular + resumen juntos.
+            title=clip_words(summary, 180, ellipsis=""),
             source=source,
             url=url,
             summary=summary,
