@@ -10,7 +10,7 @@ Cubierto:
 import asyncio
 import json
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.models import KnowledgeChunk, KnowledgeDocument, Tenant
