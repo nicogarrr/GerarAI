@@ -927,6 +927,7 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
                     "name": company.name,
                     "weight": None,
                     "currency": position.currency,
+                    "reason_code": "no_base_value",
                     "reason": "Sin valor en moneda base (conversión N/D): no se suma a la cartera.",
                 }
             )
@@ -970,7 +971,13 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
         }
         if thesis is None:
             suffix = " (hay borrador sin publicar)" if company.id in draft_only else ""
-            excluded_out.append({**base_info, "reason": f"Sin tesis publicada vigente{suffix}: excluida de la previsión."})
+            excluded_out.append(
+                {
+                    **base_info,
+                    "reason_code": "no_published_thesis",
+                    "reason": f"Sin tesis publicada vigente{suffix}: excluida de la previsión.",
+                }
+            )
             continue
         intrinsic, basis_label = _intrinsic_for_comparison(thesis, position, company)
         if intrinsic is None:
@@ -978,7 +985,7 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
                 "adr_without_listed_values": "ADR sin valores por acción cotizada: comparación con el precio no verificada (N/D).",
                 "currency_mismatch": "Moneda de la posición distinta de la moneda de cotización de la compañía: comparación sin conversión verificada (N/D).",
             }.get(basis_label, "Base de valoración no verificada (tesis sin value_per_share_basis del motor): comparación con el precio N/D, nunca asumida.")
-            excluded_out.append({**base_info, "reason": reason})
+            excluded_out.append({**base_info, "reason_code": "valuation_basis_unverified", "reason": reason})
             continue
         if model is not None:
             basis_dict = thesis.valuation_basis if isinstance(thesis.valuation_basis, dict) else {}
@@ -995,7 +1002,9 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
             if result is not None:
                 cagrs[key], total_returns[key] = result
         if not cagrs:
-            excluded_out.append({**base_info, "reason": "Tesis sin valores intrinsecos computables."})
+            excluded_out.append(
+                {**base_info, "reason_code": "no_computable_intrinsic", "reason": "Tesis sin valores intrinsecos computables."}
+            )
             continue
         raw_probs = thesis.scenario_probabilities or (
             model.scenario_probabilities if model is not None else None

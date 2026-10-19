@@ -109,12 +109,14 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
       </Panel>
     );
   }
-  if (portfolio.covered_count === 0 && forecast.excluded.length > 0) {
-    // Ninguna posición tiene tesis publicada vigente: tres tarjetas N/D no
-    // informan. Una sola línea accionable sobre la posición de mayor peso.
-    const heaviest = [...forecast.excluded]
+  const noThesis = forecast.excluded.filter((item) => item.reason_code === 'no_published_thesis');
+  if (portfolio.covered_count === 0 && noThesis.length > 0) {
+    // Solo se afirma "falta la tesis" para las posiciones cuyo motivo es ese
+    // (código de motivo del backend). El resto se declara aparte, sin causa asumida.
+    const heaviest = [...noThesis]
       .filter((item) => item.weight !== null)
       .sort((a, b) => (b.weight as number) - (a.weight as number))[0];
+    const others = forecast.excluded.length - noThesis.length;
     return (
       <Panel title="Previsión">
         <p className="text-sm text-gray-200">
@@ -134,8 +136,10 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
           )}
         </p>
         <p className="mt-1 text-xs text-gray-500">
-          Un borrador no cuenta: {forecast.excluded.length} de {portfolio.position_count} posiciones sin tesis publicada vigente.
+          {noThesis.length} de {portfolio.position_count} posiciones sin tesis publicada vigente (un borrador no cuenta)
+          {others > 0 ? `; ${others} sin comparación verificada por otro motivo (ver detalle)` : ''}.
         </p>
+        {others > 0 ? <ExcludedList items={forecast.excluded.filter((item) => item.reason_code !== 'no_published_thesis')} /> : null}
       </Panel>
     );
   }
