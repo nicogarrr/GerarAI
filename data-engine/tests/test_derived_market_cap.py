@@ -506,3 +506,19 @@ def test_duplicate_derived_rows_repaired(db):
         FinancialFact.metric == "market_cap")).all()
     assert len(caps) == 1
     assert float(caps[0].value) == pytest.approx(25.70 * 150_000_000)
+
+
+def test_two_consecutive_refreshes_second_is_skipped(db):
+    """Revisión auditor (medido con AENA): la división larga del recuento
+    derivado deja más de 6 decimales y sin cuantizar cada refresh
+    reescribía. Dos refrescos seguidos: el segundo es skipped."""
+    company = _company(db)
+    _price(db, company, Decimal("25.700001"), TODAY - timedelta(days=3))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    _split(db, company, TODAY - timedelta(days=2), 10)
+    db.commit()
+    first = refresh_derived_market_cap(db, company, today=TODAY)
+    assert first["status"] == "ok"
+    second = refresh_derived_market_cap(db, company, today=TODAY)
+    assert second["status"] == "skipped" and second["reason"] == "fresh_derived"

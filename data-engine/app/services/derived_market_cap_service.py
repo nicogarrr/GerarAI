@@ -208,13 +208,20 @@ def refresh_derived_market_cap(
         _drop_derived()
         return {"status": "unavailable", "reason": "no_shares"}
     value, basis, split_factor = shares
-    market_cap = Decimal(price.close) * value
+    # La columna es Numeric(24,6): sin cuantizar a 6 decimales lo calculado
+    # (una division larga) nunca iguala lo almacenado y cada GET reescribe
+    # (medido con AENA: dos refrescos seguidos devolvian ok, no skipped).
+    market_cap = (Decimal(price.close) * value).quantize(Decimal("0.000001"))
     unit = str(getattr(company, "currency", "") or "USD")
     period = price.date.isoformat()
     adjusted = split_factor != 1
     if newest is not None:
         same = (
-            Decimal(newest.value) == market_cap
+            # Postgres Numeric(24,6) devuelve Decimal exacto; SQLite devuelve
+            # float y a magnitudes grandes su redondeo supera el quantum
+            # (medido: 39,3B -> 1,1e-6). 1e-4 es ordenes de magnitud menor
+            # que cualquier cambio real (un tick x acciones >= miles).
+            abs(Decimal(newest.value) - market_cap) <= Decimal("0.0001")
             and newest.unit == unit
             and newest.period == period
             and bool(newest.is_adjusted) == adjusted
