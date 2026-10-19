@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -98,35 +98,47 @@ async def watchlist_monitor(
     cutoff = today - timedelta(days=365)
 
     companies = db.scalars(select(Company).where(Company.ticker.in_(wanted))).all()
+    company_ids = [company.id for company in companies]
+    valid_price = (MarketPrice.company_id.in_(company_ids),
+                   MarketPrice.close.isnot(None), MarketPrice.close > 0)
+    # Constant query count: do not fetch one year's session IDs per company.
+    counts = dict(db.execute(
+        select(MarketPrice.company_id, func.count(MarketPrice.id))
+        .where(*valid_price, MarketPrice.date >= cutoff)
+        .group_by(MarketPrice.company_id)
+    ).all())
+
+    def ranked_prices(order, *, recent=False):
+        ranked = select(
+            MarketPrice.id,
+            func.row_number().over(partition_by=MarketPrice.company_id, order_by=order).label("rank"),
+        ).where(*valid_price)
+        if recent:
+            ranked = ranked.where(MarketPrice.date >= cutoff)
+        ranked = ranked.subquery()
+        return {row.company_id: row for row in db.scalars(
+            select(MarketPrice).join(ranked, MarketPrice.id == ranked.c.id)
+            .where(ranked.c.rank == 1)
+        ).all()}
+
+    lows = ranked_prices(MarketPrice.close.asc(), recent=True)
+    closes = ranked_prices(MarketPrice.date.desc())
+    ranked_theses = select(
+        ThesisVersion.id,
+        func.row_number().over(partition_by=ThesisVersion.company_id,
+                               order_by=ThesisVersion.version.desc()).label("rank"),
+    ).where(ThesisVersion.company_id.in_(company_ids), ThesisVersion.status == "published",
+            ThesisVersion.expected_value.isnot(None)).subquery()
+    theses = {row.company_id: row for row in db.scalars(
+        select(ThesisVersion).join(ranked_theses, ThesisVersion.id == ranked_theses.c.id)
+        .where(ranked_theses.c.rank == 1)
+    ).all()}
     items: dict[str, dict] = {}
     for company in companies:
         ticker = str(company.ticker).upper()
-        low_row = db.execute(
-            select(MarketPrice)
-            .where(MarketPrice.company_id == company.id,
-                   MarketPrice.date >= cutoff,
-                   MarketPrice.close.isnot(None), MarketPrice.close > 0)
-            .order_by(MarketPrice.close.asc()).limit(1)
-        ).scalar_one_or_none()
-        sessions = db.execute(
-            select(MarketPrice.id)
-            .where(MarketPrice.company_id == company.id,
-                   MarketPrice.date >= cutoff,
-                   MarketPrice.close.isnot(None), MarketPrice.close > 0)
-        ).all()
-        last_close = db.execute(
-            select(MarketPrice)
-            .where(MarketPrice.company_id == company.id,
-                   MarketPrice.close.isnot(None), MarketPrice.close > 0)
-            .order_by(desc(MarketPrice.date)).limit(1)
-        ).scalar_one_or_none()
-        thesis = db.execute(
-            select(ThesisVersion)
-            .where(ThesisVersion.company_id == company.id,
-                   ThesisVersion.status == "published",
-                   ThesisVersion.expected_value.isnot(None))
-            .order_by(desc(ThesisVersion.version)).limit(1)
-        ).scalar_one_or_none()
+        low_row = lows.get(company.id)
+        last_close = closes.get(company.id)
+        thesis = theses.get(company.id)
         from app.schemas.api import valuation_uses_inferred_inputs
 
         if thesis is not None and valuation_uses_inferred_inputs(thesis.valuation_basis):
@@ -139,7 +151,7 @@ async def watchlist_monitor(
         items[ticker] = {
             "low_52w": float(low_row.close) if low_row is not None else None,
             "low_52w_date": low_row.date.isoformat() if low_row is not None else None,
-            "low_52w_sessions": len(sessions),
+            "low_52w_sessions": counts.get(company.id, 0),
             "last_close": price,
             "last_close_date": last_close.date.isoformat() if last_close is not None else None,
             "fair_value": fair_value,
