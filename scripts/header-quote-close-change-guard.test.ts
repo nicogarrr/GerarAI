@@ -9,5 +9,6 @@ test('closed-market variation is shown only from official-close fields, labelled
   assert.match(block, /quote\.session === 'cerrado'/);
   assert.match(block, /close_change_date && quote\.close_change_previous_date/);
   assert.match(block, /Último cierre vs anterior/);
+  assert.doesNotMatch(src.slice(src.indexOf('data-testid="quote-detail"')), /Último cierre vs anterior/);
   assert.doesNotMatch(block, /previous_close\b/);
 });

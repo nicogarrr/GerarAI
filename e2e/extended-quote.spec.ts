@@ -23,6 +23,7 @@ for (const width of [1440, 390]) {
         await expect(header.getByText('Post-cierre · 00:05', { exact: true })).toBeVisible();
         await expect(header.getByText('Yahoo Finance (no oficial), retraso posible · 00:05 (Madrid)', { exact: true })).toBeVisible();
         await expect(header.getByText('Cierre anterior', { exact: true }).locator('..').locator('dd')).toHaveText('N/D');
+        await header.getByText('Más detalle', { exact: true }).click();
         await expect(header.getByText('Cierre regular:', { exact: false })).toContainText('522,61');
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await page.screenshot({ path: `/downloads/extended-quote-${width}.png`, fullPage: true });
@@ -63,6 +64,7 @@ test('real authenticated proxy serves the gated E2E fixture without Yahoo', asyn
     const header = page.getByTestId('company-header-quote');
     await expect(header.getByText('336,56 US$', { exact: true })).toBeVisible();
     await expect(header.getByText('+2,34', { exact: false })).toBeVisible();
+    await header.getByText('Más detalle', { exact: true }).click();
     await expect(header.getByText('Fixture local · Sesión regular del 2026-09-09 · 17:00 (Madrid)', { exact: true })).toBeVisible();
     await page.screenshot({ path: '/downloads/extended-quote-test-fixture.png', fullPage: true });
 });
