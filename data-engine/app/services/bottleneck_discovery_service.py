@@ -358,13 +358,48 @@ def build_request(context: ThemeContext, model: str | None = None) -> LLMRequest
     )
 
 
-def compose_reasoning(ticker: str, exposure: str, channel: str) -> str:
-    """Texto en espanol 100% de plantilla: nada del modelo llega al usuario salvo valores de listas cerradas."""
-    who = "Una empresa aún sin identificar (N/D)" if ticker == NO_DATA else f"{ticker}"
+def compose_reasoning(
+    ticker: str,
+    exposure: str,
+    channel: str,
+    *,
+    company_name: str | None = None,
+    sector: str | None = None,
+    industry: str | None = None,
+) -> str:
+    """Texto en espanol 100% de plantilla: nada del modelo llega al usuario salvo valores de listas cerradas.
+
+    El nombre, sector e industria salen de la tabla ``companies`` (dato curado,
+    no del modelo): hacen la hipotesis especifica por empresa sin abrir texto
+    libre. Si la ficha no tiene sector/industria curado ("Unknown"), se omite.
+    """
+    if ticker == NO_DATA:
+        who = "Una empresa aún sin identificar (N/D)"
+    else:
+        who = ticker
+        details = []
+        if company_name and company_name.strip() and company_name.strip() != ticker:
+            details.append(company_name.strip())
+        for value in (industry, sector):
+            if value and value.strip() and value.strip() != "Unknown":
+                details.append(value.strip())
+                break
+        if details:
+            who = f"{ticker} ({' · '.join(details)})"
     return (
         f"Hipótesis del modelo, no un hecho: {who} podría resultar {EXPOSURES[exposure]} por este cuello de "
         f"botella porque {CHANNELS[channel]}. Se infiere de las evidencias citadas."
     )
+
+
+def build_company_profiles(db: Session) -> dict[str, tuple[str, str, str]]:
+    """ticker -> (nombre, sector, industria) de la tabla companies (dato curado)."""
+    return {
+        ticker: (name, sector, industry)
+        for ticker, name, sector, industry in db.execute(
+            select(Company.ticker, Company.name, Company.sector, Company.industry)
+        )
+    }
 
 
 def _check_candidate(
@@ -374,6 +409,7 @@ def _check_candidate(
     *,
     evidence_by_id: dict[str, ResolvedEvidence] | None = None,
     mention_patterns: dict[str, re.Pattern[str]] | None = None,
+    company_profiles: dict[str, tuple[str, str, str]] | None = None,
 ) -> Candidate | str:
     if not isinstance(item, dict):
         return "candidato_invalido"
@@ -403,8 +439,13 @@ def _check_candidate(
         texts = [evidence_by_id[i].text for i in unique_ids if i in evidence_by_id]
         if texts and _cites_other_company_only(texts, ticker, mention_patterns):
             return "evidencia_de_otra_empresa"
-    return Candidate(ticker, exposure, channel, compose_reasoning(ticker, exposure, channel),
-                     unique_ids)
+    name = sector = industry = None
+    if company_profiles and ticker != NO_DATA:
+        name, sector, industry = company_profiles.get(ticker, (None, None, None))
+    return Candidate(
+        ticker, exposure, channel,
+        compose_reasoning(ticker, exposure, channel, company_name=name, sector=sector, industry=industry),
+        unique_ids)
 
 
 def validate_output(
@@ -414,6 +455,7 @@ def validate_output(
     known_tickers: set[str],
     evidence_by_id: dict[str, ResolvedEvidence] | None = None,
     mention_patterns: dict[str, re.Pattern[str]] | None = None,
+    company_profiles: dict[str, tuple[str, str, str]] | None = None,
 ) -> tuple[list[Candidate], list[str]]:
     """Devuelve (aceptados, motivos de descarte). Salida mal formada = DiscoveryRejected."""
     if not isinstance(raw, dict) or not isinstance(raw.get("candidatos"), list):
@@ -428,6 +470,7 @@ def validate_output(
         result = _check_candidate(
             item, allowed_ids, known_tickers,
             evidence_by_id=evidence_by_id, mention_patterns=mention_patterns,
+            company_profiles=company_profiles,
         )
         if isinstance(result, str):
             rejected.append(result)
@@ -555,7 +598,8 @@ async def discover(
     if todays_discoveries(db, now) >= DAILY_QUOTA:
         return {**result, "status": "skipped", "stop_reason": "cuota_agotada"}
     contexts = load_theme_contexts(db, min_sources=min_sources)
-    known = set(db.scalars(select(Company.ticker)))
+    company_profiles = build_company_profiles(db)
+    known = set(company_profiles)
     mention_patterns = build_mention_patterns(db)
     db.commit()  # sin conexion ni transaccion abiertas durante el LLM
     result["themes_considered"] = len(contexts)
@@ -605,6 +649,7 @@ async def discover(
                 known_tickers=known,
                 evidence_by_id={e.id: e for e in context.evidence},
                 mention_patterns=mention_patterns,
+                company_profiles=company_profiles,
             )
         except TimeoutError:
             if deadline is not None:
