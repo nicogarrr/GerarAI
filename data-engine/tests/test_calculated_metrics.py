@@ -1222,10 +1222,10 @@ def test_fcf_before_growth_capex_partial_lower_bound_without_da():
         )
         # Sin D&A no hay separacion: FCF reportado como cota inferior declarada
         assert result.status == "partial"
-        assert result.value == Decimal("100.00000000")
+        assert result.value is None
         assert result.calculation_trace["reason"] == "growth_capex_not_separable"
         assert "depreciation_amortization" in result.calculation_trace["missing_inputs"]
-        assert "lower_bound" in result.calculation_trace["value_basis"]
+        assert "no_value_without_split" in result.calculation_trace["value_basis"]
     finally:
         db.close()
         cleanup_metric_test_artifacts()
@@ -1241,14 +1241,14 @@ def test_fcf_before_growth_capex_unavailable_without_capex_or_fcf():
 
         service = MetricCalculationService()
         result = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
-        assert result.status == "unavailable"
+        assert result.status == "insufficient_data"
         assert result.value is None
         assert "free_cash_flow" in result.calculation_trace["missing_inputs"]
 
         add_fact(db, company, "free_cash_flow", "100")
         db.commit()
         result2 = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
-        assert result2.status == "unavailable"
+        assert result2.status == "insufficient_data"
         assert "capital_expenditure" in result2.calculation_trace["missing_inputs"]
     finally:
         db.close()
@@ -1285,7 +1285,7 @@ def test_fcf_before_growth_capex_mixed_currency_is_unavailable():
         result = MetricCalculationService().calculate(
             db, company, "fcf_before_growth_capex", persist=False
         )
-        assert result.status == "unavailable"
+        assert result.status == "insufficient_data"
         assert result.value is None
         assert result.calculation_trace["reason"] == "mixed_currency_inputs"
     finally:

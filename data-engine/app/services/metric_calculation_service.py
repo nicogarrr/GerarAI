@@ -1723,12 +1723,8 @@ class MetricCalculationService:
     ) -> MetricResult:
         """FCF antes de gasto de crecimiento = FCF + capex de crecimiento estimado.
 
-        Estados: ok con los tres inputs (la separacion mantenimiento/crecimiento
-        es siempre una estimacion declarada, nunca un dato reportado); partial
-        cuando falta D&A y el capex de crecimiento no se puede separar - el
-        valor publicado es el FCF reportado, cota inferior declarada porque
-        growth_capex >= 0; unavailable cuando falta FCF o capex (insufficient
-        data).
+        Estados: ok con inputs completos; partial sin D&A, siempre sin valor;
+        insufficient_data sin FCF/capex o con inputs incompatibles/invalidos.
         """
         metric = "fcf_before_growth_capex"
         definition_version, formula, inputs, unit = METRIC_DEFINITIONS[metric]
@@ -1769,7 +1765,7 @@ class MetricCalculationService:
                 db,
                 company,
                 build(
-                    status="unavailable",
+                    status="insufficient_data",
                     value=None,
                     numerator=None,
                     trace={
@@ -1795,7 +1791,7 @@ class MetricCalculationService:
                 db,
                 company,
                 build(
-                    status="unavailable",
+                    status="insufficient_data",
                     value=None,
                     numerator=None,
                     trace={
@@ -1816,9 +1812,9 @@ class MetricCalculationService:
             return self._persist_if_requested(
                 db,
                 company,
-                self._mixed_unit_result(
-                    metric, period, unit, definition_version, formula, unique_facts, sorted(units)
-                ),
+                build(status="insufficient_data", value=None, numerator=None,
+                      trace={"reason": "mixed_currency_inputs", "units": sorted(units)},
+                      confidence=Decimal("0"), fact_list=unique_facts, result_unit=unit),
                 persist,
             )
         result_unit = units.pop() if units else unit
@@ -1834,24 +1830,22 @@ class MetricCalculationService:
         capex_abs = abs(Decimal(facts["capital_expenditure"].value))
 
         if "depreciation_amortization" in missing:
-            # Sin D&A no se puede separar el capex de crecimiento. El FCF
-            # reportado es un dato real y una cota inferior (growth_capex >= 0):
-            # se publica como partial con la base declarada, nunca como ok.
+            # No publicar el FCF reportado bajo el nombre de otra metrica.
             return self._persist_if_requested(
                 db,
                 company,
                 build(
                     status="partial",
-                    value=_quantize(fcf),
-                    numerator=_quantize(fcf),
+                    value=None,
+                    numerator=None,
                     trace={
                         "method": "fcf_before_growth_capex",
                         "reason": "growth_capex_not_separable",
                         "missing_inputs": ["depreciation_amortization"],
                         "maintenance_capex_rule": maintenance_rule,
                         "value_basis": (
-                            "reported_fcf_lower_bound: growth capex >= 0, so the "
-                            "reported FCF understates FCF before growth spend"
+                            "no_value_without_split: "
+                            "reported FCF is not this metric"
                         ),
                     },
                     confidence=confidence,
@@ -1862,6 +1856,12 @@ class MetricCalculationService:
             )
 
         depreciation = Decimal(facts["depreciation_amortization"].value)
+        if depreciation < 0 or not depreciation.is_finite() or not fcf.is_finite() or not capex_abs.is_finite():
+            return self._persist_if_requested(db, company, build(
+                status="insufficient_data", value=None, numerator=None,
+                trace={"reason": "invalid_inputs"}, confidence=Decimal("0"),
+                fact_list=unique_facts, result_unit=result_unit,
+            ), persist)
         maintenance_capex = min(capex_abs, depreciation)
         growth_capex = capex_abs - maintenance_capex
         value = _quantize(fcf + growth_capex)
