@@ -73,6 +73,11 @@ const nextConfig: NextConfig = {
             { source: '/movers', destination: '/screener?vista=subidas', permanent: true },
             // Carteras se fusiona en Inversores (decisión de Nico, 2026-10-20): la ruta vieja redirige.
             { source: '/inversores/carteras', destination: '/inversores', permanent: true },
+            // /inversores/mas-compradas y /inversores/solape pasan a ser vistas
+            // de Movimientos 13F (/ownership). Decision de Nico (WhatsApp 2026-10-20 00:59):
+            // fusionar las pestañas del hub Inversores/Senales de 10 a 4.
+            { source: '/inversores/mas-compradas', destination: '/ownership?vista=mas-compradas', permanent: true },
+            { source: '/inversores/solape', destination: '/ownership?vista=solape', permanent: true },
         ];
     },
     async headers() {

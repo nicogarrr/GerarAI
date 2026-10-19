@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-const page = readFileSync('app/(root)/inversores/mas-compradas/page.tsx', 'utf8');
+// Movidas a vistas de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.
+const page = readFileSync('app/(root)/ownership/_components/MostBought.tsx', 'utf8');
 test('más compradas pagina sin eliminar fechas, procedencia ni compradores', () => {
     assert.match(page, /paginate\(data\.items, pagina, PAGE_SIZE\)/);
     assert.match(page, /paged\.items\.map/);
     assert.doesNotMatch(page, /data\.items\.map/);
-    assert.match(page, /<Pagination basePath="\/inversores\/mas-compradas" page=\{paged\.page\} total=\{paged\.total\}/);
+    assert.match(page, /<Pagination basePath="\/ownership" page=\{paged\.page\} total=\{paged\.total\} params=\{\{ vista: 'mas-compradas' \}\}/);
     assert.match(page, /data\.report_dates/);
     assert.match(page, /item\.buyers\.map/);
     assert.match(page, /item\.cusip/);

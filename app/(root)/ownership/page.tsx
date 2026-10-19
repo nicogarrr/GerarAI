@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { ExternalLink, FileText } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,8 @@ import { form13fValueToUsd } from '@/lib/form13f-value';
 import { formatMarketCapUsd, formatDate, formatUserDateTime, formatNumber, NA } from '@/lib/format';
 
 import SyncButton from './SyncButton';
+import { MostBought } from './_components/MostBought';
+import { Overlap } from './_components/Overlap';
 import { ownershipManagerName } from '@/lib/ownership-display';
 import { ownershipLimitations } from '@/lib/research/ownership-display';
 
@@ -56,12 +59,26 @@ function reportLabel(value: string | null | undefined): string {
 }
 
 type PageProps = {
-    searchParams: Promise<{ cik?: string }>;
+    searchParams: Promise<{ cik?: string; vista?: string; pagina?: string; compras?: string }>;
 };
 
+// Vistas de Movimientos 13F: el mismo dataset (SEC 13F, EDGAR) en tres cortes.
+// Antes eran páginas sueltas del hub Inversores (decisión de Nico, 2026-10-20).
+const VIEWS = [
+    ['gestor', 'Por gestor'],
+    ['mas-compradas', 'Más compradas'],
+    ['solape', 'Solape con tu cartera'],
+] as const;
+type View = (typeof VIEWS)[number][0];
+
 export default async function OwnershipPage({ searchParams }: PageProps) {
-    const { cik: selectedCik } = await searchParams;
-    const activeHref = selectedCik ? `/ownership?cik=${encodeURIComponent(selectedCik)}` : '/ownership';
+    const { cik: selectedCik, vista, pagina, compras } = await searchParams;
+    const view: View = vista === 'mas-compradas' || vista === 'solape' ? vista : 'gestor';
+    const activeHref = view === 'gestor'
+        ? selectedCik
+            ? `/ownership?cik=${encodeURIComponent(selectedCik)}`
+            : '/ownership'
+        : `/ownership?vista=${view}`;
     // La lista de gestores es la lectura esencial: sin ella la página no tiene
     // nada que mostrar. Antes su fallo se tragaba con `.catch(() => null)` y la
     // pantalla decía "no hay gestores (o el backend no responde)": dos estados
@@ -81,7 +98,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
 
     let holdings: ManagerHoldings | null = null;
     let changes: ManagerChanges | null = null;
-    if (activeCik) {
+    if (view === 'gestor' && activeCik) {
         const [holdingsRead, changesRead] = await Promise.all([
             getManagerHoldings(activeCik).then(
                 (value) => ({ value, error: null as unknown }),
@@ -105,16 +122,32 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 overflow-x-clip">
             <header className="flex items-center justify-between gap-3 border-b border-gray-800 pb-4">
-                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Propiedad institucional (13F)</h1>
+                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Movimientos 13F</h1>
                 <SyncButton />
             </header>
 
-            {!managers.length ? (
+            <nav aria-label="Vistas de Movimientos 13F" className="flex flex-nowrap gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {VIEWS.map(([id, label]) => (
+                    <Link
+                        aria-current={view === id ? 'page' : undefined}
+                        className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors md:min-h-0 ${view === id ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400 hover:bg-gray-900 hover:text-gray-100'}`}
+                        href={id === 'gestor' ? '/ownership' : `/ownership?vista=${id}`}
+                        key={id}
+                    >
+                        {label}
+                    </Link>
+                ))}
+            </nav>
+
+            {view === 'mas-compradas' ? <MostBought pagina={pagina} /> : null}
+            {view === 'solape' ? <Overlap compras={compras} pagina={pagina} /> : null}
+
+            {view !== 'gestor' ? null : !managers.length ? (
                 <EmptyState
                     title="No hay gestores revisados en esta versión"
                 />
             ) : (
-                <section className="flex flex-wrap gap-2">
+                <section className="flex flex-nowrap gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {managers.map((manager) => (
                         <a
                             className={`max-w-full rounded-lg border px-3 py-2 text-sm ${manager.cik === activeCik ? 'border-teal-700 bg-teal-950/30 text-teal-200' : 'border-gray-800 bg-surface-1 text-gray-300 hover:border-gray-700'}`}
@@ -127,7 +160,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                 </section>
             )}
 
-            {activeCik && holdings ? (
+            {view === 'gestor' && activeCik && holdings ? (
                 holdings.status === 'ok' ? (
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">
@@ -199,7 +232,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                     </section>
                 )
             ) : null}
-            {activeCik && changes ? (
+            {view === 'gestor' && activeCik && changes ? (
                 changes.status === 'ok' ? (
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const page = readFileSync('app/(root)/inversores/mas-compradas/page.tsx', 'utf8');
+// Movidas a vistas de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.
+const page = readFileSync('app/(root)/ownership/_components/MostBought.tsx', 'utf8');
 const grid = readFileSync('app/(root)/inversores/_components/HubNav.tsx', 'utf8');
 
 test('Más compradas dice "Sin datos todavía" cuando no hay dos trimestres', () => {
@@ -21,6 +22,6 @@ test('no muestra tickers ni multiplica por mil a ciegas', () => {
     assert.ok(!/\* 1000/.test(page));
 });
 
-test('la rejilla enlaza a Más compradas', () => {
-    assert.match(grid, /\/inversores\/mas-compradas/);
+test('la barra del hub enlaza a Movimientos 13F (/ownership)', () => {
+    assert.match(grid, /\/ownership/);
 });

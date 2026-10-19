@@ -4,7 +4,8 @@ import test from 'node:test';
 
 const read = (path: string) => readFileSync(path, 'utf8');
 test('solape has pagination, period and partial-data labels', () => {
-  const page = read('app/(root)/inversores/solape/page.tsx');
+  // Movidas a vistas de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.
+  const page = read('app/(root)/ownership/_components/Overlap.tsx');
   for (const text of ['Pagination', 'report_date', 'filing_date', 'Datos parciales', 'unresolved_positions', '13F histórico']) assert.ok(page.includes(text), text);
 });
 test('chat sends only signed server requests and renders quotes as plain text', () => {

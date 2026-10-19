@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import BackendOffline from '@/components/system/BackendOffline';
@@ -6,29 +5,23 @@ import { getMostBought } from '@/lib/actions/investors.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatMarketCapUsd, formatNumber, NA } from '@/lib/format';
 
-import { periodLabel } from '../_components/format';
-import { newLabel } from '../_components/labels';
-import { Pagination, paginate } from '../_components/Pagination';
-import { SyncPortfoliosButton } from '../_components/SyncPortfoliosButton';
-
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-export const metadata: Metadata = {
-    title: 'Más compradas por los inversores',
-    description: 'Acciones que más inversores compraron en su último 13F frente al trimestre anterior.',
-};
+import { periodLabel } from '../../inversores/_components/format';
+import { newLabel } from '../../inversores/_components/labels';
+import { Pagination, paginate } from '../../inversores/_components/Pagination';
+import { SyncPortfoliosButton } from '../../inversores/_components/SyncPortfoliosButton';
 
 const PAGE_SIZE = 10;
 
-export default async function MostBoughtPage({ searchParams }: { searchParams: Promise<{ pagina?: string }> }) {
-    const { pagina } = await searchParams;
+/** Vista "Más compradas" de Movimientos 13F: ranking de emisores que más
+ *  gestores añadieron en su último 13F frente al trimestre anterior.
+ *  Antes /inversores/mas-compradas (fusionada aquí, decisión de Nico 2026-10-20). */
+export async function MostBought({ pagina }: { pagina?: string }) {
     let data: Awaited<ReturnType<typeof getMostBought>>;
     try {
         data = await getMostBought();
     } catch (error) {
         if (isBackendUnavailableError(error)) {
-            return <BackendOffline feature="Más compradas" retryHref="/inversores/mas-compradas" />;
+            return <BackendOffline feature="Más compradas" retryHref="/ownership?vista=mas-compradas" />;
         }
         throw error;
     }
@@ -36,11 +29,8 @@ export default async function MostBoughtPage({ searchParams }: { searchParams: P
     const period = data.report_dates.map((date) => periodLabel(date)).join(', ');
 
     return (
-        <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-12 overflow-x-clip py-6">
-            <header className="flex flex-col gap-3">
-                <h1 className="text-3xl font-semibold text-gray-100">Más compradas</h1>
-                <p className="text-base text-gray-400">Lo que más inversores añadieron a su cartera en el último trimestre.</p>
-            </header>
+        <>
+            <p className="text-base text-gray-400">Lo que más inversores añadieron a su cartera en el último trimestre.</p>
 
             {data.status === 'sin_datos' || data.items.length === 0 ? (
                 <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-8 text-center">
@@ -82,7 +72,7 @@ export default async function MostBoughtPage({ searchParams }: { searchParams: P
                 </ul>
             )}
 
-            <Pagination basePath="/inversores/mas-compradas" page={paged.page} total={paged.total} />
+            <Pagination basePath="/ownership" page={paged.page} total={paged.total} params={{ vista: 'mas-compradas' }} />
 
             <p className="text-xs text-gray-500">
                 Fuente: SEC, Form 13F (EDGAR){period ? `, informes a ${period}` : ''}. Trimestral, con hasta 45 días de retardo.
@@ -92,6 +82,6 @@ export default async function MostBoughtPage({ searchParams }: { searchParams: P
                 acciones largas en EE. UU.; las opciones no cuentan. El 13F no trae ticker, se muestra el emisor y su CUSIP.
                 Valor = posición actual de quienes compran, en dólares.
             </p>
-        </main>
+        </>
     );
 }
