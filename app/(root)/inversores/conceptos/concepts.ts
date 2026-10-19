@@ -95,7 +95,7 @@ export const CONCEPTS: InvestorConcept[] = [
     slug: "cfroi",
     title: "CFROI",
     summary: "Rentabilidad del flujo de caja sobre la inversión bruta realizada.",
-    body: "El CFROI compara el flujo de caja bruto que genera una empresa con la inversión bruta realizada, con ajuste por inflación en la versión original de Credit Suisse HOLT. Busca medir la rentabilidad real del capital sin las distorsiones contables del beneficio. La versión completa exige datos que pocas empresas publican, por lo que en la práctica se calculan aproximaciones que deben declararse.",
+    body: "El CFROI (cash flow return on investment) estima la rentabilidad de la inversión a partir de sus flujos de caja. Su formulación completa usa una tasa interna de rentabilidad sobre la inversión bruta, con ajustes por inflación y vida útil de los activos. No es simplemente flujo de caja dividido por activos. Las aproximaciones deben declarar fórmula y límites antes de compararse con el coste de capital.",
     application:
       "Un CFROI sostenido por encima del coste de capital indica creación de valor; por debajo, la empresa destruye valor aunque el beneficio contable crezca.",
     risk: "Las aproximaciones no son comparables entre sí ni con el CFROI original si no se conoce la fórmula exacta usada.",
@@ -121,7 +121,7 @@ export const CONCEPTS: InvestorConcept[] = [
     slug: "owner-earnings",
     title: "Beneficio del propietario (owner earnings)",
     summary: "La caja que el dueño puede extraer sin deteriorar el negocio.",
-    body: "En la carta de 1986 Buffett definió el beneficio del propietario como el beneficio contable más depreciación y amortización, menos el capex medio que el negocio necesita para mantener su posición competitiva y su volumen, y las necesidades de capital circulante. Es su alternativa al beneficio neto para valorar. El capex de mantenimiento no se publica por separado: siempre es una estimación y hay que declarar la regla usada.",
+    body: "El beneficio del propietario (owner earnings), descrito por Buffett en 1986, parte del beneficio contable, suma depreciación, amortización y ciertos cargos sin salida de caja, y resta la inversión media necesaria para mantener la posición competitiva y el volumen del negocio, incluidas las necesidades adicionales de capital circulante. La inversión de mantenimiento exige juicio y no siempre se publica por separado. No equivale automáticamente al FCF ni a beneficio neto más D&A menos capex total.",
     application:
       "Úsalo en lugar del beneficio neto cuando evalúes cuánta caja genera realmente un negocio para su dueño.",
     risk: "Si la estimación del capex de mantenimiento es demasiado baja, el beneficio del propietario queda inflado sin que nadie mienta.",
@@ -133,7 +133,7 @@ export const CONCEPTS: InvestorConcept[] = [
     title: "Capex de mantenimiento vs. de crecimiento",
     summary:
       "No toda la inversión es un coste: parte mantiene el negocio y parte lo expande.",
-    body: "El capex de mantenimiento conserva la capacidad y la posición competitiva actuales; el capex de crecimiento busca más volumen o más margen. Las empresas casi nunca separan ambos en sus informes, así que distinguirlos exige una estimación declarada. La distinción cambia la valoración: solo el capex de mantenimiento es un coste inevitable; el de crecimiento puede ser una buena inversión si rinde por encima del coste de capital.",
+    body: "El capex de mantenimiento busca conservar la capacidad y la posición competitiva actuales; el de crecimiento busca ampliarlas. Ambos suponen salidas de caja y pueden capitalizarse contablemente. Separarlos ayuda a estimar la caja que generaría el negocio sin expansión, pero no hay una regla universal: muchas empresas no publican el desglose. D&A puede servir de aproximación, no prueba cuánto mantenimiento necesita el negocio.",
     application:
       "Cuando una empresa invierte mucho, pregunta qué parte mantiene lo que ya existe y qué parte construye algo nuevo con rentabilidad esperada.",
     risk: "Un negocio que necesita reinvertir todo solo para no retroceder parece que crece cuando en realidad corre para quedarse en el mismo sitio.",
@@ -144,7 +144,7 @@ export const CONCEPTS: InvestorConcept[] = [
     slug: "trampa-de-valor",
     title: "Trampa de valor",
     summary: "Barato por múltiplos no es barato si el negocio se deteriora.",
-    body: "Una trampa de valor es una acción que cotiza a múltiplos bajos porque el mercado descuenta un deterioro permanente: beneficios que caen, foso que desaparece, deuda que ahoga. El precio bajo es correcto, no una oportunidad. Para distinguirla de una ganga hay que comprobar que la generación de caja y la posición competitiva se mantienen.",
+    body: "Una trampa de valor es una acción que cotiza a múltiplos bajos porque el mercado descuenta un deterioro permanente: beneficios que caen, foso que desaparece, deuda que ahoga. El múltiplo bajo puede reflejar un deterioro que la valoración inicial no tuvo en cuenta. Para distinguirla de una ganga hay que comprobar que la generación de caja y la posición competitiva se mantienen.",
     application:
       "Antes de comprar algo muy barato, busca la razón del descuento y comprueba si el deterioro es temporal o permanente.",
     risk: "Que una acción haya caído mucho no es evidencia de nada: puede estar barata o puede estar empezando a descontar su declive.",
@@ -173,7 +173,7 @@ export const CONCEPTS: InvestorConcept[] = [
     slug: "curva-de-tipos",
     title: "Curva de tipos de interés",
     summary: "La rentabilidad de la deuda pública según el plazo y lo que anticipa.",
-    body: "La curva de tipos representa la rentabilidad de los bonos del Estado en cada vencimiento. Lo normal es que el largo plazo pague más que el corto; cuando se invierte, históricamente ha precedido a desaceleraciones, sin ser una señal mecánica. Recoge expectativas de tipos oficiales, inflación y prima de riesgo, y cambia cada día con los precios de los bonos.",
+    body: "La curva de tipos relaciona rendimientos y vencimientos de instrumentos de deuda comparables en una fecha. Para deuda pública suele usarse un mismo emisor o una curva de referencia homogénea. Puede tener pendiente positiva, plana o invertida. Refleja expectativas de tipos futuros y primas por plazo y riesgo. Una inversión de la curva no es un calendario seguro de recesión.",
     application:
       "Úsala como contexto: una curva invertida encarece la financiación corta y suele coincidir con políticas monetarias restrictivas.",
     risk: "Predecir recesiones con la curva acumula falsos positivos; es contexto, no un calendario.",
@@ -187,7 +187,7 @@ export const CONCEPTS: InvestorConcept[] = [
     slug: "deflacion",
     title: "Deflación",
     summary: "La bajada sostenida de precios que encarece las deudas.",
-    body: "La deflación es el descenso sostenido del nivel general de precios, no la bajada aislada de algunos bienes. Retrasa compras e inversiones y encarece la deuda en términos reales: el importe adeudado no baja mientras los ingresos sí. Por eso los bancos centrales la consideran más peligrosa que una inflación moderada y actúan para evitarla.",
+    body: "La deflación es el descenso sostenido del nivel general de precios, distinto de la desinflación, que es una menor tasa de subida. Puede deberse a una demanda débil o a mejoras de oferta y productividad; sus efectos dependen de la causa. Puede aumentar el peso real de deudas nominales y, cuando se espera que continúe, aplazar parte del gasto. Una bajada aislada de un producto no demuestra deflación.",
     application:
       "En un entorno deflacionista, la deuda pesa más cada año: exige más caja real a empresas y familias endeudadas.",
     risk: "Confundir deflación con desinflación (precios que suben más despacio) cambia por completo el diagnóstico.",
@@ -253,8 +253,8 @@ export const CONCEPTS: InvestorConcept[] = [
   {
     slug: "poder-de-precios",
     title: "Poder de precios",
-    summary: "Subir precios sin perder clientes: la prueba de fuego del foso.",
-    body: "El poder de precios es la capacidad de subir precios sin perder un volumen de clientes que compense la subida. Es la señal más directa de ventaja competitiva y la mejor protección contra la inflación de costes: quien lo tiene traslada el encarecimiento y conserva márgenes. Se comprueba en el historial de subidas y su efecto en ventas, no en lo que la empresa afirma.",
+    summary: "Subir precios sin que la pérdida de demanda anule la mejora.",
+    body: "El poder de precios es la capacidad de una empresa de aumentar sus precios sin perder suficiente demanda como para perjudicar la rentabilidad. Puede apoyarse en diferenciación, costes de cambio u otras barreras y no es ilimitado. Conviene comprobar precios, volúmenes, competencia y márgenes conjuntamente. Trasladar una subida de costes a clientes puede mostrarlo, pero una subida de precios por sí sola no lo demuestra.",
     application:
       "Revisa si la empresa ha subido precios en años de inflación de costes y qué pasó con sus volúmenes y márgenes.",
     risk: "El poder de precios tiene límite: abusar de él atrae competencia, reguladores o sustitutos.",
@@ -282,11 +282,11 @@ export const CONCEPTS: InvestorConcept[] = [
     slug: "efecto-ricardo",
     title: "Efecto Ricardo",
     summary:
-      "Cómo los salarios reales cambian la intensidad de capital de la producción (escuela austríaca).",
-    body: "En la teoría austríaca del ciclo, formalizada por Hayek, el efecto Ricardo describe cómo un cambio en los salarios reales altera la intensidad de capital que eligen las empresas: salarios reales más bajos hacen rentables métodos menos intensivos en capital, y al revés. Se usa para explicar cómo una expansión alimentada por crédito barato acaba mostrando desajustes entre las etapas de producción. Es un término de una escuela económica concreta, no de uso general.",
+      "Cómo los costes relativos influyen en la sustitución entre trabajo y capital.",
+    body: "El efecto Ricardo relaciona el coste relativo del trabajo y del capital con la elección entre métodos más intensivos en trabajo o en maquinaria: si el trabajo se encarece relativamente, puede convenir sustituirlo por capital, y a la inversa. La interpretación del mecanismo dentro de la teoría austríaca del ciclo es discutida. No debe confundirse con la equivalencia ricardiana sobre impuestos y deuda pública.",
     application:
-      "Sirve como marco cualitativo para entender por qué los tipos artificialmente bajos distorsionan la estructura productiva.",
-    risk: "Es discutido: fuera de la escuela austríaca su validez empírica se cuestiona; no es una herramienta de valoración.",
+      "Úsalo para analizar la sustitución entre trabajo y maquinaria cuando cambian sus costes relativos.",
+    risk: "Su papel en la teoría del ciclo es discutido y depende de supuestos; no es una herramienta de valoración ni equivale a la equivalencia ricardiana.",
     investors: [],
     source: {
       title: "Mises Wiki · Ricardo effect",
