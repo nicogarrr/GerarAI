@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { Panel } from '@/components/ui/panel';
-import { openReviewsLabel, sectorIndustryLine } from '@/lib/labels';
+import { sectorIndustryLine } from '@/lib/labels';
 import { sortCompaniesByRelevance } from '@/lib/research/relevance';
 import { fetchInBatches } from '@/lib/research/snapshots';
 import {
@@ -87,7 +87,6 @@ function CompanyCard({ row }: { row: CompanyRow }) {
     const { company, snapshot, unreadable } = row;
     const health = snapshot?.research_health;
     const thesis = snapshot?.latest_thesis ?? null;
-    const pending = snapshot ? openReviewsLabel(snapshot.counts) : null;
     const valuable = snapshot ? researchValuability(snapshot) !== NOT_VALUABLE : false;
 
     const sectorLine = sectorIndustryLine(company.sector, company.industry);
@@ -114,12 +113,6 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                         <span className="text-xs text-gray-500">Sin research generado</span>
                     ) : (
                         <>
-                            <span
-                                className="text-xs font-semibold text-gray-400"
-                                title="Mide qué capas existen (documentos, hechos, tesis, modelo), no si la empresa se puede valorar ni la fiabilidad de los datos."
-                            >
-                                Cobertura de capas {formatNumber(health?.score)}/100
-                            </span>
                             {valuable ? (
                                 <>
                                     {thesis && visibleThesisRating(thesis.rating, snapshot) ? <Badge>{ratingLabel(thesis.rating)}</Badge> : null}
@@ -128,11 +121,21 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                                             v{formatNumber(thesis.version)} · {formatDate(thesis.created_at)}
                                         </span>
                                     ) : null}
+                                    <span
+                                        className="text-xs text-gray-500"
+                                        title="Mide qué capas existen (documentos, hechos, tesis, modelo), no si la empresa se puede valorar ni la fiabilidad de los datos."
+                                    >
+                                        Cobertura {formatNumber(health?.score)}/100
+                                    </span>
                                 </>
                             ) : (
-                                <span className="text-xs text-warn" title="Hay capas de datos, pero faltan inputs o evidencia con fuente para publicar una valoración.">No valorable: falta evidencia</span>
+                                <span
+                                    className="text-xs text-gray-500"
+                                    title="Hay capas de datos, pero faltan inputs o evidencia con fuente para publicar una valoración."
+                                >
+                                    Cobertura {formatNumber(health?.score)}/100 · Sin evidencia suficiente
+                                </span>
                             )}
-                            {pending ? <span className="text-xs text-gray-500">{pending}</span> : null}
                         </>
                     )}
                 </div>
@@ -241,7 +244,7 @@ export default async function ResearchPage({
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
             <PageHeader
-                actions={<><Link href="/research/data-health" className="text-sm text-teal-300">Salud de los datos</Link><WorkProductButton /></>}
+                actions={<WorkProductButton />}
                 kicker="Research OS"
                 title="Índice de research"
             />
@@ -256,7 +259,7 @@ export default async function ResearchPage({
                                 Filtrar por ticker o nombre
                             </label>
                             <input
-                                className="w-full max-w-xs rounded-lg border border-gray-700 bg-surface-1 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:border-teal-600 focus:outline-none"
+                                className="min-w-0 flex-1 rounded-lg border border-gray-700 bg-surface-1 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:border-teal-600 focus:outline-none sm:max-w-xs sm:flex-none"
                                 defaultValue={query}
                                 id="research-index-q"
                                 name="q"
