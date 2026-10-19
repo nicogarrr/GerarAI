@@ -370,6 +370,12 @@ def _session(tenant_id: int | None, user_id: str | None):
         raise ValueError(f"Active tenant {tenant_id} was not found")
     db.info["tenant_id"] = tenant.id
     db.info["user_id"] = user_id
+    # El SELECT del tenant abre una transaccion (autocommit=False); sin este
+    # commit cada actor arrancaba "idle in transaction" y la mantenia abierta
+    # durante toda la unidad de trabajo, bloqueando escritores (p. ej. el
+    # UPDATE de market_prices). db.info ya esta poblado y expire_on_commit=False
+    # (database.py) mantiene los atributos del tenant utilizables tras el commit.
+    db.commit()
     return db
 
 
@@ -2254,6 +2260,10 @@ def refresh_news(
             companies = sorted(
                 companies, key=lambda c: (c.ticker.upper() not in PRIORITY_TICKERS, c.ticker)
             )
+            # Cierra la transaccion de lectura de _session/_companies ANTES del
+            # bucle de red (GDELT tarda segundos por empresa): la lista ya esta
+            # materializada y expire_on_commit=False mantiene los atributos.
+            db.commit()
             # 300 s: el ultimo query puede entrar con 429+reintentos y 30 items;
             # el margen real hasta los 600 s del TimeLimit es de 5 min.
             deadline = Deadline(300)
