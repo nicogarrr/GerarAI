@@ -125,3 +125,50 @@ async def test_provider_error_falls_back(db):
     assert result["status"] == "unavailable" and result["text"] is None
     assert row.summary == EN_SUMMARY
     assert cached_summary_translation(row)["status"] == "unavailable"
+
+
+@sync_test
+async def test_provider_error_reports_reason(db):
+    # Un fallo del proveedor devuelve "unavailable" con reason clasificada y la
+    # persiste en metadata para diagnóstico sin acceso a logs.
+    row = event(db)
+    p = Provider(error=True)
+    result = await translate_summary(db, row.id, provider=p)
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "provider"
+    assert result["text"] is None
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["status"] == "unavailable"
+    assert record["failure"] == "provider"
+
+
+@sync_test
+async def test_rejected_output_reports_bad_output_reason(db):
+    # El proveedor responde pero la salida no pasa las validaciones: la causa no
+    # es el proveedor, es la salida rechazada.
+    row = event(db)
+    p = Provider("Texto sin numeros")  # el original tiene 12%: la firma no casa
+    result = await translate_summary(db, row.id, provider=p)
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "bad_output"
+    db.refresh(row)
+    assert row.metadata_["summary_translation"]["failure"] == "bad_output"
+
+
+@sync_test
+async def test_translated_result_has_no_reason(db):
+    row = event(db)
+    result = await translate_summary(db, row.id, provider=Provider())
+    assert result["status"] == "translated"
+    assert "reason" not in result
+
+
+@sync_test
+async def test_cooldown_reports_reason(db):
+    row = event(db)
+    p = Provider(error=True)
+    await translate_summary(db, row.id, provider=p)
+    second = await translate_summary(db, row.id, provider=p)
+    assert second["status"] == "unavailable"
+    assert second["reason"] == "cooldown"

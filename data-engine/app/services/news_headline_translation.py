@@ -89,8 +89,23 @@ def display_translation(event: NewsEvent) -> dict | None:
     return cached if cached and cached.get("status") == "translated" else None
 
 
-def _result(event: NewsEvent, status: str, text: str | None = None) -> dict:
-    return {"status": status, "text": text, "original": original_headline(event), "target_language": "es", "machine_translation": True}
+def _classify_translation_failure(exc: Exception) -> str:
+    """Categoría estable para diagnóstico de un fallo de traducción. Sin
+    detalles internos: el valor viaja en el payload de la API."""
+    if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
+        return "provider_timeout"
+    if isinstance(exc, RuntimeError) and "request limit" in str(exc).lower():
+        return "quota"
+    if isinstance(exc, RuntimeError):
+        return "provider"
+    return type(exc).__name__
+
+
+def _result(event: NewsEvent, status: str, text: str | None = None, reason: str | None = None) -> dict:
+    result = {"status": status, "text": text, "original": original_headline(event), "target_language": "es", "machine_translation": True}
+    if reason is not None:
+        result["reason"] = reason
+    return result
 
 
 async def translate_headline(db, event_id: int, *, provider=None) -> dict:
@@ -108,16 +123,16 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
         return _result(event, "translated", cached["text"])
     now = datetime.now(UTC)
     if _cooldown_active(cached, now):
-        return _result(event, "unavailable")
+        return _result(event, "unavailable", reason="cooldown")
     key = (tenant, event_id)
     if key in _inflight or _slots.locked():
-        return _result(event, "busy")
+        return _result(event, "busy", reason="busy")
     _inflight.add(key)
     try:
         async with _slots:
             budget = BudgetController()
             if not budget.can_spend(db, 0.01):
-                return _result(event, "unavailable")
+                return _result(event, "unavailable", reason="budget")
             # Atomic row lease also prevents duplicate calls across worker processes.
             event = db.scalar(select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update().execution_options(populate_existing=True))
             cached = cached_translation(event)
@@ -126,7 +141,7 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
                 return _result(event, "translated", cached["text"])
             if _cooldown_active(cached, now):
                 db.rollback()
-                return _result(event, "busy")
+                return _result(event, "busy", reason="busy")
             original = original_headline(event)
             if (event.metadata_ or {}).get("headline_from_source") is False or not _needs_translation(original) or len(original) > 500:
                 db.rollback()
@@ -135,6 +150,7 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
             event.metadata_ = {**(event.metadata_ or {}), "headline_translation": {"fingerprint": digest, "status": "pending", "retry_after": (now + timedelta(minutes=10)).isoformat()}}
             db.commit()
             translated = None
+            failure_reason = "bad_output"  # si el proveedor responde pero se rechaza su salida
             try:
                 if provider is None:
                     from app.services.public_headline_translation import free_provider
@@ -164,21 +180,23 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
                             and numeric_signature(original) == numeric_signature(candidate)
                             and not response.degraded and not response.warnings):
                         translated = candidate.strip()
-            except Exception:
+            except Exception as exc:
                 # Source headline remains usable even when the provider fails.
                 db.rollback()
                 translated = None
+                failure_reason = _classify_translation_failure(exc)
             db.refresh(event)
             if fingerprint(original_headline(event)) != digest:
                 db.rollback()
-                return _result(event, "unavailable")
+                return _result(event, "unavailable", reason="changed")
             record = {"fingerprint": digest, "status": "translated" if translated else "unavailable", "text": translated,
                       "target_language": "es", "machine_translation": True, "created_at": now.isoformat()}
             if not translated:
                 record["retry_after"] = (now + timedelta(minutes=10)).isoformat()
+                record["failure"] = failure_reason
             event.metadata_ = {**(event.metadata_ or {}), "headline_translation": record}
             db.commit()
-            return _result(event, record["status"], translated)
+            return _result(event, record["status"], translated, reason=None if translated else failure_reason)
     finally:
         _inflight.discard(key)
 
@@ -210,8 +228,13 @@ def display_summary_translation(event: NewsEvent) -> dict | None:
     return cached if cached and cached.get("status") == "translated" else None
 
 
-def _summary_result(event: NewsEvent, status: str, text: str | None = None) -> dict:
-    return {"status": status, "text": text, "original": original_summary(event), "target_language": "es", "machine_translation": True}
+def _summary_result(event: NewsEvent, status: str, text: str | None = None, reason: str | None = None) -> dict:
+    result = {"status": status, "text": text, "original": original_summary(event), "target_language": "es", "machine_translation": True}
+    # Diagnóstico: la causa de un "unavailable" viaja en el payload (el front la
+    # ignora) para poder distinguir en prod cuota/presupuesto/proveedor sin logs.
+    if reason is not None:
+        result["reason"] = reason
+    return result
 
 
 async def translate_summary(db, event_id: int, *, provider=None) -> dict:
@@ -232,16 +255,16 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
         return _summary_result(event, "translated", cached["text"])
     now = datetime.now(UTC)
     if _cooldown_active(cached, now):
-        return _summary_result(event, "unavailable")
+        return _summary_result(event, "unavailable", reason="cooldown")
     key = (tenant, -event_id)  # negativo: no colisiona con el lease del titular
     if key in _inflight or _slots.locked():
-        return _summary_result(event, "busy")
+        return _summary_result(event, "busy", reason="busy")
     _inflight.add(key)
     try:
         async with _slots:
             budget = BudgetController()
             if not budget.can_spend(db, 0.02):
-                return _summary_result(event, "unavailable")
+                return _summary_result(event, "unavailable", reason="budget")
             event = db.scalar(select(NewsEvent).where(NewsEvent.id == event_id, NewsEvent.tenant_id == tenant).with_for_update().execution_options(populate_existing=True))
             cached = cached_summary_translation(event)
             if cached and cached.get("status") == "translated":
@@ -249,7 +272,7 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
                 return _summary_result(event, "translated", cached["text"])
             if _cooldown_active(cached, now):
                 db.rollback()
-                return _summary_result(event, "busy")
+                return _summary_result(event, "busy", reason="busy")
             original = original_summary(event)
             if len(original) < 3 or not _needs_translation(original) or len(original) > SUMMARY_MAX_CHARS:
                 db.rollback()
@@ -258,6 +281,7 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
             event.metadata_ = {**(event.metadata_ or {}), "summary_translation": {"fingerprint": digest, "status": "pending", "retry_after": (now + timedelta(minutes=10)).isoformat()}}
             db.commit()
             translated = None
+            failure_reason = "bad_output"  # si el proveedor responde pero se rechaza su salida
             try:
                 if provider is None:
                     from app.services.public_headline_translation import free_provider
@@ -287,21 +311,24 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
                             and numeric_token_signature(original) == numeric_token_signature(candidate)
                             and not response.degraded and not response.warnings):
                         translated = candidate.strip()
-            except Exception:
-                # El original sigue usable aunque el proveedor falle.
+            except Exception as exc:
+                # El original sigue usable aunque el proveedor falle. La causa
+                # se clasifica para diagnóstico (sin detalles internos).
                 db.rollback()
                 translated = None
+                failure_reason = _classify_translation_failure(exc)
             db.refresh(event)
             if summary_fingerprint(original_summary(event)) != digest:
                 db.rollback()
-                return _summary_result(event, "unavailable")
+                return _summary_result(event, "unavailable", reason="changed")
             record = {"fingerprint": digest, "status": "translated" if translated else "unavailable", "text": translated,
                       "target_language": "es", "machine_translation": True, "created_at": now.isoformat()}
             if not translated:
                 record["retry_after"] = (now + timedelta(minutes=10)).isoformat()
+                record["failure"] = failure_reason
             event.metadata_ = {**(event.metadata_ or {}), "summary_translation": record}
             db.commit()
-            return _summary_result(event, record["status"], translated)
+            return _summary_result(event, record["status"], translated, reason=None if translated else failure_reason)
     finally:
         _inflight.discard(key)
 
