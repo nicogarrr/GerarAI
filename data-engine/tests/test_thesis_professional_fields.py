@@ -190,6 +190,14 @@ def test_hypothesis_publishable_has_no_indicative_prefix() -> None:
     assert not hypothesis.startswith("Valoración indicativa")
 
 
+def test_is_annual_rejects_quarter_period_with_date_prefix() -> None:
+    from types import SimpleNamespace
+
+    from app.services.long_term_model_service import _is_annual
+
+    assert not _is_annual(SimpleNamespace(fiscal_quarter=None, period="2022-12-31:Q1"))
+    assert _is_annual(SimpleNamespace(fiscal_quarter=None, period="2025-09-27:FY"))
+    assert _is_annual(SimpleNamespace(fiscal_quarter=None, period=None))
 def test_news_dedupe_collapses_same_headline_from_several_agencies() -> None:
     from types import SimpleNamespace
 
