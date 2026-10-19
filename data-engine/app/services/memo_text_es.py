@@ -88,18 +88,38 @@ TERMS_ES: dict[str, str] = {
     "cost_of_equity_above_book_value_growth": "coste del capital propio por encima del crecimiento del valor contable",
     "consistent_period_volume_cost_price": "volumen, coste y precio de un mismo período",
     "valid_effective_tax_rate_and_commodity_earnings_multiple": "tipo impositivo efectivo válido y múltiplo de beneficios",
-    # Frases sueltas que algunos motores emiten ya en lenguaje natural
-    "free cash flow or fcf margin": "flujo de caja libre o margen FCF",
-    "non negative fcf margin": "margen FCF no negativo",
-    "book value growth": "crecimiento del valor contable",
+    # Claves que emiten los motores/snapshots y llegaban crudas a la UI.
+    # term_es normaliza espacios->guiones bajos: una entrada snake_case cubre
+    # tambien las frases sueltas ("book value growth" -> "book_value_growth").
+    "free_cash_flow_or_fcf_margin": "flujo de caja libre o margen FCF",
+    "current_price": "precio actual",
+    "peer_multiples": "múltiplos de comparables",
+    "cash_cost_per_unit": "coste de caja por unidad",
+    "holding_company_discount": "descuento de holding",
+    "retention_ratio_or_payout_ratio": "ratio de retención o de payout",
+    "maintenance_vs_growth_capex_split": "desglose de capex de mantenimiento frente a crecimiento",
+    "market_opportunity": "oportunidad de mercado",
+    "working_capital_and_absorption": "capital circulante y absorción",
+    "annual_revenue_missing": "ingresos anuales",
+    "no_revenue_reported": "ingresos reportados",
+    "revenue_history_two_periods": "histórico de ingresos de dos períodos",
     "unknown": "desconocido",
 }
 
 
 def term_es(key: object) -> str:
-    """Etiqueta ES de una clave interna; desconocida -> con espacios."""
+    """Etiqueta ES de una clave interna; desconocida -> con espacios.
+
+    Las claves llegan en dos formas (snake_case y frases con espacios, segun
+    el motor que las emite): se prueba la clave tal cual, en minusculas y
+    normalizada a snake_case para que una sola entrada cubra ambas formas."""
     text = str(key)
-    return TERMS_ES.get(text) or TERMS_ES.get(text.lower()) or text.replace("_", " ")
+    return (
+        TERMS_ES.get(text)
+        or TERMS_ES.get(text.lower())
+        or TERMS_ES.get(text.lower().replace(" ", "_"))
+        or text.replace("_", " ")
+    )
 
 
 def number_es(value: object, unit: object = None) -> str:
