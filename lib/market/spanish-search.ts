@@ -14,3 +14,25 @@ export function searchSpanishListings(query: string): StockWithWatchlistStatus[]
             type: 'Common Stock', isInWatchlist: false,
         }));
 }
+
+export function mergeSpanishListings(
+    query: string,
+    local: StockWithWatchlistStatus[],
+    remote: StockWithWatchlistStatus[],
+): StockWithWatchlistStatus[] {
+    const q = foldSearchQuery(query).toUpperCase();
+    const preferred = new Set(listings.filter((row) =>
+        [row.name, ...row.aliases.filter((alias) => !alias.includes('.'))]
+            .some((name) => {
+                const value = foldSearchQuery(name).toUpperCase();
+                return value === q || value.startsWith(q);
+            }),
+    ).map((row) => row.symbol));
+    const ordered = [
+        ...local.filter((row) => preferred.has(row.symbol)),
+        ...remote,
+        ...local.filter((row) => !preferred.has(row.symbol)),
+    ];
+    return ordered.filter((row, index) => ordered.findIndex((other) =>
+        other.symbol.toUpperCase() === row.symbol.toUpperCase()) === index).slice(0, 15);
+}

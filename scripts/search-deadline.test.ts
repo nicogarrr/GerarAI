@@ -3,7 +3,7 @@ import test from 'node:test';
 // @ts-expect-error TS5097
 import { withFetchDeadline } from '../lib/upstream/fetch-deadline.ts';
 // @ts-expect-error TS5097
-import { searchSpanishListings } from '../lib/market/spanish-search.ts';
+import { mergeSpanishListings, searchSpanishListings } from '../lib/market/spanish-search.ts';
 import { readFileSync } from 'node:fs';
 
 test('headers arrive but body never ends: timeout aborts the transport', async () => {
@@ -44,4 +44,17 @@ test('modal handles rejection, deadline, stale query and close', () => {
     assert.match(modal, /catch \{[\s\S]*setSearchFailed\(true\)/);
     assert.match(modal, /if \(!open \|\| !query\) return/);
     assert.ok((modal.match(/isLatest\(ticket\)/g) ?? []).length >= 3);
+});
+
+
+test('local Spanish substring matches never suppress remote markets', () => {
+    const remote = [{symbol: 'SAN', name: 'US test issuer', exchange: 'NYSE', type: 'Stock', isInWatchlist: false}];
+    const merged = mergeSpanishListings('SAN', searchSpanishListings('SAN'), remote);
+    assert.ok(merged.some((row) => row.symbol === 'SAN'));
+    assert.ok(merged.some((row) => row.symbol === 'SAN.MC'));
+    const onlySubstring = mergeSpanishListings('NDER', searchSpanishListings('NDER'), remote);
+    assert.equal(onlySubstring[0].symbol, 'SAN');
+    const exactName = mergeSpanishListings('Inditex', searchSpanishListings('Inditex'), remote);
+    assert.equal(exactName[0].symbol, 'ITX.MC');
+    assert.equal(mergeSpanishListings('SAN', searchSpanishListings('SAN'), [...remote, ...remote]).filter((r) => r.symbol === 'SAN').length, 1);
 });

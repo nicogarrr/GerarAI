@@ -1,6 +1,6 @@
 'use server';
 
-import { searchSpanishListings } from '@/lib/market/spanish-search';
+import { mergeSpanishListings, searchSpanishListings } from '@/lib/market/spanish-search';
 import { withFetchDeadline } from '@/lib/upstream/fetch-deadline';
 import { isFinanciallyRelevant } from '@/lib/newsRelevance';
 
@@ -413,11 +413,12 @@ export const searchStocksWithStatus = cache(async (query?: string): Promise<Sear
         return { status: 'ok', stocks: [] };
     }
     const local = searchSpanishListings(query ?? '');
-    if (local.length) return { status: 'ok', stocks: local };
     try {
-        return { status: 'ok', stocks: await withFetchDeadline(() => searchStocksOrThrow(query), 4500) };
+        const remote = await withFetchDeadline(() => searchStocksOrThrow(query), 4500);
+        return { status: 'ok', stocks: mergeSpanishListings(query ?? '', local, remote) };
     } catch (err) {
         console.error('Error in stock search:', err);
+        if (local.length) return { status: 'ok', stocks: local };
         return { status: 'error', stocks: [] };
     }
 });
