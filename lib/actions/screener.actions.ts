@@ -299,10 +299,22 @@ export const getScreenerStocksReal = cache(
 );
 
 
-/** Fair value determinista del Research OS (backend /api/valuation/{ticker}).
- *  Devuelve null si no hay valoracion publicable (nunca datos inventados). */
-export const getFairValue = cache(
-  async (symbol: string): Promise<number | null> => {
+export type FairValueReading = {
+  value: number;
+  /** true = valoracion final publicable; false = orientacion del motor: el
+   *  numero existe pero algun input no es trazable a fuente datada (el
+   *  backend devuelve publishable=false y los publication_blockers). */
+  publishable: boolean;
+};
+
+/** Lectura del valor del motor (backend /api/valuation/{ticker}).
+ *  Devuelve el valor esperado/base aunque no sea publicable, CON su etiqueta:
+ *  una valoracion no publicable es una orientacion valida si se declara, y
+ *  descartarla dejaba la tarjeta DCF del inicio siempre vacia (los megacaps
+ *  llevan publication_blockers por inputs sin trazabilidad datada).
+ *  null solo cuando no hay ningun valor computado o la peticion falla. */
+export const getFairValueReading = cache(
+  async (symbol: string): Promise<FairValueReading | null> => {
     await requireAuthenticatedUser();
     try {
       const data = await researchRequest<{
@@ -310,8 +322,9 @@ export const getFairValue = cache(
         base_value?: number | null;
         publishable?: boolean;
       }>(`/api/valuation/${encodeURIComponent(symbol)}`, { cache: 'no-store' });
-      if (!data?.publishable) return null;
-      return data.expected_value ?? data.base_value ?? null;
+      const value = data?.expected_value ?? data?.base_value ?? null;
+      if (value == null || !(value > 0)) return null;
+      return { value, publishable: data?.publishable === true };
     } catch {
       return null;
     }
