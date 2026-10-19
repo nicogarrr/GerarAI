@@ -32,7 +32,7 @@ export function HubNav() {
       {SECTIONS.map(([href, label]) => (
         <Link
           aria-current={active === href ? "page" : undefined}
-          className={`rounded-lg px-3 py-2 text-sm transition-colors ${active === href ? "bg-lime-300/10 text-lime-300" : "text-gray-400 hover:bg-gray-900 hover:text-gray-100"}`}
+          className={`inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm transition-colors md:min-h-0 ${active === href ? "bg-lime-300/10 text-lime-300" : "text-gray-400 hover:bg-gray-900 hover:text-gray-100"}`}
           href={href}
           key={href}
         >
