@@ -1,6 +1,7 @@
 "use client";
 import { useState } from 'react';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
+import { newsSummaryToShow } from '@/lib/news-summary';
 
 const nonLatin = /[\u0370-\u03ff\u0400-\u052f\u0600-\u06ff\u0900-\u097f\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
 const ENGLISH_MARK = /\b(the|with|says|shares|stocks|earnings|reports|raises|falls|after|amid|outlook|growth|investors|market|billion|million|revenue|warns|cuts|for|and|as|to|in)\b/i;
@@ -10,7 +11,10 @@ const ENGLISH_MARK = /\b(the|with|says|shares|stocks|earnings|reports|raises|fal
  *  se pide al motor (cache por noticia, cadena gratuita) y se etiqueta; si
  *  no está disponible se queda el original sin meta-texto de fallo. */
 export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
-  const original = (event.summary ?? '').trim();
+  // El helper comparte la regla del resto de superficies: un resumen que solo
+  // repite el titular no se pinta (la ingesta SEC sintética guarda
+  // summary === title y pintarlo duplicaba el prefijo «TICKER »).
+  const original = newsSummaryToShow(event.title ?? '', event.summary) ?? '';
   const [translated, setTranslated] = useState<string | null>(event.summary_translation?.text ?? null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [busy, setBusy] = useState(false);
