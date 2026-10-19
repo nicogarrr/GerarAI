@@ -53,3 +53,29 @@ export function exactSymbolFirst<T extends SearchRow>(rows: T[], query: string):
     const exact = (r: T) => r.symbol.toUpperCase() === q || (r.displaySymbol ?? '').toUpperCase() === q;
     return [...rows.filter(exact), ...rows.filter((r) => !exact(r))];
 }
+
+// Mercados con suficiente liquidez para ir antes que el resto de sufijos.
+const LIQUID_SUFFIXES = new Set(['MC', 'L', 'PA', 'AS', 'DE', 'MI', 'SW', 'TO', 'HK', 'T', 'AX']);
+
+function marketRank(r: SearchRow): number {
+    const sym = r.symbol.toUpperCase();
+    const idx = sym.lastIndexOf('.');
+    if (idx < 0) return 0; // listado desnudo (EE. UU.)
+    return LIQUID_SUFFIXES.has(sym.slice(idx + 1)) ? 1 : 2;
+}
+
+/**
+ * Orden por mercado: EE. UU. primero, luego bolsas líquidas, luego el resto.
+ * Una coincidencia exacta con lo escrito (query) conserva el primer puesto y
+ * el orden de Finnhub se mantiene dentro de cada grupo (CPT: Camden antes que CPT.BK).
+ */
+export function marketPriority<T extends SearchRow>(rows: T[], query: string): T[] {
+    const q = query.trim().toUpperCase();
+    const exact = (r: T) => !!q && (r.symbol.toUpperCase() === q || (r.displaySymbol ?? '').toUpperCase() === q);
+    const rest = rows.filter((r) => !exact(r));
+    const ranked = rest
+        .map((r, i) => ({ r, i, k: marketRank(r) }))
+        .sort((a, b) => a.k - b.k || a.i - b.i)
+        .map((x) => x.r);
+    return [...rows.filter(exact), ...ranked];
+}
