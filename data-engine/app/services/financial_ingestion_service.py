@@ -371,6 +371,71 @@ def _sum_disjoint_components(
 # concept (a recast), never across concepts.
 SCOPE_PRIORITY_METRICS = {"total_debt"}
 
+# Tags us-gaap de deuda financiera (lado PASIVO) usados como evidencia para la
+# derivada "net_debt = -caja" (EXEL, 19/10/2026): solo si NINGUNO tiene valor
+# en los ultimos 5 ejercicios la ausencia de total_debt es probatoria ("sin
+# deuda financiera reportada"). Si alguno tiene valor reciente (mapeado o no,
+# p.ej. ShortTermBorrowings o convertibles fuera del alcance de total_debt),
+# la ausencia es un posible hueco de mapeo y la deuda neta queda N/D (regla
+# del auditor). Lista cerrada y deliberadamente SIN los tags de deuda como
+# ACTIVO (DebtSecurities*, AvailableForSaleDebtSecurities*,
+# PaymentsToAcquire*Debt, ProceedsFromSaleOf*Debt): son inversiones, no
+# pasivo, y falsearian a emisores como EXEL que si los reportan. Verificado
+# contra el companyfacts real de EXEL: su ultimo tag de pasivo es
+# FinanceLeaseLiability* (2019-09-27) y su ultimo flujo de deuda
+# RepaymentsOfLongTermDebt (2020-01-03), ambos fuera de la ventana.
+DEBT_SIGNAL_CONCEPTS: frozenset[str] = frozenset({
+    # alcance actual de total_debt (si estan recientes, total_debt existe y
+    # esta via no se usa; se incluyen por fail-closed)
+    "DebtLongtermAndShorttermCombinedAmount", "LongTermDebt",
+    "LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations",
+    # saldos NO mapeados
+    "LongTermDebtCurrent", "ShortTermBorrowings",
+    "ConvertibleDebt", "ConvertibleDebtCurrent", "ConvertibleDebtNoncurrent",
+    "ConvertibleNotesPayable", "ConvertibleNotesPayableCurrent",
+    "ConvertibleNotesPayableNoncurrent",
+    "NotesPayable", "NotesPayableCurrent", "NotesPayableNoncurrent",
+    "LongTermNotesPayable", "LineOfCreditFacilityAmountOutstanding",
+    "FinanceLeaseLiability", "FinanceLeaseLiabilityCurrent",
+    "FinanceLeaseLiabilityNoncurrent",
+    "CommercialPaper", "SecuredDebt", "UnsecuredDebt",
+    "DebtInstrumentCarryingAmount", "BankOverdrafts",
+    # flujos del periodo: no son saldo a la fecha, pero una emision o
+    # amortizacion reciente es evidencia de que HUBO deuda cerca (prudencia)
+    "RepaymentsOfDebt", "RepaymentsOfLongTermDebt", "RepaymentsOfConvertibleDebt",
+    "RepaymentsOfShortTermDebt", "RepaymentsOfLinesOfCredit",
+    "ProceedsFromIssuanceOfDebt", "ProceedsFromIssuanceOfLongTermDebt",
+    "ProceedsFromShortTermDebt", "ProceedsFromConvertibleDebt",
+    "ProceedsFromLinesOfCredit", "PaymentsOfDebtIssuanceCosts",
+})
+
+# Ventana de evidencia (regla del auditor: "ultimos N ejercicios"): 5 anos
+# anclados al ejercicio anual mas reciente de ESTA ingesta (nivel emisor, no
+# por ano, para que la serie derivada sea consistente).
+DEBT_SIGNAL_MAX_AGE_DAYS = 365 * 5
+
+
+def _latest_debt_signal_end(us_gaap: dict[str, Any]) -> date | None:
+    """Fecha (end) mas reciente con valor en cualquier tag de DEBT_SIGNAL_CONCEPTS.
+
+    Escaneo bruto del companyfacts (sin filtro de forma/fp/unidad): cualquier
+    valor reportado cuenta como evidencia de deuda financiera viva o reciente.
+    """
+    latest: date | None = None
+    for concept in DEBT_SIGNAL_CONCEPTS:
+        units = (us_gaap.get(concept) or {}).get("units") or {}
+        for entries in units.values():
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                try:
+                    end = date.fromisoformat(str(entry.get("end") or "")[:10])
+                except ValueError:
+                    continue
+                if latest is None or end > latest:
+                    latest = end
+    return latest
+
 
 def _collapse_by_scope(
     by_concept: dict[str, dict[str, dict[str, Any]]],
@@ -1428,7 +1493,9 @@ class FinancialIngestionService:
                 # La deuda neta derivada es ligeramente optimista en ellos.
                 "cash_includes_restricted_periods": sorted(cash_restricted_years),
             }
-        facts_imported += self._derive_sec_metrics(db, company, document)
+        facts_imported += self._derive_sec_metrics(
+            db, company, document, debt_signal_latest_end=_latest_debt_signal_end(us_gaap)
+        )
 
         conflicts: list[str] = []
         sec_facts = list(
@@ -1746,11 +1813,29 @@ class FinancialIngestionService:
         )
         db.flush()
 
-    def _derive_sec_metrics(self, db: Session, company: Company, document: Document) -> int:
+    def _derive_sec_metrics(
+        self,
+        db: Session,
+        company: Company,
+        document: Document,
+        debt_signal_latest_end: date | None = None,
+    ) -> int:
         """Metricas derivadas del XBRL bruto (la SEC publica componentes, no
         derivadas; FMP si las trae): FCF = OCF + capex (capex ya negativo),
         margen FCF, crecimiento de revenue y deuda neta, por ano fiscal.
-        Sin ellas el snapshot de valoracion queda insufficient_data."""
+        Sin ellas el snapshot de valoracion queda insufficient_data.
+
+        Deuda neta sin concepto de deuda: si el ejercicio no tiene NINGUN
+        hecho total_debt pero el balance completo consta (caja, activos y
+        pasivos del mismo ano) Y el emisor no muestra ningun tag de deuda
+        financiera con valor en los ultimos 5 ejercicios
+        (DEBT_SIGNAL_CONCEPTS, evidencia positiva), la deuda neta se deriva
+        como -caja con la etiqueta "calculada; sin deuda financiera
+        reportada (ausencia de concepto, no un cero reportado)" en
+        document.metadata_ y en el claim de la tesis. Con señal de deuda
+        reciente o sin balance completo no se infiere nada: N/D. El LLM
+        nunca aporta la cifra: toda derivada nace de hechos reportados con
+        fuente."""
         by_metric: dict[str, dict[int, FinancialFact]] = {}
         for fact in db.scalars(
             select(FinancialFact).where(
@@ -1766,6 +1851,28 @@ class FinancialIngestionService:
             return by_metric.get(metric, {}).get(year)
 
         derived = 0
+        no_financial_debt_periods: dict[str, str] = {}
+        # Evidencia positiva para "sin deuda financiera": ningun tag de deuda
+        # (DEBT_SIGNAL_CONCEPTS) con valor en los ultimos 5 ejercicios, contado
+        # desde el ejercicio anual mas reciente de esta ingesta (nivel emisor).
+        # Con señal reciente la ausencia de total_debt puede ser un hueco de
+        # mapeo (ShortTermBorrowings, convertibles, leases...) y la deuda neta
+        # queda N/D, nunca -caja (regla del auditor, 19/10/2026).
+        latest_annual_end: date | None = None
+        for metric_facts in by_metric.values():
+            for fact in metric_facts.values():
+                try:
+                    end = date.fromisoformat(str(fact.period).split(":")[0])
+                except ValueError:
+                    continue
+                if latest_annual_end is None or end > latest_annual_end:
+                    latest_annual_end = end
+        debt_signal_recent = (
+            debt_signal_latest_end is not None
+            and latest_annual_end is not None
+            and (latest_annual_end - debt_signal_latest_end).days
+            <= DEBT_SIGNAL_MAX_AGE_DAYS
+        )
         # roe y book_value_growth solo se derivan para motores que los usan
         # como INPUT PROPIO (insurer/bank, P/B-ROE). Derivarlas para toda
         # empresa las haria visibles como alias de dividend_growth en el motor
@@ -1781,6 +1888,8 @@ class FinancialIngestionService:
             revenue = year_fact("revenue", year)
             debt = year_fact("total_debt", year)
             cash = year_fact("cash_and_equivalents", year)
+            assets = year_fact("total_assets", year)
+            liabilities = year_fact("total_liabilities", year)
             equity = year_fact("total_equity", year) if derives_equity_ratios else None
             prev_equity = year_fact("total_equity", year - 1) if derives_equity_ratios else None
             net_income = year_fact("net_income", year) if derives_equity_ratios else None
@@ -1903,6 +2012,51 @@ class FinancialIngestionService:
                     )
                 )
                 derived += 1
+            elif (
+                debt is None
+                and cash is not None
+                and assets is not None
+                and liabilities is not None
+                and not debt_signal_recent
+            ):
+                # Emisor que ya no reporta NINGUN concepto de deuda financiera
+                # en su 10-K (EXEL, 19/10/2026: pago su deuda; el ultimo tag
+                # LongTermDebt* es FY2017). Con el balance completo presente
+                # (activos y pasivos del mismo ejercicio), la ausencia del
+                # concepto significa "sin deuda financiera" y la deuda neta
+                # se deriva como -caja. NO es un cero reportado: la fila
+                # lleva is_reported=False, confidence rebajada y la etiqueta
+                # queda en document.metadata_["net_debt_no_financial_debt_periods"].
+                # Sin balance completo no hay inferencia: N/D (no se crea fila).
+                db.add(
+                    FinancialFact(
+                        company_id=company.id,
+                        metric="net_debt",
+                        value=-cash.value,
+                        unit=cash.unit,
+                        period=cash.period,
+                        fiscal_year=year,
+                        fiscal_quarter="FY",
+                        source_id=document.id,
+                        source_type="SEC",
+                        is_reported=False,
+                        confidence=Decimal("0.80"),
+                    )
+                )
+                derived += 1
+                no_financial_debt_periods[cash.period] = (
+                    "calculada; sin deuda financiera reportada en el 10-K del "
+                    f"periodo {cash.period} (ausencia de concepto, no un cero reportado)"
+                )
+        if no_financial_debt_periods:
+            existing = dict(
+                (document.metadata_ or {}).get("net_debt_no_financial_debt_periods") or {}
+            )
+            existing.update(no_financial_debt_periods)
+            document.metadata_ = {
+                **(document.metadata_ or {}),
+                "net_debt_no_financial_debt_periods": existing,
+            }
         db.flush()
         return derived
 

@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import desc, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.models import (
     Claim,
@@ -199,6 +199,29 @@ _METRIC_LABELS_ES = {
     "cash_and_equivalents": "efectivo y equivalentes",
     "total_debt": "deuda total",
 }
+
+
+def _no_financial_debt_note(fact: FinancialFact) -> str | None:
+    """Etiqueta por periodo cuando net_debt se derivo como -caja por AUSENCIA
+    de concepto de deuda (EXEL: sin deuda financiera reportada en el 10-K).
+
+    La ingesta la persiste en el documento fuente
+    (metadata_["net_debt_no_financial_debt_periods"]); la UI no lee esa
+    metadata, asi que el matiz viaja en el texto del claim, que es el canal
+    que la ficha si muestra. Mismo documento para toda la tanda: la carga
+    perezosa resuelve una vez por la identity map.
+    """
+    # Facts transitorios del snapshot (no persistidos) no pueden cargar la
+    # relacion perezosamente: sin sesion o sin source_id no hay nota.
+    session = object_session(fact)
+    if session is None or fact.source_id is None:
+        return None
+    source = session.get(Document, fact.source_id)
+    if source is None:
+        return None
+    notes = (source.metadata_ or {}).get("net_debt_no_financial_debt_periods") or {}
+    note = notes.get(fact.period)
+    return str(note) if note else None
 
 
 def _metric_claim_statement(ticker: str, metric: str, fact: FinancialFact) -> str:
@@ -1155,6 +1178,11 @@ class ThesisService:
         )
 
         for metric, fact in facts.items():
+            claim_text = _metric_claim_statement(company.ticker, metric, fact)
+            if metric == "net_debt" and not fact.is_reported and _no_financial_debt_note(fact):
+                # Matiz visible del criterio EXEL: la cifra es -caja por
+                # ausencia de concepto de deuda, no un cero reportado.
+                claim_text = f"{claim_text} Calculada; sin deuda financiera reportada."
             claims.append(
                 {
                     "claim_id": f"{company.ticker}:{metric}:{fact.period}",
@@ -1163,7 +1191,7 @@ class ThesisService:
                     "object": float(fact.value),
                     "unit": fact.unit,
                     "period": fact.period,
-                    "claim": _metric_claim_statement(company.ticker, metric, fact),
+                    "claim": claim_text,
                     "source_id": fact.source_id,
                     "source_type": fact.source_type,
                     "source_document_id": fact.source_id,
