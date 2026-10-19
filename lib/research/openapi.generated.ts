@@ -3959,29 +3959,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/screeners/universe-close": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Universe Close
-         * @description Resto del universo con el ultimo cierre almacenado (fecha por fila).
-         *
-         *     Excluye los valores que ya salen en vivo en /real y las entradas de
-         *     prueba (sin CIK ni ISIN). Cada fila lleva close_date y fuente.
-         */
-        get: operations["universe_close_api_screeners_universe_close_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/search": {
         parameters: {
             query?: never;
@@ -17825,49 +17802,6 @@ export interface operations {
             path: {
                 screen_id: number;
             };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    universe_close_api_screeners_universe_close_get: {
-        parameters: {
-            query?: {
-                sector?: string | null;
-                limit?: number;
-            };
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path?: never;
             cookie?: never;
         };
         requestBody?: never;

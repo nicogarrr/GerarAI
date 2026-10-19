@@ -425,33 +425,3 @@ export async function getSavedScreenerEngines(): Promise<
     Array<{ id: number; name: string; description: string; alerts_enabled: boolean; last_run_at: string | null }>
   >('/api/screeners/screens', { cache: 'no-store' });
 }
-
-export type UniverseCloseRow = {
-  symbol: string;
-  name: string;
-  sector: string;
-  currency: string;
-  close: number;
-  close_date: string;
-  change_pct: number | null;
-  source: string;
-};
-
-/**
- * Resto del universo con el último cierre almacenado (fecha en cada fila).
- * Los 35 valores en vivo van aparte; aquí no hay precios del minuto.
- */
-export async function getScreenerUniverseClose(
-  sector?: string,
-  limit = 100,
-): Promise<{ rows: UniverseCloseRow[]; total: number }> {
-  await requireAuthenticatedUser();
-  const params = new URLSearchParams({ limit: String(limit) });
-  if (sector) params.set('sector', sector);
-  const data = await researchRequest<{ rows?: UniverseCloseRow[]; total?: number }>(
-    `/api/screeners/universe-close?${params.toString()}`,
-    { timeoutMs: 8000 },
-  );
-  const rows = Array.isArray(data?.rows) ? data.rows : [];
-  return { rows, total: typeof data?.total === 'number' ? data.total : rows.length };
-}
