@@ -210,11 +210,27 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
     ).scalar_one_or_none()
     per = None
     if price_row is not None and eps_row is not None:
+        # Divisa del EPS vs divisa del listado: el cierre almacenado es el
+        # del listado de la Company (market_close_sync pide yahoo_symbol), y
+        # mezclar un EPS en EUR con un cierre en USD fabrica el ratio (caso
+        # real: PER de ASML 56x por cruzar ADR USD con EPS ESEF EUR). Misma
+        # regla que el screener (_unit_currency): sin coincidencia, N/D.
+        from app.services.screener_fundamentals import _unit_currency
         from app.services.split_adjustment import (
             cumulative_split_factor_after,
             period_end_date,
             split_events_by_company,
         )
+
+        eps_ccy = _unit_currency(eps_row.unit)
+        list_ccy = (company.currency or "").upper()
+        if eps_ccy and list_ccy and eps_ccy != list_ccy:
+            sources.append(
+                f"PER: N/D: EPS {eps_row.metric} FY{eps_row.fiscal_year} en "
+                f"{eps_ccy} y cierre del listado en {list_ccy}: mezclar "
+                "divisas fabrica el ratio")
+            return {"market_cap": market_cap, "per": None,
+                    "currency": company.currency, "sources": sources}
 
         # El cierre es de hoy: EPS en acciones actuales o el PER sale
         # inflado por el factor de cualquier split posterior al ejercicio.

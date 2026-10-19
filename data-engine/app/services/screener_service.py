@@ -222,6 +222,28 @@ class ScreenerService:
         db.refresh(screen)
         return screen
 
+    def metric_coverage(self, db: Session) -> list[str]:
+        """Metric names at least one company has data for.
+
+        Drives the screener UI suggestions: a name nobody has data for
+        (typo, metric never ingested) can only produce the "every company is
+        missing it" outcome, so offering it in the datalist sets the user up
+        to fail. Mirrors what run() tracks as names_with_data: calculated
+        metrics with a value plus raw financial facts.
+        """
+        calculated = set(
+            db.scalars(
+                select(CalculatedMetric.metric)
+                .where(
+                    CalculatedMetric.value.is_not(None),
+                    CalculatedMetric.status == "ok",
+                )
+                .distinct()
+            ).all()
+        )
+        facts = set(db.scalars(select(FinancialFact.metric).distinct()).all())
+        return sorted(calculated | facts)
+
     def run_saved(self, db: Session, screen: SavedScreen) -> dict[str, Any]:
         response = self.run(
             db,

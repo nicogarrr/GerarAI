@@ -105,6 +105,41 @@ def _has_phrase(lower_text: str, phrase: str) -> bool:
     return re.search(rf"(?<![a-z0-9]){re.escape(words)}(?![a-z0-9])", text) is not None
 
 
+
+_NAME_NOISE = {
+    "inc", "corp", "corporation", "ltd", "limited", "plc", "holdings", "holding", "group",
+    "company", "co", "the", "sa", "nv", "ag", "se", "class", "common", "stock", "adr", "ordinary",
+}
+# Fuentes que publican de todo (medios y agregadores): solo ahí la mención de la
+# empresa decide si la noticia es sobre ella. Filings, IR, transcripciones y
+# notas del usuario nunca se degradan.
+_GENERIC_SOURCE_TIERS = {"tier_4_reputable_media", "tier_5_data_provider", "tier_unknown"}
+UNRELATED_NEWS_MAX_MATERIALITY = 6
+
+
+def mentions_company(text: str, company: Company | None) -> bool:
+    """El texto cita el ticker o una palabra distintiva del nombre de la empresa."""
+    if company is None:
+        return True
+    folded = _fold(text or "")
+    ticker = (company.ticker or "").strip().lower()
+    if ticker and re.search(rf"(?<![a-z0-9]){re.escape(ticker)}(?![a-z0-9])", folded):
+        return True
+    for token in re.findall(r"[a-z0-9]+", _fold(company.name or "")):
+        if len(token) >= 3 and token not in _NAME_NOISE:
+            if re.search(rf"(?<![a-z0-9]){re.escape(token)}", folded):
+                return True
+    return not (ticker or (company.name or "").strip())
+
+
+def is_unrelated_generic_news(text: str, company: Company | None, source: str, url: str | None) -> bool:
+    """Titular de una fuente genérica que no menciona ni el ticker ni el nombre."""
+    if company is None:
+        return False
+    if classify_source(source, url).key not in _GENERIC_SOURCE_TIERS:
+        return False
+    return not mentions_company(text, company)
+
 # Un evento mas viejo que esta ventana nunca es "urgente" por recencia: un
 # filing de 2025 ingerido hoy no puede abrir una cola de revision urgente.
 RECENT_URGENCY_WINDOW = timedelta(days=7)
@@ -210,6 +245,12 @@ class MaterialityService:
             except Exception:  # noqa: BLE001 — Jev es best-effort, nunca rompe ingesta
                 pass
 
+        # Relevancia conservadora: nunca se descarta, solo se baja por debajo del
+        # umbral de revisión (7) si la fuente es genérica y el texto no cita a la
+        # empresa (QA: titulares de CoreWeave/HOOD con materialidad 10 en AAPL).
+        if is_unrelated_generic_news(text, company, source, url) and materiality > UNRELATED_NEWS_MAX_MATERIALITY:
+            materiality = UNRELATED_NEWS_MAX_MATERIALITY
+            reasons.append(f"sin mención de la empresa en fuente genérica => max {UNRELATED_NEWS_MAX_MATERIALITY}")
         materiality = max(1, min(materiality, 10))
         requires_update = materiality >= 7 or (portfolio_weight >= 0.10 and materiality >= 6)
         requires_update = apply_recency_policy(requires_update, published_at, reasons)

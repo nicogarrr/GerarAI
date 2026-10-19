@@ -51,7 +51,7 @@ export type CompanyMarketSnapshot = {
 };
 
 
-type ResearchCompanyBasics = { name?: string; exchange?: string; currency?: string };
+type ResearchCompanyBasics = { ticker?: string; name?: string; exchange?: string; currency?: string };
 
 // Finnhub profile2 no siempre cubre mercados no-US; la ficha research sí
 // tiene la compañía (resuelve sufijos, SAN.MC -> SAN) con nombre/bolsa/moneda.
