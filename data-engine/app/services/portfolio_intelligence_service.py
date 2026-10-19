@@ -274,6 +274,19 @@ class PortfolioIntelligenceService:
         attribution = self._attribution(db, rows, weights, price_series, cutoff)
         ledger_contribution = self._ledger_contribution(db, rows, cutoff)
         complete_price_series = sum(len(series) >= 2 for series in price_series.values())
+        today_ = date.today()
+        horizon_coverages = {
+            company.id: self._horizon_coverage(price_series.get(company.id, []), cutoff, today_)
+            for _, company in rows
+        }
+        positions_with_full_horizon = sum(
+            1 for _, full in horizon_coverages.values() if full
+        )
+        mean_horizon_coverage = (
+            round(100 * fmean(share for share, _ in horizon_coverages.values()), 1)
+            if rows
+            else 100.0
+        )
         return {
             "as_of": date.today(),
             "base_currency": base_currency,
@@ -336,6 +349,8 @@ class PortfolioIntelligenceService:
             "coverage": {
                 "positions": len(rows),
                 "positions_with_price_history": complete_price_series,
+                "positions_with_full_horizon": positions_with_full_horizon,
+                "price_history_window_percent": mean_horizon_coverage,
                 "price_history_percent": (
                     round(100 * complete_price_series / len(rows), 1) if rows else 100
                 ),
@@ -442,6 +457,36 @@ class PortfolioIntelligenceService:
             else:
                 filled.append(row)
         return filled
+
+    # Tolerancia de anclaje al inicio/fin del horizonte: fines de semana y
+    # festivos cortos no deben marcar una serie como "sin cubrir el horizonte".
+    _HORIZON_ANCHOR_TOLERANCE = timedelta(days=10)
+
+    @classmethod
+    def _horizon_coverage(
+        cls, series: list[Any], cutoff: date, today: date
+    ) -> tuple[float, bool]:
+        """(fraccion del horizonte cubierta, cubre_todo_el_horizonte).
+
+        `len(series) >= 2` solo dice "hay algo"; una serie de 15 sesiones en
+        un horizonte de 5 anos contaba como cobertura completa. Aqui se mide
+        la ventana real: tramo [primera, ultima] dentro de [cutoff, today]
+        sobre la longitud del horizonte, y cobertura completa cuando la serie
+        arranca a lo sumo _HORIZON_ANCHOR_TOLERANCE despues del cutoff y
+        llega hasta hoy con la misma tolerancia.
+        """
+        horizon_days = max((today - cutoff).days, 1)
+        if not series:
+            return 0.0, False
+        first = max(series[0].date, cutoff)
+        last = min(series[-1].date, today)
+        covered_days = max((last - first).days, 0)
+        share = min(covered_days / horizon_days, 1.0)
+        full = (
+            series[0].date <= cutoff + cls._HORIZON_ANCHOR_TOLERANCE
+            and series[-1].date >= today - cls._HORIZON_ANCHOR_TOLERANCE
+        )
+        return round(share, 4), full
 
     @staticmethod
     def _returns(series: list[MarketPrice]) -> dict[date, float]:
