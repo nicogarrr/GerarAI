@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import BottleneckDiscovery, BottleneckSignal
-from app.services.bottleneck_discovery_service import NO_DATA, resolve_evidence
+from app.services.bottleneck_discovery_service import NO_DATA, distinct_sources, resolve_evidence
 from app.services.bottleneck_service import THEMES
 
 router = APIRouter()
@@ -54,11 +54,14 @@ def list_bottlenecks(db: Session = Depends(get_db)) -> BottlenecksOut:
             theme=theme,
             evidence_ids=row.evidence_ids if row else [],
             evidence=[DiscoveryEvidenceOut(
-                id=ident,
-                title=resolved[ident].title if ident in resolved else None,
-                url=resolved[ident].url if ident in resolved else None,
-                status="verificada" if ident in resolved and resolved[ident].url else NO_DATA,
-            ) for ident in (row.evidence_ids or [])] if row else [],
+                id=item.id,
+                title=item.title,
+                url=item.url,
+                status="verificada" if item.url else NO_DATA,
+            # Fuentes realmente distintas: varios chunks de un mismo filing cuentan una vez.
+            ) for item in distinct_sources(
+                resolved[ident] for ident in (row.evidence_ids or []) if ident in resolved
+            )] if row else [],
             first_seen=row.first_seen if row else None,
             last_seen=row.last_seen if row else None,
             n_sources=row.n_sources if row else 0,
@@ -108,13 +111,15 @@ def list_discoveries(
     resolved = resolve_evidence(db, [i for row in rows for i in row.evidence_ids or []])
     items = []
     for row in rows:
-        evidence = []
-        for ident in row.evidence_ids or []:
-            found = resolved.get(ident)
-            url = found.url if found else None
-            evidence.append(DiscoveryEvidenceOut(
-                id=ident, title=found.title if found else None, url=url,
-                status="verificada" if url else NO_DATA))
+        # Fuentes realmente distintas: varios chunks de un mismo filing cuentan una vez.
+        evidence = [
+            DiscoveryEvidenceOut(
+                id=item.id, title=item.title, url=item.url,
+                status="verificada" if item.url else NO_DATA)
+            for item in distinct_sources(
+                resolved[ident] for ident in (row.evidence_ids or []) if ident in resolved
+            )
+        ]
         items.append(DiscoveryOut(
             id=row.id, theme=row.theme, ticker=row.ticker, label="INFERIDO", reasoning=row.reasoning,
             evidence=evidence, model=row.model, created_at=row.created_at))

@@ -71,6 +71,28 @@ _BOILERPLATE = re.compile(
 )
 
 
+_DECLARED_ITEM = re.compile(r"\d\.\d{2}")
+
+
+def declared_items(document: Document) -> list[dict[str, Any]]:
+    """Apartados declarados en el indice EDGAR (metadata["items"], "2.02, 9.01").
+
+    Sin texto completo (la SEC bloquea la IP del servidor, F359) son lo
+    unico veraz que se puede mostrar: codigo y nombre oficial del apartado,
+    sin extractos.
+    """
+    raw = (document.metadata_ or {}).get("items")
+    if not isinstance(raw, str):
+        return []
+    out: list[dict[str, Any]] = []
+    for code in _DECLARED_ITEM.findall(raw):
+        if any(i["code"] == code for i in out):
+            continue
+        out.append({"code": code, "title": ITEM_TITLES.get(code, f"Apartado {code}"),
+                    "official_title": None, "excerpts": []})
+    return out
+
+
 def tracked_company_ids(db: Session) -> dict[int, list[str]]:
     """company_id -> ["cartera", "watchlist"] para el tenant de la sesión."""
     tenant = db.info["tenant_id"]
@@ -249,15 +271,21 @@ def eight_k_digest(db: Session, *, page: int = 1, page_size: int = 10) -> dict[s
             "filing_intelligence": (document.metadata_ or {}).get(KEY),
         }
         if not chunks:
-            entry = {**base, "status": "insufficient_data", "items": [],
-                     "reason": "Sin texto completo disponible; revisa el documento oficial."}
+            declared = declared_items(document)
+            entry = {**base, "status": "insufficient_data", "items": declared,
+                     "reason": ("Sin texto completo disponible; se muestran solo los apartados "
+                                "declarados ante la SEC." if declared else
+                                "Sin texto completo disponible; revisa el documento oficial.")}
             entries.append(entry)
             seen[identity] = entry
             continue
         items = summarize_items(chunks)
         if not items:
-            entry = {**base, "status": "insufficient_data", "items": [],
-                     "reason": "No se identificaron apartados legibles en el 8-K."}
+            declared = declared_items(document)
+            entry = {**base, "status": "insufficient_data", "items": declared,
+                     "reason": ("No se identificaron apartados legibles en el 8-K; se muestran "
+                                "los declarados ante la SEC." if declared else
+                                "No se identificaron apartados legibles en el 8-K.")}
             entries.append(entry)
             seen[identity] = entry
         elif is_material(items):

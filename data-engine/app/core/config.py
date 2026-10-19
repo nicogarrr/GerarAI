@@ -434,7 +434,7 @@ class Settings(BaseSettings):
     # ChatFallbackProvider). Corto a proposito: la respuesta al usuario no
     # puede esperar una generacion larga; el primario compite con reasoning
     # reducido (opencode_go_chat_reasoning_effort).
-    chat_total_timeout_seconds: float = Field(default=45.0, gt=0)
+    chat_total_timeout_seconds: float = Field(default=20.0, gt=0)
     # Modelos con razonamiento oculto: gastan tokens de salida pensando y con un
     # max_tokens bajo devuelven "no assistant message". Suelo de salida para ellos.
     llm_hidden_reasoning_models: str = "longcat-2.5-preview-free"

@@ -24,8 +24,10 @@ converts that into an honest degraded state.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -131,12 +133,41 @@ def parse_entity(payload: dict[str, Any]) -> tuple[str, str]:
         raise EsefError(f"entity schema drift: {exc!r}") from exc
 
 
+def _inclusive_date(component: str) -> str:
+    """Componente de periodo xBRL-JSON -> fecha inclusiva ISO.
+
+    Los instantes xBRL-JSON son timestamps EXCLUSIVOS a medianoche: el
+    endDate inclusivo 2025-12-31 del XBRL inline se serializa como
+    «2026-01-01T00:00:00» (el instante en que EMPIEZA el dia siguiente), y
+    un instant de balance 2025-12-31 igual. Leer [:10] a pelo desplaza
+    TODOS los periodos un dia y un ejercicio (caso real prod: Aena FY2024
+    etiquetado «2025-01-01:FY» FY2025, ASML FY2025 como «2026-01-01:FY»
+    FY2026). Solo se corrige el patron con hora de medianoche explicita,
+    firma del instante exclusivo; un componente date-only ya es una fecha
+    inclusiva y se respeta.
+    """
+    if re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T00:00:00(\.\d+)?(Z|[+-]\d{2}:?\d{2})?",
+        component.strip(),
+    ):
+        try:
+            return (date.fromisoformat(component[:10]) - timedelta(days=1)).isoformat()
+        except ValueError:
+            pass
+    return component[:10]
+
+
 def parse_period(period: str) -> dict[str, str]:
-    """xBRL-JSON period -> {'instant': ...} or {'start': ..., 'end': ...}."""
+    """xBRL-JSON period -> {'instant': ...} or {'start': ..., 'end': ...}.
+
+    Fechas INCLUSIVAS: el start no se toca (medianoche = inicio de ese
+    dia); end e instant se convierten de instante exclusivo a fecha
+    inclusiva (_inclusive_date).
+    """
     if "/" in period:
         start, end = period.split("/", 1)
-        return {"start": start[:10], "end": end[:10]}
-    return {"instant": period[:10]}
+        return {"start": start[:10], "end": _inclusive_date(end)}
+    return {"instant": _inclusive_date(period)}
 
 
 def normalize_xbrl_json(doc: dict[str, Any]) -> dict[str, dict[str, list[dict[str, Any]]]]:

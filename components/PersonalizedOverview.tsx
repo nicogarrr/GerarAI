@@ -25,7 +25,7 @@ import {
     type TriggeredAlertDelivery,
 } from '@/lib/actions/alerts.actions';
 import { holdingDisplayMode } from '@/lib/portfolio/holding-display';
-import { alertCardDestination } from '@/lib/alerts/card-destination';
+import { alertCardDestination, alertThesisHref } from '@/lib/alerts/card-destination';
 import { alertCardCopy } from '@/lib/alerts/card-copy';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { t } from '@/lib/i18n/t';
@@ -481,7 +481,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                             {item.ticker && (
                                                 <Link
                                                     className="inline-flex min-h-[44px] items-center text-xs text-teal-400 after:absolute after:inset-0 after:rounded-lg after:content-[''] hover:text-teal-300 hover:underline"
-                                                    href={`/research/${item.ticker}?view=thesis`}
+                                                    href={alertThesisHref(item.ticker)}
                                                 >
                                                     Revisar tesis de {item.ticker}
                                                 </Link>

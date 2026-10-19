@@ -23,9 +23,9 @@ def db():
         yield session
 
 
-def _company(db, ticker="ITX"):
+def _company(db, ticker="ITX", name="Inditex"):
     company = Company(
-        ticker=ticker, name=ticker, exchange="BME", currency="EUR",
+        ticker=ticker, name=name, exchange="BME", currency="EUR",
         sector="S", industry="I", company_type="holding",
         valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
     )
@@ -240,3 +240,151 @@ def test_total_debt_honest_gap_with_one_component(db, monkeypatch):
             FinancialFact.metric == "total_debt",
         )
     ).all()
+
+
+def test_company_mismatch_never_writes_cross_entity_facts(db, monkeypatch):
+    """KRKNF = Kraken Robotics (CA) con snapshot de Kerry Group (IE): la
+    guardia rechaza la escritura. Sin ella, el join por ticker global
+    escribia los hechos de un emisor bajo otra Company (contaminacion real
+    detectada en prod 2026-10-19)."""
+    kerry_snapshot = {
+        "lei": "635400TLVVBNXLFHWC59",
+        "ticker": "KRYAY",
+        "entity_name": "Kerry Group Public Limited Company",
+        "period_end": "2025-12-31",
+        "fxo_id": "pkg",
+        "fetched_at": "2026-10-19",
+        "facts": {"ifrs-full:Revenue": {"iso4217:EUR": [
+            {"start": "2025-01-01", "end": "2025-12-31", "val": "6757600000",
+             "decimals": -5, "lei": "635400TLVVBNXLFHWC59", "dims": []},
+        ]}},
+    }
+    monkeypatch.setattr(ingestion.esef_connector, "read_esef_snapshot",
+                        lambda ticker: kerry_snapshot)
+    kraken = Company(
+        ticker="KRKNF", name="Kraken Robotics Inc (OTC)", exchange="OTC PINK",
+        currency="USD", sector="S", industry="I", company_type="standard",
+        valuation_model="unassigned", special_sources=[], special_risks=[],
+        factor_tags=[],
+    )
+    db.add(kraken)
+    db.commit()
+    with pytest.raises(RuntimeError, match="company_mismatch"):
+        asyncio.run(FinancialIngestionService().refresh_from_esef(db=db, company=kraken))
+    facts = db.scalars(
+        select(FinancialFact).where(FinancialFact.company_id == kraken.id)
+    ).all()
+    assert facts == []  # nada escrito bajo la Company equivocada
+
+
+def test_guard_folds_accents_legit_identity_passes(db, monkeypatch):
+    """«Telefónica» (Company) vs «TELEFONICA SA» (filing): sin plegar el
+    acento la guardia bloquearia la cobertura legitima de TEF."""
+    snapshot = json.loads(json.dumps(SNAPSHOT))
+    snapshot["entity_name"] = "TELEFONICA SA"
+    snapshot["lei"] = "549300EEJH4FEPDBBR25"
+    company = _company(db, ticker="TEF")
+    company.name = "Telefónica"
+    db.commit()
+    monkeypatch.setattr(ingestion.esef_connector, "read_esef_snapshot",
+                        lambda ticker: snapshot)
+    result = asyncio.run(FinancialIngestionService().refresh_from_esef(db=db, company=company))
+    assert result["status"] == "ingested"
+
+
+def test_reviewed_alias_name_passes_guard(db, monkeypatch):
+    """Nombre comercial corto («Inditex») con emisor legal largo: pasa por el
+    alias reviewed («INDITEX»), no por adivinacion."""
+    snapshot = json.loads(json.dumps(SNAPSHOT))
+    company = _company(db, ticker="ITX")
+    company.name = "Inditex"
+    db.commit()
+    monkeypatch.setattr(ingestion.esef_connector, "read_esef_snapshot",
+                        lambda ticker: snapshot)
+    result = asyncio.run(FinancialIngestionService().refresh_from_esef(db=db, company=company))
+    assert result["status"] == "ingested"
+
+
+def test_ticker_suffix_alias_never_rescues_identity(db, monkeypatch):
+    """ARM.MC no es un nombre: el alias reviewed de Arima NO puede rescatar a
+    Arm Holdings (UK, NASDAQ). Sin esta regla el dry-run de limpieza no marcaba
+    ARM (el token «ARM» del alias casa con «Arm Holdings»)."""
+    arima_snapshot = {
+        "lei": "959800K5R280DP2B5694", "ticker": "ARM",
+        "entity_name": "ARIMA REAL ESTATE SOCIMI, S.A.",
+        "period_end": "2025-12-31", "fxo_id": "fx", "fetched_at": "2026-10-19",
+        "facts": {"ifrs-full:Revenue": {"iso4217:EUR": [
+            {"start": "2025-01-01", "end": "2025-12-31", "val": "100",
+             "decimals": 0, "lei": "959800K5R280DP2B5694", "dims": []},
+        ]}},
+    }
+    monkeypatch.setattr(ingestion.esef_connector, "read_esef_snapshot",
+                        lambda ticker: arima_snapshot)
+    arm_holdings = _company(db, ticker="ARM", name="Arm Holdings PLC")
+    with pytest.raises(RuntimeError, match="company_mismatch"):
+        asyncio.run(FinancialIngestionService().refresh_from_esef(db=db, company=arm_holdings))
+    assert db.scalars(select(FinancialFact).where(
+        FinancialFact.company_id == arm_holdings.id)).all() == []
+
+
+def test_single_shared_token_with_loose_tokens_blocked(db, monkeypatch):
+    """Objecion del auditor: «Kerry Logistics Network» comparte «KERRY» con
+    «KERRY GROUP PLC» y es otra empresa. Un token solo no basta."""
+    kerry_snapshot = {
+        "lei": "635400TLVVBNXLFHWC59", "ticker": "KRYAY",
+        "entity_name": "Kerry Group Public Limited Company",
+        "period_end": "2025-12-31", "fxo_id": "fx", "fetched_at": "2026-10-19",
+        "facts": {},
+    }
+    monkeypatch.setattr(ingestion.esef_connector, "read_esef_snapshot",
+                        lambda ticker: kerry_snapshot)
+    logistics = _company(db, ticker="KRYAY", name="Kerry Logistics Network Ltd")
+    with pytest.raises(RuntimeError, match="company_mismatch"):
+        asyncio.run(FinancialIngestionService().refresh_from_esef(db=db, company=logistics))
+
+
+def test_short_legit_name_contained_passes(db, monkeypatch):
+    """El legitimo si pasa: «Kerry Group plc» esta contenido integro en el
+    nombre legal del filing."""
+    kerry_snapshot = {
+        "lei": "635400TLVVBNXLFHWC59", "ticker": "KRYAY",
+        "entity_name": "Kerry Group Public Limited Company",
+        "period_end": "2025-12-31", "fxo_id": "fx", "fetched_at": "2026-10-19",
+        "facts": {},
+    }
+    monkeypatch.setattr(ingestion.esef_connector, "read_esef_snapshot",
+                        lambda ticker: kerry_snapshot)
+    legit = _company(db, ticker="KRYAY", name="Kerry Group plc")
+    result = asyncio.run(FinancialIngestionService().refresh_from_esef(db=db, company=legit))
+    assert result["status"] == "ingested"
+
+
+def test_isin_lane_strongest_evidence(db, monkeypatch):
+    """ISIN (capturado del Flex de IBKR) manda sobre el nombre: match pasa
+    aunque el nombre no solape; mismatch bloquea aunque el nombre solape."""
+    snapshot = json.loads(json.dumps(SNAPSHOT))
+    monkeypatch.setattr(ingestion.esef_connector, "read_esef_snapshot",
+                        lambda ticker: snapshot)
+    # match: nombre deliberadamente distinto, ISIN reviewed ITX
+    ok = _company(db, ticker="ITX", name="Nombre Comercial Raro SA")
+    ok.isin = "ES0148396007"
+    db.commit()
+    result = asyncio.run(FinancialIngestionService().refresh_from_esef(db=db, company=ok))
+    assert result["status"] == "ingested"
+    # mismatch: nombre que solaparia, ISIN de otra empresa
+    bad = _company(db, ticker="SAN", name="Banco Santander")
+    bad.isin = "US0126531013"  # ISIN de otra empresa: bloquea sin mirar nombres
+    db.commit()
+    with pytest.raises(RuntimeError, match="company_mismatch"):
+        asyncio.run(FinancialIngestionService().refresh_from_esef(db=db, company=bad))
+
+
+def test_isin_mismatch_blocks_despite_name_overlap(db, monkeypatch):
+    snapshot = json.loads(json.dumps(SNAPSHOT))
+    monkeypatch.setattr(ingestion.esef_connector, "read_esef_snapshot",
+                        lambda ticker: snapshot)
+    bad = _company(db, ticker="ITX", name="Inditex")
+    bad.isin = "US0126531013"  # ISIN de otra empresa: manda sobre el nombre
+    db.commit()
+    with pytest.raises(RuntimeError, match="company_mismatch"):
+        asyncio.run(FinancialIngestionService().refresh_from_esef(db=db, company=bad))

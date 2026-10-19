@@ -177,7 +177,7 @@ class DocumentIngestionService:
             checksum=checksum,
             metadata_={
                 **{key: value for key, value in (filing_metadata or {}).items()
-                   if key in {"form", "report_date", "period_of_report", "accession_number", "parent_form", "fiscal_quarter"}},
+                   if key in {"form", "report_date", "period_of_report", "accession_number", "parent_form", "fiscal_quarter", "items"}},
                 "parser": parsed.parser,
                 "filename": filename,
                 "content_type": content_type,
