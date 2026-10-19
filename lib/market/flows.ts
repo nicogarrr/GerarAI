@@ -58,6 +58,8 @@ export type MoneyFlow = {
   method: string;
   limitation: string;
   notes: string[];
+  destinations_note: string | null;
+  suppliers_note: string | null;
 };
 
 export type MoneyFlowThemeSummary = { id: string; name: string; tagline: string };

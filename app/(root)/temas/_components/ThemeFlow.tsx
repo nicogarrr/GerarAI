@@ -125,6 +125,9 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
           <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
             A dónde va{attributed ? ' · estimación de terceros' : ' · reportado'}
           </h4>
+          {flow.destinations_note ? (
+            <p className="mt-1 text-[11px] text-gray-500">{flow.destinations_note}</p>
+          ) : null}
           <ul className="mt-2 space-y-1.5">
             {flow.destinations.map((destination) => {
               const thirdParty = destination.source.kind === 'estimacion_terceros';
@@ -168,6 +171,9 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
           <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
             Quién cobra
           </h4>
+          {flow.suppliers_note ? (
+            <p className="mt-1 text-[11px] text-gray-500">{flow.suppliers_note}</p>
+          ) : null}
           <ul className="mt-2 grid gap-2 sm:grid-cols-2">
             {flow.suppliers.map((supplier) => (
               <li className="rounded-lg border border-gray-800 bg-gray-900/40 p-3" key={supplier.ticker ?? supplier.name}>
