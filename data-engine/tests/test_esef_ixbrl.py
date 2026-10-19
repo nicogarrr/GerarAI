@@ -3,7 +3,6 @@ indexa Irlanda) y build de snapshots desde paquetes reviewed."""
 
 import asyncio
 import io
-import json
 import sys
 import zipfile
 from pathlib import Path
@@ -119,8 +118,9 @@ def test_build_package_payloads_lei_mismatch_discards(monkeypatch):
 
 
 def test_build_package_payloads_happy_path(monkeypatch):
-    import app.services.esef_package_sources as sources
     import build_esef_snapshots as builder
+
+    import app.services.esef_package_sources as sources
 
     pkgs = (
         sources.EsefPackageSource("635400TLVVBNXLFHWC59", "2025-12-31", "https://x/2025.zip"),
