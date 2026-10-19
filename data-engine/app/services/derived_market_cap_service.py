@@ -13,6 +13,15 @@ fecha del precio como period y la divisa de la compania como unit. Sin
 precio fresco o sin acciones: no se escribe nada (N/D honesto, nunca
 inventado). Idempotente: cada refresco reemplaza los derivados anteriores.
 
+Escritura acotada: un derivado mas fresco que DERIVED_TTL no se reescribe
+(revision auditor 19-oct-2026: sin TTL cada lectura de la watchlist haria
+delete+insert+commit; con TTL la ventana concurrente no escribe nada). Al
+refrescar se ACTUALIZA la fila existente en vez de delete+insert y se
+borran los duplicados: dos GET a la vez convergen en la misma fila y no
+nacen filas gemelas (la carrera residual es el primer derivado simultaneo;
+el siguiente refresco la repara). ttl=None desactiva el salto (barrido
+nocturno).
+
 Los recuentos de acciones son de la fecha de SU hecho y el precio es de
 hoy: si hubo un split entre ambos, el cap sale desplazado por el factor
 (caso real medido en prod 19-oct-2026: AENA, split 10:1 tras el FY2025 -
@@ -30,7 +39,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import FinancialFact, MarketPrice
@@ -43,6 +52,29 @@ from app.services.split_adjustment import (
 
 MAX_PRICE_AGE = timedelta(days=7)
 DERIVED_SOURCE = "derived"
+# Frescura de un derivado para NO reescribirlo: un backup calculado no
+# cambia mas rapido que sus entradas (cierre diario + hechos anuales).
+DERIVED_TTL = timedelta(hours=6)
+
+
+def _derived_rows(db: Session, company: Company, tenant_filter) -> list[FinancialFact]:
+    return list(db.scalars(
+        select(FinancialFact)
+        .where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == "market_cap",
+            FinancialFact.source_type == DERIVED_SOURCE,
+            tenant_filter,
+        )
+        .order_by(FinancialFact.updated_at.desc(), FinancialFact.id.desc())
+    ).all())
+
+
+def _age(updated_at: datetime, now: datetime) -> timedelta:
+    # SQLite devuelve datetimes naive aunque la columna sea tz-aware.
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=UTC)
+    return now - updated_at
 
 
 def _latest_price(db: Session, company: Company, *, today: date) -> MarketPrice | None:
@@ -134,25 +166,29 @@ def _shares_outstanding(
 
 
 def refresh_derived_market_cap(
-    db: Session, company: Company, *, today: date | None = None
+    db: Session,
+    company: Company,
+    *,
+    today: date | None = None,
+    ttl: timedelta | None = DERIVED_TTL,
 ) -> dict[str, Any]:
     """Escribe (o refresca) el market_cap derivado de una empresa."""
     today = today or datetime.now(UTC).date()
+    now = datetime.now(UTC)
     tenant_id = db.info.get("tenant_id")
     tenant_filter = (
         FinancialFact.tenant_id == tenant_id
         if tenant_id is not None
         else FinancialFact.tenant_id.is_(None)
     )
-    # Idempotencia: los derivados anteriores se reemplazan siempre.
-    db.execute(
-        delete(FinancialFact).where(
-            FinancialFact.company_id == company.id,
-            FinancialFact.metric == "market_cap",
-            FinancialFact.source_type == DERIVED_SOURCE,
-            tenant_filter,
-        )
-    )
+    existing = _derived_rows(db, company, tenant_filter)
+    newest = existing[0] if existing else None
+    if newest is not None and ttl is not None and _age(newest.updated_at, now) < ttl:
+        return {"status": "skipped", "reason": "fresh_derived"}
+    # Reparacion de duplicados (p. ej. dos primeros refrescos concurrentes):
+    # se actualiza la fila mas reciente y el resto se borra.
+    for extra in existing[1:]:
+        db.delete(extra)
     price = _latest_price(db, company, today=today)
     if price is None:
         db.flush()
@@ -166,22 +202,31 @@ def refresh_derived_market_cap(
         return {"status": "unavailable", "reason": "no_shares"}
     value, basis, split_factor = shares
     market_cap = Decimal(price.close) * value
-    db.add(
-        FinancialFact(
-            company_id=company.id,
-            metric="market_cap",
-            value=market_cap,
-            unit=str(getattr(company, "currency", "") or "USD"),
-            period=price.date.isoformat(),
-            fiscal_year=None,
-            fiscal_quarter=None,
-            source_id=None,
-            source_type=DERIVED_SOURCE,
-            is_reported=False,
-            is_adjusted=split_factor != 1,
-            confidence=Decimal("0.70"),
+    if newest is not None:
+        # Update-in-place: sin delete+insert no hay ventana sin fila ni
+        # duplicados por GET concurrentes.
+        newest.value = market_cap
+        newest.unit = str(getattr(company, "currency", "") or "USD")
+        newest.period = price.date.isoformat()
+        newest.is_adjusted = split_factor != 1
+        newest.confidence = Decimal("0.70")
+    else:
+        db.add(
+            FinancialFact(
+                company_id=company.id,
+                metric="market_cap",
+                value=market_cap,
+                unit=str(getattr(company, "currency", "") or "USD"),
+                period=price.date.isoformat(),
+                fiscal_year=None,
+                fiscal_quarter=None,
+                source_id=None,
+                source_type=DERIVED_SOURCE,
+                is_reported=False,
+                is_adjusted=split_factor != 1,
+                confidence=Decimal("0.70"),
+            )
         )
-    )
     db.flush()
     return {
         "status": "ok",
