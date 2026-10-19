@@ -50,7 +50,7 @@ for (const width of [390,820,1440]) test(`translated headline preserves original
  const surface=width<768?page.getByRole("list",{name:"Eventos de noticias",exact:true}):page.getByRole("region",{name:"Flujo de eventos de noticias",exact:true});
  await expect(surface.getByText(`La empresa anuncia resultados 2026 ${marker}`,{exact:true})).toBeVisible();
  await expect(surface.getByText("Traducción automática · español").first()).toBeVisible();
- await surface.getByText("Ver titular original").first().click();
+ await surface.getByText("Ver original").first().click();
  await expect(surface.getByText(original,{exact:true})).toBeVisible();
  expect(calls).toBe(1);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
