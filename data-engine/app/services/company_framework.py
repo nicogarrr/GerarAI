@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.models import Company
+from app.services.company_types import is_holding_company_type
 
 
 @dataclass(frozen=True)
@@ -259,7 +260,7 @@ def resolve_company_framework(company: Company) -> CompanyFramework:
         return FRAMEWORKS["insurer"]
     if "reit" in company_type or "reit" in model or "real_estate_nav" in model:
         return FRAMEWORKS["reit"]
-    if "holding" in company_type or "asset_manager" in company_type or "sotp" in model:
+    if is_holding_company_type(company_type) or "sotp" in model:
         return FRAMEWORKS["holding_asset_manager"]
     if "commodity" in tags or "mining" in company_type or "uranium" in company_type or "royalty" in company_type:
         return FRAMEWORKS["commodity"]

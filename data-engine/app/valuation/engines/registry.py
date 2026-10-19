@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.models import Company
+from app.services.company_types import is_holding_company_type
 from app.valuation.engines.base import ValuationEngine
 from app.valuation.engines.commodity import CommodityCycleEngine
 from app.valuation.engines.holding_company import HoldingCompanyEngine
@@ -31,14 +32,14 @@ def resolve_engine_key(company: Company) -> str:
     model = (company.valuation_model or "").lower()
     tags = set(company.factor_tags or [])
     company_type = (company.company_type or "").lower()
+    is_holding = is_holding_company_type(company_type)
 
     if (
         "sotp" in model
         or "sotp" in tags
-        or "holding" in company_type
-        or "asset_manager" in company_type
+        or is_holding
     ):
-        if "holding" in company_type or "asset_manager" in company_type:
+        if is_holding:
             return "holding_company"
         return "sotp"
     if "commodity" in model or "commodities" in tags or "mining" in company_type or "uranium" in company_type:
