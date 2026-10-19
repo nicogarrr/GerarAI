@@ -1312,10 +1312,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             )}
           </div>
         </Panel>
-        <Panel title="Grafo de dependencias y red team" collapsible="mobile">
-          <p className="text-sm text-gray-300">{data.graph ? `${data.graph.nodes.length} nodos · ${data.graph.edges.length} dependencias` : 'Sin grafo persistido.'}</p>
-          <p className="mt-2 text-sm text-gray-400">{data.redTeam?.strongest_bear_case ?? 'Sin ejecución de red team persistida.'}</p>
-        </Panel>
       </div>
     );
   } else if (activeView === 'changes') {
