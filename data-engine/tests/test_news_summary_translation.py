@@ -194,11 +194,56 @@ async def test_timeout_failure_cools_down_one_minute(db):
 
 
 @sync_test
-async def test_provider_failure_cools_down_ten_minutes(db):
+async def test_provider_failure_cools_down_one_minute(db):
+    # Fallo genérico de proveedor: cooldown corto (1 min); solo bad_output espera 10.
     row = event(db)
     await translate_summary(db, row.id, provider=Provider(error=True))
     db.refresh(row)
     record = row.metadata_["summary_translation"]
     assert record["failure"] == "provider"
     delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta <= timedelta(minutes=1)
+
+
+@sync_test
+async def test_bad_output_cools_down_ten_minutes(db):
+    # Salida rechazada: 10 min (reintentar no cambia el resultado).
+    row = event(db)
+    await translate_summary(db, row.id, provider=Provider("Texto sin numeros"))
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["failure"] == "bad_output"
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
     assert delta >= timedelta(minutes=10)
+
+
+class RateLimitedProvider(Provider):
+    async def complete(self, request):
+        from app.llm import ProviderHTTPError
+        raise ProviderHTTPError("fake", 429)
+
+
+@sync_test
+async def test_rate_limited_reports_reason_and_short_cooldown(db):
+    row = event(db)
+    result = await translate_summary(db, row.id, provider=RateLimitedProvider())
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "provider_rate_limited"
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["failure"] == "provider_rate_limited"
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta <= timedelta(minutes=1)
+
+
+@sync_test
+async def test_chain_falls_back_after_429(db, monkeypatch):
+    # La cadena gratuita: un 429 del primer eslabón pasa al siguiente, que traduce.
+    import app.services.public_headline_translation as pub
+    monkeypatch.setattr(pub, "free_provider_chain", lambda: [(RateLimitedProvider(), "m1"), (Provider(), "m2")])
+    row = event(db)
+    result = await translate_summary(db, row.id)
+    assert result["status"] == "translated"
+    assert result["text"] == ES_SUMMARY
+    db.refresh(row)
+    assert row.metadata_["summary_translation"]["status"] == "translated"

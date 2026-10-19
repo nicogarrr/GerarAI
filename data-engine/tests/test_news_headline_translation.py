@@ -220,4 +220,33 @@ async def test_headline_timeout_cools_down_one_minute_with_reason(db):
     record2 = row2.metadata_["headline_translation"]
     assert record2["failure"] == "provider"
     delta2 = datetime.fromisoformat(record2["retry_after"]) - datetime.fromisoformat(record2["created_at"])
-    assert delta2 >= timedelta(minutes=10)
+    assert delta2 <= timedelta(minutes=1)
+
+
+class RateLimitedProvider(Provider):
+    async def complete(self, request):
+        from app.llm import ProviderHTTPError
+        raise ProviderHTTPError("fake", 429)
+
+
+@sync_test
+async def test_headline_429_reports_reason_and_falls_back(db, monkeypatch):
+    # 429 aislado: reason provider_rate_limited y cooldown corto. Y la cadena
+    # gratuita pasa al siguiente eslabón, que traduce.
+    from datetime import datetime, timedelta
+    row = event(db)
+    result = await translate_headline(db, row.id, provider=RateLimitedProvider())
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "provider_rate_limited"
+    db.refresh(row)
+    record = row.metadata_["headline_translation"]
+    assert record["failure"] == "provider_rate_limited"
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta <= timedelta(minutes=1)
+
+    import app.services.public_headline_translation as pub
+    monkeypatch.setattr(pub, "free_provider_chain", lambda: [(RateLimitedProvider(), "m1"), (Provider(), "m2")])
+    row2 = event(db)
+    result2 = await translate_headline(db, row2.id)
+    assert result2["status"] == "translated"
+    assert result2["text"] == "La empresa anuncia resultados 2026"
