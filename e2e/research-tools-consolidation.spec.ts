@@ -4,7 +4,8 @@ for(const width of [390,820,1440]) test(`research tools stay contextual ${width}
  await page.setViewportSize({width,height:1000});
  await page.goto("/research");
  const nav=page.getByRole("navigation",{name:"Herramientas de la sección"});
- for(const name of ["Empresas","Asistente","Noticias","Fuentes"])
+ // "Asistente" salió del subnav en 317c5b3 (unificado en el Cerebro).
+ for(const name of ["Empresas","Noticias","Fuentes"])
   await expect(nav.getByRole("link",{name,exact:true})).toBeVisible();
  await expect(page.getByRole("heading",{name:"Herramientas de research",exact:true})).toHaveCount(0);
  await expect(page.getByRole("heading",{name:"Contexto de cartera",exact:true})).toHaveCount(0);
