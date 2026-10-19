@@ -6,7 +6,15 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models import Company, FinancialFact, InsiderTransaction, MarketPrice, NewsEvent, Position, ThesisVersion
+from app.models import (
+    Company,
+    FinancialFact,
+    InsiderTransaction,
+    MarketPrice,
+    NewsEvent,
+    Position,
+    ThesisVersion,
+)
 from app.models.entities import Base
 from app.services.brain_data_tools import answer_data_question
 from app.services.chat_service import ChatService

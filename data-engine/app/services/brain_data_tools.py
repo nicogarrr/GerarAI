@@ -13,7 +13,15 @@ from urllib.parse import quote
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Company, DividendRecord, InsiderTransaction, MarketPrice, NewsEvent, Position, ThesisVersion
+from app.models import (
+    Company,
+    DividendRecord,
+    InsiderTransaction,
+    MarketPrice,
+    NewsEvent,
+    Position,
+    ThesisVersion,
+)
 from app.schemas import ChatResponse
 from app.services.investment_plan_service import InvestmentPlanService
 from app.services.portfolio_fx_service import PortfolioFXService
