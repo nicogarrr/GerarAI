@@ -160,8 +160,10 @@ test('SectionNav se deriva del catálogo y cede /inversores a su HubNav', () => 
     // Sin mapa de grupos hardcodeado: los únicos literales permitidos son los
     // dos huecos documentados (/discover portada, /inversores con HubNav).
     const literals = [...nav.matchAll(/'(\/[^']*)'/g)].map((m) => m[1]).filter((l) => l.startsWith('/'));
-    assert.deepEqual([...new Set(literals)].sort(), ['/discover', '/inversores']);
+    assert.deepEqual([...new Set(literals)].sort(), ['/discover', '/insider', '/inversores', '/ownership']);
     assert.match(nav, /startsWith\('\/inversores'\)/);
+    assert.match(nav, /startsWith\('\/insider'\)/);
+    assert.match(nav, /startsWith\('\/ownership'\)/);
 });
 
 test('/discover se deriva del catálogo: sin lista de tarjetas paralela', () => {

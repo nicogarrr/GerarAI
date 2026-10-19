@@ -56,7 +56,8 @@ describe('proyección de dividendos: ausente no es cero', () => {
 
   it('la etiqueta del backend (INFERIDO) se pinta tal cual', () => {
     const view = source('components/portfolio/PortfolioDividends.tsx');
-    assert.ok(view.includes('projection.label'), 'la etiqueta de veracidad viene del payload');
+    // La etiqueta INFERIDO ya no se pinta en la UI (decisión del dueño, 17 oct): el payload la conserva.
+    assert.equal(view.includes('{projection.label}'), false, 'sin etiqueta «inferido» visible');
     const actions = source('lib/actions/portfolio.actions.ts');
     assert.ok(actions.includes('label: string;'), 'el tipo conserva la etiqueta del backend');
   });
