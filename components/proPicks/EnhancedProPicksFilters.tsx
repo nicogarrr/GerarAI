@@ -45,6 +45,14 @@ const sectors = [
   'Communication Services'
 ];
 
+const DEFAULT_FILTERS: ProPicksFilters = {
+  timePeriod: 'month',
+  limit: 20,
+  minScore: 70,
+  sector: 'all',
+  sortBy: 'score',
+};
+
 export default function EnhancedProPicksFilters({ filters, disabled = false, neutralSorts = [], onFiltersChange, onApply }: Props) {
   // Móvil: colapsado por defecto para que los picks sean lo primero que se
   // ve (Tester 4: el panel ocupaba toda la primera pantalla). En escritorio
@@ -55,14 +63,13 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
   };
 
   const resetFilters = () => {
-    onFiltersChange({
-      timePeriod: 'month',
-      limit: 20,
-      minScore: 70,
-      sector: 'all',
-      sortBy: 'score',
-    });
+    onFiltersChange(DEFAULT_FILTERS);
   };
+
+  // Con el panel colapsado en móvil, un filtro activo no puede quedar
+  // invisible: contador de desviaciones respecto a los valores por defecto.
+  const activeFilterCount = (Object.keys(DEFAULT_FILTERS) as (keyof ProPicksFilters)[])
+    .filter((key) => filters[key] !== DEFAULT_FILTERS[key]).length;
 
   return (
     <Card className="w-full min-w-0 border-gray-700 bg-gray-800/50">
@@ -74,6 +81,11 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
               <CardTitle className="text-lg">Filtros Avanzados</CardTitle>
             </div>
             <div className="flex items-center gap-1">
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-teal-500/20 px-2 py-0.5 text-xs font-semibold text-teal-300" title="Filtros distintos de los valores por defecto">
+                  {activeFilterCount} {activeFilterCount === 1 ? 'filtro' : 'filtros'}
+                </span>
+              )}
               <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={resetFilters}>
                 <X className="h-4 w-4 mr-1" />
                 Limpiar
