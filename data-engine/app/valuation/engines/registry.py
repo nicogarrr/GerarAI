@@ -59,6 +59,17 @@ def resolve_engine_key(company: Company) -> str:
         return "insurer"
     if "reit" in company_type:
         return "reit"
+    # Misma senal por industria que resolve_company_framework: company_type
+    # generico + industria Finnhub real (CB/KKR/CPT en prod, 2026-10-19).
+    industry = (getattr(company, "industry", "") or "").lower()
+    if "insur" in industry:
+        return "insurer"
+    if "reit" in industry or "real estate" in industry:
+        return "reit"
+    if "asset management" in industry:
+        return "holding_company"
+    if "bank" in industry:
+        return "bank"
     return "standard_dcf"
 
 

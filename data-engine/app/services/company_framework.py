@@ -249,6 +249,11 @@ def resolve_company_framework(company: Company) -> CompanyFramework:
         "BABA": "holding_asset_manager",
         "CCJ": "commodity",
         "FRPH": "commodity",
+        # Verificados en prod 2026-10-19 (fichas): CB aseguradora, KKR gestora,
+        # CPT REIT - sin maestro ni company_type que los distinga hoy.
+        "CB": "insurer",
+        "KKR": "holding_asset_manager",
+        "CPT": "reit",
     }
     if ticker in explicit_tickers:
         return FRAMEWORKS[explicit_tickers[ticker]]
@@ -262,6 +267,19 @@ def resolve_company_framework(company: Company) -> CompanyFramework:
         return FRAMEWORKS["reit"]
     if is_holding_company_type(company_type) or "sotp" in model:
         return FRAMEWORKS["holding_asset_manager"]
+    # Senal por industria (Finnhub profile / maestro) cuando el company_type
+    # no decide: una aseguradora o un REIT con company_type generico caian en
+    # generic_fcf, un framework que no les aplica (FCF no es FFO ni combined
+    # ratio). El modelo declara "bloqueado" hasta tener sus metricas propias.
+    industry = (getattr(company, "industry", "") or "").lower()
+    if "insur" in industry:
+        return FRAMEWORKS["insurer"]
+    if "reit" in industry or "real estate" in industry:
+        return FRAMEWORKS["reit"]
+    if "asset management" in industry:
+        return FRAMEWORKS["holding_asset_manager"]
+    if "bank" in industry:
+        return FRAMEWORKS["bank"]
     if "commodity" in tags or "mining" in company_type or "uranium" in company_type or "royalty" in company_type:
         return FRAMEWORKS["commodity"]
     if "subscriber" in tags or "subscriber" in company_type:
