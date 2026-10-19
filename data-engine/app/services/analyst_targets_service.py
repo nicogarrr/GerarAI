@@ -19,7 +19,9 @@ from pydantic import BaseModel
 
 SOURCE = "Yahoo Finance (no oficial), agregado de analistas"
 SOURCE_URL = "https://finance.yahoo.com/quote/{symbol}/analysis/"
-CACHE_TTL_SECONDS = 6 * 3600
+# 1h: movimientos de analistas del día (p.ej. reiteraciones) deben llegar a
+# ficha y listas el mismo día; Yahoo sigue marcando la latencia real de ingesta.
+CACHE_TTL_SECONDS = 3600
 FETCH_TIMEOUT_SECONDS = 12.0
 MAX_AGE_DAYS = 365
 MAX_ROWS = 25
