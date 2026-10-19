@@ -190,6 +190,18 @@ def test_hypothesis_publishable_has_no_indicative_prefix() -> None:
     assert not hypothesis.startswith("Valoración indicativa")
 
 
+def test_notice_es_never_shows_raw_english() -> None:
+    from app.services.thesis_service import _notice_es
+
+    indicativo = _notice_es({"notice": "INDICATIVE RANGE — uses assumed FCF margin (base 25%)"})
+    assert indicativo.startswith("RANGO INDICATIVO")
+    assert "INDICATIVE" not in indicativo
+    orientacion = _notice_es({"notice": "Valuation computed on inputs that are not traceable"})
+    assert orientacion.startswith("Valoración calculada")
+    assert _notice_es({"notice": "Something new in English"}) == ""
+    assert _notice_es({}) == ""
+
+
 def test_is_annual_rejects_quarter_period_with_date_prefix() -> None:
     from types import SimpleNamespace
 
