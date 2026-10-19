@@ -1287,14 +1287,14 @@ def refresh_market_pipeline(
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000)
 def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
-    """Digest yesterday's completed closes for one tenant."""
-    from datetime import timedelta
-
+    """Digest the last completed session's closes (skips weekends) for one tenant."""
     from app.services.portfolio_moves_service import build_digest
 
     db = _session(tenant_id, user_id)
     try:
-        as_of = datetime.now(UTC).date() - timedelta(days=1)
+        from app.services.daily_digest_alerts import last_session_date
+
+        as_of = last_session_date(datetime.now(UTC).date())
         digest = build_digest(db, as_of)
         from app.services.daily_digest_alerts import emit_digest_alert
 
