@@ -38,7 +38,10 @@ test('la acción resuelve símbolo y divisa con el master', () => {
 });
 
 test('métricas Finnhub solo para líneas US (nunca del ADR ni de un homónimo)', () => {
-    assert.match(action, /usListing \? getStockFinancialDataLight\(normalized\) : Promise\.resolve\(null\)/);
+    // La variante cambia (getStockValuationBasics: solo profile2+metric, sin /quote
+    // duplicada ni /price-target); la condición que fija el guard se mantiene:
+    // métricas Finnhub SOLO para líneas US, nunca del ADR ni de un homónimo.
+    assert.match(action, /usListing \? getStockValuationBasics\(normalized\) : Promise\.resolve\(null\)/);
 });
 
 test('sin correspondencia validada: «sin datos», nunca el ticker desnudo', () => {
