@@ -6,10 +6,26 @@ import { newsSummaryToShow } from '@/lib/news-summary';
 const nonLatin = /[\u0370-\u03ff\u0400-\u052f\u0600-\u06ff\u0900-\u097f\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
 const ENGLISH_MARK = /\b(the|with|says|shares|stocks|earnings|reports|raises|falls|after|amid|outlook|growth|investors|market|billion|million|revenue|warns|cuts|for|and|as|to|in)\b/i;
 
+/** Motivo estable que devuelve el motor (campo `reason` de la API) → texto
+ *  honesto para la persona. Medido en prod 19-oct-2026: un fallo devolvía el
+ *  botón a «Traducir» sin decir nada. Sin motivo conocido, mensaje genérico. */
+const REASON_TEXT: Record<string, string> = {
+  cooldown: 'Reintento programado en unos minutos.',
+  busy: 'Otra traducción está en curso. Inténtalo en unos segundos.',
+  budget: 'Límite diario de traducción alcanzado.',
+  quota: 'Límite de traducciones por minuto alcanzado. Inténtalo en un minuto.',
+  bad_output: 'El traductor automático no dio un resultado fiable para este texto.',
+  provider_rate_limited: 'Los traductores gratuitos están saturados ahora mismo. Inténtalo en unos minutos.',
+  provider_timeout: 'El traductor no respondió a tiempo. Inténtalo de nuevo en unos minutos.',
+  provider: 'El traductor falló. Inténtalo de nuevo en unos minutos.',
+  changed: 'La noticia cambió mientras se traducía. Inténtalo de nuevo.',
+};
+const GENERIC_FAILURE = 'Traducción no disponible ahora mismo. Inténtalo de nuevo en un rato.';
+
 /** Resumen/cuerpo ingerido con traducción bajo demanda (Nico: traducir cada
  *  noticia desde la ficha y el feed). El original es inmutable: la traducción
  *  se pide al motor (cache por noticia, cadena gratuita) y se etiqueta; si
- *  no está disponible se queda el original sin meta-texto de fallo. */
+ *  no está disponible se queda el original y se muestra el motivo. */
 export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
   // El helper comparte la regla del resto de superficies: un resumen que solo
   // repite el titular no se pinta (la ingesta SEC sintética guarda
@@ -24,23 +40,23 @@ export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
   const [translated, setTranslated] = useState<string | null>(event.summary_translation?.text ?? null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   if (!original) return null;
   const translatable = nonLatin.test(original) || ENGLISH_MARK.test(original);
   const onTranslate = () => {
     if (busy) return;
     setBusy(true);
-    setUnavailable(false);
+    setFailure(null);
     fetch(`/api/news/${event.id}/translation/summary`, { method: 'POST', signal: AbortSignal.timeout(17000) })
       .then(async res => {
         const data = res.ok ? await res.json() : null;
         if (data?.status === 'translated' && typeof data.text === 'string') {
           setTranslated(data.text);
         } else {
-          setUnavailable(true);
+          setFailure(typeof data?.reason === 'string' ? data.reason : 'unknown');
         }
       })
-      .catch(() => setUnavailable(true))
+      .catch(() => setFailure('unknown'))
       .finally(() => setBusy(false));
   };
   const showingTranslation = translated !== null && !showOriginal;
@@ -59,9 +75,9 @@ export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
           <button className="min-h-11 text-teal-300 hover:text-teal-200 sm:min-h-0" type="button" disabled={busy} onClick={onTranslate}>
             {busy ? 'Traduciendo…' : 'Traducir'}
           </button>
-          {unavailable ? (
+          {failure ? (
             <span className="text-gray-500" role="status">
-              Traducción no disponible ahora mismo. Inténtalo de nuevo en un rato.
+              {REASON_TEXT[failure] ?? GENERIC_FAILURE}
             </span>
           ) : null}
         </span>
