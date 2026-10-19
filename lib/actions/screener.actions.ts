@@ -258,6 +258,11 @@ export type RealScreenerResponse = {
   as_of: number;
   count: number;
   screener: RealScreenerRow[];
+  /** true = sin datos todavía y un refresco en vuelo (carga fría), no un filtro
+   *  sin resultados. */
+  refreshing?: boolean;
+  /** Tamaño del universo seguido, para declarar el alcance real del listado. */
+  universe_size?: number;
 };
 
 /**
@@ -266,6 +271,19 @@ export type RealScreenerResponse = {
  */
 export const getScreenerStocksReal = cache(
   async (filters: RealScreenerFilters = {}): Promise<RealScreenerRow[]> => {
+    return (await getScreenerStocksRealWithStatus(filters)).rows;
+  },
+);
+
+/** Versión con estado: además de las filas devuelve `refreshing` (carga fría
+ *  con refresco en vuelo, distinto de «filtro sin resultados») y el tamaño
+ *  del universo seguido, para que la pantalla declare su alcance real. */
+export const getScreenerStocksRealWithStatus = cache(
+  async (filters: RealScreenerFilters = {}): Promise<{
+    rows: RealScreenerRow[];
+    refreshing: boolean;
+    universeSize: number | null;
+  }> => {
     await requireAuthenticatedUser();
     const params = new URLSearchParams();
     if (filters.marketCapMoreThan) {
@@ -281,9 +299,11 @@ export const getScreenerStocksReal = cache(
       { cache: 'no-store' },
     );
     const rows = data?.screener ?? [];
+    const refreshing = data?.refreshing === true;
+    const universeSize = typeof data?.universe_size === 'number' ? data.universe_size : null;
     // Precio, variación y fecha salen de los mismos cierres datados que Movers.
     const dated = await fetchDatedChanges(rows.map((row) => row.symbol));
-    return rows.map((row) => {
+    const mapped = rows.map((row) => {
       const d = dated[row.symbol.toUpperCase()];
       if (!d) return row;
       return {
@@ -295,6 +315,7 @@ export const getScreenerStocksReal = cache(
         priceDate: d.date,
       };
     });
+    return { rows: mapped, refreshing, universeSize };
   },
 );
 
