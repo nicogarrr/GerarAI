@@ -369,8 +369,14 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
   }
   const stalenessOf = (fact: ResearchFact) =>
     factStalenessNotice(fact, { isLatestForMetric: latestIdByMetric.get(fact.metric) === fact.id, latestFiscalYear });
+  const hasUnofficial = facts.some((fact) => String(fact.source_type ?? '').toUpperCase() === 'YAHOO_FUNDAMENTALS');
   return (
     <>
+      {hasUnofficial ? (
+        <p className="mb-3 text-xs text-amber-300" role="note">
+          Incluye cifras de una fuente no oficial (Yahoo Finance), sin auditar ni contrastar con el emisor; la fuente de cada fila aparece a la derecha.
+        </p>
+      ) : null}
       {/* Móvil: cards paginadas con «ver más» en vez de corte silencioso */}
       <div className="space-y-3 md:hidden">
         {facts.slice(0, FACTS_MOBILE_PAGE).map((fact) => (
@@ -390,9 +396,9 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
         ) : null}
       </div>
       {/* Escritorio: tabla completa */}
-      <div aria-label="Hechos reportados" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
+      <div aria-label="Hechos financieros" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
       <table className="w-full text-left text-sm">
-        <caption className="sr-only">Hechos reportados de la empresa: métrica, periodo, valor y tipo de fuente</caption>
+        <caption className="sr-only">Hechos financieros de la empresa (oficiales y, si se indica, no oficiales): métrica, periodo, valor y fuente</caption>
         <thead className="text-xs uppercase text-gray-500">
           <tr>
             <th className="border-b border-gray-800 py-2" scope="col">Métrica</th>
