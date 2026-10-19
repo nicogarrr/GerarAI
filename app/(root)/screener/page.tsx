@@ -5,7 +5,7 @@ import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { MoversTable } from '@/components/market/MoversTable';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getSavedScreenerEngines, getScreenerStocksRealWithStatus } from '@/lib/actions/screener.actions';
-import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, formatUserDateTime, isValidCurrencyCode } from '@/lib/format';
+import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, formatUserDateTime, isValidCurrencyCode } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { indicesCardState } from '@/lib/market/indices-card-state';
