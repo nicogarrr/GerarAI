@@ -88,11 +88,16 @@ def _without_data_reason(ticker: str, company: Any, has_filings: bool) -> dict[s
             "no_open_market_trades",
             "Hay Form 4 pero ninguna compra/venta en mercado abierto (P/S) en el periodo.",
         )
-    elif not cik and ("." in ticker or exchange not in _US_EXCHANGES):
+    elif not cik and exchange and exchange not in _US_EXCHANGES and not exchange.startswith("OTC"):
         reason, label = (
             "foreign_issuer_no_form4",
             "No presenta Form 4: emisor extranjero sin registro SEC. Sus directivos "
             "declaran en su regimen local (p. ej. MAR/RNS en Londres, SEDI en Canada).",
+        )
+    elif not cik and exchange.startswith("OTC"):
+        reason, label = (
+            "otc_no_cik",
+            "Sin CIK SEC (cotiza en OTC): probablemente emisor extranjero sin Form 4; no verificado automaticamente.",
         )
     elif not cik:
         reason, label = (
