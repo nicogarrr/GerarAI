@@ -303,7 +303,7 @@ def test_memory_api_tracks_claims_evidence_sections_and_sessions():
         json={
             "text": (
                 "Microsoft (MSFT) announces a large share offering and cuts revenue guidance, "
-                "raising dilution and fcf margin concerns for the current thesis."
+                "raising dilution and fcf margin concerns for the current Microsoft thesis."
             ),
             "source": "manual_test",
             "url": "https://www.microsoft.com/investor",
@@ -326,7 +326,7 @@ def test_memory_api_tracks_claims_evidence_sections_and_sessions():
 
     unique_suffix = uuid4().hex
     contract_url = f"https://www.microsoft.com/investor/news/msft-contract-{unique_suffix}"
-    contract_title = f"MSFT wins major customer contract and raises revenue outlook {unique_suffix}"
+    contract_title = f"Microsoft wins major customer contract and raises revenue outlook {unique_suffix}"
     contract_text = f"New contract award improves backlog conversion and revenue timing {unique_suffix}."
     batch = client.post(
         "/api/news/ingest",
@@ -652,7 +652,9 @@ def test_fmp_refresh_normalizes_facts_and_valuation_uses_them(monkeypatch):
     assert "| Ingresos |" in thesis_payload["thesis_markdown"]
     assert f"Tesis de MSFT — v{thesis_payload['version']}" in thesis_payload["thesis_markdown"]
     assert thesis_payload["status"] == "draft"
-    assert thesis_payload["data_confidence_score"] == 55
+    # F7: la confianza se deriva de la evidencia (ya no la constante 55). Con
+    # valoracion no publicable cae en la banda 35-75 (floor/ceiling de _confidence_score).
+    assert 35 <= thesis_payload["data_confidence_score"] <= 75
     assert "Drivers obligatorios ausentes:" in thesis_payload["thesis_markdown"]
     assert "Drivers obligatorios ausentes: ninguno" not in thesis_payload["thesis_markdown"]
 
