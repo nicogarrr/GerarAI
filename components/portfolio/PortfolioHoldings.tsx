@@ -1,6 +1,7 @@
 'use client';
 
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
+import { nativePnlIfContradicts } from '@/lib/portfolio-native-pnl';
 import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { formatDate, formatMoney, formatNumber, formatPercent, NA } from '@/lib/format';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -36,6 +37,27 @@ function describeSymbols(symbols: string[]): string {
   const shown = symbols.slice(0, 5);
   const rest = symbols.length - shown.length;
   return `${shown.join(', ')}${rest > 0 ? ` y ${rest} más` : ''}`;
+}
+
+function NativePnlLine({ holding, gainKnown, format }: { holding: PortfolioHolding; gainKnown: boolean; format: (value: number, currency: string) => string }) {
+  const native = nativePnlIfContradicts({
+    gain: holding.gain,
+    gainKnown,
+    nativeGain: holding.nativeGain,
+    nativeCost: holding.nativeCost,
+    nativeCurrency: holding.nativeCurrency,
+    baseCurrency: holding.baseCurrency,
+  });
+  if (!native) return null;
+  const pct = native.percent == null ? '' : ` (${formatPercent(native.percent, { fromRatio: false, digits: 2, signDisplay: 'always' }, NA)})`;
+  return (
+    <span
+      className={cn('block text-right text-xs', native.amount >= 0 ? 'text-green-400' : 'text-red-400')}
+      title={`La G/P en ${holding.baseCurrency} usa el tipo de cambio de cada compra`}
+    >
+      En {native.currency}: {format(native.amount, native.currency)}{pct}
+    </span>
+  );
 }
 
 export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency }: Props) {
@@ -203,6 +225,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                           </Badge>
                         </dd>
                       </div>
+                      <NativePnlLine holding={holding} gainKnown={gainKnown} format={format} />
                       {/* Dato decisional fiscal reubicado (SERIE 1, auditoría): accesible por fila, nulo honesto. */}
                       <div className="flex items-center justify-between gap-2">
                         <dt className="text-gray-500">Fiscal</dt>
@@ -315,6 +338,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                           >
                             {gainKnown ? formatPercent(holding.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' }, NA) : NA}
                           </Badge>
+                          <NativePnlLine holding={holding} gainKnown={gainKnown} format={format} />
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-sm">
