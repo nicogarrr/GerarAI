@@ -151,6 +151,25 @@ def test_watchlist_metrics_endpoint_reports_derived_cap_and_per(db):
     assert any("derivada" in src for src in payload["sources"])
 
 
+def test_watchlist_metrics_endpoint_derives_on_demand(db):
+    # QA Tester 6 (19-oct-2026): el endpoint deriva el cap si el barrido
+    # aún no lo escribió, sin llamada previa a refresh_derived_market_cap.
+    from datetime import timedelta as _td
+
+    from app.api.routes.watchlist import watchlist_metrics
+
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - _td(days=1))
+    _fact(db, company, "net_income", 1_934_000_000, year=2024)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2024)
+    db.commit()
+
+    payload = watchlist_metrics("aena", db)
+    assert payload["market_cap"] == pytest.approx(
+        25.70 * (1_934_000_000 / 12.89), rel=1e-6)
+    assert any("derivada" in src for src in payload["sources"])
+
+
 def test_watchlist_metrics_endpoint_honest_nulls(db):
     from app.api.routes.watchlist import watchlist_metrics
 
