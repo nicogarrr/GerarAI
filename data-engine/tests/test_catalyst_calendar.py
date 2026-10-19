@@ -128,7 +128,7 @@ def test_build_real_nasdaq_formats_and_us_only():
         ("2026-10-16", "KO", "dividend_ex", "0,5100 por acción"),
         ("2026-10-22", "LOOP", "earnings", "antes de la apertura, BPA estimado -0,05"),
         ("2026-10-22", "ALM", "corporate_action", "ratio 2"),
-        ("2026-10-23", "KO", "earnings", None),
+        ("2026-10-23", "KO", "earnings", "hora por confirmar"),
     ]
     assert all(e["source"] for e in events)
     assert not any(e["type"] == "dividend_pay" for e in events)
