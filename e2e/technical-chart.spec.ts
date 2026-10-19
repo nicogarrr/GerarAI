@@ -7,7 +7,9 @@ for (const viewport of [{ width: 1440, height: 1080 }, { width: 390, height: 844
         page.on('pageerror', (error) => errors.push(error.message));
         await page.goto('/chart-preview');
         await expect(page.getByTestId('technical-price-canvas').locator('canvas').first()).toBeVisible();
-        await expect(page.getByRole('heading', { name: 'Lectura técnica', exact: true })).toBeVisible();
+        // Por debajo de md la lectura técnica va plegada: se abre antes de comprobarla.
+        if (viewport.width < 768) await page.getByRole('button', { name: 'Lectura técnica', exact: true }).click();
+        else await expect(page.getByRole('heading', { name: 'Lectura técnica', exact: true })).toBeVisible();
         await expect(page.getByText('Pivotes diarios', { exact: false })).toBeVisible();
         await expect(page.getByText('Retrocesos del rango 1M')).toBeVisible();
         await expect(page.getByRole('tab')).toHaveCount(0);

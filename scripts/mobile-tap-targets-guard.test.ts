@@ -13,14 +13,17 @@ const AREA = 'min-h-[44px]';
 describe('ficha movil: objetivos tactiles de al menos 44px', () => {
     it('enlaces de la cabecera de la ficha', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        for (const texto of ['Cortos públicos', 'Noticias</Link>', 'Insiders</Link>', 'Dividendos y splits', '>Research</Link>']) {
-            const i = page.indexOf(texto);
-            assert.ok(i > 0, `${texto} existe`);
-            const tag = page.slice(page.lastIndexOf('<Link', i), i);
-            assert.ok(tag.includes(AREA), `${texto} con ${AREA}`);
+        const i = page.indexOf('>Research</Link>');
+        assert.ok(i > 0, 'Research existe');
+        assert.ok(page.slice(page.lastIndexOf('<Link', i), i).includes(AREA), 'Research con area tactil');
+        // Los enlaces secundarios viven en el menú de cabecera.
+        const menu = readFileSync('components/research/CompanyActionsMenu.tsx', 'utf8');
+        const item = menu.match(/const ITEM = '([^']+)'/)?.[1] ?? '';
+        assert.ok(item.includes(AREA), 'enlaces del menu con area tactil');
+        for (const texto of ['Qué ha cambiado', 'Cortos públicos', 'Noticias', 'Insiders', 'Dividendos y splits']) {
+            assert.ok(menu.includes(texto), `${texto} en el menu`);
         }
-        const cambios = page.indexOf('Qué ha cambiado');
-        assert.ok(page.slice(page.lastIndexOf('<Link', cambios), cambios).includes(AREA), 'Qué ha cambiado con area tactil');
+        assert.ok(menu.includes('size-11'), 'boton del menu de 44px');
     });
     it('boton Guia de investigacion y conmutador Saldos/Emisiones', () => {
         const guide = readFileSync('components/research/GuideBrainButton.tsx', 'utf8');

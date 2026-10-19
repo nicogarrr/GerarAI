@@ -5,6 +5,8 @@ import { formatResearchMetric } from '@/lib/research/metric-value';
 import { financialFormula, financialPeriod, financialVersionLabel } from '@/lib/research/financial-display';
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import ThesisAudioPlayer from '@/components/research/ThesisAudioPlayer';
+import MobileCollapse from '@/components/ui/mobile-collapse';
+import CompanyActionsMenu from '@/components/research/CompanyActionsMenu';
 import { collapseVersionHistory } from '@/lib/research/version-history';
 import { listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
@@ -1112,6 +1114,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           )}
         </Panel>
         {snapshot.research_health.missing?.length ? (
+          <MobileCollapse title={`Capas de research que faltan (${snapshot.research_health.missing.length})`}>
           <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-200">
             <p>Capas de research que faltan:</p>
             <ul className="mt-2 space-y-1">
@@ -1133,6 +1136,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               })}
             </ul>
           </div>
+          </MobileCollapse>
         ) : null}
         <Panel collapsible="mobile"
           actions={moatScore ? (
@@ -1156,7 +1160,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             Están aquí, en el resumen, y no repartidos por las 16 píldoras
             planas que había antes.
         */}
-        <Panel collapsible="mobile"
+        <Panel className="hidden md:block" collapsible="mobile"
           description="Dónde está el resto del análisis de esta empresa."
           density="compact"
           title="Por dónde seguir"
@@ -1608,9 +1612,16 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         <header className="mb-6 flex flex-col gap-4 border-b border-gray-800 pb-6">
           <div className="flex items-start gap-3 sm:gap-4">
             <CompanyLogo ticker={ticker} name={company.name || ticker} className="size-12 shrink-0 rounded-xl sm:size-14" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3"><h1 className="text-2xl font-bold sm:text-3xl">{ticker}</h1>{exchangeDisplayName(company.exchange) ? <Badge variant="outline">{exchangeDisplayName(company.exchange)}</Badge> : null}<Badge variant="outline">{company.currency}</Badge></div>
               <p className="mt-2 text-sm text-gray-400 sm:text-base">{company.name} · {sectorIndustryLine(company.sector, company.industry)}</p>
+              <p className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500"><Target className="h-3.5 w-3.5" />{holdingBadge}</p>
+            </div>
+            <div className="-mr-2 flex shrink-0 items-center">
+              <FollowButton compact symbol={ticker} company={company.name} isFollowed={isFollowed} stateUnknown={watchlistUnknown} />
+              {/* Ancla del comando ALERT del buscador (`ASTS ALERT` -> #alerta). */}
+              <div id="alerta" className="scroll-mt-6"><QuickAlertButton compact ticker={ticker} currency={company.currency} /></div>
+              <CompanyActionsMenu ticker={ticker} changeCount={recentChangeCount} />
             </div>
           </div>
           {(() => {
@@ -1620,21 +1631,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
-          <Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense>
-          <div className="flex flex-col gap-3 border-t border-gray-900 pt-4">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><Target className="h-4 w-4" />{holdingBadge}</span><GuideBrainButton ticker={ticker} /><Link className="inline-flex min-h-[44px] items-center gap-1 text-gray-400 transition hover:text-teal-300 sm:min-h-0" href={`/research/${encodeURIComponent(ticker)}?view=changes`}><History className="h-4 w-4" />Qué ha cambiado{recentChangeCount ? <span aria-hidden="true" className="rounded-full bg-gray-800 px-1.5 text-xs font-semibold text-gray-300">{recentChangeCount}</span> : null}</Link></div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" href={`/research/${encodeURIComponent(ticker)}/shorts`}>Cortos públicos</Link>
-                <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" href={`/research/news?ticker=${encodeURIComponent(ticker)}`}>Noticias</Link>
-                <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" href={`/insider?ticker=${encodeURIComponent(ticker)}`}>Insiders</Link>
-                <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" href={`/corporate-actions?ticker=${encodeURIComponent(ticker)}`}>Dividendos y splits</Link>
-              </div>
-              {/* Ancla del comando ALERT del buscador (`ASTS ALERT` -> #alerta). */}
-              <div id="alerta" className="w-full scroll-mt-6 sm:w-auto sm:min-w-0 sm:flex-1"><QuickAlertButton ticker={ticker} currency={company.currency} /></div>
-              <FollowButton symbol={ticker} company={company.name} isFollowed={isFollowed} stateUnknown={watchlistUnknown} />
-            </div>
-          </div>
+          <MobileCollapse title="Precios objetivo de analistas"><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse>
         </header>
         {/*
             Selector de paso (Entender → Valorar → Seguir) y, debajo, solo los
