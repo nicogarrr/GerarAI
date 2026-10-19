@@ -15,3 +15,7 @@ test('la fila de watchlist no repite la tendencia en un icono', () => {
 test('el nombre de la empresa no tiene ancho máximo fijo', () => {
     assert.ok(!SRC.includes('max-w-[140px]'));
 });
+
+test('la tarjeta DCF no se pinta mientras carga (evita salto de layout)', () => {
+    assert.ok(SRC.includes('{!opportunitiesLoading && (opportunitiesError || opportunities.length > 0) && ('));
+});
