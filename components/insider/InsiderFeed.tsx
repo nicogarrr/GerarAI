@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
-import { formatDate, formatMoney, formatNumber } from '@/lib/format';
+import { formatDate, formatNumber, formatPrice } from '@/lib/format';
 import type { InsiderFeedResult, InsiderFeedSignal, InsiderFeedTransaction } from '@/lib/actions/insider.actions';
 import { insiderName, insiderRole, isInstitutionalInsiderName, sideLabel } from '@/lib/insider/format';
 
@@ -16,7 +16,7 @@ const PERIODS = [
 ] as const;
 
 const usd = (value: number | null | undefined, digits = 0) =>
-    typeof value === 'number' && Number.isFinite(value) ? formatMoney(value, 'USD', { maximumFractionDigits: digits }) : '—';
+    typeof value === 'number' && Number.isFinite(value) ? formatPrice(value, 'USD', { minimumFractionDigits: digits, maximumFractionDigits: digits }) : '—';
 
 function href(side: string, days: number) {
     const params = new URLSearchParams();

@@ -126,17 +126,17 @@ const ALLOWED: Array<{ file: string; snippet: string; why: string }> = [
     },
     {
         file: 'components/insider/InsiderSignalsView.tsx',
-        snippet: "formatMoney(value, 'USD', { maximumFractionDigits: 0 })",
+        snippet: "formatPrice(value, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })",
         why: "Form 4 / insider trading: el importe y la transacción se declaran y liquidan en USD ante la SEC (no hay divisa de bolsa que interpretar).",
     },
     {
         file: 'components/insider/InsiderFeed.tsx',
-        snippet: "formatMoney(value, 'USD', { maximumFractionDigits: digits })",
+        snippet: "formatPrice(value, 'USD', { minimumFractionDigits: digits, maximumFractionDigits: digits })",
         why: "Form 4 / insider trading: importes y precios se declaran y liquidan en USD ante la SEC.",
     },
     {
         file: 'app/(root)/research/[ticker]/page.tsx',
-        snippet: "formatMoney(tx.value, 'USD', { maximumFractionDigits: 0 })",
+        snippet: "formatPrice(tx.value, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })",
         why: "Mismo bloque Form 4 que InsiderSignalsView/InsiderFeed: las transacciones insider se declaran y liquidan en USD ante la SEC.",
     },
     {
