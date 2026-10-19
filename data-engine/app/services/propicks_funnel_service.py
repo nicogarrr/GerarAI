@@ -130,7 +130,7 @@ class FunnelResult:
 
 def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
     """Latest stored value per (company, metric) across the metrics we read."""
-    wanted = set(COVERAGE_METRICS) | {"wacc", LEVERAGE_METRIC, "fcf_conversion"}
+    wanted = set(COVERAGE_METRICS) | {"wacc", LEVERAGE_METRIC, "fcf_conversion", "momentum_12m"}
     latest_period = (
         select(
             CalculatedMetric.company_id.label("company_id"),
@@ -475,6 +475,10 @@ def run_funnel(db: Session, *, top_n: int = 20) -> tuple[list[FunnelResult], dic
                     "revenue_cagr": cagr,
                     "fcf_margin_5y": get("fcf_margin_5y"),
                     "quality_moat_score_v2": get("quality_moat_score_v2"),
+                    # F2: lo escribe propicks_price_service; el front lo lee de
+                    # aqui (sin esto la tarjeta siempre salia n/d). No pesa en
+                    # SCORE_WEIGHTS: solo se muestra y puntua en el front.
+                    "momentum_12m": get("momentum_12m"),
                 },
                 coverage=coverage,
                 components=components,

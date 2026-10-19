@@ -441,3 +441,21 @@ def test_mapped_and_name_links_merge_into_one_component():
         company.exchange = "NASDAQ"
     groups = _group_share_classes([c, a, b])
     assert set(groups) == {1, 2, 3} and len(set(groups.values())) == 1
+
+
+def test_momentum_12m_is_persisted_in_metrics_without_changing_score():
+    with _db() as db:
+        good = _company("MOMO")
+        db.add(good)
+        db.flush()
+        _full_metrics(db, good)
+        _five_good_years(db, good)
+        db.commit()
+        base = run_funnel(db)[0][0]
+        assert base.metrics["momentum_12m"] is None
+
+        _metric(db, good, "momentum_12m", "0.25")
+        db.commit()
+        with_mom = run_funnel(db)[0][0]
+        assert with_mom.metrics["momentum_12m"] == 0.25
+        assert with_mom.score == base.score
