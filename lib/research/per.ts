@@ -12,10 +12,12 @@ export function perState(input: {
     /** metric.peTTM de Finnhub; undefined si la petición no devolvió métricas. */
     peTTM: unknown;
     providerAvailable: boolean;
+    /** Linea US derivada de bolsa/divisa (isUsQuoteLine). Si se informa manda sobre la igualdad simbolo==ticker. */
+    usLine?: boolean;
 }): PerState {
-    const { quoteSymbol, ticker, peTTM, providerAvailable } = input;
+    const { quoteSymbol, ticker, peTTM, providerAvailable, usLine } = input;
     if (!quoteSymbol) return { value: null, note: 'Sin listado de cotización verificado' };
-    if (quoteSymbol !== ticker.trim().toUpperCase()) {
+    if (usLine === false || quoteSymbol !== ticker.trim().toUpperCase()) {
         return { value: null, note: 'Cotiza fuera de EE. UU.: sin PER verificable' };
     }
     if (!providerAvailable) return { value: null, note: 'Proveedor de métricas no disponible' };
