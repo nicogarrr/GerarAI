@@ -18,6 +18,6 @@ test('saved screener has durable breadcrumb, conditional ranking and real criter
 
 test('USD delta has currency sign and percent retains Spanish locale',()=>{
  const s=readFileSync('components/research/CompanyHeaderQuote.tsx','utf8');
- assert.ok(s.includes("style:'currency', currency:'USD', signDisplay:'always'"));
+ assert.ok(s.includes("style:'currency', currency:'USD', signDisplay:'exceptZero'"));
  assert.ok(s.includes("quote.change_percent != null ? formatPercent(quote.change_percent"));
 });

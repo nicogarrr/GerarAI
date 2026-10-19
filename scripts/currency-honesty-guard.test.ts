@@ -135,6 +135,11 @@ const ALLOWED: Array<{ file: string; snippet: string; why: string }> = [
         why: "Form 4 / insider trading: importes y precios se declaran y liquidan en USD ante la SEC.",
     },
     {
+        file: 'app/(root)/research/[ticker]/page.tsx',
+        snippet: "formatMoney(tx.value, 'USD', { maximumFractionDigits: 0 })",
+        why: "Mismo bloque Form 4 que InsiderSignalsView/InsiderFeed: las transacciones insider se declaran y liquidan en USD ante la SEC.",
+    },
+    {
         file: 'lib/actions/proPicks.actions.ts',
         snippet: '(objetivo $${round1(targetPrice)} vs $${round1(currentPrice)}',
         why: "Texto de la alerta de proPicks, mismo universo US-only: el «$» acompaña a un precio de cotización del S&P 500.",

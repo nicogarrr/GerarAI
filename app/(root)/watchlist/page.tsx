@@ -335,7 +335,7 @@ export default async function WatchlistPage({
                                                             </Badge>
                                                         ) : null}
                                                         {stock.monitor && stock.price !== null && stock.monitor.low_52w !== null && stock.monitor.low_52w_sessions >= 120 && stock.price <= stock.monitor.low_52w * 1.02 ? (
-                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={`Mínimo de 52 semanas: ${formatPrice(stock.monitor.low_52w, stock.monitor.currency ?? 'USD')} (${stock.monitor.low_52w_sessions} cierres en la serie propia)`}>
+                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={`Mínimo de 52 semanas: ${stock.monitor.currency ? formatPrice(stock.monitor.low_52w, stock.monitor.currency) : formatNumber(stock.monitor.low_52w)} (${stock.monitor.low_52w_sessions} cierres en la serie propia)`}>
                                                                 Mínimo 52 sem
                                                             </Badge>
                                                         ) : null}
