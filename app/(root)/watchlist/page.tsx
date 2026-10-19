@@ -7,6 +7,7 @@ import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
+import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
 import ExtendedHoursLine from '@/components/watchlist/ExtendedHoursLine';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from "@/components/ui/card";
@@ -180,6 +181,9 @@ export default async function WatchlistPage({
                         </p>
                     ) : null}
                 </div>
+                {/* Alta directa desde la página (QA 2026-10-19: antes solo se
+                    podía añadir desde la ficha research o el screener). */}
+                <WatchlistAddButton followedSymbols={watchlistItems.map((item) => item.symbol)} />
             </div>
 
             {unavailable ? (
@@ -198,12 +202,15 @@ export default async function WatchlistPage({
                             Busca la empresa en la búsqueda universal (o con Ctrl+K desde cualquier pantalla) y
                             pulsa &ldquo;Añadir a Watchlist&rdquo; para monitorizarla aquí.
                         </p>
-                        <Link
-                            href="/search"
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-teal-400/20 px-5 text-sm text-teal-400 transition-colors hover:text-teal-300"
-                        >
-                            Ir a buscar acciones
-                        </Link>
+                        <div className="flex flex-wrap items-center justify-center gap-3">
+                            <WatchlistAddButton followedSymbols={[]} />
+                            <Link
+                                href="/search"
+                                className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-teal-400/20 px-5 text-sm text-teal-400 transition-colors hover:text-teal-300"
+                            >
+                                Ir a buscar acciones
+                            </Link>
+                        </div>
                     </CardContent>
                 </Card>
             ) : (
