@@ -944,7 +944,7 @@ class ChatSynthesisService:
         # usadas o no ("Hola" salia con "Fuentes" de cartas de fondos).
         answer_plain = _plain(text)
         def _author_cited(author: object) -> bool:
-            tokens = [t for t in _author_key(author).split() if len(t) >= 4]
+            tokens = [t for t in re.findall(r"\w+", _author_key(author)) if len(t) >= 4]
             return bool(tokens) and any(t in answer_plain for t in tokens)
 
         used_sources = [
