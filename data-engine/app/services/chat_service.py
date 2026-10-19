@@ -350,7 +350,7 @@ def _natural_company_answer(
     )
     if lead:
         parts = [lead, *[p for p in parts if not lead.startswith(p)]]
-    if re.search(r"compar|\bvs\.?\b|versus|frente a|respecto a", (question or "").lower()):
+    if re.search(r"comp[aá]r|\bvs\.?\b|versus|frente a|respecto a", (question or "").lower()):
         parts.insert(
             1 if lead else 0,
             f"No puedo comparar dos empresas en una misma respuesta: te contesto solo sobre "
