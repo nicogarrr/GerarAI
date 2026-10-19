@@ -4,7 +4,7 @@ import { getMarketIndicesResult, getMarketMovers } from '@/lib/actions/market.ac
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { MoversTable } from '@/components/market/MoversTable';
 import BackendOffline from '@/components/system/BackendOffline';
-import { getSavedScreenerEngines, getScreenerStocksReal } from '@/lib/actions/screener.actions';
+import { getSavedScreenerEngines, getScreenerStocksRealWithStatus } from '@/lib/actions/screener.actions';
 import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, formatUserDateTime, isValidCurrencyCode } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
@@ -151,9 +151,14 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
   // en vez de en serie. El flag distingue "backend caído" (reintentar) de
   // "filtro sin resultados" (cambiar de sector).
   const [screenerResult, indicesResult, engineScreens] = await Promise.all([
-    getScreenerStocksReal({ sector, limit: 25 }).then(
-      (rows) => ({ rows, error: null as unknown }),
-      (error: unknown) => ({ rows: [] as Awaited<ReturnType<typeof getScreenerStocksReal>>, error }),
+    getScreenerStocksRealWithStatus({ sector, limit: 25 }).then(
+      (result) => ({ ...result, error: null as unknown }),
+      (error: unknown) => ({
+        rows: [] as Awaited<ReturnType<typeof getScreenerStocksRealWithStatus>>['rows'],
+        refreshing: false,
+        universeSize: null as number | null,
+        error,
+      }),
     ),
     // Resultado discriminado PROPIO (datos/error): la tarjeta de índices no
     // infiere su estado de la petición vecina (screener). Cada llamada puede
@@ -166,7 +171,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
       () => ({ screens: [] as Awaited<ReturnType<typeof getSavedScreenerEngines>>, engineDown: true }),
     ),
   ]);
-  const { rows, error: screenerError } = screenerResult;
+  const { rows, refreshing: screenerRefreshing, universeSize, error: screenerError } = screenerResult;
   const backendDown = screenerError !== null;
   // Un indice sin precio real (fallo del proveedor) no se pinta como $0.00.
   const validIndices = indicesResult.data.filter((i) => i.price > 0);
@@ -189,7 +194,11 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
     <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip p-4 sm:p-6">
       <div className="min-w-0">
         <h1 className="text-2xl font-semibold break-words text-gray-100">{t('nav.screener')}</h1>
-        <p className="mt-1 text-sm text-gray-400">Large caps líquidos con precio y market cap reales.</p>
+        <p className="mt-1 text-sm text-gray-400">
+          {universeSize
+            ? `${universeSize} grandes compañías seguidas con precio y market cap reales; el filtro muestra las de cada sector.`
+            : 'Grandes compañías seguidas con precio y market cap reales.'}
+        </p>
       </div>
 
       <VistaTabs vista={vista} />
@@ -271,6 +280,21 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                 <p className="mt-4 text-xs text-gray-500">
                   El servidor de GerarAI no ha podido completar la consulta. Reintenta en unos segundos.
                 </p>
+              </div>
+              ) : screenerRefreshing ? (
+              /* Carga fría: el motor responde pero aún no tiene precios (refresco
+               * en vuelo). No es «filtro sin resultados»: la acción es reintentar
+               * en unos segundos, no cambiar de sector. */
+              <div className="px-4 py-10 text-center">
+                <p className="text-sm text-gray-500 sm:text-base">
+                  Cargando precios del mercado en segundo plano.
+                </p>
+                <Button asChild className="mt-4 min-h-[44px] px-6" variant="outline">
+                  <Link href={`/screener?sector=${encodeURIComponent(sector)}`}>
+                    <RefreshCcw aria-hidden="true" className="h-4 w-4" />
+                    Reintentar
+                  </Link>
+                </Button>
               </div>
               ) : (
               /* Distinto del anterior: aquí el motor responde y el filtro no tiene
