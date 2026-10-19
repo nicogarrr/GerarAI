@@ -152,7 +152,17 @@ export default function MonthlyRebalanceView({
                         </h3>
                     </div>
                     <p className="mt-1 text-sm text-gray-400">
-                        {strategyName} · {formatNumber(currentPicks.length, { maximumFractionDigits: 0 })} valores vigentes ·{' '}
+                        {strategyName} ·{' '}
+                        {/* El recuento solo existe con los picks cargados: durante la
+                            carga o el error mostrar «0 valores vigentes» se leía como
+                            resultado real (Tester 6: «0 vigentes» y «Cargando...» a la
+                            vez, con 9 picks en Selección IA del mismo run). */}
+                        {picksStatus === 'ready'
+                            ? `${formatNumber(currentPicks.length, { maximumFractionDigits: 0 })} valores vigentes`
+                            : picksStatus === 'loading'
+                              ? 'cargando valores…'
+                              : 'valores no disponibles'}
+                        {' · '}
                         {diff.hasPrevious && previous
                             ? `comparado con ${monthLabelEs(previous.month)}`
                             : 'sin comparación con el mes anterior'}
@@ -198,7 +208,7 @@ export default function MonthlyRebalanceView({
                 </Card>
             )}
 
-            {!diff.hasPrevious && (
+            {picksStatus === 'ready' && !diff.hasPrevious && (
                 <Card className="rounded-lg border border-amber-700/60 bg-amber-950/20 p-4">
                     <p className="text-sm leading-6 text-amber-200">
                         GerarAI no guarda el histórico de meses: solo conserva el último run del embudo, así que
@@ -210,7 +220,7 @@ export default function MonthlyRebalanceView({
                 </Card>
             )}
 
-            {!diff.hasPrevious ? (
+            {picksStatus !== 'ready' ? null : !diff.hasPrevious ? (
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                         <h4 className="text-sm font-semibold text-gray-200">
