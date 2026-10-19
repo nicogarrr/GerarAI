@@ -106,6 +106,20 @@ export const METRIC_LABELS: Record<string, string> = {
     revenue_share: 'reparto de ingresos',
     satellites: 'satélites',
     utilization: 'utilización',
+    // Modelos de holding, SaaS y gestoras (missing_inputs de los motores)
+    asset_value: 'valor de los activos',
+    aum: 'activos bajo gestión (AUM)',
+    fee_rate: 'tasa de comisión',
+    holdco_debt: 'deuda de la holding',
+    holding_company_discount: 'descuento de holding',
+    nav: 'valor liquidativo (NAV)',
+    arpu: 'ARPU',
+    arr: 'ARR (ingresos recurrentes anuales)',
+    cloud_cost: 'coste de nube',
+    customers: 'clientes',
+    retention: 'retención',
+    'segment_*_operating_metric': 'métrica operativa por segmento',
+    'segment_*_valuation_multiple': 'múltiplo de valoración por segmento',
 };
 
 /** Etiqueta en español de una métrica; humaniza la clave si es desconocida. */

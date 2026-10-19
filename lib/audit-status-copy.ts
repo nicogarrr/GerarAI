@@ -41,6 +41,13 @@ export function auditFixLabel(fix: string): string {
     if (FIX_LABELS[fix]) return FIX_LABELS[fix];
     const missing = /^Missing valuation inputs:\s*(.+?)\.?$/i.exec(fix);
     if (missing) return auditFixLabel(`Faltan entradas de valoración: ${missing[1]}.`);
+    // «Faltan entradas de valoración (variables del modelo): a, b»: cada clave suelta
+    // (también sin guion bajo, como aum o nav, o con comodín segment_*) por su etiqueta.
+    const listed = /^(Faltan entradas de valoración[^:]*):\s*(.+?)(\.?)$/.exec(fix);
+    if (listed) {
+        const labels = listed[2].split(/,\s*/).map((key) => METRIC_LABELS[key] ?? METRIC_LABELS[key.toLowerCase()] ?? key.replaceAll('_', ' '));
+        return `${listed[1]}: ${labels.join(', ')}${listed[3]}`;
+    }
     return fix.replace(/\b[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b/g,
         (token) => METRIC_LABELS[token] ?? SOURCE_LABELS[token] ?? token.replaceAll('_', ' '));
 }
