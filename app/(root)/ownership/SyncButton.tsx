@@ -12,6 +12,9 @@ export default function SyncButton() {
     return (
         <div className="space-y-2">
             <Button
+                size="sm"
+                variant="ghost"
+                className="text-gray-400"
                 disabled={pending}
                 onClick={() => startTransition(async () => {
                     setFeedback(null);
@@ -32,7 +35,7 @@ export default function SyncButton() {
                 <RefreshCw className={`h-4 w-4 ${pending ? 'animate-spin' : ''}`} />
                 {pending ? 'Sincronizando…' : 'Sincronizar 13F'}
             </Button>
-            {feedback ? <p className="text-sm text-amber-300">{feedback}</p> : null}
+            {feedback ? <p className="text-xs text-amber-300">{feedback}</p> : null}
         </div>
     );
 }
