@@ -97,14 +97,15 @@ const CATALOG_EXCEPTIONS: Record<string, string> = {
     // '/research/data-health' se eliminó entera por decisión de Nico (2026-10-20).
     '/export': 'quitado del menú por decisión de Nico (sin uso); ruta conservada y enlazada desde Ayuda',
     '/search': 'página-herramienta del buscador global, se abre desde el header',
+    // /inversores/mas-compradas y /inversores/solape ya no existen: son
+    // vistas de /ownership (decision de Nico, WhatsApp 2026-10-20 00:59).
     // Subpáginas del módulo Inversores: las cubre su HubNav propio
     // (app/(root)/inversores/layout.tsx) y las migas las nombran vía
     // SUBROUTE_LABELS/humanizeSlug.
+    '/inversores/aprender': 'subnav propio de Inversores (HubNav); índice de Aprender (Opción A, decisión de Nico 2026-10-20)',
     '/inversores/cartas': 'subnav propio de Inversores (HubNav)',
     '/inversores/videos': 'subnav propio de Inversores (HubNav)',
     '/inversores/conceptos': 'subnav propio de Inversores (HubNav)',
-    '/inversores/mas-compradas': 'subnav propio de Inversores (HubNav)',
-    '/inversores/solape': 'subnav propio de Inversores (HubNav)',
     // El asistente de research se unificó en el Cerebro: la ruta queda solo
     // como redirect que lo abre (handoff sessionStorage + evento open-brain).
     '/calendar/resultados': 'pestaña de CalendarTabs (subnav propio de Calendarios)',
@@ -157,15 +158,28 @@ test('sectionForRoute se deriva del catálogo: sin listas de rutas paralelas', (
     assert.ok(!fn.includes("'/"), 'sectionForRoute no debe listar rutas a mano');
 });
 
-test('SectionNav se deriva del catálogo y se muestra también en /inversores, /insider y /ownership', () => {
+test('SectionNav se deriva del catálogo y cede en el hub fusionado Inversores/Señales', () => {
     const nav = readFileSync('components/layout/SectionNav.tsx', 'utf8');
     assert.match(nav, /flattenNavItems/);
-    // Sin mapa de grupos hardcodeado: el único literal permitido es la portada /discover.
+    // Decision de Nico (WhatsApp 2026-10-20 00:59): /inversores, /insider y
+    // /ownership comparten el HubNav del hub fusionado (4 pestañas), asi que
+    // SectionNav se excluye ahi por ruta. Revierte la mitad de #1924 (doble
+    // barra): una sola barra, la del hub. /inversores/canales sigue fuera
+    // porque pertenece al hub Biblioteca.
     const literals = [...nav.matchAll(/'(\/[^']*)'/g)].map((m) => m[1]).filter((l) => l.startsWith('/'));
-    assert.deepEqual([...new Set(literals)].sort(), ['/discover']);
-    // El HubNav de Inversores es una segunda fila solo de sus subsecciones (sin 13F ni Insiders repetidos).
+    assert.deepEqual([...new Set(literals)].sort(), [
+        '/discover',
+        '/insider',
+        '/insider/',
+        '/inversores',
+        '/inversores/',
+        '/inversores/canales',
+        '/ownership',
+        '/ownership/',
+    ]);
+    // El HubNav compartido SI incluye 13F e Insiders: es la barra del hub fusionado.
     const hub = readFileSync('app/(root)/inversores/_components/HubNav.tsx', 'utf8');
-    assert.ok(!hub.includes('"/ownership"') && !hub.includes('"/insider"'));
+    assert.ok(hub.includes('"/ownership"') && hub.includes('"/insider"'));
     assert.ok(!hub.includes('lime-'));
 });
 

@@ -114,11 +114,14 @@ test("all managers use source-labelled portfolios; no 13F filter or top-ten trun
 });
 test("hub exposes each section with selected state and real page navigation", () => {
   const nav = read("app/(root)/inversores/_components/HubNav.tsx");
-  // Carteras se fusiona en /inversores (decisión de Nico, 2026-10-20): sale del HubNav.
+  // Barra final del hub fusionado (decisión de Nico, WhatsApp 2026-10-20
+  // 00:59 y 01:15): 4 destinos. Carteras queda dentro de Inversores (PR 1);
+  // Cartas, Vídeos y Conceptos cuelgan de Aprender (PR 3 los fusiona).
   for (const name of [
-    "Cartas",
-    "Vídeos",
-    "Conceptos",
+    "Inversores",
+    "13F",
+    "Insiders",
+    "Aprender",
     "aria-current",
   ])
     assert.ok(nav.includes(name));

@@ -18,7 +18,8 @@ test('inversores: cuenta nueva sin 13F ofrece la acción real de sincronizar', (
 });
 
 test('más compradas: sin dos trimestres de 13F ofrece la misma acción de sincronizar', () => {
-  const page = read('app/(root)/inversores/mas-compradas/page.tsx');
+  // Movidas a vistas de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.
+  const page = read('app/(root)/ownership/_components/MostBought.tsx');
   assert.ok(page.includes('SyncPortfoliosButton'), 'más-compradas reutiliza el botón de sincronización en su estado vacío');
   assert.ok(page.includes('faltan dos trimestres de 13F sincronizados.'), 'la razón honesta se conserva');
 });

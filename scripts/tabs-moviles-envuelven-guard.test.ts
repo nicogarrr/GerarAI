@@ -9,8 +9,11 @@ const PROPICKS = readFileSync('components/proPicks/ProPicksTabs.tsx', 'utf8');
 const RESEARCH = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 
 test('las tres tiras envuelven en móvil', () => {
-    assert.ok(SECTION.includes('flex flex-wrap gap-1.5'), 'SectionNav sin wrap móvil');
-    assert.ok(!SECTION.includes('overflow-x-auto'), 'SectionNav sigue con scroll oculto');
+    // Decisión de Nico (WhatsApp 2026-10-20 01:15): la barra de 10 envuelta
+    // ocupaba 4 filas en móvil ("la mitad es menú"). Ahora UNA fila con scroll
+    // horizontal en móvil; el wrap vuelve desde sm.
+    assert.ok(SECTION.includes('flex flex-nowrap gap-1.5 overflow-x-auto'), 'SectionNav: una fila con scroll en móvil');
+    assert.ok(SECTION.includes('sm:flex-wrap'), 'SectionNav: wrap solo desde sm');
     assert.ok(PROPICKS.includes('flex-wrap justify-start gap-1'), 'TabsList ProPicks sin wrap');
     assert.ok(!PROPICKS.includes('snap-x'), 'TabsList ProPicks sigue con snap scroll');
     assert.ok(RESEARCH.includes('flex-wrap gap-x-6 gap-y-2'), 'nav de etapas sin wrap');

@@ -10,12 +10,14 @@ const read = (path: string) => readFileSync(path, 'utf8');
 const crumbs = read('components/layout/Breadcrumbs.tsx');
 const grid = read('app/(root)/inversores/page.tsx');
 const portfolios = read('app/(root)/inversores/page.tsx'); // carteras fusionada en el hub (decision de Nico, 2026-10-20)
-const bought = read('app/(root)/inversores/mas-compradas/page.tsx');
+// Mas compradas es ahora una vista de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.
+const bought = read('app/(root)/ownership/_components/MostBought.tsx');
 const ficha = read('app/(root)/inversores/_components/Portfolio.tsx');
 const pagination = read('app/(root)/inversores/_components/Pagination.tsx');
 
 test('las migas no muestran el slug crudo de las subpaginas de Inversores', () => {
-    assert.match(crumbs, /'mas-compradas': 'Más compradas'/);
+    // Ni 'carteras' ni 'mas-compradas' tienen miga propia: ambas rutas se
+    // fusionaron (Inversores y Movimientos 13F; decision de Nico, 2026-10-20).
     assert.match(crumbs, /humanizeSlug/);
 });
 
@@ -31,7 +33,9 @@ test('la página de Más compradas usa newLabel dentro de la plantilla (sin llav
 });
 
 test('los enlaces de la cabecera van en una fila', () => {
-    assert.match(read('app/(root)/inversores/_components/HubNav.tsx'), /flex max-w-5xl flex-wrap gap-2/);
+    // Barra final de 4 destinos en UNA fila (decisión de Nico, WhatsApp
+    // 2026-10-20 00:59 y 01:15): sin wrap, scroll horizontal si no cabe.
+    assert.match(read('app/(root)/inversores/_components/HubNav.tsx'), /flex max-w-5xl flex-nowrap gap-2 overflow-x-auto/);
 });
 
 test('rejilla, carteras y ficha paginan dentro de la pagina, sin scroll infinito', () => {

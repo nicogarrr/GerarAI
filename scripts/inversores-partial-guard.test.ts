@@ -22,7 +22,8 @@ test('la lista de inversores marca "Datos parciales" en la tarjeta', () => {
     assert.match(carteras, /Datos parciales/);
 });
 
-const masCompradas = readFileSync('app/(root)/inversores/mas-compradas/page.tsx', 'utf8');
+// Movidas a vistas de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.
+const masCompradas = readFileSync('app/(root)/ownership/_components/MostBought.tsx', 'utf8');
 
 test('mas-compradas avisa de cuantos gestores comparados van parciales', () => {
     assert.match(actions, /managers_partial\?: number/);
