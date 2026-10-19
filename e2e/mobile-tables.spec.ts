@@ -200,7 +200,7 @@ test.describe("tablas: semántica y fallback móvil (estático)", () => {
       ["app", "(root)", "research", "[ticker]", "driver-assumptions", "page.tsx"],
       ["app", "(root)", "portfolio", "intelligence", "page.tsx"],
       ["app", "(root)", "screener", "page.tsx"],
-      ["app", "(root)", "movers", "page.tsx"],
+      ["components", "market", "MoversTable.tsx"],
       ["components", "proPicks", "WalkForwardResults.tsx"],
       ["components", "research", "FundamentalModelPanels.tsx"],
     ] as const;
@@ -243,7 +243,7 @@ test.describe("tablas: semántica y fallback móvil (estático)", () => {
       ["app", "(root)", "research", "[ticker]", "driver-assumptions", "page.tsx"],
       ["app", "(root)", "portfolio", "intelligence", "page.tsx"],
       ["app", "(root)", "screener", "page.tsx"],
-      ["app", "(root)", "movers", "page.tsx"],
+      ["components", "market", "MoversTable.tsx"],
       ["components", "proPicks", "WalkForwardResults.tsx"],
       ["components", "research", "FundamentalModelPanels.tsx"],
     ] as const;
