@@ -34,8 +34,18 @@ describe('Flujo de dinero dentro del detalle de cada tema', () => {
     assert.ok(flujo.includes('estimación de terceros'));
   });
 
+  it('los importes respetan la divisa de la fila: USD en-US con $ delante', () => {
+    const formatos = readFileSync('lib/market/flows.ts', 'utf8');
+    assert.ok(formatos.includes("toLocaleString('en-US'"), 'USD se formatea en-US');
+    assert.ok(!formatos.includes('B$'), 'nada de «B$» ambiguo');
+    assert.match(formatos, /unit = 'USD'/, 'la divisa llega por parámetro');
+    assert.ok(flujo.includes('formatFlowAmount(spender.amount, spender.unit)'));
+    assert.ok(flujo.includes('formatFlowAmount(destination.amount, destination.unit)'));
+    assert.ok(flujo.includes('formatFlowAmount(supplier.amount, supplier.unit)'));
+  });
+
   it('sin reparto verificable no hay importe: solo razón declarada', () => {
-    assert.ok(flujo.includes('formatFlowAmount(supplier.amount)'));
+    assert.ok(flujo.includes('formatFlowAmount(supplier.amount, supplier.unit)'));
     assert.match(flujo, /supplier\.amount !== null \? \(/);
     assert.ok(flujo.includes('Tu exposición'), 'sección de exposición presente');
     assert.ok(flujo.includes('holdings.unavailable'), 'exposición oculta si el dato no llegó');

@@ -83,7 +83,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
                 )}
               </p>
               <p className="text-sm font-bold tabular-nums text-teal-300">
-                {spender.amount === null ? NA : formatFlowAmount(spender.amount)}
+                {spender.amount === null ? NA : formatFlowAmount(spender.amount, spender.unit)}
                 {spender.period_label ? (
                   <span className="ml-1 text-[11px] font-normal text-gray-500">{spender.period_label}</span>
                 ) : null}
@@ -98,7 +98,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
             {spender.note ? <p className="mt-1 text-[11px] text-gray-500">{spender.note}</p> : null}
             {spender.extra_amount !== null && spender.extra_label ? (
               <p className="mt-1 text-[11px] text-gray-400">
-                + {formatFlowAmount(spender.extra_amount)} {spender.extra_label}
+                + {formatFlowAmount(spender.extra_amount, spender.unit)} {spender.extra_label}
                 {spender.extra_source ? (
                   <>
                     {' · '}
@@ -113,7 +113,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
       {flow.spenders_total ? (
         <p className="mt-2 text-xs text-gray-400">
           <span className="font-semibold tabular-nums text-teal-300">
-            {formatFlowAmount(flow.spenders_total.amount)}
+            {formatFlowAmount(flow.spenders_total.amount, flow.spenders_total.unit)}
           </span>{' '}
           en total · {flow.spenders_total.note}
         </p>
@@ -151,7 +151,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
                         thirdParty ? 'text-amber-300' : 'text-teal-300'
                       }`}
                     >
-                      {formatFlowAmount(destination.amount)}
+                      {formatFlowAmount(destination.amount, destination.unit)}
                     </span>
                   </div>
                   <p className="mt-0.5 pl-1 text-[11px] text-gray-500">
@@ -190,7 +190,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
                   )}
                   {supplier.amount !== null ? (
                     <span className="text-xs font-bold tabular-nums text-teal-300">
-                      {formatFlowAmount(supplier.amount)}
+                      {formatFlowAmount(supplier.amount, supplier.unit)}
                     </span>
                   ) : null}
                 </div>

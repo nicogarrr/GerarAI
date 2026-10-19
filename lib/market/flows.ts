@@ -64,11 +64,20 @@ export type MoneyFlow = {
 
 export type MoneyFlowThemeSummary = { id: string; name: string; tagline: string };
 
-/** 35_700_000_000 USD → «35,7 B$» (miles de millones, es-ES). */
-export function formatFlowAmount(value: number | null, fallback = 'N/D'): string {
+/**
+ * Importe de un flujo respetando la divisa de la fila (regla de Nico):
+ * USD siempre en-US con $ delante → «$35.7B»; otras divisas en es-ES con el
+ * código explícito (nunca se asume USD cuando la fila dice otra cosa).
+ */
+export function formatFlowAmount(value: number | null, unit = 'USD', fallback = 'N/D'): string {
   if (value === null || !Number.isFinite(value)) return fallback;
   const abs = Math.abs(value);
-  if (abs >= 1e9) return `${(value / 1e9).toLocaleString('es-ES', { maximumFractionDigits: 1 })} B$`;
-  if (abs >= 1e6) return `${(value / 1e6).toLocaleString('es-ES', { maximumFractionDigits: 1 })} M$`;
-  return value.toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' $';
+  const scaled = abs >= 1e9 ? value / 1e9 : abs >= 1e6 ? value / 1e6 : value;
+  const suffix = abs >= 1e9 ? 'B' : abs >= 1e6 ? 'M' : '';
+  const digits = abs >= 1e6 ? 1 : 0;
+  if (unit === 'USD') {
+    return `$${scaled.toLocaleString('en-US', { maximumFractionDigits: digits })}${suffix}`;
+  }
+  const number = scaled.toLocaleString('es-ES', { maximumFractionDigits: digits });
+  return suffix ? `${number} ${suffix} ${unit}` : `${number} ${unit}`;
 }
