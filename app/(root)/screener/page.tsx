@@ -384,7 +384,7 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
                       <span className="min-w-0 flex-1 truncate text-gray-300">{i.name}</span>
                       <div className="text-right">
                         <span className="font-semibold text-gray-100">{formatIndexValue(i)}{i.unit === 'index' ? ' ptos.' : ''}</span>
-                        <div className="text-[10px] text-gray-500">{quoteObserved(i.priceAsOf)}</div>
+                        <div className="text-[10px] text-gray-500">{quoteObserved(i.priceAsOf, 'daily_candle_open')}</div>
                       </div>
                     </div>
                   ))}
