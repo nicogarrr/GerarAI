@@ -44,6 +44,7 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'rechazada',
   stale: 'desactualizada',
   draft_failed_audit: 'borrador (auditoría no superada)',
+  changes_requested: 'cambios solicitados',
 };
 
 function enumLabel(map: Record<string, string>, value: string | null | undefined): string {
