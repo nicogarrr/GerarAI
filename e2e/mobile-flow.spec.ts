@@ -25,7 +25,7 @@ test.describe("mobile flujo screener→watchlist→tesis→alerta solo con toque
   }) => {
     // 1. Screener carga sin overflow.
     await page.goto("/screener");
-    await expect(page.getByRole("heading", { name: "Screener", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mercado", level: 1 })).toBeVisible();
     await expectNoPageOverflow(page, "screener");
 
     // 2. Seguir con toque: en móvil (<md) el screener renderiza cards con

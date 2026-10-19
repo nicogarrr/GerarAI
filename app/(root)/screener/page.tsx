@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: 'Screener',
+  title: 'Mercado',
   description:
     'Large caps líquidos con precio y market cap reales, filtros guardados del motor de análisis y lectura offline con Finnhub.',
 };
