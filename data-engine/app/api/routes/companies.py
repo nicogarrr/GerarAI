@@ -104,6 +104,22 @@ async def company_extended_quote(ticker: str, db: Session = Depends(get_db)) -> 
     from official closes in our DB as `close_change*` (last close vs previous
     session). Any DB failure leaves those fields null; the quote still works."""
     quote = await extended_quote_service.get(ticker)
+    if quote.status == "unavailable":
+        # Emisor sin cotizacion en su listado OTC pero con listado revisado
+        # (KRKNF -> PNG.V, TSXV, CAD): se usa ESE listado, declarando simbolo y
+        # divisa; nunca se mezcla con cierres USD de la BD (sin close_change).
+        from app.services.yahoo_fundamentals_service import REVIEWED_MAP
+
+        entry = REVIEWED_MAP.get(ticker.strip().upper())
+        if entry:
+            alt = await extended_quote_service.get(entry["symbol"])
+            if alt.status != "unavailable" and alt.price is not None and (alt.currency or "").upper() == entry["currency"]:
+                return alt.model_copy(
+                    update={
+                        "ticker": ticker.strip().upper(),
+                        "source": f"Yahoo Finance (no oficial) - listado {entry['symbol']} en {entry['currency']}, retraso posible",
+                    }
+                )
     if quote.session == "cerrado" and quote.price is not None:
         try:
             def _close_change() -> dict | None:
