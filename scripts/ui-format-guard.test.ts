@@ -57,11 +57,14 @@ describe('formato numérico es-ES', () => {
 });
 
 describe('guardas de UI', () => {
-  it('la lista de ProPicks usa scroll horizontal real en móvil', () => {
+  it('la lista de ProPicks envuelve en móvil en vez de cortar pestañas', () => {
+    // Tester 4 (2026-10-19): el scroll horizontal sin affordance cortaba
+    // «Estrategia y rebalanc…»; las pestañas envuelven a dos filas.
     const tabs = source('components/proPicks/ProPicksTabs.tsx');
-    for (const token of ['flex h-auto w-full min-w-0 max-w-full', 'justify-start', 'overflow-x-auto', 'snap-x', 'pb-2', 'sm:inline-flex']) {
+    for (const token of ['flex h-auto w-full min-w-0 max-w-full', 'flex-wrap', 'justify-start', 'pb-2', 'sm:inline-flex']) {
       assert.ok(tabs.includes(token), `ProPicksTabs debe contener ${token}`);
     }
+    assert.ok(!tabs.includes('snap-x') && !tabs.includes('overflow-x-auto'), 'sin scroll horizontal oculto');
     const triggers = tabs.slice(tabs.indexOf('<TabsList'), tabs.indexOf('</TabsList>'));
     // «Estrategias» y «Rebalanceo» son la misma estrategia con dos lecturas
     // (el mismo currentStrategy): viven en una sola pestaña. La pestaña
