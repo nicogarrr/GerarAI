@@ -28,22 +28,30 @@ def _side(code: str | None, acquired_disposed: str | None) -> str | None:
     return None
 
 
-def primary_ticker(raw: str | None) -> str | None:
-    """Un Form 4 de un emisor con varias clases trae "LEN, LEN.B" (o "GTX,GTXAP").
+def ticker_list(raw: str | None) -> list[str]:
+    """Simbolos de un emisor multiclase: "LEN, LEN.B", "LEN;LEN.B", " len ,len.b"."""
+    if not raw:
+        return []
+    return [t.strip().upper() for t in str(raw).replace(";", ",").split(",") if t.strip()]
 
+
+def primary_ticker(raw: str | None) -> str | None:
+    """Simbolo representativo para listar al emisor una sola vez.
+
+    Un Form 4 de un emisor con varias clases trae "LEN, LEN.B" (o "GTX,GTXAP").
     Sin normalizar, el mismo emisor aparece como dos empresas ("LEN" y
     "LEN, LEN.B") y sus compras no suman en cluster. Se usa el primer simbolo
-    de la lista (el que declara el emisor como principal).
+    de la lista solo como representante (no se afirma que sea el principal);
+    el dato original se conserva en `issuer_tickers_raw`.
     """
-    if not raw:
-        return raw
-    first = str(raw).replace(";", ",").split(",")[0].strip().upper()
-    return first or raw
+    symbols = ticker_list(raw)
+    return symbols[0] if symbols else raw
 
 
 def _tx_dict(row: InsiderTransaction, filing: InsiderFiling, line: int) -> dict[str, Any]:
     return {
         "ticker": primary_ticker(row.issuer_ticker or filing.issuer_ticker),
+        "issuer_tickers_raw": row.issuer_ticker or filing.issuer_ticker,
         "issuer_name": filing.issuer_name,
         "insider": row.insider,
         "insider_cik": row.insider_cik,
@@ -133,13 +141,14 @@ def build_feed(
             func.coalesce(InsiderTransaction.tx_date, InsiderFiling.filing_date) >= cutoff,
         )
     )
-    if wanted:
-        stmt = stmt.where(
-            (InsiderFiling.issuer_ticker == wanted)
-            | InsiderFiling.issuer_ticker.like(f"{wanted},%")
-            | InsiderFiling.issuer_ticker.like(f"{wanted}, %")
-        )
     rows = db.execute(stmt).all()
+    if wanted:
+        # Mismo criterio que la lista mostrada: separadores, espacios y mayusculas.
+        rows = [
+            (tx, filing)
+            for tx, filing in rows
+            if wanted in ticker_list(tx.issuer_ticker or filing.issuer_ticker)
+        ]
 
     txs = [_tx_dict(tx, filing, i) for i, (tx, filing) in enumerate(rows)]
     txs.sort(key=lambda t: (str(t["date"] or ""), str(t["accession_number"])), reverse=True)
@@ -189,6 +198,7 @@ def build_feed(
         "transactions": [
             {
                 "ticker": t["ticker"],
+                "issuer_tickers_raw": t["issuer_tickers_raw"],
                 "issuer_name": t["issuer_name"],
                 "insider": t["insider"],
                 "role": t["role"],
