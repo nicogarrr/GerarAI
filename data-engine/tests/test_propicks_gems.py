@@ -67,3 +67,28 @@ def test_find_gems_end_to_end_reads_shared_data():
 
         # stale price -> not shown, never treated as current
         assert find_gems(db, results, today=today + timedelta(days=30)) == []
+
+
+def test_find_gems_rechaza_fundamentales_de_fy_antiguo():
+    """VOYA entraba como joya con FCF de FY2016: sin FY reciente no hay joya."""
+    from datetime import date, timedelta
+    from decimal import Decimal
+
+    from app.models import MarketPrice
+    from app.services.propicks_funnel_service import run_funnel
+    from app.services.propicks_gems_service import find_gems
+    from tests.test_propicks_funnel import _company, _db, _fact, _five_good_years, _full_metrics
+
+    today = date(2026, 10, 19)
+    with _db() as db:
+        c = _company("OLD")
+        db.add(c)
+        db.flush()
+        _full_metrics(db, c)
+        _five_good_years(db, c)
+        _fact(db, c, "free_cash_flow", "150000000", 2016)
+        _fact(db, c, "shares_diluted", "100000000", 2016)
+        db.add(MarketPrice(company_id=c.id, date=today - timedelta(days=1), close=Decimal("10"), volume=1000))
+        db.commit()
+        results, _ = run_funnel(db)
+        assert find_gems(db, results, today=today) == []
