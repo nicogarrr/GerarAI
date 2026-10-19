@@ -189,6 +189,33 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
     }
 }
 
+/**
+ * Métricas de valoración (cap, PER) y nombre de perfil para LISTADOS.
+ * La watchlist solo consumía metric + profile2 de getStockFinancialDataLight,
+ * pero esa versión pedía además /quote (duplicada: la página ya llama a
+ * getStockQuote) y /stock/price-target (sin uso): 2 llamadas Finnhub más
+ * por símbolo y página, contra la cuota compartida del plan free.
+ */
+export async function getStockValuationBasics(symbol: string): Promise<{
+    profile: FinnhubProfile2 | null;
+    metrics: any;
+} | null> {
+    await requireAuthenticatedUser();
+    try {
+        const token = env.FINNHUB_API_KEY;
+        if (!token) {
+            return null;
+        }
+        const [profile, metrics] = await Promise.all([
+            fetchJSON<FinnhubProfile2>(`${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${token}`, 86400).catch(() => null),
+            fetchJSON<any>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${token}`, 86400).catch(() => ({ metric: {} })),
+        ]);
+        return { profile, metrics };
+    } catch {
+        return null;
+    }
+}
+
 export async function getStockFinancialDataLight(symbol: string): Promise<{
     quote: any;
     profile: FinnhubProfile2 | null;

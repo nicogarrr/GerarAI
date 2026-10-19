@@ -6,7 +6,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest, jsonBody } from '@/lib/research/client';
 import { requestCache } from '@/lib/cache/requestCache';
 import { classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
-import { getStockQuote, getStockFinancialDataLight } from '@/lib/actions/finnhub.actions';
+import { getStockQuote, getStockValuationBasics } from '@/lib/actions/finnhub.actions';
 import { getResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { hasPriorClose } from '@/lib/market/session-change';
@@ -181,7 +181,9 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         // emisor. Para no-US ni se piden (ADR u homónimo): se usa el
         // respaldo propio del backend research (cap proveedor o derivado
         // precio x acciones; PER = cierre / EPS diluido FY).
-        usListing ? getStockFinancialDataLight(normalized) : Promise.resolve(null),
+        // Solo metric + profile2 (getStockValuationBasics): la versión
+        // completa pedía /quote duplicada y /price-target sin uso.
+        usListing ? getStockValuationBasics(normalized) : Promise.resolve(null),
         !usListing
             ? researchRequest<{
                   market_cap: number | null;
