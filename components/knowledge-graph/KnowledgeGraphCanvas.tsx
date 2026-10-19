@@ -430,23 +430,24 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
             <div className="min-w-0 space-y-3">
                 {/* Toolbar */}
                 <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('knowledgeGraph.canvas.controls')}>
-                    <Button aria-label={t('knowledgeGraph.canvas.zoomIn')} data-testid="kg-zoom-in" onClick={() => zoomByStep(ZOOM_STEP)} size="sm" type="button" variant="outline">
+                    <Button className="min-h-11 md:min-h-9" aria-label={t('knowledgeGraph.canvas.zoomIn')} data-testid="kg-zoom-in" onClick={() => zoomByStep(ZOOM_STEP)} size="sm" type="button" variant="outline">
                         <Plus aria-hidden="true" className="h-4 w-4" />
                         {t('knowledgeGraph.canvas.zoomIn')}
                     </Button>
-                    <Button aria-label={t('knowledgeGraph.canvas.zoomOut')} data-testid="kg-zoom-out" onClick={() => zoomByStep(1 / ZOOM_STEP)} size="sm" type="button" variant="outline">
+                    <Button className="min-h-11 md:min-h-9" aria-label={t('knowledgeGraph.canvas.zoomOut')} data-testid="kg-zoom-out" onClick={() => zoomByStep(1 / ZOOM_STEP)} size="sm" type="button" variant="outline">
                         <Minus aria-hidden="true" className="h-4 w-4" />
                         {t('knowledgeGraph.canvas.zoomOut')}
                     </Button>
-                    <Button aria-label={t('knowledgeGraph.canvas.fit')} data-testid="kg-fit" onClick={() => fit(keep)} size="sm" type="button" variant="outline">
+                    <Button className="min-h-11 md:min-h-9" aria-label={t('knowledgeGraph.canvas.fit')} data-testid="kg-fit" onClick={() => fit(keep)} size="sm" type="button" variant="outline">
                         <Maximize2 aria-hidden="true" className="h-4 w-4" />
                         {t('knowledgeGraph.canvas.fit')}
                     </Button>
-                    <Button aria-label={t('knowledgeGraph.canvas.reset')} data-testid="kg-reset" onClick={resetView} size="sm" type="button" variant="outline">
+                    <Button className="min-h-11 md:min-h-9" aria-label={t('knowledgeGraph.canvas.reset')} data-testid="kg-reset" onClick={resetView} size="sm" type="button" variant="outline">
                         <RotateCcw aria-hidden="true" className="h-4 w-4" />
                         {t('knowledgeGraph.canvas.reset')}
                     </Button>
                     <Button
+                        className="min-h-11 md:min-h-9"
                         aria-pressed={isolated}
                         data-testid="kg-isolate"
                         disabled={selectedId === null}
@@ -471,11 +472,11 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                         <span className="text-xs text-gray-500">
                             {t('knowledgeGraph.canvas.zoomLimits', { min: Math.round(MIN_SCALE * 100), max: Math.round(MAX_SCALE * 100) })}
                         </span>
-                        <Button data-testid="kg-export-svg" onClick={() => exportGraph('svg')} size="sm" type="button" variant="ghost">
+                        <Button className="min-h-11 md:min-h-9" data-testid="kg-export-svg" onClick={() => exportGraph('svg')} size="sm" type="button" variant="ghost">
                             <Download aria-hidden="true" className="h-4 w-4" />
                             {t('knowledgeGraph.canvas.exportSvg')}
                         </Button>
-                        <Button data-testid="kg-export-json" onClick={() => exportGraph('json')} size="sm" type="button" variant="ghost">
+                        <Button className="min-h-11 md:min-h-9" data-testid="kg-export-json" onClick={() => exportGraph('json')} size="sm" type="button" variant="ghost">
                             <Download aria-hidden="true" className="h-4 w-4" />
                             {t('knowledgeGraph.canvas.exportJson')}
                         </Button>
@@ -638,6 +639,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                             {suggestions.map((node) => (
                                 <li key={node.id}>
                                     <Button
+                                        className="min-h-11 md:min-h-9"
                                         aria-label={t('knowledgeGraph.search.open', { label: node.label })}
                                         data-testid={`kg-suggestion-${node.id}`}
                                         onClick={() => selectAndCenter(node.id)}
@@ -652,7 +654,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                         </ul>
                     ) : null}
                     {query.trim() ? (
-                        <Button className="mt-2" data-testid="kg-search-clear" onClick={() => setQuery('')} size="sm" type="button" variant="ghost">
+                        <Button className="mt-2 min-h-11 md:min-h-9" data-testid="kg-search-clear" onClick={() => setQuery('')} size="sm" type="button" variant="ghost">
                             <X aria-hidden="true" className="h-4 w-4" />
                             {t('knowledgeGraph.search.clear')}
                         </Button>
@@ -689,7 +691,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                                             <th className="py-2 text-left font-normal" scope="row">
                                                 <button
                                                     aria-label={t('knowledgeGraph.listing.select', { label: node.label })}
-                                                    className="text-left text-gray-300 underline-offset-2 hover:text-teal-300 hover:underline"
+                                                    className="min-h-11 w-full text-left text-gray-300 underline-offset-2 hover:text-teal-300 hover:underline"
                                                     onClick={() => selectAndCenter(node.id)}
                                                     type="button"
                                                 >
@@ -755,7 +757,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                                     {neighbors.map((row) => (
                                         <li className="border-b border-gray-900 pb-2 last:border-b-0" key={row.edgeId}>
                                             <button
-                                                className="text-left text-sm text-gray-300 underline-offset-2 hover:text-teal-300 hover:underline"
+                                                className="min-h-11 w-full text-left text-sm text-gray-300 underline-offset-2 hover:text-teal-300 hover:underline"
                                                 onClick={() => selectAndCenter(row.nodeId)}
                                                 type="button"
                                             >
@@ -781,13 +783,13 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                             )}
                         </div>
                         <div className="space-y-2">
-                            <Button asChild className="w-full" size="sm" variant="outline">
+                            <Button asChild className="w-full min-h-11 md:min-h-9" size="sm" variant="outline">
                                 <Link href={`/knowledge-graph?node=${selectedNode.id}&depth=2`}>
                                     <ExternalLink aria-hidden="true" className="h-4 w-4" />
                                     {t('knowledgeGraph.detail.scopeLink')}
                                 </Link>
                             </Button>
-                        <Button className="w-full" data-testid="kg-copy-link" onClick={() => void copyShareLink()} size="sm" type="button" variant="ghost">
+                        <Button className="w-full min-h-11 md:min-h-9" data-testid="kg-copy-link" onClick={() => void copyShareLink()} size="sm" type="button" variant="ghost">
                             {t('knowledgeGraph.detail.shareLink')}
                         </Button>
                         <p aria-live="polite" className="text-xs text-gray-500" role="status">
