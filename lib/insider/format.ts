@@ -14,40 +14,56 @@ export function insiderName(value: string | null | undefined): string {
 
 /**
  * Cargos Form 4 más comunes -> español (mapa fijo y revisable, Tester 6).
- * El resto se muestra tal cual: nunca se traduce por inferencia.
- * Orden de específico a genérico: cada patrón consume su trozo del título
- * antes de probar el siguiente («Senior Vice President» no dispara también
- * «Vicepresidente»; «SVP, GC and Government Affairs» da los dos cargos).
+ *
+ * Reglas de veracidad (auditor 2026-10-19):
+ * - Siglas con una sola lectura segura: CEO, CFO, COO, CTO, GC, EVP, SVP, VP,
+ *   CHRO. Las ambiguas (CRO ingresos/riesgos, CCO comercial/cumplimiento, CIO
+ *   sistemas/inversiones, CSO estrategia/seguridad, CLO legal/lending, CMO
+ *   medico/marketing...) NO se traducen por sigla: solo por el titulo
+ *   deletreado («Chief Risk Officer» sí; «CRO» se queda crudo).
+ * - Consumo total: el título traducido debe quedar COMPLETAMENTE cubierto por
+ *   los patrones; si queda resto alfabético sin mapear (divisiones, «Global
+ *   Sales», «Assistant», «Co-», «of ...»), se muestra el título original.
+ *   Nunca se rebaja un cargo: «Assistant Secretary» no es «Secretario».
+ * - Orden de específico a genérico: cada patrón consume su trozo antes de
+ *   probar el siguiente («Senior Vice President» no dispara también
+ *   «Vicepresidente» ni «Presidente»).
+ * - Lo no mapeado se muestra tal cual: nunca se traduce por inferencia.
  */
 const TITLE_ABBREVIATIONS: Array<[RegExp, string]> = [
     [/chief\s+executive(\s+officer)?|\bceo\b/i, 'CEO'],
     [/chief\s+financial(\s+officer)?|\bcfo\b/i, 'CFO'],
     [/chief\s+operating(\s+officer)?|\bcoo\b/i, 'COO'],
     [/chief\s+technology(\s+officer)?|\bcto\b/i, 'CTO'],
-    [/chief\s+legal(\s+officer)?|\bclo\b/i, 'Director jurídico'],
+    [/chief\s+legal(\s+officer)?/i, 'Director jurídico'],
     [/general\s+counsel|\bgc\b/i, 'Asesor jurídico general'],
-    [/chief\s+accounting(\s+officer)?|\bcao\b/i, 'Director de contabilidad'],
-    [/chief\s+commercial(\s+officer)?|\bcco\b/i, 'Director comercial'],
-    [/chief\s+medical(\s+officer)?|\bcmo\b/i, 'Director médico'],
-    [/chief\s+information(\s+officer)?|\bcio\b/i, 'Director de sistemas de información'],
+    [/chief\s+accounting(\s+officer)?/i, 'Director de contabilidad'],
+    [/chief\s+commercial(\s+officer)?/i, 'Director comercial'],
+    [/chief\s+medical(\s+officer)?/i, 'Director médico'],
+    [/chief\s+information(\s+officer)?/i, 'Director de sistemas de información'],
     [/chief\s+(human\s+resources|people)(\s+officer)?|\bchro\b/i, 'Director de recursos humanos'],
-    [/chief\s+strategy(\s+officer)?|\bcso\b/i, 'Director de estrategia'],
-    [/chief\s+investment(\s+officer)?|\bcio\b/i, 'Director de inversiones'],
-    [/chief\s+marketing(\s+officer)?|\bcmkto\b/i, 'Director de marketing'],
-    [/chief\s+revenue(\s+officer)?|\bcro\b/i, 'Director de ingresos'],
-    [/chief\s+product(\s+officer)?|\bcpo\b/i, 'Director de producto'],
-    [/chief\s+risk(\s+officer)?|\bcro\b/i, 'Director de riesgos'],
-    [/chief\s+compliance(\s+officer)?|\bcco\b/i, 'Director de cumplimiento'],
-    [/chief\s+data(\s+officer)?|\bcdo\b/i, 'Director de datos'],
+    [/chief\s+strategy(\s+officer)?/i, 'Director de estrategia'],
+    [/chief\s+investment(\s+officer)?/i, 'Director de inversiones'],
+    [/chief\s+marketing(\s+officer)?/i, 'Director de marketing'],
+    [/chief\s+revenue(\s+officer)?/i, 'Director de ingresos'],
+    [/chief\s+product(\s+officer)?/i, 'Director de producto'],
+    [/chief\s+risk(\s+officer)?/i, 'Director de riesgos'],
+    [/chief\s+compliance(\s+officer)?/i, 'Director de cumplimiento'],
+    [/chief\s+data(\s+officer)?/i, 'Director de datos'],
     [/senior\s+vice\s+president|\bsvp\b/i, 'Vicepresidente senior'],
     [/executive\s+vice\s+president|\bevp\b/i, 'Vicepresidente ejecutivo'],
     [/vice\s+president|\bvp\b/i, 'Vicepresidente'],
     // Después de los VP: «Vice President» ya se consumió arriba y no llega
-    // aquí como «Presidente»; un «President» suelto sí.
+    // aquí como «Presidente»; un «President» suelto sí. Los calificadores
+    // (Assistant, Co-, «of ...», divisiones) hacen saltar el consumo total
+    // y devuelven el título original, así que no rebajan el cargo.
     [/president/i, 'Presidente'],
     [/treasurer/i, 'Tesorero'],
     [/secretary/i, 'Secretario'],
 ];
+
+/** Conectores entre cargos compuestos: no son «resto sin mapear». */
+const CONNECTORS = /\b(and|y)\b/gi;
 
 /** Cargo corto en español a partir del rol y el título que trae el Form 4. */
 export function insiderRole(role: string | null | undefined, officerTitle: string | null | undefined): string {
@@ -56,8 +72,10 @@ export function insiderRole(role: string | null | undefined, officerTitle: strin
     const roleText = (role ?? '').toLowerCase();
     if (roleText.includes('multiple insiders')) return 'Varios insiders';
     if (roleText.includes('officer') || title) {
-        // Cada patrón consume su trozo antes de probar el siguiente: así un
-        // título compuesto da sus dos cargos sin duplicar el genérico.
+        // Cada patrón consume su trozo antes de probar el siguiente. Si al
+        // final queda texto alfabético (algo sin mapear: división, área,
+        // «Assistant»...), la traducción parcial perdería información y
+        // rebajaría o inventaría el cargo: se muestra el título original.
         let rest = title;
         const matched: Array<{ at: number; label: string }> = [];
         for (const [pattern, label] of TITLE_ABBREVIATIONS) {
@@ -67,6 +85,8 @@ export function insiderRole(role: string | null | undefined, officerTitle: strin
                 rest = rest.replace(pattern, ' ');
             }
         }
+        const leftover = rest.replace(CONNECTORS, ' ').replace(/[^a-zñáéíóúü]/gi, '');
+        if (leftover.length > 0) matched.length = 0;
         matched.sort((a, b) => a.at - b.at);
         parts.push(matched.length ? matched.map((m) => m.label).join(' y ') : title || 'Directivo');
     }
