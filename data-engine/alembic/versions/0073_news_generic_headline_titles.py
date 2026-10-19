@@ -3,7 +3,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0073_news_generic_headline_titles"
+revision = "0073_news_generic_titles"
 down_revision = "0072_news_junk_publisher_sources"
 branch_labels = None
 depends_on = None
