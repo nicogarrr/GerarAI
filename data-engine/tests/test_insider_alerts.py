@@ -69,7 +69,8 @@ def test_big_buy_and_c_suite_alerts_created_and_deduped():
         big = db.scalar(
             select(ResearchAlert).where(ResearchAlert.alert_type == "insider_big_buy")
         )
-        assert "mercado abierto o privado" in big.message
+        assert "puede ser en mercado abierto o privada" in big.message
+        assert "XML" not in big.message
         assert big.metadata_["rule_version"] == insider_alerts.RULE_VERSION
         assert big.metadata_["tx_fingerprint"]
         assert big.channels == ["in_app"]
@@ -254,3 +255,51 @@ def test_a_cluster_with_a_missing_figure_publishes_a_minimum_total():
         _cleanup(db)
         db.close()
 
+
+
+def _fake_tx(i, *, value, shares, price, day, accession="0001193125-26-397059"):
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        issuer_ticker="LEN, LEN.B", insider="BERKSHIRE HATHAWAY INC / BUFFETT WARREN E",
+        insider_cik="0001067983", role="Director", officer_title=None, tx_date=day,
+        shares=shares, price=price, value=value, code="P", acquired_disposed="A",
+        is_derivative=False, source_url="https://www.sec.gov/x.xml", multi_reporter=False,
+        accession_number=accession, form="4", data_quality="ok", fingerprint=f"fp{i}",
+    )
+
+
+def test_many_lines_of_one_form4_become_a_single_spanish_alert(monkeypatch):
+    monkeypatch.setattr(insider_alerts, "_company_id_for", lambda db, ticker: None)
+    txs = [
+        _fake_tx(1, value=1_390_347, shares=18146, price=76.62, day="2026-09-21"),
+        _fake_tx(2, value=2_477_526, shares=33122, price=74.8, day="2026-09-18"),
+        _fake_tx(3, value=37_722_588, shares=483809, price=77.97, day="2026-09-21"),
+    ]
+    alerts, _ = insider_alerts._build_alerts(None, txs)
+    big = [a for a in alerts if a["rule"] == "big_buy"]
+    assert len(big) == 1
+    msg = big[0]["message"]
+    assert "3 operaciones" in msg and "$41.59M" in msg
+    assert "entre el 18 sep 2026 y el 21 sep 2026" in msg
+    assert "XML" not in msg and "US$" not in msg
+    assert big[0]["metadata"]["transactions"] == 3
+    # El listado resuelve el emisor por la huella del primer movimiento.
+    assert big[0]["metadata"]["tx_fingerprint"] == "fp2"
+
+
+def test_different_filings_or_insiders_stay_separate(monkeypatch):
+    monkeypatch.setattr(insider_alerts, "_company_id_for", lambda db, ticker: None)
+    txs = [
+        _fake_tx(1, value=2_000_000, shares=1000, price=2000, day="2026-09-21", accession="A"),
+        _fake_tx(2, value=3_000_000, shares=1000, price=3000, day="2026-09-22", accession="B"),
+    ]
+    alerts, _ = insider_alerts._build_alerts(None, txs)
+    assert len([a for a in alerts if a["rule"] == "big_buy"]) == 2
+
+
+def test_spanish_number_and_date_formats():
+    assert insider_alerts._es_num(1390347) == "1,390,347"
+    assert insider_alerts._es_num(76.62, 2) == "76.62"
+    assert insider_alerts._es_money(1_390_347) == "$1.39M"
+    assert insider_alerts._es_money(250_000) == "$250,000"
+    assert insider_alerts._es_date("2026-09-21") == "21 sep 2026"

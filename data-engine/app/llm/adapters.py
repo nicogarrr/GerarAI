@@ -279,6 +279,13 @@ class OpenAICompatibleProvider(LLMProvider):
     ) -> tuple[LLMResponse, bool]:
         """Respaldo tardio sin interrumpir una respuesta primaria aun valida."""
         fallback = self._fallback_model
+        if fallback:
+            # Un override de entorno puede mapear el alias de respaldo al mismo
+            # modelo del primario (LLM_MODEL_OVERRIDES): seria repetir la misma
+            # llamada contra el mismo limite gratuito, no un respaldo.
+            overrides = getattr(self.model_router, "overrides", None) or {}
+            if overrides.get(fallback, fallback) == model:
+                fallback = None
         if not fallback or fallback == model:
             return await self._complete_traced(request, model), False
 

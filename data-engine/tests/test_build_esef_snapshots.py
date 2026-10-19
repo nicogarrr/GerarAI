@@ -60,7 +60,7 @@ DOC = {
             "dimensions": {
                 "concept": "ifrs-full:Revenue",
                 "entity": f"scheme:{LEI_ITX}",
-                "period": "2024-02-01T00:00:00/2025-01-31T00:00:00",
+                "period": "2024-02-01T00:00:00/2025-02-01T00:00:00",  # end exclusivo
                 "unit": "iso4217:EUR",
             },
         }
@@ -172,8 +172,8 @@ def test_merge_facts_dedupes_and_newest_filing_wins_restatements():
     entries = merged["ifrs-full:Revenue"]["iso4217:EUR"]
     assert len(entries) == 2
     by_end = {e["end"]: e["val"] for e in entries}
-    assert by_end["2025-01-01"] == "1100"  # reexpresion del filing reciente
-    assert by_end["2024-01-01"] == "900"
+    assert by_end["2024-12-31"] == "1100"  # reexpresion del filing reciente
+    assert by_end["2023-12-31"] == "900"
 
 
 def test_build_merges_multiple_filings_into_one_snapshot(tmp_path):
@@ -192,7 +192,7 @@ def test_build_merges_multiple_filings_into_one_snapshot(tmp_path):
     assert entry["periods"] == ["2024-12-31", "2023-12-31"]
     snapshot = json.loads((tmp_path / "snapshots" / f"{LEI_ITX}.json").read_text())
     entries = snapshot["facts"]["ifrs-full:Revenue"]["iso4217:EUR"]
-    assert {e["end"] for e in entries} == {"2025-01-01", "2024-01-01"}
+    assert {e["end"] for e in entries} == {"2024-12-31", "2023-12-31"}
 
 
 def test_merge_facts_preserves_multiple_instant_years():

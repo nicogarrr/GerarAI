@@ -80,7 +80,7 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
                 "ratio": None,
                 "description": (
                     f"Dividendo de {record.amount.normalize():f} {record.currency} por acción"
-                    f"{pay} · fuente {record.source}"
+                    f"{pay} · fuente {_SOURCE_LABELS.get(record.source, record.source)}"
                 ),
                 "applied": None,
                 "applied_at": None,
@@ -109,6 +109,10 @@ async def sync_portfolio_splits(db: Session = Depends(get_db)) -> dict:
     return await run_in_threadpool(
         lambda: run_from_any_context(SplitIngestionService().sync_portfolio(db))
     )
+
+
+# Fuentes con nombre legible: el slug interno (yahoo_finance) no se muestra.
+_SOURCE_LABELS = {"yahoo_finance": "Yahoo Finance"}
 
 
 @router.get("/sync-status")

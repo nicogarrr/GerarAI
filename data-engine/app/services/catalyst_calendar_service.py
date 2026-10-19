@@ -305,6 +305,9 @@ def build_catalysts(
         # Solo franjas conocidas: "time-not-supplied" o valores nuevos no se muestran crudos.
         if row.get("time") in _TIME_LABEL:
             detail.append(_TIME_LABEL[row["time"]])
+        else:
+            # Hueco declarado: sin la franja la fila parece incompleta sin motivo.
+            detail.append("hora por confirmar")
         if row.get("eps_forecast") is not None:
             detail.append(f"BPA estimado {_es_number(row['eps_forecast'], 2)}")
         events.append(

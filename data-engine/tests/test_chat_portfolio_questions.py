@@ -203,3 +203,23 @@ def test_rentabilidad_posicion_concreta_y_no_tenida(db):
     resp_ko = asyncio.run(ChatService().answer(db, "¿Qué rentabilidad tiene KO?", "portfolio", None))
     assert resp_ko.llm_trace["path"] == "portfolio_performance"
     assert "No tienes ninguna posición abierta en KO" in resp_ko.answer
+def test_cuanto_pesa_ticker_sin_posicion_lo_dice_sin_inventar(db):
+    a = _company(db, "ASTS", "AST SpaceMobile")
+    b = _company(db, "BBB", "Beta")
+    _position(db, b, 2, 50, 100)
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Cuánto pesa ASTS en mi cartera?", "portfolio", None))
+    assert resp.llm_trace["path"] == "portfolio_position"
+    assert "No tienes ninguna posición guardada en ASTS" in resp.answer
+
+
+def test_cuanto_pesa_ticker_con_posicion_da_su_peso(db):
+    a = _company(db, "ASTS", "AST SpaceMobile")
+    b = _company(db, "BBB", "Beta")
+    _position(db, a, 100, 40, 4066)
+    _position(db, b, 2, 50, 100)
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Cuánto pesa ASTS?", "portfolio", None))
+    assert resp.llm_trace["path"] == "portfolio_position"
+    assert "Tu posición guardada en ASTS" in resp.answer
+    assert "97,6 %" in resp.answer
