@@ -22,3 +22,15 @@ test('resumen cortado a media palabra termina en palabra completa con puntos sus
 test('resumen normal queda intacto', () => {
     assert.equal(newsSummaryToShow('A', 'Resumen completo.'), 'Resumen completo.');
 });
+
+test('titular recortado a media palabra no deja fragmento en el resumen', () => {
+    const full = 'SpaceX (Space Exploration Technologies): Recibe una recomendación de compra del Bernstein MarketScreener España amplió cobertura ayer.';
+    const cutTitle = full.slice(0, 86); // cae dentro de «Bernstein»
+    const out = newsSummaryToShow(cutTitle, full)!;
+    assert.ok(out.startsWith('MarketScreener'), `fragmento visible: ${out}`);
+});
+
+test('corte al final de palabra no pierde la palabra siguiente', () => {
+    const out = newsSummaryToShow('Titular X', 'Titular X: la empresa confirma el plan.');
+    assert.equal(out, 'la empresa confirma el plan.');
+});

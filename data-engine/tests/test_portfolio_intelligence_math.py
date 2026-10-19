@@ -198,3 +198,22 @@ def test_trailing_spot_rows_use_close_but_interior_gaps_stay_empty():
     assert [r.adj_close for r in filled] == [D("10"), None, D("12"), D("13"), D("14")]
     assert S._returns(filled) == {date(2026, 1, 4): pytest.approx(13 / 12 - 1), date(2026, 1, 5): pytest.approx(14 / 13 - 1)}
     assert S._fill_trailing_spot([row(1, "10", None)])[0].adj_close is None
+
+
+def test_horizon_coverage_mide_ventana_real_no_dos_filas():
+    service = PortfolioIntelligenceService
+    today = date(2026, 10, 16)
+    cutoff = date(2025, 10, 16)
+    row = lambda d: SimpleNamespace(date=d)
+    # Serie completa: ancla al inicio y llega a hoy (con tolerancia).
+    share, full = service._horizon_coverage([row(cutoff), row(today)], cutoff, today)
+    assert share == pytest.approx(1.0)
+    assert full is True
+    # Serie de 3 semanas al final: ~6% del horizonte, no cobertura completa,
+    # aunque len(series) >= 2 la contaba como "con histórico".
+    short = [row(date(2026, 9, 24)), row(date(2026, 10, 16))]
+    share, full = service._horizon_coverage(short, cutoff, today)
+    assert share == pytest.approx(22 / 365, abs=0.01)
+    assert full is False
+    # Sin filas: 0 y no completa.
+    assert service._horizon_coverage([], cutoff, today) == (0.0, False)

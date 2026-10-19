@@ -12,6 +12,7 @@ import {
   createSavedScreen,
   updateSavedScreen,
   deleteSavedScreen,
+  getScreenerMetricCoverage,
   getScreenerWorkspace,
   runAdHocScreen,
   type ScreenCriterion,
@@ -64,6 +65,9 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
     throw error;
   }
   const { metrics, screens } = workspace;
+  // Métricas con datos para sugerir en los datalist; null (engine caído o sin
+  // endpoint) mantiene la lista estática completa.
+  const metricCoverage = await getScreenerMetricCoverage();
 
   // El screener ad-hoc con fórmula inválida debe mostrar el error en un
   // banner visible en español, nunca escalar al boundary global.
@@ -85,7 +89,7 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
   }
 
   return (
-    <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
+    <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6 pb-28">
       <header className="border-b border-gray-800 pb-5"><p className="text-sm font-semibold uppercase text-teal-300">Descubrimiento de empresas</p><h1 className="mt-1 text-3xl font-bold text-gray-100">Screeners</h1></header>
 
       {/*
@@ -104,12 +108,12 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2"><Filter aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Ejecutar un filtro ad-hoc</h2></div>
         <form className="space-y-4" method="get">
-          <CriterionFields initialLeft={query.left ?? ''} initialOperator={operator} initialRight={query.right ?? ''} required />
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"><RankingFields initialDirection={query.direction} initialFormula={query.ranking} /><SubmitButton /></div>
+          <CriterionFields availableMetrics={metricCoverage ?? undefined} initialLeft={query.left ?? ''} initialOperator={operator} initialRight={query.right ?? ''} required />
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"><RankingFields availableMetrics={metricCoverage ?? undefined} initialDirection={query.direction} initialFormula={query.ranking} /><SubmitButton /></div>
         </form>
       </section>
 
-      <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><h2 className="font-semibold text-gray-100">Filtros guardados</h2><div className="mt-4 grid gap-3">{screens.map((screen) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={screen.id}><div className="flex items-start gap-3"><div><h3 className="font-semibold text-gray-200">{screen.name}</h3><p className="mt-1 text-xs text-gray-500">{formatNumber(screen.criteria.length, { maximumFractionDigits: 0 })} criterios · {screen.alerts_enabled ? 'alertas activadas' : 'alertas desactivadas'} · última {formatDate(screen.last_run_at, { day: 'numeric', month: 'short', year: 'numeric' }, NO_CORRIDO)}</p></div><Button asChild className="ml-auto" size="sm"><Link href={`/screeners/${screen.id}`}><Play aria-hidden="true" className="h-4 w-4" />Ejecutar</Link></Button></div>{screen.description ? <p className="mt-3 text-sm text-gray-400">{screen.description}</p> : null}
+      <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><h2 className="font-semibold text-gray-100">Filtros guardados</h2><div className="mt-4 grid gap-3">{screens.map((screen) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={screen.id}><div className="flex items-start gap-3"><div><h3 className="font-semibold text-gray-200">{screen.name}</h3><p className="mt-1 text-xs text-gray-500">{formatNumber(screen.criteria.length, { maximumFractionDigits: 0 })} {screen.criteria.length === 1 ? 'criterio' : 'criterios'} · {screen.alerts_enabled ? 'alertas activadas' : 'alertas desactivadas'} · última {formatDate(screen.last_run_at, { day: 'numeric', month: 'short', year: 'numeric' }, NO_CORRIDO)}</p></div><Button asChild className="ml-auto" size="sm"><Link href={`/screeners/${screen.id}`}><Play aria-hidden="true" className="h-4 w-4" />Ejecutar</Link></Button></div>{screen.description ? <p className="mt-3 text-sm text-gray-400">{screen.description}</p> : null}
         <details className="mt-3"><summary className="cursor-pointer py-2 text-sm text-teal-300">Editar o eliminar</summary>
           <MutationForm action={updateSavedScreen} className="mt-3 grid gap-3" showSuccessInline>
             <input type="hidden" name="screen_id" value={screen.id} />
@@ -138,8 +142,8 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
               <div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="screen-name">Nombre del filtro *</label><Input className="min-h-11" id="screen-name" name="name" placeholder="Calidad a precio razonable" required /></div>
               <div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="screen-desc">Qué buscas (opcional)</label><Input className="min-h-11" id="screen-desc" name="description" placeholder="Empresas rentables con retorno superior al coste de capital" /></div>
             </div>
-            <div className="mt-4 space-y-4">{([['', true], ['_2', false], ['_3', false]] as const).map(([suffix, required], index) => <CriterionFields key={suffix || 'one'} number={index + 1} required={required} suffix={suffix} />)}</div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(150px,190px)]"><FormulaField hint="Opcional: ordenarás las coincidencias por esta expresión." name="ranking_formula" title="Métrica para ordenar" /><div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="saved-order">Dirección del orden</label><select className="min-h-11 w-full rounded-md border border-gray-700 bg-black px-3 text-sm text-gray-200" id="saved-order" name="ranking_direction" defaultValue="desc"><option value="desc">Mayor primero</option><option value="asc">Menor primero</option></select></div></div>
+            <div className="mt-4 space-y-4">{([['', true], ['_2', false], ['_3', false]] as const).map(([suffix, required], index) => <CriterionFields availableMetrics={metricCoverage ?? undefined} key={suffix || 'one'} number={index + 1} required={required} suffix={suffix} />)}</div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(150px,190px)]"><FormulaField availableMetrics={metricCoverage ?? undefined} hint="Opcional: ordenarás las coincidencias por esta expresión." name="ranking_formula" title="Métrica para ordenar" /><div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="saved-order">Dirección del orden</label><select className="min-h-11 w-full rounded-md border border-gray-700 bg-black px-3 text-sm text-gray-200" id="saved-order" name="ranking_direction" defaultValue="desc"><option value="desc">Mayor primero</option><option value="asc">Menor primero</option></select></div></div>
             <label className="mt-4 flex items-center gap-2 text-sm text-gray-300"><input name="alerts_enabled" type="checkbox" />Avisar de nuevas coincidencias</label>
             <Button className="mt-4" type="submit"><Save aria-hidden="true" className="h-4 w-4" />Guardar filtro</Button>
           </MutationForm>

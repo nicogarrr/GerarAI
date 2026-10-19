@@ -96,11 +96,59 @@ def _company_id_for(db: Session, ticker: str | None) -> int | None:
     return company.id if company else None
 
 
+_MESES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def _es_num(value: float, decimals: int = 0) -> str:
+    """Numero en formato en-US (miles con coma, decimales con punto).
+
+    Decision de Nico: los importes en USD van siempre en-US con `$`.
+    El nombre se conserva por compatibilidad con los llamadores.
+    """
+    return f"{value:,.{decimals}f}"
+
+
+def _es_money(value: float) -> str:
+    if value >= 1_000_000:
+        return f"${_es_num(value / 1_000_000, 2)}M"
+    return f"${_es_num(value)}"
+
+
+def _es_date(raw: object) -> str:
+    parsed = _parse_date(raw) if raw else None
+    if parsed is None:
+        return str(raw or "fecha no indicada")
+    return f"{parsed.day} {_MESES[parsed.month - 1]} {parsed.year}"
+
+
+def _purchase_phrase(group: list[InsiderTransaction], total: float) -> str:
+    """Frase en castellano para una o varias compras del mismo formulario (sin jerga de XML)."""
+    dates = sorted({str(t.tx_date) for t in group if t.tx_date})
+    when = (
+        f"el {_es_date(dates[0])}" if len(dates) <= 1
+        else f"entre el {_es_date(dates[0])} y el {_es_date(dates[-1])}"
+    )
+    if len(group) == 1:
+        t = group[0]
+        detail = f"{_es_num(float(t.shares))} acciones a ${_es_num(float(t.price), 2)}" if t.shares and t.price else ""
+        head = f"compró acciones por {_es_money(total)}"
+        head += f" ({detail})" if detail else ""
+    else:
+        shares = sum(float(t.shares) for t in group if t.shares)
+        avg = f", precio medio ${_es_num(total / shares, 2)}" if shares else ""
+        head = f"compró acciones en {len(group)} operaciones por {_es_money(total)} en total{avg}"
+    return (f"{head}, {when}. Compra declarada en el Formulario 4; puede ser en mercado "
+            "abierto o privada.")
+
+
 def _build_alerts(
     db: Session, purchases: list[InsiderTransaction]
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     alerts: list[dict[str, Any]] = []
     coverage = {"skipped_missing_value": 0, "partial_cluster_totals": 0}
+    # Una Form 4 (accession) puede traer decenas de lineas del mismo insider: una alerta
+    # por (formulario, insider), no una por linea. Antes Lennar/Buffett daba 6 avisos.
+    groups: dict[tuple[str, str], list[InsiderTransaction]] = {}
     for tx in purchases:
         if tx.value is None:
             # Sin cifra no hay ni umbral ni frase posible (c_suite_buy no
@@ -108,19 +156,29 @@ def _build_alerts(
             # no existe. Se cuenta como hueco de cobertura, no se inventa.
             coverage["skipped_missing_value"] += 1
             continue
-        value = float(tx.value)
+        filing = tx.accession_number or tx.source_url or tx.fingerprint
+        groups.setdefault((str(filing), str(tx.insider_cik or tx.insider or "")), []).append(tx)
+    for group in groups.values():
+        group = sorted(group, key=lambda t: (str(t.tx_date), t.fingerprint))
+        first = group[0]
+        value = sum(float(t.value) for t in group)
+        group_fp = hashlib.sha256("+".join(t.fingerprint for t in group).encode()).hexdigest()
         base = {
-            "company_id": _company_id_for(db, tx.issuer_ticker),
-            "tx_fingerprint": tx.fingerprint,
+            "company_id": _company_id_for(db, first.issuer_ticker),
+            "tx_fingerprint": group_fp,
+            "tx_fingerprints": [t.fingerprint for t in group],
             "metadata": {
                 "rule_version": RULE_VERSION,
-                "accession_number": tx.accession_number,
-                "form": tx.form,
-                "insider_cik": tx.insider_cik,
-                "issuer_ticker": tx.issuer_ticker,
-                "tx_fingerprint": tx.fingerprint,
-                "source_url": tx.source_url,
-                "data_quality": tx.data_quality,
+                "accession_number": first.accession_number,
+                "form": first.form,
+                "insider_cik": first.insider_cik,
+                "issuer_ticker": first.issuer_ticker,
+                # Primer movimiento: el listado de alertas resuelve emisor/ticker por esta huella.
+                "tx_fingerprint": first.fingerprint,
+                "tx_fingerprints": [t.fingerprint for t in group],
+                "transactions": len(group),
+                "source_url": first.source_url,
+                "data_quality": first.data_quality,
             },
         }
         if value >= BIG_BUY_THRESHOLD_USD:
@@ -129,25 +187,20 @@ def _build_alerts(
                     **base,
                     "rule": "big_buy",
                     "severity": "high",
-                    "title": f"Compra insider grande — {tx.issuer_ticker or '?'}",
-                    "message": (
-                        f"{tx.insider or 'Insider'} compro ${value:,.0f} "
-                        f"({tx.shares} acc. @ ${tx.price}) el {tx.tx_date}. "
-                        "Codigo P: mercado abierto o privado; el XML no siempre lo distingue."
-                    ),
+                    "title": f"Compra insider grande — {first.issuer_ticker or '?'}",
+                    "message": f"{first.insider or 'Insider'} {_purchase_phrase(group, value)}",
                 }
             )
-        if _is_c_suite(_tx_as_signal_dict(tx)):
+        if any(_is_c_suite(_tx_as_signal_dict(t)) for t in group):
             alerts.append(
                 {
                     **base,
                     "rule": "c_suite_buy",
                     "severity": "medium",
-                    "title": f"Compra C-suite — {tx.issuer_ticker or '?'}",
+                    "title": f"Compra C-suite — {first.issuer_ticker or '?'}",
                     "message": (
-                        f"{tx.insider or 'Insider'} ({tx.officer_title or tx.role or 'directivo'}) "
-                        f"compro ${value:,.0f} el {tx.tx_date}. "
-                        "Codigo P: mercado abierto o privado."
+                        f"{first.insider or 'Insider'} ({first.officer_title or first.role or 'directivo'}) "
+                        f"{_purchase_phrase(group, value)}"
                     ),
                 }
             )
@@ -252,7 +305,11 @@ def evaluate(
         stats.update(coverage)
         for alert in alerts:
             fp = _alert_fingerprint(alert["rule"], alert["tx_fingerprint"])
-            if fp in existing:
+            legacy = alert.get("tx_fingerprints") or []
+            if fp in existing or (
+                legacy and all(_alert_fingerprint(alert["rule"], f) in existing for f in legacy)
+            ):
+                # Ya avisado (huella de grupo, o una alerta por linea emitida antes de agrupar).
                 stats["alerts_existing"] += 1
                 continue
             channels = ["in_app"]

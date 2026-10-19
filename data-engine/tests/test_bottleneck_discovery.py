@@ -175,7 +175,7 @@ def test_stored_reasoning_is_template_only_and_has_no_numbers_or_urls(db):
         assert row.reasoning == svc.compose_reasoning(row.ticker, "beneficiaria" if row.ticker != "AMD" else "afectada",
                                                       {"NVDA": "proveedor_directo", "AMD": "cliente_dependiente",
                                                        "TSM": "alternativa_sustitutiva"}[row.ticker])
-        assert not re.search(r"\d|://|www\.", row.reasoning) and "Hipotesis del modelo" in row.reasoning
+        assert not re.search(r"\d|://|www\.", row.reasoning) and "Hipótesis del modelo" in row.reasoning
     assert "N/D" in svc.compose_reasoning("N/D", "afectada", "proveedor_directo")
 
 
@@ -645,3 +645,79 @@ def test_signals_return_resolved_sources_not_only_opaque_ids(db):
     found = [e for signal in signals for e in signal.evidence]
     assert any(e.url == 'https://pub-a.example/n1' and e.status == 'verificada' for e in found)
     assert all(e.id for e in found)
+
+
+def _patterns(*companies):
+    return {t: svc._mention_pattern(t, n) for t, n in companies}
+
+
+def test_mention_pattern_matches_ticker_and_name_without_suffix():
+    pattern = svc._mention_pattern("CVU", "CV Sciences, Inc.")
+    assert pattern.search(svc.fold("CV Sciences anuncia un acuerdo"))
+    assert pattern.search(svc.fold("Las acciones de CVU suben"))
+    assert not pattern.search(svc.fold("El mercado de chips se tensiona"))
+
+
+def test_mention_pattern_skips_short_tickers():
+    # Ticker de 2 letras: no se prueba como palabra suelta ("bn" en un texto
+    # tematico no es evidencia de Brookfield); solo casa el nombre completo.
+    pattern = svc._mention_pattern("BN", "Brookfield Corporation")
+    assert pattern.search(svc.fold("Brookfield reporta resultados"))
+    assert not pattern.search(svc.fold("un parrafo con bn suelto"))
+    # Sin nombre util y ticker corto no hay patron fiable: mejor None.
+    assert svc._mention_pattern("BN", None) is None
+    short_name = svc._mention_pattern("BN", "BN Inc.")
+    assert short_name is None or not short_name.search(svc.fold("bn cae hoy"))
+
+
+def test_mention_pattern_skips_common_word_tickers():
+    # NOW/META/ZETA son palabras comunes: en minusculas (fold) serian falsos
+    # positivos sobre evidencia tematica, asi que casan por nombre, no ticker.
+    pattern = svc._mention_pattern("NOW", "ServiceNow, Inc.")
+    assert pattern.search(svc.fold("ServiceNow cierra un acuerdo"))
+    assert not pattern.search(svc.fold("act now before the deadline"))
+    meta = svc._mention_pattern("META", "Meta Platforms, Inc.")
+    assert meta.search(svc.fold("Meta Platforms presenta gafas"))
+    assert not meta.search(svc.fold("la meta del proyecto es clara"))
+    zeta = svc._mention_pattern("ZETA", "Zeta Global Holdings Corp.")
+    assert zeta.search(svc.fold("Zeta Global crece en marketing"))
+    assert not zeta.search(svc.fold("la funcion zeta de Riemann"))
+
+
+def test_cites_other_company_only_detects_cross_ticker_evidence():
+    patterns = _patterns(("AAPL", "Apple Inc."), ("MSFT", "Microsoft Corporation"))
+    # La evidencia habla de Apple, no de Microsoft: cruce detectado.
+    assert svc._cites_other_company_only(["Apple reporta ventas récord"], "MSFT", patterns)
+    # Si la evidencia tambien nombra al candidato, no es cruce.
+    assert not svc._cites_other_company_only(["Apple y Microsoft firman"], "MSFT", patterns)
+    # Evidencia tematica sin empresa conocida: la inferencia sigue permitida.
+    assert not svc._cites_other_company_only(["Chip shortages persist"], "MSFT", patterns)
+
+
+def test_cross_ticker_evidence_rejected_end_to_end(db):
+    db.add(NewsEvent(id=4, title="NVDA asegura chips ante la escasez",
+                     url="https://pub-c.example/n4", date=datetime(2026, 10, 6, tzinfo=UTC)))
+    db.commit()
+    refresh_signals(db)
+    db.commit()
+    result = run(db, Provider(out(cand(ticker="AMD", ids=("news_event:4",)))))
+    assert result["saved"] == 0 and result["rejected"] == {"evidencia_de_otra_empresa": 1}
+    assert stored(db) == []
+    # La misma evidencia citada por la empresa de la que habla si se acepta.
+    result = run(db, Provider(out(cand(ticker="NVDA", ids=("news_event:4",)))))
+    assert result["saved"] == 1
+
+
+def test_distinct_sources_collapses_chunks_of_one_document():
+    def ev(id_, title, url):
+        return svc.ResolvedEvidence(id_, f"texto de {id_}", title, url, None)
+
+    chunks = [
+        ev("document_chunk:1", "AAPL 10-K 2025", "https://sec.gov/aapl-10k"),
+        ev("document_chunk:2", "AAPL 10-K 2025", "https://sec.gov/aapl-10k"),
+        ev("document_chunk:3", "AAPL 10-Q T3", "https://sec.gov/aapl-10q"),
+        ev("news_event:9", "Titular suelto", None),
+        ev("news_event:10", "Titular suelto", None),
+    ]
+    assert [e.id for e in svc.distinct_sources(chunks)] == [
+        "document_chunk:1", "document_chunk:3", "news_event:9"]

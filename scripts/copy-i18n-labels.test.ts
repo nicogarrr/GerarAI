@@ -89,6 +89,7 @@ test('etiquetaValor traduce códigos del backend y no deja guiones bajos', () =>
 
 test('la lista de auditorías conserva la referencia a su versión de tesis', () => {
   const source = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-  assert.ok(source.includes("tesis {audit.thesis_version_id ?? 'desconocida'}"));
+  assert.ok(source.includes("`tesis v${audit.thesis_version}`"));
+  assert.ok(!source.includes('tesis {audit.thesis_version_id'), 'id interno de tesis');
   assert.ok(source.includes('<SourceAuditDetail audit={audit} ticker={ticker} />'));
 });

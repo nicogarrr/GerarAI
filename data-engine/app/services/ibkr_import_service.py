@@ -921,8 +921,31 @@ class IBKRImportService:
             source="ibkr_flex",
         )
         db.commit()
+        # market_prices solo acumula hacia adelante: las companias que la
+        # importacion estrena en cartera no tienen pasado. Backfill de ~1 ano
+        # en segundo plano, una compania por tarea; la cola nunca rompe una
+        # importacion ya confirmada.
+        price_backfills_enqueued = 0
+        try:
+            from app.services.market_close_sync import enqueue_price_backfills
+
+            # Escalonado interno: N companias nuevas no disparan N llamadas
+            # simultaneas contra Yahoo (delay incremental por tarea).
+            price_backfills_enqueued = enqueue_price_backfills(
+                db,
+                imported_company_ids,
+                tenant_id=(
+                    db.info["tenant_id"]
+                    if type(db.info.get("tenant_id")) is int
+                    else None
+                ),
+                user_id=str(db.info["user_id"]) if db.info.get("user_id") else None,
+            )
+        except Exception:  # noqa: BLE001 - cola caida: la importacion ya es valida
+            db.rollback()
         return {
             "status": "imported",
+            "price_backfills_enqueued": price_backfills_enqueued,
             "positions_imported": positions_imported,
             "cash_imported": cash_imported,
             "trades_imported": trades_imported,
