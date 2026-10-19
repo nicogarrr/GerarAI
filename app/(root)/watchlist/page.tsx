@@ -56,27 +56,35 @@ export default async function WatchlistPage({
 }: {
     searchParams: Promise<{ page?: string }>;
 }) {
-    const { items: watchlistItems, unavailable } = await getWatchlistState();
-
-    const { page: pageParam } = await searchParams;
+    const [{ items: watchlistItems, unavailable }, { page: pageParam }] = await Promise.all([getWatchlistState(), searchParams]);
     const requestedPage = /^\d+$/.test(pageParam ?? '') ? Number(pageParam) : 1;
     const totalPages = Math.max(1, Math.ceil(watchlistItems.length / PAGE_SIZE));
     const page = Math.min(totalPages, Math.max(1, Number.isSafeInteger(requestedPage) ? requestedPage : 1));
     const pageItems = watchlistItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const pageSymbols = pageItems.map((item) => item.symbol);
 
-    // Cotizar solo la página visible, no toda la lista.
-    const datedChanges = await fetchDatedChanges(pageItems.map((item) => item.symbol));
-    // Monitor denso: minimo 52 sem y cierre desde market_prices propio,
-    // proximos resultados via NASDAQ publico, comparacion con la ultima
-    // tesis publicada. Una sola llamada por pagina visible.
-    const monitorData = await getWatchlistMonitor(pageItems.map((item) => item.symbol));
+    // Cotizar solo la página visible, no toda la lista. Los cierres datados,
+    // el monitor denso (52 sem, próximos resultados, tesis) y la lectura por
+    // símbolo son independientes: se lanzan a la vez. Antes iban en cadena
+    // (cierres, luego monitor, luego símbolos) y el TTFB sumaba los tres tramos.
+    const datedChangesPromise = fetchDatedChanges(pageSymbols);
+    const monitorPromise = getWatchlistMonitor(pageSymbols);
+    const entryPromises = pageItems.map((item) =>
+        Promise.all([getWatchlistEntryData(item.symbol), getExtendedQuote(item.symbol)]).then(
+            (value) => ({ ok: true as const, value }),
+            () => ({ ok: false as const }),
+        ),
+    );
+    const [datedChanges, monitorData] = await Promise.all([datedChangesPromise, monitorPromise]);
     const watchlistStocks: WatchlistStock[] = await Promise.all(
-        pageItems.map(async (item) => {
+        pageItems.map(async (item, index) => {
             try {
                 // Precio y divisa del LISTADO REAL (master), nunca del ticker
                 // desnudo: Finnhub free lo resuelve en la línea US (ADR en USD
                 // u otro emisor) y contradecía la ficha research (F253/F254).
-                const [entry, extended] = await Promise.all([getWatchlistEntryData(item.symbol), getExtendedQuote(item.symbol)]);
+                const settled = await entryPromises[index];
+                if (!settled.ok) throw new Error('watchlist entry failed');
+                const [entry, extended] = settled.value;
                 // Mismo cierre datado y mismo % que Movers y Mercado.
                 const dated = entry.priceKind === 'live' ? undefined : datedChanges[item.symbol.trim().toUpperCase()];
                 const data = dated

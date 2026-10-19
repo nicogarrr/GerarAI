@@ -7,7 +7,7 @@ const source = readFileSync('app/(root)/watchlist/page.tsx', 'utf8');
 test('watchlist quotes only its bounded visible page', () => {
     assert.match(source, /const PAGE_SIZE = 20/);
     assert.match(source, /watchlistItems\.slice\(\(page - 1\) \* PAGE_SIZE, page \* PAGE_SIZE\)/);
-    assert.match(source, /pageItems\.map\(async \(item\)/);
+    assert.match(source, /pageItems\.map\(async \(item(?:, index)?\)/);
     assert.doesNotMatch(source, /watchlistItems\.map\(async/);
     assert.match(source, /Number\.isSafeInteger\(requestedPage\)/);
     assert.match(source, /Math\.min\(totalPages, Math\.max\(1,/);

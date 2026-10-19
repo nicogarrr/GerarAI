@@ -144,6 +144,19 @@ export default async function ResearchPage({
 }: {
     searchParams?: Promise<{ q?: string | string[]; page?: string | string[] }>;
 }) {
+    // Las lecturas de contexto del usuario (cartera, watchlist) no dependen del
+    // dashboard: se lanzan a la vez en vez de esperar a que termine el
+    // dashboard. Antes eran dos tramos secuenciales (dashboard, luego
+    // resumen+watchlist) y el TTFB sumaba ambos.
+    const userContext = (async () => {
+        const userId = (await requireAuthenticatedUser()).id;
+        return Promise.all([
+            getPortfolioSummary(userId).catch(() => null),
+            getWatchlist().catch(() => [] as Array<{ symbol: string }>),
+        ]);
+    })();
+    // Evita un rechazo sin manejar si el dashboard falla antes de esperarlo.
+    userContext.catch(() => undefined);
     let dashboard: Dashboard;
     try {
         dashboard = await getResearchDashboard();
@@ -158,11 +171,7 @@ export default async function ResearchPage({
     // Contexto del usuario para el orden por relevancia. Degradación
     // honesta: una lectura fallida degrada su bucket a «resto», nunca
     // fabrica pertenencia a cartera o watchlist.
-    const userId = (await requireAuthenticatedUser()).id;
-    const [portfolioSummary, watchlist] = await Promise.all([
-        getPortfolioSummary(userId).catch(() => null),
-        getWatchlist().catch(() => [] as Array<{ symbol: string }>),
-    ]);
+    const [portfolioSummary, watchlist] = await userContext;
     const portfolioTickers = new Set(
         (portfolioSummary?.holdings ?? [])
             .filter((holding) => holding.quantity !== 0)
