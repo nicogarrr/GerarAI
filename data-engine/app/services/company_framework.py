@@ -247,6 +247,9 @@ def resolve_company_framework(company: Company) -> CompanyFramework:
         "IREN": "capacity_infrastructure",
         "BN": "holding_asset_manager",
         "BABA": "holding_asset_manager",
+        "KKR": "holding_asset_manager",
+        "CB": "insurer",
+        "CPT": "reit",
         "CCJ": "commodity",
         "FRPH": "commodity",
     }
@@ -260,6 +263,22 @@ def resolve_company_framework(company: Company) -> CompanyFramework:
         return FRAMEWORKS["insurer"]
     if "reit" in company_type or "reit" in model or "real_estate_nav" in model:
         return FRAMEWORKS["reit"]
+    # Señal por industria (Finnhub profile / maestro) cuando el company_type
+    # no decide: asigna el MARCO de tesis correcto (drivers/KPIs). El motor de
+    # valoración solo cambia para los tickers verificados de registry.py.
+    # Reglas del auditor: "broker" excluido de insurer (AON/MMC son brokers,
+    # no aseguradoras) y "real estate" genérico NO es REIT (CBRE, Zillow son
+    # servicios/desarrollo, no vehículos de FFO/AFFO).
+    industry = (getattr(company, "industry", None) or "").lower()
+    if "insur" in industry and "broker" not in industry:
+        return FRAMEWORKS["insurer"]
+    if "reit" in industry:
+        return FRAMEWORKS["reit"]
+    if "asset management" in industry:
+        return FRAMEWORKS["holding_asset_manager"]
+    if "bank" in industry:
+        return FRAMEWORKS["bank"]
+
     if is_holding_company_type(company_type) or "sotp" in model:
         return FRAMEWORKS["holding_asset_manager"]
     if "commodity" in tags or "mining" in company_type or "uranium" in company_type or "royalty" in company_type:
