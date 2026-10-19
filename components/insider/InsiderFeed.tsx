@@ -23,7 +23,9 @@ const usd = (value: number | null | undefined, digits = 0, currency?: string) =>
             ? formatPrice(value, currency, { minimumFractionDigits: digits, maximumFractionDigits: digits })
             : formatNumber(value, { minimumFractionDigits: digits, maximumFractionDigits: digits })
         : '—';
-// El backend siempre declara la divisa (SEC = USD, PDMR UK = GBP); si falta, numero sin simbolo.
+// El backend declara la divisa por operacion (SEC Form 4 = USD; PDMR UK = la
+// que informe la fuente: GBP/USD/EUR... y 93/307 llegan sin informar). Si
+// falta: numero sin simbolo + "divisa no informada", nunca se asume.
 const txCurrency = (tx: InsiderFeedTransaction) => (tx.currency && isValidCurrencyCode(tx.currency) ? tx.currency : undefined);
 
 function href(side: string, days: number) {
@@ -130,6 +132,9 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
                 </div>
             </dl>
             {note ? <p className="mt-1.5 text-xs text-gray-500">{note}</p> : null}
+            {tx.currency == null && (tx.price != null || tx.value != null) ? (
+                <p className="mt-1.5 text-xs text-gray-500">Divisa no informada</p>
+            ) : null}
             {tx.form === 'PDMR' ? (
                 <p className="mt-1.5 text-xs text-gray-500">Fuente: tracefour (CC BY 4.0) · documento original en FCA NSM</p>
             ) : null}

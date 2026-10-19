@@ -1422,6 +1422,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                         {insiderName(tx.insider)} · {insiderRole(tx.role, tx.officer_title)} · {tx.code === 'P' ? 'Compra' : tx.code === 'S' ? 'Venta' : tx.code ?? '—'}
                         {typeof tx.shares === 'number' ? ` · ${formatNumber(tx.shares)} acciones` : ''}
                         {typeof tx.value === 'number' && Number.isFinite(tx.value) ? ` · ${tx.currency && isValidCurrencyCode(tx.currency) ? formatPrice(tx.value, tx.currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : formatNumber(tx.value, { maximumFractionDigits: 0 })}` : ''}
+                        {tx.currency == null && typeof tx.value === 'number' ? ' · divisa no informada' : ''}
                         {tx.tx_date ? ` · ${formatDate(tx.tx_date)}` : ''}
                       </li>
                     ))}
