@@ -12,6 +12,8 @@ export type CatalystEvent = {
     title: string;
     detail: string | null;
     source: string;
+    /** Solo en resultados: 'cartera' si es posición abierta, 'watchlist' si viene de la watchlist (US). */
+    origin?: 'cartera' | 'watchlist';
 };
 
 export type CatalystCalendar = {
@@ -19,6 +21,8 @@ export type CatalystCalendar = {
     desde: string;
     hasta: string;
     held_count: number;
+    /** Tickers US de la watchlist cruzados en resultados (fuera de cartera). */
+    watchlist_count?: number;
     count: number;
     events: CatalystEvent[];
     errors: string[];

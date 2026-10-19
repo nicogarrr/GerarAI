@@ -235,6 +235,25 @@ def _es_number(value: float, decimals: int) -> str:
     return f"{value:.{decimals}f}".replace(".", ",")
 
 
+def watchlist_us_tickers(db: Session, held_us: set[str]) -> set[str]:
+    """Tickers US (bolsa US y USD) de la watchlist que NO estan ya en cartera.
+
+    Misma regla ``_us_listed`` que las posiciones: NASDAQ solo se cruza con
+    lineas US. La cartera gana el origen: un ticker en ambas se etiqueta
+    ``cartera``.
+    """
+    from app.models import WatchItem
+
+    rows = db.scalars(
+        select(Company).join(WatchItem, WatchItem.symbol == Company.ticker)
+    ).all()
+    return {
+        str(c.ticker).upper()
+        for c in rows
+        if c.ticker and _us_listed(c) and str(c.ticker).upper() not in held_us
+    }
+
+
 def held_tickers(db: Session) -> tuple[set[str], set[str]]:
     """(todos, solo_us): tickers en mayusculas con posicion abierta.
 
@@ -271,13 +290,16 @@ def build_catalysts(
     earnings: list[dict[str, Any]],
     dividends: list[dict[str, Any]],
     actions: list[dict[str, Any]],
+    watchlist_us: set[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Filtra a cartera, normaliza y ordena por fecha. Funcion pura."""
+    """Filtra a cartera (+ watchlist US en resultados), normaliza y ordena."""
+    watchlist_us = watchlist_us or set()
     events: list[dict[str, Any]] = []
     for row in earnings:
         ticker = str(row.get("symbol", "")).upper()
         day = _parse_us_date(row.get("date"))
-        if ticker not in held_us or day is None or not desde <= day <= hasta:
+        in_held = ticker in held_us
+        if day is None or not desde <= day <= hasta or (not in_held and ticker not in watchlist_us):
             continue
         detail = []
         # Solo franjas conocidas: "time-not-supplied" o valores nuevos no se muestran crudos.
@@ -293,6 +315,7 @@ def build_catalysts(
                 "title": "Resultados trimestrales",
                 "detail": ", ".join(detail) or None,
                 "source": SOURCE_NASDAQ,
+                "origin": "cartera" if in_held else "watchlist",
             }
         )
     for row in dividends:
