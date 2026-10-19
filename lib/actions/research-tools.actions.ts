@@ -311,7 +311,7 @@ export type PortfolioIntelligence = {
     information_ratio: number | null;
     observations: number;
   };
-  coverage: { positions: number; positions_with_price_history: number; price_history_percent: number; portfolio_snapshots: number; snapshot_returns: number; snapshot_pricing_complete: number; limitations: string[] };
+  coverage: { positions: number; positions_with_price_history: number; positions_with_full_horizon: number; price_history_window_percent: number; price_history_percent: number; portfolio_snapshots: number; snapshot_returns: number; snapshot_pricing_complete: number; limitations: string[] };
 };
 
 export type KnowledgeGraph = {
