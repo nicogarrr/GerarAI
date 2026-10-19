@@ -722,7 +722,10 @@ export interface paths {
         };
         /**
          * Company Extended Quote
-         * @description Yahoo intraday/extended hours; no persistence or database dependency.
+         * @description Yahoo intraday/extended hours. With the market closed, `change` and
+         *     `change_percent` stay null (no live reference) and the day variation comes
+         *     from official closes in our DB as `close_change*` (last close vs previous
+         *     session). Any DB failure leaves those fields null; the quote still works.
          */
         get: operations["company_extended_quote_api_companies__ticker__extended_quote_get"];
         put?: never;
@@ -2249,6 +2252,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Market Changes
+         * @description Variación diaria de tickers concretos con la misma fórmula que Movers.
+         *
+         *     Un ticker sin cierres comparables devuelve change_pct null (la UI muestra
+         *     N/D), nunca un valor de otra fuente.
+         */
+        get: operations["market_changes_api_market_changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/indices": {
         parameters: {
             query?: never;
@@ -2275,12 +2301,12 @@ export interface paths {
         };
         /**
          * Market Movers
-         * @description Gainers/losers/más activas calculados desde market_prices local.
+         * @description Gainers/losers/más activas desde market_prices (cierres datados).
          *
-         *     Diseño frío-seguro: sin filas no hay KeyError ni 500 — se devuelve
-         *     universo vacío y la UI lo muestra como estado honesto. El cambio se
-         *     calcula entre los dos últimos cierres de cada compañía (nunca se asume
-         *     caché caliente ni fechas globales).
+         *     Sin filas devuelve universo vacío, nunca KeyError ni 500. El cambio sale de
+         *     `market_change.compute_session_changes`, la misma función que usan Mercado
+         *     y watchlist. Los rankings solo admiten valores que superan el suelo de
+         *     liquidez documentado arriba; el universo y sus exclusiones se declaran.
          */
         get: operations["market_movers_api_market_movers_get"];
         put?: never;
@@ -2610,6 +2636,23 @@ export interface paths {
         put?: never;
         /** Translate News Headline */
         post: operations["translate_news_headline_api_news__event_id__translation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/news/{event_id}/translation/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Translate News Summary */
+        post: operations["translate_news_summary_api_news__event_id__translation_summary_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3363,6 +3406,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/propicks/gems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Gems
+         * @description Joyas ocultas: calidad (embudo) + valor + insiders + 13F, con fuente y fecha por dato.
+         */
+        get: operations["list_gems_api_propicks_gems_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/propicks/prices/refresh": {
         parameters: {
             query?: never;
@@ -3379,6 +3442,44 @@ export interface paths {
          *     Ops/sync manual; el scheduler lo corre a diario tras el cierre US.
          */
         post: operations["refresh_prices_api_propicks_prices_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/propicks/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Gems
+         * @description Revision del LLM sobre la shortlist de joyas. Si el LLM falla o no es
+         *     gratuito, cada pick vuelve marcado sin_revision_ia con su score determinista.
+         */
+        post: operations["review_gems_api_propicks_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/propicks/review/brier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Review Brier */
+        get: operations["review_brier_api_propicks_review_brier_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3416,6 +3517,50 @@ export interface paths {
         };
         /** Get Run */
         get: operations["get_run_api_propicks_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/propicks/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Snapshots */
+        get: operations["list_snapshots_api_propicks_snapshots_get"];
+        put?: never;
+        /**
+         * Freeze Snapshot
+         * @description Congela el snapshot del mes (idempotente: el primero del mes gana).
+         */
+        post: operations["freeze_snapshot_api_propicks_snapshots_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/propicks/track-record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Track Record
+         * @description Ganadores anteriores: track record vivo desde los snapshots mensuales.
+         *
+         *     Cada cifra lleva su fecha; sin agregados anuales ni compuestos mientras
+         *     el historial sea corto.
+         */
+        get: operations["track_record_api_propicks_track_record_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4424,6 +4569,56 @@ export interface paths {
          * @description Add a symbol to the watchlist, or update its label if it exists.
          */
         post: operations["upsert_watch_item_api_watchlist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/metrics/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Watchlist Metrics
+         * @description Market cap y PER de respaldo para emisoras sin cobertura del
+         *     proveedor US (QA AENA/ASML): market_cap del proveedor o derivado
+         *     (precio x acciones, servicio derived_market_cap) y PER = ultimo cierre
+         *     / EPS diluido del ultimo ejercicio anual. Nulo honesto cuando no hay
+         *     base: nunca se fabrica el numero.
+         */
+        get: operations["watchlist_metrics_api_watchlist_metrics__symbol__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/monitor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Watchlist Monitor
+         * @description Datos densos por ticker para el monitor de watchlist.
+         *
+         *     Solo datos propios o de fuentes publicas con trazabilidad: minimo de 52
+         *     semanas desde ``market_prices`` (ingesta propia), proximo resultado desde
+         *     el conector publico de NASDAQ (misma fuente que /api/calendar/earnings) y
+         *     comparacion con la ultima tesis PUBLICADA de K (``expected_value``).
+         *     Cualquier pieza sin dato va a ``None``; nunca se inventa.
+         */
+        get: operations["watchlist_monitor_api_watchlist_monitor_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5788,8 +5983,14 @@ export interface components {
             period: string;
             /** Source Id */
             source_id: number | null;
+            /** Source Published At */
+            source_published_at?: string | null;
+            /** Source Title */
+            source_title?: string | null;
             /** Source Type */
             source_type: string;
+            /** Source Url */
+            source_url?: string | null;
             /** Unit */
             unit: string;
             /** Value */
@@ -5815,6 +6016,21 @@ export interface components {
             ticker: string;
             /** Valuation Input Ready */
             valuation_input_ready: boolean;
+        };
+        /** GemOut */
+        GemOut: {
+            /** Market Cap */
+            market_cap: number;
+            /** Name */
+            name: string;
+            /** Reasons */
+            reasons: {
+                [key: string]: unknown;
+            }[];
+            /** Score */
+            score: number;
+            /** Ticker */
+            ticker: string;
         };
         /** GuideContextResponse */
         GuideContextResponse: {
@@ -13009,6 +13225,48 @@ export interface operations {
             };
         };
     };
+    market_changes_api_market_changes_get: {
+        parameters: {
+            query: {
+                tickers: string;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     market_indices_api_market_indices_get: {
         parameters: {
             query?: never;
@@ -13937,6 +14195,48 @@ export interface operations {
         };
     };
     translate_news_headline_api_news__event_id__translation_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translate_news_summary_api_news__event_id__translation_summary_post: {
         parameters: {
             query?: never;
             header?: {
@@ -15888,6 +16188,46 @@ export interface operations {
             };
         };
     };
+    list_gems_api_propicks_gems_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     refresh_prices_api_propicks_prices_refresh_post: {
         parameters: {
             query?: never;
@@ -15908,6 +16248,88 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_gems_api_propicks_review_post: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_brier_api_propicks_review_brier_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -16037,6 +16459,126 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProPickRunDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_snapshots_api_propicks_snapshots_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    freeze_snapshot_api_propicks_snapshots_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    track_record_api_propicks_track_record_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -18487,6 +19029,91 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    watchlist_metrics_api_watchlist_metrics__symbol__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    watchlist_monitor_api_watchlist_monitor_get: {
+        parameters: {
+            query: {
+                /** @description CSV de tickers, max 60 */
+                tickers: string;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
