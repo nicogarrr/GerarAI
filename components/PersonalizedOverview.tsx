@@ -132,6 +132,18 @@ const SEVERITY_LABELS: Record<string, string> = {
     info: 'informativa',
 };
 
+/** La cabecera de la alerta lleva la fecha del hecho; si es el mismo día que
+ *  la hora de entrega que se ve justo al lado, se omite para no repetirla. */
+const ALERT_HEADING_DATE = /( · (?:detectada )?)(\d{1,2} [^\s·]+ \d{4})$/;
+function alertHeading(heading: string, createdAt: string): string {
+    const match = ALERT_HEADING_DATE.exec(heading);
+    if (!match) return heading;
+    const created = new Date(createdAt);
+    if (Number.isNaN(created.getTime())) return heading;
+    const sameDay = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid' }).format(created);
+    return sameDay === match[2] ? heading.replace(ALERT_HEADING_DATE, '') : heading;
+}
+
 /** Una regla de alerta en una línea legible: "AAPL: precio por encima de 200". */
 function alertRuleLabel(alert: Alert): string {
     const labels: Record<Alert['type'], string> = {
@@ -467,10 +479,10 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     key={item.id}
                                 >
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <Badge variant="outline">{SEVERITY_LABELS[item.severity] ?? item.severity}</Badge>
+                                        {(item.severity === 'critical' || item.severity === 'high') && <Badge variant="outline">{SEVERITY_LABELS[item.severity] ?? item.severity}</Badge>}
                                         <span className="text-xs text-gray-500">{formatUserDateTime(item.createdAt)}</span>
                                     </div>
-                                    <p className="mt-2 text-sm break-words font-semibold text-gray-100">{copy.heading}</p>
+                                    <p className="mt-2 text-sm break-words font-semibold text-gray-100">{alertHeading(copy.heading, item.createdAt)}</p>
                                     {/* tracked_news lleva el titular crudo de la fuente: misma
                                         traducción bajo demanda que en /alerts (#1493). */}
                                     {alertSummaryIsSourceHeadline(item) ? (
@@ -478,7 +490,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     ) : (
                                         <p className="mt-1 text-sm break-words text-gray-300">{copy.summary}</p>
                                     )}
-                                    <details className="relative z-10 mt-2 break-words text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">Ver aviso original</summary><p className="whitespace-pre-wrap">{copy.technical}</p></details>
+                                    {!item.alert_type.includes('news') && <details className="relative z-10 mt-2 break-words text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">Ver aviso original</summary><p className="whitespace-pre-wrap">{copy.technical}</p></details>}
                                     {(item.ticker || item.sourceUrl) && (
                                         <span className="mt-2 inline-flex flex-wrap gap-3">
                                             {item.ticker && (
