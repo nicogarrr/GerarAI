@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Activity, ArrowRight, BellRing, Eye, Gem, Minus, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Activity, ArrowRight, BellRing, Eye, Gem, Wallet } from 'lucide-react';
 import { PortfolioValueBreakdown } from '@/components/portfolio/PortfolioValueBreakdown';
 import { getPortfolioSummary, type PortfolioHolding, type PortfolioSummary } from '@/lib/actions/portfolio.actions';
 import { getHomeWatchlistPreview, getHomeOpportunities } from '@/lib/actions/home-overview.actions';
@@ -561,12 +561,9 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                         className="flex min-h-[44px] items-center justify-between gap-2 p-3 bg-gray-900/30 rounded-lg hover:bg-gray-800/80 transition-colors group"
                                     >
                                         <div className="flex min-w-0 items-center gap-3">
-                                            <div className={`shrink-0 p-2 rounded-full ${stock.changePercent == null ? 'bg-gray-500/10 text-gray-500' : stock.changePercent >= 0 ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                                                {stock.changePercent == null ? <Minus aria-hidden="true" className="h-4 w-4" /> : stock.changePercent >= 0 ? <TrendingUp aria-hidden="true" className="h-4 w-4" /> : <TrendingDown aria-hidden="true" className="h-4 w-4" />}
-                                            </div>
                                             <div className="min-w-0">
                                                 <span className="block truncate text-white font-medium group-hover:text-yellow-400 transition-colors">{stock.symbol}</span>
-                                                <p className="block truncate max-w-[140px] sm:max-w-none text-xs text-gray-500" title={stock.name}>{stock.name}</p>
+                                                <p className="block truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p>
                                             </div>
                                         </div>
                                         <div className="shrink-0 text-right">
