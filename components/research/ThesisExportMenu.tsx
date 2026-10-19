@@ -20,28 +20,28 @@ export default function ThesisExportMenu({
   latestDraftVersion = null,
 }: {
   ticker: string;
-  /** Sin versión publicada, leer/descargar lleva a un 404: se explica. */
+  /** Sin versión publicada solo se ofrece el PDF del borrador. */
   hasPublished: boolean;
   /** Versión más reciente en borrador, para nombrarla en la explicación. */
   latestDraftVersion?: number | null;
 }) {
   const encoded = encodeURIComponent(ticker);
-  if (!hasPublished) {
-    const motivo = latestDraftVersion !== null
-      ? `La v${latestDraftVersion} está en borrador: se puede leer y descargar cuando se apruebe.`
-      : 'Aún no hay ninguna tesis publicada: se puede leer y descargar cuando exista una versión aprobada.';
-    return (
-      <span
-        className="inline-flex min-h-[44px] cursor-not-allowed items-center gap-2 rounded-md border border-gray-800 px-4 py-2 text-sm font-medium text-gray-500 sm:min-h-0"
-        title={motivo}
-      >
-        <FileDown className="h-4 w-4" />
-        Leer / Descargar
-        <span className="text-xs text-gray-600">· borrador sin publicar</span>
-      </span>
-    );
-  }
+  const hasDraft = latestDraftVersion !== null;
+  const pdfButton = hasPublished || hasDraft ? (
+    <a
+      className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-teal-700 px-4 py-2 text-sm font-medium text-teal-200 transition hover:bg-teal-950/40 sm:min-h-0"
+      download
+      href={hasPublished ? `/api/thesis/${encoded}/pdf` : `/api/thesis/${encoded}/pdf?draft=1`}
+      title={hasPublished ? undefined : `PDF de la v${latestDraftVersion} en borrador, sin cifras de valoración ni margen.`}
+    >
+      <FileDown className="h-4 w-4" />
+      {hasPublished ? 'Descargar PDF' : `Descargar PDF (borrador v${latestDraftVersion})`}
+    </a>
+  ) : null;
+  if (!hasPublished) return pdfButton;
   return (
+    <>
+    {pdfButton}
     <DropdownMenu>
       <DropdownMenuTrigger className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-teal-700 hover:text-teal-200 sm:min-h-0">
         <FileDown className="h-4 w-4" />
@@ -68,5 +68,6 @@ export default function ThesisExportMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 }

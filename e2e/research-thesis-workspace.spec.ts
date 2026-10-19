@@ -103,15 +103,8 @@ test.describe("research thesis workspace", () => {
       page.getByRole("button", { name: "Generar tesis" }),
     ).toBeVisible();
 
-    // Sin tesis publicada no hay menú que abrir: ThesisExportMenu deja el
-    // control "Leer / Descargar" deshabilitado y explica el motivo (salida
-    // honesta). El menú real se ejerce en el spec de E2ENAR con versión
-    // publicada, más abajo.
-    const exportacionDeshabilitada = page.locator(
-      'span[title="Aún no hay ninguna tesis publicada: se puede leer y descargar cuando exista una versión aprobada."]',
-    );
-    await expect(exportacionDeshabilitada).toBeVisible();
-    await expect(exportacionDeshabilitada).toContainText("Leer / Descargar");
+    // Sin ninguna tesis no hay nada que descargar: no se pinta un botón muerto.
+    await expect(page.getByRole("link", { name: /Descargar PDF/ })).toHaveCount(0);
 
     // Without a persisted thesis the workspace says so - nothing invented.
     await expect(page.getByText("Aún no existe ninguna tesis.")).toBeVisible();
@@ -190,6 +183,9 @@ db.close()
 
     // Con versión publicada el menú "Leer / Descargar" sí existe y apunta a
     // los endpoints por ticker (la vista dedicada, el PDF y el Markdown).
+    await expect(
+      page.getByRole("link", { name: "Descargar PDF" }),
+    ).toHaveAttribute("href", "/api/thesis/E2ENAR/pdf");
     await page.getByRole("button", { name: "Leer / Descargar" }).click();
     await expect(
       page.getByRole("menuitem", { name: "Leer la tesis" }),

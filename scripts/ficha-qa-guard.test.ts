@@ -26,10 +26,12 @@ describe('QA ficha: tesis en borrador sin callejon sin salida (4)', () => {
     it('los botones de exportacion se ocultan sin version publicada (eran un 404)', () => {
         assert.ok(tesis.includes('{published ? ('), 'exportacion condicionada a publicada');
     });
-    it('el menu Leer/Descargar de la ficha se desactiva sin publicada y lo explica', () => {
+    it('el PDF de la ficha siempre se ofrece: publicada o borrador marcado', () => {
         const menu = readFileSync('components/research/ThesisExportMenu.tsx', 'utf8');
         assert.ok(menu.includes('hasPublished'), 'recibe hasPublished');
-        assert.ok(menu.includes('borrador sin publicar'), 'explica el borrador');
+        assert.ok(menu.includes('pdf?draft=1'), 'sin publicada baja el borrador');
+        const pdfRoute = readFileSync('app/api/thesis/[ticker]/pdf/route.ts', 'utf8');
+        assert.ok(pdfRoute.includes('BORRADOR sin publicar') && pdfRoute.includes('## Valoración y escenarios'), 'el borrador sale marcado y sin cifras');
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
         assert.ok(page.includes("hasPublished={data.historyDetail.history.some((entry) => entry.status === 'published')}"), 'la ficha lo alimenta');
     });
