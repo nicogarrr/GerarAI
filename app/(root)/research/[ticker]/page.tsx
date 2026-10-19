@@ -53,7 +53,7 @@ import { ChatIntentLinks } from '@/components/research/ChatIntentLinks';
 import { NextStepLink } from '@/components/research/NextStepLink';
 import { missingLayerAction, missingLayerLabel } from '@/lib/research/missing-layer-guidance';
 import { metricLabel } from '@/lib/research/metric-labels';
-import { MoatPanel } from '@/components/research/MoatPanel';
+import { MoatPanel, MoatClassificationPanel } from '@/components/research/MoatPanel';
 import { AstOrbitPanel } from '@/components/research/AstOrbitPanel';
 import { ThesisScenariosPanel } from '@/components/research/ThesisScenariosPanel';
 import { getThesisWithScenarios } from '@/lib/actions/thesis-scenarios.actions';
@@ -1477,6 +1477,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     content = (
       <div className="space-y-5">
         <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Evaluación del foso refrescada"><Button type="submit" variant="outline"><ShieldCheck className="mr-2 h-4 w-4" />Reevaluar evidencia</Button></MutationForm>
+        <MoatClassificationPanel moat={moat} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {moat?.moats.length ? moat.moats.map((item) => {
             const definition = moatDefinition(item.type);
