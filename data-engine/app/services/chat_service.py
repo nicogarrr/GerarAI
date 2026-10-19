@@ -542,6 +542,10 @@ def _history_is_portfolio(history: list[ChatTurn] | None) -> bool:
     return False
 
 
+_PAGE_IDENTITY_RE = re.compile(
+    r"(?i)\bqu[eé]\s+(?:p[aá]gina|pantalla|secci[oó]n)\s+(?:es\s+esta|estoy\s+viendo|es|ves)\b"
+    r"|\bqu[eé]\s+estoy\s+viendo\b|\bd[oó]nde\s+estoy\b"
+)
 _PAGE_CONTENT_RE = re.compile(
     r"(?i)\b(?:en|de|sobre)\s+(?:esta|la\s+presente)\s+(?:p[aá]gina|pantalla|secci[oó]n)\b"
     r"|\b(?:esta|la)\s+(?:p[aá]gina|pantalla)\b[^.?!\n]{0,40}\b(?:hay|muestra|tiene|dice)\b"
@@ -795,6 +799,29 @@ class ChatService:
                 llm_trace={"path": "small_talk"},
                 context=context_echo,
             )
+        # "¿Qué página estoy viendo?": la identidad de la página ya está
+        # resuelta en servidor; se responde sin LLM y sin fuentes (la
+        # pastilla "Viendo X" es la propia UI, no un documento citable).
+        if page_context is not None and _PAGE_IDENTITY_RE.search(question or ""):
+            seen = (
+                f"{page_context.label} ({page_context.company.name})"
+                if page_context.company is not None
+                else page_context.label
+            )
+            pointer = (
+                f" Pregúntame por {page_context.ticker}: precio, financieros, tesis o noticias guardadas."
+                if page_context.ticker
+                else ""
+            )
+            return ChatResponse(
+                answer=f"Estás viendo {seen}.{pointer}",
+                sources=[],
+                model="deterministic",
+                prompt_version="page-identity-v1",
+                confidence=0.9,
+                llm_trace={"path": "page_identity", "generated": False, "provider_calls": 0},
+                context=context_echo,
+            )
         from app.services.brain_data_tools import (
             answer_data_question,
             dividend_ticker_without_records,
@@ -961,6 +988,10 @@ class ChatService:
             except Exception:  # noqa: BLE001 — Jev nunca rompe el chat
                 pass
         synthesis = ChatSynthesisService(self.provider)
+        # La página visible viaja al LLM: sin ella "esta página/esta empresa"
+        # no tenía referente y el modelo lo inventaba (y citaba fuentes
+        # ajenas para apoyarlo).
+        page_payload = context_echo
         if ticker:
             response = await synthesis.synthesize(
                 question=question,
@@ -968,6 +999,7 @@ class ChatService:
                 baseline=baseline,
                 db=db,
                 enable_debate=enable_debate,
+                page=page_payload,
             )
         else:
             response = await synthesis.synthesize_general(
@@ -975,6 +1007,7 @@ class ChatService:
                 baseline=baseline,
                 db=db,
                 history=history,
+                page=page_payload,
             )
         response.context = context_echo
         return response
