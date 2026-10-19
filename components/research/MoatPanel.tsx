@@ -191,3 +191,21 @@ export function MoatClassificationPanel({ moat }: { moat: import('@/lib/actions/
     </details>
   </section>;
 }
+
+export function MoatChecklistPanel({ moat }: { moat: import('@/lib/actions/research.actions').ResearchMoat | null }) {
+  if (!moat?.qualitative_checklist) return null;
+  return <section className="space-y-3" aria-label="Checklist cualitativo del foso">
+    <h2 className="text-lg font-semibold text-gray-100">Preguntas sobre el foso</h2>
+    {moat.qualitative_checklist.map(item => <div className="min-w-0 rounded-lg border border-gray-800 p-3" key={item.id}>
+      <h3 className="text-sm font-medium text-gray-200">{item.question}</h3>
+      {!item.excerpts.length ? <p className="mt-2 text-xs text-gray-500">Sin evidencia</p> : <>
+        <p className="mt-1 text-xs text-gray-500">Extractos relacionados, no conclusión</p>
+        {item.excerpts.map((excerpt, index) => <blockquote className="mt-3 border-l border-gray-700 pl-3 text-sm text-gray-300" key={index}>
+          <p className="break-words">{excerpt.quote}</p>
+          <a className="mt-1 block break-words text-xs text-teal-300 underline" href={excerpt.source_url} target="_blank" rel="noopener noreferrer">{excerpt.source_title}</a>
+          <span className="text-xs text-gray-500">{excerpt.relation === 'contradicts' ? 'Evidencia en contra' : excerpt.relation === 'supports' ? 'Evidencia a favor' : 'Relación sin clasificar'}</span>
+        </blockquote>)}
+      </>}
+    </div>)}
+  </section>;
+}
