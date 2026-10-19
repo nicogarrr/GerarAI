@@ -31,15 +31,22 @@ export const metadata: Metadata = { title: 'Noticias' };
 
 export default async function ResearchNewsPage({ searchParams }: PageProps) {
   const query = await searchParams;
-  const lane = query.lane === 'macro' || query.lane === 'empresa' ? query.lane : null;
+  const lane = query.lane === 'macro' || query.lane === 'empresa' || query.lane === 'para-ti' ? query.lane : null;
   const ticker = query.ticker?.trim().toUpperCase() || null;
   const parsed = Number.parseInt(query.pagina ?? '1', 10);
   const page = Number.isFinite(parsed) ? Math.min(Math.max(1, parsed), 1000) : 1;
   // Se pide uno de más para saber si hay página siguiente sin contar toda la tabla.
-  const [fetched, tickerContext] = await Promise.all([
-    getResearchNews(lane, (page - 1) * NEWS_PAGE_SIZE, NEWS_PAGE_SIZE + 1, ticker),
-    getTickerContext(),
-  ]);
+  const tickerContext = await getTickerContext();
+  // Carril «Para ti»: solo empresas de la cartera y la watchlist del usuario
+  // (relevancia por contexto; el backend recibe los tickers explícitos).
+  const paraTiTickers = [...new Set([...tickerContext.portfolioTickers, ...tickerContext.watchlistTickers])];
+  const fetched = await getResearchNews(
+    lane,
+    (page - 1) * NEWS_PAGE_SIZE,
+    NEWS_PAGE_SIZE + 1,
+    ticker,
+    paraTiTickers,
+  );
   const hasMore = fetched.length > NEWS_PAGE_SIZE;
   const events = dedupeNewsEvents(fetched.slice(0, NEWS_PAGE_SIZE));
 

@@ -12,6 +12,7 @@ import { etiquetaDireccionImpacto, etiquetaTemaMacro, etiquetaTierFuente, etique
 
 const CARRILES = [
   { key: null, label: 'Todas' },
+  { key: 'para-ti', label: 'Para ti' },
   { key: 'empresa', label: 'Empresas' },
   { key: 'macro', label: 'Macro' },
 ] as const;
@@ -86,6 +87,43 @@ function MaterialityIndicator({ score }: { score: number }) {
   );
 }
 
+/** «N fuentes»: la misma historia la cubrieron varios medios y la portada la
+ *  agrupa en una fila (PR story clusters). El detalle lista las fuentes. */
+function CoverageChip({ event }: { event: ResearchNewsEvent }) {
+  if (!event.coverage_count || event.coverage_count < 2) return null;
+  return (
+    <span
+      className="rounded-full bg-teal-950/60 px-2 py-0.5 text-xs font-semibold text-teal-300"
+      title="La misma historia publicada por varios medios, agrupada"
+    >
+      {event.coverage_count} fuentes
+    </span>
+  );
+}
+
+/** Fuentes absorbidas por la agrupación de historia, dentro del detalle. */
+function CoverageDetail({ event }: { event: ResearchNewsEvent }) {
+  if (!event.coverage?.length) return null;
+  return (
+    <div className="mt-1 max-w-xs space-y-1 break-words rounded-md border border-gray-800 p-2">
+      <div className="font-medium">También lo cubrieron:</div>
+      <div className="space-y-0.5">
+        {event.coverage.map((item, idx) => (
+          <div key={`${item.url ?? item.source}-${idx}`}>
+            {item.url ? (
+              <a className="text-teal-300 hover:text-teal-200" href={item.url} rel="noreferrer" target="_blank">
+                {item.source || 'Fuente sin nombre'}
+              </a>
+            ) : (
+              <span>{item.source || 'Fuente sin nombre'}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MacroChip({ event }: { event: ResearchNewsEvent }) {
   if (event.news_lane !== 'macro') return null;
   return (
@@ -123,6 +161,15 @@ function ContextDetail({ event }: { event: ResearchNewsEvent }) {
       <div><dt className="inline font-medium">Peso en cartera: </dt><dd className="inline">{event.portfolio_weight != null ? formatPercent(event.portfolio_weight, { digits: 1 }) : NA}</dd></div>
       {event.news_lane === 'macro' && event.macro_theme ? <div><dt className="inline font-medium">Tema: </dt><dd className="inline">{etiquetaTemaMacro(event.macro_theme)}</dd></div> : null}
     </dl>
+  );
+}
+
+function ContextAndCoverage({ event }: { event: ResearchNewsEvent }) {
+  return (
+    <>
+      <ContextDetail event={event} />
+      <CoverageDetail event={event} />
+    </>
   );
 }
 
@@ -197,6 +244,7 @@ export function NewsEventsFlow({
                   />
                 ) : null}
                 <MacroChip event={event} />
+                <CoverageChip event={event} />
                 {event.requires_update ? (
                   <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-amber-300">Revisar</span>
                 ) : null}
@@ -211,7 +259,7 @@ export function NewsEventsFlow({
                 <DateNotes event={event} inline />
               </div>
               <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary="Ver contexto">
-                <ContextDetail event={event} />
+                <ContextAndCoverage event={event} />
               </NewsSecondOrder>
             </li>
           ))}
@@ -254,6 +302,9 @@ export function NewsEventsFlow({
                         <MacroChip event={event} />
                       </div>
                     ) : null}
+                    <div className="mt-1">
+                      <CoverageChip event={event} />
+                    </div>
                   </th>
                   <td className="min-w-[120px] px-3 py-2.5 text-gray-400">
                     <div>{formatTimeAgo(event.date)}</div>
@@ -271,7 +322,7 @@ export function NewsEventsFlow({
                   <td className="py-2.5 text-gray-300">
                     {event.requires_update ? <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-xs text-amber-300">Revisar</span> : null}
                     <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary="Ver contexto">
-                      <ContextDetail event={event} />
+                      <ContextAndCoverage event={event} />
                     </NewsSecondOrder>
                   </td>
                 </tr>
