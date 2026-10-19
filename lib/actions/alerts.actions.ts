@@ -75,6 +75,13 @@ export async function createAlert(input: CreateAlertInput): Promise<Alert> {
     if (!/^[A-Z0-9.\-]{1,20}$/.test(symbol)) {
         throw new ValidationError('A valid ticker is required', 'symbol');
     }
+    if (input.type === 'price_above' || input.type === 'price_below') {
+        const threshold = Number(input.condition.value);
+        // Un umbral de precio <= 0 nunca es una regla util y antes se guardaba tal cual (p. ej. -5).
+        if (!Number.isFinite(threshold) || threshold <= 0) {
+            throw new ValidationError('El precio debe ser mayor que 0', 'value');
+        }
+    }
     await researchRequest('/api/companies/ensure', {
         method: 'POST',
         body: jsonBody({ ticker: symbol }),

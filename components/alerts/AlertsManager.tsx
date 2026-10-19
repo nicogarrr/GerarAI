@@ -124,6 +124,10 @@ function AlertsManager() {
                 toast.error('Introduce un valor numérico válido');
                 return;
             }
+            if ((formData.type === 'price_above' || formData.type === 'price_below') && (parsedValue === null || parsedValue <= 0)) {
+                toast.error('El precio debe ser mayor que 0');
+                return;
+            }
             const numericValue: string | number = isValueless
                 ? formData.condition.value
                 : (parsedValue as number);
