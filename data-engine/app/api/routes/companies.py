@@ -1123,6 +1123,29 @@ async def refresh_esef_financials(ticker: str, db: Session = Depends(get_db)) ->
     return await run_in_threadpool(_refresh)
 
 
+@router.post("/{ticker}/refresh/yahoo-fundamentals", response_model=FinancialRefreshResponse)
+async def refresh_yahoo_fundamentals(ticker: str, db: Session = Depends(get_db)) -> dict:
+    """Fundamentales anuales NO oficiales (Yahoo) para emisores sin SEC/ESEF del mapa revisado."""
+
+    def _refresh() -> dict:
+        from app.services.yahoo_fundamentals_service import refresh_from_yahoo
+
+        company = resolve_company(db, ticker)
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+        try:
+            result = refresh_from_yahoo(db, company)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=424, detail=safe_detail(exc, 424)) from exc
+        service = FinancialIngestionService()
+        result["latest_periods"] = service.latest_periods(db, company)
+        result["valuation_input_ready"] = service.valuation_input_ready(db, company)
+        result["statements_imported"] = 0
+        return result
+
+    return await run_in_threadpool(_refresh)
+
+
 @router.post("/{ticker}/refresh/wacc")
 async def refresh_wacc_inputs(
     ticker: str, db: Session = Depends(get_db)

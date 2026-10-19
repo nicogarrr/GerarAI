@@ -55,6 +55,8 @@ SOURCE_PRIORITY: dict[str, int] = {
     "CNMV": 0,
     "FMP": 10,
     "FMP_profile": 20,
+    # Yahoo no oficial: por debajo de cualquier fuente oficial o FMP.
+    "YAHOO_FUNDAMENTALS": 40,
 }
 
 
