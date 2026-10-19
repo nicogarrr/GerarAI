@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.entities import InsiderFiling, InsiderTransaction
-from app.services import insider_feed, insider_service
+from app.services import insider_feed, insider_operations, insider_service
 
 router = APIRouter()
 
@@ -145,3 +145,21 @@ def insider_filings(
             "count": 0,
             "filings": [],
         }
+
+@router.get("/operations")
+def insider_operations_route(
+    days: int = Query(default=365, ge=1, le=1825),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Operaciones P/S agregadas por empresa de cartera + watchlist (persistidas)."""
+    try:
+        return insider_operations.insider_operations(db, days=days)
+    except Exception as exc:  # noqa: BLE001 - best-effort por contrato del modulo
+        return {
+            "status": "unavailable",
+            "reason": type(exc).__name__,
+            "days": days,
+            "companies": [],
+            "companies_without_data": [],
+        }
+

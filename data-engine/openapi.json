@@ -26051,6 +26051,70 @@
         ]
       }
     },
+    "/api/insider/operations": {
+      "get": {
+        "description": "Operaciones P/S agregadas por empresa de cartera + watchlist (persistidas).",
+        "operationId": "insider_operations_route_api_insider_operations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 365,
+              "maximum": 1825,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Insider Feed Route Api Insider Feed Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Insider Operations Route",
+        "tags": [
+          "insider"
+        ]
+      }
+    },
     "/api/insider/signals": {
       "get": {
         "operationId": "insider_signals_api_insider_signals_get",
