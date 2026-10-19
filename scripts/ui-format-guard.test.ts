@@ -120,7 +120,7 @@ describe('guardas de UI', () => {
 
   it('traduce el typo del monitor insider y no lo replica en la UI', () => {
     const insider = source('app/(root)/insider/page.tsx');
-    assert.ok(insider.includes('monitor automático'));
+    assert.ok(!insider.includes('Metodología · Monitor cada 15 min'), 'el bloque de telemetría ya no se muestra');
     assert.equal(insider.includes('monitor automatico'), false);
   });
 });

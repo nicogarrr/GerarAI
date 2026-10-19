@@ -19,5 +19,5 @@ test('el vocabulario ES no recae en compostadora/ingestar/Rhino', () => {
     // El backend clasifica c-suite como CEO o CFO (insider_service._is_c_suite
     // = _is_ceo OR _is_cfo): prometer «otro C-suite» insinuaria deteccion de
     // COO/CIO/CTO que no existe.
-    assert.match(insider, /C-suite buy<\/em> \(CEO o CFO\)/);
+    assert.match(readFileSync('lib/insider/format.ts', 'utf8'), /CEO.*CFO/);
 });

@@ -107,9 +107,9 @@ test('lectura durable: el 0 de un status no-ok es «desconocido», no un recuent
 test('el panel usa durableReadCopy y no muestra el count si el status no es ok', () => {
     assert.ok(!/lectura durable no disponible/.test(view), 'el copy crudo de status/reason queda vetado');
     assert.match(view, /durableReadCopy\(initialFilings\)/);
-    assert.match(view, /initialFilings && initialFilings\.status === 'ok' \?/);
+    assert.ok(!view.includes('Monitor cada 15 min'), 'telemetría del monitor retirada');
     // Con status no-ok el número NO se pinta como recuento.
-    assert.match(view, /número de filings persistidos desconocido/);
+    assert.match(view, /\{durable\.header\}/); // explica el fallo sin convertirlo en recuento
     assert.ok(
         !/countText\(initialFilings\?\.count \?\? 0\)/.test(view),
         'el count de una lectura fallida no puede salir como número',

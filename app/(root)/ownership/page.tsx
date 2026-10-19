@@ -111,7 +111,6 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
 
             {!managers.length ? (
                 <EmptyState
-                    description="La lista de gestores es una tabla revisada en código; se amplía de forma explícita en cada versión."
                     title="No hay gestores revisados en esta versión"
                 />
             ) : (

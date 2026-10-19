@@ -57,9 +57,6 @@ export default async function ProPicksPage() {
                     <Sparkles className="h-7 w-7 shrink-0 text-teal-400 sm:h-8 sm:w-8" />
                     <div className="min-w-0">
                         <h1 className="break-words text-2xl font-bold text-gray-100 sm:text-3xl">ProPicks IA</h1>
-                        <p className="text-gray-400 mt-1">
-                            Selección vigente del último run del embudo, con la fecha de datos en cada tarjeta
-                        </p>
                     </div>
                 </div>
                 <MethodologyDisclosure>

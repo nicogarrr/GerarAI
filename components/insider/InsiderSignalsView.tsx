@@ -163,7 +163,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                 </CardContent>
             </Card>
 
-            {/* Estado del monitor + filings persistidos (GET /api/insider/filings) */}
+            {/* Solo fallos que afectan a la lectura, no telemetría del monitor. */}
             {initialTicker ? (
                 <div className="flex flex-wrap items-center gap-2">
                     {(!initialResult || !initialFilings) ? (
@@ -171,18 +171,6 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             Lectura parcial: una de las fuentes no respondió. Reintenta la búsqueda.
                         </span>
                     ) : null}
-                    {/* El `count` de la lectura durable solo es un recuento si el
-                        status es `ok`: con cualquier otro estado es un cero de
-                        «no se pudo leer» y no debe mostrarse como número. */}
-                    {initialFilings && initialFilings.status === 'ok' ? (
-                        <Badge variant="default">
-                            Monitor cada 15 min · {countText(initialFilings.total ?? initialFilings.count)} filings persistidos
-                        </Badge>
-                    ) : (
-                        <Badge variant="outline" className="border-amber-700 text-amber-300">
-                            Monitor cada 15 min · número de filings persistidos desconocido
-                        </Badge>
-                    )}
                     {durable ? (
                         <span className="max-w-xl text-xs leading-5 text-amber-300">
                             {durable.header}
@@ -258,7 +246,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                     ) : null}
                     {signals.length === 0 ? (
                         <p className="rounded-lg border border-dashed border-gray-800 p-6 text-sm text-gray-500">
-                            {initialTicker}: {t('insider.noSignals')}(
+                            {initialTicker}: {t('insider.noSignals')} (
                             {analyzedCountCopy(initialResult.status, initialResult, countText)}).
                         </p>
                     ) : (
