@@ -350,6 +350,12 @@ def _natural_company_answer(
     )
     if lead:
         parts = [lead, *[p for p in parts if not lead.startswith(p)]]
+    if re.search(r"comp[aá]r|\bvs\.?\b|versus|frente a|respecto a", (question or "").lower()):
+        parts.insert(
+            1 if lead else 0,
+            f"No puedo comparar dos empresas en una misma respuesta: te contesto solo sobre "
+            f"{company.ticker}. Pregunta por la otra empresa por separado.",
+        )
     return "\n\n".join(parts)
 
 
@@ -399,11 +405,19 @@ def _answer_lead(
         if bits:
             return f"Sobre los riesgos de {ticker}, lo guardado señala: " + "; ".join(bits) + "."
         return f"No tengo riesgos documentados guardados de {ticker}."
-    if re.search(r"tesis|valoraci|margen de seguridad|rating", text):
+    if re.search(
+        r"tesis|valoraci|valor intr[ií]nseco|valor justo|valor esperado|margen de seguridad|rating|"
+        r"infravalor|sobrevalor",
+        text,
+    ):
         if thesis is None or thesis_line is None:
             return f"No tengo ninguna tesis guardada de {ticker}."
         summary = " ".join((thesis.executive_summary or "").split())
-        return thesis_line + (f" Resumen: {_short(summary, 320)}" if summary else "")
+        draft_note = (
+            " Es un borrador: cualquier rango de valor que aparezca es indicativo, no un valor intrínseco final."
+            if (thesis.status or "").strip() != "published" else ""
+        )
+        return thesis_line + draft_note + (f" Resumen: {_short(summary, 320)}" if summary else "")
     if focus_metrics:
         wanted = [f for f in facts if f.metric in focus_metrics]
         if not wanted:
