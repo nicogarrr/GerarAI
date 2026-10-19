@@ -64,6 +64,18 @@ export interface PickIssue {
 
 const SKEW_MS = 5 * 60 * 1000; // tolerancia de reloj
 
+/**
+ * Formas en texto aceptadas del valor de un motivo: la cruda («50.2») y la
+ * es-ES («50,2», también con separador de miles). La UI enseña las cifras en
+ * formato español; R2 exige que el valor siga siendo visible y verificable.
+ */
+export function valueTextVariants(value: number | string): string[] {
+    const raw = String(value);
+    if (typeof value !== 'number' || !Number.isFinite(value)) return [raw];
+    const es = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(value);
+    return es === raw ? [raw] : [raw, es];
+}
+
 function sameValue(fact: number | string, value: number | string): boolean {
     if (typeof fact === 'string' || typeof value === 'string') {
         return String(fact) === String(value);
@@ -120,7 +132,7 @@ export function validateReasonsTraceable(pick: PickLike): PickIssue[] {
                 message: `motivo "${reason.text}": valor ${reason.value} ≠ facts.${reason.metric} (${pick.facts[reason.metric]})`,
             });
         }
-        if (!reason.text.includes(String(reason.value))) {
+        if (!valueTextVariants(reason.value).some((variant) => reason.text.includes(variant))) {
             issues.push({
                 symbol: pick.symbol,
                 rule: 'R2-trazabilidad',

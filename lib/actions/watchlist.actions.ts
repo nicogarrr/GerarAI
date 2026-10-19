@@ -95,6 +95,20 @@ export async function addToWatchlist(symbol: string, company?: string): Promise<
     }
 }
 
+/**
+ * Alta desde el buscador de la propia /watchlist: el símbolo puede venir con
+ * sufijo de mercado (SAN.MC de Finnhub) y la watchlist guarda el ticker
+ * canónico del master (SAN). El POST del backend NO resuelve alias (guarda
+ * el literal), así que la canonicalización se hace aquí vía research; si el
+ * master no conoce el símbolo se usa el literal, como hasta ahora.
+ */
+export async function addToWatchlistCanonical(symbol: string, company?: string): Promise<WatchlistMutationResult> {
+    const normalized = symbol.trim().toUpperCase();
+    const basics = await getResearchCompanyBasics(normalized);
+    const canonical = basics?.ticker?.trim().toUpperCase() || normalized;
+    return addToWatchlist(canonical, company ?? basics?.name);
+}
+
 // Eliminar de watchlist
 export async function removeFromWatchlist(symbol: string): Promise<WatchlistMutationResult> {
     try {

@@ -224,6 +224,8 @@ class InvestmentPlanService:
             cash_total += row.balance * rate
 
         by_label: dict[str, Decimal] = {}
+        sector_order: list[str] = []
+        tickers_by_sector: dict[str, list[str]] = {}
         positions_total = Decimal("0")
         for position, company in positions:
             if position.market_value_base is None:
@@ -243,9 +245,13 @@ class InvestmentPlanService:
             if value <= 0:
                 continue
             positions_total += value
-            by_label[company.sector or "Unknown"] = (
-                by_label.get(company.sector or "Unknown", Decimal("0")) + value
-            )
+            sector = company.sector or "Unknown"
+            if sector not in by_label:
+                sector_order.append(sector)
+            tickers_by_sector.setdefault(sector, [])
+            if company.ticker not in tickers_by_sector[sector]:
+                tickers_by_sector[sector].append(company.ticker)
+            by_label[sector] = by_label.get(sector, Decimal("0")) + value
             by_label[f"ticker:{company.ticker}"] = (
                 by_label.get(f"ticker:{company.ticker}", Decimal("0")) + value
             )
@@ -255,9 +261,20 @@ class InvestmentPlanService:
         # views of the same positions, so summing every label would double the
         # invested value and distort every weight, deviation and suggestion.
         total = positions_total + cash_total
+        # Orden de lectura: cada sector seguido de SUS tickers. Con el orden de
+        # insercion un ticker de un sector ya visto (MSFT de Tecnologia tras
+        # Servicios financieros) quedaba visualmente dentro del grupo equivocado.
+        ordered_labels: list[str] = []
+        for sector in sector_order:
+            if sector in by_label:
+                ordered_labels.append(sector)
+                ordered_labels.extend(
+                    f"ticker:{ticker}" for ticker in tickers_by_sector[sector] if f"ticker:{ticker}" in by_label
+                )
+        ordered_labels.extend(label for label in by_label if label.startswith("asset_class:"))
         current_weights = {
-            label: float((value / total * 100).quantize(Decimal("0.01")))
-            for label, value in by_label.items()
+            label: float((by_label[label] / total * 100).quantize(Decimal("0.01")))
+            for label in ordered_labels
             if total > 0
         }
 
@@ -296,7 +313,7 @@ class InvestmentPlanService:
                         "label": label,
                         "direction": "buy",
                         "amount_base": float(amount.quantize(Decimal("0.01"))),
-                        "detail": f"{label} está {float(target_pct - current):+.1f} puntos por debajo del objetivo",
+                        "detail": f"{label} está {float(target_pct - current):.1f} puntos por debajo del objetivo",
                     }
                 )
             elif current > upper:
@@ -307,7 +324,7 @@ class InvestmentPlanService:
                         "label": label,
                         "direction": "sell",
                         "amount_base": float(amount.quantize(Decimal("0.01"))),
-                        "detail": f"{label} está {float(current - target_pct):+.1f} puntos por encima del objetivo",
+                        "detail": f"{label} está {float(current - target_pct):.1f} puntos por encima del objetivo",
                     }
                 )
 

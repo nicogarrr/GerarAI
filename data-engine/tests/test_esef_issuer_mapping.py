@@ -81,15 +81,60 @@ def test_kerry_ie_resolves_and_never_guessed():
         resolve_issuer_ie,
     )
 
-    assert resolve_issuer_ie("Kerry Group Public Limited Company").ticker == "KRKNF"
-    assert resolve_issuer_ie("Kerry Group plc").ticker == "KRKNF"
-    assert resolve_issuer_ie("IE0004906560").ticker == "KRKNF"
-    assert resolve_issuer_ie("635400TLVVBNXLFHWC59").ticker == "KRKNF"
-    assert resolve_issuer_ie("KYGA").ticker == "KRKNF"
+    assert resolve_issuer_ie("Kerry Group Public Limited Company").ticker == "KRYAY"
+    assert resolve_issuer_ie("Kerry Group plc").ticker == "KRYAY"
+    assert resolve_issuer_ie("IE0004906560").ticker == "KRYAY"
+    assert resolve_issuer_ie("635400TLVVBNXLFHWC59").ticker == "KRYAY"
+    assert resolve_issuer_ie("KYGA").ticker == "KRYAY"
+    assert resolve_issuer_ie("KRYAF").ticker == "KRYAY"
     assert resolve_issuer_ie("") is None
     assert resolve_issuer_ie("Kerry") is None  # parcial: no se adivina
-    assert resolve_issuer_by_lei("635400TLVVBNXLFHWC59").ticker == "KRKNF"
+    # KRKNF es Kraken Robotics (TSX-V: PNG, OTCQB: KRKNF), NUNCA Kerry:
+    # la colision original escribia hechos de un emisor bajo otra Company.
+    assert resolve_issuer_ie("KRKNF") is None
+    assert resolve_issuer_ie("Kraken Robotics Inc") is None
+    assert resolve_issuer_by_lei("635400TLVVBNXLFHWC59").ticker == "KRYAY"
     assert resolve_issuer_by_lei("724500Y6DUVHQD6OXN27").ticker == "ASML"
     assert resolve_issuer_by_lei("") is None
-    assert resolve_ticker_for_country("IE", "Kerry Group plc") == "KRKNF"
-    assert "KRKNF" in reviewed_tickers()
+    assert resolve_ticker_for_country("IE", "Kerry Group plc") == "KRYAY"
+    assert "KRYAY" in reviewed_tickers()
+    assert "KRKNF" not in reviewed_tickers()
+
+
+def test_reviewed_names_for_ticker():
+    from app.services.esef_issuer_mapping import (
+        reviewed_isins_for_ticker,
+        reviewed_names_for_ticker,
+    )
+
+    assert "INDITEX" in reviewed_names_for_ticker("ITX")
+    assert any("KERRY" in n for n in reviewed_names_for_ticker("KRYAY"))
+    assert reviewed_names_for_ticker("KRKNF") == set()
+    assert reviewed_names_for_ticker("") == set()
+
+    # via ISIN: prueba de identidad fuerte por ticker; el ADR de Kerry
+    # (misma entidad, otro security) tambien acredita identidad
+    assert reviewed_isins_for_ticker("ITX") == frozenset({"ES0148396007"})
+    assert reviewed_isins_for_ticker("KRYAY") == frozenset(
+        {"IE0004906560", "US4924601002"})
+    assert reviewed_isins_for_ticker("ARM") == frozenset({"ES0105376059"})
+    assert reviewed_isins_for_ticker("KRKNF") == frozenset()
+
+
+def test_ticker_suffix_aliases_are_not_names():
+    """«ARM.MC»/«TEF.MC»/«ASML.AS» no son nombres: su token es el propio
+    ticker y reintroducen la colision global (Arm Holdings vs Arima)."""
+    from app.services.esef_issuer_mapping import (
+        reviewed_isins_for_ticker,
+        reviewed_names_for_ticker,
+    )
+
+    assert "ARM.MC" not in reviewed_names_for_ticker("ARM") if "ARM" in reviewed_names_for_ticker("ARM") or True else True
+    assert "TEF.MC" not in reviewed_names_for_ticker("TEF")
+    assert "TELEFONICA" in reviewed_names_for_ticker("TEF")
+    assert "ASML.AS" not in reviewed_names_for_ticker("ASML")
+    assert any("ASML" in n for n in reviewed_names_for_ticker("ASML"))
+    assert reviewed_isins_for_ticker("TEF") == frozenset({"ES0178430E18"})
+    assert reviewed_isins_for_ticker("KRYAY") == frozenset(
+        {"IE0004906560", "US4924601002"})
+    assert reviewed_isins_for_ticker("KRKNF") == frozenset()

@@ -137,7 +137,7 @@ def test_build_package_payloads_happy_path(monkeypatch):
 
     payloads = asyncio.run(build_package_payloads("2026-10-19", fetch=fake_fetch))
     p = payloads["635400TLVVBNXLFHWC59"]
-    assert p["ticker"] == "KRKNF"
+    assert p["ticker"] == "KRYAY"
     assert p["entity_name"] == "Kerry Group Public Limited Company"
     assert p["period_end"] == "2025-12-31"
     assert p["periods"] == ["2025-12-31", "2024-12-31"]

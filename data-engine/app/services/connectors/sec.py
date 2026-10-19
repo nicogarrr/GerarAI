@@ -488,6 +488,9 @@ class SECClient:
                             "filing_date": filing_date,
                             "report_date": report_date,
                             "primary_document": primary_document,
+                            # Apartados declarados del 8-K ("2.02, 9.01"): sin
+                            # texto completo son lo unico veraz que mostrar.
+                            "items": self._column(recent, "items", index),
                             "is_inline_xbrl": self._column(recent, "isInlineXBRL", index),
                             **(
                                 {"source_fallback": fallback, "partial_coverage": True}

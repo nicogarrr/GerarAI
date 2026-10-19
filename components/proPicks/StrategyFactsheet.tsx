@@ -176,7 +176,7 @@ export default function StrategyFactsheet({
                 <div className="mt-4 rounded-lg border border-gray-700/50 bg-gray-900/50 p-3">
                     <h4 className="text-sm font-semibold text-gray-300">Por qué no hay cifras aquí</h4>
                     <p className="mt-1 text-xs leading-5 text-gray-500">
-                        Un backtest por estrategia necesita los fundamentales <em>con la fecha de cada corte</em>
+                        Un backtest por estrategia necesita los fundamentales <em>con la fecha de cada corte</em>{' '}
                         para no mirar el futuro. El embudo persiste un único run (el último) y en él la
                         valoración necesita CFROI y WACC por empresa, datos que hoy no cubren todo el universo:
                         sin esa serie con fecha no hay nada que medir, y sin mediciones no hay cifras

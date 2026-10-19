@@ -22,7 +22,7 @@ def _cand(t="AAA"):
         t, f"{t} Co", 72.5,
         [
             {"key": "fcf_yield", "value": 0.1234, "source": "SEC FY2025 + precio 2026-10-16"},
-            {"key": "net_debt_to_ebitda", "value": 1.2, "source": "metricas calculadas"},
+            {"key": "net_debt_to_ebitda", "value": 1.2, "source": "Métricas calculadas"},
         ],
         price=10.0, price_date=date(2026, 7, 1),
     )

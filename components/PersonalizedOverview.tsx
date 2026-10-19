@@ -26,7 +26,7 @@ import {
 } from '@/lib/actions/alerts.actions';
 import { holdingDisplayMode } from '@/lib/portfolio/holding-display';
 import { alertCardDestination, alertThesisHref } from '@/lib/alerts/card-destination';
-import { alertCardCopy } from '@/lib/alerts/card-copy';
+import { alertCardCopy, alertSummaryIsSourceHeadline } from '@/lib/alerts/card-copy';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { t } from '@/lib/i18n/t';
 import { buildPortfolioInsight } from '@/lib/portfolio-insight';
@@ -470,7 +470,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     <p className="mt-2 text-sm break-words font-semibold text-gray-100">{copy.heading}</p>
                                     {/* tracked_news lleva el titular crudo de la fuente: misma
                                         traducción bajo demanda que en /alerts (#1493). */}
-                                    {item.alert_type === 'tracked_news' ? (
+                                    {alertSummaryIsSourceHeadline(item) ? (
                                         <ExternalNewsHeadline headline={copy.summary} url={item.sourceUrl} className="mt-1 text-sm break-words text-gray-300" />
                                     ) : (
                                         <p className="mt-1 text-sm break-words text-gray-300">{copy.summary}</p>

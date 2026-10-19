@@ -228,3 +228,42 @@ def test_screen_query_count_is_constant_in_company_count():
         fact_queries = [s for s in statements if "financial_facts" in s]
         assert len(metric_queries) == 1
         assert len(fact_queries) == 1
+
+
+def test_metric_coverage_lists_only_metrics_with_data():
+    # The datalist suggests only metrics at least one company has data for;
+    # suggesting a metric nobody has (e.g. wacc before it is ingested) can
+    # only produce the "no company has data" outcome.
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        tenant = Tenant(external_id="coverage-test", name="Coverage test")
+        db.add(tenant)
+        db.flush()
+        db.info["tenant_id"] = tenant.id
+        company = _company("COV")
+        db.add(company)
+        db.flush()
+        _metric(db, company, "roic", "0.15")
+        _fact(db, company, "revenue", "1000", 2025)
+        db.add(
+            CalculatedMetric(
+                company_id=company.id,
+                metric="wacc",
+                value=None,
+                unit="decimal",
+                period="FY2025",
+                fiscal_year=2025,
+                status="missing_inputs",
+                definition_version="test-v1",
+                formula="wacc",
+                source_fact_ids=[],
+                calculation_trace={},
+                confidence=Decimal("0"),
+            )
+        )
+        db.commit()
+        coverage = ScreenerService().metric_coverage(db)
+    assert "roic" in coverage
+    assert "revenue" in coverage
+    assert "wacc" not in coverage
