@@ -73,3 +73,23 @@ def test_multi_country_build_merges_one_manifest(tmp_path):
     on_disk = json.loads((tmp_path / "manifest.json").read_text())
     assert set(on_disk["issuers"].keys()) == {aena_lei, asml_lei}
     assert (tmp_path / "snapshots" / f"{asml_lei}.json").exists()
+
+
+def test_kerry_ie_resolves_and_never_guessed():
+    from app.services.esef_issuer_mapping import (
+        resolve_issuer_by_lei,
+        resolve_issuer_ie,
+    )
+
+    assert resolve_issuer_ie("Kerry Group Public Limited Company").ticker == "KRKNF"
+    assert resolve_issuer_ie("Kerry Group plc").ticker == "KRKNF"
+    assert resolve_issuer_ie("IE0004906560").ticker == "KRKNF"
+    assert resolve_issuer_ie("635400TLVVBNXLFHWC59").ticker == "KRKNF"
+    assert resolve_issuer_ie("KYGA").ticker == "KRKNF"
+    assert resolve_issuer_ie("") is None
+    assert resolve_issuer_ie("Kerry") is None  # parcial: no se adivina
+    assert resolve_issuer_by_lei("635400TLVVBNXLFHWC59").ticker == "KRKNF"
+    assert resolve_issuer_by_lei("724500Y6DUVHQD6OXN27").ticker == "ASML"
+    assert resolve_issuer_by_lei("") is None
+    assert resolve_ticker_for_country("IE", "Kerry Group plc") == "KRKNF"
+    assert "KRKNF" in reviewed_tickers()

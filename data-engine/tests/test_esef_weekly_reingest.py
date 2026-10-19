@@ -35,10 +35,12 @@ def _company(db, ticker):
 def test_build_phase_rebuilds_snapshots_and_chains_ingest(tmp_path):
     fake_module = types.ModuleType("build_esef_snapshots")
 
-    async def fake_build(out, country, fetched_at, client):
+    async def fake_build(out, country, fetched_at, client, package_fetcher=None):
+        assert package_fetcher is not None  # el worker activa los paquetes IE
         return {"issuers": {"LEI1": {"ticker": "SAN"}}, "unresolved": {}}
 
     fake_module.build = fake_build
+    fake_module._fetch_package = object()
     db = _db()
     with (
         patch.object(workers, "_session", return_value=db),
