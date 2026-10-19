@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 
-from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
+from app.llm import LLMRequest, Message, ResponseFormat, parse_json_response
+from app.llm.chat_provider import create_chat_llm_provider
 from app.services.budget import BudgetController
 from app.services.llm_output_guard import complete_guarded
 
@@ -46,7 +47,7 @@ def _validated_sentences(payload, citations: list[dict]) -> list[dict]:
 async def synthesize(db, payload, baseline: dict, *, provider=None) -> dict:
     if baseline["status"] != "answered" or not baseline["citations"]:
         return baseline
-    provider = provider or create_llm_provider()
+    provider = provider or create_chat_llm_provider()
     if provider.name == "disabled":
         return baseline
     budget = BudgetController()
