@@ -15,7 +15,7 @@
    "dimensions": {
     "concept": "ifrs-full:Revenue",
     "entity": "scheme:9598SYNTHETIC0000001",
-    "period": "2025-01-01T00:00:00/2025-12-31T00:00:00",
+    "period": "2025-01-01T00:00:00/2026-01-01T00:00:00",
     "unit": "iso4217:EUR"
    }
   },
@@ -25,7 +25,7 @@
    "dimensions": {
     "concept": "ifrs-full:ProfitLoss",
     "entity": "scheme:9598SYNTHETIC0000001",
-    "period": "2025-01-01T00:00:00/2025-12-31T00:00:00",
+    "period": "2025-01-01T00:00:00/2026-01-01T00:00:00",
     "unit": "iso4217:EUR"
    }
   },
@@ -35,7 +35,7 @@
    "dimensions": {
     "concept": "ifrs-full:InterestExpense",
     "entity": "scheme:9598SYNTHETIC0000001",
-    "period": "2025-01-01T00:00:00/2025-12-31T00:00:00",
+    "period": "2025-01-01T00:00:00/2026-01-01T00:00:00",
     "unit": "iso4217:EUR"
    }
   },
@@ -45,7 +45,7 @@
    "dimensions": {
     "concept": "ifrs-full:PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
     "entity": "scheme:9598SYNTHETIC0000001",
-    "period": "2025-01-01T00:00:00/2025-12-31T00:00:00",
+    "period": "2025-01-01T00:00:00/2026-01-01T00:00:00",
     "unit": "iso4217:EUR"
    }
   }
