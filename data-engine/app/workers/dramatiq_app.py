@@ -896,7 +896,9 @@ def recompute_fundamental_metrics(
                 # Respaldo de market_cap (precio x acciones) ANTES del calculo:
                 # sin el, el WACC sale unavailable y el DCF no arranca (QA:
                 # 6/6 candidatas N/D; watchlist europeas sin cap).
-                cap = refresh_derived_market_cap(db, company)
+                # ttl=None: el barrido no reescribe filas identicas;
+                # escribe solo cuando el valor cambia (ver servicio).
+                cap = refresh_derived_market_cap(db, company, ttl=None)
                 derived_cap[cap["status"]] = derived_cap.get(cap["status"], 0) + 1
                 results = service.calculate_all(db, company, persist=True)
                 processed += 1

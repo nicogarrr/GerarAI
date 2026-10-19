@@ -13,6 +13,20 @@ fecha del precio como period y la divisa de la compania como unit. Sin
 precio fresco o sin acciones: no se escribe nada (N/D honesto, nunca
 inventado). Idempotente: cada refresco reemplaza los derivados anteriores.
 
+Escritura acotada (revision auditor 19-oct-2026): se calcula SIEMPRE el
+valor actual y solo se escribe cuando difiere de lo almacenado (valor,
+divisa, periodo o ajuste) o cuando una fila identica supera DERIVED_TTL
+(6h). Una fila erronea se corrige en la primera lectura aunque sea
+fresca: el TTL acota reescrituras, nunca blinda un valor malo. Si el
+respaldo pierde su base (sin precio fresco, sin acciones o con cap de
+proveedor fresco) el derivado se BORRA: un valor viejo servido como
+vigente es peor que un N/D. Al refrescar se ACTUALIZA la fila existente
+en vez de delete+insert y se borran los duplicados: dos GET a la vez
+convergen en la misma fila y no nacen filas gemelas (la carrera residual
+del primer derivado simultaneo la repara el siguiente refresco). El
+barrido nocturno llama con ttl=None: sin reescrituras de filas
+identicas; escribe solo cuando algo cambia.
+
 Los recuentos de acciones son de la fecha de SU hecho y el precio es de
 hoy: si hubo un split entre ambos, el cap sale desplazado por el factor
 (caso real medido en prod 19-oct-2026: AENA, split 10:1 tras el FY2025 -
@@ -30,7 +44,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import FinancialFact, MarketPrice
@@ -43,6 +57,29 @@ from app.services.split_adjustment import (
 
 MAX_PRICE_AGE = timedelta(days=7)
 DERIVED_SOURCE = "derived"
+# Frescura de un derivado para NO reescribirlo: un backup calculado no
+# cambia mas rapido que sus entradas (cierre diario + hechos anuales).
+DERIVED_TTL = timedelta(hours=6)
+
+
+def _derived_rows(db: Session, company: Company, tenant_filter) -> list[FinancialFact]:
+    return list(db.scalars(
+        select(FinancialFact)
+        .where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == "market_cap",
+            FinancialFact.source_type == DERIVED_SOURCE,
+            tenant_filter,
+        )
+        .order_by(FinancialFact.updated_at.desc(), FinancialFact.id.desc())
+    ).all())
+
+
+def _age(updated_at: datetime, now: datetime) -> timedelta:
+    # SQLite devuelve datetimes naive aunque la columna sea tz-aware.
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=UTC)
+    return now - updated_at
 
 
 def _latest_price(db: Session, company: Company, *, today: date) -> MarketPrice | None:
@@ -134,54 +171,93 @@ def _shares_outstanding(
 
 
 def refresh_derived_market_cap(
-    db: Session, company: Company, *, today: date | None = None
+    db: Session,
+    company: Company,
+    *,
+    today: date | None = None,
+    ttl: timedelta | None = DERIVED_TTL,
 ) -> dict[str, Any]:
     """Escribe (o refresca) el market_cap derivado de una empresa."""
     today = today or datetime.now(UTC).date()
+    now = datetime.now(UTC)
     tenant_id = db.info.get("tenant_id")
     tenant_filter = (
         FinancialFact.tenant_id == tenant_id
         if tenant_id is not None
         else FinancialFact.tenant_id.is_(None)
     )
-    # Idempotencia: los derivados anteriores se reemplazan siempre.
-    db.execute(
-        delete(FinancialFact).where(
-            FinancialFact.company_id == company.id,
-            FinancialFact.metric == "market_cap",
-            FinancialFact.source_type == DERIVED_SOURCE,
-            tenant_filter,
-        )
-    )
+    existing = _derived_rows(db, company, tenant_filter)
+    newest = existing[0] if existing else None
+
+    def _drop_derived() -> None:
+        # Sin base el respaldo se BORRA, no se conserva: servir un valor
+        # viejo como vigente es peor que un N/D (revision auditor).
+        for row in existing:
+            db.delete(row)
+        db.flush()
+
     price = _latest_price(db, company, today=today)
     if price is None:
-        db.flush()
+        _drop_derived()
         return {"status": "unavailable", "reason": "no_fresh_price"}
     if _vendor_market_cap_fresh(db, company, price.date):
-        db.flush()
+        _drop_derived()
         return {"status": "skipped", "reason": "vendor_market_cap_fresh"}
     shares = _shares_outstanding(db, company)
     if shares is None:
-        db.flush()
+        _drop_derived()
         return {"status": "unavailable", "reason": "no_shares"}
     value, basis, split_factor = shares
-    market_cap = Decimal(price.close) * value
-    db.add(
-        FinancialFact(
-            company_id=company.id,
-            metric="market_cap",
-            value=market_cap,
-            unit=str(getattr(company, "currency", "") or "USD"),
-            period=price.date.isoformat(),
-            fiscal_year=None,
-            fiscal_quarter=None,
-            source_id=None,
-            source_type=DERIVED_SOURCE,
-            is_reported=False,
-            is_adjusted=split_factor != 1,
-            confidence=Decimal("0.70"),
+    # La columna es Numeric(24,6): sin cuantizar a 6 decimales lo calculado
+    # (una division larga) nunca iguala lo almacenado y cada GET reescribe
+    # (medido con AENA: dos refrescos seguidos devolvian ok, no skipped).
+    market_cap = (Decimal(price.close) * value).quantize(Decimal("0.000001"))
+    unit = str(getattr(company, "currency", "") or "USD")
+    period = price.date.isoformat()
+    adjusted = split_factor != 1
+    if newest is not None:
+        same = (
+            # Postgres Numeric(24,6) devuelve Decimal exacto; SQLite devuelve
+            # float y a magnitudes grandes su redondeo supera el quantum
+            # (medido: 39,3B -> 1,1e-6). 1e-4 es ordenes de magnitud menor
+            # que cualquier cambio real (un tick x acciones >= miles).
+            abs(Decimal(newest.value) - market_cap) <= Decimal("0.0001")
+            and newest.unit == unit
+            and newest.period == period
+            and bool(newest.is_adjusted) == adjusted
         )
-    )
+        # Solo se escribe si el valor cambio (una fila erronea se corrige
+        # en la primera lectura) o si una fila identica supera el TTL.
+        if same and (ttl is None or _age(newest.updated_at, now) < ttl):
+            return {"status": "skipped", "reason": "fresh_derived"}
+        # Update-in-place: sin delete+insert no hay ventana sin fila ni
+        # duplicados por GET concurrentes.
+        newest.value = market_cap
+        newest.unit = unit
+        newest.period = period
+        newest.is_adjusted = adjusted
+        newest.confidence = Decimal("0.70")
+    else:
+        db.add(
+            FinancialFact(
+                company_id=company.id,
+                metric="market_cap",
+                value=market_cap,
+                unit=unit,
+                period=period,
+                fiscal_year=None,
+                fiscal_quarter=None,
+                source_id=None,
+                source_type=DERIVED_SOURCE,
+                is_reported=False,
+                is_adjusted=adjusted,
+                confidence=Decimal("0.70"),
+            )
+        )
+    # Reparacion de duplicados (p. ej. dos primeros refrescos concurrentes):
+    # se conserva la fila mas reciente y el resto se borra.
+    for extra in existing[1:]:
+        db.delete(extra)
     db.flush()
     return {
         "status": "ok",

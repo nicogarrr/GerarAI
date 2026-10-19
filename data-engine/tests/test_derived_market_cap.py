@@ -2,11 +2,11 @@
 respaldo cuando el proveedor no cubre; nunca pisa un market_cap de
 proveedor fresco ni inventa acciones."""
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, update
 from sqlalchemy.orm import sessionmaker
 
 from app.models.entities import (
@@ -193,6 +193,17 @@ def _split(db, company, effective, ratio):
     ))
 
 
+def _backdate_updated_at(db, company, hours):
+    """updated_at antiguo sin disparar el onupdate (valor explícito manda)."""
+    db.execute(
+        update(FinancialFact)
+        .where(FinancialFact.company_id == company.id,
+               FinancialFact.metric == "market_cap")
+        .values(updated_at=datetime.now(UTC) - timedelta(hours=hours))
+    )
+    db.flush()
+
+
 def test_derived_cap_adjusted_for_split_after_period(db):
     """Caso real AENA (medido en prod 19-oct-2026): split 10:1 tras el
     FY2025; precio post-split x acciones derivadas pre-split daba el cap
@@ -282,13 +293,16 @@ def test_endpoint_refreshes_existing_derived_row(db):
     _fact(db, company, "net_income", 1_972_000_000, year=2025)
     _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
     _split(db, company, TODAY - timedelta(days=2), 10)
-    # Derivado antiguo erróneo (valor imposible: debe ser reemplazado):
+    # Derivado antiguo erróneo (valor imposible: debe ser reemplazado),
+    # envejecido más allá del TTL para que el refresco proceda:
     db.add(FinancialFact(
         company_id=company.id, metric="market_cap",
         value=Decimal("999"), unit="EUR",
         period=(TODAY - timedelta(days=3)).isoformat(),
         source_type="derived", is_reported=False, tenant_id=1,
     ))
+    db.commit()
+    _backdate_updated_at(db, company, 7)
     db.commit()
     payload = watchlist_metrics("aena", db)
     assert payload["market_cap"] == pytest.approx(
@@ -340,3 +354,171 @@ def test_endpoint_never_rewrites_vendor_cap(db):
         FinancialFact.company_id == company.id,
         FinancialFact.metric == "market_cap")).all()
     assert len(caps) == 1 and caps[0].source_type == "FMP_profile"
+
+
+def test_fresh_identical_derived_not_rewritten(db):
+    """TTL (revisión auditor): un derivado idéntico y fresco no se
+    reescribe: nada de delete+insert+commit en cada lectura."""
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=1))
+    _fact(db, company, "shares_outstanding", 150_000_000, year=None, source="SEC")
+    db.commit()
+    first = refresh_derived_market_cap(db, company, today=TODAY)
+    assert first["status"] == "ok"
+    second = refresh_derived_market_cap(db, company, today=TODAY)
+    assert second["status"] == "skipped" and second["reason"] == "fresh_derived"
+    fact = db.scalar(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "market_cap"))
+    assert float(fact.value) == pytest.approx(25.70 * 150_000_000)
+
+
+def test_wrong_fresh_row_corrected_despite_ttl(db):
+    """Revisión auditor: el TTL acota reescrituras, nunca blinda un valor
+    malo: una fila derivada FRESCA pero errónea se corrige en la primera
+    lectura (caso AENA: 3,93B escrito antes del fix del split)."""
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=3))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    _split(db, company, TODAY - timedelta(days=2), 10)
+    # Fila fresca pero errónea (escrita por el algoritmo anterior):
+    db.add(FinancialFact(
+        company_id=company.id, metric="market_cap",
+        value=Decimal("3931817034"), unit="EUR",
+        period=(TODAY - timedelta(days=3)).isoformat(),
+        source_type="derived", is_reported=False, tenant_id=1,
+    ))
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result["status"] == "ok"
+    assert result["market_cap"] == pytest.approx(
+        25.70 * (1_972_000_000 / 12.89) * 10, rel=1e-6)
+
+
+def test_unavailable_branches_delete_old_derived(db):
+    """Revisión auditor: sin precio fresco o sin acciones, el derivado
+    viejo se BORRA (no se sirve un valor de hace 30 días como vigente)."""
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=30))
+    _fact(db, company, "shares_outstanding", 150_000_000, year=None, source="SEC")
+    db.add(FinancialFact(
+        company_id=company.id, metric="market_cap",
+        value=Decimal("3855000000"), unit="EUR",
+        period=(TODAY - timedelta(days=30)).isoformat(),
+        source_type="derived", is_reported=False, tenant_id=1,
+    ))
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result["status"] == "unavailable" and result["reason"] == "no_fresh_price"
+    assert db.scalars(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "market_cap",
+        FinancialFact.source_type == "derived")).all() == []
+
+
+def test_vendor_fresh_deletes_old_derived(db):
+    """Con cap de proveedor fresco el derivado viejo también se borra:
+    el respaldo sobra cuando el proveedor cubre."""
+    company = _company(db)
+    day = TODAY - timedelta(days=1)
+    _price(db, company, Decimal("25.70"), day)
+    _fact(db, company, "shares_outstanding", 150_000_000, year=None, source="SEC")
+    db.add(FinancialFact(
+        company_id=company.id, metric="market_cap",
+        value=Decimal("999"), unit="EUR", period=day.isoformat(),
+        source_type="derived", is_reported=False, tenant_id=1))
+    db.add(FinancialFact(
+        company_id=company.id, metric="market_cap",
+        value=Decimal("3900000000"), unit="EUR", period=day.isoformat(),
+        source_type="FMP_profile", is_reported=True, tenant_id=1))
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result["status"] == "skipped" and result["reason"] == "vendor_market_cap_fresh"
+    caps = db.scalars(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "market_cap")).all()
+    assert len(caps) == 1 and caps[0].source_type == "FMP_profile"
+
+
+def test_ttl_none_writes_only_on_change(db):
+    """ttl=None (barrido nocturno): una fila idéntica nunca se reescribe;
+    solo se escribe cuando el valor cambia."""
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=1))
+    _fact(db, company, "shares_outstanding", 150_000_000, year=None, source="SEC")
+    db.commit()
+    assert refresh_derived_market_cap(db, company, today=TODAY, ttl=None)["status"] == "ok"
+    _backdate_updated_at(db, company, 72)
+    db.commit()
+    # Idéntica aunque muy vieja: sin reescritura.
+    assert refresh_derived_market_cap(db, company, today=TODAY, ttl=None)["reason"] == "fresh_derived"
+    # Y con precio nuevo: se escribe aunque la fila sea idéntica en frescura.
+    _price(db, company, Decimal("30.00"), TODAY)
+    db.commit()
+    _backdate_updated_at(db, company, 1)
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY, ttl=None)
+    assert result["status"] == "ok"
+    assert result["market_cap"] == pytest.approx(30.00 * 150_000_000)
+
+
+def test_stale_derived_beyond_ttl_refreshed_in_place(db):
+    """Superado el TTL se refresca ACTUALIZANDO la misma fila (sin ventana
+    sin fila ni duplicados por GET concurrentes)."""
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=1))
+    _fact(db, company, "shares_outstanding", 150_000_000, year=None, source="SEC")
+    db.commit()
+    refresh_derived_market_cap(db, company, today=TODAY)
+    _backdate_updated_at(db, company, 7)
+    _price(db, company, Decimal("30.00"), TODAY)
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result["status"] == "ok"
+    assert result["market_cap"] == pytest.approx(30.00 * 150_000_000)
+    caps = db.scalars(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "market_cap")).all()
+    assert len(caps) == 1
+
+
+def test_duplicate_derived_rows_repaired(db):
+    """Dos filas derivadas (p. ej. de una carrera de primeros refrescos):
+    el siguiente refresco deja exactamente una, con el valor correcto."""
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=1))
+    _fact(db, company, "shares_outstanding", 150_000_000, year=None, source="SEC")
+    for value in (111, 222):
+        db.add(FinancialFact(
+            company_id=company.id, metric="market_cap",
+            value=Decimal(value), unit="EUR",
+            period=(TODAY - timedelta(days=1)).isoformat(),
+            source_type="derived", is_reported=False, tenant_id=1,
+        ))
+    db.commit()
+    _backdate_updated_at(db, company, 7)
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result["status"] == "ok"
+    caps = db.scalars(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "market_cap")).all()
+    assert len(caps) == 1
+    assert float(caps[0].value) == pytest.approx(25.70 * 150_000_000)
+
+
+def test_two_consecutive_refreshes_second_is_skipped(db):
+    """Revisión auditor (medido con AENA): la división larga del recuento
+    derivado deja más de 6 decimales y sin cuantizar cada refresh
+    reescribía. Dos refrescos seguidos: el segundo es skipped."""
+    company = _company(db)
+    _price(db, company, Decimal("25.700001"), TODAY - timedelta(days=3))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    _split(db, company, TODAY - timedelta(days=2), 10)
+    db.commit()
+    first = refresh_derived_market_cap(db, company, today=TODAY)
+    assert first["status"] == "ok"
+    second = refresh_derived_market_cap(db, company, today=TODAY)
+    assert second["status"] == "skipped" and second["reason"] == "fresh_derived"
