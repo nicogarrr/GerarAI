@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 
 import PersonalizedOverview from '@/components/PersonalizedOverview';
+import EarningsDayStrip from '@/components/calendar/EarningsDayStrip';
 import NewsSection from '@/components/NewsSection';
 import { NewsLoadingSkeleton } from '@/components/LoadingState';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -43,6 +44,9 @@ export default async function Home() {
                 scroll, sin bloquear el resto del dashboard.
             */}
             <PersonalizedOverview userId={userId} />
+            <Suspense fallback={null}>
+                <EarningsDayStrip />
+            </Suspense>
             <Suspense fallback={<NewsLoadingSkeleton />}>
                 <NewsSection />
             </Suspense>
