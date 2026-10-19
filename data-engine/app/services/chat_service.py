@@ -7,6 +7,7 @@ from decimal import Decimal
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.llm.base import LLMProvider
 from app.llm.chat_provider import create_chat_llm_provider
 from app.llm.errors import ProviderTransportError
@@ -477,7 +478,7 @@ _small_talk_answer = small_talk_answer
 
 
 _COMMON_WORD_TICKERS = frozenset(
-    {"META", "NOW", "IT", "ON", "CAT", "ALL", "ARE", "KEY", "LOW", "FAST", "WELL", "A", "BIG", "GOOD"}
+    {"META", "NOW", "IT", "ON", "CAT", "ALL", "ARE", "KEY", "LOW", "FAST", "WELL", "A", "BIG", "GOOD", "ES"}
 )
 # Palabra previa que convierte la palabra comun en un sustantivo ("mi meta").
 _DETERMINERS = frozenset(
@@ -640,19 +641,10 @@ class ChatService:
             # se resuelve una mencion EXPLICITA (ver _explicit_mention); sin
             # ella la pregunta sigue siendo de cartera.
             return self._explicit_mention(db, question)
-        # Índice por ticker + regex de palabra completa: evita falsos
-        # positivos por substring ("A" dentro de "APPLE", "IT" en "WITH")
-        # y no hace un scan substring por fila.
-        companies = list(db.scalars(select(Company)).all())
-        by_ticker = {company.ticker.upper(): company for company in companies}
-        tokens = re.findall(r"[A-Z0-9][A-Z0-9.\-]*", question.upper())
-        for token in tokens:
-            if token in by_ticker:
-                return by_ticker[token]
-        for candidate in companies:
-            if re.search(rf"\b{re.escape(candidate.ticker)}\b", question, re.IGNORECASE):
-                return candidate
-        return None
+        # Misma logica cuidadosa que el scope de cartera: un scan ingenuo
+        # con question.upper() convertia cada palabra en candidata y
+        # resolvia "es" (o cualquier sigla) como ticker real.
+        return self._explicit_mention(db, question)
 
     def _explicit_mention(self, db: Session, question: str) -> Company | None:
         """Empresa nombrada por su ticker en el texto, para el scope global.
@@ -671,7 +663,7 @@ class ChatService:
         has_cue = bool(_COMPANY_CUE_RE.search(question))
         all_caps = not any(ch.islower() for ch in question)
         recent: list[str] = []  # las dos palabras anteriores (ventana de 2)
-        for match in re.finditer(r"[A-Za-z][A-Za-z.\-]*", question):
+        for match in re.finditer(r"[A-Za-z0-9][A-Za-z0-9.\-]*", question):
             raw = match.group(0).strip(".-")
             after_determiner = any(word in _DETERMINERS for word in recent)
             recent = [*recent, raw.lower()][-2:]
@@ -691,7 +683,10 @@ class ChatService:
                 if len(token) < 3:
                     ok = has_cue and raw.isupper() and not all_caps and not after_determiner
             elif raw.isupper() and not all_caps:
-                ok = len(token) >= 2
+                # Una sola letra ("T", "V") solo con pista de empresa; dos o
+                # mas valen siempre. Los tickers con digito inicial entran por
+                # la misma puerta ("0700.HK", "7203.T").
+                ok = len(token) >= 2 or (len(token) == 1 and has_cue and not after_determiner)
             else:
                 ok = len(token) >= 3
             if ok:
@@ -842,8 +837,41 @@ class ChatService:
         payload.update({key: value for key, value in extra.items() if value is not None})
         return payload
 
-    @bounded_chat
     async def answer(
+        self,
+        db: Session,
+        question: str,
+        scope: str,
+        ticker: str | None,
+        *,
+        enable_debate: bool | None = None,
+        use_jev: bool = True,
+        page: ChatPageContext | None = None,
+        history: list[ChatTurn] | None = None,
+    ) -> ChatResponse:
+        try:
+            return await self._answer_impl(
+                db, question, scope, ticker,
+                enable_debate=enable_debate, use_jev=use_jev, page=page, history=history,
+            )
+        except TimeoutError:
+            # El plazo total vencio a media generacion (p. ej. todos los
+            # proveedores caidos): fallback determinista rotulado en vez de
+            # propagar TimeoutError/CancelledError sin capturar.
+            return ChatResponse(
+                answer="La respuesta tardó demasiado; vuelve a intentarlo en un momento.",
+                sources=[],
+                model="deterministic",
+                confidence=0,
+                llm_trace={
+                    "fallback": True,
+                    "fallback_reason": "chat_total_deadline",
+                    "deadline_seconds": get_settings().chat_total_timeout_seconds,
+                },
+            )
+
+    @bounded_chat
+    async def _answer_impl(
         self,
         db: Session,
         question: str,
