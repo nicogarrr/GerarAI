@@ -137,3 +137,39 @@ def test_followed_companies_are_scoped_to_the_tenant():
     finally:
         db.rollback()
         db.close()
+
+
+def test_fetch_yahoo_dates_uses_a_real_client_without_reopening_it(monkeypatch):
+    """Regresion: `with client:` tras haber usado el cliente lanzaba RuntimeError."""
+    from datetime import UTC, datetime
+
+    import httpx
+
+    from app.services import earnings_dates_service as svc
+
+    raw = int(datetime(2026, 10, 20, 20, 0, tzinfo=UTC).timestamp())
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = {"quoteSummary": {"result": [{"calendarEvents": {"earnings": {
+            "earningsDate": [{"raw": raw}], "isEarningsDateEstimate": False}}}]}}
+        return httpx.Response(200, json=body)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    client.get("https://fc.yahoo.com")  # el cliente ya se ha usado, como en produccion
+    monkeypatch.setattr(svc, "_yahoo_session", lambda: (client, "crumb"))
+    monkeypatch.setattr(svc, "YAHOO_PAUSE_S", 0)
+    out = svc.fetch_yahoo_dates({"CB": "CB"})
+    assert out == {"CB": {"date": date(2026, 10, 20), "estimate": False}}
+    assert client.is_closed
+
+
+def test_is_fresh_expires_automatic_rows_only():
+    from datetime import UTC, datetime, timedelta
+
+    from app.services.earnings_dates_service import is_fresh
+
+    now = datetime(2026, 10, 19, 12, tzinfo=UTC)
+    old = now - timedelta(days=4)
+    assert not is_fresh(EarningsDate(ticker="X", event_date=date(2026, 11, 1), source="yahoo", fetched_at=old), now)
+    assert is_fresh(EarningsDate(ticker="X", event_date=date(2026, 11, 1), source="yahoo", fetched_at=now), now)
+    assert is_fresh(EarningsDate(ticker="X", event_date=date(2026, 11, 1), source="manual", fetched_at=old), now)
