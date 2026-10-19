@@ -178,6 +178,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/ThesisDebatePanel.tsx': 'useState, jsx-onClick',
   'components/research/ThesisExportMenu.tsx': 'importa cliente: components/ui/dropdown-menu.tsx',
   'components/research/ThesisGenerateButton.tsx': 'useRouter, useState, useRef, useEffect, browser:document, browser:window, jsx-onClick',
+  'components/research/ThesisMarkdownPager.tsx': 'useState, useRef, jsx-onClick, jsx-onChange',
   'components/research/ThesisHumanInputForm.tsx': 'useState, jsx-onSubmit',
   'components/risk/RiskDashboardView.tsx': 'useState, useEffect, importa cliente: components/data/RecordViews.tsx',
   'components/screener/FollowButton.tsx': 'useState, jsx-onClick, libreria cliente: sonner',

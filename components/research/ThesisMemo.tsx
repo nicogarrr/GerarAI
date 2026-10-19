@@ -12,7 +12,7 @@ import ScenarioAssumptions from '@/components/research/ScenarioAssumptions';
 import ThesisHumanInputForm from '@/components/research/ThesisHumanInputForm';
 import ThesisDebatePanel from '@/components/research/ThesisDebatePanel';
 import ThesisAudioPlayer from '@/components/research/ThesisAudioPlayer';
-import ThesisMarkdown from '@/components/research/ThesisMarkdown';
+import ThesisMarkdownPager, { splitMemoPages } from '@/components/research/ThesisMarkdownPager';
 import { Badge } from '@/components/ui/badge';
 import type { ResearchThesis } from '@/lib/actions/research.actions';
 import type { GlossaryKey } from '@/lib/glossary';
@@ -156,6 +156,7 @@ export default function ThesisMemo({
   currency,
   debateBody,
   modelBlocked = false,
+  extraSections = [],
 }: {
   thesis: ResearchThesis;
   /** Ticker para el debate bull/bear (bloque interactivo de abajo). */
@@ -167,6 +168,8 @@ export default function ThesisMemo({
   debateBody?: string | null;
   /** Modelo fundamental no publicable: la tesis no muestra cifras de valoración. */
   modelBlocked?: boolean;
+  /** Secciones específicas de la empresa: van como páginas del memorando. */
+  extraSections?: { id: number | string; title: string; body: string }[];
 }) {
   const hideFigures = modelBlocked || (thesis.status !== 'published' && thesis.status !== 'approved');
   const probabilities = thesis.scenario_probabilities ?? {};
@@ -426,7 +429,14 @@ export default function ThesisMemo({
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
           Memorando completo
         </h3>
-        <ThesisMarkdown content={thesis.thesis_markdown} />
+        <ThesisMarkdownPager
+          pages={[
+            ...splitMemoPages(thesis.thesis_markdown),
+            ...extraSections
+              .filter((section) => section.body?.trim())
+              .map((section) => ({ id: `s${section.id}`, title: section.title, body: `## ${section.title}\n\n${section.body}` })),
+          ]}
+        />
       </section>
 
       {/* Audio básico al final (WorldStocks punto 6): el resumen, la narrativa,

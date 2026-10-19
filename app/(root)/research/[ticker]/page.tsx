@@ -1257,6 +1257,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               ticker={ticker}
               currency={company.currency}
               modelBlocked={snapshot?.model_summary ? !snapshot.model_summary.publishable : false}
+              extraSections={data.sections.filter((section) => section.section_key !== 'thesis_debate')}
               debateBody={
                 data.sections.find((section) => section.section_key === 'thesis_debate')?.body ?? null
               }
@@ -1270,23 +1271,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </Panel>
         </div>
         <ThesisScenariosPanel adrRatio={data.thesis?.valuation_basis?.adr_ratio} currency={company.currency} data={data.scenarios} />
-        <Panel title="Secciones de tesis específicas de la empresa" collapsible="mobile">
-          {data.sections.length ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {data.sections.map((section) => (
-                <div className="rounded-lg border border-gray-800 p-4" key={section.id}>
-                  <div className="flex justify-between gap-3"><h3 className="font-medium text-gray-200">{section.title}</h3><Badge variant="outline">{label(section.status)}</Badge></div>
-                  <p className="mt-2 text-sm leading-6 text-gray-400">{section.body}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=documents`}>Añade la primera fuente</EmptyLink>}
-              title="Sin secciones específicas todavía."
-            />
-          )}
-        </Panel>
         <Panel title="Afirmaciones y evidencia">
           <MutationForm action={createResearchClaim.bind(null, ticker)} className="mb-5 grid gap-3 sm:grid-cols-[1fr_150px_auto] sm:items-start" resetOnSuccess successMessage="Afirmación creada">
             <Textarea id="statement" name="statement" placeholder="Una afirmación falsable y específica de la empresa" required className="min-h-[44px] text-base sm:text-sm" />
