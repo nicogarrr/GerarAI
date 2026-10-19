@@ -42,6 +42,7 @@ interface WatchlistStock {
     marketCapDerived: boolean;
     peRatio: number | null;
     peKind: 'ttm' | 'fy' | null;
+    peSource: string | null;
     priceKind: 'live' | 'close' | null;
     priceAsOf: string | null;
     metricsNotApplicable: boolean;
@@ -135,6 +136,7 @@ export default async function WatchlistPage({
                     marketCapDerived: data.marketCapDerived,
                     peRatio: data.peRatio,
                     peKind: data.peKind,
+                    peSource: data.peSource,
                     analysis: item.analysis,
                     monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
                     addedAt: item.addedAt
@@ -155,6 +157,7 @@ export default async function WatchlistPage({
                     marketCapDerived: false,
                     peRatio: null,
                     peKind: null,
+                    peSource: null,
                     analysis: item.analysis,
                     monitor: null,
                     addedAt: item.addedAt
@@ -354,7 +357,7 @@ export default async function WatchlistPage({
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">{stock.peKind === 'fy' ? 'PER (FY)' : 'PER (TTM)'}</dt>
-                                        <dd className="font-mono text-sm text-gray-300" title={stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>{formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
+                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined)}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
                                     </div>
                                 </dl>
                                 <div className="mt-3 flex items-center gap-2">
@@ -464,7 +467,7 @@ export default async function WatchlistPage({
                                                 // KO 26x o ASML 55x, una recomendación implícita en
                                                 // una app de «datos, no recomendaciones». Color
                                                 // neutro, como en la vista de tarjetas.
-                                                <Badge variant="outline" className="border-gray-700 font-mono text-gray-300">
+                                                <Badge variant="outline" className="border-gray-700 font-mono text-gray-300" title={stock.peSource ?? undefined}>
                                                     {formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}
                                                 </Badge>
                                             ) : (
