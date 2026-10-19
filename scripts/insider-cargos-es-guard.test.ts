@@ -13,7 +13,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { insiderRole } from '../lib/insider/format.ts';
+import { readFileSync } from 'node:fs';
+
+// @ts-expect-error TS5097: la extension .ts explicita la exige node --experimental-strip-types en runtime
+const { insiderRole } = await import('../lib/insider/format.ts');
+
+const signalsView = readFileSync('components/insider/InsiderSignalsView.tsx', 'utf8');
 
 describe('Insider: cargos comunes en español', () => {
   it('traduce los cargos del Tester 6', () => {
@@ -30,6 +35,12 @@ describe('Insider: cargos comunes en español', () => {
   it('el genérico no se come al específico', () => {
     assert.equal(insiderRole('Officer', 'Senior Vice President'), 'Vicepresidente senior');
     assert.equal(insiderRole('Officer', 'Vice President of Sales'), 'Vicepresidente');
+  });
+
+  it('la vista de señales pasa por insiderRole (antes mostraba el cargo SEC en crudo)', () => {
+    const usos = signalsView.match(/insiderRole\(\s*typeof signal\.role/g) ?? [];
+    assert.equal(usos.length, 2, `la tabla y las tarjetas móviles tienen que usar insiderRole (${usos.length}/2)`);
+    assert.ok(!signalsView.includes('formatRecordValue(signal.officer_title ?? signal.role)'), 'sigue el cargo en crudo');
   });
 
   it('lo no mapeado se muestra tal cual y los roles sin título no cambian', () => {

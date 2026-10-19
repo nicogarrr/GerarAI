@@ -314,7 +314,11 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                             {formatRecordValue(signal.insider)}
                                             {signal.officer_title ?? signal.role ? (
                                                 <span className="block text-xs text-gray-500">
-                                                    {formatRecordValue(signal.officer_title ?? signal.role)}
+                                                    {/* Mismo mapa de cargos que el feed: aquí salía el título SEC en crudo (Tester 6). */}
+                                                    {insiderRole(
+                                                        typeof signal.role === 'string' ? signal.role : null,
+                                                        typeof signal.officer_title === 'string' ? signal.officer_title : null,
+                                                    )}
                                                 </span>
                                             ) : null}
                                         </TableCell>
@@ -359,7 +363,12 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                     </div>
                                     <div className="mt-3 text-sm font-medium text-gray-200">{formatRecordValue(signal.insider)}</div>
                                     {signal.officer_title ?? signal.role ? (
-                                        <div className="text-xs text-gray-500">{formatRecordValue(signal.officer_title ?? signal.role)}</div>
+                                        <div className="text-xs text-gray-500">
+                                            {insiderRole(
+                                                typeof signal.role === 'string' ? signal.role : null,
+                                                typeof signal.officer_title === 'string' ? signal.officer_title : null,
+                                            )}
+                                        </div>
                                     ) : null}
                                     <div className="mt-1 text-xs text-gray-500">{filingDateText(signal.date ?? signal.window_start)}</div>
                                     <div className="mt-2 text-sm leading-6 text-gray-400"><span className="line-clamp-3">{formatRecordValue(signal.detail)}</span></div>
