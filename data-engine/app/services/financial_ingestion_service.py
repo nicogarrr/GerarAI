@@ -1057,6 +1057,14 @@ class FinancialIngestionService:
             annual_anchors = await sec.annual_report_anchors(cik)
         except Exception:  # noqa: BLE001 - fail closed anual, no romper trimestres
             annual_anchors = {}
+        # Indice de filings del emisor para verificar el carril DEI: un hecho
+        # de portada que cita un accession que el indice ya no lista no es
+        # verificable y NO entra (regla de oro: OFICIAL solo si el indice lo
+        # verifica). Fail closed: indice caido -> None -> no entra ningun DEI.
+        try:
+            index_accessions: set[str] | None = await sec.index_accessions(cik)
+        except Exception:  # noqa: BLE001 - fail closed DEI, no romper lo demas
+            index_accessions = None
 
         document = self._source_document_sec(db, company, ticker)
         # published_at = presentacion mas reciente (campo `filed` de companyfacts)
@@ -1211,6 +1219,7 @@ class FinancialIngestionService:
                             source_type="SEC",
                             is_reported=True,
                             confidence=Decimal("0.9"),
+                            accession_number=entry.get("accn"),
                         )
                     )
                     # Misma proveniencia por periodo que el bucle anual:
@@ -1267,6 +1276,7 @@ class FinancialIngestionService:
                             source_type="SEC",
                             is_reported=True,
                             confidence=Decimal("0.95"),
+                            accession_number=entry.get("accn"),
                         )
                     )
                     # Record which XBRL concept produced the value. Several
@@ -1306,6 +1316,11 @@ class FinancialIngestionService:
         for entry in ecso_entries:
             if entry.get("form") not in SHARES_OUTSTANDING_FORMS:
                 continue
+            # Verificacion contra el indice (no el anclaje anual: el `end` de
+            # portada nunca casa con el cierre fiscal). Sin el accn listado en
+            # submissions el hecho de portada no es verificable: no entra.
+            if index_accessions is None or entry.get("accn") not in index_accessions:
+                continue
             if as_of is not None and not _published_by(entry, as_of):
                 continue
             end = str(entry.get("end") or "")
@@ -1340,6 +1355,7 @@ class FinancialIngestionService:
                     source_type="SEC",
                     is_reported=True,
                     confidence=Decimal("0.95"),
+                    accession_number=entry.get("accn"),
                 )
             )
             concept_usage.setdefault("shares_outstanding", {})[period] = (

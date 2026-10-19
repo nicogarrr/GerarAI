@@ -139,6 +139,10 @@ class SECClient:
             int(self.settings.sec_max_retries) if max_retries is None else max(0, max_retries)
         )
         self._minimum_interval = 1 / max(0.1, min(requests_per_second, 10))
+        # Ultimo payload de submissions servido a ESTA instancia: las vistas del
+        # indice (anclas anuales, accessions listados) se derivan de la MISMA
+        # respuesta, sin duplicar la peticion. Por instancia, nunca compartido.
+        self._last_submissions_payload: dict | None = None
 
     @property
     def headers(self) -> dict[str, str]:
@@ -335,6 +339,7 @@ class SECClient:
         resultado de la ingesta), nunca se sustituye por inferencia.
         """
         payload = await self.submissions(cik)
+        self._last_submissions_payload = payload
         filings = payload.get("filings", {})
         anchors = AnchorMap()
         if payload.get("_fallback"):
@@ -365,6 +370,35 @@ class SECClient:
             except Exception:  # noqa: BLE001 - cobertura parcial > romper la ingesta
                 continue
         return anchors
+
+    async def index_accessions(self, cik: str) -> set[str]:
+        """Todos los accessionNumber listados en el indice submissions del emisor.
+
+        Es la verificacion minima de procedencia: un hecho que cita un filing
+        que el indice ya no lista (salio de la ventana `recent` y de los
+        historicos) no es verificable y no puede entrar como OFICIAL. Misma
+        tolerancia que `annual_report_anchors`: un fichero historico caido
+        deja cobertura parcial, nunca se sustituye por inferencia.
+        """
+        payload = self._last_submissions_payload or await self.submissions(cik)
+        filings = payload.get("filings", {})
+        accessions: set[str] = set()
+
+        def _absorb(recent: dict) -> None:
+            for accession in recent.get("accessionNumber", []) or []:
+                if accession:
+                    accessions.add(str(accession))
+
+        _absorb(filings.get("recent", {}))
+        for extra in filings.get("files", []) or []:
+            name = extra.get("name") if isinstance(extra, dict) else None
+            if not name:
+                continue
+            try:
+                _absorb(await self._get_json(f"{self.submissions_url}/{name}"))
+            except Exception:  # noqa: BLE001 - cobertura parcial > romper la ingesta
+                continue
+        return accessions
 
     async def company_facts(self, cik: str) -> dict:
         padded = str(cik).zfill(10)
