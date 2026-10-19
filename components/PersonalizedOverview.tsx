@@ -358,7 +358,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                     ) : portfolioSummary && portfolioSummary.holdings.length > 0 ? (
                         <div className="space-y-5">
                             <div className="flex flex-col min-[420px]:flex-row min-[420px]:items-center gap-3 rounded-xl border border-teal-800/50 bg-teal-950/20 p-3">
-                                <div className="p-2 bg-teal-500/10 rounded-full shrink-0">
+                                <div className="p-2 bg-teal-500/10 rounded-full shrink-0 self-start">
                                     <Activity aria-hidden="true" className="h-5 w-5 text-teal-400" />
                                 </div>
                                 <div className="min-w-0">
