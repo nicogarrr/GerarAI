@@ -162,8 +162,20 @@ class CompanyEnrichmentService:
         )
 
     # -- aplicacion ---------------------------------------------------------
+    @staticmethod
+    def _name_is_placeholder(company: Company) -> bool:
+        name = (company.name or "").strip()
+        return not name or name.upper() == (company.ticker or "").upper() or "_" in name
+
     def enrich(self, db: Session, company: Company, persist: bool = True) -> bool:
-        """Actualiza name/exchange/industry/currency si la API tiene datos mejores."""
+        """Completa SOLO los campos en placeholder; los curados nunca se pisan.
+
+        needs_enrichment dispara por cualquier placeholder (nombre, exchange,
+        sector), pero la escritura es campo a campo: una ficha curada con el
+        sector en «Unknown» (Georgia Capital, LSE, GBP) no puede acabar con el
+        nombre/bolsa/divisa del proveedor (auditor 2026-10-19: Finnhub devuelve
+        GBX para LSE y pisar currency rompe los importes).
+        """
         if not self.needs_enrichment(company):
             return False
         profile = self._finnhub_profile(company.ticker)
@@ -171,16 +183,21 @@ class CompanyEnrichmentService:
             return False
         changed = False
 
-        name = (profile.get("name") or "").strip()
-        if name and name != company.name:
-            company.name = name
-            changed = True
-        exchange = (profile.get("exchange") or "").strip()
-        if exchange:
-            company.exchange = exchange
-            changed = True
+        if self._name_is_placeholder(company):
+            name = (profile.get("name") or "").strip()
+            if name and name != company.name:
+                company.name = name
+                changed = True
+        if company.exchange in _PLACEHOLDER_EXCHANGES:
+            exchange = (profile.get("exchange") or "").strip()
+            if exchange:
+                company.exchange = exchange
+                changed = True
+        # industry no es visible en la UI: solo se actualiza cuando el sector
+        # esta en placeholder y la industria es la pista para clasificarlo.
+        # Con sector ya clasificado, el perfil no la pisa.
         industry = (profile.get("finnhubIndustry") or "").strip()
-        if industry and industry.upper() not in {"N/A", "UNKNOWN"}:
+        if company.sector in _PLACEHOLDER_SECTORS and industry and industry.upper() not in {"N/A", "UNKNOWN"}:
             company.industry = industry
             changed = True
         if company.sector in _PLACEHOLDER_SECTORS:
@@ -188,10 +205,11 @@ class CompanyEnrichmentService:
             if sector:
                 company.sector = sector
                 changed = True
-        currency = (profile.get("currency") or "").strip()
-        if currency:
-            company.currency = currency
-            changed = True
+        if not (company.currency or "").strip():
+            currency = (profile.get("currency") or "").strip()
+            if currency:
+                company.currency = currency
+                changed = True
 
         if changed and persist:
             db.add(company)

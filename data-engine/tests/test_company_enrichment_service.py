@@ -220,3 +220,32 @@ def test_enrich_does_not_overwrite_existing_sector(db):
     service = CompanyEnrichmentService(settings=_Settings(), client=_Client(profile))
     service.enrich(db, company)
     assert company.sector == "Energy"
+
+
+def test_enrich_curated_record_keeps_name_exchange_currency(db):
+    """Auditor 2026-10-19 (#1871): ficha curada con SOLO el sector en Unknown.
+    Finnhub devuelve nombre/bolsa/divisa del proveedor (GBX para LSE) y antes
+    los pisaba todos: los campos curados no se tocan, solo se clasifica."""
+    company = _company(
+        db,
+        name="Georgia Capital PLC",
+        exchange="LSE",
+        ticker="CGEO",
+        sector="Unknown",
+        industry="Unknown",
+    )
+    company.currency = "GBP"
+    db.commit()
+    client = _Client({
+        "name": "GEORGIA CAPITAL PLC",
+        "exchange": "London Stock Exchange",
+        "finnhubIndustry": "Financial Services",
+        "currency": "GBX",
+    })
+    service = CompanyEnrichmentService(settings=_Settings(), client=client)
+    assert service.enrich(db, company) is True
+    assert company.name == "Georgia Capital PLC"
+    assert company.exchange == "LSE"
+    assert company.currency == "GBP"
+    assert company.industry == "Financial Services"
+    assert company.sector == "Financials"
