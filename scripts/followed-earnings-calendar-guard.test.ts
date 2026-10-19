@@ -18,9 +18,16 @@ test('resultados seguidos: estimada solo cuando la fuente lo marca', () => {
   assert.match(list, /Estimada/);
 });
 
-test('resultados seguidos: logos no se piden a terceros (iniciales honestas)', () => {
-  assert.match(list, /NameAvatar/);
-  assert.doesNotMatch(list + page, /logo\.clearbit|img\.logo|logo\.dev|<img/);
+test('resultados seguidos: logos solo via CompanyLogo (FMP, gratis) con fallback de iniciales', () => {
+  // Nico pidio logos de empresa explicitamente: se permiten SOLO las imagenes
+  // publicas y gratuitas de Financial Modeling Prep dentro de CompanyLogo, con
+  // caida a NameAvatar. Otros proveedores de logos siguen prohibidos.
+  const logo = readFileSync('components/calendar/CompanyLogo.tsx', 'utf8');
+  assert.match(list, /CompanyLogo/);
+  assert.match(logo, /financialmodelingprep\.com\/image-stock/);
+  assert.match(logo, /NameAvatar/);
+  assert.match(logo, /referrerPolicy="no-referrer"/);
+  assert.doesNotMatch(list + page + logo, /logo\.clearbit|img\.logo|logo\.dev|unavatar|google\.com\/s2\/favicons/);
 });
 
 test('resultados seguidos: pestaña propia y activa solo la más específica', () => {

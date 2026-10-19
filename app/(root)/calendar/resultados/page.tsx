@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import BackendOffline from '@/components/system/BackendOffline';
-import { FollowedEarningsRow, dayHeading } from '@/components/calendar/FollowedEarningsList';
+import { FollowedDaySources, FollowedEarningsRow, dayHeading } from '@/components/calendar/FollowedEarningsList';
 import { getFollowedEarnings, type FollowedEarningsCalendar } from '@/lib/actions/catalysts.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 
@@ -55,6 +55,7 @@ export default async function FollowedEarningsPage() {
                                     <FollowedEarningsRow key={`${event.ticker}-${event.date}`} event={event} />
                                 ))}
                             </ul>
+                            <FollowedDaySources events={day.events} />
                         </section>
                     ))}
                 </div>

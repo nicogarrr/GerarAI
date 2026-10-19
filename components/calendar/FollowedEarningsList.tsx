@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ChevronRight, ExternalLink } from 'lucide-react';
-import { NameAvatar } from '@/components/ui/name-avatar';
+import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { formatMarketDate } from '@/lib/format';
 import type { FollowedEarningsEvent } from '@/lib/actions/catalysts.actions';
 
@@ -27,7 +27,7 @@ export function FollowedEarningsRow({ event }: { event: FollowedEarningsEvent })
     const label = fiscalLabel(event.fiscal_label);
     return (
         <li className="flex items-center gap-3 px-4 py-3">
-            <NameAvatar name={event.company || event.ticker} className="size-12 rounded-xl" />
+            <CompanyLogo ticker={event.ticker} name={event.company || event.ticker} className="size-12 rounded-xl" />
             <div className="min-w-0 flex-1">
                 <p className="truncate text-base font-semibold text-gray-100">{event.company || event.ticker}</p>
                 <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-400">
@@ -62,5 +62,36 @@ export function FollowedEarningsRow({ event }: { event: FollowedEarningsEvent })
                 <ChevronRight aria-hidden="true" className="h-5 w-5" />
             </Link>
         </li>
+    );
+}
+
+/** Fuentes del día, visibles (no solo en hover): texto pequeño bajo la tarjeta. */
+export function FollowedDaySources({ events }: { events: FollowedEarningsEvent[] }) {
+    const sources = new Map<string, string | null>();
+    for (const event of events) {
+        if (!sources.has(event.source)) sources.set(event.source, event.source_url);
+    }
+    if (sources.size === 0) return null;
+    return (
+        <p className="mt-2 text-xs text-gray-500">
+            Fuente{sources.size > 1 ? 's' : ''}:{' '}
+            {[...sources.entries()].map(([label, url], index) => (
+                <span key={label}>
+                    {index > 0 ? ' · ' : ''}
+                    {url ? (
+                        <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline decoration-gray-600 underline-offset-2 hover:text-gray-300"
+                        >
+                            {label}
+                        </a>
+                    ) : (
+                        label
+                    )}
+                </span>
+            ))}
+        </p>
     );
 }
