@@ -122,6 +122,11 @@ class PortfolioLedgerService:
         db.add(row)
         db.flush()
         self.rebuild_position(db, company.id)
+        # Los hechos son por tenant: al entrar una empresa en cartera se
+        # siembran sus fundamentales sin esperar al boton de la ficha.
+        from app.services.fundamentals_seed_service import enqueue_fundamentals_seed
+
+        enqueue_fundamentals_seed(db, company.ticker)
         return row
 
     @staticmethod
