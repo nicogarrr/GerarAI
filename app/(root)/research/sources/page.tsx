@@ -31,6 +31,7 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   seed: 'Semilla inicial',
   fmp: 'FMP',
   yahoo_fundamentals: 'Yahoo Finance (fuente no oficial)',
+  YAHOO_FUNDAMENTALS: 'Yahoo Finance (fuente no oficial)',
   fmp_profile: 'Perfil FMP',
   manual_transcript: 'Transcripción manual',
   filing: 'Documento regulatorio',

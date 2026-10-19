@@ -369,6 +369,8 @@ const VALORES_BACKEND: Record<string, string> = {
   investor_relations: 'relación con inversores',
   transcript: 'transcripción',
   yfinance: 'Yahoo Finance',
+  yahoo_fundamentals: 'Yahoo Finance (fuente no oficial)',
+  YAHOO_FUNDAMENTALS: 'Yahoo Finance (fuente no oficial)',
   user: 'usuario',
   chat: 'chat',
   url: 'enlace',

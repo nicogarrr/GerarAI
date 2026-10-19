@@ -54,6 +54,7 @@ def test_writes_labelled_unofficial_facts(db):
     rev = [f for f in facts if f.metric == "revenue"]
     assert len(rev) == 1  # el NaN no se inventa
     assert rev[0].unit == "CAD" and rev[0].value == Decimal("102210000.0")
+    assert rev[0].is_reported is False
     assert rev[0].period == "2025-12-31:FY"
     eps = [f for f in facts if f.metric == "eps_diluted"]
     assert {f.unit for f in eps} == {"CAD/share"}

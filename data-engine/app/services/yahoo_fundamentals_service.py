@@ -183,7 +183,7 @@ def refresh_from_yahoo(
                     fiscal_quarter="FY",
                     source_id=document.id,
                     source_type=SOURCE_TYPE,
-                    is_reported=True,
+                    is_reported=False,  # Yahoo no es el emisor: no es cifra 'reported'
                     confidence=Decimal("0.6"),
                 )
             )
