@@ -214,6 +214,11 @@ def _gdelt_datetime(value: str | None) -> datetime | None:
     return None
 
 
+# Idiomas admitidos en la ingesta GDELT (UI es/en; veracidad: un titular
+# en otro idioma no es legible ni verificable por el usuario).
+GDELT_ALLOWED_LANGUAGES = frozenset({"english", "spanish"})
+
+
 class GDELTConnector:
     """Normalize the existing GDELT client into the connector result contract."""
 
@@ -235,6 +240,14 @@ class GDELTConnector:
             seen: set[str] = set()
             for article in articles:
                 if not isinstance(article, dict):
+                    continue
+                # Idioma: GDELT devuelve titulares en cualquier lengua y los
+                # ru/de/... llegaban al carril macro sin poder verificarse ni
+                # mostrarse con honestidad en una UI es/en. Solo se descarta
+                # cuando el idioma es CONOCIDO y distinto de en/es; si GDELT
+                # no informa el idioma, el artículo se conserva.
+                language = str(article.get("language") or "").strip().lower()
+                if language and language not in GDELT_ALLOWED_LANGUAGES:
                     continue
                 url = article.get("url")
                 title = " ".join(str(article.get("title") or "").split())

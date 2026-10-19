@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -85,6 +86,11 @@ def news_events(
         stmt = stmt.where(NewsEvent.company_id.is_not(None))
     elif lane == "macro":
         stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == "macro")
+        # Frescura: el carril se refresca cada hora (macro_news_refresh); un
+        # titular macro de más de 72 h ya no es contexto actual y ensuciaba el
+        # carril. Solo lectura: las filas no se borran.
+        macro_cutoff = datetime.now(UTC) - timedelta(hours=72)
+        stmt = stmt.where(NewsEvent.date >= macro_cutoff)
     ordered = stmt.order_by(desc(NewsEvent.date), desc(NewsEvent.id))
     # Lectura: se ocultan filas etiquetadas con un ticker cuyo titular y resumen
     # no citan a la empresa (ticker pegado delante, nada mas). Criterio sin LLM;
