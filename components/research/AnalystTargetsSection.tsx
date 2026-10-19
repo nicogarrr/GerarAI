@@ -1,4 +1,5 @@
 import { researchRequest } from '@/lib/research/client';
+import { analystRatingEs } from '@/lib/research/analyst-rating-es';
 import type { components } from '@/lib/research/openapi.generated';
 import { formatMarketDate, formatNumber, formatPercent, formatPrice, formatUserDateTime } from '@/lib/format';
 
@@ -45,7 +46,22 @@ export async function AnalystTargetsSection({ symbol, currency }: { symbol: stri
                         <p className="mt-2 text-sm text-gray-400" role="status">{data.note ?? 'Solo consenso agregado, sin detalle por firma.'}</p>
                     ) : null}
                     {data.rows.length > 0 ? (
-                    <div className="mt-3 overflow-x-auto">
+                    <>
+                    <ul aria-label="Precios objetivo por firma" className="mt-3 divide-y divide-gray-800 sm:hidden">
+                        {data.rows.map((row) => (
+                            <li className="py-2 text-sm" key={`${row.firm}-${row.date}`}>
+                                <div className="flex items-baseline justify-between gap-3">
+                                    <span className="min-w-0 font-medium text-gray-100">{row.firm}</span>
+                                    <span className="shrink-0 tabular-nums text-gray-100">{fmtTarget(row.price_target)}</span>
+                                </div>
+                                <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-3 text-xs text-gray-400">
+                                    <span>{analystRatingEs(row.rating) ?? 'N/D'} · {formatMarketDate(row.date)}</span>
+                                    <span className="tabular-nums">Anterior {fmtTarget(row.prior_target)} · Recorrido {row.upside_percent === null || row.upside_percent === undefined ? 'N/D' : formatPercent(row.upside_percent, { fromRatio: false, signDisplay: 'always' })}</span>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                    <div className="mt-3 hidden overflow-x-auto sm:block">
                         <table className="w-full min-w-[34rem] text-left text-sm">
                             <caption className="sr-only">Último precio objetivo por firma, de los últimos 12 meses</caption>
                             <thead className="text-xs text-gray-500">
@@ -62,7 +78,7 @@ export async function AnalystTargetsSection({ symbol, currency }: { symbol: stri
                                 {data.rows.map((row) => (
                                     <tr key={`${row.firm}-${row.date}`}>
                                         <th className="py-1.5 pr-3 font-medium text-gray-100" scope="row">{row.firm}</th>
-                                        <td className="py-1.5 pr-3 text-gray-300">{row.rating ?? 'N/D'}</td>
+                                        <td className="py-1.5 pr-3 text-gray-300">{analystRatingEs(row.rating) ?? 'N/D'}</td>
                                         <td className="py-1.5 pr-3 text-right tabular-nums text-gray-100">{fmtTarget(row.price_target)}</td>
                                         <td className="py-1.5 pr-3 text-right tabular-nums text-gray-400">{fmtTarget(row.prior_target)}</td>
                                         <td className="py-1.5 pr-3 text-right tabular-nums text-gray-300">{row.upside_percent === null || row.upside_percent === undefined ? 'N/D' : formatPercent(row.upside_percent, { fromRatio: false, signDisplay: 'always' })}</td>
@@ -72,6 +88,7 @@ export async function AnalystTargetsSection({ symbol, currency }: { symbol: stri
                             </tbody>
                         </table>
                     </div>
+                    </>
                     ) : null}
                     <p className="mt-2 text-xs text-gray-500">
                         Fuente: {data.source}
