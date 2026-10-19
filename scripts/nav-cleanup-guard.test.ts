@@ -20,7 +20,8 @@ test('cada destino del sidebar aparece una sola vez (árbol + pie)', () => {
     assert.ok(readFileSync("components/UserDropdown.tsx", "utf8").includes('router.push("/security")'));
     // En el árbol, cada href una vez.
     const tree = constants.slice(constants.indexOf('export const NAV_SECTIONS'), constants.indexOf('export function flattenNavItems'));
-    for (const href of ['/plan', '/help', '/export']) {
+    assert.ok(!tree.includes("href: '/export'"), '/export ya no esta en el menu');
+    for (const href of ['/plan', '/help']) {
         const occurrences = tree.split(`href: '${href}'`).length - 1;
         assert.equal(occurrences, 1, `${href} debe aparecer exactamente una vez en NAV_SECTIONS`);
     }
@@ -94,6 +95,7 @@ const CATALOG_EXCEPTIONS: Record<string, string> = {
     '/security': 'menú del avatar (UserDropdown), no es destino de sección',
     '/settings': 'menú del avatar (UserDropdown), no es destino de sección',
     '/research/data-health': 'diagnóstico fuera de navegación por decisión UX; ruta conservada, research-data-health-nav-guard lo exige',
+    '/export': 'quitado del menú por decisión de Nico (sin uso); ruta conservada y enlazada desde Ayuda',
     '/search': 'página-herramienta del buscador global, se abre desde el header',
     // Subpáginas del módulo Inversores: las cubre su HubNav propio
     // (app/(root)/inversores/layout.tsx) y las migas las nombran vía
