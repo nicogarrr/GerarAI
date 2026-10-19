@@ -40,10 +40,10 @@ test('la página degrada sin fabricar pertenencia ni tesis', () => {
     assert.match(page, /new Set\(thesisTickers \?\? \[\]\)/);
     assert.match(page, /thesisSet\.has\(company\.ticker\.trim\(\)\.toUpperCase\(\)\)/);
     // Lecturas de contexto degradan a vacío, no a badges/orden fabricados.
-    assert.match(page, /getPortfolioSummary\(userId\)\.catch\(\(\) => null\)/);
+    assert.match(page, /getResearchPortfolioPositions\(\)\.catch\(\(\) => \[\]\)/);
     assert.match(page, /getWatchlist\(\)\.catch\(\(\) => \[\]/);
     // Solo posiciones abiertas cuentan como cartera (misma semántica que los badges).
-    assert.match(page, /holding\.quantity !== 0/);
+    assert.match(readFileSync('lib/research/portfolio-membership.ts', 'utf8'), /row\.quantity !== 0/);
 });
 
 test('el bucket tesis sale de UNA query DISTINCT, no de un snapshot por empresa', () => {
