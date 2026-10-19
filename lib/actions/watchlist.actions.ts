@@ -165,6 +165,8 @@ export type WatchlistEntryData = {
     priceAsOf: string | null;
     /** true = cotiza fuera de EE. UU.: capitalización y PER no se piden a Finnhub (serían del ADR u homónimo). */
     metricsNotApplicable: boolean;
+    /** Símbolo del listado real validado (p. ej. AENA.MC); null sin listado verificado. Lo usa la celda de objetivos de analistas. */
+    quoteSymbol: string | null;
 };
 
 export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEntryData> {
@@ -187,6 +189,7 @@ export async function getWatchlistEntryData(symbol: string): Promise<WatchlistEn
         priceKind: null,
         priceAsOf: null,
         metricsNotApplicable: false,
+        quoteSymbol,
     };
     if (!quoteSymbol) return base;
 

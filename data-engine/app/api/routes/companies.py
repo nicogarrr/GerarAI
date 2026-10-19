@@ -93,8 +93,33 @@ MAX_SNAPSHOT_BATCH_TICKERS = 50
 async def company_analyst_targets(ticker: str) -> AnalystTargets:
     """Per-firm analyst price targets (Yahoo Finance via yfinance, free and
     unofficial). Every row carries its source and date; a failed or empty
-    source is reported as such, never filled in."""
-    return await analyst_targets_service.get(ticker)
+    source is reported as such, never filled in. Tickers without coverage on
+    their bare line fall back to their reviewed listing (KRKNF -> PNG.V),
+    declaring symbol and currency; a currency mismatch is never adopted."""
+    result = await analyst_targets_service.get(ticker)
+    if result.status != "empty":
+        return result
+    # Listado revisado (mapa de fundamentales no oficiales): si Yahoo no
+    # cubre el ticker OTC pero si el listado oficial, se usa ESE, con la
+    # divisa declarada verificada contra el mapa — nunca se adopta un
+    # consenso en otra divisa.
+    from app.services.yahoo_fundamentals_service import REVIEWED_MAP
+
+    entry = REVIEWED_MAP.get(ticker.strip().upper())
+    if not entry:
+        return result
+    alt = await analyst_targets_service.get(entry["symbol"])
+    if alt.status != "available" or (alt.currency or "").upper() != entry["currency"]:
+        return result
+    return alt.model_copy(
+        update={
+            "symbol": ticker.strip().upper(),
+            "source": (
+                f"Yahoo Finance (no oficial) - listado {entry['symbol']} "
+                f"en {entry['currency']}, agregado de analistas"
+            ),
+        }
+    )
 
 
 @router.get("/{ticker}/extended-quote", response_model=ExtendedQuote)

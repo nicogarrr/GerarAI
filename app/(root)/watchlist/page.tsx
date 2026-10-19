@@ -9,6 +9,7 @@ import Link from 'next/link';
 import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
 import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
 import ExtendedHoursLine from '@/components/watchlist/ExtendedHoursLine';
+import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -46,6 +47,7 @@ interface WatchlistStock {
     priceKind: 'live' | 'close' | null;
     priceAsOf: string | null;
     metricsNotApplicable: boolean;
+    quoteSymbol: string | null;
     monitor: WatchlistMonitorItem | null;
     addedAt: Date;
 }
@@ -137,6 +139,7 @@ export default async function WatchlistPage({
                     peRatio: data.peRatio,
                     peKind: data.peKind,
                     peSource: data.peSource,
+                    quoteSymbol: data.quoteSymbol,
                     analysis: item.analysis,
                     monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
                     addedAt: item.addedAt
@@ -158,6 +161,7 @@ export default async function WatchlistPage({
                     peRatio: null,
                     peKind: null,
                     peSource: null,
+                    quoteSymbol: null,
                     analysis: item.analysis,
                     monitor: null,
                     addedAt: item.addedAt
@@ -367,6 +371,10 @@ export default async function WatchlistPage({
                                         <dt className="text-[11px] text-gray-500">{stock.peKind === 'fy' ? 'PER (FY)' : 'PER (TTM)'}</dt>
                                         <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined)}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null && stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null}</dd>
                                     </div>
+                                    <div className="min-w-0">
+                                        <dt className="text-[11px] text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</dt>
+                                        <dd className="text-sm"><AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} /></dd>
+                                    </div>
                                 </dl>
                                 <div className="mt-3 flex items-center gap-2">
                                     <Link
@@ -403,6 +411,9 @@ export default async function WatchlistPage({
                                     </TableHead>
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('pe')}>
                                         <Link href={sortHref('pe')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">PER{sortIndicator('pe')}</Link>
+                                    </TableHead>
+                                    <TableHead className="text-right text-gray-300" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">
+                                        Obj. analistas
                                     </TableHead>
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('earnings')}>
                                         <Link href={sortHref('earnings')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Próx. resultados{sortIndicator('earnings')}</Link>
@@ -481,6 +492,9 @@ export default async function WatchlistPage({
                                             ) : (
                                                 <span className="text-gray-500">{NA}</span>
                                             )}
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm">
+                                            <AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} />
                                         </TableCell>
                                         <TableCell className="text-right font-mono text-sm text-gray-300" title={stock.monitor?.next_earnings_source ?? (!stock.monitor?.next_earnings_date ? earningsNote ?? undefined : undefined)}>
                                             {stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}

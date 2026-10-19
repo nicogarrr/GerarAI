@@ -105,3 +105,44 @@ def test_service_caches_successful_result_and_exposes_consensus(monkeypatch) -> 
     assert a.rows[0].upside_percent == 77.0
     assert a.consensus and a.consensus.high == 150.0
     assert a.source_url.endswith("/RKLB/analysis/")
+
+
+def test_service_declares_currency_from_source(monkeypatch) -> None:
+    monkeypatch.setattr(
+        svc,
+        "_fetch_sync",
+        lambda symbol: {
+            "records": [rec("TD Cowen", "2026-10-15 13:48:00", 90.0)],
+            "consensus": {"current": 50.84, "mean": 102.15},
+            "currency": "USD",
+        },
+    )
+    result = asyncio.run(svc.AnalystTargetsService().get("RKLB"))
+    assert result.currency == "USD"
+
+
+def test_service_without_declared_currency_keeps_none(monkeypatch) -> None:
+    monkeypatch.setattr(
+        svc,
+        "_fetch_sync",
+        lambda symbol: {"records": [], "consensus": {}, "currency": None},
+    )
+    result = asyncio.run(svc.AnalystTargetsService().get("zzzz"))
+    assert result.currency is None
+
+
+def test_consensus_only_is_available_with_aggregate_note(monkeypatch) -> None:
+    monkeypatch.setattr(
+        svc,
+        "_fetch_sync",
+        lambda symbol: {
+            "records": [],
+            "consensus": {"current": 5.5, "mean": 9.07, "low": 7.0, "high": 11.0},
+            "currency": "CAD",
+        },
+    )
+    result = asyncio.run(svc.AnalystTargetsService().get("PNG.V"))
+    assert result.status == "available"
+    assert result.rows == [] and result.consensus and result.consensus.mean == 9.07
+    assert result.note and "consenso agregado" in result.note
+    assert result.currency == "CAD"
