@@ -22,7 +22,10 @@ describe('Joyas: tarjetas legibles', () => {
   it('la fuente sale legible del backend (periodo FY + fecha es), nunca ISO crudo', () => {
     assert.match(servicio, /SEC \{_periodo_es\(g\.fcf_period\)\} \+ precio \{fecha_es/);
     assert.ok(!servicio.includes('+ precio {g.price_date}'), 'sigue la fecha ISO cruda');
-    assert.match(servicio, /return f"\{fp\}\{end\[:4\]\}"/, 'falta el periodo «FY2025»');
+    // main #1894 (ejercicios 52/53 semanas): el año ya no es end[:4] a pelo,
+    // lo calcula _annual_fiscal_year (cierre 1-7 ene -> FY anterior).
+    assert.match(servicio, /return f"\{fp\}\{year\}"/, 'falta el periodo «FY2025»');
+    assert.match(servicio, /_annual_fiscal_year\(end, None\)/, 'falta el ajuste 52/53 semanas');
     assert.match(servicio, /SEC 13F, trimestre a \{fecha_es/);
   });
 
