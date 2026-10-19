@@ -33,6 +33,13 @@ const SCOPE_LABEL: Record<CalendarFeedScope, string> = {
     watchlist: 'Solo la watchlist',
 };
 
+// Lo que el enlace expone segun el filtro: KO en cartera no aparece con
+// 'watchlist' y eso tiene que leerse aqui, no descubrirse en el calendario.
+const SCOPE_HINT: Record<CalendarFeedScope, string> = {
+    followed: 'Incluye los resultados de las posiciones de tu cartera y de tu watchlist.',
+    watchlist: 'Incluye solo los resultados de tu watchlist; tu cartera no se comparte.',
+};
+
 function feedUrls(origin: string, token: string) {
     const https = `${origin}/api/calendar-feed/${token}.ics`;
     return {
@@ -152,22 +159,25 @@ export default function SubscriptionManager({
 
     return (
         <div className="flex flex-col gap-6">
-            <section aria-label="Filtro" className="flex flex-col gap-2">
-                <h2 className="text-base font-semibold text-gray-100">Filtro</h2>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                    {(Object.keys(SCOPE_LABEL) as CalendarFeedScope[]).map((option) => (
-                        <button
-                            key={option}
-                            aria-pressed={scope === option}
-                            disabled={pending}
-                            onClick={() => setScope(option)}
-                            className={`min-h-11 flex-1 rounded-xl border px-4 text-sm font-medium transition-colors ${scope === option ? 'border-teal-400/60 bg-teal-400/10 text-teal-200' : 'border-gray-800 bg-surface-1 text-gray-400 hover:border-gray-700 hover:text-gray-200'}`}
-                        >
-                            {SCOPE_LABEL[option]}
-                        </button>
-                    ))}
-                </div>
-            </section>
+            {state.active ? null : (
+                <section aria-label="Filtro" className="flex flex-col gap-2">
+                    <h2 className="text-base font-semibold text-gray-100">Filtro</h2>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                        {(Object.keys(SCOPE_LABEL) as CalendarFeedScope[]).map((option) => (
+                            <button
+                                key={option}
+                                aria-pressed={scope === option}
+                                disabled={pending}
+                                onClick={() => setScope(option)}
+                                className={`min-h-11 flex-1 rounded-xl border px-4 text-sm font-medium transition-colors ${scope === option ? 'border-teal-400/60 bg-teal-400/10 text-teal-200' : 'border-gray-800 bg-surface-1 text-gray-400 hover:border-gray-700 hover:text-gray-200'}`}
+                            >
+                                {SCOPE_LABEL[option]}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-xs text-gray-500">{SCOPE_HINT[scope]}</p>
+                </section>
+            )}
 
             {error ? <p role="alert" className="rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-sm text-red-200">{error}</p> : null}
 
@@ -176,7 +186,9 @@ export default function SubscriptionManager({
                     <h2 className="text-base font-semibold text-gray-100">Configuración</h2>
                     <SubscribeButtons origin={origin} token={freshToken} />
                 </section>
-            ) : state.active ? (
+            ) : null}
+
+            {state.active ? (
                 <section aria-label="Suscripción activa" className="flex flex-col gap-3 rounded-2xl border border-gray-800 bg-surface-1 p-4">
                     <p className="text-sm text-gray-200">
                         Suscripción activa: <span className="font-medium">{state.scope ? SCOPE_LABEL[state.scope] : ''}</span>
@@ -184,8 +196,9 @@ export default function SubscriptionManager({
                             <span className="text-gray-500"> · creada el {formatUserDateTime(state.created_at)}</span>
                         ) : null}
                     </p>
+                    {state.scope ? <p className="text-xs text-gray-500">{SCOPE_HINT[state.scope]}</p> : null}
                     <div className="flex flex-col gap-2 sm:flex-row">
-                        <Button disabled={pending} onClick={() => create(scope)} className="min-h-11 flex-1">
+                        <Button disabled={pending} onClick={() => create(state.scope ?? scope)} className="min-h-11 flex-1">
                             Regenerar enlace
                         </Button>
                         <Button disabled={pending} variant="outline" onClick={revoke} className="min-h-11 flex-1">
@@ -194,7 +207,7 @@ export default function SubscriptionManager({
                     </div>
                     <p className="text-xs text-gray-500">
                         Por seguridad el enlace no se puede volver a mostrar: regenerarlo crea uno nuevo y el anterior
-                        deja de funcionar.
+                        deja de funcionar. Para cambiar el filtro, desactiva y crea una suscripción nueva.
                     </p>
                 </section>
             ) : (

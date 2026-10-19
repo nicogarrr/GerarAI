@@ -29,6 +29,8 @@ const SUBROUTE_LABELS: Record<string, string> = {
   // Modulo Inversores: sub-paginas fijas (no son un slug de inversor).
   'carteras': 'Carteras',
   'mas-compradas': 'Más compradas',
+  // Sub-pestaña de Calendarios (#1777): sin entrada, la miga salia cruda.
+  'suscripcion': 'Suscripción',
 };
 
 /** Slug sin etiqueta propia (p. ej. "warren-buffett") -> "Warren Buffett" en vez del slug crudo. */
