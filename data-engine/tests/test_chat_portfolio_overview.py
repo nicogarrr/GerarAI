@@ -130,8 +130,11 @@ def test_risk_question_about_my_portfolio_is_not_answered_with_the_positions_tab
     db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), market_value=Decimal("300")))
     db.commit()
     resp = asyncio.run(ChatService().answer(db, "¿Qué riesgos tiene mi cartera?", "portfolio", None))
-    assert resp.prompt_version != "portfolio-overview-v1"
-    assert (resp.llm_trace or {}).get("path") != "portfolio_overview"
+    assert resp.prompt_version == "portfolio-analysis-v1"
+    assert (resp.llm_trace or {}).get("path") == "portfolio_analysis"
+    assert "Mayor posición: AAA" in resp.answer
+    assert "100 %" in resp.answer or "100,0 %" in resp.answer
+    assert "no son un análisis de riesgos de mercado" in resp.answer
     # La pregunta de listado sigue por el volcado de posiciones.
     listing = asyncio.run(ChatService().answer(db, "¿Qué tengo en mi cartera?", "portfolio", None))
     assert listing.prompt_version == "portfolio-overview-v1"
