@@ -34,7 +34,7 @@ function parsePage(raw: string | string[] | undefined): number {
   return Number.isInteger(page) && page >= 1 ? page : 1;
 }
 
-function SignalCard({ signal }: { signal: Awaited<ReturnType<typeof getBottlenecks>>['signals'][number] }) {
+function SignalCard({ signal, minSources }: { signal: Awaited<ReturnType<typeof getBottlenecks>>['signals'][number]; minSources: number }) {
   const detected = signal.status === 'detectado';
   return (
     <li className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
@@ -53,7 +53,10 @@ function SignalCard({ signal }: { signal: Awaited<ReturnType<typeof getBottlenec
       <p className="mt-3 text-xs text-gray-400">
         {detected
           ? `${signal.n_sources} fuentes independientes · última señal ${formatUserDate(signal.last_seen)}`
-          : 'Sin evidencia suficiente en las fuentes guardadas'}
+          : /* Puede haber evidencias enlazables y aun asi N/D: el umbral cuenta
+               FUENTES independientes, no evidencias (Tester 6: 2 evidencias de
+               un mismo editor no detectan). El contador lo hace visible. */
+            `${signal.n_sources} de ${minSources} fuentes independientes · sin evidencia suficiente`}
       </p>
       {signal.evidence?.length ? (
         <details className="mt-3 text-xs">
@@ -158,7 +161,7 @@ export default async function CuellosPage({ searchParams }: PageProps) {
       <section aria-label="Señales de escasez">
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {bottlenecks.signals.map((signal) => (
-            <SignalCard key={signal.theme} signal={signal} />
+            <SignalCard key={signal.theme} signal={signal} minSources={bottlenecks.min_sources} />
           ))}
         </ul>
       </section>

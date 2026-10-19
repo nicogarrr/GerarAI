@@ -885,6 +885,11 @@
             "title": "Method",
             "type": "string"
           },
+          "min_sources": {
+            "default": 2,
+            "title": "Min Sources",
+            "type": "integer"
+          },
           "signals": {
             "items": {
               "$ref": "#/components/schemas/BottleneckSignalOut"
