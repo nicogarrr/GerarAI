@@ -24,7 +24,7 @@ describe('ficha: cifra grande y métricas compactas', () => {
     it('pestañas limpias sin borrar rutas ni módulos', () => {
         assert.match(page, /activeModule.group === group.key \? 'border-teal-300 text-gray-100'/);
         const views = readFileSync('lib/research/research-views.ts', 'utf8');
-        for (const view of ['entender', 'valorar', 'seguir']) assert.ok(views.includes(`key: '${view}'`));
+        for (const view of ['resumen', 'numeros', 'fuentes', 'mas']) assert.ok(views.includes(`key: '${view}'`));
         // Las 6 claves de grupo antiguas siguen abriendo su módulo (compat ?view=), en un Map (sin prototipo).
         for (const legacy of ['resumen', 'tesis', 'financieros', 'modelo', 'evidencia', 'seguimiento']) assert.ok(views.includes(`['${legacy}',`));
         assert.doesNotMatch(page, /captura de solo lectura/);

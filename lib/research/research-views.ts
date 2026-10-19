@@ -1,49 +1,50 @@
 /**
- * Selector de la ficha de empresa. El recorrido simple (WorldStocks punto 1,
- * aprobado por Nico 2026-10-16) son 3 pasos: Entender -> Valorar -> Seguir.
- * Los 19 destinos (14 vistas + 5 subrutas) se agrupan bajo esos 3 pasos;
- * nada se borra, lo secundario queda un nivel debajo.
+ * Selector de la ficha de empresa: 3 pestañas visibles (Resumen, Números,
+ * Fuentes) y un menú "Más" con lo de seguimiento. Cada pestaña agrupa sus
+ * módulos en una sola fila; nada se borra.
  *
  * COMPATIBILIDAD: los `?view=` antiguos siguen siendo URLs validas. Cada
  * modulo conserva su clave historica (`overview`, `thesis`, `chat`...) y
- * `asView` acepta tanto una clave de modulo como una clave de grupo, asi que
+ * `asView` acepta tanto una clave de modulo como una clave de grupo (nueva o
+ * de los pasos anteriores Entender/Valorar/Seguir), asi que
  * `/research/AAPL?view=thesis` y `/research/AAPL?view=tesis` abren lo mismo.
  *
  * Test funcional: scripts/research-views-guard.test.ts.
  */
 export const GROUPS = [
-  { key: 'entender', label: '1 · Entender', entry: 'overview' },
-  { key: 'valorar', label: '2 · Valorar', entry: 'model' },
-  { key: 'seguir', label: '3 · Seguir', entry: 'changes' },
+  { key: 'resumen', label: 'Resumen', entry: 'overview' },
+  { key: 'numeros', label: 'Números', entry: 'financials' },
+  { key: 'fuentes', label: 'Fuentes', entry: 'documents' },
+  { key: 'mas', label: 'Más', entry: 'changes' },
 ] as const;
 
 export const MODULES = [
-  { key: 'overview', label: 'Vista general', group: 'entender' },
-  { key: 'moat', label: 'Foso', group: 'entender' },
-  { key: 'satellites', label: 'Satélites AST', group: 'seguir' },
-  { key: 'thesis', label: 'Tesis', group: 'entender' },
-  { key: 'financials', label: 'Financieros', group: 'entender' },
-  { key: 'capital', label: 'Dilución y recompras', group: 'entender', path: 'share-capital' },
-  { key: 'terminal', label: 'Terminal financiero', group: 'entender', path: 'financial-terminal' },
-  { key: 'supuestos', label: 'Supuestos de drivers', group: 'valorar', path: 'driver-assumptions' },
-  { key: 'model', label: 'Modelo a largo plazo', group: 'valorar' },
-  { key: 'market-opportunity', label: 'Oportunidad de mercado', group: 'valorar' },
-  { key: 'valuation', label: 'Valoración', group: 'valorar' },
-  { key: 'peers', label: 'Comparables', group: 'valorar' },
-  { key: 'documents', label: 'Documentos', group: 'entender' },
-  { key: 'sources', label: 'Fuentes', group: 'entender' },
-  { key: 'chat', label: 'Chat con fuentes', group: 'entender' },
-  { key: 'changes', label: 'Cambios y revisiones', group: 'seguir' },
-  { key: 'holders', label: 'Superinversores', group: 'seguir' },
-  { key: 'lecciones', label: 'Lecciones de decisiones', group: 'seguir', path: 'decision-lessons' },
-  { key: 'directiva', label: 'Credibilidad de la directiva', group: 'seguir', path: 'management-credibility' },
+  { key: 'overview', label: 'Vista general', group: 'resumen' },
+  { key: 'thesis', label: 'Tesis', group: 'resumen' },
+  { key: 'financials', label: 'Financieros', group: 'numeros' },
+  { key: 'valuation', label: 'Valoración', group: 'numeros' },
+  { key: 'model', label: 'Modelo a largo plazo', group: 'numeros' },
+  { key: 'peers', label: 'Comparables', group: 'numeros' },
+  { key: 'moat', label: 'Foso', group: 'numeros' },
+  { key: 'capital', label: 'Dilución y recompras', group: 'numeros', path: 'share-capital' },
+  { key: 'terminal', label: 'Terminal financiero', group: 'numeros', path: 'financial-terminal' },
+  { key: 'supuestos', label: 'Supuestos de drivers', group: 'numeros', path: 'driver-assumptions' },
+  { key: 'market-opportunity', label: 'Oportunidad de mercado', group: 'numeros' },
+  { key: 'documents', label: 'Documentos', group: 'fuentes' },
+  { key: 'sources', label: 'Fuentes', group: 'fuentes' },
+  { key: 'chat', label: 'Chat con fuentes', group: 'fuentes' },
+  { key: 'changes', label: 'Cambios y revisiones', group: 'mas' },
+  { key: 'holders', label: 'Superinversores', group: 'mas' },
+  { key: 'lecciones', label: 'Lecciones de decisiones', group: 'mas', path: 'decision-lessons' },
+  { key: 'directiva', label: 'Credibilidad de la directiva', group: 'mas', path: 'management-credibility' },
+  { key: 'satellites', label: 'Satélites AST', group: 'mas' },
 ] as const;
 
 export type View = (typeof MODULES)[number]['key'];
 
 /**
- * URLs antiguas: las claves de los 6 grupos previos a los 3 pasos siguen
- * abriendo su modulo de entrada.
+ * URLs antiguas: las claves de los grupos previos (6 grupos y los 3 pasos
+ * Entender/Valorar/Seguir) siguen abriendo su modulo de entrada.
  *
  * Map, no objeto llano: un lookup por string sobre un Record hereda del
  * prototipo (`?view=constructor` devolveria `Object` truthy y se colaria como
@@ -51,6 +52,9 @@ export type View = (typeof MODULES)[number]['key'];
  */
 const LEGACY_GROUP_ENTRIES = new Map<string, View>([
   ['resumen', 'overview'],
+  ['entender', 'overview'],
+  ['valorar', 'model'],
+  ['seguir', 'changes'],
   ['tesis', 'thesis'],
   ['financieros', 'financials'],
   ['modelo', 'model'],

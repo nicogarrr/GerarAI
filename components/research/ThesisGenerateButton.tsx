@@ -161,7 +161,7 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
                     ) : (
                         <BrainCircuit aria-hidden="true" className="mr-2 h-4 w-4" />
                     )}
-                    {recovering ? 'Recuperando generación…' : starting ? 'Encolando…' : active ? 'Generando en segundo plano…' : label}
+                    {recovering ? 'Recuperando generación…' : starting ? 'Encolando…' : active ? 'Generando…' : label}
                 </Button>
                 {active ? (
                     <span className="text-sm text-gray-400">

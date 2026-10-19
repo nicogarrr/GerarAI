@@ -64,16 +64,15 @@ test.describe("company research workspace", () => {
     await expect(quote.getByText('Fixture local · 17:00 (Madrid)', { exact: true })).toBeVisible();
     await expect(quote.getByText('Sesión regular del 2026-09-09 · 17:00 (Madrid)', { exact: true })).toBeVisible();
     // Vista general compacta: la cabecera de tesis resume el estado; el
-    // modelo vive en su modulo (grupo Valorar) desde la reorganizacion por
-    // pasos Entender/Valorar/Seguir.
+    // modelo vive en su modulo (pestaña Números).
     await expect(page.getByRole("heading", { name: "Última tesis" })).toBeVisible();
 
-    await page.getByRole("navigation", { name: "Etapas del research" }).getByRole("link", { name: "2 · Valorar", exact: true }).click();
+    await page.getByRole("navigation", { name: "Etapas del research" }).getByRole("link", { name: "Números", exact: true }).click();
     await page.getByRole("navigation", { name: /Módulos de/ }).getByRole("link", { name: "Modelo a largo plazo", exact: true }).click();
     await expect(page).toHaveURL(/view=model/);
     await expect(page.getByRole("heading", { name: "Modelo fundamental a largo plazo" })).toBeVisible();
 
-    await page.getByRole("navigation", { name: "Etapas del research" }).getByRole("link", { name: "3 · Seguir", exact: true }).click();
+    await page.getByRole("navigation", { name: "Etapas del research" }).getByRole("link", { name: "Más", exact: true }).click();
     await page.getByRole("navigation", { name: /Módulos de/ }).getByRole("link", { name: "Cambios y revisiones", exact: true }).click();
     await expect(page).toHaveURL(/view=changes/);
     await expect(page.getByRole("heading", { name: "Diario de decisiones" })).toBeVisible();
