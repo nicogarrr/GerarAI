@@ -4,8 +4,8 @@ import { getMarketIndicesResult, getMarketMovers } from '@/lib/actions/market.ac
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { MoversTable } from '@/components/market/MoversTable';
 import BackendOffline from '@/components/system/BackendOffline';
-import { getSavedScreenerEngines, getScreenerStocksRealWithStatus } from '@/lib/actions/screener.actions';
-import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, formatUserDateTime, isValidCurrencyCode } from '@/lib/format';
+import { getSavedScreenerEngines, getScreenerStocksRealWithStatus, getScreenerUniverseClose } from '@/lib/actions/screener.actions';
+import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, formatPrice, formatUserDateTime, isValidCurrencyCode } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { indicesCardState } from '@/lib/market/indices-card-state';
@@ -172,6 +172,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
     ),
   ]);
   const { rows, refreshing: screenerRefreshing, universeSize, error: screenerError } = screenerResult;
+  const universeClose = await getScreenerUniverseClose(sector, 100).catch(() => null);
   const backendDown = screenerError !== null;
   // Un indice sin precio real (fallo del proveedor) no se pinta como $0.00.
   const validIndices = indicesResult.data.filter((i) => i.price > 0);
@@ -419,7 +420,45 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
           </CardContent>
         </Card>
       </div>
+
+      {universeClose && universeClose.rows.length > 0 ? (
+        <Card className="mt-6 border-gray-800 bg-gray-900/60">
+          <CardHeader>
+            <CardTitle className="text-base break-words">Resto del universo — {sectorEs(sector)}</CardTitle>
+            <p className="text-xs text-gray-500">
+              Último cierre almacenado de cada empresa, con su fecha ({formatNumber(universeClose.rows.length, { maximumFractionDigits: 0 })} de {formatNumber(universeClose.total, { maximumFractionDigits: 0 })}). No son precios en vivo.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div aria-label="Resto del universo por sector" className="overflow-x-auto" role="region" tabIndex={0}>
+              <table className="w-full min-w-[32rem] text-left text-sm">
+                <caption className="sr-only">Último cierre por empresa del resto del universo: ticker, nombre, cierre, fecha y cambio</caption>
+                <thead className="text-xs text-gray-500">
+                  <tr>
+                    <th scope="col" className="py-1.5 pr-3 font-medium">Ticker</th>
+                    <th scope="col" className="py-1.5 pr-3 font-medium">Nombre</th>
+                    <th scope="col" className="py-1.5 pr-3 text-right font-medium">Cierre</th>
+                    <th scope="col" className="py-1.5 pr-3 text-right font-medium">Cambio</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {universeClose.rows.map((r) => (
+                    <tr key={r.symbol}>
+                      <td className="py-1.5 pr-3"><Link className="text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(r.symbol)}`}>{r.symbol}</Link></td>
+                      <td className="py-1.5 pr-3 text-gray-300">{r.name}</td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums text-gray-100">
+                        {formatPrice(r.close, r.currency)}
+                        <span className="block text-[10px] text-gray-500">Cierre {formatDate(r.close_date)}</span>
+                      </td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums text-gray-300">{r.change_pct === null ? 'N/D' : formatPercent(r.change_pct, { fromRatio: false, signDisplay: 'always' })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </main>
   );
 }
-
