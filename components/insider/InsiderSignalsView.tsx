@@ -1,6 +1,6 @@
 'use client';
 
-import { formatDate, formatUserDateTime, formatMoney, formatNumber } from '@/lib/format';
+import { formatDate, formatUserDateTime, formatNumber, formatPrice } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -33,7 +33,7 @@ function signalTone(signal: unknown): 'default' | 'outline' {
 
 function moneyText(value: unknown): string {
     if (typeof value !== 'number' || !Number.isFinite(value)) return formatRecordValue(value);
-    return formatMoney(value, 'USD', { maximumFractionDigits: 0 });
+    return formatPrice(value, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 function formBadge(form: unknown): { label: string; amended: boolean } | null {
