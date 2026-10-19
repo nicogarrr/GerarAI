@@ -1142,6 +1142,9 @@ export async function importResearchDocumentUrl(formData: FormData) {
 
 export type ResearchNewsEvent = {
   original_headline?: string;
+  /** Misma historia en otros medios, agrupada en portada (PR story clusters). */
+  coverage_count?: number | null;
+  coverage?: {source: string; url: string | null; title?: string}[] | null;
   headline_translation?: {text: string; target_language: string; machine_translation: boolean} | null;
   /** Resumen/cuerpo ingerido y su traducción cacheada (misma procedencia que el titular). */
   summary?: string;
@@ -1193,14 +1196,17 @@ type ResearchThesisVersion = {
 };
 
 export async function getResearchNews(
-  lane: 'empresa' | 'macro' | null = null,
+  lane: 'empresa' | 'macro' | 'para-ti' | null = null,
   offset = 0,
   limit = 30,
   ticker: string | null = null,
+  /** Carril «Para ti»: tickers de cartera + watchlist del usuario (los conoce el cliente). */
+  tickers: string[] = [],
 ): Promise<ResearchNewsEvent[]> {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-  if (lane) params.set('lane', lane);
+  if (lane === 'empresa' || lane === 'macro') params.set('lane', lane);
   if (ticker) params.set('ticker', ticker);
+  if (lane === 'para-ti' && tickers.length) params.set('tickers', tickers.join(','));
   return getJson<ResearchNewsEvent[]>(`/api/news?${params.toString()}`, []);
 }
 
