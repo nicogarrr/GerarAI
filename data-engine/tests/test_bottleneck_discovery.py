@@ -645,3 +645,53 @@ def test_signals_return_resolved_sources_not_only_opaque_ids(db):
     found = [e for signal in signals for e in signal.evidence]
     assert any(e.url == 'https://pub-a.example/n1' and e.status == 'verificada' for e in found)
     assert all(e.id for e in found)
+
+
+def _patterns(*companies):
+    return {t: svc._mention_pattern(t, n) for t, n in companies}
+
+
+def test_mention_pattern_matches_ticker_and_name_without_suffix():
+    pattern = svc._mention_pattern("CVU", "CV Sciences, Inc.")
+    assert pattern.search(svc.fold("CV Sciences anuncia un acuerdo"))
+    assert pattern.search(svc.fold("Las acciones de CVU suben"))
+    assert not pattern.search(svc.fold("El mercado de chips se tensiona"))
+
+
+def test_cites_other_company_only_detects_cross_ticker_evidence():
+    patterns = _patterns(("AAPL", "Apple Inc."), ("MSFT", "Microsoft Corporation"))
+    # La evidencia habla de Apple, no de Microsoft: cruce detectado.
+    assert svc._cites_other_company_only(["Apple reporta ventas récord"], "MSFT", patterns)
+    # Si la evidencia tambien nombra al candidato, no es cruce.
+    assert not svc._cites_other_company_only(["Apple y Microsoft firman"], "MSFT", patterns)
+    # Evidencia tematica sin empresa conocida: la inferencia sigue permitida.
+    assert not svc._cites_other_company_only(["Chip shortages persist"], "MSFT", patterns)
+
+
+def test_cross_ticker_evidence_rejected_end_to_end(db):
+    db.add(NewsEvent(id=4, title="NVDA asegura chips ante la escasez",
+                     url="https://pub-c.example/n4", date=datetime(2026, 10, 6, tzinfo=UTC)))
+    db.commit()
+    refresh_signals(db)
+    db.commit()
+    result = run(db, Provider(out(cand(ticker="AMD", ids=("news_event:4",)))))
+    assert result["saved"] == 0 and result["rejected"] == {"evidencia_de_otra_empresa": 1}
+    assert stored(db) == []
+    # La misma evidencia citada por la empresa de la que habla si se acepta.
+    result = run(db, Provider(out(cand(ticker="NVDA", ids=("news_event:4",)))))
+    assert result["saved"] == 1
+
+
+def test_distinct_sources_collapses_chunks_of_one_document():
+    def ev(id_, title, url):
+        return svc.ResolvedEvidence(id_, f"texto de {id_}", title, url, None)
+
+    chunks = [
+        ev("document_chunk:1", "AAPL 10-K 2025", "https://sec.gov/aapl-10k"),
+        ev("document_chunk:2", "AAPL 10-K 2025", "https://sec.gov/aapl-10k"),
+        ev("document_chunk:3", "AAPL 10-Q T3", "https://sec.gov/aapl-10q"),
+        ev("news_event:9", "Titular suelto", None),
+        ev("news_event:10", "Titular suelto", None),
+    ]
+    assert [e.id for e in svc.distinct_sources(chunks)] == [
+        "document_chunk:1", "document_chunk:3", "news_event:9"]
