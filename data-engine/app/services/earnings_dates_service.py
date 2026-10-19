@@ -24,6 +24,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 from sqlalchemy import delete, select
@@ -64,6 +65,34 @@ def followed_companies(db: Session) -> dict[str, dict[str, Any]]:
     return out
 
 
+# Zona horaria del mercado por sufijo Yahoo. Yahoo da la fecha como instante UTC:
+# una publicacion el 5-nov en Tokio (00:00 JST) cae el 4-nov en UTC y mostraria el
+# dia equivocado. Sin sufijo = linea US. Sufijo desconocido = sin fecha (nunca el
+# dia UTC a ciegas).
+_SUFFIX_TZ = {
+    "": "America/New_York", "TO": "America/Toronto", "V": "America/Toronto",
+    "L": "Europe/London", "IL": "Europe/London", "MC": "Europe/Madrid", "PA": "Europe/Paris",
+    "DE": "Europe/Berlin", "F": "Europe/Berlin", "AS": "Europe/Amsterdam", "BR": "Europe/Brussels",
+    "MI": "Europe/Rome", "LS": "Europe/Lisbon", "SW": "Europe/Zurich", "VI": "Europe/Vienna",
+    "ST": "Europe/Stockholm", "CO": "Europe/Copenhagen", "HE": "Europe/Helsinki", "OL": "Europe/Oslo",
+    "T": "Asia/Tokyo", "HK": "Asia/Hong_Kong", "SS": "Asia/Shanghai", "SZ": "Asia/Shanghai",
+    "KS": "Asia/Seoul", "KQ": "Asia/Seoul", "TW": "Asia/Taipei", "TWO": "Asia/Taipei",
+    "SI": "Asia/Singapore", "NS": "Asia/Kolkata", "BO": "Asia/Kolkata", "AX": "Australia/Sydney",
+    "NZ": "Pacific/Auckland", "SA": "America/Sao_Paulo", "MX": "America/Mexico_City",
+    "TA": "Asia/Jerusalem", "JO": "Africa/Johannesburg",
+}
+
+
+def market_timezone(symbol: str) -> str | None:
+    """Zona del mercado del simbolo Yahoo, o None si no se puede asegurar."""
+    head, _, suffix = symbol.strip().upper().partition(".")
+    if not head:
+        return None
+    if suffix in {"A", "B", "C"}:  # clases de acciones US (BRK.B), no una bolsa
+        return _SUFFIX_TZ[""]
+    return _SUFFIX_TZ.get(suffix)
+
+
 def _yahoo_session() -> tuple[httpx.Client, str]:
     client = httpx.Client(headers={"User-Agent": "Mozilla/5.0"}, timeout=15, follow_redirects=True)
     client.get("https://fc.yahoo.com")  # 404 esperado: solo fija la cookie
@@ -91,10 +120,13 @@ def fetch_yahoo_dates(symbols: dict[str, str]) -> dict[str, dict[str, Any]]:
                 payload = response.json()["quoteSummary"]["result"]
                 earnings = payload[0]["calendarEvents"]["earnings"] if payload else {}
                 dates = earnings.get("earningsDate") or []
-                if dates:
+                zone = market_timezone(symbol)
+                if dates and zone is None:
+                    logger.info("earnings_dates yahoo %s: zona horaria desconocida, sin fecha", symbol)
+                elif dates:
                     raw = min(int(item["raw"]) for item in dates if item.get("raw"))
                     result[ticker] = {
-                        "date": datetime.fromtimestamp(raw, UTC).date(),
+                        "date": datetime.fromtimestamp(raw, ZoneInfo(zone)).date(),
                         "estimate": bool(earnings.get("isEarningsDateEstimate")),
                     }
             except Exception as exc:  # noqa: BLE001
@@ -220,14 +252,30 @@ def refresh_earnings_dates(
     }
 
 
-def followed_calendar(db: Session, desde: date, hasta: date) -> dict[str, Any]:
+def _aware(value: datetime) -> datetime:
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+# Una fecha automatica que el refresco lleva dias sin renovar ya no es fiable
+# (el proveedor pudo moverla): se omite y el ticker aparece como "sin fecha".
+STALE_AFTER = timedelta(days=3)
+
+
+def followed_calendar(
+    db: Session, desde: date, hasta: date, *, now: datetime | None = None
+) -> dict[str, Any]:
     followed = followed_companies(db)
-    rows = db.scalars(
-        select(EarningsDate)
-        .where(EarningsDate.ticker.in_(list(followed) or [""]),
-               EarningsDate.event_date >= desde, EarningsDate.event_date <= hasta)
-        .order_by(EarningsDate.event_date, EarningsDate.ticker)
-    ).all()
+    cutoff = (now or datetime.now(UTC)) - STALE_AFTER
+    rows = [
+        row
+        for row in db.scalars(
+            select(EarningsDate)
+            .where(EarningsDate.ticker.in_(list(followed) or [""]),
+                   EarningsDate.event_date >= desde, EarningsDate.event_date <= hasta)
+            .order_by(EarningsDate.event_date, EarningsDate.ticker)
+        ).all()
+        if row.source == "manual" or _aware(row.fetched_at) >= cutoff
+    ]
     # Si hay fila manual y automatica el mismo ticker, la manual (empresa) gana.
     by_ticker: dict[str, list[EarningsDate]] = {}
     for row in rows:
