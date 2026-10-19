@@ -55166,7 +55166,7 @@
     },
     "/api/thesis/{ticker}/audio": {
       "get": {
-        "description": "El mp3 cacheado de la ultima version; 404 si aun no esta generado.",
+        "description": "El mp3 cacheado; 404 si aun no esta generado o la version no existe.\n\nMisma seleccion que POST: ultima PUBLICADA por defecto, ``?version=N``\npara una concreta.",
         "operationId": "thesis_audio_api_thesis__ticker__audio_get",
         "parameters": [
           {
@@ -55176,6 +55176,23 @@
             "schema": {
               "title": "Ticker",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
             }
           },
           {
@@ -55333,7 +55350,7 @@
         ]
       },
       "post": {
-        "description": "Encola la generacion (idempotente); si ya esta listo devuelve ready.",
+        "description": "Encola la generacion (idempotente); si ya esta listo devuelve ready.\n\nPor defecto genera la ultima PUBLICADA (404 si no hay: nunca se locuta\nun borrador por omision). ``?version=N`` genera esa version; una no\npublicada suena en modo borrador, sin veredicto ni cifras.",
         "operationId": "thesis_audio_generate_api_thesis__ticker__audio_post",
         "parameters": [
           {
@@ -55343,6 +55360,23 @@
             "schema": {
               "title": "Ticker",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
             }
           },
           {
@@ -55506,7 +55540,7 @@
     },
     "/api/thesis/{ticker}/audio/status": {
       "get": {
-        "description": "Estado del audio: ready | pending | missing | unavailable | error.",
+        "description": "Estado del audio: ready | pending | missing | unavailable | error.\n\nPor defecto, de la ultima tesis PUBLICADA; si no hay ninguna devuelve\n``missing`` (no 404) para que la ficha muestre \u00absin audio\u00bb en vez de un\nerror. ``?version=N`` consulta una version concreta (404 si no existe).",
         "operationId": "thesis_audio_status_api_thesis__ticker__audio_status_get",
         "parameters": [
           {
@@ -55516,6 +55550,23 @@
             "schema": {
               "title": "Ticker",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
             }
           },
           {

@@ -4501,13 +4501,20 @@ export interface paths {
         };
         /**
          * Thesis Audio
-         * @description El mp3 cacheado de la ultima version; 404 si aun no esta generado.
+         * @description El mp3 cacheado; 404 si aun no esta generado o la version no existe.
+         *
+         *     Misma seleccion que POST: ultima PUBLICADA por defecto, ``?version=N``
+         *     para una concreta.
          */
         get: operations["thesis_audio_api_thesis__ticker__audio_get"];
         put?: never;
         /**
          * Thesis Audio Generate
          * @description Encola la generacion (idempotente); si ya esta listo devuelve ready.
+         *
+         *     Por defecto genera la ultima PUBLICADA (404 si no hay: nunca se locuta
+         *     un borrador por omision). ``?version=N`` genera esa version; una no
+         *     publicada suena en modo borrador, sin veredicto ni cifras.
          */
         post: operations["thesis_audio_generate_api_thesis__ticker__audio_post"];
         delete?: never;
@@ -4526,6 +4533,10 @@ export interface paths {
         /**
          * Thesis Audio Status
          * @description Estado del audio: ready | pending | missing | unavailable | error.
+         *
+         *     Por defecto, de la ultima tesis PUBLICADA; si no hay ninguna devuelve
+         *     ``missing`` (no 404) para que la ficha muestre «sin audio» en vez de un
+         *     error. ``?version=N`` consulta una version concreta (404 si no existe).
          */
         get: operations["thesis_audio_status_api_thesis__ticker__audio_status_get"];
         put?: never;
@@ -19137,7 +19148,9 @@ export interface operations {
     };
     thesis_audio_api_thesis__ticker__audio_get: {
         parameters: {
-            query?: never;
+            query?: {
+                version?: number | null;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;
@@ -19177,7 +19190,9 @@ export interface operations {
     };
     thesis_audio_generate_api_thesis__ticker__audio_post: {
         parameters: {
-            query?: never;
+            query?: {
+                version?: number | null;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;
@@ -19219,7 +19234,9 @@ export interface operations {
     };
     thesis_audio_status_api_thesis__ticker__audio_status_get: {
         parameters: {
-            query?: never;
+            query?: {
+                version?: number | null;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;

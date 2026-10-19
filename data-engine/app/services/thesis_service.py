@@ -361,6 +361,34 @@ class ThesisService:
             .limit(1)
         )
 
+    def latest_published(self, db: Session, ticker: str) -> ThesisVersion | None:
+        """Ultima version PUBLICADA vigente; None si la empresa no tiene ninguna."""
+        company = resolve_company(db, ticker)
+        if not company:
+            return None
+        return db.scalar(
+            select(ThesisVersion)
+            .where(
+                ThesisVersion.company_id == company.id,
+                ThesisVersion.status == "published",
+            )
+            .order_by(desc(ThesisVersion.version))
+            .limit(1)
+        )
+
+    def by_version(self, db: Session, ticker: str, version: int) -> ThesisVersion | None:
+        company = resolve_company(db, ticker)
+        if not company:
+            return None
+        return db.scalar(
+            select(ThesisVersion)
+            .where(
+                ThesisVersion.company_id == company.id,
+                ThesisVersion.version == version,
+            )
+            .limit(1)
+        )
+
     @staticmethod
     def _insufficient_signature(valuation: dict, material_fp: str) -> dict:
         """Firma estructurada de una valoracion insufficient_data.
