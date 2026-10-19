@@ -69,6 +69,9 @@ export type PortfolioHolding = {
     nativeCurrency: string;
     baseCurrency: string;
     fxMissing: boolean;
+    /** G/P y coste en divisa nativa tal como los expone la API (null si no hay dato). */
+    nativeGain: number | null;
+    nativeCost: number | null;
     /** El valor en divisa base no está disponible (independiente del coste). */
     valueMissing: boolean;
     firstBuyDate: string | null;
@@ -134,6 +137,7 @@ type ResearchPortfolioPosition = {
     market_value_native: number;
     market_value_base: number | null;
     cost_basis_native: number;
+    unrealized_pnl_native?: number | null;
     cost_basis_base: number | null;
     unrealized_pnl_base: number | null;
     realized_pnl_base: number | null;
@@ -244,6 +248,8 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
             nativeCurrency: position.native_currency,
             baseCurrency: position.base_currency,
             fxMissing: position.market_value_base === null || position.cost_basis_base === null,
+            nativeGain: position.unrealized_pnl_native ?? null,
+            nativeCost: position.cost_basis_native ?? null,
             valueMissing: position.market_value_base === null,
             firstBuyDate: position.first_buy_date ?? null,
             holdingDays: position.holding_days ?? null,
