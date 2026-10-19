@@ -273,3 +273,31 @@ async def test_locked_row_returns_busy_instead_of_waiting(db, monkeypatch):
     out = await translate_headline(db, row.id, provider=p)
     assert seen == [True], "el lease debe usar skip_locked"
     assert out["status"] == "busy" and out["reason"] == "busy" and p.calls == 0
+
+
+@sync_test
+async def test_db_access_does_not_block_the_event_loop(db, monkeypatch):
+    """Una consulta lenta (lock, pool) no debe congelar el loop de todo el backend."""
+    import time
+
+    row = event(db, "La empresa anuncia resultados")  # latino: solo hace la primera consulta
+    real = db.scalar
+
+    def slow_scalar(*a, **k):
+        time.sleep(0.5)
+        return real(*a, **k)
+
+    monkeypatch.setattr(db, "scalar", slow_scalar)
+    ticks = 0
+
+    async def ticker():
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.05)
+            ticks += 1
+
+    task = asyncio.create_task(ticker())
+    out = await translate_headline(db, row.id, provider=Provider())
+    task.cancel()
+    assert out["status"] == "not_needed"
+    assert ticks >= 5, f"el event loop estuvo bloqueado (ticks={ticks})"
