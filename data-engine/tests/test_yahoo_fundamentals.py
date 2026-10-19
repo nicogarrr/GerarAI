@@ -76,17 +76,47 @@ def test_refresh_is_idempotent(db):
     assert len(db.scalars(select(FinancialFact)).all()) == n1
 
 
-def test_refuses_when_official_facts_exist(db):
-    company = _company(db)
-    db.add(Document(company_id=company.id, title="d", source_type="SEC"))
-    db.flush()
-    doc = db.scalars(select(Document)).first()
-    db.add(FinancialFact(company_id=company.id, metric="revenue", value=Decimal(1), unit="USD",
-                         period="2024-12-31:FY", fiscal_year=2024, fiscal_quarter="FY",
+def _official_fact(db, company, metric, year):
+    doc = db.scalars(select(Document).where(Document.company_id == company.id, Document.source_type == "SEC")).first()
+    if doc is None:
+        doc = Document(company_id=company.id, title="d", source_type="SEC")
+        db.add(doc)
+        db.flush()
+    db.add(FinancialFact(company_id=company.id, metric=metric, value=Decimal(1), unit="USD",
+                         period=f"{year}-12-31:FY", fiscal_year=year, fiscal_quarter="FY",
                          source_id=doc.id, source_type="SEC", is_reported=True,
                          confidence=Decimal("0.95")))
     db.commit()
-    with pytest.raises(RuntimeError, match="SEC/ESEF"):
+
+
+def test_complements_partial_official_coverage_without_touching_it(db):
+    """BN: el 40-F aporta unos pocos hechos; Yahoo completa el resto."""
+    company = _company(db)
+    _official_fact(db, company, "revenue", 2025)
+    out = refresh_from_yahoo(db, company, fetcher=_fetcher())
+    assert out["facts_skipped_official"] == 1
+    assert out["facts_imported"] > 0
+    facts = db.scalars(select(FinancialFact).where(FinancialFact.company_id == company.id)).all()
+    # El hecho oficial sigue intacto y es el unico revenue 2025.
+    rev = [f for f in facts if f.metric == "revenue"]
+    assert len(rev) == 1 and rev[0].source_type == "SEC" and rev[0].value == Decimal(1)
+    # El resto de metricas llegan de Yahoo, marcadas como no oficiales.
+    yahoo = [f for f in facts if f.source_type == "YAHOO_FUNDAMENTALS"]
+    assert yahoo and all(f.is_reported is False for f in yahoo)
+    assert {f.metric for f in yahoo} >= {"operating_income", "capital_expenditure"}
+
+
+def test_refuses_when_official_coverage_is_complete(db):
+    company = _company(db)
+    for metric, year in [
+        ("revenue", 2025),
+        ("operating_income", 2025), ("operating_income", 2024),
+        ("eps_diluted", 2025), ("eps_diluted", 2024),
+        ("shares_diluted", 2025), ("shares_diluted", 2024),
+        ("capital_expenditure", 2025),
+    ]:
+        _official_fact(db, company, metric, year)
+    with pytest.raises(RuntimeError, match="nada que complementar"):
         refresh_from_yahoo(db, company, fetcher=_fetcher())
 
 
@@ -107,3 +137,22 @@ def test_unmapped_ticker_rejected(db):
     company = _company(db, ticker="ZZZZ", name="Zeta Corp")
     with pytest.raises(RuntimeError, match="mapa Yahoo"):
         refresh_from_yahoo(db, company, fetcher=_fetcher())
+
+
+def test_bn_reviewed_map_entry_and_identity():
+    from app.services.yahoo_fundamentals_service import REVIEWED_MAP, _name_identity_ok
+
+    entry = REVIEWED_MAP["BN"]
+    assert entry["symbol"] == "BN" and entry["currency"] == "USD"
+    yname = "Brookfield Corporation"
+    assert _name_identity_ok("Brookfield Corporation", yname)
+    assert any(_name_identity_ok(n, yname) for n in entry["names"])
+
+
+def test_bn_ingests_in_usd_with_unofficial_label(db):
+    company = _company(db, ticker="BN", name="Brookfield Corporation")
+    out = refresh_from_yahoo(db, company, fetcher=_fetcher(name="Brookfield Corporation", currency="USD"))
+    assert out["symbol"] == "BN" and out["currency"] == "USD" and out["official"] is False
+    facts = db.scalars(select(FinancialFact).where(FinancialFact.company_id == company.id)).all()
+    assert facts and {f.source_type for f in facts} == {"YAHOO_FUNDAMENTALS"}
+    assert {f.unit for f in facts if f.metric == "revenue"} == {"USD"}

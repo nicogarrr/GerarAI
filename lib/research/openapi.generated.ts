@@ -6162,6 +6162,11 @@ export interface components {
         FinancialRefreshResponse: {
             /** Facts Imported */
             facts_imported: number;
+            /**
+             * Facts Skipped Official
+             * @default 0
+             */
+            facts_skipped_official: number;
             /** Latest Periods */
             latest_periods: {
                 [key: string]: string | null;
