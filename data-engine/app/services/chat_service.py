@@ -490,6 +490,12 @@ _CAPABILITIES_ANSWER = (
     "te muestro tus datos guardados y conocimiento general."
 )
 
+_DOCTRINE_CUE_RE = re.compile(
+    r"(?i)\b(?:doctrina|cartas?|biblioteca|principios|filosof[ií]a|"
+    r"buffett|munger|howard\s+marks|fundsmith|smithson|numantia|azvalor|magallanes|"
+    r"value\s+investing|inversi[oó]n\s+en\s+valor)\b"
+)
+
 _PORTFOLIO_SELF_RE = re.compile(
     r"(?i)\b(?:mi|mis)\s+(?:cartera|posici[oó]n(?:es)?|inversi[oó]n(?:es)?|acciones|holdings)\b"
     r"|\bmy\s+(?:portfolio|positions|holdings)\b"
@@ -1271,9 +1277,16 @@ class ChatService:
         retrieved_memory = self.memory.retrieve(db, question, company, scope=scope, limit=6)
         recent_sessions = self._recent_sessions(db, company)
 
+        # Doctrina de la biblioteca (cartas Buffett/Numantia/...): contexto para
+        # preguntas generales o de doctrina, NUNCA fuente visible de una ficha de
+        # empresa. Antes se recuperaba siempre y la seccion "inferences" citaba
+        # cada chunk, asi que una respuesta sobre ASTS salia con "Fuentes:
+        # Numantia Patrimonio - Carta 2020" sin relacion alguna con ASTS.
         library_context = (
             retrieve_library_context(db, question)
-            if os.getenv("CAVAAI_ENABLE_VECTOR_CHAT") == "1" else []
+            if os.getenv("CAVAAI_ENABLE_VECTOR_CHAT") == "1"
+            and (company is None or _DOCTRINE_CUE_RE.search(question or ""))
+            else []
         )
         library_lines = [
             f"- Investment doctrine, not a company fact: {item['text']} "
