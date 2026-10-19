@@ -1597,16 +1597,16 @@ Drivers obligatorios ausentes: {", ".join(mandatory_missing) if mandatory_missin
 {self._facts_markdown(facts)}
 
 ## 5. Histórico financiero
-Se guarda en `financial_facts` y `financial_statements` una vez ingerido. El constructor de snapshots exige coherencia de periodo.
+Los últimos resultados con su fuente y periodo están en la sección 4. La serie histórica completa está en la pestaña «Financieros» de la ficha.
 
 ## 6. Flujo de caja libre
-Se deriva solo de hechos coherentes del snapshot (mismo ancla fiscal). Los márgenes FCF de arranque están desactivados.
+El flujo de caja libre de la sección 4 solo se muestra si procede de hechos reportados del mismo ejercicio. Sin ese dato la valoración no se presenta como definitiva.
 
 ## 7. Balance
-Deuda neta, caja y acciones deben alinear con el periodo ancla de la cuenta de resultados (o un instante compatible).
+Caja, deuda total y deuda neta de la sección 4 corresponden al mismo ejercicio que la cuenta de resultados cuando están disponibles; si falta alguno, aparece como pendiente en la sección 21.
 
 ## 8. Asignación de capital
-Seguimiento mediante filings, calls, recompras, dilución y dividendos. La dilución por gap de financiación sustituye a las ampliaciones fijas de 100 $ cuando hay datos de caja/capex.
+Recompras, dilución y dividendos se consultan en las pestañas «Dilución y recompras» y «Financieros» de la ficha.
 
 ## 9. Equipo directivo y calls
 {self._earnings_markdown(sources)}
@@ -1616,7 +1616,7 @@ Seguimiento mediante filings, calls, recompras, dilución y dividendos. La diluc
 {self._news_markdown(sources)}
 
 ## 11. Riesgos
-{", ".join(company.special_risks)}
+{", ".join(company.special_risks) or "Sin riesgos específicos registrados para esta empresa."}
 
 ## 12. Competencia y foso
 {self._moat_markdown(company, valuation)}
@@ -1642,7 +1642,7 @@ Pregunta primaria del red team: ¿qué supuesto se rompería primero si el próx
 Invalidadores estructurales: afirmaciones sin respaldo, trazas de cálculo ausentes, filings primarios adversos, snapshots incoherentes o deriva material de supuestos.
 
 ## 18. Qué vigilar
-{", ".join(company.special_sources)}
+{", ".join(company.special_sources) or "Sin fuentes específicas registradas para esta empresa; ver la sección 20."}
 
 ## 19. Auditoría de fuentes
 Superada: {"sí" if audit["passed"] else "no"}
