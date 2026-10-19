@@ -61,6 +61,28 @@ def numeric_signature(text: str) -> list[tuple[str, str, str]]:
         result.append(("dimensions", "|".join(item.casefold() for item in dimensions), ""))
     return result
 
+_SCALE_ALIASES = {"millón": "million", "millones": "million"}
+
+
+def headline_numeric_signature(text: str) -> list[str]:
+    """Firma numerica de un TITULAR: cada numero con su representacion exacta
+    mas las dimensiones (divisa, %, million/billion...) en el mismo orden que
+    numeric_signature. Las palabras vecinas SI cambian al traducir («Oct. 28
+    Event» -> «28 de octubre»), asi que no entran: con ellas, todo titular con
+    una fecha caia en «unavailable». «millón/millones» cuenta como «million»."""
+    tokens: list[str] = []
+    dimensions = ""
+    for token, first, second in numeric_signature(text):
+        if token == "dimensions":
+            parts = [_SCALE_ALIASES.get(part, part) for part in first.split("|") if part]
+            dimensions = "|".join(parts)
+        elif token == "ambiguous":
+            tokens.append("ambiguous:" + first)  # texto exacto: no casa con ninguna traduccion
+        else:
+            tokens.append(token)
+    return sorted(tokens) + ["dimensions:" + dimensions]
+
+
 def numeric_token_signature(text: str) -> list[str]:
     """Solo los tokens numericos con su representacion EXACTA (mas las
     dimensiones detectadas): para textos largos las palabras vecinas cambian
@@ -219,7 +241,7 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
                     candidate = payload.get("text") if isinstance(payload, dict) else None
                     if (isinstance(candidate, str) and 3 <= len(candidate.strip()) <= 500
                             and candidate.strip() != original and not NON_LATIN.search(candidate)
-                            and numeric_signature(original) == numeric_signature(candidate)
+                            and headline_numeric_signature(original) == headline_numeric_signature(candidate)
                             and not response.degraded and not response.warnings):
                         translated = candidate.strip()
                         break

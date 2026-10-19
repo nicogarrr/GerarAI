@@ -191,3 +191,15 @@ def test_nearly_identical_output_is_not_marked_translated():
             provider=Provider(text='Apple informa de resultados tras el cierre'))
         assert real['status'] == 'translated'
     asyncio.run(run())
+
+
+def test_headline_signature_ignores_neighbour_words_but_not_numbers():
+    from app.services.news_headline_translation import headline_numeric_signature as sig
+
+    assert sig("Apple Announces Oct. 28 Event for Touch-Screen MacBook Pro") == sig("Apple anuncia un evento el 28 de octubre")
+    assert sig("ASML Q3 2026 Earnings Call, Oct 14, 2026") == sig("Llamada de resultados de ASML del Q3 2026, 14 de octubre de 2026")
+    assert sig("Ingresos de 12 million USD") == sig("Ingresos de 12 millones USD")
+    assert sig("Revenue 12 million USD") != sig("Ingresos 12 billion USD")
+    assert sig("Apple Oct. 28 Event") != sig("Apple evento 29 de octubre")
+    assert sig("FCF 12 USD") != sig("FCF 12 EUR")
+    assert sig("growth -12%") != sig("crecimiento 12%")
