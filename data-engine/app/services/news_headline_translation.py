@@ -97,6 +97,11 @@ _NEGATION = re.compile(
 )
 
 
+_CONNECTOR = re.compile(
+    r"(?i)\b(?:while|whereas|as|after|before|and|but|amid|despite|although|though|then|because|since|while|with|vs|versus|y|e|pero|mientras|tras|después|antes|aunque|pese|mientras que|con|frente)\b|[,;:—–]| - "
+)
+
+
 def _polarity(text: str) -> frozenset[str]:
     """Direccion que declara un titular (sube/baja). Vacio si no declara ninguna."""
     marks = set()
@@ -125,9 +130,6 @@ def headline_numbers_match(original: str, translated: str) -> bool:
     # Falla cerrado, tenga o no numeros.
     if _polarity(original) != _polarity(translated):
         return False
-    # Negaciones («fall 8%» -> «no caen un 8%»): fallan cerrado en ambos lados.
-    if _NEGATION.search(original) or _NEGATION.search(translated):
-        return False
     if _numbers_are_only_dates(original) and not _has_dimension_marks(translated):
         tokens = lambda t: sorted(token for token, _, _ in numeric_signature(t) if token not in {"dimensions", "ambiguous"})  # noqa: E731
         return not any(token == "ambiguous" for token, _, _ in numeric_signature(original) + numeric_signature(translated)) \
@@ -140,8 +142,20 @@ def headline_numbers_match(original: str, translated: str) -> bool:
     # Una sola cifra: con dos o mas, una traduccion podria cruzarlas entre
     # empresas o magnitudes con el mismo sentido («Amazon soars 5%, Apple gains
     # 8%» -> «Apple se dispara un 5%, Amazon gana un 8%»).
+    # Ademas, una sola clausula: con conectores («Amazon soars while Apple gains
+    # 5%») la cifra podria cruzarse de entidad aunque cifra y sentido coincidan.
+    # Y sin negaciones («fall 8%» -> «no caen un 8%»), en ninguno de los lados.
     relaxed = _relaxed_numbers(original)
-    if len(pol) == 1 and relaxed is not None and len(relaxed[0]) == 1 and relaxed == _relaxed_numbers(translated):
+    if (
+        len(pol) == 1
+        and relaxed is not None
+        and len(relaxed[0]) == 1
+        and relaxed == _relaxed_numbers(translated)
+        and not _NEGATION.search(original)
+        and not _NEGATION.search(translated)
+        and not _CONNECTOR.search(original)
+        and not _CONNECTOR.search(translated)
+    ):
         return True
     return numeric_signature(original) == numeric_signature(translated)
 
