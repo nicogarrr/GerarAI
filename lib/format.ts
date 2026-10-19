@@ -503,11 +503,12 @@ export function formatCompanyName(value: string | null | undefined): string {
   const fixWord = (word: string): string => {
     if (!word) return word;
     if (NAME_SUFFIXES[word]) return NAME_SUFFIXES[word];
+    // Finnhub recorta la descripción (~28 caracteres): «… LT» es «Ltd» cortado.
     if (KEEP_UPPER.has(word)) return word;
     if (word.length <= 3 || /[&\d]/.test(word)) return word;
     return word[0] + word.slice(1).toLowerCase();
   };
-  return raw
+  const formatted = raw
     .split(/(\s+)/)
     .map((part) => {
       if (!part.trim()) return part;
@@ -518,4 +519,6 @@ export function formatCompanyName(value: string | null | undefined): string {
         .join('');
     })
     .join('');
+  // Solo la ÚLTIMA palabra, sin guion/barra delante: «… LT» es «Ltd» recortado.
+  return /\s+LT$/.test(raw) ? formatted.replace(/\s+LT$/, ' Ltd') : formatted;
 }

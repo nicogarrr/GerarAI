@@ -21,7 +21,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
-import { parseLocalizedNumber, todayLocal } from '@/lib/format';
+import { formatCompanyName, parseLocalizedNumber, todayLocal } from '@/lib/format';
 
 type Props = {
   userId: string;
@@ -257,7 +257,7 @@ export default function AddTransactionButton({ userId }: Props) {
                     <TrendingUp className="h-4 w-4 text-teal-400" />
                     <div>
                       <div className="text-white font-medium">{stock.symbol}</div>
-                      <div className="text-sm text-gray-400">{stock.name}</div>
+                      <div className="text-sm text-gray-400 line-clamp-2 break-words">{formatCompanyName(stock.name)}</div>
                     </div>
                   </button>
                 ))}
