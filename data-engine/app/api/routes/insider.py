@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import unicodedata
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -10,30 +9,39 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.entities import Company, InsiderFiling, InsiderTransaction
+from app.models.entities import Company, Document, InsiderFiling, InsiderTransaction
 from app.services import insider_feed, insider_operations, insider_service
 
 router = APIRouter()
 
-_US_DOMICILES = {
-    "us", "usa", "u.s.", "u.s.a.", "united states", "united states of america",
-    "estados unidos", "eeuu", "ee. uu.",
-}
+# Un FPI presenta 20-F/40-F (anual) y 6-K (corriente); uno domestico, 10-K/10-Q.
+_FPI_FORMS = {"20-F", "20-F/A", "40-F", "40-F/A", "6-K", "6-K/A"}
+_US_PERIODIC_FORMS = {"10-K", "10-K/A", "10-Q", "10-Q/A"}
 
 
 def _foreign_issuer(db: Session, ticker: str) -> bool | None:
-    """True si la ficha curada declara domicilio fuera de EE. UU. (los FPI estan
-    exentos de la Seccion 16: no presentan Form 4); None si no hay ficha o
-    domicilio: nunca se afirma la causa sin dato."""
+    """Estatus FPI derivado de los formularios SEC guardados, NO del domicilio:
+    Chubb, Accenture o Schlumberger domicilian fuera de EE. UU. y presentan
+    10-K (sus insiders SI declaran Form 4). True = solo formularios de FPI
+    (20-F/40-F/6-K sin 10-K/10-Q): exento de la Seccion 16, no presenta Form 4.
+    False = presenta 10-K/10-Q. None = sin filings guardados o solo formularios
+    no concluyentes: nunca se afirma la causa sin dato."""
     company = db.scalar(select(Company).where(Company.ticker == ticker))
-    domicile = (company.domicile_country or "").strip() if company else ""
-    if not domicile:
+    if company is None:
         return None
-    folded = "".join(
-        c for c in unicodedata.normalize("NFKD", domicile.lower())
-        if not unicodedata.combining(c)
+    rows = db.scalars(
+        select(Document.metadata_["form"].as_string()).where(
+            Document.company_id == company.id, Document.source_type == "SEC"
+        )
     )
-    return folded not in _US_DOMICILES
+    forms = {str(form).strip().upper() for form in rows if form}
+    if not forms:
+        return None
+    if forms & _US_PERIODIC_FORMS:
+        return False
+    if forms & _FPI_FORMS:
+        return True
+    return None
 
 
 @router.get("/signals")
@@ -170,6 +178,7 @@ def insider_filings(
             "foreign_issuer": None,
         }
 
+
 @router.get("/operations")
 def insider_operations_route(
     days: int = Query(default=365, ge=1, le=1825),
@@ -187,4 +196,3 @@ def insider_operations_route(
             "companies_without_data": [],
             "companies_without_data_detail": [],
         }
-

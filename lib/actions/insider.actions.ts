@@ -82,8 +82,9 @@ export interface InsiderFilingsResult {
     total?: number;
     filings: InsiderFilingEntry[];
     /**
-     * Causa real cuando está vacío: true = emisor extranjero (FPI, exento de
-     * Form 4 en la SEC); false = emisor de EE. UU.; null/undefined = se desconoce.
+     * Causa real cuando está vacío: true = emisor privado extranjero (FPI,
+     * derivado de sus formularios SEC guardados: 20-F/40-F/6-K sin 10-K/10-Q,
+     * exento de Form 4); false = presenta 10-K/10-Q; null = se desconoce.
      */
     foreign_issuer?: boolean | null;
 }
