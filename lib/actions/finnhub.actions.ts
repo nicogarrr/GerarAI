@@ -1,5 +1,7 @@
 'use server';
 
+import { mergeSpanishListings, searchSpanishListings } from '@/lib/market/spanish-search';
+import { withFetchDeadline } from '@/lib/upstream/fetch-deadline';
 import { isFinanciallyRelevant } from '@/lib/newsRelevance';
 
 import { exactSymbolFirst, marketPriority, onePerIssuer } from '@/lib/market/search-results';
@@ -324,7 +326,7 @@ const searchStocksOrThrow = async (query?: string): Promise<StockWithWatchlistSt
             return popular.stocks;
         } else {
             const url = `${FINNHUB_BASE_URL}/search?q=${encodeURIComponent(trimmed)}&token=${token}`;
-            const data = await fetchJSON<FinnhubSearchResponse>(url, 1800);
+            const data = await fetchJSON<FinnhubSearchResponse>(url, 1800, 3500);
             results = Array.isArray(data?.result) ? data.result : [];
 
             // Un ticker exacto con sufijo de bolsa ("SAN.MC") no matchea en el
@@ -342,7 +344,7 @@ const searchStocksOrThrow = async (query?: string): Promise<StockWithWatchlistSt
                 if (base) {
                     try {
                         const fbUrl = `${FINNHUB_BASE_URL}/search?q=${encodeURIComponent(base)}&token=${token}`;
-                        const fbData = await fetchJSON<FinnhubSearchResponse>(fbUrl, 1800);
+                        const fbData = await fetchJSON<FinnhubSearchResponse>(fbUrl, 1800, 1000);
                         const fbResults = Array.isArray(fbData?.result) ? fbData.result : [];
                         const exact = fbResults.filter(matchesExact);
                         if (exact.length > 0) {
@@ -410,10 +412,13 @@ export const searchStocksWithStatus = cache(async (query?: string): Promise<Sear
     if (typeof query === 'string' && (query.length > 120 || /[<>\x00-\x1f]/.test(query))) {
         return { status: 'ok', stocks: [] };
     }
+    const local = searchSpanishListings(query ?? '');
     try {
-        return { status: 'ok', stocks: await searchStocksOrThrow(query) };
+        const remote = await withFetchDeadline(() => searchStocksOrThrow(query), 4500);
+        return { status: 'ok', stocks: mergeSpanishListings(query ?? '', local, remote) };
     } catch (err) {
         console.error('Error in stock search:', err);
+        if (local.length) return { status: 'ok', stocks: local };
         return { status: 'error', stocks: [] };
     }
 });
