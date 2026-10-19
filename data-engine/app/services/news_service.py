@@ -43,6 +43,14 @@ def is_generic_headline(headline: str | None) -> bool:
     return bool(headline) and bool(_GENERIC_HEADLINE_RE.search(headline))
 
 
+def is_viewer_link_only(title: str | None, summary: str | None) -> bool:
+    """Fila sin contenido: el titular Y el resumen son solo el texto de enlace
+    del visor de la fuente (ZETA 19-oct-2026: «Press Release of Q2 2026, PDF
+    file, (opens in new window)» como titular y como resumen). No hay nada
+    que mostrar. Si el resumen aporta texto real, la fila se conserva."""
+    return is_generic_headline(title) and is_generic_headline(summary)
+
+
 def is_position_change_headline(headline: str) -> bool:
     """Titular boilerplate de cambio de posición institucional (spam 13F)."""
     return bool(headline) and bool(POSITION_CHANGE_HEADLINE_RE.search(headline))
@@ -567,6 +575,9 @@ class NewsService:
         for item in items:
             # Captacion de demandantes de despachos: no es un hecho de la empresa.
             if is_law_firm_solicitation(item.title, item.text):
+                continue
+            # Fila sin contenido: titular y cuerpo son solo el enlace del visor.
+            if is_viewer_link_only(item.title, item.text):
                 continue
             # F175: el ticker solo prefija el texto si el título no lo trae ya;
             # si no, el titular guardado salía «COST COST 8-K».

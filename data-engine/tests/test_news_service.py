@@ -310,3 +310,18 @@ def test_generic_viewer_link_headline_is_not_a_title():
     assert not is_generic_headline("Zeta Global reports Q2 2026 results")
     assert not is_generic_headline("")
     assert not is_generic_headline(None)
+
+
+def test_viewer_link_only_row_is_skipped_but_real_summary_is_kept(db):
+    from app.services.news_service import is_viewer_link_only
+
+    generic = "Press Release of Q2 2026, PDF file, (opens in new window)"
+    assert is_viewer_link_only(f"ZETA {generic}", generic)
+    assert not is_viewer_link_only(f"ZETA {generic}", "Zeta Global reports Q2 revenue of $308M, up 20%.")
+    assert not is_viewer_link_only("Zeta Global reports Q2 2026 results", generic)
+    service = NewsService()
+    empty = NewsFeedItem(title=generic, text=generic, source="ir", ticker="ZETA", url="https://example.com/zeta-q2-empty")
+    result = service.ingest_news_items(db, [empty], default_source="ir")
+    assert result.created == 0
+    kept = NewsFeedItem(title=generic, text="Zeta Global reports Q2 revenue of $308M, up 20%.", source="ir", ticker="ZETA", url="https://example.com/zeta-q2-real")
+    assert service.ingest_news_items(db, [kept], default_source="ir").created == 1
