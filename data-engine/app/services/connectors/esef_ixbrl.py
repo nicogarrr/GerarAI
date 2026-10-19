@@ -194,7 +194,7 @@ def parse_ixbrl_facts(source: str | BinaryIO) -> dict[str, Any]:
         for entries in concepts.values():
             entries.sort(key=lambda e: e.get("end") or e.get("instant") or "")
 
-    entity_lei = max(lei_counts, key=lei_counts.get) if lei_counts else None
+    entity_lei = max(lei_counts, key=lambda lei: lei_counts[lei]) if lei_counts else None
     return {"facts": facts, "dropped": dropped, "entity_lei": entity_lei}
 
 

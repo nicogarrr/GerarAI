@@ -19,9 +19,9 @@ import logging
 import re
 import threading
 from collections import Counter
-from collections.abc import Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field, replace
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from app.llm import LLMRequest, Message
 
@@ -411,7 +411,8 @@ async def complete_guarded(
         # modelo. Tras un rechazo CJK el reintento salta a la cadena de
         # respaldo verificada (Groq) cuando el proveedor la ofrece.
         _count(source, "cjk_backup_retry")
-        second = await cjk_retry(retry_request)
+        cjk_complete = cast(Callable[[LLMRequest], Awaitable[Any]], cjk_retry)
+        second = await cjk_complete(retry_request)
     else:
         second = await provider.complete(retry_request)
     if on_response is not None:
