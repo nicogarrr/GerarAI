@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -18,7 +19,12 @@ from app.llm.adapters import OpenAICompatibleProvider
 from app.llm.base import LLMProvider
 from app.llm.cascade import _FALL_THROUGH, CascadeModelRouter
 from app.llm.contracts import LLMRequest, LLMResponse, Message
-from app.llm.errors import ProviderRequestError, ProviderResponseError, ProviderTransportError
+from app.llm.errors import (
+    ProviderHTTPError,
+    ProviderRequestError,
+    ProviderResponseError,
+    ProviderTransportError,
+)
 from app.llm.factory import create_llm_provider
 from app.llm.model_aliases import VERIFIED_FREE_MODELS
 
@@ -33,6 +39,34 @@ GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 _BACKUP_PROMPT = "Puedes opinar y razonar sobre posiciones y decisiones de inversión del usuario, siempre apoyándote en los datos y fuentes del contexto. Si falta un dato, dilo en vez de inventarlo. No atribuyas opiniones a un autor si no hay fragmentos de ese autor en el contexto; en ese caso explica el concepto en general y di que no tienes una fuente concreta para atribuírselo. No añadas porcentajes, umbrales o reglas numéricas sin fuente. No deduzcas una deuda neta alta del tamaño de la deuda bruta: si falta el dato neto, indica que no está disponible. Conserva exactamente el contrato JSON y las citas del contexto cuando se exijan. Escribe en prosa plana en español, en párrafos cortos y de unas 120 palabras como máximo: sin LaTeX, sin tablas, sin listas con viñetas y sin negritas ni otro formato markdown. No escribas cifras, rangos, porcentajes ni años que no aparezcan en el contexto; explica con palabras como bajo, alto o mayor que. No uses corchetes, enlaces ni nombres de páginas web. Responde directamente, sin razonar en voz alta."
 
 
+#: Enfriamiento por (proveedor, modelo) tras un 429: el siguiente chat no
+#: pierde segundos en un miembro cuya cuota gratuita acaba de agotarse.
+QUOTA_COOLDOWN_SECONDS = 90.0
+_cooldowns: dict[tuple[str, str], float] = {}
+
+
+def _member_key(provider, model: str | None) -> tuple[str, str]:
+    return (str(getattr(provider, "name", "?")), str(model or ""))
+
+
+def _is_cooling(provider, model: str | None) -> bool:
+    return _cooldowns.get(_member_key(provider, model), 0.0) > time.monotonic()
+
+
+def _note_failure(provider, model: str | None, exc: Exception) -> None:
+    if isinstance(exc, ProviderHTTPError) and exc.status_code == 429:
+        _cooldowns[_member_key(provider, model)] = time.monotonic() + QUOTA_COOLDOWN_SECONDS
+
+
+def reset_quota_cooldowns() -> None:
+    _cooldowns.clear()
+
+
+def is_quota_exhausted(exc: BaseException) -> bool:
+    """True si el fallo es cuota gratuita agotada (429) y no una caída."""
+    return isinstance(exc, ProviderHTTPError) and exc.status_code == 429
+
+
 class _LanguageRejected(ProviderResponseError):
     def __init__(self, response):
         super().__init__("Candidate language rejected")
@@ -42,8 +76,9 @@ class _LanguageRejected(ProviderResponseError):
 class ChatFallbackProvider(LLMProvider):
     name = "chat-independent-fallback"
 
-    def __init__(self, primary: LLMProvider, backup: LLMProvider, *, total: float = 45, delay: float = 2, validator: Callable[[LLMResponse], None] | None = None, on_response: Callable[[LLMResponse], None] | None = None, backup2: LLMProvider | None = None):
+    def __init__(self, primary: LLMProvider, backup: LLMProvider, *, total: float = 45, delay: float = 2, validator: Callable[[LLMResponse], None] | None = None, on_response: Callable[[LLMResponse], None] | None = None, backup2: LLMProvider | None = None, extra_backups: tuple[tuple[LLMProvider, str], ...] = ()):
         self.backup2 = backup2
+        self.extra_backups = extra_backups
         self.validator = validator
         self.on_response = on_response
         self.primary = primary
@@ -57,7 +92,7 @@ class ChatFallbackProvider(LLMProvider):
     def with_candidate_validator(self, validator, on_response=None):
         # Per-call clone: concurrent requests never share validation context.
         return ChatFallbackProvider(self.primary, self.backup, total=self.total,
-                                    delay=self.delay, validator=validator, on_response=on_response, backup2=self.backup2)
+                                    delay=self.delay, validator=validator, on_response=on_response, backup2=self.backup2, extra_backups=self.extra_backups)
 
     async def _candidate(self, provider, request, *, backup=False):
         response = await provider.complete(request)
@@ -102,20 +137,28 @@ class ChatFallbackProvider(LLMProvider):
 
     async def _backup_chain(self, request: LLMRequest) -> LLMResponse:
         """Groq gpt-oss-120b, then Gemini 3.5 Flash-Lite and Gemini 3.8 Flash (when configured); sequential, never in parallel."""
-        members = [(self.backup, GROQ_MODEL)] + ([(self.backup2, model) for model in GEMINI_MODELS] if self.backup2 is not None else [])
+        members = [(self.backup, GROQ_MODEL)] + ([(self.backup2, model) for model in GEMINI_MODELS] if self.backup2 is not None else []) + list(self.extra_backups)
+        # Miembros con la cuota recién agotada se saltan; si TODOS están
+        # enfriándose se prueban igualmente (mejor intentar que callar).
+        ready = [m for m in members if not _is_cooling(*m)]
         last: Exception | None = None
-        for provider, model in members:
+        for provider, model in ready or members:
             try:
                 return await self._candidate(provider, replace(
                     request, model=model,
                     messages=(*request.messages, Message("system", _BACKUP_PROMPT)),
                 ), backup=True)
             except _FALL_THROUGH as exc:
+                _note_failure(provider, model, exc)
                 last = exc
         assert last is not None
         raise last
 
     async def _race(self, request: LLMRequest) -> LLMResponse:
+        primary_model = self.primary.model_router.resolve(request) if getattr(self.primary, "model_router", None) else None
+        if _is_cooling(self.primary, primary_model):
+            # Cuota del primario agotada hace segundos: directo a la cadena.
+            return await self._backup_chain(request)
         primary = asyncio.create_task(self._candidate(self.primary, request))
         tasks = [primary]
         rejected_primary = None
@@ -128,6 +171,7 @@ class ChatFallbackProvider(LLMProvider):
                         raise ProviderResponseError("chat response was degraded")
                     return response
                 except _FALL_THROUGH as exc:
+                    _note_failure(self.primary, primary_model, exc)
                     if isinstance(exc, _LanguageRejected):
                         rejected_primary = exc.response
             # Pin backup explicitly. Never send DeepSeek aliases or effort=max.
@@ -147,6 +191,8 @@ class ChatFallbackProvider(LLMProvider):
                         return response
                     except _FALL_THROUGH as exc:
                         last = exc
+                        if task is primary:
+                            _note_failure(self.primary, primary_model, exc)
                         if task is primary and isinstance(exc, _LanguageRejected):
                             rejected_primary = exc.response
             # Only after all candidates fail, hand the primary's language
@@ -276,6 +322,19 @@ def _gemini_backup(
     )
 
 
+def _openrouter_backup(settings: Settings, client: httpx.AsyncClient | None) -> tuple[tuple[OpenAICompatibleProvider, str], ...]:
+    """OpenRouter solo si ya hay clave y el modelo es :free; nunca crea cuentas."""
+    key = settings.openrouter_api_key
+    model = settings.openrouter_model
+    if not (key and str(key).strip()) or not model.endswith(":free"):
+        return ()
+    return ((OpenAICompatibleProvider(
+        api_key=str(key), base_url=settings.openrouter_base_url, default_model=model,
+        provider_name="openrouter", timeout_seconds=15, total_timeout_seconds=18,
+        max_retries=0, max_output_tokens=2400, client=client,
+    ), model),)
+
+
 def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
     settings = settings or get_settings()
     # Chat interactivo: presupuesto corto propio (chat_total_timeout_seconds,
@@ -297,7 +356,8 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
     backup = _groq_backup(settings, client)
     assert backup is not None  # el flag de arriba lo garantiza
     backup2 = _gemini_backup(settings, client)
-    return ChatFallbackProvider(primary, backup, total=settings.chat_total_timeout_seconds, backup2=backup2)
+    return ChatFallbackProvider(primary, backup, total=settings.chat_total_timeout_seconds, backup2=backup2,
+                                extra_backups=_openrouter_backup(settings, client))
 
 
 def create_background_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:

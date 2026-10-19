@@ -926,8 +926,10 @@ class ChatSynthesisService:
                 on_response=None if bind else _record,
                 before_retry=_can_retry,
             )
-        except Exception:  # proveedor caido, guard agotado o presupuesto: fallback honesto
-            return self._general_fallback(baseline, reason="provider_or_guard_failure")
+        except Exception as exc:  # proveedor caido, guard agotado o presupuesto: fallback honesto
+            from app.llm.chat_provider import is_quota_exhausted
+
+            return self._general_fallback(baseline, reason="quota" if is_quota_exhausted(exc) else "provider_or_guard_failure")
         text = (guarded.response.text or "").strip()
         if not _inferred_general_text_valid(
             text,
@@ -975,11 +977,15 @@ class ChatSynthesisService:
         Sin fuentes adjuntas: el degradado no uso ninguna y ensenarlas
         sugeriria un respaldo que no existe.
         """
+        answer = (
+            "Los modelos gratuitos han llegado a su límite de uso y no puedo responderte con fuentes ahora mismo; "
+            "prueba de nuevo en un par de minutos o dame un ticker para ir a datos concretos."
+            if reason == "quota"
+            else "No puedo responderte con fuentes ahora mismo; "
+            "prueba de nuevo en un momento o dame un ticker para ir a datos concretos."
+        )
         return ChatResponse(
-            answer=(
-                "No puedo responderte con fuentes ahora mismo; "
-                "prueba de nuevo en un momento o dame un ticker para ir a datos concretos."
-            ),
+            answer=answer,
             sources=[],
             proposed_actions=baseline.proposed_actions,
             model="fallback",

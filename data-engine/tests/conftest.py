@@ -140,3 +140,12 @@ def _no_live_benchmark(monkeypatch):
     from app.services import portfolio_intelligence_service as svc
 
     monkeypatch.setattr(svc, "_live_benchmark_prices", lambda cutoff: None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_chat_quota_cooldowns():
+    from app.llm.chat_provider import reset_quota_cooldowns
+
+    reset_quota_cooldowns()
+    yield
+    reset_quota_cooldowns()
