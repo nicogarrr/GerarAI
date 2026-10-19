@@ -15,6 +15,11 @@ const usdPrice = (value: number | null) =>
     value === null ? '—' : formatPrice(value, 'USD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const sharesText = (side: InsiderOperationsSide) =>
     side.trades === 0 ? '—' : formatNumber(side.shares, { maximumFractionDigits: 0 });
+/** Con filas sin importe el medio no se calcula: se declara N/D (convención N/D del repo), nunca «—» a secas. */
+const avgText = (side: InsiderOperationsSide) =>
+    side.rows_without_value > 0 ? 'precio medio N/D' : usdPrice(side.avg_price);
+/** El total con filas sin importe es un mínimo: se marca en la cifra, no solo en el pie. */
+const minMark = (side: InsiderOperationsSide) => (side.rows_without_value > 0 ? '≥ ' : '');
 
 function periodText(period: InsiderOperationsCompany['period']): string {
     if (!period.from || !period.to) return 'Periodo sin fechas';
@@ -29,7 +34,7 @@ function SideCells({ side, empty }: { side: InsiderOperationsSide; empty?: strin
         <TableCell className="text-right text-sm font-semibold tabular-nums text-gray-100">
             {usdCompact(side.value)}
             <span className="block text-xs font-normal text-gray-500">
-                {sharesText(side)} acc. · {side.rows_without_value > 0 ? 'precio medio n/d (hay filas sin importe)' : usdPrice(side.avg_price)}
+                {sharesText(side)} acc. · {side.rows_without_value > 0 ? 'precio medio N/D (hay filas sin importe)' : usdPrice(side.avg_price)}
             </span>
         </TableCell>
     );
@@ -53,7 +58,7 @@ function CompanyCard({ company }: { company: InsiderOperationsCompany }) {
                 <span className="ml-auto text-xs text-gray-500">{periodText(company.period)}</span>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-                Total vendido {usdCompact(totals.sell.value)} · total comprado {usdCompact(totals.buy.value)} ·{' '}
+                Total vendido {minMark(totals.sell)}{usdCompact(totals.sell.value)} · total comprado {minMark(totals.buy)}{usdCompact(totals.buy.value)} ·{' '}
                 {formatNumber(company.filings, { maximumFractionDigits: 0 })}{' '}
                 {company.filings === 1 ? 'filing' : 'filings'}
             </p>
@@ -105,13 +110,13 @@ function CompanyCard({ company }: { company: InsiderOperationsCompany }) {
                             <div>
                                 <dt className="text-xs text-gray-500">Ventas</dt>
                                 <dd className="tabular-nums text-gray-100">
-                                    {row.sell.trades === 0 ? '—' : `${usdCompact(row.sell.value)} · ${sharesText(row.sell)} acc. · ${usdPrice(row.sell.avg_price)}`}
+                                    {row.sell.trades === 0 ? '—' : `${usdCompact(row.sell.value)} · ${sharesText(row.sell)} acc. · ${avgText(row.sell)}`}
                                 </dd>
                             </div>
                             <div>
                                 <dt className="text-xs text-gray-500">Compras</dt>
                                 <dd className="tabular-nums text-gray-100">
-                                    {row.buy.trades === 0 ? '—' : `${usdCompact(row.buy.value)} · ${sharesText(row.buy)} acc. · ${usdPrice(row.buy.avg_price)}`}
+                                    {row.buy.trades === 0 ? '—' : `${usdCompact(row.buy.value)} · ${sharesText(row.buy)} acc. · ${avgText(row.buy)}`}
                                 </dd>
                             </div>
                         </dl>
@@ -136,7 +141,7 @@ function CompanyCard({ company }: { company: InsiderOperationsCompany }) {
                         ? `${formatNumber(company.excluded_derivative, { maximumFractionDigits: 0 })} derivadas excluidas. `
                         : ''}
                     {company.totals.buy.rows_without_value + company.totals.sell.rows_without_value > 0
-                        ? `${formatNumber(company.totals.buy.rows_without_value + company.totals.sell.rows_without_value, { maximumFractionDigits: 0 })} sin importe en el filing: no se imputa y el precio medio queda n/d. `
+                        ? `${formatNumber(company.totals.buy.rows_without_value + company.totals.sell.rows_without_value, { maximumFractionDigits: 0 })} sin importe en el filing: no se imputa, el precio medio queda N/D y los totales marcados con ≥ son mínimos. `
                         : ''}
                     {company.rows_without_date > 0
                         ? `${formatNumber(company.rows_without_date, { maximumFractionDigits: 0 })} sin fecha: suman al agregado pero no al periodo. `
