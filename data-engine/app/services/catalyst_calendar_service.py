@@ -164,7 +164,7 @@ def filing_deadline_event(submissions: dict[str, Any], ticker: str) -> dict[str,
         "date": deadline.isoformat(),
         "ticker": ticker.upper(),
         "type": "filing_deadline",
-        "title": f"Plazo para presentar el {form} (INFERIDO)",
+        "title": f"Plazo para presentar el {form}",
         "detail": basis,
         "source": SOURCE_SEC_RULE,
     }

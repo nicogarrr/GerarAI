@@ -26,13 +26,9 @@ const ACTIONS: Record<string, string> = {
 export function Datum({
   datum,
   kind = "number",
-  hideLabel = false,
 }: {
   datum: InvestorDatum;
   kind?: "number" | "usd" | "percent";
-  /** Oculta el rótulo del dato (OFICIAL/INFERIDO) conservando fecha y fuente:
-   *  decisión de Nico (16-oct): la app no marca «inferido» en UI. */
-  hideLabel?: boolean;
 }) {
   // Fail closed even if a malformed payload claims OFICIAL without a dated source.
   const available =
@@ -54,10 +50,8 @@ export function Datum({
     <span className="flex flex-col gap-1">
       <span className="font-medium text-gray-100">{text}</span>
       {available ? (
-        <span
-          className={`text-xs ${datum.label === "INFERIDO" && !hideLabel ? "text-amber-300" : "text-gray-500"}`}
-        >
-          {hideLabel ? "" : `${datum.label} · `}{periodLabel(datum.as_of)}
+        <span className="text-xs text-gray-500">
+          {periodLabel(datum.as_of)}
           {datum.source_url ? (
             <>
               {" "}
@@ -209,11 +203,7 @@ export function Portfolio({
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-gray-500">Peso en cartera</p>
-                  <Datum
-                    datum={weight}
-                    kind="percent"
-                    hideLabel={weight !== row.weight_pct}
-                  />
+                  <Datum datum={weight} kind="percent" />
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-gray-500">Acciones</p>

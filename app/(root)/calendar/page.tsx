@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 const TYPE_LABEL: Record<CatalystEvent['type'], string> = {
     earnings: 'Resultados',
     dividend_ex: 'Ex-dividendo',
-    filing_deadline: 'Plazo 10-Q/10-K (inferido)',
+    filing_deadline: 'Plazo 10-Q/10-K',
     corporate_action: 'Acción corporativa',
 };
 
