@@ -5,6 +5,7 @@ from app.models.entities import (
     AlertSubscription,
     BudgetUsage,
     CalculatedMetric,
+    CalendarFeedToken,
     CallClaim,
     CashBalance,
     CashDailySnapshot,
@@ -205,6 +206,7 @@ __all__ = [
     "ValuationModel",
     "ValuationOutput",
     "WatchItem",
+    "CalendarFeedToken",
     "EarningsDate",
 ]
 

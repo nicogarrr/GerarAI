@@ -269,9 +269,11 @@ def is_fresh(row: EarningsDate, now: datetime | None = None) -> bool:
 
 
 def followed_calendar(
-    db: Session, desde: date, hasta: date, *, now: datetime | None = None
+    db: Session, desde: date, hasta: date, *, now: datetime | None = None, scope: str = "followed"
 ) -> dict[str, Any]:
     followed = followed_companies(db)
+    if scope == "watchlist":
+        followed = {t: v for t, v in followed.items() if v["origin"] == "watchlist"}
     cutoff = (now or datetime.now(UTC)) - STALE_AFTER
     rows = [
         row
