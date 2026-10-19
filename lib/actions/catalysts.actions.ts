@@ -33,3 +33,33 @@ export async function getCatalystCalendar(): Promise<CatalystCalendar> {
     await requireAuthenticatedUser();
     return researchRequest<CatalystCalendar>('/api/calendar/catalysts');
 }
+
+export type FollowedEarningsEvent = {
+    ticker: string;
+    company: string;
+    origin: 'cartera' | 'watchlist';
+    date: string;
+    /** Solo la franja que publica la fuente; nunca una hora. */
+    session: 'pre_market' | 'after_market' | null;
+    /** Trimestre cerrado que informa la fuente (p. ej. "Sep/2026"). */
+    fiscal_label: string | null;
+    /** true confirmada, false estimada, null la fuente no lo dice. */
+    confirmed: boolean | null;
+    source: string;
+    source_url: string | null;
+};
+
+export type FollowedEarningsCalendar = {
+    desde: string;
+    hasta: string;
+    followed_count: number;
+    count: number;
+    days: { date: string; events: FollowedEarningsEvent[] }[];
+    without_date_in_range: string[];
+};
+
+/** GET /api/calendar/followed — resultados de cartera + watchlist agrupados por día (60 días). */
+export async function getFollowedEarnings(): Promise<FollowedEarningsCalendar> {
+    await requireAuthenticatedUser();
+    return researchRequest<FollowedEarningsCalendar>('/api/calendar/followed');
+}
