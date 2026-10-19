@@ -78,7 +78,11 @@ function MaterialityIndicator({ score }: { score: number }) {
   const text =
     clamped >= 7 ? 'text-red-400' : clamped >= 4 ? 'text-amber-400' : 'text-gray-500';
   return (
-    <span className="inline-flex items-center justify-center gap-2">
+    <span
+      className="inline-flex items-center justify-center gap-2"
+      title={`Materialidad ${score} de 10: ${clamped >= 7 ? 'alta' : clamped >= 4 ? 'media' : 'baja'}`}
+      aria-label={`Materialidad ${score} de 10: ${clamped >= 7 ? 'alta' : clamped >= 4 ? 'media' : 'baja'}`}
+    >
       <span aria-hidden="true" className="h-1.5 w-10 overflow-hidden rounded-full bg-gray-800">
         <span className={`block h-full ${color}`} style={{ width: `${clamped * 10}%` }} />
       </span>

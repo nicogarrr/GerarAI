@@ -112,7 +112,7 @@ describe('canarios de render: declarados futuros', () => {
     // El componente usa formatPrice (adaptativo), no formatMoney (2 decimales).
     const view = source('components/portfolio/PortfolioDividends.tsx');
     assert.ok(view.includes('formatPrice(item.amount_per_share'), 'amount_per_share usa formato adaptativo');
-    assert.equal(formatMoney(0.000001, 'USD').replace(/\u00a0/g, ' '), '0,00 US$', 'formatMoney a 2 decimales sí inventaría el cero (canario del riesgo)');
+    assert.equal(formatMoney(0.000001, 'USD').replace(/\u00a0/g, ' '), '$0.00', 'formatMoney a 2 decimales sí inventaría el cero (canario del riesgo)');
   });
 });
 

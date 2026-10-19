@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useEffect, useRef, useState } from 'react';
-import { NA, formatMoney, formatNumber, formatPercent, isValidCurrencyCode } from '@/lib/format';
+import { NA, formatMarketDate, formatMoney, formatNumber, formatPercent, isValidCurrencyCode } from '@/lib/format';
 import { extendedQuoteLabel, quoteDate, quoteTime, quoteSessionDate, type ExtendedQuote } from '@/lib/market/extended-quote';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { CompanyTechnicalWorkspace } from './CompanyTechnicalWorkspace';
@@ -156,7 +156,7 @@ export function CompanyHeaderQuote({
                         </div>
                     ))}
                 </dl>
-                {hasDatedMetrics ? <p className="mt-2 text-xs text-gray-500">Sesión regular del {quote!.metrics_session} · {quoteTime(quote!.metrics_timestamp)} (Madrid)</p> : null}
+                {hasDatedMetrics ? <p className="mt-2 text-xs text-gray-500">Sesión regular del {formatMarketDate(quote!.metrics_session)} · {quoteTime(quote!.metrics_timestamp)} (Madrid)</p> : null}
             </div>
             <CompanyTechnicalWorkspace snapshot={snapshot} />
         </div>
