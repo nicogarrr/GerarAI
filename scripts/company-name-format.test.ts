@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatCompanyName } from '../lib/format';
+// @ts-expect-error TS5097: la extension explicita la exige node --experimental-strip-types.
+import { formatCompanyName } from '../lib/format.ts';
 
 test('formatCompanyName respeta marcas con &, guiones y sufijos /ADR', () => {
   assert.equal(formatCompanyName('AT&T INC'), 'AT&T Inc');
