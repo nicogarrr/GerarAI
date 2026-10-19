@@ -4,6 +4,7 @@ import ScrollToOnMount from '@/components/research/ScrollToOnMount';
 import { formatResearchMetric } from '@/lib/research/metric-value';
 import { financialFormula, financialPeriod, financialVersionLabel } from '@/lib/research/financial-display';
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
+import ThesisAudioPlayer from '@/components/research/ThesisAudioPlayer';
 import { collapseVersionHistory } from '@/lib/research/version-history';
 import { listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
@@ -1259,6 +1260,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             El historial muestra estado, fecha y resumen del cambio tal como están persistidos; el sistema no registra quién aprobó cada versión.
           </p>
         </Panel>
+        <ThesisAudioPlayer
+          ticker={ticker}
+          version={data.historyDetail.history.filter((entry) => entry.status === 'published').reduce<number | null>((a, entry) => (a === null ? entry.version : Math.max(a, entry.version)), null)}
+        />
         <div id="tesis-actual" style={{ scrollMarginTop: '5rem' }}>
         <Panel title="Tesis actual">
           {data.thesis ? (
