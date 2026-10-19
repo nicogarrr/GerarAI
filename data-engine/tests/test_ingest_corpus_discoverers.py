@@ -1,11 +1,6 @@
 """Parsing de los discoverers del corpus libre (fixtures HTML inline)."""
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-
-from ingest_corpus import (  # noqa: E402
+from app.services.corpus_ingestion_service import (
     _extract_azvalor_gateway,
     _extract_azvalor_pages,
     _extract_magallanes_pdfs,

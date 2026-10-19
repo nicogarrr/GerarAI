@@ -114,7 +114,7 @@ def test_memo_markdown_download_contains_professional_fields():
     body = response.text
     assert f"Memo de tesis — {TICKER}" in body
     assert "La red directa a celular se monetiza" in body
-    assert "| Bajista | $10.00 | 0.2 |" in body
+    assert "| Bajista | $10.00 | 20 % |" in body
     assert "Retrasos regulatorios" in body
     assert "Foso competitivo" in body
     assert "https://example.com/cobertura" in body

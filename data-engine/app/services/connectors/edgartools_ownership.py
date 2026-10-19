@@ -49,6 +49,7 @@ FORM4_TX_KEYS: tuple[str, ...] = (
     "value",
     "date",
     "is_derivative",
+    "rule_10b5_1",
 )
 
 FORM4_TOP_KEYS: tuple[str, ...] = (
@@ -114,7 +115,8 @@ def transactions_from_edgartools_dataframe(
     'Shares', 'Price', 'Value', 'Date', 'Ticker', 'Issuer', 'Insider',
     'Position', 'Form'. Perdidas documentadas frente al XML: sin A/D (se
     deriva de Purchase/Sale, resto None), sin insider_cik (""), sin rol
-    director/officer/10% (Position como rol literal).
+    director/officer/10% (Position como rol literal), sin notas al pie
+    (rule_10b5_1 queda None, nunca False inventado).
     """
     rows: list[dict] = []
     try:
@@ -166,6 +168,8 @@ def transactions_from_edgartools_dataframe(
                 "value": value,
                 "date": _iso_date(raw_date),
                 "is_derivative": is_derivative,
+                # El DataFrame de edgartools no trae notas al pie: desconocido.
+                "rule_10b5_1": None,
             }
         )
     return {

@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 import main
 from app.core.database import init_db
+from app.schemas import ChatResponse
 
 client = TestClient(main.app)
 
@@ -31,7 +32,7 @@ def test_chat_service_call_off_the_event_loop(monkeypatch):
         calls.append(_off_loop())
 
         async def _result():
-            return {"answer": "a", "sources": []}
+            return ChatResponse(answer="a", sources=[])
 
         return _result()
 
