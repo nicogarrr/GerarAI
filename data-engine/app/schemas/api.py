@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CompanyOut(BaseModel):
@@ -275,6 +275,20 @@ class ThesisGenerateRequest(BaseModel):
     request_id: str | None = Field(default=None, min_length=8, max_length=64)
 
 
+VALUATION_WITHHELD_REASON = (
+    "Valoración no disponible: faltan ingresos modelados con fuente. El modelo "
+    "solo se podía calcular con un supuesto no verificado, así que no se "
+    "publica ningún valor por acción."
+)
+
+
+def valuation_uses_inferred_inputs(valuation_basis: object) -> bool:
+    if not isinstance(valuation_basis, dict):
+        return False
+    used = valuation_basis.get("inferred_inputs_used")
+    return isinstance(used, list) and len(used) > 0
+
+
 class NarrativeSectionOut(BaseModel):
     titulo: str
     parrafos: list[str]
@@ -319,6 +333,22 @@ class ThesisOut(BaseModel):
     stale: bool = False
     latest_data_at: datetime | None = None
     created_at: datetime
+    # Motivo en español cuando la valoracion se retiene (input inferido).
+    valuation_withheld_reason: str | None = None
+
+    @model_validator(mode="after")
+    def _withhold_inferred_valuation(self) -> "ThesisOut":
+        """Un margen/ingreso INFERIDO nunca pasa por dato: sin cifras por accion."""
+        if not valuation_uses_inferred_inputs(self.valuation_basis):
+            return self
+        self.bear_value = self.base_value = self.bull_value = None
+        self.expected_value = None
+        self.margin_of_safety = None
+        self.rating = "insufficient_data"
+        self.valuation_withheld_reason = VALUATION_WITHHELD_REASON
+        self.executive_summary = VALUATION_WITHHELD_REASON
+        self.thesis_markdown = f"# Valoración no disponible\n\n{VALUATION_WITHHELD_REASON}\n"
+        return self
 
 
 class ClaimEvidenceCreate(BaseModel):

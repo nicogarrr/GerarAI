@@ -1757,8 +1757,14 @@ class ChatService:
                 if claim.status != "supported"
             ]
             unverified_text = "\n".join(claim_lines) or "- No hay afirmaciones sin resolver en el contexto recuperado."
+            from app.schemas.api import VALUATION_WITHHELD_REASON, valuation_uses_inferred_inputs
+
+            thesis_withheld = bool(thesis) and valuation_uses_inferred_inputs(thesis.valuation_basis)
             thesis_text = (
-                f"Tesis {company.ticker} v{thesis.version}: `{thesis.status}` con rating `{thesis.rating}`. "
+                f"Tesis {company.ticker} v{thesis.version}: {VALUATION_WITHHELD_REASON} "
+                f"[thesis_version:{thesis.id}]"
+                if thesis_withheld
+                else f"Tesis {company.ticker} v{thesis.version}: `{thesis.status}` con rating `{thesis.rating}`. "
                 f"Valor esperado={_decimal_to_float(thesis.expected_value)} frente a precio actual={_decimal_to_float(thesis.current_price)}. "
                 f"[thesis_version:{thesis.id}]"
                 if thesis

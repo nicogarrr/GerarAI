@@ -255,6 +255,13 @@ def _assert_approvable(db: Session, thesis: ThesisVersion) -> None:
         raise ValueError(
             f"thesis v{thesis.version} is {thesis.status}: there is nothing to publish"
         )
+    from app.schemas.api import valuation_uses_inferred_inputs
+
+    if valuation_uses_inferred_inputs(thesis.valuation_basis):
+        raise ValueError(
+            f"thesis v{thesis.version} usa inputs inferidos: valoración no disponible, "
+            "no se puede publicar"
+        )
     if thesis.status not in APPROVABLE_STATUSES:
         raise ValueError(
             f"thesis v{thesis.version} is {thesis.status!r}, which is not an approvable state"
