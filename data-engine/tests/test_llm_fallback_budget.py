@@ -317,3 +317,35 @@ def test_real_shadow_tracer_keeps_fallback_reason_and_cancelled_generation(slow_
     assert 'PRIVATE ANSWER' not in repr(sink)
     assert 'private upstream body' not in repr(sink)
     assert tracing.sanitize_metadata({'prompt': 'x', 'content': 'y'}) == {}
+
+
+def test_fallback_aliased_to_primary_by_override_is_not_called():
+    seen = []
+
+    async def handler(req):
+        seen.append(json.loads(req.content)['model'])
+        return httpx.Response(429, json={'error': {'message': 'FreeTierLimitError'}})
+
+    def build(client, overrides):
+        return create_llm_provider(Settings(
+            _env_file=None,
+            opencode_go_api_key='test-secret',
+            opencode_go_base_url='https://opencode.test/v1',
+            opencode_go_model=PRIMARY,
+            opencode_go_fallback_model=FALLBACK,
+            llm_model_overrides=overrides,
+            llm_total_timeout_seconds=5,
+            llm_timeout_seconds=5,
+            llm_max_retries=0,
+        ), client=client)
+
+    async def scenario(overrides):
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(Exception):
+                await build(client, overrides).complete(request())
+
+    asyncio.run(scenario({FALLBACK: PRIMARY}))
+    assert seen == [PRIMARY]
+    seen.clear()
+    asyncio.run(scenario({}))
+    assert seen == [PRIMARY, FALLBACK]
