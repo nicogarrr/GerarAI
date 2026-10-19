@@ -76,9 +76,60 @@ def test_watchlist_monitor_degrades_without_earnings(monkeypatch):
         raise RuntimeError("nasdaq down")
 
     monkeypatch.setattr("app.api.routes.watchlist.fetch_earnings_range", broken)
+
+    def yahoo_broken(symbols, today=None, deadline_monotonic=None):
+        raise RuntimeError("yahoo down")
+
+    monkeypatch.setattr(
+        "app.api.routes.watchlist.fetch_next_earnings_dates", yahoo_broken)
     client = TestClient(main.app)
     res = client.get("/api/watchlist/monitor", params={"tickers": "MONTEST"})
     assert res.status_code == 200
     row = res.json()["items"]["MONTEST"]
     assert row["next_earnings_date"] is None
     assert res.json()["earnings_status"] == "unavailable"
+
+
+def test_watchlist_monitor_yahoo_fills_when_nasdaq_has_no_date(monkeypatch):
+    """UNH el 19-10-2026: reportó el 13-10; NASDAQ (31 días) no la cubre y la
+    fecha estimada de Yahoo (12-01-2027) rellena el hueco, etiquetada no oficial."""
+    _seed_monitor_fixtures()
+
+    async def fake_earnings(desde, hasta, client=None):
+        return {"status": "ok", "events": [], "errors": []}
+
+    def fake_yahoo(symbols, today=None, deadline_monotonic=None):
+        return {"MONTEST": (date.today() + timedelta(days=85)).isoformat()}
+
+    monkeypatch.setattr(
+        "app.api.routes.watchlist.fetch_earnings_range", fake_earnings)
+    monkeypatch.setattr(
+        "app.api.routes.watchlist.fetch_next_earnings_dates", fake_yahoo)
+    client = TestClient(main.app)
+    res = client.get("/api/watchlist/monitor", params={"tickers": "MONTEST"})
+    assert res.status_code == 200
+    row = res.json()["items"]["MONTEST"]
+    assert row["next_earnings_date"] == (date.today() + timedelta(days=85)).isoformat()
+    assert row["next_earnings_source"] == "Yahoo Finance (no oficial), fecha estimada"
+
+
+def test_watchlist_monitor_nasdaq_wins_over_yahoo(monkeypatch):
+    _seed_monitor_fixtures()
+    nasdaq_day = (date.today() + timedelta(days=9)).isoformat()
+
+    async def fake_earnings(desde, hasta, client=None):
+        return {"status": "ok", "events": [{"symbol": "MONTEST", "date": nasdaq_day}], "errors": []}
+
+    def fake_yahoo(symbols, today=None, deadline_monotonic=None):
+        return {"MONTEST": (date.today() + timedelta(days=85)).isoformat()}
+
+    monkeypatch.setattr(
+        "app.api.routes.watchlist.fetch_earnings_range", fake_earnings)
+    monkeypatch.setattr(
+        "app.api.routes.watchlist.fetch_next_earnings_dates", fake_yahoo)
+    client = TestClient(main.app)
+    res = client.get("/api/watchlist/monitor", params={"tickers": "MONTEST"})
+    assert res.status_code == 200
+    row = res.json()["items"]["MONTEST"]
+    assert row["next_earnings_date"] == nasdaq_day
+    assert row["next_earnings_source"] == "NASDAQ (api.nasdaq.com)"

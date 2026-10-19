@@ -1,3 +1,5 @@
+import asyncio
+import time
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models import Company, FinancialFact, MarketPrice, ThesisVersion, WatchItem
 from app.services.connectors.earnings_calendar import fetch_earnings_range
+from app.services.connectors.yahoo_earnings import fetch_next_earnings_dates
 from app.services.fundamentals_seed_service import enqueue_fundamentals_seed
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
 
@@ -163,6 +166,32 @@ async def watchlist_monitor(
                     row["next_earnings_source"] = "NASDAQ (api.nasdaq.com)"
         except Exception:
             earnings_status = "unavailable"
+
+    # Fallback: fecha ESTIMADA por Yahoo (no oficial) para los símbolos sin
+    # fecha confirmada en la ventana de 31 días de NASDAQ — p.ej. UNH, que
+    # acaba de reportar y tiene la siguiente a meses vista. NASDAQ manda
+    # cuando tiene dato; Yahoo solo rellena huecos.
+    missing = [t for t, row in items.items() if row["next_earnings_date"] is None][:20]
+    if missing:
+        try:
+            yahoo_dates = await asyncio.wait_for(
+                asyncio.to_thread(
+                    fetch_next_earnings_dates, missing, None, time.monotonic() + 7
+                ),
+                timeout=9,
+            )
+        except Exception:  # noqa: BLE001 - Yahoo puede fallar; se queda N/D
+            yahoo_dates = {}
+        filled = 0
+        for symbol, day in yahoo_dates.items():
+            row = items.get(symbol)
+            if row is not None and row["next_earnings_date"] is None:
+                row["next_earnings_date"] = day
+                row["next_earnings_source"] = "Yahoo Finance (no oficial), fecha estimada"
+                filled += 1
+        if filled and earnings_status == "unavailable":
+            # NASDAQ cayó pero Yahoo cubrió huecos: ni "ok" ni "unavailable".
+            earnings_status = "partial"
 
     return {"items": items, "earnings_status": earnings_status}
 
