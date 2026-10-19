@@ -491,6 +491,10 @@ def build_usaspending_theme(theme: FlowTheme) -> dict:
 
 
 def build_theme_payload(db: Session, theme: FlowTheme, tenant: int | None) -> dict:
+    if theme.destinations_live == "eia_retail_revenue":
+        from app.services.energy_flows import build_energy_flow
+
+        return build_energy_flow(theme)
     if theme.suppliers_live == "usaspending_recipients":
         spenders, destinations, suppliers, fy_label, notes, destinations_note, suppliers_note = (
             build_usaspending_theme(theme)
@@ -563,6 +567,13 @@ def build_theme_payload(db: Session, theme: FlowTheme, tenant: int | None) -> di
 
 
 FLOW_THEMES: dict[str, FlowTheme] = {
+    "utilities": FlowTheme(
+        id="utilities", name="Electricidad de EE. UU.",
+        tagline="Gasto eléctrico por sector y quién lo recibe, sin repartirlo entre empresas",
+        spenders=(), suppliers=(), destinations_live="eia_retail_revenue",
+        method="EIA API v2, retail-sales: ingresos anuales reportados, US Total, millones de dólares convertidos a USD",
+        limitation="Solo electricidad al por menor en EE. UU., no todo el sector energético ni capex. Gasto del cliente e ingreso del vendedor son el mismo flujo: no se suman. Sin reparto verificable por empresa ni exposición cuantificada de cartera. Datos revisables.",
+    ),
     # Clave = id de la cesta de Temas (market_themes.BASKETS): el flujo se
     # muestra dentro del detalle del tema, no como página aparte.
     "centros-de-datos": FlowTheme(
