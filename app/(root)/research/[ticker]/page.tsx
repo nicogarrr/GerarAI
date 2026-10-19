@@ -119,7 +119,7 @@ import CitationsList from '@/components/chat/CitationsList';
 import { toChatCitations } from '@/lib/chat/citations';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
-import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, NA } from '@/lib/format';
+import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
 import { getInsiderFilings } from '@/lib/actions/insider.actions';
 import { insiderName, insiderRole } from '@/lib/insider/format';
 import { glossary, moatGlossaryKey } from '@/lib/glossary';
@@ -1421,7 +1421,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                       <li key={`${filing.accession_number}-${index}`}>
                         {insiderName(tx.insider)} · {insiderRole(tx.role, tx.officer_title)} · {tx.code === 'P' ? 'Compra' : tx.code === 'S' ? 'Venta' : tx.code ?? '—'}
                         {typeof tx.shares === 'number' ? ` · ${formatNumber(tx.shares)} acciones` : ''}
-                        {typeof tx.value === 'number' && Number.isFinite(tx.value) ? ` · ${formatPrice(tx.value, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : ''}
+                        {typeof tx.value === 'number' && Number.isFinite(tx.value) ? ` · ${tx.currency && isValidCurrencyCode(tx.currency) ? formatPrice(tx.value, tx.currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : formatNumber(tx.value, { maximumFractionDigits: 0 })}` : ''}
                         {tx.tx_date ? ` · ${formatDate(tx.tx_date)}` : ''}
                       </li>
                     ))}

@@ -62,6 +62,9 @@ def _tx_dict(row: InsiderTransaction, filing: InsiderFiling, line: int) -> dict[
         "acquired_disposed": row.acquired_disposed,
         "shares": row.shares,
         "price": row.price,
+        # Divisa declarada por transaccion (PDMR UK via tracefour la trae; SEC = USD).
+        "currency": (row.data_quality or {}).get("currency", "USD")
+        if isinstance(row.data_quality, dict) else "USD",
         "value": row.value,
         "date": row.tx_date or filing.filing_date,
         "is_derivative": bool(row.is_derivative),

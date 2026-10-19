@@ -150,6 +150,8 @@ def insider_filings(
                             "rule_10b5_1": bool(tx.rule_10b5_1),
                             "shares": tx.shares,
                             "price": tx.price,
+                            "currency": (tx.data_quality or {}).get("currency", "USD")
+                            if isinstance(tx.data_quality, dict) else "USD",
                             "value": tx.value,
                             "tx_date": tx.tx_date,
                             "source_url": tx.source_url,
