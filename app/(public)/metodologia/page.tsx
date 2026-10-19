@@ -102,7 +102,7 @@ const engines = [
 const steps = [
   {
     title: 'Métricas de calidad y crecimiento',
-    text: 'Rentabilidad, flujo de caja, crecimiento y salud de balance, calculadas sobre los filings persistidos. La valoración y el momentum aún no puntúan en v1 (ver el embudo).',
+    text: 'Rentabilidad, flujo de caja, crecimiento y salud de balance, calculadas sobre los filings persistidos. La valoración y el momentum puntúan cuando hay datos para la empresa (CFROI y WACC; serie de precios); si faltan, la categoría entra neutra (50) y se marca n/d en la tarjeta.',
   },
   {
     title: 'Ranking por percentiles del universo',
