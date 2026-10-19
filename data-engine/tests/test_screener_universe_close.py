@@ -25,14 +25,25 @@ def test_rows_have_date_change_and_exclusions():
     db = _db()
     _add(db, "OKCO", ["100", "110"])
     _add(db, "LIVE", ["10", "11"])            # ya sale en vivo: excluida
-    _add(db, "TESTCO", ["5", "6"], cik=None)  # entrada de prueba: sin CIK ni ISIN
+    _add(db, "ZZZZ9", ["5", "6"], cik=None)   # sintetico: patron Z{3,}
+    _add(db, "TESTCO", ["5", "6"], cik=None)  # sintetico: patron TEST
+    _add(db, "REALNOCIK", ["20", "22"], cik=None)  # real sin CIK/ISIN: entra
     _add(db, "OLD", ["5", "6"], last=date(2026, 9, 1))  # cierre viejo: fuera
     out = universe_close_rows(db, exclude_symbols={"LIVE"}, today=TODAY)
-    assert [r["symbol"] for r in out["rows"]] == ["OKCO"]
-    row = out["rows"][0]
+    assert sorted(r["symbol"] for r in out["rows"]) == ["OKCO", "REALNOCIK"]
+    row = next(r for r in out["rows"] if r["symbol"] == "OKCO")
     assert row["close_date"] == "2026-10-16"
     assert abs(row["change_pct"] - 10.0) < 1e-6
-    assert out["total"] == 1
+    assert out["total"] == 2
+
+
+def test_limit_cuts_before_prev_close_queries_and_keeps_total():
+    db = _db()
+    for t in ("AAA", "BBB", "CCC"):
+        _add(db, t, ["100", "120"], cik=None)
+    out = universe_close_rows(db, exclude_symbols=set(), limit=2, today=TODAY)
+    assert out["total"] == 3 and [r["symbol"] for r in out["rows"]] == ["AAA", "BBB"]
+    assert all(abs(r["change_pct"] - 20.0) < 1e-6 for r in out["rows"])
 
 
 def test_change_is_none_without_previous_close_and_sector_filter():
