@@ -55,6 +55,9 @@ interface UndervaluedStock {
     currency: string | null;
     fairValue: number;
     upside: number;
+    /** true = el DCF no es publicable (inputs sin trazabilidad datada):
+     *  la ficha lo muestra como orientacion del motor, no como valoracion final. */
+    orientation?: boolean;
 }
 
 /** El universo del screener es todo lo que devuelve /api/screeners/real por
@@ -639,7 +642,7 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                     // La ficha DCF muestra el precio en la divisa del
                                     // listado y el valor justo SIN símbolo: el modelo
                                     // (/api/valuation/{ticker}) sí trae `currency` pero
-                                    // getFairValue no la propaga, así que se declara N/D
+                                    // getFairValueReading no la propaga, así que se declara N/D
                                     // en la etiqueta en vez de suponer dólares.
                                     const priceLabel = isValidCurrencyCode(op.currency) ? 'Precio' : 'Precio (divisa N/D)';
                                     return (
@@ -663,6 +666,9 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                                     />
                                                 </div>
                                                 <p className="text-xs text-gray-500 mt-2 text-right">Valor justo (divisa N/D): {formatNumber(op.fairValue)}</p>
+                                                {op.orientation ? (
+                                                    <p className="text-xs text-amber-500/90 mt-1 text-right">Orientación del motor, no valoración final</p>
+                                                ) : null}
                                             </div>
                                         </Link>
                                     );
