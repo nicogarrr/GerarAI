@@ -62,17 +62,24 @@ NEGATION = re.compile(rf"\b(?:{_NEG_WORDS})\b(?:\W+\w+){{0,6}}\W*$")
 # Alivio ANTES ("resolved shortage", "end of the shortage").
 RELIEF_BEFORE = re.compile(
     r"\b(?:easing|eased|resolved|eliminated|falling|shrinking|reduced|reduction in|end of|"
-    r"overcome|alleviated|mitigated|cleared|resuelta|resuelto|fin de|superada|superado|"
+    r"overcome|alleviated|mitigated|cleared|fading|resuelta|resuelto|fin de|superada|superado|"
     r"disminucion de|reduccion de|alivio de)\b(?:\W+\w+){0,3}\W*$"
 )
 # Negacion o alivio DESPUES ("shortages are not expected", "did not materialize",
 # "shortage already resolved", "ya resuelta"), con cualquier adverbio intermedio.
 AFTER_CUES = re.compile(
     rf"\b(?:{_NEG_WORDS}|easing|eased|easy|easier|resolved|ended|over|behind us|subsided|"
-    r"alleviated|mitigated|cleared|disappeared|vanished|normali[sz]ed|overcome|unlikely|"
+    r"alleviated|mitigated|cleared|disappeared|vanished|normali[sz]\w*|overcome|unlikely|"
     r"improving|improved|falling|fell|shrinking|resuelt[ao]s?|superad[ao]s?|terminad[ao]s?|"
-    r"disminuy\w+|reducid[ao]s?|mejor\w+|normalizad[ao]s?|improbable|descartad[ao]s?)\b"
+    r"disminuy\w+|reducid[ao]s?|mejor\w+|normalizad[ao]s?|improbable|descartad[ao]s?)\b|"
+    # Alivio aun sin consumar: "will ease", "expected to ease", "ease as...",
+    # "has faded" y "now/back to normal" (auditoria #1920).
+    r"\b(?:ease|ease[sd]|fading|faded|fades|now normal|back to normal)\b"
 )
+# Contraste pasado->presente en la misma frase: "were 20 weeks in 2022 but are
+# now normal" habla de una restriccion pasada, no actual (auditoria #1920).
+PAST_CONTRAST = re.compile(r"\bbut\b(?:\W+\w+){0,6}\W+now\b")
+
 # Hipotesis, escenario o riesgo: no es evidencia de una restriccion real.
 CONDITIONAL = re.compile(
     r"\b(?:if|unless|whether|should|could|would|may|might|in case|in the event|"
@@ -95,7 +102,12 @@ def extract_themes(text: str) -> set[str]:
         for match in CONSTRAINT.finditer(sentence):
             before = sentence[max(0, match.start() - 80):match.start()]
             after = sentence[match.end():match.end() + 80]
-            if NEGATION.search(before) or RELIEF_BEFORE.search(before) or AFTER_CUES.search(after):
+            if (
+                NEGATION.search(before)
+                or RELIEF_BEFORE.search(before)
+                or AFTER_CUES.search(after)
+                or PAST_CONTRAST.search(after)
+            ):
                 continue
             # Co-occurrence within 100 characters, never across sentences.
             local = sentence[max(0, match.start() - 100):match.end() + 100]

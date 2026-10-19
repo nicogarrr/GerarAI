@@ -66,6 +66,13 @@ ABSENCE_OR_HYPOTHESIS = [
     "Si hay escasez de chips, la produccion se frenara.",
     "Chip shortage is behind us.",
     "A chip shortage is unlikely.",
+    # Objecion del auditor (PR #1920): alivio anunciado o ya consumado no es escasez.
+    "Chip shortage will ease by Q3.",
+    "The chip shortage is expected to ease.",
+    "Chip shortages ease as capacity returns.",
+    "The GPU shortage has faded.",
+    "Delivery times were 20 weeks in 2022 but are now normal.",
+    "Supply constraints persist though the CEO expects supply to normalize.",
 ]
 
 
