@@ -70,7 +70,7 @@ def test_refresh_replaces_and_keeps_previous_on_failure(db):
     # fichero truncado (<10 filas): no sustituye
     files["https://procureetfs.com/x/UFO-JP-Holdings-Oct-19-2026.csv"] = "\n".join(PROCURE.splitlines()[:4])
     out = eh.refresh_etf_holdings(db, _client(files))
-    assert "incompleto" in out["UFO"]
+    assert "ningun fichero valido" in out["UFO"]
     assert len(db.scalars(select(EtfHolding).where(EtfHolding.etf == "UFO")).all()) >= 10
 
 
@@ -103,3 +103,19 @@ def test_news_strip_includes_etf_for_primary_even_without_other_tickers(db):
     assert [e["ticker"] for e in out[1]] == ["ASTS", "NASA"]
     assert out[1][1]["kind"] == "etf" and out[1][1]["weight_pct"] == 5.5
     assert out[1][0]["primary"] is True
+
+
+def test_broken_link_in_list_does_not_abort_issuer(db):
+    files = {
+        "https://procureetfs.com/ufo/": (
+            '<a href="https://procureetfs.com/wp-content/uploads/2026/09/UFO-JP-Holdings-Oct-19-2026.csv">'
+            '<a href="https://procureetfs.com/wp-content/uploads/2026/10/UFO-JP-Holdings-Oct-19-2026.csv">'
+            '<a href="https://evil.example/UFO-Holdings-x.csv">'
+        ),
+        "https://procureetfs.com/wp-content/uploads/2026/10/UFO-JP-Holdings-Oct-19-2026.csv": PROCURE,
+        "https://temaetfs.com/nasa": "",
+    }
+    out = eh.refresh_etf_holdings(db, _client(files))  # el de /09/ da 404
+    assert out["UFO"].startswith("ok"), out
+    assert db.scalar(select(EtfHolding).where(EtfHolding.etf == "UFO")) is not None
+    assert "evil.example" not in db.scalars(select(EtfHolding.source_url)).first()

@@ -40,9 +40,9 @@ class EtfSource:
 
 SOURCES = {
     "UFO": EtfSource("UFO", "Procure Space ETF", "https://procureetfs.com/ufo/",
-                     r"https?://[^\"' ]*UFO[^\"' ]*Holdings[^\"' ]*\.csv"),
+                     r"https://procureetfs\.com/[^\"' ]*UFO[^\"' ]*Holdings[^\"' ]*\.csv"),
     "NASA": EtfSource("NASA", "Tema Space Innovators ETF", "https://temaetfs.com/nasa",
-                      r"https?://[^\"' ]*NASA-holdings-\d+\.csv"),
+                      r"https://temaetfs\.com/[^\"' ]*NASA-holdings-\d+\.csv"),
 }
 
 
@@ -115,13 +115,17 @@ def refresh_etf_holdings(db: Session | None = None, client: httpx.Client | None 
                     continue
                 best: tuple[date, str, list[tuple[str, Decimal]]] | None = None
                 for link in links:
-                    resp = http.get(link)
-                    resp.raise_for_status()
-                    as_of, rows = _PARSERS[etf](resp.text)
-                    if as_of and (best is None or as_of > best[0]):
+                    try:  # un enlace roto (404 de un mes anterior) no aborta los demas
+                        resp = http.get(link)
+                        resp.raise_for_status()
+                        as_of, rows = _PARSERS[etf](resp.text)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("etf_holdings %s enlace %s fallo: %s", etf, link, exc)
+                        continue
+                    if as_of and len(rows) >= MIN_ROWS and (best is None or as_of > best[0]):
                         best = (as_of, link, rows)
-                if best is None or len(best[2]) < MIN_ROWS:
-                    out[etf] = "fichero incompleto: se conserva la carga anterior"
+                if best is None:
+                    out[etf] = "ningun fichero valido: se conserva la carga anterior (si la hay)"
                     continue
                 as_of, link, rows = best
                 if sum(w for _, w in rows) > Decimal("105"):
