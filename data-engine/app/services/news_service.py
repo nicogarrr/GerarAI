@@ -219,6 +219,22 @@ class NewsService:
             requires_update = assessment.requires_update or bool(
                 semantic_impact and semantic_impact.affected_claim_ids and materiality_score >= 7
             )
+        # El impacto semantico puede subir la nota por encima del tope de
+        # relevancia: la misma regla conservadora se reaplica (solo baja, no descarta).
+        from app.services.materiality_service import (
+            UNRELATED_NEWS_MAX_MATERIALITY,
+            is_unrelated_generic_news,
+        )
+
+        if (
+            is_unrelated_generic_news(text, company, source, url)
+            and materiality_score > UNRELATED_NEWS_MAX_MATERIALITY
+        ):
+            materiality_score = UNRELATED_NEWS_MAX_MATERIALITY
+            requires_update = False
+            materiality_reasons.append(
+                f"sin mención de la empresa en fuente genérica => max {UNRELATED_NEWS_MAX_MATERIALITY}"
+            )
         # La politica de recencia tambien cubre la urgencia derivada del
         # impacto semantico: un filing antiguo nunca es urgente por recencia.
         requires_update = apply_recency_policy(requires_update, published_at, materiality_reasons)
