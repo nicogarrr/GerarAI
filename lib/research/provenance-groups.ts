@@ -1,3 +1,5 @@
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { METRIC_LABELS } from './metric-labels.ts';
 export type ProvenanceGroup = 'reportado' | 'sin_verificar' | 'calculado' | 'supuesto';
 
 export const PROVENANCE_GROUPS: ReadonlyArray<{ key: ProvenanceGroup; title: string }> = [
@@ -27,6 +29,11 @@ export function provenanceBasisEs(base: string | null | undefined): string | nul
   const clean = (base ?? '').trim().replace(/^dado\s+/i, '');
   if (!clean) return null;
   for (const [pattern, text] of BASIS_ES) if (pattern.test(clean)) return text;
+  const median = /^mediana de las últimas (\d+) observaciones anuales de ([a-z_]+)$/i.exec(clean);
+  if (median) {
+    const metric = (METRIC_LABELS as Record<string, string>)[median[2]];
+    if (metric) return `Mediana de las últimas ${median[1]} observaciones anuales de ${metric.toLowerCase()}`;
+  }
   const reported = /^(.+?) reportado(?: \(periodo (.+)\))?$/.exec(clean);
   if (reported) return reported[2] ? `Reportado, periodo ${reported[2]}` : 'Reportado';
   const sentence = clean.charAt(0).toUpperCase() + clean.slice(1);

@@ -8,7 +8,7 @@ test('F300: las tarjetas de alerta de /inicio enlazan al contexto de la alerta',
     // El enlace va a la investigación del ticker REAL del disparo (nunca una
     // ruta inventada): se pinta solo cuando item.ticker existe.
     assert.match(overview, /\{item\.ticker && \(/);
-    assert.match(overview, /href=\{`\/research\/\$\{item\.ticker\}\?view=thesis`\}/);
+    assert.match(overview, /href=\{alertThesisHref\(item\.ticker\)\}/);
     assert.match(overview, /Revisar tesis de \{item\.ticker\}/);
 });
 

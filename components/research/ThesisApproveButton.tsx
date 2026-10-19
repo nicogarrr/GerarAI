@@ -34,6 +34,8 @@ export default function ThesisApproveButton({
     disabled = false,
     latestStatus = null,
     latestVersion = null,
+    riskNotes = [],
+    olderPublishedVersion = null,
 }: {
     ticker: string;
     /** Sin versiones de tesis no hay nada que aprobar/rechazar (B17). */
@@ -42,9 +44,14 @@ export default function ThesisApproveButton({
     latestStatus?: string | null;
     /** Numero de la ultima version, para nombrarla en la explicacion. */
     latestVersion?: number | null;
+    /** Motivos por los que publicar esta versión merece una confirmación explícita. */
+    riskNotes?: string[];
+    /** Versión publicada anterior (si existe): rechazar la última no la retira. */
+    olderPublishedVersion?: number | null;
 }) {
     const router = useRouter();
     const [pending, setPending] = useState<'approved' | 'rejected' | null>(null);
+    const [confirming, setConfirming] = useState(false);
 
     const alreadyPublished = latestStatus === 'published';
     const notApprovableReason = latestStatus ? NON_APPROVABLE[latestStatus] : undefined;
@@ -59,7 +66,14 @@ export default function ThesisApproveButton({
             ? `La v${latestVersion ?? '?'} no se puede publicar: ${notApprovableReason}.`
             : null;
 
-    const decide = async (decision: 'approved' | 'rejected') => {
+    const decide = async (decision: 'approved' | 'rejected', confirmed = false) => {
+        // Publicar una tesis con valoración parcial, datos pendientes o red team
+        // bajo exige una confirmación explícita con los motivos a la vista.
+        if (decision === 'approved' && riskNotes.length > 0 && !confirmed) {
+            setConfirming(true);
+            return;
+        }
+        setConfirming(false);
         setPending(decision);
         try {
             const result = await approveThesis(ticker, decision);
@@ -80,13 +94,16 @@ export default function ThesisApproveButton({
                         ? `Tesis v${result.version} rechazada y retirada de la Biblioteca`
                         : `Tesis v${result.version} rechazada`,
                 );
+                if (olderPublishedVersion !== null) {
+                    toast.info(`La v${olderPublishedVersion} sigue publicada: rechazar solo afecta a la última versión.`);
+                }
             }
             // F391: sin refresh el memo y el historial siguen mostrando el estado anterior.
             // El ancla de scroll se conserva: el lector no pierde su sitio.
             preserveScrollPosition(() => router.refresh());
         } catch (exc) {
             if (isNextRedirectError(exc)) throw exc;
-            showErrorToast(exc, { onRetry: () => decide(decision) });
+            showErrorToast(exc, { onRetry: () => decide(decision, confirmed) });
         } finally {
             setPending(null);
         }
@@ -129,6 +146,27 @@ export default function ThesisApproveButton({
             </Button>
             {blockNote ? (
                 <span className="text-xs text-gray-500">{blockNote}</span>
+            ) : null}
+            {confirming ? (
+                <div role="alert" className="w-full rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
+                    <p className="font-medium">Esta tesis aún no es una valoración final:</p>
+                    <ul className="mt-1 list-disc pl-5">
+                        {riskNotes.map((note) => (
+                            <li key={note}>{note}</li>
+                        ))}
+                    </ul>
+                    <p className="mt-2 text-xs text-amber-300/80">
+                        Al publicarla pasa a la Biblioteca y el Cerebro la usará como referencia.
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                        <Button type="button" size="sm" onClick={() => decide('approved', true)} disabled={pending !== null}>
+                            Publicar igualmente
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setConfirming(false)}>
+                            Cancelar
+                        </Button>
+                    </div>
+                </div>
             ) : null}
         </div>
     );

@@ -28,6 +28,18 @@ from app.services.connectors.yahoo import YahooFinanceClient
 from app.services.provenance import Coverage, SourceKind, provenance
 
 
+class NoSafeProviderSymbol(RuntimeError):
+    """Sin simbolo de proveedor calificable por bolsa: NO se consulta nada.
+
+    Yahoo/FMP resuelven el ticker pelado en la linea US (gemelo o ADR): un
+    split del gemelo aplicado al listado real corrompe los recuentos de
+    acciones (caso real: split 10:1 de Aena 2025-06-19 nunca ingerido porque
+    «AENA» no existe en Yahoo — es «AENA.MC» — y de haber existido un
+    homonimo US habriamos importado SUS splits). «Sin dato» antes que el
+    dato de otro instrumento, mismo criterio que yahoo_symbol.
+    """
+
+
 class ProviderIngestionService:
     """Skeleton for ingesting declared rows from labeled providers into own records.
 
@@ -69,6 +81,22 @@ class ProviderIngestionService:
         raise NotImplementedError
 
     @staticmethod
+    def _provider_symbol(company: Company) -> str:
+        """Simbolo calificado por bolsa (AENA -> AENA.MC) o excepcion honesta."""
+        from app.services.propicks_price_service import yahoo_symbol
+
+        symbol = yahoo_symbol(company)
+        if symbol is None:
+            raise NoSafeProviderSymbol(
+                f"sin simbolo Yahoo seguro para {company.ticker} "
+                f"(bolsa {getattr(company, 'exchange', None)!r}, divisa "
+                f"{getattr(company, 'currency', None)!r}): el ticker pelado "
+                "resolveria el gemelo/ADR US y sus eventos no son los del "
+                "listado real"
+            )
+        return symbol
+
+    @staticmethod
     def _row_is_ingestible(row: dict[str, Any]) -> bool:
         raise NotImplementedError
 
@@ -89,6 +117,14 @@ class ProviderIngestionService:
             return {"ticker": ticker.upper(), "status": "unknown_company", "inserted": 0, "existing": 0}
         try:
             rows, source = await self._fetch_rows(company)
+        except NoSafeProviderSymbol as exc:
+            return {
+                "ticker": company.ticker,
+                "status": "no_safe_symbol",
+                "error": str(exc)[:300],
+                "inserted": 0,
+                "existing": 0,
+            }
         except Exception as exc:  # provider/auth/entitlement/network failure
             return {
                 "ticker": company.ticker,
@@ -186,10 +222,11 @@ class SplitIngestionService(ProviderIngestionService):
         empty Yahoo answer means "no splits", not a failure, so it does not
         trigger the fallback.
         """
+        symbol = self._provider_symbol(company)
         try:
-            payload = await self.yahoo.splits(company.ticker)
+            payload = await self.yahoo.splits(symbol)
         except Exception:
-            payload = await self.fmp.splits(company.ticker)
+            payload = await self.fmp.splits(symbol)
             rows = payload if isinstance(payload, list) else payload.get("historical", [])
             return [
                 {
