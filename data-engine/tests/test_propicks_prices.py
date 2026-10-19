@@ -65,7 +65,7 @@ def _fake_fetcher(symbols, *, period="1y"):
     bars = {}
     for symbol in symbols:
         bars[symbol] = [
-            PriceBar(day=d, close=p, adj_close=p, volume=1000) for d, p in _series(300)
+            PriceBar(day=d, close=p, adj_close=p, volume=1000) for d, p in _series(400)
         ]
     return bars
 
@@ -77,13 +77,13 @@ def test_yahoo_symbol_mapea_bolsa_o_devuelve_none_honesto():
 
 
 def test_momentum_6m_and_12m():
-    series = _series(300)
-    mom6 = momentum_from_series(series, 126)
-    mom12 = momentum_from_series(series, 252)
+    series = _series(400)
+    mom6 = momentum_from_series(series, 182)
+    mom12 = momentum_from_series(series, 365)
     assert mom6 is not None and mom6 > 0
     assert mom12 is not None and mom12 > mom6  # serie creciente: 12m > 6m
-    # Esperado 6m: (400-274)/274
-    expected = (Decimal(400) - Decimal(274)) / Decimal(274)
+    # Esperado 6m: ultimo 500, hace 182 dias 318
+    expected = (Decimal(500) - Decimal(318)) / Decimal(318)
     assert abs(mom6 - expected) < Decimal("0.001")
 
 
@@ -125,7 +125,7 @@ def test_refresh_writes_metrics_only_with_coverage():
                                          as_of=date(2026, 9, 25))
         assert result["status"] == "ok"
         assert result["covered"] == 1
-        assert result["bars_written"] == 301
+        assert result["bars_written"] == 401
         metrics = db.scalars(
             select(CalculatedMetric).where(CalculatedMetric.company_id == company.id)
         ).all()
@@ -173,6 +173,6 @@ def test_refresh_cubre_todas_las_aprobadas_no_solo_el_top():
         assert result["status"] == "ok"
         assert result["companies"] == 3
         assert result["covered"] == 3
-        assert result["bars_written"] == 3 * 301
+        assert result["bars_written"] == 3 * 401
         metrics = db.scalars(select(CalculatedMetric)).all()
         assert {m.company_id for m in metrics} == {c.id for c in companies}
