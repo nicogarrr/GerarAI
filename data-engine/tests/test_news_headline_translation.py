@@ -191,3 +191,33 @@ async def test_english_headline_translates_with_cache(db):
     assert (await translate_headline(db,row.id,provider=p))["status"]=="translated"
     assert (await translate_headline(db,row.id,provider=p))["status"]=="translated"
     assert p.calls==1 and row.title=="Apple reports earnings 2026"
+
+
+class TimeoutProvider(Provider):
+    async def complete(self, request):
+        raise TimeoutError("provider timed out")
+
+
+@sync_test
+async def test_headline_timeout_cools_down_one_minute_with_reason(db):
+    # translate_headline: mismo criterio que el resumen — timeout reintenta a
+    # 1 min con reason clasificada; un fallo de proveedor espera 10 min.
+    from datetime import datetime, timedelta
+    row = event(db)
+    result = await translate_headline(db, row.id, provider=TimeoutProvider())
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "provider_timeout"
+    db.refresh(row)
+    record = row.metadata_["headline_translation"]
+    assert record["failure"] == "provider_timeout"
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta <= timedelta(minutes=1)
+
+    row2 = event(db)
+    result2 = await translate_headline(db, row2.id, provider=Provider(error=True))
+    assert result2["reason"] == "provider"
+    db.refresh(row2)
+    record2 = row2.metadata_["headline_translation"]
+    assert record2["failure"] == "provider"
+    delta2 = datetime.fromisoformat(record2["retry_after"]) - datetime.fromisoformat(record2["created_at"])
+    assert delta2 >= timedelta(minutes=10)

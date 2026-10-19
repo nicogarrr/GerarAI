@@ -175,13 +175,30 @@ async def test_cooldown_reports_reason(db):
     assert second["reason"] == "cooldown"
 
 
+class TimeoutProvider(Provider):
+    async def complete(self, request):
+        raise TimeoutError("provider timed out")
+
+
 @sync_test
-async def test_transient_failure_cools_down_one_minute(db):
-    # Fallo transitorio (proveedor): reintento a 1 min, no 10.
+async def test_timeout_failure_cools_down_one_minute(db):
+    # Timeout del proveedor: único fallo con reintento a 1 min (cada reintento
+    # consume cuota diaria; el resto de fallos espera 10 min).
+    row = event(db)
+    await translate_summary(db, row.id, provider=TimeoutProvider())
+    db.refresh(row)
+    record = row.metadata_["summary_translation"]
+    assert record["failure"] == "provider_timeout"
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta <= timedelta(minutes=1)
+
+
+@sync_test
+async def test_provider_failure_cools_down_ten_minutes(db):
     row = event(db)
     await translate_summary(db, row.id, provider=Provider(error=True))
     db.refresh(row)
-    retry = row.metadata_["summary_translation"]["retry_after"]
-    created = row.metadata_["summary_translation"]["created_at"]
-    delta = datetime.fromisoformat(retry) - datetime.fromisoformat(created)
-    assert delta <= timedelta(minutes=1)
+    record = row.metadata_["summary_translation"]
+    assert record["failure"] == "provider"
+    delta = datetime.fromisoformat(record["retry_after"]) - datetime.fromisoformat(record["created_at"])
+    assert delta >= timedelta(minutes=10)

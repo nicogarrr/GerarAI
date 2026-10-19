@@ -192,9 +192,12 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
             record = {"fingerprint": digest, "status": "translated" if translated else "unavailable", "text": translated,
                       "target_language": "es", "machine_translation": True, "created_at": now.isoformat()}
             if not translated:
-                # Fallo transitorio (proveedor/salida): reintento pronto. Cuota o
-                # presupuesto: espera larga para no martillear hasta que se reponga.
-                transient = failure_reason not in ("quota", "budget")
+                # Cada reintento consume cuota diaria (reserve_quota va antes de
+                # llamar al proveedor y el límite es 100/día), así que el reintento
+                # pronto se reserva al timeout del proveedor: es el único fallo
+                # transitorio con pinta de recuperarse en segundos. bad_output,
+                # provider, changed, quota y budget esperan 10 min.
+                transient = failure_reason == "provider_timeout"
                 record["retry_after"] = (now + timedelta(minutes=1 if transient else 10)).isoformat()
                 record["failure"] = failure_reason
             event.metadata_ = {**(event.metadata_ or {}), "headline_translation": record}
@@ -327,9 +330,12 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
             record = {"fingerprint": digest, "status": "translated" if translated else "unavailable", "text": translated,
                       "target_language": "es", "machine_translation": True, "created_at": now.isoformat()}
             if not translated:
-                # Fallo transitorio (proveedor/salida): reintento pronto. Cuota o
-                # presupuesto: espera larga para no martillear hasta que se reponga.
-                transient = failure_reason not in ("quota", "budget")
+                # Cada reintento consume cuota diaria (reserve_quota va antes de
+                # llamar al proveedor y el límite es 100/día), así que el reintento
+                # pronto se reserva al timeout del proveedor: es el único fallo
+                # transitorio con pinta de recuperarse en segundos. bad_output,
+                # provider, changed, quota y budget esperan 10 min.
+                transient = failure_reason == "provider_timeout"
                 record["retry_after"] = (now + timedelta(minutes=1 if transient else 10)).isoformat()
                 record["failure"] = failure_reason
             event.metadata_ = {**(event.metadata_ or {}), "summary_translation": record}
