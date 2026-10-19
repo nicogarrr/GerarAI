@@ -94,7 +94,7 @@ function listRoutes(dir: string, base: string): string[] {
 const CATALOG_EXCEPTIONS: Record<string, string> = {
     '/security': 'menú del avatar (UserDropdown), no es destino de sección',
     '/settings': 'menú del avatar (UserDropdown), no es destino de sección',
-    '/research/data-health': 'diagnóstico fuera de navegación por decisión UX; ruta conservada, research-data-health-nav-guard lo exige',
+    // '/research/data-health' se eliminó entera por decisión de Nico (2026-10-20).
     '/export': 'quitado del menú por decisión de Nico (sin uso); ruta conservada y enlazada desde Ayuda',
     '/search': 'página-herramienta del buscador global, se abre desde el header',
     // Subpáginas del módulo Inversores: las cubre su HubNav propio

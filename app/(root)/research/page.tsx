@@ -129,12 +129,20 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                                     </span>
                                 </>
                             ) : (
-                                <span
-                                    className="text-xs text-gray-500"
-                                    title="Hay capas de datos, pero faltan inputs o evidencia con fuente para publicar una valoración."
-                                >
-                                    Cobertura {formatNumber(health?.score)}/100 · Sin evidencia suficiente
-                                </span>
+                                <>
+                                    <span
+                                        className="text-xs text-gray-500"
+                                        title="Mide qué capas existen (documentos, hechos, tesis, modelo), no si la empresa se puede valorar ni la fiabilidad de los datos."
+                                    >
+                                        Cobertura {formatNumber(health?.score)}/100
+                                    </span>
+                                    <span
+                                        className="text-xs text-gray-500"
+                                        title="Hay capas de datos, pero faltan inputs o evidencia con fuente para publicar una valoración."
+                                    >
+                                        No valorable: falta evidencia
+                                    </span>
+                                </>
                             )}
                         </>
                     )}

@@ -17,13 +17,9 @@ test('bloqueos conocidos y métricas se presentan en español sin cambiar cifras
   assert.equal(auditFixLabel('Faltan normalized_fcf_or_fcf_margin, shares_diluted (2025).'), 'Faltan FCF normalizado o margen FCF, Acciones diluidas (media) (2025).');
 });
 
-test('inventario separa noticias sin paginar fuera los fundamentales', () => {
-  const page = readFileSync('app/(root)/research/data-health/page.tsx', 'utf8');
-  assert.ok(page.includes("row.layer !== 'Noticias'"));
-  assert.ok(page.includes('sources.map('));
-  assert.ok(page.includes('newsSources.slice('));
-  assert.ok(page.includes('empresas con registros'));
-  assert.ok(!page.includes('DERIVADO'));
+// La parte de inventario (/research/data-health) se eliminó entera por
+// decisión de Nico (2026-10-20); se conserva lo que fija sobre /research/sources.
+test('sources no inventa identificadores y traduce los motivos de bloqueo', () => {
   const sources = readFileSync('app/(root)/research/sources/page.tsx', 'utf8');
   assert.ok(!sources.includes('Tesis #'));
   assert.ok(sources.includes('map(auditFixLabel)'));
