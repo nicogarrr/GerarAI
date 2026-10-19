@@ -14,7 +14,13 @@ export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
   // El helper comparte la regla del resto de superficies: un resumen que solo
   // repite el titular no se pinta (la ingesta SEC sintética guarda
   // summary === title y pintarlo duplicaba el prefijo «TICKER »).
-  const original = newsSummaryToShow(event.title ?? '', event.summary) ?? '';
+  // Titulares generados por GerarAI (headline_from_source === false, p. ej. el
+  // cluster 13F «N movimientos institucionales») no llevan resumen: el cuerpo
+  // crudo del agregador es boilerplate y ensuciaba la fila. El helper recibe
+  // la fuente para recortar restos de proveedor («News TradingView»).
+  const original = event.headline_from_source === false
+    ? ''
+    : newsSummaryToShow(event.title ?? '', event.summary, event.source) ?? '';
   const [translated, setTranslated] = useState<string | null>(event.summary_translation?.text ?? null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [busy, setBusy] = useState(false);
