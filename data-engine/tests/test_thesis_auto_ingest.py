@@ -293,7 +293,7 @@ def test_generate_with_mocked_sources_persists_facts_and_blocks_range_on_cash_bu
     assert thesis["expected_value"] is None
     assert thesis["current_price"] is not None and float(thesis["current_price"]) == 25.50
     assert "no publicable" in thesis["executive_summary"]
-    assert "normalized_fcf_or_fcf_margin" in thesis["executive_summary"]
+    assert "FCF normalizado o margen FCF" in thesis["executive_summary"]
 
     markdown = thesis["thesis_markdown"]
     assert "SIN VALORACIÓN — datos insuficientes" in markdown
@@ -332,7 +332,7 @@ def test_generate_with_mocked_sources_persists_facts_and_blocks_range_on_cash_bu
         assert price is not None and float(price.close) == 25.50 and price.source == "Finnhub"
         # Sin missing criticos financieros (revenue/shares resueltos).
         missing = " ".join(thesis["executive_summary"].split())
-        assert "normalized_fcf_or_fcf_margin" in missing
+        assert "FCF normalizado o margen FCF" in missing
     finally:
         db.close()
 

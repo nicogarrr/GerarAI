@@ -1028,13 +1028,13 @@ class ThesisService:
         """
         base: str
         if valuation.get("status") == "insufficient_data":
-            missing = ", ".join(valuation.get("missing_inputs") or []) or "datos financieros basicos"
+            missing = ", ".join(term_es(k) for k in (valuation.get("missing_inputs") or [])) or "datos financieros basicos"
             base = (
                 f"Tesis de {company.ticker} no publicable todavía: faltan {missing}. "
                 "Ningún valor justo debe considerarse fiable hasta completar las fuentes."
             )
         elif valuation.get("status") == "partial":
-            missing = ", ".join(valuation.get("missing_inputs") or []) or "algunos inputs"
+            missing = ", ".join(term_es(k) for k in (valuation.get("missing_inputs") or [])) or "algunos inputs"
             base = f"{hypothesis} Faltan {missing} (ver sección 13 del memo)."
         else:
             base = hypothesis
@@ -1246,7 +1246,7 @@ class ThesisService:
 
     def _valuation_markdown(self, valuation: dict) -> str:
         if valuation.get("status") == "insufficient_data":
-            missing = "\n".join(f"- {item}" for item in (valuation.get("missing_inputs") or []))
+            missing = "\n".join(f"- {term_es(item)}" for item in (valuation.get("missing_inputs") or []))
             return (
                 "**SIN VALORACIÓN — datos insuficientes**\n\n"
                 f"Motor: {term_es((valuation.get('trace') or {}).get('engine', 'unknown'))}\n\n"
@@ -1257,7 +1257,7 @@ class ThesisService:
         if valuation.get("status") == "partial":
             trace = valuation.get("trace") or {}
             assumed = trace.get("assumed") or {}
-            missing = "\n".join(f"- {item}" for item in (valuation.get("missing_inputs") or []))
+            missing = "\n".join(f"- {term_es(item)}" for item in (valuation.get("missing_inputs") or []))
             supuestos = (
                 f"margen FCF base {_pct_es(assumed.get('fcf_margin_base'))} "
                 f"(banda {_band_es(assumed.get('fcf_margin_band'))})"

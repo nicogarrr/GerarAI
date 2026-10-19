@@ -1017,7 +1017,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             {snapshot.model_summary ? (
               <div className="space-y-3 text-sm text-gray-300">
                 <div className="flex flex-wrap gap-2">
-                  <Badge>{snapshot.model_summary.framework_key}</Badge>
+                  <Badge>{termLabel(snapshot.model_summary.framework_key)}</Badge>
                   <Badge variant="outline">v{snapshot.model_summary.version}</Badge>
                   <Badge variant="outline">{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Badge>
                 </div>
