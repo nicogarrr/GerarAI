@@ -25,6 +25,7 @@ from app.models.entities import (
     Document,
     DocumentChunk,
     DriverAssumptionVersion,
+    EarningsDate,
     EarningsRun,
     EvidenceSuggestion,
     ExpectationReview,
@@ -204,6 +205,7 @@ __all__ = [
     "ValuationModel",
     "ValuationOutput",
     "WatchItem",
+    "EarningsDate",
 ]
 
 from app.models.paper_trading import PaperTrade as PaperTrade  # noqa: E402

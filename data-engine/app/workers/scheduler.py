@@ -24,6 +24,7 @@ from app.workers.dramatiq_app import (
     reconcile_alert_deliveries,
     refresh_asts_catalog,
     refresh_bottlenecks,
+    refresh_earnings_calendar,
     refresh_esef_fundamentals,
     refresh_ir_pages,
     refresh_macro_context,
@@ -469,6 +470,16 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         day_of_week="mon-fri",
         hour=22,
         minute=30,
+    )
+    # Fechas de resultados (cartera + watchlist): dos veces al dia, las fechas
+    # cambian poco. Misma cadencia para todos los tenants.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, refresh_earnings_calendar),
+        "cron",
+        job_id="earnings_dates_refresh",
+        hour="4,16",
+        minute=20,
     )
     return scheduler
 

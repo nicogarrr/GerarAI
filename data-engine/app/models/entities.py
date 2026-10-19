@@ -106,6 +106,33 @@ class WatchItem(TenantOwnedMixin, Base, TimestampMixin):
     company: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
+class EarningsDate(Base, TimestampMixin):
+    """Fecha de resultados de un ticker (dato de mercado, no del tenant).
+
+    ``confirmed`` es tri-estado: True = el proveedor la da por confirmada,
+    False = el proveedor la marca estimada, None = la fuente no lo dice.
+    ``session`` solo guarda la franja que publica la fuente (pre/after market);
+    nunca una hora inventada. Las filas ``source='manual'`` las escribe una
+    persona con enlace a la fuente y el refresco automatico no las toca.
+    """
+
+    __tablename__ = "earnings_dates"
+    __table_args__ = (
+        UniqueConstraint("ticker", "event_date", "source", name="uq_earnings_date_ticker_day_source"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ticker: Mapped[str] = mapped_column(String(20), index=True)
+    event_date: Mapped[date] = mapped_column(Date, index=True)
+    session: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    fiscal_label: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    confirmed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    source: Mapped[str] = mapped_column(String(40))
+    source_label: Mapped[str] = mapped_column(String(160))
+    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
 class FXRate(TenantOwnedMixin, Base, TimestampMixin):
     """Historical conversion where quote amount × rate = base amount."""
 

@@ -62,6 +62,29 @@ async def dividends_calendar(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.get("/followed")
+def followed_earnings_calendar(
+    desde: date | None = Query(default=None),
+    hasta: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Resultados de cartera + watchlist del tenant agrupados por dia (60 dias por defecto).
+
+    Lee la tabla ``earnings_dates`` (refresco programado, fuentes Yahoo/NASDAQ):
+    no llama a ningun proveedor en la peticion. ``confirmed`` es true/false/null
+    segun lo diga la fuente y ``session`` solo es la franja publicada.
+    """
+    from app.services.earnings_dates_service import followed_calendar
+
+    start = desde or date.today()
+    end = hasta or (start + timedelta(days=60))
+    if start > end:
+        raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
+    if (end - start).days > 366:
+        raise HTTPException(status_code=400, detail="rango maximo: 366 dias")
+    return followed_calendar(db, start, end)
+
+
 @router.get("/catalysts")
 async def catalysts_calendar(
     desde: date | None = Query(default=None),

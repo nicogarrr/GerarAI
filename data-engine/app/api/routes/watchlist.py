@@ -6,7 +6,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import Company, FinancialFact, MarketPrice, ThesisVersion, WatchItem
+from app.models import Company, EarningsDate, FinancialFact, MarketPrice, ThesisVersion, WatchItem
 from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.fundamentals_seed_service import enqueue_fundamentals_seed
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
@@ -145,14 +145,30 @@ async def watchlist_monitor(
             "currency": company.currency,
             "next_earnings_date": None,
             "next_earnings_source": None,
+            "next_earnings_confirmed": None,
         }
 
     # Proximos resultados (NASDAQ publico, mismo conector que /api/calendar).
     earnings_status = "skipped"
-    us_wanted = [t for t in items]
+    # Primero la tabla de fechas refrescada (Yahoo/NASDAQ/manual): cubre tambien
+    # lineas no US y lleva la fuente y si esta confirmada.
+    stored = db.execute(
+        select(EarningsDate)
+        .where(EarningsDate.ticker.in_(list(items) or [""]), EarningsDate.event_date >= today)
+        .order_by(EarningsDate.event_date)
+    ).scalars().all()
+    for row in stored:
+        target = items.get(row.ticker)
+        if target is not None and target["next_earnings_date"] is None:
+            target["next_earnings_date"] = row.event_date.isoformat()
+            target["next_earnings_source"] = row.source_label
+            target["next_earnings_confirmed"] = row.confirmed
+    us_wanted = [t for t, v in items.items() if v["next_earnings_date"] is None]
     if us_wanted:
         try:
-            result = await fetch_earnings_range(today, today + timedelta(days=31))
+            # El conector rechaza rangos de mas de 31 dias inclusive: hoy+31
+            # son 32 y el ValueError se tragaba como "unavailable" siempre.
+            result = await fetch_earnings_range(today, today + timedelta(days=30))
             earnings_status = str(result.get("status", "unavailable"))
             for event in result.get("events", []):
                 symbol = str(event.get("symbol") or "").upper()
