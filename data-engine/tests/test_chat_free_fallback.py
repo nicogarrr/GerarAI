@@ -472,3 +472,36 @@ async def test_cjk_retry_respects_total_timeout():
         raise AssertionError("debe agotar el timeout total")
     except ProviderTransportError:
         pass
+
+
+@run_async
+async def test_429_cooldown_skips_primary_on_next_chat():
+    p, b = Fake(ProviderHTTPError("fake", 429)), Fake(response(model=GROQ_MODEL, provider="groq"))
+    chat = ChatFallbackProvider(p, b, total=.3, delay=.1)
+    await chat.complete(LLMRequest([Message("user", "hola")], task="chat"))
+    await chat.complete(LLMRequest([Message("user", "hola")], task="chat"))
+    assert len(p.calls) == 1 and len(b.calls) == 2
+
+
+@run_async
+async def test_cooling_backup_is_skipped_for_next_member():
+    p = Fake(ProviderHTTPError("opencode-go", 429))
+    groq = Fake(ProviderHTTPError("groq", 429))
+    groq.name = "groq"
+    gem = Fake(response(model="gemini-3.5-flash-lite", provider="gemini"))
+    gem.name = "gemini"
+    chat = ChatFallbackProvider(p, groq, total=.5, delay=.01, backup2=gem)
+    await chat.complete(LLMRequest([Message("user", "hola")], task="chat"))
+    await chat.complete(LLMRequest([Message("user", "hola")], task="chat"))
+    assert len(groq.calls) == 1 and len(gem.calls) == 2
+
+
+@run_async
+async def test_extra_openrouter_member_is_last_resort():
+    p = Fake(ProviderHTTPError("opencode-go", 429))
+    groq = Fake(ProviderHTTPError("groq", 429))
+    groq.name = "groq"
+    orr = Fake(response(model="x:free", provider="openrouter"))
+    orr.name = "openrouter"
+    out = await ChatFallbackProvider(p, groq, total=.5, delay=.01, extra_backups=((orr, "x:free"),)).complete(LLMRequest([Message("user", "hola")], task="chat"))
+    assert out.provider == "openrouter" and orr.calls[0].model == "x:free"
