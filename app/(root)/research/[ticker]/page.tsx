@@ -991,7 +991,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     content = (
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <Panel collapsible="mobile" title="Última tesis">
+          <Panel density="compact" title="Última tesis">
             {snapshot.latest_thesis ? (
               <>
                 <div className="flex flex-wrap gap-2">
@@ -1001,8 +1001,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     <Badge variant="outline">{label(snapshot.latest_thesis.status)}</Badge>
                   ) : null}
                 </div>
+                <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                  <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100" title={per.note ?? undefined}>{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
+                  {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100">{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</dd></div> : null}
+                </dl>
                 {thesisIsPublic(snapshot.latest_thesis.status) ? (
-                  <p className="mt-3 text-sm leading-6 text-gray-300">{cleanThesisText(snapshot.latest_thesis.executive_summary)}</p>
+                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-300 md:line-clamp-none">{cleanThesisText(snapshot.latest_thesis.executive_summary)}</p>
                 ) : (
                   <p className="mt-3 text-sm leading-6 text-gray-400">{snapshot.latest_thesis.status === 'insufficient_data' ? `La v${snapshot.latest_thesis.version} es provisional por datos insuficientes: sin veredicto ni cifras.` : `La v${snapshot.latest_thesis.version} está en borrador: sin veredicto ni cifras hasta que se publique.`}</p>
                 )}
@@ -1175,13 +1179,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </div>
         </Panel>
         {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><p className="text-sm text-gray-400">Elementos orbitales de CelesTrak y evolución del semieje mayor.</p><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
-        <p className="text-sm text-gray-400">
-          PER (TTM){' '}
-          <span className="font-semibold text-gray-100">
-            {per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}
-          </span>
-          {per.note ? <span className="ml-2 text-xs text-gray-500">{per.note}</span> : null}
-        </p>
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
           {researchValuability(snapshot)}
         </p>
