@@ -174,7 +174,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/ScrollToOnMount.tsx': 'useEffect, browser:document',
   'components/research/ShareCapitalPanel.tsx': 'jsx-onClick, useState, jsx-onChange, libreria cliente: recharts, importa cliente: components/ui/panel.tsx',
   'components/research/ThesisApproveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
-  'components/research/ThesisAudioPlayer.tsx': 'browser:window, useSyncExternalStore, useState, useRef, useEffect, jsx-onClick',
+  'components/research/ThesisAudioPlayer.tsx': 'useState, jsx-onError',
   'components/research/ThesisDebatePanel.tsx': 'useState, jsx-onClick',
   'components/research/ThesisExportMenu.tsx': 'importa cliente: components/ui/dropdown-menu.tsx',
   'components/research/ThesisGenerateButton.tsx': 'useRouter, useState, useRef, useEffect, browser:document, browser:window, jsx-onClick',
