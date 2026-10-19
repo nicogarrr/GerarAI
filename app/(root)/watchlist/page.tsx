@@ -50,6 +50,14 @@ interface WatchlistStock {
 }
 
 const PAGE_SIZE = 20;
+// La línea pre/post-mercado es decorativa: el TTFB de la página no puede
+// depender de la cotización extendida más lenta (Yahoo en frío: 0,3-1,7 s por
+// símbolo medido en prod). Pasado el plazo esa fila no muestra la línea
+// (igual que cuando falla la lectura), nunca un dato inventado.
+const EXTENDED_QUOTE_BUDGET_MS = 700;
+function withinBudget<T>(read: Promise<T | null>, ms: number): Promise<T | null> {
+    return Promise.race([read, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
+}
 
 export default async function WatchlistPage({
     searchParams,
@@ -70,7 +78,7 @@ export default async function WatchlistPage({
     const datedChangesPromise = fetchDatedChanges(pageSymbols);
     const monitorPromise = getWatchlistMonitor(pageSymbols);
     const entryPromises = pageItems.map((item) =>
-        Promise.all([getWatchlistEntryData(item.symbol), getExtendedQuote(item.symbol)]).then(
+        Promise.all([getWatchlistEntryData(item.symbol), withinBudget(getExtendedQuote(item.symbol), EXTENDED_QUOTE_BUDGET_MS)]).then(
             (value) => ({ ok: true as const, value }),
             () => ({ ok: false as const }),
         ),

@@ -19,3 +19,8 @@ test('research starts user context before awaiting the dashboard', () => {
     assert.match(research, /await userContext/);
 });
 
+
+test('watchlist does not wait for the slowest extended quote', () => {
+    assert.match(watchlist, /EXTENDED_QUOTE_BUDGET_MS/);
+    assert.match(watchlist, /withinBudget\(getExtendedQuote\(item\.symbol\), EXTENDED_QUOTE_BUDGET_MS\)/);
+});
