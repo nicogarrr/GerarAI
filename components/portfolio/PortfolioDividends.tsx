@@ -141,6 +141,29 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                 </span>
             </div>
 
+            {projection.gross_summary && projection.gross_summary.gross_total_base > 0 ? (
+                <p className="text-sm text-gray-200">
+                    Bruto proyectado a {projection.horizon_months} meses:{' '}
+                    <span className="font-semibold">{formatMoney(projection.gross_summary.gross_total_base, baseCurrency)}</span>
+                    {projection.gross_summary.gross_unverified_base > 0 ? (
+                        <span className="text-gray-400">
+                            {' '}(de ellos {formatMoney(projection.gross_summary.gross_unverified_base, baseCurrency)} con retención en origen no verificada)
+                        </span>
+                    ) : null}
+                    . Neto e IRPF: N/D salvo posiciones con retención verificada.
+                    {projection.coverage.fx_missing.length > 0 ? (
+                        <span className="text-amber-400/90">
+                            {' '}No incluye: {projection.coverage.fx_missing.length} {projection.coverage.fx_missing.length === 1 ? 'posición' : 'posiciones'} sin tipo de cambio ({projection.coverage.fx_missing.join(', ')}).
+                        </span>
+                    ) : null}
+                    {projection.coverage.sin_datos.length > 0 ? (
+                        <span className="text-gray-400">
+                            {' '}Sin dividendos registrados: {projection.coverage.sin_datos.join(', ')}.
+                        </span>
+                    ) : null}
+                </p>
+            ) : null}
+
             {projection.positions.length === 0 && projection.declared_future.length === 0 ? (
                 <Panel title="Proyección de dividendos">
                     <p className="text-sm text-gray-400">
@@ -182,8 +205,24 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                                                 <td className="py-2 pr-4 font-medium text-gray-100">{monthLabel(month.month)}</td>
                                                 <td className="py-2 pr-4">
                                                     {month.covered_tickers.length > 0
-                                                        ? formatMoney(month.gross_base, baseCurrency)
-                                                        : 'N/D'}
+                                                        ? (
+                                                            <span>
+                                                                {formatMoney(month.gross_base, baseCurrency)}
+                                                                {month.gross_unverified_base != null && month.gross_unverified_base > 0 ? (
+                                                                    <span className="block text-[10px] text-amber-400/90">
+                                                                        + {formatMoney(month.gross_unverified_base, baseCurrency)} bruto, retención sin verificar
+                                                                    </span>
+                                                                ) : null}
+                                                            </span>
+                                                        )
+                                                        : month.gross_unverified_base != null && month.gross_unverified_base > 0
+                                                            ? (
+                                                                <span title="Importe bruto; retención en origen no verificada">
+                                                                    {formatMoney(month.gross_unverified_base, baseCurrency)}
+                                                                    <span className="block text-[10px] text-amber-400/90">bruto, retención sin verificar</span>
+                                                                </span>
+                                                            )
+                                                            : 'N/D'}
                                                 </td>
                                                 <td className="py-2 pr-4">
                                                     {month.covered_tickers.length > 0
