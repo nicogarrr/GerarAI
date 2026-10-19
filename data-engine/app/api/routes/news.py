@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
@@ -17,6 +18,7 @@ from app.services.news_headline_translation import (
     translate_headline,
     translate_summary,
 )
+from app.services.news_related_tickers import related_for_events
 from app.services.news_service import (
     NewsService,
     is_position_change_headline,
@@ -37,6 +39,8 @@ from app.services.ticker_news_lane import (
     fails_strict_name,
     is_law_firm_solicitation,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -69,6 +73,25 @@ def manual_news(payload: ManualNewsRequest, db: Session = Depends(get_db)) -> Ma
 @router.post("/ingest", response_model=NewsIngestResponse)
 def ingest_news(payload: NewsIngestRequest, db: Session = Depends(get_db)) -> NewsIngestResponse:
     return NewsService().ingest_news_items(db, payload.items, payload.source)
+
+
+def _related_tickers_for_rows(db: Session, rows: list, clusters: dict, story_groups: list) -> dict[int, list[dict]]:
+    """Relacionados por evento visible. Nunca rompe el feed: ante un error se
+    omite la tira (el dato es complementario)."""
+    items: list[tuple[int, object, str]] = []
+    for item in rows:
+        if isinstance(item[0], str) and item[0] == "cluster":
+            continue  # titular 13F agrupado: boilerplate, sin tira
+        if isinstance(item[0], str) and item[0] == "story":
+            event, company = story_groups[item[1]].event, story_groups[item[1]].company
+        else:
+            event, company = item
+        items.append((event.id, company, f"{original_headline(event)} {event.summary or ''}"))
+    try:
+        return related_for_events(db, items)
+    except Exception:  # noqa: BLE001 - complemento: no tumba el feed
+        logger.warning("related_tickers fallo; feed sin tira", exc_info=True)
+        return {}
 
 
 @router.get("")
@@ -193,6 +216,7 @@ def news_events(
         if len(chunk) < _SCAN_CHUNK:
             break
     events = []
+    related_by_event = _related_tickers_for_rows(db, rows, clusters, story_groups)
     for item in rows:
         cluster_count = 0
         story_coverage: list[dict] = []
@@ -262,6 +286,9 @@ def news_events(
                 "materiality_reasons": persisted.get("materiality_reasons"),
                 "source_policy": persisted.get("source_policy"),
                 "model_route": persisted.get("model_route"),
+                # Tira de tickers relacionados (solo evidencia explicita en el
+                # texto) con ultimo cierre y variacion; ausente si no hay.
+                "related_tickers": related_by_event.get(event.id) or None,
             }
         )
     return events
