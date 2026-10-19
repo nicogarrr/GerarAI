@@ -61,6 +61,7 @@ import {
   termLabel,
 } from '@/components/research/FundamentalModelPanels';
 import { Badge } from '@/components/ui/badge';
+import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { exchangeDisplayName } from '@/lib/exchangeName';
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
 import { companyTypeLabel, etiquetaTierFuente, etiquetaValor, sectorIndustryLine } from '@/lib/labels';
@@ -1618,7 +1619,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <div className="mx-auto max-w-[1600px]">
         <Link className="mb-5 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
         <header className="mb-6 flex flex-col gap-4 border-b border-gray-800 pb-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <CompanyLogo ticker={ticker} name={company.name || ticker} className="size-12 shrink-0 rounded-xl sm:size-14" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3"><h1 className="text-2xl font-bold sm:text-3xl">{ticker}</h1>{exchangeDisplayName(company.exchange) ? <Badge variant="outline">{exchangeDisplayName(company.exchange)}</Badge> : null}<Badge variant="outline">{company.currency}</Badge></div>
               <p className="mt-2 text-sm text-gray-400 sm:text-base">{company.name} · {sectorIndustryLine(company.sector, company.industry)}</p>

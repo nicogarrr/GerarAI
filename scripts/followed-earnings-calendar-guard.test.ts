@@ -39,3 +39,16 @@ test('resultados seguidos: la fuente es visible (title) y el enlace es externo s
   assert.match(list, /title=\{`Fuente: \$\{event\.source\}`\}/);
   assert.match(list, /rel="noopener noreferrer"/);
 });
+
+void test('la tira de Inicio usa logos legibles en movil (no los 20 px de antes)', () => {
+  const strip = readFileSync('components/calendar/EarningsDayStrip.tsx', 'utf8');
+  assert.ok(strip.includes('size-9'), 'logo de 36 px en movil');
+  assert.ok(!strip.includes('size-5 rounded-md'), 'sin el logo diminuto anterior');
+  assert.ok(strip.includes('LOGOS_SHOWN = 2'), 'con logos grandes caben 2 + «+N»');
+});
+
+void test('la cabecera de la ficha de empresa muestra el logo a la izquierda del ticker', () => {
+  const ficha = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+  assert.match(ficha, /import \{ CompanyLogo \} from '@\/components\/calendar\/CompanyLogo'/);
+  assert.match(ficha, /<CompanyLogo ticker=\{ticker\} name=\{company\.name \|\| ticker\}/);
+});
