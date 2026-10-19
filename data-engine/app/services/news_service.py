@@ -26,6 +26,23 @@ POSITION_CHANGE_HEADLINE_RE = re.compile(
 )
 
 
+_GENERIC_HEADLINE_RE = re.compile(
+    r"se\s+abre\s+en\s+una\s+nueva\s+ventana|opens?\s+in\s+a\s+new\s+window",
+    re.IGNORECASE,
+)
+
+
+def is_generic_headline(headline: str | None) -> bool:
+    """Texto de enlace del visor de la fuente que llegó como «titular»
+    (SEC: «Comunicado de prensa del Q2 2026, archivo PDF, (se abre en una
+    nueva ventana)», visto en prod con ZETA 19-oct-2026). No describe la
+    noticia: no se guarda como titular de la fuente ni sustituye al
+    recorte del resumen. Solo la frase exacta de enlace de visor: un
+    «archivo PDF» suelto puede ser parte de un titular real (objeción del
+    auditor, 19-oct-2026)."""
+    return bool(headline) and bool(_GENERIC_HEADLINE_RE.search(headline))
+
+
 def is_position_change_headline(headline: str) -> bool:
     """Titular boilerplate de cambio de posición institucional (spam 13F)."""
     return bool(headline) and bool(POSITION_CHANGE_HEADLINE_RE.search(headline))
@@ -320,6 +337,11 @@ class NewsService:
         if published_at:
             date_source = date_source_label or "source"
         news_metadata: dict = {"date_source": date_source}
+        # Un texto de enlace del visor («archivo PDF, (se abre en una nueva
+        # ventana)») no es un titular: se descarta aquí para que ni el title
+        # ni metadata.source_headline (alertas, feed, traducción) lo usen.
+        if is_generic_headline(source_headline):
+            source_headline = None
         # Titular original de la fuente (antes del prefijo de ticker F175),
         # guardado en la creación para que las alertas muestren el titular real.
         if source_headline:

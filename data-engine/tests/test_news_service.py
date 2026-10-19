@@ -297,3 +297,16 @@ def test_ingest_without_url_dedups_against_stored_source_headline(db):
     second = NewsService().ingest_news_items(db, [item])
     assert second.created == 0
     assert second.skipped_duplicates == 1
+
+
+def test_generic_viewer_link_headline_is_not_a_title():
+    """Caso real 19 oct 2026 (ZETA): «Comunicado de prensa del Q2 2026,
+    archivo PDF, (se abre en una nueva ventana)» es texto de enlace del
+    visor de la SEC, no un titular."""
+    from app.services.news_service import is_generic_headline
+
+    assert is_generic_headline("Comunicado de prensa del Q2 2026, archivo PDF, (se abre en una nueva ventana)")
+    assert is_generic_headline("Q2 2026 Press Release, PDF file (opens in a new window)")
+    assert not is_generic_headline("Zeta Global reports Q2 2026 results")
+    assert not is_generic_headline("")
+    assert not is_generic_headline(None)

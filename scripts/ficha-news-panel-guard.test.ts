@@ -34,5 +34,6 @@ test('sin relleno de traducción bajo el titular', () => {
     assert.ok(!headline.includes('traducción no disponible'), 'nada de meta-texto de fallo: el original ya es honesto');
     // La traducción, cuando existe, sigue etiquetada con su provenance.
     assert.ok(headline.includes('Traducción automática · español'));
-    assert.ok(headline.includes('Ver titular original'));
+    assert.ok(headline.includes('Ver original'), 'misma etiqueta que el resumen: una sola «Ver original» por fila');
+    assert.ok(!headline.includes('Ver titular original'), 'sin doble etiqueta «Ver titular original»/«Ver original» (Tester 4 nº4)');
 });
