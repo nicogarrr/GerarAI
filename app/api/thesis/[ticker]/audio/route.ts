@@ -9,6 +9,11 @@ type Ctx = { params: Promise<{ ticker: string }> };
 
 type Resolved = { error: NextResponse; path?: undefined; identity?: undefined } | { error?: undefined; path: string; identity: Record<string, string> };
 
+function versionQuery(request: NextRequest): string {
+  const raw = request.nextUrl.searchParams.get('version');
+  return raw && /^\d{1,6}$/.test(raw) ? `?version=${raw}` : '';
+}
+
 async function resolve(ctx: Ctx, method: 'GET' | 'POST'): Promise<Resolved> {
   await requireAuthenticatedUser();
   const { ticker } = await ctx.params;
@@ -25,13 +30,13 @@ async function resolve(ctx: Ctx, method: 'GET' | 'POST'): Promise<Resolved> {
 /**
  * Proxy firmado del mp3 de la tesis. El navegador no puede firmar la identidad
  * research, así que el `<audio>` pasa por aquí. Reenvía Range (avanzar y
- * retroceder). `v` solo invalida la caché del navegador al cambiar de versión.
+ * retroceder). `version` (opcional) elige la versión; sin ella el backend usa la última publicada. `v` solo invalida la caché del navegador al cambiar de versión.
  */
 async function getHandler(request: NextRequest, ctx: Ctx) {
   const r = await resolve(ctx, 'GET');
   if (r.error) return r.error;
   const range = request.headers.get('range');
-  const upstream = await fetch(`${BACKEND_URL}${r.path}`, {
+  const upstream = await fetch(`${BACKEND_URL}${r.path}${versionQuery(request)}`, {
     headers: range ? { ...r.identity, Range: range } : r.identity,
     cache: 'no-store',
   });
@@ -51,10 +56,10 @@ async function getHandler(request: NextRequest, ctx: Ctx) {
 }
 
 /** Pide generar el audio (202). 503 si el sintetizador no responde. */
-async function postHandler(_request: NextRequest, ctx: Ctx) {
+async function postHandler(request: NextRequest, ctx: Ctx) {
   const r = await resolve(ctx, 'POST');
   if (r.error) return r.error;
-  const upstream = await fetch(`${BACKEND_URL}${r.path}`, { method: 'POST', headers: r.identity, cache: 'no-store' });
+  const upstream = await fetch(`${BACKEND_URL}${r.path}${versionQuery(request)}`, { method: 'POST', headers: r.identity, cache: 'no-store' });
   return NextResponse.json({ ok: upstream.ok }, { status: upstream.ok ? 202 : upstream.status === 503 ? 503 : 502 });
 }
 

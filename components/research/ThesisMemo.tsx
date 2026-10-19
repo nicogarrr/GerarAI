@@ -11,7 +11,6 @@ import { GlossaryTerm } from '@/components/GlossaryTerm';
 import ScenarioAssumptions from '@/components/research/ScenarioAssumptions';
 import ThesisHumanInputForm from '@/components/research/ThesisHumanInputForm';
 import ThesisDebatePanel from '@/components/research/ThesisDebatePanel';
-import ThesisAudioPlayer from '@/components/research/ThesisAudioPlayer';
 import ThesisMarkdownPager, { splitMemoPages } from '@/components/research/ThesisMarkdownPager';
 import { Badge } from '@/components/ui/badge';
 import type { ResearchThesis } from '@/lib/actions/research.actions';
@@ -201,7 +200,6 @@ export default function ThesisMemo({
         ) : null}
       </div>
 
-      {ticker ? <ThesisAudioPlayer ticker={ticker} version={thesis.version} /> : null}
 
       {thesis.status === 'insufficient_data' ? (
         <div
