@@ -10,7 +10,9 @@ import test from 'node:test';
 import { form13fValueToUsd } from '../lib/form13f-value.ts';
 
 const grid = readFileSync('app/(root)/inversores/page.tsx', 'utf8');
-const portfolios = readFileSync('app/(root)/inversores/carteras/page.tsx', 'utf8');
+// Carteras se fusiona en /inversores (decision de Nico, WhatsApp 2026-10-20 00:59):
+// las aserciones sobre la pagina de carteras apuntan ahora al hub que la absorbe.
+const portfolios = readFileSync('app/(root)/inversores/page.tsx', 'utf8');
 const detail = readFileSync('app/(root)/inversores/[slug]/page.tsx', 'utf8');
 const format = readFileSync('app/(root)/inversores/_components/format.ts', 'utf8');
 const constants = readFileSync('lib/constants.ts', 'utf8');

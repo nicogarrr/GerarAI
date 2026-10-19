@@ -4,10 +4,11 @@ import Link from 'next/link';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getInvestors } from '@/lib/actions/investors.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
+import { formatNumber } from '@/lib/format';
 
 import { InvestorAvatar } from './_components/Avatar';
 import { SyncPortfoliosButton } from './_components/SyncPortfoliosButton';
-import { periodLabel } from './_components/format';
+import { periodLabel, usd } from './_components/format';
 import { Pagination, paginate } from './_components/Pagination';
 
 export const dynamic = 'force-dynamic';
@@ -37,8 +38,8 @@ export default async function InvestorsPage({ searchParams }: PageProps) {
     }
 
     const paged = paginate(data.investors, pagina, PAGE_SIZE);
-    // Misma primera carga que /inversores/carteras: sin ningún 13F descargado,
-    // el hub ofrece la acción real en vez de una lista de "sin sincronizar".
+    // Sin ningún 13F descargado, el hub ofrece la acción real en vez de una
+    // lista de "sin sincronizar".
     const noneSynced = data.investors.length > 0 && data.investors.every((investor) => !investor.report_date);
 
     return (
@@ -54,27 +55,46 @@ export default async function InvestorsPage({ searchParams }: PageProps) {
                 </div>
             ) : null}
 
-            <ul className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                 {paged.items.map((investor) => (
                     <li className="min-w-0" key={investor.slug}>
                         <Link
-                            className="flex h-full items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-5 transition-colors hover:border-gray-700"
+                            className="flex h-full flex-col gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-6 transition-colors hover:border-gray-700"
                             href={`/inversores/${investor.slug}`}
                         >
-                            <InvestorAvatar name={investor.name} slug={investor.slug} />
-                            <span className="min-w-0">
-                                <span className="block truncate text-base font-medium text-gray-100">{investor.name}</span>
-                                <span className="block truncate text-sm text-gray-500">{investor.firm}</span>
-                                <span className="mt-1 block text-xs text-gray-500">
+                            <span className="flex items-center gap-4">
+                                <InvestorAvatar name={investor.name} slug={investor.slug} />
+                                <span className="min-w-0">
+                                    <span className="block truncate text-base font-medium text-gray-100">{investor.name}</span>
+                                    <span className="block truncate text-sm text-gray-500">{investor.firm}</span>
+                                </span>
+                            </span>
+                            {investor.report_date ? (
+                                <span className="flex items-end justify-between gap-4">
+                                    <span>
+                                        <span className="block text-2xl font-semibold text-gray-100">{usd(investor.value_usd_thousands, investor.report_date)}</span>
+                                        <span className="block text-xs text-gray-500">
+                                            {investor.positions !== null
+                                                ? `${formatNumber(investor.positions, { maximumFractionDigits: 0 })} posiciones`
+                                                : 'N/D'}
+                                        </span>
+                                    </span>
+                                    <span className="text-right text-xs text-gray-500">
+                                        Cartera a {periodLabel(investor.report_date)}
+                                        {investor.coverage === 'partial' ? (
+                                            <span className="block text-amber-300">Datos parciales</span>
+                                        ) : null}
+                                    </span>
+                                </span>
+                            ) : (
+                                <span className="text-sm text-gray-500">
                                     {investor.has_13f
-                                        ? investor.report_date
-                                            ? `Cartera a ${periodLabel(investor.report_date)}`
-                                            : 'Cartera sin sincronizar todavía'
+                                        ? '13F sin sincronizar'
                                         : investor.has_public_profile
                                           ? 'Participaciones públicas · ver ficha'
                                           : 'Sin 13F · ver ficha'}
                                 </span>
-                            </span>
+                            )}
                         </Link>
                     </li>
                 ))}
@@ -82,8 +102,8 @@ export default async function InvestorsPage({ searchParams }: PageProps) {
 
             <Pagination basePath="/inversores" page={paged.page} total={paged.total} />
 
-            <p className="text-xs text-gray-500">Fotos con licencia libre de Wikimedia Commons; autor y licencia en cada ficha.</p>
-            <p className="text-xs text-gray-500">Fuente: SEC, Form 13F (EDGAR). Posiciones declaradas en EE. UU.; hasta 45 días de retardo. Otras participaciones: fuente y fecha en cada ficha.</p>
+            <p className="text-xs text-gray-500">Fotos con licencia libre de Wikimedia Commons; autor y licencia en cada ficha. Sin foto libre, inicial.</p>
+            <p className="text-xs text-gray-500">Fuente: SEC, Form 13F (EDGAR). Trimestral, con hasta 45 días de retardo; solo posiciones largas en EE. UU. Valor en dólares tal como se declara. Otras participaciones: fuente y fecha en cada ficha.</p>
         </main>
     );
 }

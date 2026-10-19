@@ -5,7 +5,8 @@ import test from 'node:test';
 const read = (p: string) => readFileSync(p, 'utf8');
 
 test('inversores: cuenta nueva sin 13F ofrece la acción real de sincronizar', () => {
-  const page = read('app/(root)/inversores/carteras/page.tsx');
+  // Carteras se fusiona en /inversores (decisión de Nico, 2026-10-20): el estado vacío vive en el hub.
+  const page = read('app/(root)/inversores/page.tsx');
   assert.ok(page.includes('SyncPortfoliosButton'), 'la página de carteras debe usar SyncPortfoliosButton');
   assert.ok(page.includes('Aún no hay carteras descargadas en esta cuenta.'));
   assert.ok(page.includes('.every((investor) => !investor.report_date)'), 'el estado vacío solo aparece cuando NINGÚN inversor tiene 13F descargado');
@@ -22,11 +23,6 @@ test('más compradas: sin dos trimestres de 13F ofrece la misma acción de sincr
   assert.ok(page.includes('faltan dos trimestres de 13F sincronizados.'), 'la razón honesta se conserva');
 });
 
-test('hub inversores: sin ningún 13F ofrece la misma acción de sincronizar', () => {
-  const page = read('app/(root)/inversores/page.tsx');
-  assert.ok(page.includes('SyncPortfoliosButton'), 'el hub reutiliza el botón de sincronización en su estado vacío');
-  assert.ok(page.includes('.every((investor) => !investor.report_date)'), 'solo cuando NINGÚN inversor tiene 13F');
-});
 
 test('ficha de inversor: con 13F sin sincronizar ofrece la acción en vez de «N/D · 0 posiciones»', () => {
   const page = read('app/(root)/inversores/[slug]/page.tsx');

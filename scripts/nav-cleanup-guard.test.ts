@@ -100,7 +100,6 @@ const CATALOG_EXCEPTIONS: Record<string, string> = {
     // Subpáginas del módulo Inversores: las cubre su HubNav propio
     // (app/(root)/inversores/layout.tsx) y las migas las nombran vía
     // SUBROUTE_LABELS/humanizeSlug.
-    '/inversores/carteras': 'subnav propio de Inversores (HubNav)',
     '/inversores/cartas': 'subnav propio de Inversores (HubNav)',
     '/inversores/videos': 'subnav propio de Inversores (HubNav)',
     '/inversores/conceptos': 'subnav propio de Inversores (HubNav)',

@@ -71,6 +71,8 @@ const nextConfig: NextConfig = {
         return [
             { source: '/research/settings', destination: '/settings', permanent: true },
             { source: '/movers', destination: '/screener?vista=subidas', permanent: true },
+            // Carteras se fusiona en Inversores (decisión de Nico, 2026-10-20): la ruta vieja redirige.
+            { source: '/inversores/carteras', destination: '/inversores', permanent: true },
         ];
     },
     async headers() {

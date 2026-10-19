@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 
 const SECTIONS = [
   ["/inversores", "Todos"],
-  ["/inversores/carteras", "Carteras"],
   ["/inversores/cartas", "Cartas"],
   ["/inversores/videos", "Vídeos"],
   ["/inversores/conceptos", "Conceptos"],

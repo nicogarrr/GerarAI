@@ -94,7 +94,7 @@ test("concepts have primary sources and do not attribute SEC education to an inv
 });
 test("all managers use source-labelled portfolios; no 13F filter or top-ten truncation", () => {
   assert.ok(
-    !read("app/(root)/inversores/carteras/page.tsx").includes(".filter("),
+    !read("app/(root)/inversores/page.tsx").includes(".filter("), // carteras fusionada en el hub (decision de Nico, 2026-10-20)
   );
   const detail = read("app/(root)/inversores/[slug]/page.tsx");
   assert.match(detail, /getInvestorPortfolio\(slug\)/);
@@ -114,8 +114,8 @@ test("all managers use source-labelled portfolios; no 13F filter or top-ten trun
 });
 test("hub exposes each section with selected state and real page navigation", () => {
   const nav = read("app/(root)/inversores/_components/HubNav.tsx");
+  // Carteras se fusiona en /inversores (decisión de Nico, 2026-10-20): sale del HubNav.
   for (const name of [
-    "Carteras",
     "Cartas",
     "Vídeos",
     "Conceptos",
