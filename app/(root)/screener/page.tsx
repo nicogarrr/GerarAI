@@ -209,7 +209,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
             {engineScreens.engineDown ? (
               <Badge variant="outline">motor no disponible · Finnhub como fallback offline</Badge>
             ) : (
-              <Badge>{engineScreens.screens.length} filtros guardados</Badge>
+              <Badge>{engineScreens.screens.length} {engineScreens.screens.length === 1 ? 'filtro guardado' : 'filtros guardados'}</Badge>
             )}
             <Button asChild variant="outline" size="sm" className="ml-auto">
               <Link href="/screeners">Abrir screeners</Link>
