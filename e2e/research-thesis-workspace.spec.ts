@@ -103,13 +103,15 @@ test.describe("research thesis workspace", () => {
       page.getByRole("button", { name: "Generar tesis" }),
     ).toBeVisible();
 
-    // Memo export link targets the per-ticker markdown endpoint; since the
-    // export actions live in the "Exportar" menu, open it before asserting.
-    await page.getByRole("button", { name: "Exportar" }).click();
-    await expect(
-      page.getByRole("menuitem", { name: "Memo de la tesis" }),
-    ).toHaveAttribute("href", "/api/thesis-memo/MSFT");
-    await page.keyboard.press("Escape");
+    // Sin tesis publicada no hay menú que abrir: ThesisExportMenu deja el
+    // control "Leer / Descargar" deshabilitado y explica el motivo (salida
+    // honesta). El menú real se ejerce en el spec de E2ENAR con versión
+    // publicada, más abajo.
+    const exportacionDeshabilitada = page.locator(
+      'span[title="Aún no hay ninguna tesis publicada: se puede leer y descargar cuando exista una versión aprobada."]',
+    );
+    await expect(exportacionDeshabilitada).toBeVisible();
+    await expect(exportacionDeshabilitada).toContainText("Leer / Descargar");
 
     // Without a persisted thesis the workspace says so - nothing invented.
     await expect(page.getByText("Aún no existe ninguna tesis.")).toBeVisible();
@@ -185,6 +187,20 @@ db.close()
     await narrativePanel.screenshot({
       path: "test-results/analisis-narrativo.png",
     });
+
+    // Con versión publicada el menú "Leer / Descargar" sí existe y apunta a
+    // los endpoints por ticker (la vista dedicada, el PDF y el Markdown).
+    await page.getByRole("button", { name: "Leer / Descargar" }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "Leer la tesis" }),
+    ).toHaveAttribute("href", "/research/E2ENAR/tesis");
+    await expect(
+      page.getByRole("menuitem", { name: "Descargar PDF" }),
+    ).toHaveAttribute("href", "/api/thesis/E2ENAR/pdf");
+    await expect(
+      page.getByRole("menuitem", { name: "Descargar Markdown" }),
+    ).toHaveAttribute("href", "/api/thesis-memo/E2ENAR");
+    await page.keyboard.press("Escape");
 
     // Caso oculto: sin narrative_sections la seccion no aparece (honesto).
     await page.goto("/research/MSFT?view=thesis");
