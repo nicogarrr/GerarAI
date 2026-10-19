@@ -24,6 +24,16 @@ function shortNumber(raw: string): string {
  * snake_case, decimales de 4+ cifras y puntuación doble ("..", "?."). Solo se
  * toca la presentación; el texto guardado no cambia.
  */
+// Siglas y claves cortas de una sola palabra que el backend antiguo persistió
+// en crudo dentro de prosa española («faltan valor contable, roe, aum, nav»,
+// medido en prod 19 oct 2026 en resúmenes de CB/BN): la regla snake_case no
+// las toca porque no llevan guion bajo. Lista cerrada de siglas financieras
+// (ninguna es palabra de prosa española); lo demás sigue intacto. La guarda
+// de contexto replica la regla snake_case (sin letra/dígito/_/./@/- pegados) y
+// además excluye '?' y '=' alrededor: los tokens dentro de URLs y query
+// strings (https://x.com/nav/roe?eps=1) no se tocan.
+const SHORT_KEY = /(?<![\w/.@?=-])(?:roe|roa|roic|eps|ebitda|wacc|aum|nav|arr|arpu|noi|tpv|rpo|sbc)(?![\w/?=-])/g;
+
 export function cleanThesisText(text: string | null | undefined): string {
     if (!text) return text ?? '';
     return text
@@ -33,6 +43,7 @@ export function cleanThesisText(text: string | null | undefined): string {
             const known = frameworkTerm(token) ?? metricLabel(token);
             return known.replaceAll('_', ' ');
         })
+        .replace(SHORT_KEY, (token) => frameworkTerm(token) ?? metricLabel(token))
         .replace(/(?<![\w.])-?\d+\.\d{4,}(?![\d.]*\d\.)/g, (num) => shortNumber(num))
         .replace(/([?!])\.(?!\.)/g, '$1')
         .replace(/(?<!\.)\.{2}(?!\.)/g, '.');
