@@ -510,6 +510,10 @@ _POSITION_QUERY_RE = re.compile(
     r"(?i)\b(?:peso|posici[oó]n|acciones)\b[^.!?\n]{0,40}\b(?:cartera|tengo|mis)\b"
     r"|\b(?:peso|posici[oó]n)\s+(?:de|en|que)\b"
     r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+)?(?:tengo|vale|valen|tienen)\b"
+    # "cuánto pesa ASTS (en mi cartera)" / "qué peso tiene ASTS": la forma
+    # verbal de peso tambien es pregunta de posicion.
+    r"|\bcu[aá]nt[oa]\s+pesa[n]?\b"
+    r"|\bqu[eé]\s+peso\s+tiene[n]?\b"
 )
 # Cuando la misma frase pide ademas caja o patrimonio se adjunta ese bloque.
 _RANK_HIGH_RE = re.compile(r"(?i)\b(?:m[aá]s\s+(?:alto|caro|grande)|mayor|m[aá]xim[oa])\b")
