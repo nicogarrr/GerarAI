@@ -45,6 +45,8 @@ export interface DiscoveryView {
   evidence: DiscoveryEvidenceView[];
   model: string;
   created_at: string;
+  theme_detected: boolean;
+  theme_last_seen: string | null;
 }
 
 export interface DiscoveriesState {
