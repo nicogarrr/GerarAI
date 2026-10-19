@@ -1174,7 +1174,23 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <div className="min-w-0 max-w-full space-y-6 [overflow-wrap:anywhere]">
         <div className="flex flex-wrap items-center gap-3">
           <ThesisGenerateButton ticker={ticker} />
-          <ThesisApproveButton ticker={ticker} disabled={data.history.length === 0} latestStatus={data.thesis?.status ?? null} latestVersion={data.thesis?.version ?? null} />
+          <ThesisApproveButton
+            ticker={ticker}
+            disabled={data.history.length === 0}
+            latestStatus={data.thesis?.status ?? null}
+            latestVersion={data.thesis?.version ?? null}
+            riskNotes={[
+              ...(snapshot?.model_summary && !snapshot.model_summary.publishable ? ['La valoración es parcial o está bloqueada: no es un valor justo final.'] : []),
+              ...((data.thesis?.missing_inputs?.length ?? 0) > 0 ? [`Faltan ${data.thesis?.missing_inputs?.length} inputs del modelo (ver «Datos pendientes»).`] : []),
+              ...(typeof data.thesis?.red_team_score === 'number' && data.thesis.red_team_score < 40 ? [`El red team puntúa ${data.thesis.red_team_score}/100.`] : []),
+            ]}
+            olderPublishedVersion={
+              data.historyDetail.history
+                .filter((entry) => entry.status === 'published' && entry.version !== data.thesis?.version)
+                .map((entry) => entry.version)
+                .reduce<number | null>((a, b) => (a === null ? b : Math.max(a, b)), null)
+            }
+          />
           <ThesisExportMenu
             hasPublished={data.historyDetail.history.some((entry) => entry.status === 'published')}
             latestDraftVersion={data.historyDetail.history.filter((entry) => entry.status !== 'published').map((entry) => entry.version).reduce((a, b) => Math.max(a, b), 0) || null}
