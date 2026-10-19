@@ -1208,7 +1208,7 @@ def test_fcf_before_growth_capex_ok_declared_estimate():
         cleanup_metric_test_artifacts()
 
 
-def test_fcf_before_growth_capex_partial_lower_bound_without_da():
+def test_fcf_before_growth_capex_partial_without_da():
     cleanup_metric_test_artifacts()
     db = SessionLocal()
     try:
@@ -1220,7 +1220,7 @@ def test_fcf_before_growth_capex_partial_lower_bound_without_da():
         result = MetricCalculationService().calculate(
             db, company, "fcf_before_growth_capex", persist=False
         )
-        # Sin D&A no hay separacion: FCF reportado como cota inferior declarada
+        # Sin D&A no hay separacion y no se publica un valor sustitutivo
         assert result.status == "partial"
         assert result.value is None
         assert result.calculation_trace["reason"] == "growth_capex_not_separable"
@@ -1314,5 +1314,32 @@ def test_fcf_before_growth_capex_rejects_negative_da_and_mixed_periods():
         assert result.value is None
         assert result.calculation_trace["reason"] == "incoherent_periods"
     finally:
+        db.close()
+        cleanup_metric_test_artifacts()
+
+
+def test_fcf_before_growth_capex_rejects_nonfinite_before_arithmetic(monkeypatch):
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        facts = {metric: add_fact(db, company, metric, value) for metric, value in (
+            ("free_cash_flow", "100"), ("capital_expenditure", "-120"),
+            ("depreciation_amortization", "80"),
+        )}
+        db.commit()
+        service = MetricCalculationService()
+        # In-memory corrupt provider payload, never written to SQLite.
+        for metric in facts:
+            for invalid in ("NaN", "Infinity", "-Infinity"):
+                original = facts[metric].value
+                facts[metric].value = Decimal(invalid)
+                monkeypatch.setattr(service, "_coherent_facts", lambda *args: facts)
+                result = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
+                assert result.status == "insufficient_data"
+                assert result.value is None
+                facts[metric].value = original
+    finally:
+        db.rollback()
         db.close()
         cleanup_metric_test_artifacts()

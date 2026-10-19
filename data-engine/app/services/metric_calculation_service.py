@@ -1827,7 +1827,23 @@ class MetricCalculationService:
             "conservative estimate"
         )
         fcf = Decimal(facts["free_cash_flow"].value)
-        capex_abs = abs(Decimal(facts["capital_expenditure"].value))
+        capex = Decimal(facts["capital_expenditure"].value)
+        depreciation = (
+            Decimal(facts["depreciation_amortization"].value)
+            if "depreciation_amortization" not in missing else None
+        )
+        invalid = not fcf.is_finite() or not capex.is_finite()
+        if depreciation is not None:
+            invalid = invalid or not depreciation.is_finite()
+            if depreciation.is_finite():
+                invalid = invalid or depreciation < 0
+        if invalid:
+            return self._persist_if_requested(db, company, build(
+                status="insufficient_data", value=None, numerator=None,
+                trace={"reason": "invalid_inputs"}, confidence=Decimal("0"),
+                fact_list=unique_facts, result_unit=result_unit,
+            ), persist)
+        capex_abs = abs(capex)
 
         if "depreciation_amortization" in missing:
             # No publicar el FCF reportado bajo el nombre de otra metrica.
@@ -1855,13 +1871,7 @@ class MetricCalculationService:
                 persist,
             )
 
-        depreciation = Decimal(facts["depreciation_amortization"].value)
-        if depreciation < 0 or not depreciation.is_finite() or not fcf.is_finite() or not capex_abs.is_finite():
-            return self._persist_if_requested(db, company, build(
-                status="insufficient_data", value=None, numerator=None,
-                trace={"reason": "invalid_inputs"}, confidence=Decimal("0"),
-                fact_list=unique_facts, result_unit=result_unit,
-            ), persist)
+        assert depreciation is not None
         maintenance_capex = min(capex_abs, depreciation)
         growth_capex = capex_abs - maintenance_capex
         value = _quantize(fcf + growth_capex)
@@ -2140,7 +2150,7 @@ class MetricCalculationService:
                     CalculatedMetric.company_id == company.id,
                     CalculatedMetric.metric == result.metric,
                     CalculatedMetric.period != result.period,
-                    CalculatedMetric.status == "unavailable",
+                    CalculatedMetric.status.in_(["unavailable", "insufficient_data"]),
                     CalculatedMetric.definition_version == result.definition_version,
                 )
             )
