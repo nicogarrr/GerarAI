@@ -162,6 +162,8 @@ const MOTIVO_CONCENTRACION_SIN_DATOS: Record<string, string> = {
   snapshot_integrity_failed: 'El factsheet del S&P 500 no pasó la verificación de integridad; sin datos hasta la próxima sincronización.',
   snapshot_vintage_after_requested_date: 'El factsheet disponible es posterior a la fecha consultada; no describe el índice en esa fecha.',
   requested_date_invalid: 'Sin fecha de consulta válida no se puede leer el factsheet del S&P 500.',
+  snapshot_too_stale_for_requested_date: 'El último factsheet del S&P 500 es demasiado antiguo para la fecha de hoy; sin datos hasta que se actualice.',
+  index_weights_not_published_by_source: 'El factsheet no publica el peso de los mayores constituyentes.',
 };
 
 function motivoConcentracionSinDatos(top?: RegimeTopTen) {
