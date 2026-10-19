@@ -27,7 +27,7 @@ POSITION_CHANGE_HEADLINE_RE = re.compile(
 
 
 _GENERIC_HEADLINE_RE = re.compile(
-    r"se\s+abre\s+en\s+una\s+nueva\s+ventana|opens?\s+in\s+a\s+new\s+window",
+    r"se\s+abre\s+en\s+una\s+nueva\s+ventana|opens?\s+in\s+(?:a\s+)?new\s+window",
     re.IGNORECASE,
 )
 
