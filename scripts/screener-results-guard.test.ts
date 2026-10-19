@@ -15,3 +15,8 @@ test('ambas vistas muestran coincidencias y aceptan rank Decimal string', () => 
 test('cabeceras tienen separación y no rompen etiquetas', () => {
   assert.ok(adHoc.includes('px-3 py-2 whitespace-nowrap'));
 });
+test('la columna Coincidencia muestra el valor real de cada criterio, no un chip literal', () => {
+  assert.ok(!adHoc.includes("t('screener.match')"), 'chip literal «coincidencia» aún presente');
+  assert.ok(adHoc.includes('formatScreenCriterionValue(criterion.left_value)'));
+  assert.ok(formatter.includes('formatScreenCriterionValue'));
+});
