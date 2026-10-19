@@ -61,26 +61,43 @@ def numeric_signature(text: str) -> list[tuple[str, str, str]]:
         result.append(("dimensions", "|".join(item.casefold() for item in dimensions), ""))
     return result
 
-_SCALE_ALIASES = {"millón": "million", "millones": "million"}
+_MONTH = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?"
+_DATE_ONLY = re.compile(
+    rf"(?i)\b(?:{_MONTH}\s+\d{{1,2}}(?:st|nd|rd|th)?(?:,?\s+(?:19|20)\d{{2}})?|\d{{1,2}}(?:st|nd|rd|th)?\s+{_MONTH}(?:,?\s+(?:19|20)\d{{2}})?"
+    r"|Q[1-4]|H[12]|FY\s?\d{2,4}|(?:19|20)\d{2})\b"
+)
 
 
-def headline_numeric_signature(text: str) -> list[str]:
-    """Firma numerica de un TITULAR: cada numero con su representacion exacta
-    mas las dimensiones (divisa, %, million/billion...) en el mismo orden que
-    numeric_signature. Las palabras vecinas SI cambian al traducir («Oct. 28
-    Event» -> «28 de octubre»), asi que no entran: con ellas, todo titular con
-    una fecha caia en «unavailable». «millón/millones» cuenta como «million»."""
-    tokens: list[str] = []
-    dimensions = ""
-    for token, first, second in numeric_signature(text):
-        if token == "dimensions":
-            parts = [_SCALE_ALIASES.get(part, part) for part in first.split("|") if part]
-            dimensions = "|".join(parts)
-        elif token == "ambiguous":
-            tokens.append("ambiguous:" + first)  # texto exacto: no casa con ninguna traduccion
-        else:
-            tokens.append(token)
-    return sorted(tokens) + ["dimensions:" + dimensions]
+def _has_dimension_marks(text: str) -> bool:
+    return bool(re.search(
+        r"(?i)[$€£¥₹%％]|\b(?:USD|EUR|GBP|JPY|CNY|INR|CAD|AUD|CHF|bps|million|billion|trillion|thousand|percent|basis points"
+        r"|millón|millones|mil|billón|billones|dólares?|euros?|porcentaje)\b", text))
+
+
+def _numbers_are_only_dates(text: str) -> bool:
+    """True si los unicos numeros del titular son fechas, años o trimestres
+    (sin %, divisa ni magnitud): ahi las palabras vecinas son solo calendario."""
+    if _has_dimension_marks(text):
+        return False
+    return not re.search(r"\d", _DATE_ONLY.sub(" ", text))
+
+
+def headline_numbers_match(original: str, translated: str) -> bool:
+    """Los numeros del titular sobreviven a la traduccion. Falla cerrado.
+
+    - Titular cuyos numeros son solo fechas/años/trimestres («Oct. 28 Event»
+      -> «28 de octubre»): basta que los numeros exactos coincidan y que la
+      traduccion no añada porcentajes, divisas ni magnitudes; las palabras
+      vecinas cambian al traducir.
+    - Cualquier otro numero (%, divisa, magnitud, cifras sueltas): firma
+      estricta con la palabra anterior y posterior, para que una traduccion
+      que invierta el sentido («falls 8%» -> «suben un 8%») no pase.
+    """
+    if _numbers_are_only_dates(original) and not _has_dimension_marks(translated):
+        tokens = lambda t: sorted(token for token, _, _ in numeric_signature(t) if token not in {"dimensions", "ambiguous"})  # noqa: E731
+        return not any(token == "ambiguous" for token, _, _ in numeric_signature(original) + numeric_signature(translated)) \
+            and tokens(original) == tokens(translated)
+    return numeric_signature(original) == numeric_signature(translated)
 
 
 def numeric_token_signature(text: str) -> list[str]:
@@ -241,7 +258,7 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
                     candidate = payload.get("text") if isinstance(payload, dict) else None
                     if (isinstance(candidate, str) and 3 <= len(candidate.strip()) <= 500
                             and candidate.strip() != original and not NON_LATIN.search(candidate)
-                            and headline_numeric_signature(original) == headline_numeric_signature(candidate)
+                            and headline_numbers_match(original, candidate)
                             and not response.degraded and not response.warnings):
                         translated = candidate.strip()
                         break

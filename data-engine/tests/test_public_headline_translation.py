@@ -193,13 +193,18 @@ def test_nearly_identical_output_is_not_marked_translated():
     asyncio.run(run())
 
 
-def test_headline_signature_ignores_neighbour_words_but_not_numbers():
-    from app.services.news_headline_translation import headline_numeric_signature as sig
+def test_headline_numbers_dates_relaxed_everything_else_strict():
+    from app.services.news_headline_translation import headline_numbers_match as ok
 
-    assert sig("Apple Announces Oct. 28 Event for Touch-Screen MacBook Pro") == sig("Apple anuncia un evento el 28 de octubre")
-    assert sig("ASML Q3 2026 Earnings Call, Oct 14, 2026") == sig("Llamada de resultados de ASML del Q3 2026, 14 de octubre de 2026")
-    assert sig("Ingresos de 12 million USD") == sig("Ingresos de 12 millones USD")
-    assert sig("Revenue 12 million USD") != sig("Ingresos 12 billion USD")
-    assert sig("Apple Oct. 28 Event") != sig("Apple evento 29 de octubre")
-    assert sig("FCF 12 USD") != sig("FCF 12 EUR")
-    assert sig("growth -12%") != sig("crecimiento 12%")
+    # Fechas, años y trimestres: las palabras vecinas cambian al traducir.
+    assert ok("Apple Announces Oct. 28 Event for Touch-Screen MacBook Pro", "Apple anuncia un evento el 28 de octubre para el MacBook Pro")
+    assert ok("Transcript : ASML Holding N.V., Q3 2026 Pre Recorded Earnings Call, Oct 14, 2026", "Transcripción: ASML Holding N.V., llamada del Q3 2026, 14 de octubre de 2026")
+    assert not ok("Apple Announces Oct. 28 Event", "Apple anuncia un evento el 29 de octubre")
+    assert not ok("Apple Announces Oct. 28 Event", "Apple anuncia un evento el 28 de octubre con un 5% más")
+    # Cualquier otro numero: firma estricta, la direccion no puede invertirse.
+    assert not ok("Tesla shares fall 8%", "Las acciones de Tesla suben un 8%")
+    assert not ok("Fed cuts rates by 0.25%", "La Fed sube los tipos un 0.25%")
+    assert not ok("Down 5%", "Sube 5%")
+    assert not ok("Revenue 12 million USD", "Ingresos 12 billion USD")
+    assert not ok("FCF 12 USD", "FCF 12 EUR")
+    assert not ok("growth -12%", "crecimiento 12%")
