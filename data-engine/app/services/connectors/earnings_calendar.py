@@ -28,7 +28,9 @@ DIVIDENDS_URL = "https://api.nasdaq.com/api/calendar/dividends"
 MAX_DAYS_PER_REQUEST = 31
 # Concurrencia acotada entre dias: secuencial eran ~2.4s x dia (17s para la
 # semana por defecto en prod); sin tope, 31 dias a la vez martirizan NASDAQ.
-RANGE_CONCURRENCY = 4
+# 4 -> 8 (19 oct 2026): 15 dias con 4 no cabian en el deadline de 8 s en frio
+# (medido en prod: partial, ultimo dia agotado); NASDAQ respondia bien.
+RANGE_CONCURRENCY = 8
 
 # Deadline TOTAL del rango (16 oct 2026: /api/calendar/catalysts tardaba >10s
 # en prod y la pagina moria con un 504 de plataforma). Los dias ya resueltos
@@ -38,11 +40,11 @@ RANGE_DEADLINE_S = 8.0
 # Por debajo de este resto no merece abrir otra consulta: no daria tiempo.
 _MIN_DAY_BUDGET_S = 0.5
 
-# Cache breve por dia (el calendario publico cambia intradia) + singleflight:
+# Cache por dia (1 h: los resultados casi no cambian y cada restart la deja fria) + singleflight:
 # peticiones concurrentes al mismo dia comparten UNA consulta en vuelo.
 # Solo aplica sin cliente inyectado (produccion); con cliente inyectado
 # (tests) la cache queda fuera para que cada test controle su red.
-_DAY_CACHE_TTL_S = 900.0
+_DAY_CACHE_TTL_S = 3600.0
 _day_cache: dict[tuple[str, date], tuple[float, list[dict[str, Any]]]] = {}
 _day_inflight: dict[tuple[int, str, date], asyncio.Task[list[dict[str, Any]] | None]] = {}
 

@@ -22,7 +22,9 @@ def run_async(coroutine):
 
 
 @pytest.fixture(autouse=True)
-def _clean_module_cache():
+def _clean_module_cache(monkeypatch):
+    # Los tests de deadline razonan con oleadas de 4 dias: se fija explicito.
+    monkeypatch.setattr(connector, "RANGE_CONCURRENCY", 4)
     connector._day_cache.clear()  # noqa: SLF001 - estado de proceso del conector
     connector._day_inflight.clear()  # noqa: SLF001
     yield
@@ -129,3 +131,24 @@ def test_pooled_client_is_reused_between_calls():
     first = connector._pooled_client()  # noqa: SLF001
     second = connector._pooled_client()  # noqa: SLF001
     assert first is second
+
+
+def test_default_concurrency_fits_two_weeks_in_the_cold_deadline(monkeypatch):
+    """Medido en prod (19 oct 2026): 15 dias frios con concurrencia 4 no cabian
+    en 8 s. Con el valor por defecto actual, 15 dias a ~1 s caben en 2 oleadas
+    dentro de un deadline que con 4 (4 oleadas) no alcanzaria."""
+    monkeypatch.undo()  # valor por defecto del modulo, no el fijado por el fixture
+    assert connector.RANGE_CONCURRENCY >= 8
+
+    async def fake_day(day, _client):
+        await asyncio.sleep(1)
+        return [{"symbol": "X", "date": day.isoformat()}]
+
+    async def probe():
+        start = date(2026, 10, 19)
+        return await connector._fetch_days(  # noqa: SLF001
+            fake_day, start, start + timedelta(days=14), object(), deadline_s=3.0
+        )
+
+    events, errors = run_async(probe())
+    assert len(events) == 15 and errors == []
