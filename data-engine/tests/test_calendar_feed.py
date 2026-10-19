@@ -92,8 +92,11 @@ def test_public_feed_is_tenant_scoped_scope_filtered_and_has_no_portfolio_data()
         anon.close()
         assert "FHELD" in ics and "FWATCH" in ics and "FOTHER" not in ics
         assert "Held\\, Inc\\;" in ics  # escapado RFC 5545
+        # El nombre del calendario (X-WR-CALNAME) menciona cartera/watchlist como
+        # etiqueta; el resto del ICS no puede llevar nada de la cartera.
+        body = "\n".join(line for line in ics.splitlines() if not line.startswith("X-WR-CALNAME:"))
         for banned in ("quantity", "cartera", "watchlist", "cost", "price"):
-            assert banned not in ics.lower()
+            assert banned not in body.lower()
         assert "DTSTART;VALUE=DATE:20261021" in ics and "T" not in ics.split("DTSTART;VALUE=DATE:")[1][:9]
         assert ics.endswith("END:VCALENDAR\r\n") and "\r\n" in ics
         assert all(len(line.encode()) <= 75 for line in ics.split("\r\n"))
@@ -182,3 +185,10 @@ def test_public_client_ip_uses_last_xff_only_behind_private_proxy():
     assert public_client_ip(req("172.18.0.2", "basura")) == "172.18.0.2"
     # Acceso directo (peer publico): la cabecera se ignora.
     assert public_client_ip(req("8.8.4.4", "9.9.9.9")) == "8.8.4.4"
+
+
+def test_ics_calname_follows_scope():
+    cal = {"days": []}
+    assert "X-WR-CALNAME:Resultados de tu watchlist" in svc.build_ics(cal, scope="watchlist")
+    assert "X-WR-CALNAME:Resultados de cartera y watchlist" in svc.build_ics(cal, scope="followed")
+    assert "X-WR-CALNAME:Resultados de cartera y watchlist" in svc.build_ics(cal)
