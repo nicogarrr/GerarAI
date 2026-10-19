@@ -169,6 +169,10 @@ def is_law_firm_solicitation(title: str | None, summary: str | None = None) -> b
     return bool(_LAW_FIRM_SOLICITATION.search(f"{title or ''} {summary or ''}"))
 
 
+# Etiquetas de «medio» de Google News que en realidad son granjas de
+# contenido u organizaciones, verificadas en prod (ampliar solo con evidencia).
+JUNK_PUBLISHER_LABELS = {"bitcoin foundation"}
+
 _PUBLISHER_RE = re.compile(r"^(?P<title>.+?)\s+-\s+(?P<publisher>[^-]{2,60})$")
 
 
@@ -333,8 +337,15 @@ def label_google(result: ConnectorResult, company, evidence_level) -> ConnectorR
             continue
         match = _PUBLISHER_RE.match(item.title)
         if match:
+            publisher = match.group("publisher").strip()
+            # Granjas de contenido que republican noticias ajenas bajo un
+            # nombre de organización: la etiqueta no es un medio y confunde
+            # («Bitcoin Foundation» para una noticia de JPM, prod 19 oct
+            # 2026). Se muestra el agregador, no la etiqueta.
+            if publisher.casefold() in JUNK_PUBLISHER_LABELS:
+                publisher = "Google News"
             item = dataclasses.replace(
-                item, title=match.group("title").strip(), source=match.group("publisher").strip()
+                item, title=match.group("title").strip(), source=publisher
             )
         else:
             item = dataclasses.replace(item, source="Google News")
