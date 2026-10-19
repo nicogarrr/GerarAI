@@ -102,9 +102,9 @@ export function CompanyHeaderQuote({
         const timer = window.setTimeout(() => setSlow(true), 4000);
         return () => window.clearTimeout(timer);
     }, [settled, requestTicker]);
-    const currency = quote?.currency ?? null;
+    const quoteCurrency = quote?.currency ?? null;
     const label = extendedQuoteLabel(quote);
-    const showPrice = label !== NA && quote?.price != null && isValidCurrencyCode(currency);
+    const showPrice = label !== NA && quote?.price != null && isValidCurrencyCode(quoteCurrency);
     const signBase = quote?.change ?? quote?.change_percent ?? 0;
     // «Cierre regular» repite «Cierre anterior» cuando ambos son el mismo dato: se muestra una sola vez.
     const duplicatedClose = quote?.regular_close != null && quote.regular_close === quote.previous_close;
@@ -115,14 +115,24 @@ export function CompanyHeaderQuote({
     const prev = snapshot.history.at(-2) ?? null;
     const fallbackPrice = last?.close ?? null;
     const fallbackCurrency = snapshot.currency;
-    const useFallback = !showPrice && (slow || settled) && fallbackPrice != null && isValidCurrencyCode(fallbackCurrency);
+    // Listados en subunidad (LSE en peniques GBX, .JO, .TA): las velas no traen
+    // divisa propia y snapshot.currency sería la unidad grande (x100): sin fallback.
+    const subunitListing = /\.(L|JO|TA)$/i.test(symbol ?? snapshot.ticker)
+        || /LONDON|^LSE$|JOHANNESBURG|TEL AVIV/i.test(snapshot.exchange ?? '')
+        || ['GBX', 'GBp', 'ZAc', 'ILA'].includes(snapshot.currency ?? '');
+    const useFallback = !showPrice && (slow || settled) && !subunitListing && fallbackPrice != null && isValidCurrencyCode(fallbackCurrency);
+    // La vela de hoy puede ser parcial (sesión abierta): solo es «cierre» si es
+    // anterior a la fecha actual en Nueva York; si no, se rotula «Última vela».
+    const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+    const lastIsClose = last != null && last.date.slice(0, 10) < todayEt;
     const loading = !settled && !useFallback;
-    const shownCurrency = useFallback ? fallbackCurrency : currency;
+    // Con fallback, la divisa es la del listado; con cotización real, la suya.
+    const currency: string = (useFallback ? fallbackCurrency : quoteCurrency) ?? '';
     const hasDatedMetrics = !!quote?.metrics_timestamp && !!quote.metrics_session;
     return (
         <div className="flex w-full flex-col gap-4" data-testid="company-header-quote">
             <div>
-                <p className="text-[11px] uppercase tracking-wide text-gray-500">{showPrice ? label : useFallback ? `Último cierre del gráfico · ${formatMarketDate(last!.date)}` : loading ? '\u00a0' : NA}</p>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">{showPrice ? label : useFallback ? `${lastIsClose ? 'Último cierre del gráfico' : 'Última vela del gráfico (puede ser parcial)'} · ${formatMarketDate(last!.date)}` : loading ? '\u00a0' : NA}</p>
                 <div className="text-4xl font-semibold tracking-tight text-gray-100 sm:text-5xl" aria-busy={loading || undefined}>
                     {showPrice ? headerMoney(quote!.price, currency) : useFallback ? headerMoney(fallbackPrice, fallbackCurrency!) : loading ? (
                         <>
@@ -160,15 +170,20 @@ export function CompanyHeaderQuote({
             </div>
             <div className="min-w-0 max-w-full">
                 <dl className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800" data-testid="company-metric-strip">
-                    {[
-                        ['Apertura', useFallback ? last?.open ?? null : hasDatedMetrics ? quote!.open : null],
-                        ['Máximo', useFallback ? last?.high ?? null : hasDatedMetrics ? quote!.high : null],
-                        ['Mínimo', useFallback ? last?.low ?? null : hasDatedMetrics ? quote!.low : null],
-                        ['Cierre anterior', useFallback ? prev?.close ?? null : quote?.previous_close_timestamp || quote?.previous_close_date ? quote.previous_close : null],
-                    ].map(([metricLabel, value]) => (
+                    {(useFallback ? [
+                        ['Apertura', last?.open ?? null],
+                        ['Máximo', last?.high ?? null],
+                        ['Mínimo', last?.low ?? null],
+                        ['Cierre anterior', prev?.close ?? null],
+                    ] : [
+                        ['Apertura', hasDatedMetrics ? quote!.open : null],
+                        ['Máximo', hasDatedMetrics ? quote!.high : null],
+                        ['Mínimo', hasDatedMetrics ? quote!.low : null],
+                        ['Cierre anterior', quote?.previous_close_timestamp || quote?.previous_close_date ? quote.previous_close : null],
+                    ]).map(([metricLabel, value]) => (
                         <div className="min-w-0 py-3 sm:px-3 sm:first:pl-0" key={String(metricLabel)}>
                             <dt className="text-xs text-gray-500">{metricLabel}</dt>
-                            <dd className="mt-1 break-words text-sm font-medium text-gray-200">{loading ? <span aria-hidden="true" className="inline-block h-4 w-16 animate-pulse rounded bg-gray-800 align-middle" /> : value == null || !isValidCurrencyCode(shownCurrency) ? NA : headerMoney(value as number, shownCurrency)}</dd>
+                            <dd className="mt-1 break-words text-sm font-medium text-gray-200">{loading ? <span aria-hidden="true" className="inline-block h-4 w-16 animate-pulse rounded bg-gray-800 align-middle" /> : value == null || !isValidCurrencyCode(currency) ? NA : headerMoney(value as number, currency)}</dd>
                             {useFallback && metricLabel === 'Cierre anterior' && prev ? <p className="break-words text-[11px] text-gray-500">{formatMarketDate(prev.date)}</p> : null}
                             {!useFallback && metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <p className="break-words text-[11px] text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp)} · ${quoteTime(quote.previous_close_timestamp)}` : quoteSessionDate(quote.previous_close_date)}</p> : null}
                         </div>

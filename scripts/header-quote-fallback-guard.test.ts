@@ -15,9 +15,20 @@ describe('cabecera de precio con fallback al cierre del gráfico', () => {
     it('espera 4 s y usa solo datos de las velas (sin inventar métricas)', () => {
         assert.match(header, /setTimeout\(\(\) => setSlow\(true\), 4000\)/);
         assert.match(header, /snapshot\.history\.at\(-1\)/);
-        assert.match(header, /Último cierre del gráfico · /);
+        assert.match(header, /Último cierre del gráfico/);
         assert.match(header, /Cotización en vivo no disponible ahora/);
         assert.match(header, /last\?\.open \?\? null/);
+    });
+    it('no pinta fallback en subunidades (GBX) y rotula la vela parcial', () => {
+        assert.match(header, /subunitListing/);
+        assert.match(header, /GBX/);
+        assert.match(header, /!subunitListing/);
+        assert.match(header, /Última vela del gráfico \(puede ser parcial\)/);
+        assert.match(header, /lastIsClose/);
+    });
+    it('la rama de cotización real sigue exigiendo metadata y fecha de cierre anterior', () => {
+        assert.match(header, /hasDatedMetrics \? quote!.open : null/);
+        assert.match(header, /\['Cierre anterior', quote\?\.previous_close_timestamp \|\| quote\?\.previous_close_date \? quote.previous_close : null\]/);
     });
     it('la cotización real sustituye al fallback cuando llega', () => {
         assert.match(header, /const useFallback = !showPrice && /);
