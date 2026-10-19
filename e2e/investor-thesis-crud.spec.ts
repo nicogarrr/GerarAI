@@ -71,6 +71,9 @@ test("thesis workspace create -> read (claim + change + sections)", async ({
         impact_direction: "positive",
         materiality_score: 6,
         summary: `Manual upside note for the durable thesis (${marker}).`,
+        // El feed «Qué ha cambiado» descarta tarjetas sin relación con la
+        // tesis (8644dd1): el cambio creado debe declarar su métrica.
+        affected_metrics: ["revenue"],
       },
     }),
     200,

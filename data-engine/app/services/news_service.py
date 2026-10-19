@@ -363,7 +363,20 @@ class NewsService:
                 change_type=change_type,
                 impact_direction=assessment.impact_direction,
                 materiality_score=materiality_score,
-                summary=_change_summary(summary, semantic_impact.summary if semantic_impact else ""),
+                # La traza de "sin relacion" del motor semantico no es
+                # contenido del cambio: si se persiste en el summary, el feed
+                # «Qué ha cambiado» descarta la tarjeta aunque sea una
+                # invalidacion material (filtro de memory.py).
+                summary=_change_summary(
+                    summary,
+                    semantic_impact.summary
+                    if semantic_impact
+                    and (
+                        semantic_impact.affected_claim_ids
+                        or getattr(semantic_impact, "affected_node_ids", [])
+                    )
+                    else "",
+                ),
                 affected_claim_ids=(semantic_impact.affected_claim_ids if semantic_impact else []),
                 affected_metrics=assessment.affected_assumptions,
                 requires_review=True,
