@@ -18,9 +18,15 @@ from app.services.money_flows import (
     aggregate_recipients,
     build_theme_payload,
     map_recipient_to_ticker,
-    normalize_recipient,
     period_label,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_flow_cache():
+    money_flows._cache.clear()
+    yield
+    money_flows._cache.clear()
 
 
 @pytest.fixture
@@ -108,6 +114,7 @@ def test_capex_ultimo_trimestre_reportado(db):
     assert msft["amount"] is None and "Sin datos" in msft["note"]
     # Total = suma de lo disponible, con la advertencia de periodos no coincidentes.
     assert payload["spenders_total"]["amount"] == 35_700_000_000
+    assert "1 de 7 gastadores incluidos" in payload["spenders_total"]["note"]
     assert "no coinciden" in payload["spenders_total"]["note"]
 
 
@@ -190,6 +197,9 @@ def test_defensa_payload_con_datos(db, monkeypatch):
     assert payload["suppliers"][0]["ticker"] == "LMT"
     assert payload["suppliers"][1]["ticker"] is None
     assert payload["suppliers"][1]["reason"] == "Sin mapeo a ticker declarado"
+    # (5) cobertura declarada de los "principales"
+    assert payload["destinations_note"].startswith("Principales categorías")
+    assert payload["suppliers_note"].startswith("Principales recipientes")
 
 
 def test_period_label_legible():

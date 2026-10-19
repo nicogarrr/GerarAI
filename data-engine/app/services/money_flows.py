@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 import httpx
@@ -156,7 +156,7 @@ RECIPIENT_TICKER_MAP: tuple[tuple[str, str | None, str | None], ...] = (
     ("TRIWEST", None, "Gestora de TRICARE; empresa privada, sin ticker."),
     ("BAE SYSTEMS", None, "Contratista británica (BA. en Londres), fuera del universo US."),
     ("GENERAL ATOMICS", None, "Drones MQ-9; empresa privada, sin ticker."),
-    ("McKESSON", "MCK", "Distribución farmacéutica al sistema sanitario militar."),
+    ("MCKESSON", "MCK", "Distribución farmacéutica al sistema sanitario militar."),
     ("ATLANTIC DIVING", None, "Suministros; empresa privada, sin ticker."),
 )
 
@@ -178,6 +178,7 @@ PSC_LABELS_ES: dict[str, str] = {
 _USASPENDING_BASE = "https://api.usaspending.gov/api/v2"
 _USASPENDING_AGENCY_URL = "https://www.usaspending.gov/agency/department-of-defense"
 _CACHE_TTL = 3600.0
+_NEGATIVE_CACHE_TTL = 120.0  # fallos de USAspending: no martillear la API
 _cache: dict[str, tuple[float, object]] = {}
 _cache_lock = threading.RLock()
 
@@ -424,6 +425,10 @@ def build_usaspending_theme(theme: FlowTheme) -> dict:
         }
         spenders.append(spender)
     try:
+        with _cache_lock:
+            failed_at = _cache.get(f"fail:{agency}", (0.0, None))[0]
+        if time.monotonic() - failed_at < _NEGATIVE_CACHE_TTL:
+            raise RuntimeError("USAspending falló hace <2 min (caché negativa)")
         total = _cached(f"oblig:{agency}:{start}", lambda: fetch_agency_obligations(agency, start, end))
         spenders[0]["amount"] = total
         psc = _cached(f"psc:{agency}:{start}", lambda: fetch_top_categories(agency, start, end))
@@ -462,14 +467,34 @@ def build_usaspending_theme(theme: FlowTheme) -> dict:
                 },
             })
     except (httpx.HTTPError, RuntimeError, ValueError, KeyError) as exc:
+        with _cache_lock:
+            _cache[f"fail:{agency}"] = (time.monotonic(), None)
         notes.append(f"USAspending no disponible ahora mismo ({type(exc).__name__}); sin cifras en lugar de inventarlas")
         spenders[0]["note"] = "USAspending no disponible ahora mismo"
-    return spenders, destinations, suppliers, fy_label, notes
+    # (5) cobertura declarada: los tops son "principales", no el total
+    total_amount = spenders[0]["amount"]
+    if total_amount:
+        psc_sum = sum(item["amount"] for item in destinations)
+        rec_sum = sum(item["amount"] for item in suppliers if item["amount"] is not None)
+        destinations_note = (
+            f"Principales categorías: cubren el {psc_sum / total_amount * 100:.0f} % de lo obligado"
+            if destinations else None
+        )
+        suppliers_note = (
+            f"Principales recipientes: cubren el {rec_sum / total_amount * 100:.0f} % de lo obligado"
+            if suppliers else None
+        )
+    else:
+        destinations_note = None
+        suppliers_note = None
+    return spenders, destinations, suppliers, fy_label, notes, destinations_note, suppliers_note
 
 
 def build_theme_payload(db: Session, theme: FlowTheme, tenant: int | None) -> dict:
     if theme.suppliers_live == "usaspending_recipients":
-        spenders, destinations, suppliers, fy_label, notes = build_usaspending_theme(theme)
+        spenders, destinations, suppliers, fy_label, notes, destinations_note, suppliers_note = (
+            build_usaspending_theme(theme)
+        )
         generated_at = datetime.now(UTC)
     else:
         spenders = [build_sec_spender(db, cfg, tenant) for cfg in theme.spenders]
@@ -501,14 +526,23 @@ def build_theme_payload(db: Session, theme: FlowTheme, tenant: int | None) -> di
         ]
         fy_label = None
         notes = []
+        destinations_note = None
+        suppliers_note = "Sin importes: no hay fuente gratuita del reparto por proveedor"
         generated_at = datetime.now(UTC)
-    amounts = [s["amount"] for s in spenders if s["amount"] is not None]
+    # (3)+(4) total solo de importes en USD, declarando cuántos gastadores entran
+    usd_amounts = [
+        s["amount"] for s in spenders if s["amount"] is not None and s["unit"] == "USD"
+    ]
     total = None
-    if amounts and theme.suppliers_live != "usaspending_recipients":
+    if usd_amounts and theme.suppliers_live != "usaspending_recipients":
+        included = len(usd_amounts)
         total = {
-            "amount": sum(amounts),
+            "amount": sum(usd_amounts),
             "unit": "USD",
-            "note": "Suma de los últimos trimestres reportados disponibles; los periodos no coinciden necesariamente entre empresas",
+            "note": (
+                f"{included} de {len(spenders)} gastadores incluidos (solo USD reportado); "
+                "los periodos no coinciden necesariamente entre empresas"
+            ),
         }
     return {
         "id": theme.id,
@@ -523,6 +557,8 @@ def build_theme_payload(db: Session, theme: FlowTheme, tenant: int | None) -> di
         "method": theme.method,
         "limitation": theme.limitation,
         "notes": notes,
+        "destinations_note": destinations_note,
+        "suppliers_note": suppliers_note,
     }
 
 

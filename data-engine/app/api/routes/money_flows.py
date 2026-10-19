@@ -11,13 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.services.money_flows import (
-    FLOW_THEMES,
-    KIND_ESTIMACION_TERCEROS,
-    KIND_REPORTADO,
-    build_theme_payload,
-    theme_summaries,
-)
+from app.services.money_flows import FLOW_THEMES, build_theme_payload, theme_summaries
 
 router = APIRouter()
 
@@ -80,6 +74,8 @@ class FlowThemeOut(BaseModel):
     method: str
     limitation: str
     notes: list[str] = []
+    destinations_note: str | None = None
+    suppliers_note: str | None = None
 
 
 class FlowThemeSummaryOut(BaseModel):
