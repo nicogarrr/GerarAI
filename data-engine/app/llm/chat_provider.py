@@ -76,7 +76,8 @@ class _LanguageRejected(ProviderResponseError):
 class ChatFallbackProvider(LLMProvider):
     name = "chat-independent-fallback"
 
-    def __init__(self, primary: LLMProvider, backup: LLMProvider, *, total: float = 45, delay: float = 2, validator: Callable[[LLMResponse], None] | None = None, on_response: Callable[[LLMResponse], None] | None = None, backup2: LLMProvider | None = None, extra_backups: tuple[tuple[LLMProvider, str], ...] = ()):
+    def __init__(self, primary: LLMProvider, backup: LLMProvider, *, total: float = 45, delay: float = 2, validator: Callable[[LLMResponse], None] | None = None, on_response: Callable[[LLMResponse], None] | None = None, backup2: LLMProvider | None = None, extra_backups: tuple[tuple[LLMProvider, str], ...] = (), backup_model: str = GROQ_MODEL):
+        self.backup_model = backup_model
         self.backup2 = backup2
         self.extra_backups = extra_backups
         self.validator = validator
@@ -92,7 +93,7 @@ class ChatFallbackProvider(LLMProvider):
     def with_candidate_validator(self, validator, on_response=None):
         # Per-call clone: concurrent requests never share validation context.
         return ChatFallbackProvider(self.primary, self.backup, total=self.total,
-                                    delay=self.delay, validator=validator, on_response=on_response, backup2=self.backup2, extra_backups=self.extra_backups)
+                                    delay=self.delay, validator=validator, on_response=on_response, backup2=self.backup2, extra_backups=self.extra_backups, backup_model=self.backup_model)
 
     async def _candidate(self, provider, request, *, backup=False):
         response = await provider.complete(request)
@@ -137,12 +138,13 @@ class ChatFallbackProvider(LLMProvider):
 
     async def _backup_chain(self, request: LLMRequest) -> LLMResponse:
         """Groq gpt-oss-120b, then Gemini 3.5 Flash-Lite and Gemini 3.8 Flash (when configured); sequential, never in parallel."""
-        members = [(self.backup, GROQ_MODEL)] + ([(self.backup2, model) for model in GEMINI_MODELS] if self.backup2 is not None else []) + list(self.extra_backups)
-        # Miembros con la cuota recién agotada se saltan; si TODOS están
-        # enfriándose se prueban igualmente (mejor intentar que callar).
+        members = [(self.backup, self.backup_model)] + ([(self.backup2, model) for model in GEMINI_MODELS] if self.backup2 is not None else []) + list(self.extra_backups)
+        # Do not re-probe exhausted members until their cooldown expires.
         ready = [m for m in members if not _is_cooling(*m)]
         last: Exception | None = None
-        for provider, model in ready or members:
+        if not ready:
+            raise ProviderHTTPError(self.name, 429)
+        for provider, model in ready:
             try:
                 return await self._candidate(provider, replace(
                     request, model=model,
@@ -308,7 +310,7 @@ def _gemini_backup(
         return None
     if not (settings.gemini_api_key and settings.gemini_free_plan_confirmed):
         raise ValueError("Gemini chat requires a verified free plan (no billing) and API key")
-    return OpenAICompatibleProvider(
+    provider = OpenAICompatibleProvider(
         api_key=settings.gemini_api_key,
         base_url=GEMINI_BASE_URL,
         default_model=GEMINI_MODEL,
@@ -320,6 +322,7 @@ def _gemini_backup(
         max_output_tokens=max_output_tokens,
         client=client,
     )
+    return provider
 
 
 def _openrouter_backup(settings: Settings, client: httpx.AsyncClient | None) -> tuple[tuple[OpenAICompatibleProvider, str], ...]:
@@ -373,13 +376,23 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
             verified = False
         if not verified:
             return DisabledProvider("chat_override_not_verified_free")
-    if not settings.groq_chat_fallback_enabled or primary.name == "disabled":
+    if primary.name == "disabled":
         return primary
+    backup2 = _gemini_backup(settings, client)
+    if backup2 is not None:
+        backup2.interactive_quota_breaker = True
+    if not settings.groq_chat_fallback_enabled:
+        if backup2 is None:
+            return primary
+        return ChatFallbackProvider(
+            primary, backup2, backup_model=GEMINI_MODEL,
+            total=settings.chat_total_timeout_seconds,
+            extra_backups=((backup2, GEMINI_MODEL_2),),
+        )
     if primary.name != "opencode-go":
         raise ValueError("Groq chat fallback requires the verified OpenCode primary")
     backup = _groq_backup(settings, client)
     assert backup is not None  # el flag de arriba lo garantiza
-    backup2 = _gemini_backup(settings, client)
     return ChatFallbackProvider(primary, backup, total=settings.chat_total_timeout_seconds, backup2=backup2,
                                 extra_backups=_openrouter_backup(settings, client))
 
