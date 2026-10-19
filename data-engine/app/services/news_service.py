@@ -222,6 +222,17 @@ class NewsService:
         # La politica de recencia tambien cubre la urgencia derivada del
         # impacto semantico: un filing antiguo nunca es urgente por recencia.
         requires_update = apply_recency_policy(requires_update, published_at, materiality_reasons)
+        # Relevancia: una noticia que solo menciona de pasada a la empresa (titular sin ella y < 3
+        # menciones) se guarda, pero no abre revision de tesis ni alerta "material". Filings
+        # (sec/ir) quedan fuera: su titular es generico y la fuente es primaria.
+        if requires_update and company and connector not in ("sec", "ir"):
+            from app.services.news_relevance import company_is_central
+
+            if not company_is_central(
+                company.ticker, company.name, headline=source_headline, text=text,
+            ):
+                requires_update = False
+                materiality_reasons.append("relevancia: la empresa solo se menciona de pasada")
 
         summary = clip_words(" ".join(text.strip().split()), 320)
         # Tipo de noticia con Jev (earnings/filing/macro/opinion): 1 llamada
