@@ -75,7 +75,6 @@ export default async function FilingsYoyPage({ params, searchParams }: {
         </Panel>
         <Panel title="Cambios de texto">
           {data.text ? <>
-            <Badge variant="outline">INFERIDO</Badge>
             <p className="my-2 text-xs text-gray-500">{data.text.label}</p>
             <div className="space-y-4">{data.text.sections.map((section) => <section key={section.section}>
               <h3 className="font-medium text-gray-200">{section.label}</h3>

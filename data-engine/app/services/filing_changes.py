@@ -121,5 +121,5 @@ def compare_sections(current: list[dict], previous: list[dict], *, limit: int = 
                        "changes": changes, "change_count": count, "truncated": count > limit})
     return {"status": "changed" if any(s["status"] == "changed" for s in result)
             else "unchanged" if all(s["status"] == "unchanged" for s in result) else "partial",
-            "method": "derived_text_diff", "label": "INFERIDO: comparación textual, no materialidad financiera",
+            "method": "derived_text_diff", "label": "Comparación textual, no materialidad financiera",
             "sections": result}

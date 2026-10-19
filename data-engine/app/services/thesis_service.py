@@ -1428,8 +1428,8 @@ class ThesisService:
             "o se aporta como supuesto etiquetado (método + fecha)."
         ),
         "normalized_fcf_or_fcf_margin": (
-            "falta un FCF o margen FCF reportado; si hay un margen INFERIDO "
-            "(base + fuentes https) se usa solo como valor indicativo no publicable."
+            "falta un FCF o margen FCF reportado; si hay un margen estimado con base "
+            "y fuentes https, se usa solo como valor indicativo no publicable."
         ),
         "net_debt": (
             "falta la deuda neta; se deriva de deuda total menos efectivo (mismo "
