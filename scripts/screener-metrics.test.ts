@@ -7,7 +7,7 @@ test('solo ofrece métricas con datos, agrupadas, y añade las personalizadas', 
   const options = buildMetricOptions(['roic', 'market_cap', 'metrica_rara'], [{ metric_key: 'roic_spread', name: 'Diferencial ROIC', unit: 'percent' }]);
   assert.deepEqual(options.map((o: { key: string }) => o.key), ['roic', 'market_cap', 'roic_spread', 'metrica_rara']);
   assert.equal(options.find((o: { key: string }) => o.key === 'roic')?.group, 'Rentabilidad');
-  assert.equal(options.find((o: { key: string }) => o.key === 'roic_spread')?.unit, 'ratio');
+  assert.equal(options.find((o: { key: string }) => o.key === 'roic_spread')?.unit, 'number');
   assert.equal(options.find((o: { key: string }) => o.key === 'metrica_rara')?.group, 'Otras');
 });
 

@@ -27,10 +27,11 @@ for (const g of GROUPS) for (const k of g.keys) BY_KEY.set(k, { group: g.title, 
 
 export type MetricOption = { key: string; label: string; group: string; unit: UnitKind; hasData: boolean };
 
-const CUSTOM_UNIT: Record<string, UnitKind> = { percent: 'ratio', USD: 'usd', ratio: 'multiple', decimal: 'number' };
 
 /**
- * Métricas elegibles. Con cobertura conocida solo salen las que tienen datos de
+ * Métricas elegibles. Las personalizadas usan el valor tal cual lo devuelve su
+ * fórmula: el backend guarda la unidad solo como etiqueta, sin escala fija.
+ * Con cobertura conocida solo salen las que tienen datos de
  * alguna empresa; sin cobertura (motor caído) se ofrece el catálogo completo.
  */
 export function buildMetricOptions(
@@ -51,7 +52,7 @@ export function buildMetricOptions(
   for (const c of custom) {
     if (seen.has(c.metric_key)) continue;
     seen.add(c.metric_key);
-    out.push({ key: c.metric_key, label: c.name, group: 'Personalizadas', unit: CUSTOM_UNIT[c.unit] ?? 'number', hasData: true });
+    out.push({ key: c.metric_key, label: c.name, group: 'Personalizadas', unit: 'number', hasData: true });
   }
   if (have) {
     for (const key of have) {
