@@ -1141,6 +1141,8 @@ export async function importResearchDocumentUrl(formData: FormData) {
 }
 
 export type ResearchNewsEvent = {
+  /** Tickers relacionados (evidencia explícita en el texto) con último cierre y variación; null si no hay. */
+  related_tickers?: import('@/lib/news-related-tickers').RelatedTicker[] | null;
   original_headline?: string;
   /** Misma historia en otros medios, agrupada en portada (PR story clusters). */
   coverage_count?: number | null;

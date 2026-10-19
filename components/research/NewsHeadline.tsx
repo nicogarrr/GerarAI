@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import { newsDisplayTitle } from '@/lib/news-display';
 import { isTranslatable } from '@/lib/news-language';
+import { RelatedTickersStrip } from '@/components/research/RelatedTickersStrip';
 
 const queue: Array<() => void> = [];
 let running = 0;
@@ -38,5 +39,6 @@ export function NewsHeadline({ event }: { event: ResearchNewsEvent }) {
   return <div ref={ref} className="break-words">
     {event.url ? <a className="hover:text-teal-200" href={event.url} rel="noreferrer" target="_blank">{title}</a> : title}
     {translated ? <><span className="mt-1 block text-xs text-gray-500">Traducción automática · español</span><details className="mt-1 text-xs text-gray-400"><summary className="cursor-pointer">Ver original</summary><p className="mt-1 break-words">{original}</p></details></> : null}
+    <RelatedTickersStrip items={event.related_tickers} />
   </div>;
 }
