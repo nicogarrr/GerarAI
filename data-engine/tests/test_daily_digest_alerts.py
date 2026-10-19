@@ -14,7 +14,7 @@ from app.api.routes.alerts import (
 )
 from app.models import PortfolioMoveDigest, ResearchAlert, Tenant
 from app.models.entities import Base
-from app.services.daily_digest_alerts import VERSION, emit_digest_alert
+from app.services.daily_digest_alerts import VERSION, emit_digest_alert, last_session_date
 from app.services.outbound_alerts import EVENT_TYPES, dispatch_pending, event_type, subscription_for
 
 AS_OF = date(2026, 10, 9)
@@ -260,3 +260,11 @@ def test_truncation_is_explicit(db):
     assert "Mostradas 16 de 20 posiciones con variacion; 4 omitidas." in alert.message
     assert "20 de 40 posiciones con variacion" in alert.message
     assert "y 4 mas." in alert.message  # sin_datos tambien acotado
+
+
+def test_last_session_date_skips_weekends():
+    # 2026-10-19 es lunes: el ultimo cierre es el viernes 16, no el domingo 18.
+    assert last_session_date(date(2026, 10, 19)) == date(2026, 10, 16)
+    assert last_session_date(date(2026, 10, 18)) == date(2026, 10, 16)  # domingo
+    assert last_session_date(date(2026, 10, 17)) == date(2026, 10, 16)  # sabado
+    assert last_session_date(date(2026, 10, 20)) == date(2026, 10, 19)  # martes
