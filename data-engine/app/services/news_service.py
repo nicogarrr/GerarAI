@@ -12,6 +12,30 @@ from app.services.materiality_service import MaterialityService, apply_recency_p
 from app.services.review_alert_service import ReviewAlertService
 from app.services.source_hierarchy_service import classify_source
 from app.services.text_clip import clip_words
+
+# Boilerplate de movimiento de posición institucional reescrito por agregadores
+# (patrón 13F de MarketBeat: «X Shares Purchased by Y», «Stock: Z Raises
+# Stake»...). Cada fila es un hecho distinto pero de muy bajo valor unitario:
+# en portada se agrupan por empresa y día (una fila con recuento).
+POSITION_CHANGE_HEADLINE_RE = re.compile(
+    r"(?:\bshares\s+(?:purchased|sold|bought|acquired)\b"
+    r"|\b(?:buys|sells|purchases|acquires|bought|acquired)\b[\w\s,.$()]*\bshares\b"
+    r"|\b(?:raises|lowers|boosts|cuts|increases|reduces|trims|grows|lifts)\b[\w\s,.$()]*\b(?:stake|position|holdings)\b"
+    r"|\b(?:stake|position|holdings)\s+(?:raised|lowered|boosted|cut|increased|reduced|lifted|trimmed)\b)",
+    re.IGNORECASE,
+)
+
+
+def is_position_change_headline(headline: str) -> bool:
+    """Titular boilerplate de cambio de posición institucional (spam 13F)."""
+    return bool(headline) and bool(POSITION_CHANGE_HEADLINE_RE.search(headline))
+
+
+def position_change_cluster_title(ticker: str | None, source: str, count: int) -> str:
+    """Etiqueta generada para la fila agrupada (no verbatim de la fuente:
+    la fila se marca headline_from_source=False)."""
+    donde = f" en {ticker}" if ticker else ""
+    return f"{count} movimientos de inversores institucionales{donde} · {source}"
 from app.services.thesis_graph_service import ThesisGraphService
 from app.services.ticker_news_lane import is_competitor_only, is_law_firm_solicitation
 
@@ -486,7 +510,19 @@ class NewsService:
                 continue
             # F175: el ticker solo prefija el texto si el título no lo trae ya;
             # si no, el titular guardado salía «COST COST 8-K».
-            parts = [item.title, item.text]
+            # Cuerpo sin el titular repetido ni la firma de la fuente: feeds
+            # (Simply Wall Street, MarketBeat) repiten el titular al inicio de
+            # la descripción y la cierran con el nombre del medio; sin limpiar,
+            # el titular guardado salía duplicado («Meta (META) ... Glasses
+            # Meta (META) ... Glasses Simply Wall Street»).
+            body = (item.text or "").strip()
+            headline_txt = (item.title or "").strip()
+            if headline_txt and body.casefold().startswith(headline_txt.casefold()):
+                body = body[len(headline_txt):].lstrip(" \t\r\n:–—-|·")
+            source_name = (item.source or "").strip()
+            if source_name and body.casefold().endswith(source_name.casefold()):
+                body = body[: -len(source_name)].rstrip(" \t\r\n:–—-|·")
+            parts = [item.title, body]
             # Límite de palabra: «COSTCO Wholesale...» no empieza por el
             # ticker «COST» a efectos de prefijo.
             if item.ticker and not re.match(
