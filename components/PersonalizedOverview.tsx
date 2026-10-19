@@ -3,7 +3,6 @@
 import { formatCompact, formatUserDateTime, formatMarketDate, formatMoney, formatNumber, formatPercent, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
 import {
     DCF_CANDIDATE_LIMIT,
-    dcfEmptyNote,
     dcfScopeNote,
     summarizeDcfProbe,
     type DcfScope,
@@ -622,7 +621,8 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                 </CardContent>
             </Card>
 
-            {/* 4 · Oportunidades por valor intrínseco. */}
+            {/* 4 · Oportunidades por valor intrínseco. Sin candidatas (y sin error) el bloque no se pinta: una tarjeta que solo dice «ninguna» no aporta. */}
+            {(opportunitiesLoading || opportunitiesError || opportunities.length > 0) && (
             <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-x-2 pb-2 border-b border-gray-700/50">
                     <CardTitle className="text-lg text-gray-100 flex items-center gap-2">
@@ -690,13 +690,10 @@ export default function PersonalizedOverview({ userId }: PersonalizedOverviewPro
                                 </p>
                             )}
                         </>
-                    ) : (
-                        <p className="text-sm text-gray-500">
-                            {dcfEmptyNote(dcfScope ?? { probed: 0, evaluated: 0, failed: 0 })}
-                        </p>
-                    )}
+                    ) : null}
                 </CardContent>
             </Card>
+            )}
         </div>
     );
 }
