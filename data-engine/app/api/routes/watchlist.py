@@ -3,11 +3,13 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import Company, EarningsDate, FinancialFact, MarketPrice, ThesisVersion, WatchItem
 from app.services.connectors.earnings_calendar import fetch_earnings_range
+from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
 from app.services.fundamentals_seed_service import enqueue_fundamentals_seed
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
@@ -213,7 +215,14 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
         ).scalar_one_or_none()
 
     cap_row = _cap_row()
-    if cap_row is None:
+    if cap_row is None or (
+        # Un derivado es un respaldo calculado, no un dato: se REFRESCA en
+        # cada lectura (revisión auditor 19-oct-2026: un derivado antiguo
+        # erróneo - cap de AENA 10x bajo por split - se serviría
+        # indefinidamente). Es idempotente y nunca pisa un cap de proveedor.
+        not cap_row.is_reported
+        and cap_row.source_type == DERIVED_SOURCE
+    ):
         # Respaldo bajo demanda (QA Tester 6, 19-oct-2026: AENA/CGEO.L con
         # cap N/D en la watchlist porque el barrido de métricas aún no lo
         # había derivado): precio x acciones, idempotente. Sin base (sin
@@ -222,6 +231,14 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
             refresh_derived_market_cap,
         )
         refresh_derived_market_cap(db, company)
+        # get_db cierra TODA request con rollback (database.py): sin commit
+        # el derivado recalculado no se persistiría jamás y cada lectura
+        # re-derivaría lo mismo. Si el commit falla, rollback y se sirve el
+        # estado anterior (None o el derivado viejo): degradación honesta.
+        try:
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
         cap_row = _cap_row()
     market_cap = float(cap_row.value) if cap_row is not None else None
     if cap_row is not None:

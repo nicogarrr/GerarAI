@@ -269,3 +269,74 @@ def test_endpoint_declares_split_adjusted_derived_cap(db):
     assert payload["market_cap"] == pytest.approx(
         25.70 * (1_972_000_000 / 12.89) * 10, rel=1e-6)
     assert any("acciones ajustadas por split" in src for src in payload["sources"])
+
+
+def test_endpoint_refreshes_existing_derived_row(db):
+    """Revisión auditor 19-oct-2026: un derivado antiguo erróneo no se sirve
+    indefinidamente: la fila derivada se recalcula (con el ajuste de split
+    ya aplicado) en cada lectura."""
+    from app.api.routes.watchlist import watchlist_metrics
+
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=3))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    _split(db, company, TODAY - timedelta(days=2), 10)
+    # Derivado antiguo erróneo (valor imposible: debe ser reemplazado):
+    db.add(FinancialFact(
+        company_id=company.id, metric="market_cap",
+        value=Decimal("999"), unit="EUR",
+        period=(TODAY - timedelta(days=3)).isoformat(),
+        source_type="derived", is_reported=False, tenant_id=1,
+    ))
+    db.commit()
+    payload = watchlist_metrics("aena", db)
+    assert payload["market_cap"] == pytest.approx(
+        25.70 * (1_972_000_000 / 12.89) * 10, rel=1e-6)
+    caps = db.scalars(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "market_cap")).all()
+    assert len(caps) == 1  # idempotente: el derivado viejo se reemplaza
+
+
+def test_endpoint_refresh_persists_committed(db):
+    """Revisión auditor 19-oct-2026: get_db cierra cada request con
+    rollback; sin commit explícito el derivado del GET no se persistía
+    nunca. Tras la lectura, una sesión NUEVA ve el hecho."""
+    from app.api.routes.watchlist import watchlist_metrics
+
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=3))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    db.commit()
+    payload = watchlist_metrics("aena", db)
+    assert payload["market_cap"] is not None
+    engine = db.bind
+    from sqlalchemy.orm import sessionmaker
+    with sessionmaker(engine)() as fresh:
+        caps = fresh.scalars(select(FinancialFact).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == "market_cap")).all()
+    assert len(caps) == 1 and caps[0].source_type == "derived"
+
+
+def test_endpoint_never_rewrites_vendor_cap(db):
+    """Un market_cap de proveedor NO se refresca ni se toca."""
+    from app.api.routes.watchlist import watchlist_metrics
+
+    company = _company(db)
+    day = TODAY - timedelta(days=1)
+    _price(db, company, Decimal("25.70"), day)
+    _fact(db, company, "shares_outstanding", 150_000_000, year=None, source="SEC")
+    db.add(FinancialFact(
+        company_id=company.id, metric="market_cap",
+        value=Decimal("3900000000"), unit="EUR", period=day.isoformat(),
+        source_type="FMP_profile", is_reported=True, tenant_id=1))
+    db.commit()
+    payload = watchlist_metrics("aena", db)
+    assert payload["market_cap"] == pytest.approx(3_900_000_000)
+    caps = db.scalars(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "market_cap")).all()
+    assert len(caps) == 1 and caps[0].source_type == "FMP_profile"
