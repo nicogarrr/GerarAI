@@ -1727,6 +1727,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/insider/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Insider Operations Route
+         * @description Operaciones P/S agregadas por empresa de cartera + watchlist (persistidas).
+         */
+        get: operations["insider_operations_route_api_insider_operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/insider/signals": {
         parameters: {
             query?: never;
@@ -12060,6 +12080,48 @@ export interface operations {
                 side?: string;
                 ticker?: string | null;
                 limit?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    insider_operations_route_api_insider_operations_get: {
+        parameters: {
+            query?: {
+                days?: number;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
