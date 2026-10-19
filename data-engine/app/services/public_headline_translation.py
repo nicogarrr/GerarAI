@@ -12,7 +12,7 @@ from app.core.config import get_settings
 from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
 from app.services.asts_llm_quota import reserve_quota
 from app.services.knowledge_rag.query_translation import _resolved_verified_free_model
-from app.services.news_headline_translation import NON_LATIN, QUOTA, fingerprint, numeric_signature
+from app.services.news_headline_translation import NON_LATIN, QUOTA, fingerprint, headline_numbers_match
 
 _cache: dict[tuple[int, str], tuple[float, dict]] = {}
 _slots = asyncio.Semaphore(2)
@@ -149,7 +149,7 @@ async def translate_external_headline(db, original: str, *, provider=None) -> di
                 text = payload.get("text") if isinstance(payload, dict) else None
                 if (isinstance(text, str) and 3 <= len(text.strip()) <= 500 and text.strip() != original
                         and not NON_LATIN.search(text) and not response.degraded and not response.warnings
-                        and numeric_signature(original) == numeric_signature(text)
+                        and headline_numbers_match(original, text)
                         and not _nearly_identical(original, text.strip())):
                     result = {**result, "status": "translated", "text": text.strip()}
                     break

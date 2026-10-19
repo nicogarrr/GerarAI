@@ -191,3 +191,31 @@ def test_nearly_identical_output_is_not_marked_translated():
             provider=Provider(text='Apple informa de resultados tras el cierre'))
         assert real['status'] == 'translated'
     asyncio.run(run())
+
+
+def test_headline_numbers_dates_relaxed_everything_else_strict():
+    from app.services.news_headline_translation import headline_numbers_match as ok
+
+    # Fechas, años y trimestres: las palabras vecinas cambian al traducir.
+    assert ok("Apple Announces Oct. 28 Event for Touch-Screen MacBook Pro", "Apple anuncia un evento el 28 de octubre para el MacBook Pro")
+    assert ok("Transcript : ASML Holding N.V., Q3 2026 Pre Recorded Earnings Call, Oct 14, 2026", "Transcripción: ASML Holding N.V., llamada del Q3 2026, 14 de octubre de 2026")
+    assert not ok("Apple Announces Oct. 28 Event", "Apple anuncia un evento el 29 de octubre")
+    assert not ok("Apple Announces Oct. 28 Event", "Apple anuncia un evento el 28 de octubre con un 5% más")
+    # Cualquier otro numero: firma estricta, la direccion no puede invertirse.
+    assert not ok("Tesla shares fall 8%", "Las acciones de Tesla suben un 8%")
+    assert not ok("Fed cuts rates by 0.25%", "La Fed sube los tipos un 0.25%")
+    assert not ok("Down 5%", "Sube 5%")
+    assert not ok("Revenue 12 million USD", "Ingresos 12 billion USD")
+    assert not ok("FCF 12 USD", "FCF 12 EUR")
+    assert not ok("growth -12%", "crecimiento 12%")
+
+
+def test_headline_direction_must_survive_translation():
+    from app.services.news_headline_translation import headline_numbers_match as ok
+
+    assert not ok("Dividend raised on Oct 28", "Dividendo recortado el 28 de octubre")
+    assert not ok("Q3 profit falls", "El beneficio del Q3 sube")
+    assert not ok("Dividend raised on Oct 28", "Dividendo el 28 de octubre")  # sin direccion: no se acepta
+    assert ok("Dividend raised on Oct 28", "Dividendo aumentado el 28 de octubre")
+    assert ok("Q3 profit falls", "El beneficio del Q3 baja")
+    assert ok("Apple Announces Oct. 28 Event", "Apple anuncia un evento el 28 de octubre")
