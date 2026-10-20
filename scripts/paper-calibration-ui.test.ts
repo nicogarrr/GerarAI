@@ -33,7 +33,7 @@ test('missing calibration is unavailable, never a manufactured zero', async () =
     const html=await render(); assert.match(html,/Calibración no disponible/);assert.doesNotMatch(html,/Error Brier/);
 });
 test('shows Brier, reference and bins in Spanish, difference in points not returns', async () => {
-    const html=await render(payload);for(const word of ['0,1234','0,25','80','60','20 p.p.','50 % - 75 %','30','50'])assert.ok(html.includes(word),word);
+    const html=await render(payload);for(const word of ['0,1234','0,25','80','60','20 p.p.','50 % - 75 %','30','50','No es una rentabilidad'])assert.ok(html.includes(word),word);
     assert.doesNotMatch(html,/Muestra insuficiente/);
 });
 test('empty or tiny sample keeps warning and missing bins rates', async () => {
