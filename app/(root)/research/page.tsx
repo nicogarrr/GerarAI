@@ -343,7 +343,7 @@ export default async function ResearchPage({
                                 <EmptyLink href="/watchlist">Ver mi watchlist</EmptyLink>
                             </div>
                         }
-                        description="Busca una empresa y genera su research desde su ficha: el motor reúne evidencia con fuentes trazables y construye la tesis paso a paso. También puedes empezar por tu watchlist."
+                        description="Busca una empresa y genera su research desde su ficha. También puedes empezar por tu watchlist."
                         icon={FileSearch}
                         title="Todavía no hay ninguna empresa con research."
                     />

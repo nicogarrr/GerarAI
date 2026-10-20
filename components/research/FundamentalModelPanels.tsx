@@ -265,9 +265,6 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
               <div className="flex justify-between gap-3"><span className="text-gray-400"><GlossaryTerm k="roic" icon={false}>ROIC</GlossaryTerm> / <GlossaryTerm k="wacc" icon={false}>WACC</GlossaryTerm></span><span className="text-gray-200">{percentage(terminal?.roic)} / {waccDisplay(model.assumptions.wacc)}</span></div>
             </div>
             <p className="mt-3 text-xs leading-5 text-gray-500">
-              El WACC es la tasa con la que se descuentan los flujos futuros: lo que piden conjuntamente accionistas y prestamistas. El ROIC es lo que la empresa gana con su capital invertido; solo crea valor cuando supera el WACC.
-            </p>
-            <p className="mt-3 text-xs leading-5 text-gray-500">
               Fuentes ingresos: <AssumptionSources fuentes={growthAssumption?.fuentes} /> · FCF: <AssumptionSources fuentes={marginAssumption?.fuentes} />
             </p>
           </div>
