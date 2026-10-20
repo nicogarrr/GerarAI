@@ -1427,6 +1427,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                       </li>
                     ))}
                   </ul>
+                  {filing.transactions.length > 6 ? (
+                    <p className="mt-1 text-xs text-gray-500">Se muestran 6 de {formatNumber(filing.transactions.length, { maximumFractionDigits: 0 })} operaciones de este formulario.</p>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -1544,7 +1547,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     content = (
       <Panel title="Auditorías de fuentes">
         {audits.length ? (
-          <div className="space-y-3">{audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? `tesis v${audit.thesis_version}` : 'versión de tesis no registrada'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>)}</div>
+          <div className="space-y-3">
+            {audits.length > 100 ? <p className="text-xs text-gray-500">Se muestran 100 de {formatNumber(audits.length, { maximumFractionDigits: 0 })} auditorías.</p> : null}
+            {audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? `tesis v${audit.thesis_version}` : 'versión de tesis no registrada'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>)}</div>
         ) : (
           <EmptyState
             action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>Genera una tesis para auditar fuentes</EmptyLink>}

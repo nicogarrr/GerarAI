@@ -228,6 +228,9 @@ export default async function ResearchSourcesPage({
             <h2 className="text-lg font-semibold text-gray-100">Auditorías de fuentes</h2>
           </div>
           <div className="grid gap-3">
+            {audits.length > 8 ? (
+              <p className="text-xs text-gray-500">Se muestran 8 de {formatNumber(audits.length, { maximumFractionDigits: 0 })} auditorías.</p>
+            ) : null}
             {audits.slice(0, 8).map((audit) => (
               <div key={audit.id} className="rounded-md border border-gray-800 bg-black/30 p-3">
                 <div className="flex items-center justify-between gap-3">
