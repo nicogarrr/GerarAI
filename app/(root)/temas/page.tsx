@@ -6,6 +6,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { ThemeBrainButton } from './_components/ThemeBrainButton';
 import { ThemeOrderToggle } from './_components/ThemeOrderToggle';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
+import { getBottlenecks } from '@/lib/actions/bottlenecks.actions';
 import { getMarketThemes } from '@/lib/actions/market-themes.actions';
 import { getFlowHoldings, getMoneyFlow, getMoneyFlowThemes } from '@/lib/actions/money-flows.actions';
 import type { MoneyFlow } from '@/lib/market/flows';
@@ -24,6 +25,7 @@ import {
   type MarketTheme,
   type ThemeOrder,
 } from '@/lib/market/themes';
+import { THEME_TO_BOTTLENECK } from '@/lib/market/theme-bottleneck-map';
 
 export const metadata: Metadata = {
   title: 'Temas',
@@ -52,11 +54,13 @@ function ThemeCard({
   order,
   flow,
   holdings,
+  detectedBottleneck,
 }: {
   theme: MarketTheme;
   order: ThemeOrder;
   flow: MoneyFlow | null;
   holdings: FlowHoldings;
+  detectedBottleneck: string | null;
 }) {
   const main = themeMetric(theme, order);
   const other = order === 'ytd' ? theme.m1 : theme.ytd;
@@ -158,6 +162,14 @@ function ThemeCard({
           {!holdings.unavailable ? (
             <HoldingsLines constituents={theme.constituents} holdings={holdings} />
           ) : null}
+          {detectedBottleneck ? (
+            <p className="mt-3 border-t border-gray-800 pt-2 text-xs text-gray-400">
+              Cuello de botella detectado:{' '}
+              <Link className="text-teal-300 underline hover:text-teal-200" href="/cuellos">
+                {detectedBottleneck}
+              </Link>
+            </p>
+          ) : null}
         </div>
       </details>
     </li>
@@ -208,6 +220,14 @@ export default async function TemasPage({ searchParams }: PageProps) {
     throw error;
   }
 
+  // Cruce con Cuellos de botella: si ese carril falla, la pagina sigue sin el enlace.
+  const bottlenecks = await getBottlenecks().catch(() => null);
+  const detectedThemes = new Set(
+    (bottlenecks?.signals ?? [])
+      .filter((signal) => signal.status === 'detectado')
+      .map((signal) => signal.theme),
+  );
+
   const themes = sortThemes(data.themes, order);
   // Flujos de dinero por tema: degradan en silencio (la página se pinta igual
   // si el endpoint no existe o el backend no responde); jamás un importe
@@ -236,15 +256,19 @@ export default async function TemasPage({ searchParams }: PageProps) {
         </section>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {themes.map((theme) => (
-            <ThemeCard
-              flow={flowsById.get(theme.id) ?? null}
-              holdings={holdings}
-              key={theme.id}
-              order={order}
-              theme={theme}
-            />
-          ))}
+          {themes.map((theme) => {
+            const bottleneck = THEME_TO_BOTTLENECK[theme.id];
+            return (
+              <ThemeCard
+                detectedBottleneck={bottleneck && detectedThemes.has(bottleneck) ? bottleneck : null}
+                flow={flowsById.get(theme.id) ?? null}
+                holdings={holdings}
+                key={theme.id}
+                order={order}
+                theme={theme}
+              />
+            );
+          })}
         </ul>
       )}
 
