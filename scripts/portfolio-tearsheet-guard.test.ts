@@ -15,6 +15,6 @@ describe('tearsheet: honestidad de Sharpe y fecha de corte', () => {
         assert.match(view, /metrics\.sharpe === null \? 'text-gray-400'/);
     });
     it('las métricas declaran la fecha de corte de los datos', () => {
-        assert.match(view, /datos hasta el \{formatDate\(tearsheet\.exposure\.snapshot_date\)\}/);
+        assert.match(view, /datos hasta el \$\{formatDate\(tearsheet\.exposure\.snapshot_date\)\}/);
     });
 });
