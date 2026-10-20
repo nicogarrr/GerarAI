@@ -59,6 +59,8 @@ describe('memo-pages es módulo de servidor', () => {
         // @ts-expect-error TS5097: extensión explícita para node --experimental-strip-types.
         const { splitMemoPages } = await import('../lib/research/memo-pages.ts');
         const pages = splitMemoPages('# Titulo\n\n## 1. Uno\ntexto\n\n## 2. Dos\notro');
-        assert.deepEqual(pages.map((p: { title: string }) => p.title), ['1. Uno', '2. Dos']);
+        // El paginador numera las opciones; el titulo llega sin numeracion
+        // propia (antes se duplicaba: "1. 1. Uno").
+        assert.deepEqual(pages.map((p: { title: string }) => p.title), ['Uno', 'Dos']);
     });
 });
