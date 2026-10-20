@@ -135,34 +135,20 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
 
     return (
         <div className="grid w-full min-w-0 grid-cols-1 gap-6">
-            <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
-                <CardHeader className="border-b border-gray-700/50 pb-4">
-                    <div className="flex items-center gap-3">
-                        <Users aria-hidden="true" className="h-5 w-5 text-teal-400" />
-                        <div>
-                            <CardTitle className="text-lg font-semibold text-gray-100">
-                                Buscar señales por ticker
-                            </CardTitle>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="pt-4">
-                    <form onSubmit={handleSearch} className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
-                        <TickerSearchInput
-                            value={ticker}
-                            onValueChange={setTicker}
-                            onSelect={(stock) => router.push(`/insider?ticker=${encodeURIComponent(stock.symbol.toUpperCase())}`)}
-                            placeholder="Buscar por ticker o empresa"
-                            ariaLabel={t('insider.searchPlaceholder')}
-                            className="h-11 w-full bg-gray-900"
-                        />
-                        <Button type="submit" className="h-11 w-full gap-2 bg-teal-600 hover:bg-teal-700 sm:w-auto">
-                            <Search aria-hidden="true" className="h-4 w-4" />
-                            Buscar
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+            <form onSubmit={handleSearch} className="flex w-full max-w-md items-start gap-2">
+                <TickerSearchInput
+                    value={ticker}
+                    onValueChange={setTicker}
+                    onSelect={(stock) => router.push(`/insider?ticker=${encodeURIComponent(stock.symbol.toUpperCase())}`)}
+                    placeholder="Buscar por ticker o empresa"
+                    ariaLabel={t('insider.searchPlaceholder')}
+                    className="h-11 w-full bg-gray-900"
+                />
+                <Button type="submit" className="h-11 shrink-0 gap-2 bg-teal-600 hover:bg-teal-700">
+                    <Search aria-hidden="true" className="h-4 w-4" />
+                    Buscar
+                </Button>
+            </form>
 
             {/* Solo fallos que afectan a la lectura, no telemetría del monitor. */}
             {initialTicker ? (
