@@ -5,6 +5,1667 @@
   "metrics": [],
   "series": [
     {
+      "title": "Aluminio · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/t",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            3283
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            3251
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            3161
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            3439
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            3666
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            3600
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            3373
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            3065
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            3142
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            2876
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            2819
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            2793
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            2653
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            2597
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            2606
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            2526
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            2449
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            2372
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            2658
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            2658
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            2573
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            2541
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            2582
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            2596
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): Bloomberg Finance L.P.; Engineering and Mining Journal; Platts Metals Week; Thomson Reuters Datastream; World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "Bloomberg Finance L.P.; Engineering and Mining Journal; Platts Metals Week; Thomson Reuters Datastream; World Bank.",
+      "sourceHeader": "Aluminum",
+      "sourceUnit": "($/mt)",
+      "sourceDescription": "Aluminum (LME) London Metal Exchange, unalloyed primary ingots, high grade, minimum 99.7% purity, settlement price beginning 2005; previously cash price",
+      "licenseStatus": "third_party_rights_unverified_owner_requested_republication"
+    },
+    {
+      "title": "Cobre · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/t",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            14474
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            14326
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            13543
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            13552
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            13543
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            12951
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            12529
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            12951
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            13012
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            11785
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            10812
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            10740
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            9984
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            9670
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            9771
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            9835
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            9533
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            9177
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            9740
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            9331
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            8991
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            8916
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            9076
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            9534
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): Bloomberg Finance L.P.; Engineering and Mining Journal; Platts Metals Week; Thomson Reuters Datastream; World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "Bloomberg Finance L.P.; Engineering and Mining Journal; Platts Metals Week; Thomson Reuters Datastream; World Bank.",
+      "sourceHeader": "Copper",
+      "sourceUnit": "($/mt)",
+      "sourceDescription": "Copper (LME), grade A, minimum 99.9935% purity, cathodes and wire bar shapes, settlement price",
+      "licenseStatus": "third_party_rights_unverified_owner_requested_republication"
+    },
+    {
+      "title": "Mineral de hierro · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/dmtu (unidad de la hoja)",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            null
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): Bloomberg Finance L.P.; Thomson Reuters Datastream, World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "Bloomberg Finance L.P.; Thomson Reuters Datastream, World Bank.",
+      "sourceHeader": "Iron ore, cfr spot",
+      "sourceUnit": "($/dmtu)",
+      "sourceDescription": "Iron ore (any origin) fines, spot price, c.f.r. China, 62% Fe beginning December 2008; previously 63.5%",
+      "licenseStatus": "third_party_rights_unverified_owner_requested_republication",
+      "unavailableReason": "N/D · unidad no resuelta: cabecera $/dmtu; descripción USD/t seca."
+    },
+    {
+      "title": "Plomo · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/t",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            1873
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            1855
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            1842
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            1946
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            1991
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            1930
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            1878
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            1917
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            1995
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            1940
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            1998
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            1968
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            1955
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            1947
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            1993
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            1974
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            1958
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            1903
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            2033
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            1957
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            1921
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            1990
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            1988
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            2034
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): Bloomberg Finance L.P.; Engineering and Mining Journal; Platts Metals Week; Thomson Reuters Datastream; World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "Bloomberg Finance L.P.; Engineering and Mining Journal; Platts Metals Week; Thomson Reuters Datastream; World Bank.",
+      "sourceHeader": "Lead",
+      "sourceUnit": "($/mt)",
+      "sourceDescription": "Lead (LME), refined, 99.97% purity, settlement price",
+      "licenseStatus": "third_party_rights_unverified_owner_requested_republication"
+    },
+    {
+      "title": "Níquel · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/t",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            16324
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            16751
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            16651
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            17588
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            18806
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            17962
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            17076
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            17173
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            17769
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            14884
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            14671
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            15092
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            15106
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            14949
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            15034
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            15003
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            15346
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            15113
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            16066
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            15288
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            15394
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            15445
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            15723
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            16766
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): Bloomberg Finance L.P.; Platts Metals Week, Thomson Reuters Datastream; World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "Bloomberg Finance L.P.; Platts Metals Week, Thomson Reuters Datastream; World Bank.",
+      "sourceHeader": "Nickel",
+      "sourceUnit": "($/mt)",
+      "sourceDescription": "Nickel (LME), cathodes, minimum 99.8% purity, settlement price beginning 2005; previously cash price",
+      "licenseStatus": "third_party_rights_unverified_owner_requested_republication"
+    },
+    {
+      "title": "Estaño · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/t",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            53712
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            55385
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            52971
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            53037
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            53563
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            48806
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            47324
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            48694
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            49538
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            41220
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            36963
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            36012
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            34484
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            33834
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            33610
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            32544
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            31981
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            32565
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            34048
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            31833
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            29612
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            28865
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            29655
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            32012
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): Bloomberg Finance L.P.; Engineering and Mining Journal; Platts Metals Week; Thomson Reuters Datastream; World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "Bloomberg Finance L.P.; Engineering and Mining Journal; Platts Metals Week; Thomson Reuters Datastream; World Bank.",
+      "sourceHeader": "Tin",
+      "sourceUnit": "($/mt)",
+      "sourceDescription": "Tin (LME), refined, 99.85% purity, settlement price",
+      "licenseStatus": "third_party_rights_unverified_owner_requested_republication"
+    },
+    {
+      "title": "Zinc · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/t",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            4021
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            3875
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            3599
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            3539
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            3482
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            3364
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            3182
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            3324
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            3213
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            3168
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            3177
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            3152
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            2933
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            2789
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            2763
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            2655
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            2644
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            2622
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            2889
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            2800
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            2819
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            3034
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            3004
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            3106
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): Bloomberg Finance L.P.; Engineering and Mining Journal; Platts Metals Week; Thomson Reuters Datastream; World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "Bloomberg Finance L.P.; Engineering and Mining Journal; Platts Metals Week; Thomson Reuters Datastream; World Bank.",
+      "sourceHeader": "Zinc",
+      "sourceUnit": "($/mt)",
+      "sourceDescription": "Zinc (LME), high grade, minimum 99.95% purity, settlement price beginning April 1990; previously special high grade, minimum 99.995%, cash prices ",
+      "licenseStatus": "third_party_rights_unverified_owner_requested_republication"
+    },
+    {
+      "title": "Oro · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/oz troy",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            4319
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            4411
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            4073
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            4228
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            4587
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            4721
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            4856
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            5020
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            4753
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            4309
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            4087
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            4058
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            3668
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            3368
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            3340
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            3353
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            3309
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            3218
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            2983
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            2895
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            2710
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            2648
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            2651
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            2690
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): Bloomberg Finance L.P.; Kitco.com; International Monetary Fund, International Financial Statistics; London Bullion Market; Metals Week; Platts Metals Week; Shearson Lehman Brothers, Metal Market Weekly Review; Thomson Reuters Datastream; World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "Bloomberg Finance L.P.; Kitco.com; International Monetary Fund, International Financial Statistics; London Bullion Market; Metals Week; Platts Metals Week; Shearson Lehman Brothers, Metal Market Weekly Review; Thomson Reuters Datastream; World Bank.",
+      "sourceHeader": "Gold",
+      "sourceUnit": "($/troy oz)",
+      "sourceDescription": "Gold, spot average of daily rates, from June 2025; previously (UK), 99.5% fine, London afternoon fixing, average of daily rates",
+      "licenseStatus": "third_party_rights_unverified_owner_requested_republication"
+    },
+    {
+      "title": "Platino · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/oz troy",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            1784
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            1780
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            1622
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            1726
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            1998
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            2028
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            2046
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            2137
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            2434
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            1893
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            1565
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            1616
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            1435
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            1343
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            1391
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            1251
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            980
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            959
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            980
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            978
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            949
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            938
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            966
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            999
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): Bloomberg Finance L.P.; London Platinum & Palladium Market; Platts Metals Week, CRB Commodity Yearbook; Thomson Reuters Datastream; World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "Bloomberg Finance L.P.; London Platinum & Palladium Market; Platts Metals Week, CRB Commodity Yearbook; Thomson Reuters Datastream; World Bank.",
+      "sourceHeader": "Platinum",
+      "sourceUnit": "($/troy oz)",
+      "sourceDescription": "Platinum,  99.95% minimum purity, plate or ingot form, spot average of daily rates, from June 2025; previously, (UK), 99.9% refined, London afternoon fixing",
+      "licenseStatus": "third_party_rights_unverified_owner_requested_republication"
+    },
+    {
+      "title": "Plata · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/oz troy",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            64.6
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            65.4
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            58.8
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            66.7
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            78
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            75.9
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            77.9
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            81.9
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            92.1
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            62.3
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            50.4
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            49.4
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            42.8
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            38.2
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            37.7
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            36
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            32.8
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            32.2
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            33.2
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            32.2
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            30.4
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            30.8
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            31.1
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            32.4
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): American Metal Market; Australian Mineral Economics Pty. Ltd.; Bloomberg Finance L.P.; London Bullion Market; Metals Week; Metals Statistics; Platts Metasl Week; The Silver Institute, Silver World Supply & Demand; Thomson Reuters Datastream; World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "American Metal Market; Australian Mineral Economics Pty. Ltd.; Bloomberg Finance L.P.; London Bullion Market; Metals Week; Metals Statistics; Platts Metasl Week; The Silver Institute, Silver World Supply & Demand; Thomson Reuters Datastream; World Bank.",
+      "sourceHeader": "Silver",
+      "sourceUnit": "($/troy oz)",
+      "sourceDescription": "Silver (UK), 99.9% refined, London afternoon fixing; prior to July 1976 Handy & Harman.  Grade prior to 1962 unrefined silver.",
+      "licenseStatus": "third_party_rights_unverified_owner_requested_republication"
+    },
+    {
       "title": "Cobre · producción minera mundial",
       "columns": [
         "Producción estimada"
@@ -451,8 +2112,7 @@
     "Producción 2025 estimada por USGS, no cotización ni dato en vivo.",
     "Tierras raras en equivalente de óxidos (REO); no se suman a toneladas de otros metales.",
     "W y ausencias son N/D; los umbrales como >50 se conservan sin convertirlos en cifras exactas.",
-    "Los totales mundiales son filas de control de la fuente; no se suman otra vez con países.",
-    "Precios mensuales externos: sin serie incrustada hasta verificar derechos de los proveedores de cada referencia."
+    "Los totales mundiales son filas de control de la fuente; no se suman otra vez con países."
   ],
   "links": [
     {
@@ -463,5 +2123,12 @@
       "label": "Datos y licencia CC0 · USGS",
       "url": "https://www.usgs.gov/data/mineral-commodity-summaries-2026-data-release"
     }
-  ]
+  ],
+  "pinkSheet": {
+    "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+    "sha256": "ea1c350827878ea3bbe30e3cda16a13fd3bd5b409b8458940dc94a36b5a33154",
+    "vintage": "2026-10-02",
+    "window": "Últimos 24 meses disponibles en el XLS; medias mensuales nominales, no precios en vivo.",
+    "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets"
+  }
 }
