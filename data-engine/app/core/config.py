@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     # (test_settings_hermeticity) en vez de forbid global.
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+    # EIA Open Data: optional, never exposed in payloads or source links.
+    eia_api_key: str | None = None
+
     app_env: str = "local"
     app_name: str = "CavaAI Research Engine"
     api_prefix: str = "/api"
