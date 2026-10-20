@@ -67,4 +67,13 @@ def parse(production, reliance):
 
 if __name__ == '__main__':
     data = parse(fetch_csv(PRODUCTION_ID, 'MCS2026_Commodities_Data.csv'), fetch_csv(RELIANCE_ID, 'MCS2026_Fig2_Net_Import_Reliance.csv'))
-    Path('data/theme-fundamentals/materiales.json').write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+    file = Path('data/theme-fundamentals/materiales.json')
+    if file.exists():
+        previous = json.loads(file.read_text())
+        monthly = [s for s in previous['series'] if s.get('monthly')]
+        if monthly:
+            data['series'] = monthly + data['series']
+            data['notes'] = [n for n in data['notes'] if not n.startswith('Precios mensuales externos:')]
+        if 'pinkSheet' in previous:
+            data['pinkSheet'] = previous['pinkSheet']
+    file.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')

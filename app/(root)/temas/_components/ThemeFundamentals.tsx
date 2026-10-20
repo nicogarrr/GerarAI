@@ -31,7 +31,7 @@ export async function ThemeFundamentals({ themeId }: { themeId: string }) {
       <a href={m.source} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-xs text-teal-300 underline">Fuente oficial</a>
     </div>)}
     {data.series.map((s) => <details key={s.title} className="mt-3 min-w-0 rounded-lg border border-gray-800 p-3" open={!s.monthly}>
-      <summary className="min-h-11 cursor-pointer text-xs font-semibold text-gray-100">{s.title}{s.monthly ? <span className="mt-1 block font-normal text-teal-300">{value(s.rows[0]?.values[0] ?? null, s.unit)} · {s.unit} · {s.rows[0]?.label} · vintage {s.vintage}</span> : null}</summary>
+      <summary className="min-h-11 cursor-pointer text-xs font-semibold text-gray-100">{s.title}{s.monthly ? <span className="mt-1 block font-normal text-teal-300">{value(s.rows[0]?.values[0] ?? null, s.unit)} · {s.unit} · {s.rows[0]?.label} · vintage {s.vintage}<a href={s.source} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center underline">{s.sourceName} · XLS fuente</a></span> : null}</summary>
       <p className="text-[11px] text-gray-400">{s.kind === 'escenario' ? 'Escenario atribuido · ' : s.kind === 'estimacion_oficial' ? 'Estimación oficial · ' : 'Reportado · '}{s.unit} · corte {s.vintage} · publicado {s.published}</p>
       <ul className="mt-2 space-y-2">{s.rows.map((r) => <li key={r.label} className="border-t border-gray-800 py-2">
         <p className="text-xs font-semibold text-gray-200">{r.label}</p>

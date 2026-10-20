@@ -22,12 +22,12 @@ class USGSUnits(unittest.TestCase):
 
     def test_snapshot(self):
         d = json.loads(Path('data/theme-fundamentals/materiales.json').read_text())
-        self.assertTrue(all(s['source'] and s['vintage'] and s['published'] for s in d['series']))
+        self.assertTrue(all(s['source'] and s['vintage'] and s['published'] for s in d['series'] if not s.get('monthly')))
         lithium = next(s for s in d['series'] if s['title'].startswith('Litio'))
         self.assertIsNone(next(r for r in lithium['rows'] if r['label'] == 'Estados Unidos')['values'][0])
         reliance = d['series'][-1]
         self.assertEqual(next(r for r in reliance['rows'] if r['label'] == 'Litio')['values'][0], '>50')
-        self.assertTrue(all(s['kind'] == 'estimacion_oficial' for s in d['series']))
+        self.assertTrue(all(s['kind'] == 'estimacion_oficial' for s in d['series'] if not s.get('monthly')))
 
 
 if __name__ == '__main__':
