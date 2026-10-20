@@ -93,13 +93,16 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
             const latestDate = new Date(`${scores.history.dates.at(-1)}T00:00:00`);
             const yearStart = new Date(latestDate.getFullYear(), 0, 1);
             const ytdPoints = Math.max(1, scores.history.dates.filter((date) => new Date(`${date}T00:00:00`) >= yearStart).length);
-            const rows = scores.history.dates.map((date, index) => ({
+            // Punto sin NAV: se omite, jamás se dibuja un 0 inventado (un
+            // hueco en la serie no es una caída a cero).
+            const rows = scores.history.dates.flatMap((date, index) => {
+                const value = scores.history?.nav[index];
+                if (value == null) return [];
                 // "YYYY-MM-DD" es un día de calendario: formatDate lo parsea en
                 // hora local y lo formatea en la zona del proceso, así que el
                 // eje sale igual en el servidor (UTC) y en el navegador.
-                date: formatDate(date, { day: '2-digit', month: 'short' }),
-                value: scores.history?.nav[index] ?? 0,
-            }));
+                return [{ date: formatDate(date, { day: '2-digit', month: 'short' }), value }];
+            });
             const maxPoints: Record<string, number> = {
                 '1S': 7,
                 '1M': 30,
