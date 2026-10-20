@@ -79,7 +79,9 @@ test("concepts have primary sources and do not attribute SEC education to an inv
         item.source.url.startsWith("https://") && item.risk && item.application,
     ),
   );
-  assert.equal(conceptsForInvestor("buffett").length, 3);
+  // 3 iniciales + 4 de la tanda 2026-10-20 con fuente en cartas de Buffett
+  // (foso competitivo, owner earnings, capex mantenimiento/crecimiento, compounder).
+  assert.equal(conceptsForInvestor("buffett").length, 7);
   assert.equal(conceptsForInvestor("munger").length, 0);
   assert.deepEqual(
     CONCEPTS.find(
