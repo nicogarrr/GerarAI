@@ -457,6 +457,7 @@ type ResearchPeerAnalysis = {
 };
 
 export type ResearchMoat = {
+  qualitative_checklist?: Array<{ id: string; question: string; status: string; excerpts: Array<{ quote: string; source_url: string; source_title: string; relation: string; published_at: string | null }> }>; 
   ticker: string;
   status: string;
   methodology: string;
