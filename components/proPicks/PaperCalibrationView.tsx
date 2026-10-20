@@ -23,7 +23,7 @@ export function PaperCalibrationView({ data }: { data?: PaperCalibration }) {
                 <dt>Error Brier</dt><dd>{metric(data.brier)}</dd>
                 <dt>Referencia sin información</dt><dd>{metric(data.brier_referencia_sin_informacion)}</dd>
             </dl>
-            <p className="text-xs text-gray-400">Brier mide la distancia entre la convicción y el acierto observado: más bajo es mejor. Compáralo con la referencia de la misma muestra. No es una rentabilidad ni una garantía.</p>
+            <p className="text-xs text-gray-400">No es una rentabilidad ni una garantía.</p>
             {data.bins.length ? <div>
                 <div className="space-y-2 sm:hidden" aria-label="Grupos de convicción">
                     {data.bins.map(bin => <article key={bin.rango} className="rounded border border-gray-800 p-3">

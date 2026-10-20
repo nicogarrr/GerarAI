@@ -44,10 +44,10 @@ function extractAlerts(dashboard: DataRecord | null): DataRecord[] {
 function thresholdExplanation(alert: DataRecord): string {
     const threshold = alert.threshold;
     if (threshold === 0.2) {
-        return 'Umbral 20% del valor de la cartera: por encima, una sola posición concentra el riesgo y si falla arrastra gran parte del resultado. Es una regla de concentración simple y verificable, no un VaR ni una probabilidad de pérdida.';
+        return 'Umbral 20% del valor de la cartera: por encima, una sola posición concentra el riesgo. Regla de concentración, no un VaR ni una probabilidad de pérdida.';
     }
     if (threshold === 0.1) {
-        return 'Umbral 10%: las empresas «pre-FCF» todavía no generan caja libre, así que el límite es el doble de estricto que el 20% general. Regla de prudencia sobre fragilidad financiera, no una predicción de caída.';
+        return 'Umbral 10% para empresas pre-FCF (todavía no generan caja libre): el doble de estricto que el 20% general.';
     }
     if (threshold === 0) {
         return 'La caja de esta divisa está en negativo (saldo deudor). Revisa los saldos o las operaciones en esa divisa; el umbral es no bajar de cero.';
