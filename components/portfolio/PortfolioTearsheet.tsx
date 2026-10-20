@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Gauge, TrendingDown, Target } from 'lucide-react';
 import type { PortfolioTearsheet } from '@/lib/actions/portfolio.actions';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { formatDate, formatNumber, formatPercent } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 
 type Props = {
@@ -37,9 +37,10 @@ export default function PortfolioTearsheet({ tearsheet }: Props) {
         );
     }
 
-    const sharpePositive = (metrics.sharpe ?? 0) >= 0;
+    // Sharpe null = N/D: sin signo que colorear; jamás verde por defecto.
+    const sharpeColor = metrics.sharpe === null ? 'text-gray-400' : metrics.sharpe >= 0 ? 'text-green-400' : 'text-red-400';
     const items = [
-        { label: 'Sharpe', value: formatMetric(metrics.sharpe), icon: Gauge, color: sharpePositive ? 'text-green-400' : 'text-red-400' },
+        { label: 'Sharpe', value: formatMetric(metrics.sharpe), icon: Gauge, color: sharpeColor },
         { label: t('portfolio.tearsheet.maxDrawdown'), value: formatRatioPercent(metrics.max_drawdown), icon: TrendingDown, color: 'text-orange-400' },
         { label: t('portfolio.tearsheet.winRate'), value: formatRatioPercent(metrics.win_rate), icon: Target, color: 'text-blue-400' },
     ];
@@ -64,6 +65,7 @@ export default function PortfolioTearsheet({ tearsheet }: Props) {
                     {formatRatioPercent(metrics.cumulative_return)} · Mejor día {formatRatioPercent(metrics.best_day)} · Peor día{' '}
                     {formatRatioPercent(metrics.worst_day)}
                     {tearsheet.exposure ? ` · ${formatNumber(tearsheet.exposure.n_positions, { maximumFractionDigits: 0 })} posiciones` : ''}
+                    {tearsheet.exposure ? ` · datos hasta el ${formatDate(tearsheet.exposure.snapshot_date)}` : ''}
                 </p>
             </CardContent>
         </Card>
