@@ -114,7 +114,7 @@ RATIO_METRICS: list[MetricSpec] = [
 #        > LongTermDebtAndCapitalLeaseObligations (+ su Current): YA incluye los
 #          arrendamientos financieros, asi que no se les suma FinanceLease*.
 #      Con deuda a plazo presente se anaden SOLO las partidas que no estan
-#      dentro de ella: prestamos corrientes (ShortTermBorrowings > LinesOfCreditCurrent)
+#      dentro de ella: prestamos corrientes (ShortTermBorrowings > CommercialPaper > LinesOfCreditCurrent)
 #      y arrendamientos financieros (si el tag de plazo no los incluye).
 #   3. Sin deuda a plazo, se suman los componentes sueltos, uno por componente:
 #      convertibles, pagares, linea de credito (LT y corriente), vencimiento corriente,
@@ -130,6 +130,7 @@ TOTAL_DEBT_TERM_CHOICES: tuple[tuple[str, tuple[str, ...], bool], ...] = (
 )
 TOTAL_DEBT_SHORT_CHOICES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("ShortTermBorrowings", ()),
+    ("CommercialPaper", ()),
     ("LinesOfCreditCurrent", ()),
 )
 TOTAL_DEBT_LEASE_CHOICES: tuple[tuple[str, tuple[str, ...]], ...] = (

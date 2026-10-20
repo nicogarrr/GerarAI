@@ -106,3 +106,17 @@ def test_lone_finance_lease_is_not_total_debt():
 
 def test_lone_finance_lease_falls_to_instrument_amount_if_present():
     assert _debt(FinanceLeaseLiability=890, DebtInstrumentCarryingAmount=300)["val"] == 300
+
+
+def test_apple_commercial_paper_is_counted():
+    """Apple FY2025: LongTermDebt 90,678 + CP 7,979 + finance leases 1,230."""
+    row = _debt(LongTermDebt=90_678, CommercialPaper=7_979, FinanceLeaseLiability=1_230)
+    assert row["val"] == 99_887
+    assert row["_components"].keys() == {"LongTermDebt", "CommercialPaper", "FinanceLeaseLiability"}
+
+
+def test_short_debt_one_tag_priority():
+    row = _debt(LongTermDebt=100, ShortTermBorrowings=5, CommercialPaper=7, LinesOfCreditCurrent=9)
+    assert row["val"] == 105
+    row = _debt(LongTermDebt=100, CommercialPaper=7, LinesOfCreditCurrent=9)
+    assert row["val"] == 107
