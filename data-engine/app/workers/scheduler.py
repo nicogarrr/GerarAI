@@ -22,6 +22,7 @@ from app.workers.dramatiq_app import (
     ingest_corporate_splits,
     ingest_sec_bottleneck_filings,
     ingest_spy_daily,
+    ingest_uk_pdmr_filings,
     recompute_fundamental_metrics,
     reconcile_alert_analyses,
     reconcile_alert_deliveries,
@@ -474,6 +475,14 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         day_of_week="mon-fri",
         hour=22,
         minute=40,
+    )
+    # PDMR UK (tracefour, 60 req/h/IP): 1 GET por corrida cada 6 h basta y sobra.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, ingest_uk_pdmr_filings),
+        "interval",
+        job_id="uk_pdmr_filings",
+        hours=6,
     )
     # Cierres oficiales de todo el universo (base de Movers/Mercado/watchlist).
     # 22:30 UTC: tras el cierre US tanto en EDT como en EST.

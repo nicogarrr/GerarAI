@@ -150,6 +150,11 @@ def insider_filings(
                             "rule_10b5_1": bool(tx.rule_10b5_1),
                             "shares": tx.shares,
                             "price": tx.price,
+                            # Como insider_feed: USD solo en Form 4; PDMR sin
+                            # divisa queda None (nunca se asume).
+                            "currency": ((tx.data_quality or {}).get("currency")
+                            if isinstance(tx.data_quality, dict) else None)
+                            or ("USD" if tx.form in ("4", "4/A") else None),
                             "value": tx.value,
                             "tx_date": tx.tx_date,
                             "source_url": tx.source_url,

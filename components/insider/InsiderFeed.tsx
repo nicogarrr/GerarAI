@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
-import { formatDate, formatMarketCapUsd, formatNumber, formatPrice } from '@/lib/format';
+import { formatDate, formatMarketCapUsd, formatNumber, formatPrice, isValidCurrencyCode } from '@/lib/format';
 import type { InsiderFeedResult, InsiderFeedSignal, InsiderFeedTransaction } from '@/lib/actions/insider.actions';
 import { insiderName, insiderRole, isInstitutionalInsiderName, sideLabel } from '@/lib/insider/format';
 
@@ -15,8 +15,18 @@ const PERIODS = [
     [365, '1 año'],
 ] as const;
 
-const usd = (value: number | null | undefined, digits = 0) =>
-    typeof value === 'number' && Number.isFinite(value) ? formatPrice(value, 'USD', { minimumFractionDigits: digits, maximumFractionDigits: digits }) : '—';
+// La divisa es por operacion y siempre declarada (SEC = USD, PDMR UK = GBP);
+// nunca se asume una ni se mezclan en un solo formato.
+const usd = (value: number | null | undefined, digits = 0, currency?: string) =>
+    typeof value === 'number' && Number.isFinite(value)
+        ? currency
+            ? formatPrice(value, currency, { minimumFractionDigits: digits, maximumFractionDigits: digits })
+            : formatNumber(value, { minimumFractionDigits: digits, maximumFractionDigits: digits })
+        : '—';
+// El backend declara la divisa por operacion (SEC Form 4 = USD; PDMR UK = la
+// que informe la fuente: GBP/USD/EUR... y 93/307 llegan sin informar). Si
+// falta: numero sin simbolo + "divisa no informada", nunca se asume.
+const txCurrency = (tx: InsiderFeedTransaction) => (tx.currency && isValidCurrencyCode(tx.currency) ? tx.currency : undefined);
 
 function href(side: string, days: number) {
     const params = new URLSearchParams();
@@ -68,7 +78,7 @@ function SignalLine({ signal, children }: { signal: InsiderFeedSignal; children?
                 <span className="rounded-full bg-indigo-950/60 px-2 py-0.5 text-xs font-semibold text-indigo-300">Institucional</span>
             ) : null}
             {children}
-            <span className="tabular-nums text-gray-300">{usd(signal.value ?? signal.total_value)}</span>
+            <span className="tabular-nums text-gray-300">{usd(signal.value ?? signal.total_value, 0, 'USD')}</span>
             <span className="text-gray-500">{signal.date ? formatDate(signal.date) : signal.window_start ? `desde ${formatDate(signal.window_start)}` : '—'}</span>
         </li>
     );
@@ -88,6 +98,7 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
                 </Link>
                 <span className={`font-medium ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>{sideLabel(tx.side)}</span>
                 {tx.rule_10b5_1 ? <span className="text-xs text-gray-500">Plan 10b5-1</span> : null}
+                {tx.form === 'PDMR' ? <span className="text-xs text-gray-500">PDMR (Reino Unido)</span> : null}
                 <span className="ml-auto tabular-nums text-xs text-gray-500">{tx.date ? formatDate(tx.date) : '—'}</span>
             </div>
             <div className="mt-1.5 text-sm font-medium text-gray-100">{insiderName(tx.insider)}</div>
@@ -99,7 +110,7 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
                 </div>
                 <div>
                     <dt className="text-xs text-gray-500">Precio</dt>
-                    <dd className="tabular-nums text-gray-200">{usd(tx.price, 2)}</dd>
+                    <dd className="tabular-nums text-gray-200">{usd(tx.price, 2, txCurrency(tx))}</dd>
                 </div>
                 <div>
                     <dt className="text-xs text-gray-500">Importe</dt>
@@ -111,16 +122,22 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
                                 rel="noopener noreferrer"
                                 target="_blank"
                             >
-                                {usd(tx.value)}
+                                {usd(tx.value, 0, txCurrency(tx))}
                                 <ExternalLink aria-hidden="true" className="h-3 w-3" />
                             </a>
                         ) : (
-                            usd(tx.value)
+                            usd(tx.value, 0, txCurrency(tx))
                         )}
                     </dd>
                 </div>
             </dl>
             {note ? <p className="mt-1.5 text-xs text-gray-500">{note}</p> : null}
+            {tx.currency == null && (tx.price != null || tx.value != null) ? (
+                <p className="mt-1.5 text-xs text-gray-500">Divisa no informada</p>
+            ) : null}
+            {tx.form === 'PDMR' ? (
+                <p className="mt-1.5 text-xs text-gray-500">Fuente: tracefour (CC BY 4.0) · documento original en FCA NSM</p>
+            ) : null}
         </article>
     );
 }
@@ -236,7 +253,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                     {formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 })}
                                                     {note ? <span className="block text-xs font-normal text-gray-500">{note}</span> : null}
                                                 </td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{usd(tx.price, 2)}</td>
+                                                <td className="px-3 py-2 text-right tabular-nums">{usd(tx.price, 2, txCurrency(tx))}</td>
                                                 <td className="py-2 pl-3 text-right tabular-nums">
                                                     {tx.source_url ? (
                                                         <a
@@ -245,11 +262,11 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                             rel="noopener noreferrer"
                                                             target="_blank"
                                                         >
-                                                            {usd(tx.value)}
+                                                            {usd(tx.value, 0, txCurrency(tx))}
                                                             <ExternalLink aria-hidden="true" className="h-3 w-3" />
                                                         </a>
                                                     ) : (
-                                                        usd(tx.value)
+                                                        usd(tx.value, 0, txCurrency(tx))
                                                     )}
                                                 </td>
                                             </tr>

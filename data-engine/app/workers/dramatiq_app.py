@@ -1142,6 +1142,22 @@ def ingest_sec_bottleneck_filings(tenant_id: int | None = None, user_id: str | N
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
+def ingest_uk_pdmr_filings(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
+    """Movimientos PDMR del Reino Unido (tracefour, gratis, CC BY 4.0): 1 GET por corrida."""
+    from app.services.uk_pdmr_ingestion import ingest_uk_pdmr
+
+    db = _session(tenant_id, user_id)
+    try:
+        result = _run(ingest_uk_pdmr(db, db.info["tenant_id"]))
+        return {"actor": "ingest_uk_pdmr_filings", "status": "ok", **result}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("ingest_uk_pdmr_filings", exc)
+    finally:
+        db.close()
+
+
 DISCOVERY_DEADLINE_SECONDS = 480  # margen de 2 min bajo el time_limit de 10 min
 
 

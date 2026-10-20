@@ -119,9 +119,13 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
     cutoff = (date.today() - timedelta(days=days)).isoformat()
     # Sin filtro de codigo/fecha en SQL: los descartes se cuentan en Python
     # para declararlos (el WHERE los haria invisibles).
+    # Solo Form 4 (SEC, USD): los movimientos PDMR (UK) vienen en GBP y esta
+    # vista SUMA valores entre insiders; mezclar divisas en una suma seria un
+    # dato falso. Los PDMR se ven en el feed y en la ficha, con su divisa.
     rows = db.execute(
         select(InsiderTransaction, InsiderFiling)
         .join(InsiderFiling, InsiderTransaction.filing_id == InsiderFiling.id)
+        .where(InsiderTransaction.form.in_(("4", "4/A")))
     ).all()
 
     by_ticker: dict[str, list[tuple[InsiderTransaction, InsiderFiling]]] = {}

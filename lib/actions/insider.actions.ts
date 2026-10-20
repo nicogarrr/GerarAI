@@ -57,6 +57,8 @@ export interface InsiderFilingTransaction {
     rule_10b5_1?: boolean | null;
     shares?: number | null;
     price?: number | null;
+    /** Divisa declarada de la operacion (USD en SEC, GBP en PDMR UK). */
+    currency?: string | null;
     value?: number | null;
     tx_date?: string | null;
     source_url?: string | null;
@@ -131,6 +133,10 @@ export interface InsiderFeedTransaction {
     side?: 'compra' | 'venta' | null;
     shares?: number | null;
     price?: number | null;
+    /** Divisa declarada (USD en SEC, GBP en PDMR UK); nunca se asume. */
+    currency?: string | null;
+    /** Formulario origen: "4"/"4/A" (SEC) o "PDMR" (UK, via tracefour). */
+    form?: string | null;
     value?: number | null;
     date?: string | null;
     /** Tramos Form 4 agregados en esta fila (mismo filing + insider + codigo). */
