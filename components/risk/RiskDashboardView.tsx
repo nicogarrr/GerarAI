@@ -50,7 +50,7 @@ function thresholdExplanation(alert: DataRecord): string {
         return 'Umbral 10%: las empresas «pre-FCF» todavía no generan caja libre, así que el límite es el doble de estricto que el 20% general. Regla de prudencia sobre fragilidad financiera, no una predicción de caída.';
     }
     if (threshold === 0) {
-        return 'La caja de esta divisa está en negativo (saldo deudor, típicamente préstamo sobre margen). Revisa los saldos o las operaciones en esa divisa; el umbral es no bajar de cero.';
+        return 'La caja de esta divisa está en negativo (saldo deudor). Revisa los saldos o las operaciones en esa divisa; el umbral es no bajar de cero.';
     }
     return 'Alerta disparada al superar el umbral indicado junto al valor medido.';
 }
