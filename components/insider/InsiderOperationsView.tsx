@@ -170,6 +170,12 @@ export default function InsiderOperationsView({ result, days }: { result: Inside
                 <p className="mt-1 text-xs text-gray-500">
                     Últimos {formatNumber(days, { maximumFractionDigits: 0 })} días · compras y ventas en mercado abierto (P/S) guardadas por el monitor.
                 </p>
+                <details className="mt-1 text-xs text-gray-500">
+                    <summary className="inline-flex min-h-11 cursor-pointer items-center">Cobertura de las operaciones</summary>
+                    <p className="pb-2 leading-5">
+                        Concesiones y ejercicios no suman. El periodo de cada empresa va de su primera a su última operación guardada: fuera de ahí no hay dato que mostrar.
+                    </p>
+                </details>
             </div>
             {result.companies.length === 0 ? (
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center text-sm text-gray-400">
