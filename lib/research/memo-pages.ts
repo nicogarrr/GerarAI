@@ -16,7 +16,12 @@ export function splitMemoPages(markdown: string): MemoPage[] {
     const heading = /^##\s+(.+?)\s*$/.exec(line);
     if (heading) {
       flush();
-      current = { title: heading[1].replace(/[*_`]/g, ''), lines: [...preface.filter((l) => !/^#\s/.test(l)), line] };
+      // El paginador numera las opciones ({i + 1}.): si el propio encabezado
+      // ya trae numeracion ("## 1. Resumen ejecutivo") se duplicaba ("1. 1.").
+      // Se conserva en el cuerpo (lines), solo se limpia el titulo del selector.
+      // Exige separador + espacio: "1.5 Dividendos" no es una enumeracion.
+      const title = heading[1].replace(/[*_`]/g, '').replace(/^\d+[.\-)]\s+/, '');
+      current = { title, lines: [...preface.filter((l) => !/^#\s/.test(l)), line] };
       preface = [];
     } else if (current) {
       current.lines.push(line);
