@@ -9,7 +9,7 @@ type Snapshot = { title: string; checkedAt: string; metrics: Metric[]; series: S
 
 function value(n: number | null, unit: string) {
   if (n === null || !Number.isFinite(n)) return 'N/D';
-  return unit.startsWith('USD/') ? formatMoney(n, 'USD') : formatNumber(n, { maximumFractionDigits: 3 });
+  return unit.startsWith('USD/') ? formatMoney(n, unit.split('/')[0]) : formatNumber(n, { maximumFractionDigits: 3 });
 }
 
 /** Reviewed public-source snapshots. No request-time remote calls or silent refresh.
