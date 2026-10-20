@@ -166,9 +166,8 @@ def _discover_numantia_sources(client: httpx.Client) -> list[dict]:
 # entrada: (anio de la carta, ruta en berkshirehathaway.com/letters/, fecha de
 # firma que consta en el propio documento o None si el documento no la declara).
 # Verificado el 2026-10-20 con una peticion real por enlace: 200, contenido de
-# Berkshire y fecha de firma del anio siguiente al de la carta (la de 1981 no
-# lleva fecha; se verifico por su <TITLE> "Chairman's Letter - 1981"; la de
-# 2007 solo declara "February 2008"). El indice oficial se scrapeaba con regex,
+# Berkshire y fecha de firma del anio siguiente al de la carta (la de 2007
+# solo declara "February 2008", sin dia). El indice oficial se scrapeaba con regex,
 # pero Berkshire sirve siempre Content-Encoding: br (incluso pidiendo
 # identity): con un httpx sin brotli el HTML llegaba sin decodificar y el
 # discovery devolvia lista vacia en silencio (corpus sin Buffett). Para anadir
@@ -178,7 +177,7 @@ BUFFETT_LETTERS: tuple[tuple[int, str, date | None], ...] = (
     (1978, "1978.html", date(1979, 3, 26)),
     (1979, "1979.html", date(1980, 3, 3)),
     (1980, "1980.html", date(1981, 2, 27)),
-    (1981, "1981.html", None),
+    (1981, "1981.html", date(1982, 2, 26)),
     (1982, "1982.html", date(1983, 3, 3)),
     (1983, "1983.html", date(1984, 3, 14)),
     (1984, "1984.html", date(1985, 2, 25)),
