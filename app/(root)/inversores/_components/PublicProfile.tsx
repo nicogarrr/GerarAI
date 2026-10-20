@@ -44,7 +44,7 @@ export function PublicProfileSection({ profile }: { profile: PublicProfile }) {
 
             {profile.letters.length > 0 ? (
                 <section className="flex flex-col gap-3">
-                    <h2 className="text-xl font-semibold text-gray-100">Cartas</h2>
+                    <h2 className="text-xl font-semibold text-gray-100">Fuentes sobre el inversor</h2>
                     <ul className="flex flex-col divide-y divide-gray-900">
                         {profile.letters.map((letter) => (
                             <li className="py-2 text-sm" key={letter.url}>

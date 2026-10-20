@@ -85,6 +85,10 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  // selector de inversor y contenido con navegación por URL.
+  'app/(root)/inversores/_components/InvestorSelector.tsx': 'useRouter, jsx-onChange',
+  'app/(root)/inversores/_components/InvestorViewSelector.tsx': 'useRouter, jsx-onChange',
+
   'app/(auth)/sign-in/page.tsx': 'useRouter, useState, jsx-onSubmit, jsx-onClick, libreria cliente: react-hook-form, libreria cliente: sonner',
   'app/(root)/error.tsx': 'useEffect, jsx-onClick',
   'app/(root)/inversores/_components/HubNav.tsx': 'usePathname',

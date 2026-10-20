@@ -15,7 +15,6 @@ export function InvestorVideos({ videos }: { videos?: unknown }) {
                 <p className="text-sm font-medium text-gray-300">No hay vídeos verificados disponibles para este inversor.</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                     <Link href="/inversores/canales" className="inline-flex min-h-11 items-center rounded-lg border border-gray-700 px-3 text-sm text-teal-300">Ver canales de inversión</Link>
-                    <Link href="/inversores/cartas" className="inline-flex min-h-11 items-center rounded-lg border border-gray-700 px-3 text-sm text-teal-300">Explorar cartas</Link>
                 </div>
             </div> : (
                 <ul className="grid gap-6 sm:grid-cols-2">
