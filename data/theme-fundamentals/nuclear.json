@@ -1,0 +1,310 @@
+{
+  "id": "nuclear",
+  "title": "Uranio",
+  "checkedAt": "2026-10-20",
+  "series": [
+    {
+      "title": "Necesidades sin contratar · EE. UU.",
+      "columns": [
+        "Sin contratar"
+      ],
+      "unit": "millones lb U3O8e",
+      "rows": [
+        {
+          "label": "2026",
+          "values": [
+            0.952
+          ]
+        },
+        {
+          "label": "2027",
+          "values": [
+            2.358
+          ]
+        },
+        {
+          "label": "2028",
+          "values": [
+            6.036
+          ]
+        },
+        {
+          "label": "2029",
+          "values": [
+            8.244
+          ]
+        },
+        {
+          "label": "2030",
+          "values": [
+            12.021
+          ]
+        },
+        {
+          "label": "2031",
+          "values": [
+            23.061
+          ]
+        },
+        {
+          "label": "2032",
+          "values": [
+            26.35
+          ]
+        },
+        {
+          "label": "2033",
+          "values": [
+            33.591
+          ]
+        },
+        {
+          "label": "2034",
+          "values": [
+            37.236
+          ]
+        },
+        {
+          "label": "2035",
+          "values": [
+            36.429
+          ]
+        }
+      ],
+      "source": "https://www.eia.gov/uranium/marketing/xls/umartable11figure10.xlsx",
+      "sourceName": "EIA",
+      "vintage": "31/12/2025",
+      "published": "julio 2026",
+      "kind": "reportado"
+    },
+    {
+      "title": "Cobertura contractual máxima · EE. UU.",
+      "columns": [
+        "Contratado máximo",
+        "Sin contratar",
+        "Total máximo"
+      ],
+      "unit": "millones lb U3O8e",
+      "rows": [
+        {
+          "label": "2026",
+          "values": [
+            null,
+            null,
+            42.968
+          ]
+        },
+        {
+          "label": "2027",
+          "values": [
+            37.437,
+            2.358,
+            39.794
+          ]
+        },
+        {
+          "label": "2028",
+          "values": [
+            27.887,
+            6.036,
+            33.923
+          ]
+        },
+        {
+          "label": "2029",
+          "values": [
+            23.213,
+            8.244,
+            31.457
+          ]
+        },
+        {
+          "label": "2030",
+          "values": [
+            17.934,
+            12.021,
+            29.955
+          ]
+        },
+        {
+          "label": "2031",
+          "values": [
+            10.148,
+            23.061,
+            33.209
+          ]
+        },
+        {
+          "label": "2032",
+          "values": [
+            8.993,
+            26.35,
+            35.343
+          ]
+        },
+        {
+          "label": "2033",
+          "values": [
+            3.151,
+            33.591,
+            36.742
+          ]
+        },
+        {
+          "label": "2034",
+          "values": [
+            2.234,
+            37.236,
+            39.47
+          ]
+        },
+        {
+          "label": "2035",
+          "values": [
+            null,
+            null,
+            37.513
+          ]
+        }
+      ],
+      "source": "https://www.eia.gov/uranium/marketing/xls/umartable12figure11.xlsx",
+      "sourceName": "EIA",
+      "vintage": "31/12/2025",
+      "published": "julio 2026",
+      "kind": "reportado"
+    },
+    {
+      "title": "Precio medio pagado · entregas 2025",
+      "columns": [
+        "Contratos spot",
+        "Largo plazo",
+        "Total"
+      ],
+      "unit": "USD/lb U3O8e",
+      "rows": [
+        {
+          "label": "2025",
+          "values": [
+            75.8298230929553,
+            55.911904219905,
+            58.4616138010522
+          ]
+        }
+      ],
+      "source": "https://www.eia.gov/uranium/marketing/xls/umartable7.xlsx",
+      "sourceName": "EIA",
+      "vintage": "Entregas 2025",
+      "published": "julio 2026",
+      "kind": "reportado"
+    },
+    {
+      "title": "Producción de concentrado · EE. UU.",
+      "columns": [
+        "Producción"
+      ],
+      "unit": "millones lb U3O8",
+      "rows": [
+        {
+          "label": "T2 2025",
+          "values": [
+            0.477501
+          ]
+        },
+        {
+          "label": "T3 2025",
+          "values": [
+            0.329623
+          ]
+        },
+        {
+          "label": "T4 2025",
+          "values": [
+            1.043474
+          ]
+        },
+        {
+          "label": "T1 2026",
+          "values": [
+            1.039075
+          ]
+        },
+        {
+          "label": "T2 2026",
+          "values": [
+            1.087504
+          ]
+        }
+      ],
+      "source": "https://www.eia.gov/uranium/production/quarterly/xls/qupd_tbl1.xlsx",
+      "sourceName": "EIA",
+      "vintage": "Producción US, T2 2026",
+      "published": "agosto 2026",
+      "kind": "reportado"
+    },
+    {
+      "title": "Mundo · necesidades anuales de reactores",
+      "columns": [
+        "Necesidades"
+      ],
+      "unit": "tU/año",
+      "rows": [
+        {
+          "label": "Base al 01/01/2023",
+          "values": [
+            59000
+          ]
+        }
+      ],
+      "source": "https://www.oecd-nea.org/upload/docs/application/pdf/2025-04/7683_uranium_2024_-_resources_production_and_demand_2025-04-22_14-29-2_928.pdf",
+      "sourceName": "NEA/IAEA · Uranium 2024 (2025)",
+      "vintage": "01/01/2023",
+      "published": "2025",
+      "kind": "reportado"
+    },
+    {
+      "title": "Mundo · escenarios 2050, no contratos",
+      "columns": [
+        "Escenario bajo",
+        "Escenario alto"
+      ],
+      "unit": "tU/año",
+      "rows": [
+        {
+          "label": "2050",
+          "values": [
+            90000,
+            142000
+          ]
+        }
+      ],
+      "source": "https://www.oecd-nea.org/upload/docs/application/pdf/2025-04/7683_uranium_2024_-_resources_production_and_demand_2025-04-22_14-29-2_928.pdf",
+      "sourceName": "NEA/IAEA · Uranium 2024 (2025)",
+      "vintage": "Edición 2024, base 2022/2023",
+      "published": "2025",
+      "kind": "escenario"
+    }
+  ],
+  "metrics": [
+    {
+      "label": "Necesidades sin contratar · acumulado",
+      "value": 186.278,
+      "unit": "millones lb U3O8e",
+      "period": "2026–2035",
+      "source": "https://www.eia.gov/uranium/marketing/xls/umartable12figure11.xlsx",
+      "vintage": "31/12/2025"
+    }
+  ],
+  "notes": [
+    "Solo utilities de EE. UU.; sin contratar no significa escasez física.",
+    "Precios de entregas históricas, no cotización spot actual.",
+    "W y ausencias se muestran como N/D; no se reconstruyen por diferencias.",
+    "Contexto mundial NEA/IAEA: valores aproximados; estadísticas principales de 2021–2022. tU no es lb U3O8.",
+    "Fuente: OECD/NEA e IAEA, Uranium 2024 (2025), CC BY 4.0. Adaptación: las opiniones y argumentos no representan las opiniones oficiales de la OCDE ni de sus miembros. Traducción de GerarAI; en caso de discrepancia prevalece el texto original."
+  ],
+  "links": [
+    {
+      "label": "Precio indicativo externo · Cameco (UxC/TradeTech)",
+      "url": "https://www.cameco.com/invest/markets/uranium-price"
+    }
+  ]
+}
