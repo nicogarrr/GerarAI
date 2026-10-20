@@ -1,5 +1,5 @@
 """Persisted, tenant-scoped supply constraints. GET never ingests or calls AI."""
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -8,10 +8,18 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import BottleneckDiscovery, BottleneckSignal
+from app.models import (
+    BottleneckDiscovery,
+    BottleneckSignal,
+    Company,
+    InsiderTransaction,
+    Position,
+    WatchItem,
+)
 from app.services.bottleneck_discovery_service import NO_DATA, distinct_sources, resolve_evidence
 from app.services.bottleneck_service import MIN_SOURCES as DETECTION_MIN_SOURCES
 from app.services.bottleneck_service import THEMES
+from app.services.insider_service import _parse_date as _parse_insider_date
 
 router = APIRouter()
 
@@ -87,6 +95,12 @@ class DiscoveryOut(BaseModel):
     # caiga despues bajo el umbral de deteccion; la UI lo etiqueta.
     theme_detected: bool
     theme_last_seen: datetime | None
+    # Conexion con lo que el tenant ya tiene: posicion abierta o en seguimiento.
+    in_portfolio: bool
+    in_watchlist: bool
+    # True solo si hay transaccion insider (Form 4) del ticker en los ultimos
+    # 90 dias; sin datos no se muestra nada (ausencia != ausencia de actividad).
+    recent_insider_activity: bool
 
 
 class DiscoveriesOut(BaseModel):
@@ -121,6 +135,25 @@ def list_discoveries(
         signal.theme: signal
         for signal in db.scalars(select(BottleneckSignal).where(BottleneckSignal.tenant_id == tenant))
     }
+    portfolio_tickers = set(db.scalars(
+        select(Company.ticker).join(Position, Position.company_id == Company.id).where(
+            Position.tenant_id == tenant, Position.quantity != 0
+        )
+    ))
+    watchlist_tickers = {symbol.upper() for symbol in db.scalars(
+        select(WatchItem.symbol).where(WatchItem.tenant_id == tenant)
+    )}
+    # tx_date es texto; se interpreta con el mismo parser que las alertas insider.
+    insider_cutoff = datetime.now(UTC).date() - timedelta(days=90)
+    insider_tickers: set[str] = set()
+    for ticker, tx_date in db.execute(
+        select(InsiderTransaction.issuer_ticker, InsiderTransaction.tx_date)
+        .where(InsiderTransaction.tenant_id == tenant, InsiderTransaction.issuer_ticker.is_not(None))
+        .distinct()
+    ):
+        parsed = _parse_insider_date(tx_date)
+        if ticker and parsed is not None and parsed >= insider_cutoff:
+            insider_tickers.add(ticker.upper())
     items = []
     for row in rows:
         # Fuentes realmente distintas: varios chunks de un mismo filing cuentan una vez.
@@ -137,7 +170,11 @@ def list_discoveries(
             id=row.id, theme=row.theme, ticker=row.ticker, label="INFERIDO", reasoning=row.reasoning,
             evidence=evidence, model=row.model, created_at=row.created_at,
             theme_detected=bool(signal and signal.n_sources >= DETECTION_MIN_SOURCES),
-            theme_last_seen=signal.last_seen if signal else None))
+            theme_last_seen=signal.last_seen if signal else None,
+
+            in_portfolio=row.ticker in portfolio_tickers,
+            in_watchlist=row.ticker.upper() in watchlist_tickers,
+            recent_insider_activity=row.ticker.upper() in insider_tickers))
     return DiscoveriesOut(items=items, total=total, limit=limit, offset=offset,
                           has_more=offset + len(items) < total)
 

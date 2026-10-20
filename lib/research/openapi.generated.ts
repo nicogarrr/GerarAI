@@ -6021,6 +6021,10 @@ export interface components {
             evidence: components["schemas"]["DiscoveryEvidenceOut"][];
             /** Id */
             id: number;
+            /** In Portfolio */
+            in_portfolio: boolean;
+            /** In Watchlist */
+            in_watchlist: boolean;
             /**
              * Label
              * @constant
@@ -6030,6 +6034,8 @@ export interface components {
             model: string;
             /** Reasoning */
             reasoning: string;
+            /** Recent Insider Activity */
+            recent_insider_activity: boolean;
             /** Theme */
             theme: string;
             /** Theme Detected */

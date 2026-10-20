@@ -47,6 +47,9 @@ export interface DiscoveryView {
   created_at: string;
   theme_detected: boolean;
   theme_last_seen: string | null;
+  in_portfolio: boolean;
+  in_watchlist: boolean;
+  recent_insider_activity: boolean;
 }
 
 export interface DiscoveriesState {

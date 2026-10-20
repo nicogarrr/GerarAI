@@ -2792,6 +2792,14 @@
             "title": "Id",
             "type": "integer"
           },
+          "in_portfolio": {
+            "title": "In Portfolio",
+            "type": "boolean"
+          },
+          "in_watchlist": {
+            "title": "In Watchlist",
+            "type": "boolean"
+          },
           "label": {
             "const": "INFERIDO",
             "title": "Label",
@@ -2804,6 +2812,10 @@
           "reasoning": {
             "title": "Reasoning",
             "type": "string"
+          },
+          "recent_insider_activity": {
+            "title": "Recent Insider Activity",
+            "type": "boolean"
           },
           "theme": {
             "title": "Theme",
@@ -2840,7 +2852,10 @@
           "model",
           "created_at",
           "theme_detected",
-          "theme_last_seen"
+          "theme_last_seen",
+          "in_portfolio",
+          "in_watchlist",
+          "recent_insider_activity"
         ],
         "title": "DiscoveryOut",
         "type": "object"
