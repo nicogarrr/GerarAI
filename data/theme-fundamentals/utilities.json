@@ -1,0 +1,349 @@
+{
+  "id": "utilities",
+  "title": "Energía y utilities",
+  "metrics": [],
+  "series": [
+    {
+      "title": "Petróleo · media Brent, Dubái y WTI · precio mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "USD/barril",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            102.3
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            84.4
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            79.8
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            81.7
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            100.4
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            103.9
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            95.6
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            68
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            63.7
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            60.9
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            62.3
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            63
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            66.5
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            66.7
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            69.2
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            69.1
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            62.7
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            65.9
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            70.7
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            73.8
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            78.2
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            72.3
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            72.3
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            74
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "World Bank.",
+      "sourceHeader": "Crude oil, average",
+      "sourceUnit": "($/bbl)",
+      "sourceDescription": "Crude oil, average spot price of Brent, Dubai and West Texas  Intermediate, equally weighed",
+      "licenseStatus": "CC BY 4.0 + World Bank dataset terms"
+    },
+    {
+      "title": "Gas natural · índice mensual",
+      "columns": [
+        "Media mensual"
+      ],
+      "unit": "índice 2010=100",
+      "rows": [
+        {
+          "label": "2026-09",
+          "values": [
+            166.4
+          ]
+        },
+        {
+          "label": "2026-08",
+          "values": [
+            144.3
+          ]
+        },
+        {
+          "label": "2026-07",
+          "values": [
+            130.3
+          ]
+        },
+        {
+          "label": "2026-06",
+          "values": [
+            118.3
+          ]
+        },
+        {
+          "label": "2026-05",
+          "values": [
+            121.2
+          ]
+        },
+        {
+          "label": "2026-04",
+          "values": [
+            117.4
+          ]
+        },
+        {
+          "label": "2026-03",
+          "values": [
+            130
+          ]
+        },
+        {
+          "label": "2026-02",
+          "values": [
+            105
+          ]
+        },
+        {
+          "label": "2026-01",
+          "values": [
+            155.8
+          ]
+        },
+        {
+          "label": "2025-12",
+          "values": [
+            104.4
+          ]
+        },
+        {
+          "label": "2025-11",
+          "values": [
+            103.1
+          ]
+        },
+        {
+          "label": "2025-10",
+          "values": [
+            98.1
+          ]
+        },
+        {
+          "label": "2025-09",
+          "values": [
+            96.7
+          ]
+        },
+        {
+          "label": "2025-08",
+          "values": [
+            96.3
+          ]
+        },
+        {
+          "label": "2025-07",
+          "values": [
+            102.1
+          ]
+        },
+        {
+          "label": "2025-06",
+          "values": [
+            103.7
+          ]
+        },
+        {
+          "label": "2025-05",
+          "values": [
+            101.6
+          ]
+        },
+        {
+          "label": "2025-04",
+          "values": [
+            105
+          ]
+        },
+        {
+          "label": "2025-03",
+          "values": [
+            121.5
+          ]
+        },
+        {
+          "label": "2025-02",
+          "values": [
+            132.9
+          ]
+        },
+        {
+          "label": "2025-01",
+          "values": [
+            128.4
+          ]
+        },
+        {
+          "label": "2024-12",
+          "values": [
+            111.1
+          ]
+        },
+        {
+          "label": "2024-11",
+          "values": [
+            100.4
+          ]
+        },
+        {
+          "label": "2024-10",
+          "values": [
+            96.7
+          ]
+        }
+      ],
+      "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+      "sourceName": "World Bank · Pink Sheet",
+      "vintage": "2026-10-02",
+      "published": "2026-10-02",
+      "kind": "reportado",
+      "monthly": true,
+      "attribution": "The World Bank: World Bank Commodity Price Data (The Pink Sheet): World Bank.",
+      "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
+      "providers": "World Bank.",
+      "sourceHeader": "Natural gas index",
+      "sourceUnit": "(2010=100)",
+      "sourceDescription": "Natural gas index (Laspeyres), average of Europe, US and Japan (LNG), weights based on 5-year average consumption volumes, updated every 5 years, except the 11-year period 1960-70.",
+      "licenseStatus": "CC BY 4.0 + World Bank dataset terms"
+    }
+  ],
+  "notes": [],
+  "links": [],
+  "checkedAt": "2026-10-20",
+  "pinkSheet": {
+    "source": "https://thedocs.worldbank.org/en/doc/74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/CMO-Historical-Data-Monthly.xlsx",
+    "sha256": "ea1c350827878ea3bbe30e3cda16a13fd3bd5b409b8458940dc94a36b5a33154",
+    "vintage": "2026-10-02",
+    "window": "Últimos 24 meses disponibles en el XLS; medias mensuales nominales, no precios en vivo.",
+    "terms": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets"
+  }
+}
