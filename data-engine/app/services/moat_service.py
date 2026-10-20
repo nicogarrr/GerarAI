@@ -17,8 +17,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Company, MoatAssessment
 from app.services.claim_scope import live_claims
-from app.services.moat_classification import classify_result
 from app.services.moat_checklist import moat_checklist
+from app.services.moat_classification import classify_result
 from app.services.moat_profile import moat_evidence_context
 from app.services.source_hierarchy_service import SOURCE_TIERS
 from app.valuation.moat_framework import (
