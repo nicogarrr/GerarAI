@@ -10,6 +10,7 @@ import { getMarketThemes } from '@/lib/actions/market-themes.actions';
 import { getFlowHoldings, getMoneyFlow, getMoneyFlowThemes } from '@/lib/actions/money-flows.actions';
 import type { MoneyFlow } from '@/lib/market/flows';
 import { ThemeFlow } from './_components/ThemeFlow';
+import { ThemeFundamentals } from './_components/ThemeFundamentals';
 import { NA, formatMarketDate, formatPercent } from '@/lib/format';
 import {
   constituentContribution,
@@ -153,6 +154,7 @@ function ThemeCard({
               })}
             </tbody>
           </table>
+          <ThemeFundamentals themeId={theme.id} />
           {flow ? <ThemeFlow flow={flow} holdings={holdings} /> : null}
           <ThemeBrainButton question={brainQuestion} />
         </div>

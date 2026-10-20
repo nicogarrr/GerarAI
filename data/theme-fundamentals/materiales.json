@@ -1,0 +1,467 @@
+{
+  "id": "materiales",
+  "title": "Materiales críticos",
+  "checkedAt": "2026-10-20",
+  "metrics": [],
+  "series": [
+    {
+      "title": "Cobre · producción minera mundial",
+      "columns": [
+        "Producción estimada"
+      ],
+      "unit": "t de contenido metálico",
+      "rows": [
+        {
+          "label": "Estados Unidos",
+          "values": [
+            1000000.0
+          ]
+        },
+        {
+          "label": "Australia",
+          "values": [
+            730000.0
+          ]
+        },
+        {
+          "label": "Canadá",
+          "values": [
+            500000.0
+          ]
+        },
+        {
+          "label": "Chile",
+          "values": [
+            5300000.0
+          ]
+        },
+        {
+          "label": "China",
+          "values": [
+            1800000.0
+          ]
+        },
+        {
+          "label": "R. D. Congo",
+          "values": [
+            3200000.0
+          ]
+        },
+        {
+          "label": "Alemania",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "India",
+          "values": [
+            23000.0
+          ]
+        },
+        {
+          "label": "Indonesia",
+          "values": [
+            710000.0
+          ]
+        },
+        {
+          "label": "Japón",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "Kazajistán",
+          "values": [
+            710000.0
+          ]
+        },
+        {
+          "label": "Corea del Sur",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "México",
+          "values": [
+            690000.0
+          ]
+        },
+        {
+          "label": "Perú",
+          "values": [
+            2700000.0
+          ]
+        },
+        {
+          "label": "Polonia",
+          "values": [
+            410000.0
+          ]
+        },
+        {
+          "label": "Rusia",
+          "values": [
+            1300000.0
+          ]
+        },
+        {
+          "label": "Zambia",
+          "values": [
+            940000.0
+          ]
+        },
+        {
+          "label": "Otros países",
+          "values": [
+            3000000.0
+          ]
+        }
+      ],
+      "source": "https://www.sciencebase.gov/catalog/item/69837e43b66b01367d7ec7c7",
+      "sourceName": "USGS MCS 2026 · CC0",
+      "vintage": "2025, estimación USGS",
+      "published": "2026",
+      "kind": "estimacion_oficial"
+    },
+    {
+      "title": "Litio · producción minera mundial",
+      "columns": [
+        "Producción estimada"
+      ],
+      "unit": "t de contenido metálico",
+      "rows": [
+        {
+          "label": "Estados Unidos",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "Argentina",
+          "values": [
+            23000.0
+          ]
+        },
+        {
+          "label": "Australia",
+          "values": [
+            92000.0
+          ]
+        },
+        {
+          "label": "Brasil",
+          "values": [
+            12000.0
+          ]
+        },
+        {
+          "label": "Canadá",
+          "values": [
+            5600.0
+          ]
+        },
+        {
+          "label": "Chile",
+          "values": [
+            56000.0
+          ]
+        },
+        {
+          "label": "China",
+          "values": [
+            62000.0
+          ]
+        },
+        {
+          "label": "Mali",
+          "values": [
+            9400.0
+          ]
+        },
+        {
+          "label": "Portugal",
+          "values": [
+            380.0
+          ]
+        },
+        {
+          "label": "Zimbabue",
+          "values": [
+            28000.0
+          ]
+        },
+        {
+          "label": "Otros países",
+          "values": [
+            null
+          ]
+        }
+      ],
+      "source": "https://www.sciencebase.gov/catalog/item/69837e43b66b01367d7ec7c7",
+      "sourceName": "USGS MCS 2026 · CC0",
+      "vintage": "2025, estimación USGS",
+      "published": "2026",
+      "kind": "estimacion_oficial"
+    },
+    {
+      "title": "Níquel · producción minera mundial",
+      "columns": [
+        "Producción estimada"
+      ],
+      "unit": "t de contenido metálico",
+      "rows": [
+        {
+          "label": "Estados Unidos",
+          "values": [
+            10000.0
+          ]
+        },
+        {
+          "label": "Australia",
+          "values": [
+            45000.0
+          ]
+        },
+        {
+          "label": "Brasil",
+          "values": [
+            70000.0
+          ]
+        },
+        {
+          "label": "Canadá",
+          "values": [
+            140000.0
+          ]
+        },
+        {
+          "label": "China",
+          "values": [
+            120000.0
+          ]
+        },
+        {
+          "label": "Indonesia",
+          "values": [
+            2600000.0
+          ]
+        },
+        {
+          "label": "Nueva Caledonia",
+          "values": [
+            140000.0
+          ]
+        },
+        {
+          "label": "Filipinas",
+          "values": [
+            270000.0
+          ]
+        },
+        {
+          "label": "Rusia",
+          "values": [
+            200000.0
+          ]
+        },
+        {
+          "label": "Otros países",
+          "values": [
+            290000.0
+          ]
+        }
+      ],
+      "source": "https://www.sciencebase.gov/catalog/item/69837e43b66b01367d7ec7c7",
+      "sourceName": "USGS MCS 2026 · CC0",
+      "vintage": "2025, estimación USGS",
+      "published": "2026",
+      "kind": "estimacion_oficial"
+    },
+    {
+      "title": "Tierras raras · producción minera mundial",
+      "columns": [
+        "Producción estimada"
+      ],
+      "unit": "t de REO equivalente",
+      "rows": [
+        {
+          "label": "Estados Unidos",
+          "values": [
+            51000.0
+          ]
+        },
+        {
+          "label": "Australia",
+          "values": [
+            29000.0
+          ]
+        },
+        {
+          "label": "Brasil",
+          "values": [
+            2000.0
+          ]
+        },
+        {
+          "label": "Myanmar",
+          "values": [
+            22000.0
+          ]
+        },
+        {
+          "label": "Canadá",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "China",
+          "values": [
+            270000.0
+          ]
+        },
+        {
+          "label": "Groenlandia",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "India",
+          "values": [
+            2900.0
+          ]
+        },
+        {
+          "label": "Madagascar",
+          "values": [
+            2700.0
+          ]
+        },
+        {
+          "label": "Malasia",
+          "values": [
+            110.0
+          ]
+        },
+        {
+          "label": "Nigeria",
+          "values": [
+            1500.0
+          ]
+        },
+        {
+          "label": "Rusia",
+          "values": [
+            2600.0
+          ]
+        },
+        {
+          "label": "Sudáfrica",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "Tanzania",
+          "values": [
+            null
+          ]
+        },
+        {
+          "label": "Tailandia",
+          "values": [
+            4800.0
+          ]
+        },
+        {
+          "label": "Vietnam",
+          "values": [
+            150.0
+          ]
+        },
+        {
+          "label": "Otros países",
+          "values": [
+            550.0
+          ]
+        }
+      ],
+      "source": "https://www.sciencebase.gov/catalog/item/69837e43b66b01367d7ec7c7",
+      "sourceName": "USGS MCS 2026 · CC0",
+      "vintage": "2025, estimación USGS",
+      "published": "2026",
+      "kind": "estimacion_oficial"
+    },
+    {
+      "title": "EE. UU. · dependencia neta de importaciones",
+      "columns": [
+        "Consumo aparente cubierto con importaciones netas"
+      ],
+      "unit": "%",
+      "rows": [
+        {
+          "label": "Grafito natural",
+          "values": [
+            100.0
+          ]
+        },
+        {
+          "label": "Cobalto",
+          "values": [
+            79.0
+          ]
+        },
+        {
+          "label": "Tierras raras: compuestos y metales",
+          "values": [
+            67.0
+          ]
+        },
+        {
+          "label": "Cobre refinado",
+          "values": [
+            57.0
+          ]
+        },
+        {
+          "label": "Litio",
+          "values": [
+            ">50"
+          ]
+        },
+        {
+          "label": "Níquel",
+          "values": [
+            41.0
+          ]
+        }
+      ],
+      "source": "https://www.sciencebase.gov/catalog/item/696a75d5d4be0228872d3bf8",
+      "sourceName": "USGS MCS 2026 · CC0",
+      "vintage": "2025",
+      "published": "2026",
+      "kind": "estimacion_oficial"
+    }
+  ],
+  "notes": [
+    "Producción 2025 estimada por USGS, no cotización ni dato en vivo.",
+    "Tierras raras en equivalente de óxidos (REO); no se suman a toneladas de otros metales.",
+    "W y ausencias son N/D; los umbrales como >50 se conservan sin convertirlos en cifras exactas.",
+    "Los totales mundiales son filas de control de la fuente; no se suman otra vez con países.",
+    "Precios mensuales externos: sin serie incrustada hasta verificar derechos de los proveedores de cada referencia."
+  ],
+  "links": [
+    {
+      "label": "Precios mensuales · World Bank Pink Sheet (fuente externa)",
+      "url": "https://www.worldbank.org/en/research/commodity-markets"
+    },
+    {
+      "label": "Datos y licencia CC0 · USGS",
+      "url": "https://www.usgs.gov/data/mineral-commodity-summaries-2026-data-release"
+    }
+  ]
+}
