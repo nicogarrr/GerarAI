@@ -95,7 +95,7 @@ export default async function PortfolioIntelligencePage({ searchParams }: { sear
     */}
     <Panel
       actions={<Link className="text-sm text-teal-300 hover:text-teal-200" href="/risk">Ver concentraciones</Link>}
-      description="Pesos sobre el valor de las posiciones de renta variable, sin caja; Exposiciones de cartera calcula sobre el total con caja. El desglose por sector, país, divisa y factor, los pesos por posición y las alertas de concentración se calculan y se muestran solo en Exposiciones de cartera."
+      description="Pesos sobre el valor de las posiciones de renta variable, sin caja; Exposiciones de cartera calcula sobre el total con caja. El desglose completo está en Exposiciones de cartera."
       title="Concentración de la cartera"
     >
       <div className="grid gap-3 text-sm sm:grid-cols-3">
