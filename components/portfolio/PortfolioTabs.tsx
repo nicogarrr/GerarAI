@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic';
 import PortfolioDataNotice from '@/components/portfolio/PortfolioDataNotice';
 import PortfolioSummary from '@/components/portfolio/PortfolioSummary';
 import { hasCostBasis } from '@/lib/portfolio-insight';
+import { windowNav } from '@/lib/portfolio-nav';
 import PortfolioHoldings from '@/components/portfolio/PortfolioHoldings';
 import PortfolioTransactions from '@/components/portfolio/PortfolioTransactions';
 import PortfolioAllocation from '@/components/portfolio/PortfolioAllocation';
@@ -90,29 +91,13 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
 
     const chartData = useMemo(() => {
         if (scores.history?.dates?.length && scores.history.nav?.length) {
-            const latestDate = new Date(`${scores.history.dates.at(-1)}T00:00:00`);
-            const yearStart = new Date(latestDate.getFullYear(), 0, 1);
-            const ytdPoints = Math.max(1, scores.history.dates.filter((date) => new Date(`${date}T00:00:00`) >= yearStart).length);
-            // Punto sin NAV: se omite, jamás se dibuja un 0 inventado (un
-            // hueco en la serie no es una caída a cero).
-            const rows = scores.history.dates.flatMap((date, index) => {
-                const value = scores.history?.nav[index];
-                if (value == null) return [];
-                // "YYYY-MM-DD" es un día de calendario: formatDate lo parsea en
-                // hora local y lo formatea en la zona del proceso, así que el
-                // eje sale igual en el servidor (UTC) y en el navegador.
-                return [{ date: formatDate(date, { day: '2-digit', month: 'short' }), value }];
-            });
-            const maxPoints: Record<string, number> = {
-                '1S': 7,
-                '1M': 30,
-                '3M': 90,
-                '6M': 180,
-                'YTD': ytdPoints,
-                '1A': 365,
-                'Todo': rows.length,
-            };
-            return rows.slice(-Math.min(rows.length, maxPoints[chartPeriod] ?? 30));
+            // "YYYY-MM-DD" es un día de calendario: formatDate lo parsea en
+            // hora local y lo formatea en la zona del proceso, así que el
+            // eje sale igual en el servidor (UTC) y en el navegador.
+            return windowNav(scores.history.dates, scores.history.nav, chartPeriod).map((point) => ({
+                date: formatDate(point.date, { day: '2-digit', month: 'short' }),
+                value: point.value,
+            }));
         }
 
         return [];
