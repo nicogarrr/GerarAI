@@ -7,6 +7,7 @@ import { getKnowledgeDocument, getKnowledgeDocumentChunkPage } from '@/lib/actio
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 
 import { Pagination } from '../../_components/Pagination';
+import { investorLetters } from '../investor-letters';
 import { authorKey, titleYear } from '../letters';
 
 export const dynamic = 'force-dynamic';
@@ -22,12 +23,12 @@ const LINK = 'text-sm text-teal-300 hover:underline';
 
 type PageProps = {
     params: Promise<{ id: string }>;
-    searchParams: Promise<{ pagina?: string }>;
+    searchParams: Promise<{ pagina?: string; inversor?: string }>;
 };
 
 export default async function LetterReaderPage({ params, searchParams }: PageProps) {
     const { id } = await params;
-    const { pagina } = await searchParams;
+    const { pagina, inversor } = await searchParams;
     const letterId = /^\d+$/.test(id) ? Number(id) : null;
     if (!letterId) notFound();
 
@@ -51,7 +52,8 @@ export default async function LetterReaderPage({ params, searchParams }: PagePro
 
     const year = titleYear(letter.title);
     const author = letter.author?.trim() || null;
-    const backHref = author ? `/inversores/cartas?autor=${authorKey(author) || 'sin-autor'}` : '/inversores/cartas?autor=sin-autor';
+    const verifiedInvestor = inversor && investorLetters(inversor, [letter]).length > 0 ? inversor : null;
+    const backHref = verifiedInvestor ? `/inversores/${encodeURIComponent(verifiedInvestor)}?vista=cartas` : author ? `/inversores/cartas?autor=${authorKey(author) || 'sin-autor'}` : '/inversores/cartas?autor=sin-autor';
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-8 overflow-x-clip py-6">
@@ -92,7 +94,7 @@ export default async function LetterReaderPage({ params, searchParams }: PagePro
                 </section>
             )}
 
-            <Pagination basePath={`/inversores/cartas/${letterId}`} page={page} total={totalPages} />
+            <Pagination basePath={`/inversores/cartas/${letterId}`} page={page} total={totalPages} params={verifiedInvestor ? { inversor: verifiedInvestor } : {}} />
 
             <p className="text-xs text-gray-500">
                 Fuente: biblioteca de GerarAI, texto extraído del PDF y troceado en fragmentos (puede tener errores de extracción;

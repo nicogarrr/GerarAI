@@ -149,6 +149,7 @@ export default async function InvestorPage({
         documents={documents}
         unavailable={lettersUnavailable}
         pagina={pagina}
+        publicLetters={investor.public_profile?.letters}
       /> : null}
       {view === "videos" ? <InvestorVideos videos={investor.videos} /> : null}
     </main>

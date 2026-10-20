@@ -8,11 +8,13 @@ export function InvestorLetters({
   documents,
   unavailable,
   pagina,
+  publicLetters = [],
 }: {
   slug: string;
   documents: LetterDoc[];
   unavailable?: boolean;
   pagina?: string;
+  publicLetters?: { title: string; date: string; url: string }[];
 }) {
   const letters = investorLetters(slug, documents);
   const paged = paginate(letters, pagina, 12);
@@ -33,7 +35,7 @@ export function InvestorLetters({
         <p role="status" className="text-sm text-amber-300">
           Biblioteca no disponible
         </p>
-      ) : letters.length === 0 ? (
+      ) : letters.length === 0 && publicLetters.length === 0 ? (
         <p className="text-sm text-gray-500">
           N/D · Sin cartas indexadas de este inversor
         </p>
@@ -46,7 +48,7 @@ export function InvestorLetters({
             >
               <Link
                 className="text-sm text-gray-200 hover:text-teal-300"
-                href={`/inversores/cartas/${letter.id}`}
+                href={`/inversores/cartas/${letter.id}?inversor=${encodeURIComponent(slug)}`}
               >
                 {letter.title}
               </Link>
@@ -58,6 +60,12 @@ export function InvestorLetters({
           ))}
         </ul>
       )}
+      {publicLetters.length > 0 ? <ul className="divide-y divide-gray-800">
+        {publicLetters.map((letter) => <li key={letter.url} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
+          <a className="text-teal-300" href={letter.url} target="_blank" rel="noreferrer">{letter.title} · Fuente original</a>
+          <span className="text-xs text-gray-500">{letter.date || "N/D"}</span>
+        </li>)}
+      </ul> : null}
       <Pagination basePath={`/inversores/${slug}`} page={paged.page} total={paged.total} params={{ vista: "cartas" }} />
     </section>
   );
