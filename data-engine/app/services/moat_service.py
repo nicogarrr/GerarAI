@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Company, MoatAssessment
 from app.services.claim_scope import live_claims
+from app.services.moat_classification import classify_result
 from app.services.moat_profile import moat_evidence_context
 from app.services.source_hierarchy_service import SOURCE_TIERS
 from app.valuation.moat_framework import (
@@ -273,7 +274,7 @@ class MoatService:
                 "excluded_categories": excluded,
             }
         )
-        return result
+        return classify_result(result)
 
     def assess(
         self,
@@ -364,7 +365,7 @@ class MoatService:
         )
         # Contexto de perfil: informativo. No participa en el score.
         result["profile_context"] = moat_evidence_context(company)
-        return result
+        return classify_result(result)
 
     def _persist(
         self, db: Session, company: Company, payload: CategoryScore

@@ -456,12 +456,14 @@ type ResearchPeerAnalysis = {
   methodology: string;
 };
 
-type ResearchMoat = {
+export type ResearchMoat = {
   ticker: string;
   status: string;
   methodology: string;
+  nico_mapping?: { version: string; types: Record<string, string>; mapping: Record<string, string>; unclassified: string[] };
   moats: Array<{
     type: string;
+    nico_classification?: { type: string | null; label: string; method: string; basis: string };
     strength: number;
     trend: string;
     persistence: string;

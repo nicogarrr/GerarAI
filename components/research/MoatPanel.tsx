@@ -1,6 +1,7 @@
 import { Check, Minus, X } from 'lucide-react';
 
 import type { MoatScoreMetric } from '@/lib/actions/research.actions';
+import { moatLabel } from '@/lib/glossary';
 import { formatCompact, formatNumber, formatPercent } from '@/lib/format';
 
 type MoatCheck = {
@@ -170,4 +171,23 @@ export function MoatPanel({ metric, company }: { metric: MoatScoreMetric; compan
       </p>
     </div>
   );
+}
+
+
+/** Clasificación conceptual independiente de los umbrales financieros. */
+export function MoatClassificationPanel({ moat }: { moat: import('@/lib/actions/research.actions').ResearchMoat | null }) {
+  if (!moat?.nico_mapping) return null;
+  return <section className="space-y-3" aria-label="Tipos de foso de Nico">
+    <h2 className="text-lg font-semibold text-gray-100">Tipos de foso</h2>
+    <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {Object.entries(moat.nico_mapping.types).map(([key, title]) => <li key={key} className="min-w-0 rounded-lg border border-gray-800 p-3">
+        <h3 className="text-sm text-gray-200">{title}</h3>
+        <p className="mt-1 text-xs text-gray-400">{(() => { const count = moat.moats.filter(item => item.nico_classification?.type === key).length; return `${count} ${count === 1 ? 'categoría' : 'categorías'} con evaluación`; })()}</p>
+      </li>)}
+    </ul>
+    <details className="text-xs text-gray-400"><summary className="cursor-pointer">Mapeo declarado</summary>
+      <ul className="mt-2 space-y-1">{Object.entries(moat.nico_mapping.mapping).map(([source, target]) => <li key={source}>{moatLabel(source)}: {moat.nico_mapping?.types[target]}</li>)}{moat.nico_mapping.unclassified.map(source => <li key={source}>{moatLabel(source)}: Sin clasificar</li>)}</ul>
+      <p className="mt-2">Capa editorial, no cambia la puntuación. Red, distribución, datos, ecosistema y proceso quedan sin clasificar por admitir varios mecanismos.</p>
+    </details>
+  </section>;
 }
