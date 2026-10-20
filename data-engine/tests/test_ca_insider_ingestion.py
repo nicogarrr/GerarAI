@@ -1,6 +1,8 @@
 """Insiders Canada (Yahoo quoteSummary): mapping fail-closed e ingesta (grabado)."""
 
 import asyncio
+from datetime import date
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -15,6 +17,7 @@ from app.services.connectors.ca_insider_yahoo import (
     SEDI_URL,
     map_transaction,
     map_transaction_code,
+    yahoo_insider_url,
 )
 
 # Respuestas grabadas de quoteSummary?modules=insiderTransactions (20/10/2026).
@@ -80,7 +83,7 @@ def test_map_transaction_never_declares_currency():
     mapped = map_transaction("KRKNF", RECORDED_KRKNF[0])
     assert mapped["code"] == "P" and mapped["price"] == 4.44
     assert mapped["currency"] is None  # Yahoo no la declara: N/D, nunca CAD/USD asumido
-    assert mapped["shares"] == 12000.0 and mapped["source_url"] == SEDI_URL
+    assert mapped["shares"] == 12000.0 and mapped["source_url"] == yahoo_insider_url("KRKNF")
     assert map_transaction("BN", RECORDED_KRKNF[1]) is None  # incompleto: sin dato con causa
 
 
@@ -93,7 +96,8 @@ def test_ingest_saves_once_with_unofficial_label(db, monkeypatch):
     assert tx.data_quality["unofficial"] is True and tx.data_quality["official_source"] == SEDI_URL
     assert tx.data_quality["currency"] is None
     filing = db.scalar(select(InsiderFiling).where(InsiderFiling.id == tx.filing_id))
-    assert filing.form == "CA-INSIDER" and filing.source_url == SEDI_URL
+    assert filing.form == "CA-INSIDER" and filing.source_url == yahoo_insider_url("KRKNF")
+    assert tx.source_url == filing.source_url
     bn_tx = db.scalar(select(InsiderTransaction).where(InsiderTransaction.issuer_ticker == "BN"))
     assert bn_tx.code is None  # exercise de opciones: guardado pero no senal de compra
     assert _ingest(db, monkeypatch)["saved"] == 0  # idempotente
@@ -146,3 +150,41 @@ def test_feed_and_operations_keep_ca_out_of_usd_sums(db, monkeypatch):
     # Aunque KRKNF/BN estuvieran seguidos, sus movimientos CA-INSIDER no
     # entran en el agregado (solo Form 4): nada que sumar en USD.
     assert all(c["ticker"] not in {"KRKNF", "BN"} for c in ops.get("companies", []))
+
+
+def test_build_feed_final_contract_keeps_ca_out_of_usd_totals_and_signals(db, monkeypatch):
+    from app.services.insider_feed import build_feed
+
+    _ingest(db, monkeypatch)
+    feed = build_feed(db, days=365, today=date(2026, 10, 20))
+    assert feed["count"] == 1
+    tx = feed["transactions"][0]
+    assert tx["ticker"] == "KRKNF" and tx["form"] == "CA-INSIDER"
+    assert "currency" in tx and tx["currency"] is None
+    assert tx["value"] == 53244.0
+    assert tx["source_url"] == yahoo_insider_url("KRKNF")
+    assert feed["totals"]["buy_value"] == 0
+    assert feed["totals"]["sell_value"] == 0
+    assert feed["c_suite_buys"] == feed["clusters"] == feed["big_buys"] == []
+
+    # Even a large CEO acquisition cannot become a USD signal or total.
+    stored = db.scalar(select(InsiderTransaction).where(InsiderTransaction.code == "P"))
+    stored.value = 2_000_000
+    stored.role = "CEO"
+    stored.officer_title = "Chief Executive Officer"
+    db.commit()
+    feed = build_feed(db, days=365, today=date(2026, 10, 20))
+    assert feed["totals"]["buy_value"] == 0
+    assert feed["c_suite_buys"] == feed["clusters"] == feed["big_buys"] == []
+
+
+def test_desktop_and_mobile_preserve_source_and_missing_currency_labels():
+    source = (Path(__file__).resolve().parents[2] / "components/insider/InsiderFeed.tsx").read_text()
+    desktop = source.split("<table", 1)[1].split("</table>", 1)[0]
+    mobile = source.split("function OperationCard", 1)[1].split("export", 1)[0]
+    for layout in (desktop, mobile):
+        assert "tx.form === 'CA-INSIDER'" in layout
+        assert "fuente no oficial (Yahoo)" in layout
+        assert "Divisa no informada" in layout
+        assert "tx.source_url" in layout
+    assert "Totales y señales: solo Form 4" in source

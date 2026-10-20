@@ -25,6 +25,16 @@ SOURCE_NAME = "yahoo_quoteSummary"
 PARSER_VERSION = "yahoo-ca-1"
 FORM = "CA-INSIDER"
 SEDI_URL = "https://www.sedi.ca"
+
+
+def yahoo_insider_url(symbol: str) -> str:
+    """Pagina publica de Yahoo con los movimientos de insiders del valor.
+
+    Es la fuente no oficial del dato; SEDI queda
+    en ``data_quality.official_source`` como verdad oficial de consulta manual.
+    """
+    return f"https://finance.yahoo.com/quote/{symbol}/insider-transactions/"
+
 TIMEOUT_SECONDS = 15
 PAUSE_SECONDS = 3.0
 QUOTESUMMARY_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary"
@@ -121,5 +131,5 @@ def map_transaction(ticker: str, raw: dict[str, Any]) -> dict[str, Any] | None:
         "value": float(value) if isinstance(value, (int, float)) else None,
         "tx_date": day,
         "ownership": raw.get("ownership"),
-        "source_url": SEDI_URL,
+        "source_url": yahoo_insider_url(CA_TICKERS.get(ticker, ticker)),
     }

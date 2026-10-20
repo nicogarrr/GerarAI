@@ -67,7 +67,7 @@ async def ingest_ca_insiders(
                 issuer_name=company.name,
                 filing_date=mapped["tx_date"],
                 report_date=mapped["tx_date"],
-                source_url=SEDI_URL,
+                source_url=mapped["source_url"],
                 parser_version=PARSER_VERSION,
                 status="parsed",
             )
@@ -87,7 +87,7 @@ async def ingest_ca_insiders(
                 price=mapped["price"],
                 value=mapped["value"],
                 tx_date=mapped["tx_date"],
-                source_url=SEDI_URL,
+                source_url=mapped["source_url"],
                 data_quality={
                     "source": SOURCE_NAME,
                     "unofficial": True,

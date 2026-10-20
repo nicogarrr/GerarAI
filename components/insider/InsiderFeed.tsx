@@ -180,6 +180,10 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                     </div>
                 ))}
             </dl>
+            <p className="-mt-3 text-xs text-gray-500">
+                Totales y señales: solo Form 4 (SEC, importes declarados en USD). Canadá (Yahoo, fuente no
+                oficial) y PDMR del Reino Unido se listan en la tabla con su divisa declarada, sin sumarse aquí.
+            </p>
 
             {feed.clusters.length > 0 ? (
                 <section className="rounded-xl border border-gray-800 bg-surface-1 p-4">
@@ -250,6 +254,8 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                     <Link className="text-teal-300 hover:text-teal-200" href={`/insider?ticker=${tx.ticker}`}>
                                                         {tx.ticker}
                                                     </Link>
+                                                    {tx.form === 'PDMR' ? <span className="block text-xs font-normal text-gray-500">PDMR (Reino Unido)</span> : null}
+                                                    {tx.form === 'CA-INSIDER' ? <span className="block text-xs font-normal text-gray-500">Canadá · fuente no oficial (Yahoo)</span> : null}
                                                 </td>
                                                 <td className="px-3 py-2 text-gray-100">{insiderName(tx.insider)}</td>
                                                 <td className="px-3 py-2 text-gray-400">{insiderRole(tx.role, tx.officer_title)}</td>
@@ -276,6 +282,9 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                     ) : (
                                                         usd(tx.value, 0, txCurrency(tx))
                                                     )}
+                                                    {tx.currency == null && (tx.price != null || tx.value != null) ? (
+                                                        <span className="block text-xs font-normal text-gray-500">Divisa no informada</span>
+                                                    ) : null}
                                                 </td>
                                             </tr>
                                         );
