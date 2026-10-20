@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { RefreshCcw } from 'lucide-react';
 import FollowButton from '@/components/screener/FollowButton';
+import SectorSelect from '@/components/screener/SectorSelect';
 import { MarketRegimeVista } from '@/components/market/MarketRegime';
 
 export const dynamic = 'force-dynamic';
@@ -74,10 +75,10 @@ const vistaDe = (value: string | undefined): Vista =>
 
 function VistaTabs({ vista }: { vista: Vista }) {
   return (
-    <nav aria-label="Vista de mercado" className="flex flex-wrap gap-2">
+    <nav aria-label="Vista de mercado" className="flex flex-nowrap gap-1.5 overflow-x-auto">
       {VISTAS.map((v) => (
-        <Button key={v.id} asChild variant={vista === v.id ? 'default' : 'outline'} size="sm" className="min-h-[44px] min-w-[44px] rounded-md px-4">
-          <Link aria-current={vista === v.id ? 'page' : undefined} href={v.href}>{v.label}</Link>
+        <Button key={v.id} asChild variant={vista === v.id ? 'default' : 'outline'} size="sm" className="min-h-[36px] shrink-0 rounded-md px-3 text-sm">
+          <Link aria-current={vista === v.id ? 'page' : undefined} href={v.href} scroll={false}>{v.label}</Link>
         </Button>
       ))}
     </nav>
@@ -192,64 +193,20 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
 
   return (
     <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip p-4 sm:p-6">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-semibold break-words text-gray-100">{t('nav.screener')}</h1>
-        <p className="mt-1 text-sm text-gray-400">
-          {universeSize
-            ? `${universeSize} grandes compañías seguidas con precio y market cap reales; el filtro muestra las de cada sector.`
-            : 'Grandes compañías seguidas con precio y market cap reales.'}
-        </p>
+      <div className="flex min-w-0 items-baseline gap-3">
+        <h1 className="text-xl font-semibold break-words text-gray-100 sm:text-2xl">{t('nav.screener')}</h1>
+        {universeSize ? (
+          <span className="text-xs text-gray-500">{universeSize} grandes compañías</span>
+        ) : null}
       </div>
 
-      <VistaTabs vista={vista} />
-
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por sector">
-        {SECTORES.map((s) => (
-          <Button key={s.en} asChild variant={sector === s.en ? 'default' : 'outline'} size="sm" className="min-h-[44px] min-w-[44px] rounded-md px-4">
-            <Link href={`/screener?sector=${encodeURIComponent(s.en)}`}>{etiquetaSector(s.en)}</Link>
-          </Button>
-        ))}
+      <div aria-label="Filtros de mercado" className="flex min-w-0 flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/30 p-2 sm:flex-row sm:items-center sm:justify-between">
+        <VistaTabs vista={vista} />
+        <SectorSelect
+          options={SECTORES.map((s) => ({ value: s.en, label: etiquetaSector(s.en) }))}
+          value={sector}
+        />
       </div>
-
-      <Card className="min-w-0 border-gray-800">
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-base break-words">Motor de análisis</CardTitle>
-            {engineScreens.engineDown ? (
-              <Badge variant="outline">motor no disponible · Finnhub como fallback offline</Badge>
-            ) : (
-              <Badge>{engineScreens.screens.length} {engineScreens.screens.length === 1 ? 'filtro guardado' : 'filtros guardados'}</Badge>
-            )}
-            <Button asChild variant="outline" size="sm" className="ml-auto">
-              <Link href="/screeners">Abrir screeners</Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {engineScreens.engineDown ? (
-            <p className="text-sm text-gray-500">
-La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertura.
-            </p>
-          ) : engineScreens.screens.length === 0 ? (
-            <p className="text-sm text-gray-500">
-              Motor operativo pero sin filtros guardados.{' '}
-              <Link href="/screeners" className="text-teal-300 hover:text-teal-200 hover:underline">
-                Crea el primero en Screeners
-              </Link>.
-            </p>
-          ) : (
-            <ul className="flex flex-wrap gap-2">
-              {engineScreens.screens.slice(0, 6).map((screen) => (
-                <li key={screen.id}>
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={`/screeners/${screen.id}`}>{screen.name}</Link>
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
 
       <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="min-w-0 border-gray-800 lg:col-span-2">
@@ -404,12 +361,12 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
               <>
                 <div className="space-y-3">
                   {validIndices.map((i) => (
-                    <div key={i.symbol} className="flex min-w-0 items-center justify-between gap-3">
-                      <span className="min-w-0 flex-1 truncate text-gray-300">{i.name}</span>
+                    <div key={i.symbol} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1">
+                      <span className="min-w-0 break-words text-gray-300">{i.name}</span>
                       <div className="text-right">
                         <span className="font-semibold text-gray-100">{formatIndexValue(i)}{i.unit === 'index' ? ' ptos.' : ''}</span>
-                        <div className="text-[10px] text-gray-500">{quoteObserved(i.priceAsOf, 'daily_candle_open')}</div>
                       </div>
+                      <div className="col-span-2 text-right text-[10px] text-gray-500">{quoteObserved(i.priceAsOf, 'daily_candle_open')}</div>
                     </div>
                   ))}
                   {validIndices.length === 0 && <p className="text-sm text-gray-500">Sin datos de índices</p>}
@@ -419,6 +376,47 @@ La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertur
           </CardContent>
         </Card>
       </div>
+      <Card className="min-w-0 border-gray-800">
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-base break-words">Motor de análisis</CardTitle>
+            {engineScreens.engineDown ? (
+              <Badge variant="outline">motor no disponible · Finnhub como fallback offline</Badge>
+            ) : (
+              <Badge>{engineScreens.screens.length} {engineScreens.screens.length === 1 ? 'filtro guardado' : 'filtros guardados'}</Badge>
+            )}
+            <Button asChild variant="outline" size="sm" className="ml-auto">
+              <Link href="/screeners">Abrir screeners</Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {engineScreens.engineDown ? (
+            <p className="text-sm text-gray-500">
+La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertura.
+            </p>
+          ) : engineScreens.screens.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              Motor operativo pero sin filtros guardados.{' '}
+              <Link href="/screeners" className="text-teal-300 hover:text-teal-200 hover:underline">
+                Crea el primero en Screeners
+              </Link>.
+            </p>
+          ) : (
+            <ul className="flex flex-wrap gap-2">
+              {engineScreens.screens.slice(0, 6).map((screen) => (
+                <li key={screen.id}>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/screeners/${screen.id}`}>{screen.name}</Link>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+
     </main>
   );
 }
