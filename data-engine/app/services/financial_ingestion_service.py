@@ -142,6 +142,9 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("operating_lease_liabilities", ["OperatingLeaseLiability", "OperatingLeaseLiabilityNoncurrent"],                "USD"),
     ("operating_cash_flow", ["NetCashProvidedByUsedInOperatingActivities"],                                         "USD"),
     ("capital_expenditure", ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"],          "USD"),
+    # Leases financieros nuevos del periodo (adiciones de RoU): complemento del capex en
+    # efectivo para flujos de inversión tipo hyperscalers (distinción cash capex vs leases).
+    ("finance_lease_additions", ["RightOfUseAssetObtainedInExchangeForFinanceLeaseLiability"], "USD"),
     ("depreciation_amortization", ["DepreciationDepletionAndAmortization", "DepreciationAmortizationAndAccretionNet",
                                    "Depreciation", "DepreciationAndAmortization"],                                                                  "USD"),
     ("common_stock_repurchased", ["PaymentsForRepurchaseOfCommonStock", "StockRepurchasedDuringPeriodValue"], "USD"),
