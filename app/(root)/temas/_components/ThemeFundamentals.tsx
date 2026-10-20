@@ -36,7 +36,7 @@ export async function ThemeFundamentals({ themeId }: { themeId: string }) {
       <ul className="mt-2 space-y-2">{s.rows.map((r) => <li key={r.label} className="border-t border-gray-800 py-2">
         <p className="text-xs font-semibold text-gray-200">{r.label}</p>
         <dl className="mt-1 space-y-1">{s.columns.map((c, i) => <div key={c} className="flex flex-wrap justify-between gap-x-2 text-xs"><dt className="text-gray-400">{c}</dt><dd className={`font-semibold tabular-nums ${s.kind !== 'reportado' ? 'text-amber-300' : 'text-teal-300'}`}>{value(r.values[i], s.unit)}</dd></div>)}</dl>
-      {s.columns.length === 1 && typeof r.values[0] === 'number' ? <div aria-hidden="true" className="mt-1 h-1 rounded bg-gray-800"><div className="h-1 rounded bg-teal-400/60" style={{ width: `${Math.max(0, Math.min(100, r.values[0] / Math.max(...s.rows.map((row) => typeof row.values[0] === 'number' ? row.values[0] : 0), 1) * 100))}%` }} /></div> : null}
+      {s.columns.length === 1 && typeof r.values[0] === 'number' && !r.label.startsWith('Otros países') && !r.label.startsWith('Total mundial') ? <div aria-hidden="true" className="mt-1 h-1 rounded bg-gray-800"><div className="h-1 rounded bg-teal-400/60" style={{ width: `${Math.max(0, Math.min(100, r.values[0] / Math.max(...s.rows.filter((row) => !row.label.startsWith('Otros países') && !row.label.startsWith('Total mundial')).map((row) => typeof row.values[0] === 'number' ? row.values[0] : 0), 1) * 100))}%` }} /></div> : null}
       </li>)}</ul>
       <a href={s.source} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-xs text-teal-300 underline">{s.sourceName} · fuente y metodología</a>
     </details>)}
