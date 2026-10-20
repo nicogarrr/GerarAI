@@ -320,7 +320,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
         <div>
           <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Lo que debe cumplirse</div>
           <ul className="space-y-2 text-sm">
-            {model.what_must_be_true.slice(0, 6).map((item) => (
+            {model.what_must_be_true.map((item) => (
               <li key={item.id} className="flex gap-2 text-gray-300">
                 <CircleHelp aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
                 <span><span className="block text-xs text-amber-300">{modelConditionState(item, waccHasSource(model.assumptions.wacc))}</span>{conditionInSpanish(item, model.market_opportunity?.constraints?.binding_constraint, waccHasSource(model.assumptions.wacc))}</span>
@@ -412,6 +412,9 @@ export function DecisionAndRealityPanel({
         ) : (
           <>
             <p className="mb-3 text-xs leading-5 text-gray-500">N/D significa que falta el dato esperado o real: no hay una comparación verificable, ni un acierto medido.</p>
+            {reviews.length > 40 ? (
+              <p className="mb-3 text-xs text-gray-500">Se muestran 40 de {formatNumber(reviews.length, { maximumFractionDigits: 0 })} comparaciones.</p>
+            ) : null}
             {/* Móvil: cards sin scroll horizontal */}
             <div className="max-h-[560px] space-y-3 overflow-auto md:hidden">
               {reviews.slice(0, 40).map((review) => (
