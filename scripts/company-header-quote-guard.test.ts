@@ -8,8 +8,6 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { sparklinePoints } from '../lib/sparkline.ts';
-// @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
 import { e2eMarketFixture, E2E_MARKET_FIXTURE_TICKER, isE2EMarketFixtureEnabled } from '../lib/e2e-market-fixture.ts';
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
 import { isValidCurrencyCode } from '../lib/format.ts';
@@ -17,17 +15,6 @@ import { isValidCurrencyCode } from '../lib/format.ts';
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 const component = readFileSync('components/research/CompanyHeaderQuote.tsx', 'utf8');
 const actions = readFileSync('lib/actions/market-workspace.actions.ts', 'utf8');
-
-test('el sparkline normaliza al viewBox y exige al menos dos cierres', () => {
-    assert.equal(sparklinePoints([]), '');
-    assert.equal(sparklinePoints([10]), '');
-    const points = sparklinePoints([10, 15, 20]);
-    const coords = points.split(' ').map((pair) => pair.split(',').map(Number));
-    assert.deepEqual(coords[0], [0, 36]); // el mínimo abajo a la izquierda
-    assert.deepEqual(coords[2], [120, 0]); // el máximo arriba a la derecha
-    // Serie plana (span 0) no divide por cero ni rompe.
-    assert.ok(sparklinePoints([7, 7, 7]).length > 0);
-});
 
 test('la cabecera compone la cotización en todas las vistas', () => {
     assert.match(page, /CompanyHeaderQuote snapshot=\{headerMarket\}/);

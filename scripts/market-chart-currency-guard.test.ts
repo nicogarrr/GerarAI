@@ -1,5 +1,6 @@
 /**
- * F380: el tooltip del gráfico usaba siempre USD aunque el listado fuese EUR/GBP.
+ * F380: el gráfico de la ficha no puede fijar USD con listados en otra divisa.
+ * (Antes cubría CompanyMarketChart, eliminado por código muerto; ahora el vivo.)
  * Ejecución: node --experimental-strip-types --test scripts/market-chart-currency-guard.test.ts
  */
 import { describe, it } from 'node:test';
@@ -11,12 +12,11 @@ import { dirname, join } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const source = (p: string): string => readFileSync(join(root, p), 'utf8');
 
-describe('gráfico de mercado: divisa del listado', () => {
-    it('no fija USD y recibe la divisa del snapshot', () => {
-        const chart = source('components/research/CompanyMarketChart.tsx');
+describe('gráfico técnico: divisa del listado', () => {
+    it('no fija USD y muestra el número sin símbolo si la divisa falta o es inválida', () => {
+        const chart = source('components/research/CompanyTechnicalChart.tsx');
         assert.ok(!/formatMoney\(value, 'USD'\)/.test(chart));
-        assert.match(chart, /currency\?: string \| null/);
-        const panel = source('components/research/CompanyMarketPanel.tsx');
-        assert.match(panel, /<CompanyMarketChart history=\{snapshot\.history\} currency=\{snapshot\.currency\}/);
+        assert.ok(!/'USD'/.test(chart), 'ningún USD literal en el chart vivo');
+        assert.match(chart, /isValidCurrencyCode\(currency\) \? formatMoney\(value, currency\) : formatNumber\(value\)/);
     });
 });

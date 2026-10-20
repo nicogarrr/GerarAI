@@ -57,8 +57,5 @@ describe('superficies (F156)', () => {
         const page = readSource('app/(root)/research/[ticker]/page.tsx');
         assert.ok(page.includes('exchangeDisplayName(company.exchange)'), 'la ficha normaliza el exchange');
         assert.ok(!page.includes('<Badge variant="outline">{company.exchange}</Badge>'), 'exchange crudo vetado en la ficha');
-        const panel = readSource('components/research/CompanyMarketPanel.tsx');
-        assert.ok(panel.includes('exchangeDisplayName(snapshot.exchange)'), 'el panel normaliza el exchange');
-        assert.ok(!panel.includes('[snapshot.exchange,'), 'exchange crudo vetado en el panel');
     });
 });

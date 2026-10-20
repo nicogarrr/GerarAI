@@ -6,6 +6,7 @@ import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actio
 import { formatMarketDate, formatMoney, formatNumber, isValidCurrencyCode } from '@/lib/format';
 import { getCompanyChartHistory, type CompanyChartHistory, type CompanyChartBar } from '@/lib/actions/company-chart.actions';
 import MobileCollapse from '@/components/ui/mobile-collapse';
+import { TRADINGVIEW_URL } from '@/lib/market/candles';
 import { CHART_RANGES, type CompanyChartRange } from '@/lib/market/chart-ranges';
 import { adx, cleanBars, dailyPivots, fibonacci, rangeBars, sma, structure } from '@/lib/market/technical';
 
@@ -56,7 +57,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                         <div className="grid w-full grid-cols-8 gap-0 sm:w-auto sm:gap-1" aria-label="Rango del gráfico">
                             {CHART_RANGES.map((value) => <button type="button" key={value} disabled={range === value && requestState !== 'error'} aria-pressed={range === value} className={`min-h-11 rounded-md px-1 text-[11px] transition sm:px-3 sm:text-xs ${range === value ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { if (range === value) setRetry((count) => count + 1); setRequestState(value === '1D' || value === '5D' || value === '5A' || value === 'Máx' ? 'loading' : 'ready'); setRange(value); }}>{value}</button>)}
                         </div>
-                        <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer" className="text-[10px] text-gray-500 underline">TradingView</a>
+                        <a href={TRADINGVIEW_URL} target="_blank" rel="noreferrer" className="text-[10px] text-gray-500 underline">TradingView</a>
                     </div>
                     {visible.length > 0 ? <p className="mt-1 text-[11px] text-gray-500">{formatMarketDate(visible[0].date)} – {formatMarketDate(visible.at(-1)!.date)} · {visible.length} {hourly ? 'velas horarias' : 'sesiones'}{range === 'Máx' ? ' · Máximo disponible del proveedor' : ''}{hourly ? ' · Ventana sobre la última vela disponible' : ''}</p> : null}
                 </div>

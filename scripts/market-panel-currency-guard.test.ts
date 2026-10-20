@@ -1,6 +1,7 @@
 /**
- * F380b: el panel de mercado caía a USD con una divisa inválida. Sin divisa
- * válida se muestra el número sin símbolo, nunca USD por defecto.
+ * F380b: superficies de mercado no caen a USD con una divisa inválida.
+ * Sin divisa válida se muestra el número sin símbolo, nunca USD por defecto.
+ * (El panel CompanyMarketPanel se eliminó por código muerto; queda movers.)
  * Ejecución: node --experimental-strip-types --test scripts/market-panel-currency-guard.test.ts
  */
 import { describe, it } from 'node:test';
@@ -10,18 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const panel = readFileSync(join(root, 'components/research/CompanyMarketPanel.tsx'), 'utf8');
 const movers = readFileSync(join(root, 'components/market/MoversTable.tsx'), 'utf8');
-
-describe('panel de mercado: divisa', () => {
-    it('no asume USD', () => {
-        assert.ok(!/'USD'/.test(panel));
-        assert.ok(!panel.includes('safeCurrency'));
-        // formatPrice es el formato adaptativo de precios (USD en locale en-US por
-        // regla de producto); lo que guarda el guard es el ternario de divisa válida.
-        assert.match(panel, /isValidCurrencyCode\(currency\) \? formatPrice\(value, currency\) : formatNumber\(value\)/);
-    });
-});
 
 describe('movers: divisa', () => {
     it('no asume USD con una divisa ausente o inválida', () => {
