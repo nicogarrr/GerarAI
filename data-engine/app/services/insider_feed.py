@@ -92,7 +92,7 @@ def _group_tranches(items: list[dict]) -> list[dict]:
     groups: dict[tuple, dict] = {}
     order: list[tuple] = []
     for tx in items:
-        key = (tx.get("accession_number"), tx.get("insider"), tx.get("type"))
+        key = (tx.get("accession_number"), tx.get("insider"), tx.get("type"), tx.get("form"), tx.get("currency"))
         group = groups.get(key)
         if group is None:
             group = dict(tx)
@@ -159,7 +159,12 @@ def build_feed(
     txs = [_tx_dict(tx, filing, i) for i, (tx, filing) in enumerate(rows)]
     txs.sort(key=lambda t: (str(t["date"] or ""), str(t["accession_number"])), reverse=True)
 
-    signals = insider_service.detect_signals(txs)
+    # Totales y senales: solo Form 4/4A (SEC, importe declarado en USD).
+    # Canada (currency=None) y PDMR (GBP/EUR/USD/sin divisa) se listan con su
+    # divisa declarada pero jamas se suman a cabeceras en USD ni alimentan
+    # senales pensadas para Form 4 (umbrales en USD, 10b5-1, clusters SEC).
+    form4 = [t for t in txs if t["form"] in ("4", "4/A") and t["currency"] == "USD"]
+    signals = insider_service.detect_signals(form4)
     clusters = [s for s in signals if s["signal"] == "cluster_buy"]
     c_suite = [s for s in signals if s["signal"] == "c_suite_buy"]
     big_buys = [s for s in signals if s["signal"] == "big_buy"]
@@ -170,8 +175,8 @@ def build_feed(
     code = SIDES.get(side)
     shown = _group_tranches([t for t in txs if code is None or t["type"] == code])
 
-    buys = [t for t in txs if t["type"] == "P"]
-    sells = [t for t in txs if t["type"] == "S"]
+    buys = [t for t in form4 if t["type"] == "P"]
+    sells = [t for t in form4 if t["type"] == "S"]
 
     def _sum(items: list[dict]) -> float:
         return sum(float(t["value"]) for t in items if t.get("value") is not None)
@@ -220,6 +225,8 @@ def build_feed(
                 "rule_10b5_1": t["rule_10b5_1"],
                 "accession_number": t["accession_number"],
                 "source_url": t["source_url"],
+                "form": t["form"],
+                "currency": t["currency"],
             }
             for t in shown[:limit]
         ],

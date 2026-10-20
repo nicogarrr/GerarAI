@@ -135,7 +135,7 @@ export interface InsiderFeedTransaction {
     price?: number | null;
     /** Divisa declarada (USD en SEC, GBP en PDMR UK); nunca se asume. */
     currency?: string | null;
-    /** Formulario origen: "4"/"4/A" (SEC) o "PDMR" (UK, via tracefour). */
+    /** Formulario origen: "4"/"4/A" (SEC), "PDMR" (UK) o "CA-INSIDER" (Canada, Yahoo no oficial). */
     form?: string | null;
     value?: number | null;
     date?: string | null;
