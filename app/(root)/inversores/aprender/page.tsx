@@ -6,7 +6,7 @@ export const metadata: Metadata = {
     description: 'Conceptos y canales de inversión.',
 };
 
-// Nico, WhatsApp 2026-10-20 08:30:56: cartas y vídeos pasan a la ficha de cada inversor.
+// cartas y vídeos pasan a la ficha de cada inversor.
 const SECTIONS = [
     { href: '/inversores/conceptos', title: 'Conceptos', text: 'Las ideas clave de value investing, explicadas.' },
     { href: '/inversores/canales', title: 'Canales', text: 'Canales de análisis que merece la pena seguir.' },

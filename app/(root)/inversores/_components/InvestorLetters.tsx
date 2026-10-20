@@ -19,6 +19,7 @@ export function InvestorLetters({
   const letters = investorLetters(slug, documents);
   const paged = paginate(letters, pagina, 12);
   return (
+    <>
     <section
       aria-labelledby="investor-letters-title"
       className="flex flex-col gap-4 border-t border-gray-800 pt-6"
@@ -35,7 +36,7 @@ export function InvestorLetters({
         <p role="status" className="text-sm text-amber-300">
           Biblioteca no disponible
         </p>
-      ) : letters.length === 0 && publicLetters.length === 0 ? (
+      ) : letters.length === 0 ? (
         <p className="text-sm text-gray-500">
           N/D · Sin cartas indexadas de este inversor
         </p>
@@ -60,13 +61,17 @@ export function InvestorLetters({
           ))}
         </ul>
       )}
-      {publicLetters.length > 0 ? <ul className="divide-y divide-gray-800">
-        {publicLetters.map((letter) => <li key={letter.url} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
-          <a className="text-teal-300" href={letter.url} target="_blank" rel="noreferrer">{letter.title} · Fuente original</a>
-          <span className="text-xs text-gray-500">{letter.date || "N/D"}</span>
-        </li>)}
-      </ul> : null}
       <Pagination basePath={`/inversores/${slug}`} page={paged.page} total={paged.total} params={{ vista: "cartas" }} />
     </section>
+    {publicLetters.length > 0 ? <section aria-labelledby="investor-public-sources-title" className="flex flex-col gap-3 border-t border-gray-800 pt-6">
+      <h2 id="investor-public-sources-title" className="text-xl font-semibold text-gray-100">Fuentes sobre el inversor</h2>
+      <ul className="divide-y divide-gray-800">
+        {publicLetters.map((source) => <li key={source.url} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
+          <a className="text-teal-300" href={source.url} target="_blank" rel="noreferrer">{source.title} · Fuente original</a>
+          <span className="text-xs text-gray-500">{source.date || "N/D"}</span>
+        </li>)}
+      </ul>
+    </section> : null}
+    </>
   );
 }

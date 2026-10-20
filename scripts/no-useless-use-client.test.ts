@@ -85,7 +85,7 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
-  // Nico 2026-10-20 08:30:56: selector de inversor y contenido con navegación por URL.
+  // selector de inversor y contenido con navegación por URL.
   'app/(root)/inversores/_components/InvestorSelector.tsx': 'useRouter, jsx-onChange',
   'app/(root)/inversores/_components/InvestorViewSelector.tsx': 'useRouter, jsx-onChange',
 

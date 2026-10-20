@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const read = (path: string) => readFileSync(path, 'utf8');
 
 test('ficha: selector de inversor y contenido propio sin otra barra', () => {
-    // Nico, WhatsApp 2026-10-20 08:30:56: ficha por inversor.
+    // ficha por inversor.
     const page = read('app/(root)/inversores/[slug]/page.tsx');
     assert.match(page, /<InvestorSelector investors=\{choices.investors\}/);
     assert.match(page, /<InvestorViewSelector/);
@@ -43,4 +43,33 @@ test('Aprender conserva solo Conceptos y Canales; lectores viejos siguen accesib
     assert.match(page, /href: '\/inversores\/conceptos'/);
     assert.match(page, /href: '\/inversores\/canales'/);
     assert.match(read('app/(root)/inversores/cartas/[id]/page.tsx'), /investorLetters\(inversor, \[letter\]\)/);
+});
+
+test('Munger: enlaces del perfil público no son cartas propias', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const { createRequire } = await import('node:module');
+    const require = createRequire(import.meta.url);
+    const React = require('react');
+    const { renderToStaticMarkup } = require('react-dom/server');
+    const publicLetters = JSON.parse(execFileSync('python3', ['-c',
+        'import runpy,json; p=runpy.run_path("data-engine/app/services/investor_profiles.py"); print(json.dumps(p["PUBLIC_PROFILES"]["munger"]["letters"]))',
+    ], { encoding: 'utf8' }));
+    assert.equal(publicLetters.length, 3);
+    const code = ts.transpileModule(read('app/(root)/inversores/_components/InvestorLetters.tsx'), {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+    }).outputText;
+    const exports: Record<string, (props: object) => unknown> = {};
+    vm.runInNewContext(code, { exports, require: (name: string) => {
+        if (name === 'next/link') return { default: ({ children, ...props }: { children: unknown }) => React.createElement('a', props, children) };
+        if (name === './Pagination') return { paginate: (items: unknown[]) => ({ items, page: 1, total: 1 }), Pagination: () => null };
+        if (name === '../cartas/investor-letters') return { investorLetters: () => [] };
+        return require(name);
+    } });
+    const html = renderToStaticMarkup(exports.InvestorLetters({ slug: 'munger', documents: [], publicLetters }));
+    const sections = html.split('</section>');
+    assert.match(sections[0], /N\/D · Sin cartas indexadas/);
+    assert.doesNotMatch(sections[0], /Comunicado de Berkshire|Todas las cartas de Berkshire|2023ltr.pdf/);
+    assert.match(sections[1], /Fuentes sobre el inversor/);
+    for (const source of publicLetters) assert.ok(sections[1].includes(source.url), source.title);
+    assert.match(read('app/(root)/inversores/_components/PublicProfile.tsx'), />Fuentes sobre el inversor<\/h2>/);
 });

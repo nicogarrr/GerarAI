@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
  */
 describe('inversor: las vistas de la cartera conservan el scroll', () => {
     it('el nav de vistas lleva scroll={false}', () => {
-        // Nico 2026-10-20 08:30:56: selector de contenido en la ficha, no otra barra.
+        // selector de contenido en la ficha, no otra barra.
         const src = readFileSync('app/(root)/inversores/_components/InvestorViewSelector.tsx', 'utf8');
         assert.ok(src.includes('scroll: false'), 'el selector conserva scroll al cambiar ?vista=');
         assert.ok(src.includes('Contenido del inversor'));
