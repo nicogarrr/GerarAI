@@ -155,9 +155,46 @@ function ThemeCard({
           </table>
           {flow ? <ThemeFlow flow={flow} holdings={holdings} /> : null}
           <ThemeBrainButton question={brainQuestion} />
+          {!holdings.unavailable ? (
+            <HoldingsLines constituents={theme.constituents} holdings={holdings} />
+          ) : null}
         </div>
       </details>
     </li>
+  );
+}
+
+function HoldingsLines({
+  constituents,
+  holdings,
+}: {
+  constituents: MarketTheme['constituents'];
+  holdings: { portfolio: Set<string>; watchlist: Set<string> };
+}) {
+  const tickers = constituents.map((row) => row.ticker.toUpperCase());
+  const held = tickers.filter((ticker) => holdings.portfolio.has(ticker));
+  const watched = tickers.filter(
+    (ticker) => holdings.watchlist.has(ticker) && !holdings.portfolio.has(ticker),
+  );
+  if (held.length === 0 && watched.length === 0) return null;
+  const line = (label: string, symbols: string[]) => (
+    <p className="text-xs text-gray-400">
+      {label}:{' '}
+      {symbols.map((symbol, index) => (
+        <span key={symbol}>
+          {index > 0 ? ' · ' : ''}
+          <Link className="text-teal-300 hover:text-teal-200" href={`/research/${symbol}`}>
+            {symbol}
+          </Link>
+        </span>
+      ))}
+    </p>
+  );
+  return (
+    <div className="mt-3 space-y-1 border-t border-gray-800 pt-2">
+      {held.length > 0 ? line('En tu cartera', held) : null}
+      {watched.length > 0 ? line('En tu lista de seguimiento', watched) : null}
+    </div>
   );
 }
 
@@ -172,7 +209,6 @@ export default async function TemasPage({ searchParams }: PageProps) {
   }
 
   const themes = sortThemes(data.themes, order);
-
   // Flujos de dinero por tema: degradan en silencio (la página se pinta igual
   // si el endpoint no existe o el backend no responde); jamás un importe
   // inventado en su lugar.

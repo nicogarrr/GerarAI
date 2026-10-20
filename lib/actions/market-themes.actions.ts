@@ -17,3 +17,4 @@ export async function getMarketThemes(): Promise<MarketThemes> {
   }
   return payload;
 }
+
