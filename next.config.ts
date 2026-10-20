@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
     distDir: process.env.NEXT_DIST_DIR ?? '.next',
     devIndicators: false,
+    outputFileTracingIncludes: { '/temas': ['./data/theme-fundamentals/*.json'] },
     /* Performance optimizations */
     compress: true, // Enable gzip compression
     productionBrowserSourceMaps: false, // Disable source maps in production for smaller bundle
