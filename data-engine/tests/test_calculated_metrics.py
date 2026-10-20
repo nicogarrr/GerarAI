@@ -1166,3 +1166,180 @@ def test_owner_earnings_mixed_currency_is_unavailable():
     finally:
         db.close()
         cleanup_metric_test_artifacts()
+
+
+def test_fcf_before_growth_capex_ok_declared_estimate():
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        add_fact(db, company, "free_cash_flow", "100")
+        add_fact(db, company, "capital_expenditure", "-120")
+        add_fact(db, company, "depreciation_amortization", "80")
+        db.commit()
+
+        service = MetricCalculationService()
+        result = service.calculate(db, company, "fcf_before_growth_capex", persist=True)
+        db.commit()
+        # maintenance = min(120, 80) = 80; growth = 40; FCF antes de crecimiento = 140
+        assert result.status == "ok"
+        assert result.definition_version == "FCF_BEFORE_GROWTH_CAPEX_V1"
+        assert result.value == Decimal("140.00000000")
+        assert result.calculation_trace["maintenance_capex"] == "80.00000000"
+        assert result.calculation_trace["estimated_growth_capex"] == "40.00000000"
+        assert "declared" in result.calculation_trace["maintenance_capex_rule"]
+        assert "estimate" in result.calculation_trace
+
+        # capex por debajo de D&A: growth = 0, el valor coincide con el FCF
+        db.execute(
+            delete(FinancialFact).where(
+                FinancialFact.company_id == company.id,
+                FinancialFact.metric == "capital_expenditure",
+            )
+        )
+        add_fact(db, company, "capital_expenditure", "-50")
+        db.commit()
+        result2 = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
+        assert result2.status == "ok"
+        assert result2.value == Decimal("100.00000000")
+        assert Decimal(result2.calculation_trace["estimated_growth_capex"]) == 0
+    finally:
+        db.close()
+        cleanup_metric_test_artifacts()
+
+
+def test_fcf_before_growth_capex_partial_without_da():
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        add_fact(db, company, "free_cash_flow", "100")
+        add_fact(db, company, "capital_expenditure", "-120")
+        db.commit()
+
+        result = MetricCalculationService().calculate(
+            db, company, "fcf_before_growth_capex", persist=False
+        )
+        # Sin D&A no hay separacion y no se publica un valor sustitutivo
+        assert result.status == "partial"
+        assert result.value is None
+        assert result.calculation_trace["reason"] == "growth_capex_not_separable"
+        assert "depreciation_amortization" in result.calculation_trace["missing_inputs"]
+        assert "no_value_without_split" in result.calculation_trace["value_basis"]
+    finally:
+        db.close()
+        cleanup_metric_test_artifacts()
+
+
+def test_fcf_before_growth_capex_unavailable_without_capex_or_fcf():
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        add_fact(db, company, "depreciation_amortization", "80")
+        db.commit()
+
+        service = MetricCalculationService()
+        result = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
+        assert result.status == "insufficient_data"
+        assert result.value is None
+        assert "free_cash_flow" in result.calculation_trace["missing_inputs"]
+
+        add_fact(db, company, "free_cash_flow", "100")
+        db.commit()
+        result2 = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
+        assert result2.status == "insufficient_data"
+        assert "capital_expenditure" in result2.calculation_trace["missing_inputs"]
+    finally:
+        db.close()
+        cleanup_metric_test_artifacts()
+
+
+def test_fcf_before_growth_capex_unit_follows_input_currency():
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        for metric, val in (("free_cash_flow", "100"), ("capital_expenditure", "-120"), ("depreciation_amortization", "80")):
+            fact = add_fact(db, company, metric, val)
+            fact.unit = "EUR"
+        db.commit()
+        result = MetricCalculationService().calculate(
+            db, company, "fcf_before_growth_capex", persist=False
+        )
+        assert result.status == "ok"
+        assert result.unit == "EUR"
+    finally:
+        db.close()
+        cleanup_metric_test_artifacts()
+
+
+def test_fcf_before_growth_capex_mixed_currency_is_unavailable():
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        for metric, val, unit in (("free_cash_flow", "100", "EUR"), ("capital_expenditure", "-120", "USD"), ("depreciation_amortization", "80", "USD")):
+            add_fact(db, company, metric, val).unit = unit
+        db.commit()
+        result = MetricCalculationService().calculate(
+            db, company, "fcf_before_growth_capex", persist=False
+        )
+        assert result.status == "insufficient_data"
+        assert result.value is None
+        assert result.calculation_trace["reason"] == "mixed_currency_inputs"
+    finally:
+        db.close()
+        cleanup_metric_test_artifacts()
+
+
+def test_fcf_before_growth_capex_rejects_negative_da_and_mixed_periods():
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        add_fact(db, company, "free_cash_flow", "100")
+        add_fact(db, company, "capital_expenditure", "-120")
+        dna = add_fact(db, company, "depreciation_amortization", "-80")
+        db.commit()
+        service = MetricCalculationService()
+        result = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
+        assert result.value is None
+        assert result.calculation_trace["reason"] == "invalid_inputs"
+        dna.value = Decimal("80")
+        dna.period = "FY2024"
+        dna.fiscal_year = 2024
+        db.commit()
+        result = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
+        assert result.value is None
+        assert result.calculation_trace["reason"] == "incoherent_periods"
+    finally:
+        db.close()
+        cleanup_metric_test_artifacts()
+
+
+def test_fcf_before_growth_capex_rejects_nonfinite_before_arithmetic(monkeypatch):
+    cleanup_metric_test_artifacts()
+    db = SessionLocal()
+    try:
+        company = create_test_company(db)
+        facts = {metric: add_fact(db, company, metric, value) for metric, value in (
+            ("free_cash_flow", "100"), ("capital_expenditure", "-120"),
+            ("depreciation_amortization", "80"),
+        )}
+        db.commit()
+        service = MetricCalculationService()
+        # In-memory corrupt provider payload, never written to SQLite.
+        for metric in facts:
+            for invalid in ("NaN", "Infinity", "-Infinity"):
+                original = facts[metric].value
+                facts[metric].value = Decimal(invalid)
+                monkeypatch.setattr(service, "_coherent_facts", lambda *args: facts)
+                result = service.calculate(db, company, "fcf_before_growth_capex", persist=False)
+                assert result.status == "insufficient_data"
+                assert result.value is None
+                facts[metric].value = original
+    finally:
+        db.rollback()
+        db.close()
+        cleanup_metric_test_artifacts()

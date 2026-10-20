@@ -19,6 +19,8 @@ const WORDS: Record<string, string> = {
 };
 
 const PHRASES: [string, string][] = [
+  ['the maintenance/growth split is not separately reported - declared estimate', 'la separación mantenimiento/crecimiento no se publica por separado: estimación declarada'],
+  ['and maintenance_capex', 'y maintenance_capex'],
   ['inflation-adjusted internal rate of return on gross investment; no proxy calculation is permitted', 'Tasa interna de rentabilidad de la inversión bruta ajustada por inflación; no admite cálculos sustitutivos'],
   ['using current invested capital when no coherent prior period exists', 'usa el capital invertido actual cuando no existe un periodo anterior comparable'],
   ['over up to 5 most recent fiscal years, minimum 3; coverage declared in trace', 'de los últimos 5 ejercicios como máximo, con un mínimo de 3; cobertura indicada en el desglose'],
