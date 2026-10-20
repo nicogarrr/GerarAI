@@ -21,6 +21,13 @@ describe('Flujo de dinero dentro del detalle de cada tema', () => {
     assert.ok(!pagina.includes("href=\"/flujos"), 'sin enlace a una página /flujos aparte');
   });
 
+  it('flujo declarado por el backend pero no entregado: N/D visible con causa, nunca ausencia silenciosa', () => {
+    assert.ok(pagina.includes('failedFlowIds'), 'la página registra los flujos declarados no entregados');
+    assert.ok(pagina.includes('failedFlowIds.has(theme.id)'), 'la tarjeta recibe el fallo de SU tema');
+    assert.match(pagina, /Flujo de dinero N\/D: el backend declara este flujo pero no lo ha devuelto/);
+    assert.match(pagina, /Sin importes en lugar de inventarlos/);
+  });
+
   it('degrada en silencio si el endpoint no existe (no rompe /temas)', () => {
     assert.match(acciones, /catch \{\s*return \[\];/);
     assert.match(acciones, /catch \{\s*return null;/);
