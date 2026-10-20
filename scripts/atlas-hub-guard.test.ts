@@ -101,7 +101,8 @@ test("all managers use source-labelled portfolios; no 13F filter or top-ten trun
   const detail = read("app/(root)/inversores/[slug]/page.tsx");
   assert.match(detail, /getInvestorPortfolio\(slug\)/);
   assert.match(detail, /<InvestorLetters/);
-  assert.match(detail, /<InvestorConcepts/);
+  // Nico 2026-10-20 08:30:56: conceptos siguen transversales, fuera de la ficha.
+  assert.match(detail, /<InvestorViewSelector/);
   assert.ok(!detail.includes("holdings.slice(0, 10)"));
   const portfolio = read("app/(root)/inversores/_components/Portfolio.tsx");
   for (const text of [

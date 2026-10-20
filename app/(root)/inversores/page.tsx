@@ -6,6 +6,7 @@ import { getInvestors } from '@/lib/actions/investors.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatNumber } from '@/lib/format';
 
+import { InvestorSelector } from './_components/InvestorSelector';
 import { InvestorAvatar } from './_components/Avatar';
 import { SyncPortfoliosButton } from './_components/SyncPortfoliosButton';
 import { periodLabel, usd } from './_components/format';
@@ -43,10 +44,12 @@ export default async function InvestorsPage({ searchParams }: PageProps) {
     const noneSynced = data.investors.length > 0 && data.investors.every((investor) => !investor.report_date);
 
     return (
-        <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-12 overflow-x-clip py-6">
+        <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 overflow-x-clip py-6">
             <header className="flex flex-col gap-3">
                 <h1 className="text-3xl font-semibold text-gray-100">Inversores</h1>
             </header>
+
+            <InvestorSelector investors={data.investors} />
 
             {noneSynced ? (
                 <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-8 text-center">

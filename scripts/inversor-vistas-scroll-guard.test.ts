@@ -10,13 +10,10 @@ import { readFileSync } from 'node:fs';
  */
 describe('inversor: las vistas de la cartera conservan el scroll', () => {
     it('el nav de vistas lleva scroll={false}', () => {
-        const src = readFileSync('app/(root)/inversores/[slug]/page.tsx', 'utf8');
-        const labelAt = src.indexOf('aria-label="Vistas de la cartera"');
-        assert.ok(labelAt > 0, 'nav "Vistas de la cartera" existe');
-        const start = src.lastIndexOf('<nav', labelAt);
-        const end = src.indexOf('</nav>', labelAt);
-        assert.ok(start >= 0 && end > labelAt, 'el nav esta bien formado');
-        const nav = src.slice(start, end);
-        assert.ok(nav.includes('scroll={false}'), 'las vistas ?vista= llevan scroll={false}');
+        // Nico 2026-10-20 08:30:56: selector de contenido en la ficha, no otra barra.
+        const src = readFileSync('app/(root)/inversores/_components/InvestorViewSelector.tsx', 'utf8');
+        assert.ok(src.includes('scroll: false'), 'el selector conserva scroll al cambiar ?vista=');
+        assert.ok(src.includes('Contenido del inversor'));
+
     });
 });
