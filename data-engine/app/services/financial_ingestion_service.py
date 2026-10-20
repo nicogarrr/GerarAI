@@ -101,6 +101,63 @@ RATIO_METRICS: list[MetricSpec] = [
     ("effective_tax_rate", "effectiveTaxRate", "decimal"),
 ]
 
+# --- total_debt: definicion explicita (suma de componentes, un tag por componente) ---
+# total_debt = deuda financiera con coste: prestamos y bonos + pagares + lineas de
+# credito dispuestas + arrendamientos financieros + convertibles. NUNCA se suma
+# mas de un tag por componente (alias), y los tags que ya incluyen a otros se
+# usan en lugar de ellos, no ademas:
+#   1. DebtLongtermAndShorttermCombinedAmount: total declarado por el emisor.
+#      Gana solo; no se le suma nada.
+#   2. Si no hay total declarado, deuda a plazo (un tag, por prioridad):
+#        LongTermDebt (incluye vencimientos corrientes por definicion US-GAAP)
+#        > LongTermDebtNoncurrent (+ LongTermDebtCurrent si consta el mismo cierre)
+#        > LongTermDebtAndCapitalLeaseObligations (+ su Current): YA incluye los
+#          arrendamientos financieros, asi que no se les suma FinanceLease*.
+#      Con deuda a plazo presente se anaden SOLO las partidas que no estan
+#      dentro de ella: prestamos corrientes (ShortTermBorrowings > LinesOfCreditCurrent)
+#      y arrendamientos financieros (si el tag de plazo no los incluye).
+#   3. Sin deuda a plazo, se suman los componentes sueltos, uno por componente:
+#      convertibles, pagares, linea de credito (LT y corriente), vencimiento corriente,
+#      prestamos corrientes y arrendamientos financieros. DebtInstrumentCarryingAmount
+#      solo si no hay ninguna otra partida de deuda (es un hecho por instrumento).
+#      Un arrendamiento financiero SOLO no cuenta como deuda: sin otra partida, no hay total_debt.
+# Fail closed: sin ninguna partida en el cierre no hay total_debt (nunca 0 inventado).
+TOTAL_DEBT_AGGREGATE = "DebtLongtermAndShorttermCombinedAmount"
+TOTAL_DEBT_TERM_CHOICES: tuple[tuple[str, tuple[str, ...], bool], ...] = (
+    ("LongTermDebt", (), False),
+    ("LongTermDebtNoncurrent", ("LongTermDebtCurrent",), False),
+    ("LongTermDebtAndCapitalLeaseObligations", ("LongTermDebtAndCapitalLeaseObligationsCurrent",), True),
+)
+TOTAL_DEBT_SHORT_CHOICES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("ShortTermBorrowings", ()),
+    ("LinesOfCreditCurrent", ()),
+)
+TOTAL_DEBT_LEASE_CHOICES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("FinanceLeaseLiability", ()),
+    ("FinanceLeaseLiabilityNoncurrent", ("FinanceLeaseLiabilityCurrent",)),
+)
+# Componentes sueltos (solo sin deuda a plazo): cada grupo aporta UN tag.
+TOTAL_DEBT_LOOSE_GROUPS: tuple[tuple[tuple[str, tuple[str, ...]], ...], ...] = (
+    (("ConvertibleDebt", ()), ("ConvertibleNotesPayable", ()),
+     ("ConvertibleDebtNoncurrent", ("ConvertibleDebtCurrent",)),
+     ("ConvertibleNotesPayableNoncurrent", ("ConvertibleNotesPayableCurrent",))),
+    (("NotesPayable", ()), ("LongTermNotesPayable", ()),
+     ("NotesPayableNoncurrent", ("NotesPayableCurrent",))),
+    (("LongTermLineOfCredit", ()),),
+    (("LongTermDebtCurrent", ()),),
+    TOTAL_DEBT_SHORT_CHOICES,
+    TOTAL_DEBT_LEASE_CHOICES,
+)
+TOTAL_DEBT_LAST_RESORT = "DebtInstrumentCarryingAmount"
+TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
+    [TOTAL_DEBT_AGGREGATE]
+    + [t for t, _, _ in TOTAL_DEBT_TERM_CHOICES]
+    + [t for _, extra, _ in TOTAL_DEBT_TERM_CHOICES for t in extra]
+    + [t for g in (TOTAL_DEBT_SHORT_CHOICES, TOTAL_DEBT_LEASE_CHOICES, *TOTAL_DEBT_LOOSE_GROUPS)
+       for t, extra in g for t in (t, *extra)]
+    + [TOTAL_DEBT_LAST_RESORT]
+))
+
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
     ("gross_profit",      ["GrossProfit"],                                                                          "USD"),
@@ -129,7 +186,7 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # LongTermDebt, asi que la deuda neta salia sin la parte corriente. El
     # ganador lo decide el `filed` mas reciente del MISMO periodo, de modo que el
     # orden solo desempata cuando el emisor nunca presenta el tag combinado.
-    ("total_debt",        ["DebtLongtermAndShorttermCombinedAmount", "LongTermDebt", "LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations"], "USD"),
+    ("total_debt",        list(TOTAL_DEBT_CONCEPTS), "USD"),
     ("total_assets",      ["Assets"],                                                                               "USD"),
     ("total_liabilities", ["Liabilities"],                                                                          "USD"),
     # StockholdersEquity = patrimonio atribuible a la matriz; la variante
@@ -451,12 +508,81 @@ def _collapse_by_scope(
     return by_end
 
 
+def _compose_total_debt(
+    by_concept: dict[str, dict[str, dict[str, Any]]],
+) -> dict[str, dict[str, Any]]:
+    """total_debt por cierre segun la definicion explicita (ver TOTAL_DEBT_*)."""
+    ends: set[str] = set()
+    for entries in by_concept.values():
+        ends.update(entries)
+
+    def pick(
+        choices: tuple[tuple[str, tuple[str, ...]], ...], end: str
+    ) -> list[tuple[str, dict[str, Any]]]:
+        for tag, extras in choices:
+            entry = by_concept.get(tag, {}).get(end)
+            if entry is None or _decimal(entry.get("val")) is None:
+                continue
+            parts = [(tag, entry)]
+            for extra in extras:
+                other = by_concept.get(extra, {}).get(end)
+                if other is not None and _decimal(other.get("val")) is not None:
+                    parts.append((extra, other))
+            return parts
+        return []
+
+    out: dict[str, dict[str, Any]] = {}
+    for end in ends:
+        parts: list[tuple[str, dict[str, Any]]] = []
+        aggregate = by_concept.get(TOTAL_DEBT_AGGREGATE, {}).get(end)
+        if aggregate is not None and _decimal(aggregate.get("val")) is not None:
+            parts = [(TOTAL_DEBT_AGGREGATE, aggregate)]
+        else:
+            term: list[tuple[str, dict[str, Any]]] = []
+            leases_in = False
+            for tag, extras, includes_leases in TOTAL_DEBT_TERM_CHOICES:
+                term = pick(((tag, extras),), end)
+                if term:
+                    leases_in = includes_leases
+                    break
+            if term:
+                parts = term + pick(TOTAL_DEBT_SHORT_CHOICES, end)
+                if not leases_in:
+                    parts += pick(TOTAL_DEBT_LEASE_CHOICES, end)
+            else:
+                for group in TOTAL_DEBT_LOOSE_GROUPS:
+                    parts += pick(group, end)
+                # Un arrendamiento financiero solo NO es la deuda de la
+                # empresa (p.ej. F: 0,9 mil M frente a la deuda real de
+                # Ford Credit): sin ninguna partida de deuda financiera no
+                # se publica total_debt.
+                lease_tags = {t for t, _ in TOTAL_DEBT_LEASE_CHOICES} | {
+                    x for _, extra in TOTAL_DEBT_LEASE_CHOICES for x in extra
+                }
+                if not any(tag not in lease_tags for tag, _ in parts):
+                    parts = pick(((TOTAL_DEBT_LAST_RESORT, ()),), end)
+        if not parts:
+            continue
+        total = sum((_decimal(e["val"]) for _, e in parts), Decimal("0"))
+        latest = max((e for _, e in parts), key=lambda e: str(e.get("filed") or ""))
+        components = {tag: str(_decimal(e["val"])) for tag, e in parts}
+        out[end] = {
+            **latest,
+            "val": float(total),
+            "_concept": "+".join(sorted(components)),
+            "_components": components,
+        }
+    return out
+
+
 def _merge_for_metric(
     by_concept: dict[str, dict[str, dict[str, Any]]], metric: str
 ) -> dict[str, dict[str, Any]]:
     """Merge concepts per period: summed when they are parts, else one winner."""
     if is_summed_component(metric):
         return _sum_disjoint_components(by_concept)
+    if metric == "total_debt":
+        return _compose_total_debt(by_concept)
     if metric in SCOPE_PRIORITY_METRICS:
         return _collapse_by_scope(by_concept)
     return _collapse_aliases(by_concept)
