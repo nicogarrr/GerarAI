@@ -140,6 +140,11 @@ const ALLOWED: Array<{ file: string; snippet: string; why: string }> = [
         why: "Texto de la alerta de proPicks, mismo universo US-only: el «$» acompaña a un precio de cotización del S&P 500.",
     },
     {
+        file: 'lib/market/flows.ts',
+        snippet: "`$${scaled.toLocaleString('en-US', { maximumFractionDigits: digits })}${suffix}`",
+        why: "Flujos de dinero: la regla de Nico para USD es en-US con $ delante («$35.7B») y solo se aplica en la rama unit === 'USD'; la divisa llega de cada fila del backend y el resto va en es-ES con código explícito.",
+    },
+    {
         file: 'components/portfolio/EditTransactionDialog.tsx',
         snippet: "transaction.currency || 'USD'",
         why: "Semilla del SELECTOR de moneda del formulario de edición (editable por el usuario entre 9 divisas), no un importe pintado.",
