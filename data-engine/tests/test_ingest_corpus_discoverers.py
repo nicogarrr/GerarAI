@@ -1,5 +1,7 @@
 """Parsing de los discoverers del corpus libre (fixtures HTML inline)."""
 
+import re
+
 from app.services.corpus_ingestion_service import (
     _extract_azvalor_gateway,
     _extract_azvalor_pages,
@@ -44,3 +46,28 @@ def test_magallanes_solo_cartas_pdf_sin_anchor():
         "https://magallanesvalue.com/wp-content/uploads/MAGALLANES-CARTA-1T26.pdf",
         "https://magallanesvalue.com/wp-content/uploads/MAGALLANES-LETTER-1Q26.pdf",
     ]
+
+
+
+def test_buffett_manifest_completo_y_coherente():
+    from datetime import date
+
+    from app.services.corpus_ingestion_service import BUFFETT_LETTERS, _buffett_sources
+
+    years = [year for year, _, _ in BUFFETT_LETTERS]
+    assert years == list(range(1977, 2025))
+    for year, path, published in BUFFETT_LETTERS:
+        assert re.fullmatch(r"[a-z0-9]+\.(?:html|pdf)", path), path
+        assert str(year) in path, (year, path)
+        assert published is None or (
+            isinstance(published, date) and published.year == year + 1
+        ), (year, published)
+
+    sources = _buffett_sources()
+    assert len(sources) == 48
+    for source, (year, path, published) in zip(sources, BUFFETT_LETTERS, strict=True):
+        assert source["url"] == f"https://www.berkshirehathaway.com/letters/{path}"
+        assert source["author"] == "Warren E. Buffett (Berkshire Hathaway)"
+        assert source["document_type"] == "fund_letter"
+        assert source["published_on"] is published
+        assert source["title"].endswith(str(year))

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 import time
+from datetime import date
 
 import httpx
 from sqlalchemy import select
@@ -27,7 +28,6 @@ NUMANTIA_AUTHOR = "Emérito Quintana (Numantia Patrimonio)"
 NUMANTIA_HOME = "https://numantiapatrimonio.com/"
 
 BUFFETT_AUTHOR = "Warren E. Buffett (Berkshire Hathaway)"
-BUFFETT_INDEX = "https://www.berkshirehathaway.com/letters/letters.html"
 
 AZVALOR_AUTHOR = "Azvalor Asset Management"
 AZVALOR_INDEX = "https://www.azvalor.com/categorias_anuncios/cartas-a-inversores/"
@@ -162,38 +162,83 @@ def _discover_numantia_sources(client: httpx.Client) -> list[dict]:
     return sources
 
 
-def _discover_buffett_sources(client: httpx.Client) -> list[dict]:
-    """Lee el indice publico de cartas de Berkshire y declara cada enlace.
+# Manifiesto estatico de cartas anuales de Buffett (Berkshire Hathaway), una por
+# entrada: (anio de la carta, ruta en berkshirehathaway.com/letters/, fecha de
+# firma que consta en el propio documento o None si el documento no la declara).
+# Verificado el 2026-10-20 con una peticion real por enlace: 200, contenido de
+# Berkshire y fecha de firma del anio siguiente al de la carta (la de 1981 no
+# lleva fecha; se verifico por su <TITLE> "Chairman's Letter - 1981"; la de
+# 2007 solo declara "February 2008"). El indice oficial se scrapeaba con regex,
+# pero Berkshire sirve siempre Content-Encoding: br (incluso pidiendo
+# identity): con un httpx sin brotli el HTML llegaba sin decodificar y el
+# discovery devolvia lista vacia en silencio (corpus sin Buffett). Para anadir
+# la carta de un anio nuevo: verificar el enlace igual y extender la lista.
+BUFFETT_LETTERS: tuple[tuple[int, str, date | None], ...] = (
+    (1977, "1977.html", date(1978, 3, 14)),
+    (1978, "1978.html", date(1979, 3, 26)),
+    (1979, "1979.html", date(1980, 3, 3)),
+    (1980, "1980.html", date(1981, 2, 27)),
+    (1981, "1981.html", None),
+    (1982, "1982.html", date(1983, 3, 3)),
+    (1983, "1983.html", date(1984, 3, 14)),
+    (1984, "1984.html", date(1985, 2, 25)),
+    (1985, "1985.html", date(1986, 3, 4)),
+    (1986, "1986.html", date(1987, 2, 27)),
+    (1987, "1987.html", date(1988, 2, 29)),
+    (1988, "1988.html", date(1989, 2, 28)),
+    (1989, "1989.html", date(1990, 3, 2)),
+    (1990, "1990.html", date(1991, 3, 1)),
+    (1991, "1991.html", date(1992, 2, 28)),
+    (1992, "1992.html", date(1993, 3, 1)),
+    (1993, "1993.html", date(1994, 3, 1)),
+    (1994, "1994.html", date(1995, 3, 7)),
+    (1995, "1995.html", date(1996, 3, 1)),
+    (1996, "1996.html", date(1997, 2, 28)),
+    (1997, "1997.html", date(1998, 2, 27)),
+    (1998, "1998pdf.pdf", date(1999, 3, 1)),
+    (1999, "final1999pdf.pdf", date(2000, 3, 1)),
+    (2000, "2000pdf.pdf", date(2001, 2, 28)),
+    (2001, "2001pdf.pdf", date(2002, 2, 28)),
+    (2002, "2002pdf.pdf", date(2003, 2, 21)),
+    (2003, "2003ltr.pdf", date(2004, 2, 27)),
+    (2004, "2004ltr.pdf", date(2005, 2, 28)),
+    (2005, "2005ltr.pdf", date(2006, 2, 28)),
+    (2006, "2006ltr.pdf", date(2007, 2, 28)),
+    (2007, "2007ltr.pdf", None),
+    (2008, "2008ltr.pdf", date(2009, 2, 27)),
+    (2009, "2009ltr.pdf", date(2010, 2, 26)),
+    (2010, "2010ltr.pdf", date(2011, 2, 26)),
+    (2011, "2011ltr.pdf", date(2012, 2, 25)),
+    (2012, "2012ltr.pdf", date(2013, 3, 1)),
+    (2013, "2013ltr.pdf", date(2014, 2, 28)),
+    (2014, "2014ltr.pdf", date(2015, 2, 27)),
+    (2015, "2015ltr.pdf", date(2016, 2, 27)),
+    (2016, "2016ltr.pdf", date(2017, 2, 25)),
+    (2017, "2017ltr.pdf", date(2018, 2, 24)),
+    (2018, "2018ltr.pdf", date(2019, 2, 23)),
+    (2019, "2019ltr.pdf", date(2020, 2, 22)),
+    (2020, "2020ltr.pdf", date(2021, 2, 27)),
+    (2021, "2021ltr.pdf", date(2022, 2, 26)),
+    (2022, "2022ltr.pdf", date(2023, 2, 25)),
+    (2023, "2023ltr.pdf", date(2024, 2, 24)),
+    (2024, "2024ltr.pdf", date(2025, 2, 22)),
+)
 
-    El indice lista las cartas con su año; solo se aceptan enlaces del propio
-    dominio (html/htm/pdf). Si el indice no responde, se devuelve lista vacia
-    y se reporta - nunca se fabrican URLs.
-    """
-    try:
-        response = client.get(BUFFETT_INDEX)
-        response.raise_for_status()
-    except Exception:
-        return []
+
+def _buffett_sources() -> list[dict]:
+    """Una fuente por carta del manifiesto verificado (sin red, sin scraping)."""
     sources: list[dict] = []
-    for href, label in re.findall(
-        r'href="([^"]+\.(?:html?|pdf))"[^>]*>([^<]*)', response.text, re.IGNORECASE
-    ):
-        if href.startswith("http") and "berkshirehathaway.com" not in href:
-            continue
-        url = href if href.startswith("http") else f"https://www.berkshirehathaway.com/letters/{href}"
-        year_match = re.search(r"(19|20)\d{2}", label) or re.search(r"(19|20)\d{2}", href)
-        if not year_match:
-            continue
-        year = year_match.group(0)
-        ext = href.rsplit(".", 1)[-1].lower()
+    for year, path, published in BUFFETT_LETTERS:
+        ext = path.rsplit(".", 1)[-1]
         sources.append(
             {
                 "title": f"Berkshire Hathaway - Carta anual accionistas {year}",
-                "url": url,
+                "url": f"https://www.berkshirehathaway.com/letters/{path}",
                 "filename": f"Berkshire{year}.{ext}",
                 "author": BUFFETT_AUTHOR,
                 "document_type": "fund_letter",
                 "language": "en",
+                "published_on": published,
             }
         )
     return sources
@@ -229,10 +274,7 @@ def ingest_free_corpus(db) -> dict:
         sources = _discover_numantia_sources(client)
         if not sources:
             stats["skipped_sources"].append("numantia_home_unreachable")
-        buffett = _discover_buffett_sources(client)
-        if not buffett:
-            stats["skipped_sources"].append("buffett_index_unreachable")
-        sources.extend(buffett)
+        sources.extend(_buffett_sources())
         for name, discoverer in (
             ("azvalor", _discover_azvalor_sources),
             ("magallanes", _discover_magallanes_sources),
@@ -256,6 +298,7 @@ def ingest_free_corpus(db) -> dict:
                     author=source["author"],
                     source_url=source["url"],
                     language=source["language"],
+                    publication_date=source.get("published_on"),
                 )
                 db.commit()
                 if result["status"] == "duplicate":
