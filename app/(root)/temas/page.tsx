@@ -10,7 +10,7 @@ import { getBottlenecks } from '@/lib/actions/bottlenecks.actions';
 import { getMarketThemes } from '@/lib/actions/market-themes.actions';
 import { getFlowHoldings, getMoneyFlow, getMoneyFlowThemes } from '@/lib/actions/money-flows.actions';
 import type { MoneyFlow } from '@/lib/market/flows';
-import { ThemeFlow } from './_components/ThemeFlow';
+import { ThemeFlow, ThemeFlowUnavailable } from './_components/ThemeFlow';
 import { ThemeFundamentals } from './_components/ThemeFundamentals';
 import { NA, formatMarketDate, formatPercent } from '@/lib/format';
 import {
@@ -164,10 +164,7 @@ function ThemeCard({
           {flow ? (
             <ThemeFlow flow={flow} holdings={holdings} />
           ) : flowUnavailable ? (
-            <p className="mt-4 border-t border-gray-800 pt-3 text-xs text-gray-500">
-              Flujo de dinero N/D: el backend declara este flujo pero no lo ha devuelto (fuente no
-              disponible o error temporal). Sin importes en lugar de inventarlos.
-            </p>
+            <ThemeFlowUnavailable />
           ) : null}
           <ThemeBrainButton question={brainQuestion} />
           {!holdings.unavailable ? (

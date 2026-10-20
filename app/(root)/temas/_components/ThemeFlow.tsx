@@ -37,6 +37,20 @@ function SourceLink({ source }: { source: FlowSource }) {
  * Sin importes inventados: donde no hay fuente gratuita del reparto, se
  * muestra la razón declarada y N/D.
  */
+/**
+ * El backend declara el flujo del tema en /api/market/flows/themes pero el
+ * detalle no llega (fuente caida, 500, timeout): N/D visible con la causa,
+ * nunca ausencia silenciosa ni importes inventados.
+ */
+export function ThemeFlowUnavailable() {
+  return (
+    <p className="mt-4 border-t border-gray-800 pt-3 text-xs text-gray-500">
+      Flujo de dinero N/D: el backend declara este flujo pero no lo ha devuelto (fuente no disponible o
+      error temporal). Sin importes en lugar de inventarlos.
+    </p>
+  );
+}
+
 export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
   const maxDestination = Math.max(
     ...flow.destinations.map((item) => item.amount ?? 0),
