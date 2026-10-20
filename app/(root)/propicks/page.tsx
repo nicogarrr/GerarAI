@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { generateEnhancedProPicksWithRun, getAvailableStrategies } from '@/lib/actions/proPicks.actions';
-import { Sparkles } from 'lucide-react';
 import ProPicksTabs from '@/components/proPicks/ProPicksTabs';
 import ProPicksLoadError from '@/components/proPicks/ProPicksLoadError';
 import { MethodologyDisclosure } from '@/components/ui/methodology-disclosure';
@@ -52,13 +51,8 @@ export default async function ProPicksPage() {
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-7xl flex-col overflow-x-clip p-4 sm:p-6">
             {/* Header */}
-            <div className="mb-8">
-                <div className="flex items-center gap-3 mb-4">
-                    <Sparkles className="h-7 w-7 shrink-0 text-teal-400 sm:h-8 sm:w-8" />
-                    <div className="min-w-0">
-                        <h1 className="break-words text-2xl font-bold text-gray-100 sm:text-3xl">ProPicks IA</h1>
-                    </div>
-                </div>
+            <div className="mb-5">
+                <h1 className="mb-3 text-xl font-bold text-gray-100 sm:text-2xl">ProPicks IA</h1>
                 <MethodologyDisclosure>
                     <p>
                         El embudo v1 puntúa cada categoría cuando hay datos para

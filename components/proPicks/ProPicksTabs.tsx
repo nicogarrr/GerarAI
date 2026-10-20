@@ -128,21 +128,21 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 triggers son alcanzables con flechas (tablist de Radix). */}
             <TabsList
                 aria-label="Secciones de Pro Picks"
-                className="flex h-auto w-full min-w-0 max-w-full flex-wrap justify-start gap-1 border border-gray-700 bg-gray-800 pb-2 text-gray-400 sm:inline-flex sm:h-9 sm:w-auto sm:max-w-none sm:pb-[3px]"
+                className="flex h-auto w-full min-w-0 max-w-full flex-wrap justify-start gap-1 border border-gray-700 bg-gray-800 p-1 pb-2 text-gray-400 sm:inline-flex sm:h-9 sm:w-auto sm:max-w-none sm:pb-[3px]"
             >
-                <TabsTrigger value="picks" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">
+                <TabsTrigger value="picks" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">
                     Selección IA
                 </TabsTrigger>
-                <TabsTrigger value="joyas" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">
+                <TabsTrigger value="joyas" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">
                     Joyas
                 </TabsTrigger>
-                <TabsTrigger value="estrategia" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">
+                <TabsTrigger value="estrategia" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">
                     Estrategia y rebalanceo
                 </TabsTrigger>
-                <TabsTrigger value="backtest" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">
+                <TabsTrigger value="backtest" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">
                     Backtesting
                 </TabsTrigger>
-                <TabsTrigger value="paper" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300">Paper trading</TabsTrigger>
+                <TabsTrigger value="paper" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Paper trading</TabsTrigger>
             </TabsList>
 
             <TabsContent value="paper" className="mt-6"><PaperTradingView /></TabsContent>
