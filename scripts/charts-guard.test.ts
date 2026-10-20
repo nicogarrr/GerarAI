@@ -13,9 +13,10 @@ import { existsSync, readFileSync } from 'node:fs';
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
 import { summarizeCandles, toCandleRows, toCandlestickData, toVolumeData } from '../lib/market/candles.ts';
 
-const chart = readFileSync('components/research/CompanyMarketChart.tsx', 'utf8');
+const chart = readFileSync('components/research/CompanyTechnicalChart.tsx', 'utf8');
+const workspace = readFileSync('components/research/CompanyTechnicalWorkspace.tsx', 'utf8');
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-const workspace = readFileSync('lib/actions/market-workspace.actions.ts', 'utf8');
+const workspaceActions = readFileSync('lib/actions/market-workspace.actions.ts', 'utf8');
 const finnhub = readFileSync('lib/actions/finnhub.actions.ts', 'utf8');
 const quoteRoute = existsSync('app/api/quote/route.ts') ? readFileSync('app/api/quote/route.ts', 'utf8') : '';  // /api/quote se borro: era codigo muerto con cuatro '|| 0' que inventaban variaciones
 const footer = readFileSync('app/(public)/layout.tsx', 'utf8');
@@ -24,6 +25,11 @@ const candles = readFileSync('lib/market/candles.ts', 'utf8');
 const STATIC_LW_IMPORT = /^import\s+(?!type)[^;]*?from\s+['"]lightweight-charts['"]/m;
 
 describe('charts: montaje solo-cliente (ESM-only, Next 16)', () => {
+    it('el workspace monta el chart tecnico con dynamic y ssr:false', () => {
+        assert.match(workspace, /dynamic\(\(\) => import\('\.\/CompanyTechnicalChart'\)/);
+        assert.match(workspace, /ssr:\s*false/);
+    });
+
     it('el chart es un Client Component que carga la librería por import dinámico', () => {
         assert.match(chart, /^'use client';/m);
         assert.match(chart, /await import\('lightweight-charts'\)/);
@@ -32,7 +38,7 @@ describe('charts: montaje solo-cliente (ESM-only, Next 16)', () => {
     it('ningún fichero de servidor importa la librería de forma estática', () => {
         for (const [name, source] of [
             ['page', page],
-            ['workspace', workspace],
+            ['workspace-actions', workspaceActions],
             ['finnhub', finnhub],
             ['quote-route', quoteRoute],
         ] as const) {
