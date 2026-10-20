@@ -16,7 +16,5 @@ describe('gráfico de mercado: divisa del listado', () => {
         const chart = source('components/research/CompanyMarketChart.tsx');
         assert.ok(!/formatMoney\(value, 'USD'\)/.test(chart));
         assert.match(chart, /currency\?: string \| null/);
-        const panel = source('components/research/CompanyMarketPanel.tsx');
-        assert.match(panel, /<CompanyMarketChart history=\{snapshot\.history\} currency=\{snapshot\.currency\}/);
     });
 });

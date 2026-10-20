@@ -14,7 +14,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { summarizeCandles, toCandleRows, toCandlestickData, toVolumeData } from '../lib/market/candles.ts';
 
 const chart = readFileSync('components/research/CompanyMarketChart.tsx', 'utf8');
-const panel = readFileSync('components/research/CompanyMarketPanel.tsx', 'utf8');
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 const workspace = readFileSync('lib/actions/market-workspace.actions.ts', 'utf8');
 const finnhub = readFileSync('lib/actions/finnhub.actions.ts', 'utf8');
@@ -25,11 +24,6 @@ const candles = readFileSync('lib/market/candles.ts', 'utf8');
 const STATIC_LW_IMPORT = /^import\s+(?!type)[^;]*?from\s+['"]lightweight-charts['"]/m;
 
 describe('charts: montaje solo-cliente (ESM-only, Next 16)', () => {
-    it('el panel monta el chart con dynamic y ssr:false', () => {
-        assert.match(panel, /dynamic\(\(\) => import\('\.\/CompanyMarketChart'\)/);
-        assert.match(panel, /ssr:\s*false/);
-    });
-
     it('el chart es un Client Component que carga la librería por import dinámico', () => {
         assert.match(chart, /^'use client';/m);
         assert.match(chart, /await import\('lightweight-charts'\)/);
@@ -38,7 +32,6 @@ describe('charts: montaje solo-cliente (ESM-only, Next 16)', () => {
     it('ningún fichero de servidor importa la librería de forma estática', () => {
         for (const [name, source] of [
             ['page', page],
-            ['panel-origen', panel],
             ['workspace', workspace],
             ['finnhub', finnhub],
             ['quote-route', quoteRoute],

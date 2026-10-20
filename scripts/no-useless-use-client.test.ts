@@ -160,7 +160,6 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/CompanyChatForm.tsx': 'useFormStatus',
   'components/research/CompanyHeaderQuote.tsx': 'useState, useEffect, browser:document, browser:window, importa cliente: components/research/CompanyTechnicalWorkspace.tsx',
   'components/research/CompanyMarketChart.tsx': 'browser:window, browser:getComputedStyle, browser:document, useRef, useState, jsx-onHover, jsx-onState, useEffect',
-  'components/research/CompanyMarketPanel.tsx': 'dynamic-ssr-false, importa cliente: components/research/CompanyMarketChart.tsx',
   'components/research/CompanyTechnicalChart.tsx': 'useState, useEffect, jsx-onClick, useRef, browser:window',
   'components/research/CompanyTechnicalWorkspace.tsx': 'dynamic-ssr-false, importa cliente: components/research/CompanyTechnicalChart.tsx',
   'components/research/ExternalNewsHeadline.tsx': 'useState, useRef, useEffect, browser:new IntersectionObserver, browser:IntersectionObserver',
