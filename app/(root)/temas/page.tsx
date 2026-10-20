@@ -10,7 +10,7 @@ import { getBottlenecks } from '@/lib/actions/bottlenecks.actions';
 import { getMarketThemes } from '@/lib/actions/market-themes.actions';
 import { getFlowHoldings, getMoneyFlow, getMoneyFlowThemes } from '@/lib/actions/money-flows.actions';
 import type { MoneyFlow } from '@/lib/market/flows';
-import { ThemeFlow } from './_components/ThemeFlow';
+import { ThemeFlow, ThemeFlowUnavailable } from './_components/ThemeFlow';
 import { ThemeFundamentals } from './_components/ThemeFundamentals';
 import { NA, formatMarketDate, formatPercent } from '@/lib/format';
 import {
@@ -54,12 +54,14 @@ function ThemeCard({
   theme,
   order,
   flow,
+  flowUnavailable,
   holdings,
   detectedBottleneck,
 }: {
   theme: MarketTheme;
   order: ThemeOrder;
   flow: MoneyFlow | null;
+  flowUnavailable: boolean;
   holdings: FlowHoldings;
   detectedBottleneck: string | null;
 }) {
@@ -159,7 +161,11 @@ function ThemeCard({
             </tbody>
           </table>
           <ThemeFundamentals themeId={theme.id} />
-          {flow ? <ThemeFlow flow={flow} holdings={holdings} /> : null}
+          {flow ? (
+            <ThemeFlow flow={flow} holdings={holdings} />
+          ) : flowUnavailable ? (
+            <ThemeFlowUnavailable />
+          ) : null}
           <ThemeBrainButton question={brainQuestion} />
           {!holdings.unavailable ? (
             <HoldingsLines constituents={theme.constituents} holdings={holdings} />
@@ -240,9 +246,16 @@ export default async function TemasPage({ searchParams }: PageProps) {
     getFlowHoldings(),
   ]);
   const flowsById = new Map<string, MoneyFlow>();
+  const failedFlowIds = new Set<string>();
   flowIds.forEach((item, index) => {
     const payload = flowPayloads[index];
-    if (payload) flowsById.set(item.id, payload);
+    if (payload) {
+      flowsById.set(item.id, payload);
+    } else {
+      // El backend declara el flujo pero no lo entrega (fuente caida, 500,
+      // timeout): ausencia con causa -> N/D visible, nunca silencio.
+      failedFlowIds.add(item.id);
+    }
   });
 
   return (
@@ -264,6 +277,7 @@ export default async function TemasPage({ searchParams }: PageProps) {
               <ThemeCard
                 detectedBottleneck={bottleneck && detectedThemes.has(bottleneck) ? bottleneck : null}
                 flow={flowsById.get(theme.id) ?? null}
+                flowUnavailable={failedFlowIds.has(theme.id)}
                 holdings={holdings}
                 key={theme.id}
                 order={order}
