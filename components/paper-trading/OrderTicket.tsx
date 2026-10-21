@@ -4,6 +4,7 @@ import { useId, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { Label } from '@/components/ui/label';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useRouter } from 'next/navigation';
@@ -31,6 +32,13 @@ function newClientOrderId(): string {
  * estandar (multiplicador 100, entrega en acciones, sin ajustados). El
  * vencimiento es la fecha civil del contrato; no afirma que hoy sea
  * negociable.
+ *
+ * Guiado (Nico, 21-oct-2026): el simbolo/subyacente se busca por nombre o
+ * ticker con el TickerSearchInput compartido (misma busqueda real que el
+ * buscador global) y al elegir se rellenan simbolo y nombre; el resto del
+ * ticket sigue manual porque registra una operacion YA ejecutada. No hay
+ * selector de cadena de opciones: sin fuente gratuita verificable de
+ * strikes/vencimientos, la identidad del contrato queda manual y etiquetada.
  */
 export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; disabled?: boolean }) {
     const uid = useId();
@@ -66,6 +74,17 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     const [duplicate, setDuplicate] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
+    // Al elegir una empresa del buscador se rellenan simbolo y nombre con la
+    // identidad real del resultado. Divisa: solo se preselecciona EUR cuando
+    // el resultado viene del listado español revisado por CNMV (exchange
+    // 'BME', identidad estatica del repo); para el resto no se infiere divisa
+    // y el toggle del usuario manda.
+    function onSelectInstrument(stock: StockWithWatchlistStatus) {
+        setSymbol(stock.symbol);
+        setName(stock.name);
+        if (stock.exchange === 'BME') setCurrency('EUR');
+    }
+
     const fieldKey = JSON.stringify([kind, symbol, name, side, quantity, price, currency, callPut, strike, expiry, fee, executedAtLocal]);
     const validationError = invalid !== null && invalid.key === fieldKey ? invalid.message : null;
 
@@ -83,7 +102,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
 
     function validate(): string | null {
         if (!symbol.trim()) return 'Indica el símbolo.';
-        if (!name.trim()) return 'Indica el nombre (no hay buscador en la fase manual).';
+        if (!name.trim()) return 'Indica el nombre (o elige la empresa en el buscador).'
         if (!Number.isFinite(parsedQuantity)) return `La cantidad no es un número válido (${NUM_INPUT_HINT}).`;
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return 'La cantidad debe ser un entero mayor que cero.';
         if (!Number.isFinite(parsedPrice)) return `El precio no es un número válido (${NUM_INPUT_HINT}).`;
@@ -194,15 +213,17 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-symbol`}>{kind === 'accion' ? 'Símbolo' : 'Subyacente'}</Label>
-                    <Input
-                        className="uppercase placeholder:text-gray-600"
+                    <TickerSearchInput
                         id={`${uid}-symbol`}
                         value={symbol}
-                        onChange={(event) => setSymbol(event.target.value)}
+                        onValueChange={setSymbol}
+                        onSelect={onSelectInstrument}
                         placeholder={kind === 'accion' ? 'p. ej. ASTS' : 'p. ej. AAPL'}
-                        autoComplete="off"
+                        ariaLabel={kind === 'accion' ? 'Buscar acción por nombre o ticker' : 'Buscar subyacente por nombre o ticker'}
+                        className="h-10 w-full bg-gray-800/50 uppercase placeholder:text-gray-600"
                         required
                     />
+                    <p className="text-xs text-gray-500">Busca por nombre o ticker y elige: se rellenan símbolo y nombre.</p>
                 </div>
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-name`}>Nombre</Label>
@@ -252,7 +273,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     <div className="space-y-1.5">
                         <Label htmlFor={`${uid}-expiry`}>Vencimiento</Label>
                         <Input
-                        className="placeholder:text-gray-600"
+                            className="w-full min-w-0 max-w-full px-3 text-sm placeholder:text-gray-600"
                             id={`${uid}-expiry`}
                             type="date"
                             value={expiry}
@@ -340,6 +361,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 <div className="col-span-2 space-y-1.5">
                     <Label htmlFor={`${uid}-executed`}>Fecha de ejecución</Label>
                     <Input
+                        className="w-full min-w-0 max-w-full px-3 text-sm"
                         id={`${uid}-executed`}
                         type="datetime-local"
                         value={executedAtLocal}
