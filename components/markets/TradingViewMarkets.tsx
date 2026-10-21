@@ -109,8 +109,10 @@ function TradingViewMarketRows({ group }: { group: Group }) {
     /*
      * iframe DIRECTO al documento oficial del widget en el origen de
      * TradingView (https://www.tradingview-widget.com/embed-widget/market-overview/?locale=es#<config>),
-     * estructura y claves observadas en el DOM real por QA (21-oct-2026,
-     * config decodificada completa). Aislamiento REAL por origen cruzado
+     * estructura y claves observadas en el DOM real por QA (21-oct-2026).
+     * Si la URL externa deja de funcionar: estado de error visible y
+     * recuperable; NUNCA fallback automático al srcDoc (eso reintroduciría
+     * el script de TV con el origen de la app: regresión de seguridad). Aislamiento REAL por origen cruzado
      * (SOP): el script de TradingView corre en SU origen, sin acceso al
      * DOM, cookies ni almacenamiento de la app; por eso ya no hace falta
      * s3.tradingview.com en script-src. El sandbox refuerza: allow-scripts
@@ -128,10 +130,6 @@ function TradingViewMarketRows({ group }: { group: Group }) {
         showSymbolLogo: true,
         showFloatingTooltip: false,
         tabs: [{ title: group.label, symbols: group.symbols }],
-        utm_source: '',
-        utm_medium: 'widget',
-        utm_campaign: 'market-overview',
-        'page-uri': '__NHTTP__',
     };
     const src = `https://www.tradingview-widget.com/embed-widget/market-overview/?locale=es#${encodeURIComponent(JSON.stringify(config))}`;
     return (
@@ -156,14 +154,23 @@ export function TradingViewMarkets() {
                     ))}
                 </TabsList>
                 {GROUPS.map((group) => (
-                    <TabsContent key={group.key} value={group.key} forceMount className="data-[state=inactive]:hidden">
+                    <TabsContent key={group.key} value={group.key}>
                         <p className="my-2 text-xs leading-5 text-gray-500">{group.note}</p>
                         <TradingViewMarketRows group={group} />
                     </TabsContent>
                 ))}
             </Tabs>
             <div className="mt-4 text-xs leading-5 text-gray-500">
-                Fuente: widget oficial de TradingView, servido por ellos dentro de esta página. La marca de
+                Fuente:{' '}
+                <a
+                    href="https://www.tradingview.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-gray-400"
+                >
+                    widget oficial de TradingView
+                </a>
+                , servido por ellos dentro de esta página. La marca de
                 cada fila (D = retraso, E = cierre del día) la aplica el proveedor; las divisas van en tiempo
                 real según su documentación. No son datos oficiales de mercado ni sirven para operar con
                 garantías.{' '}
