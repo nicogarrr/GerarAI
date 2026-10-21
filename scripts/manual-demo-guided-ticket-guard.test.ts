@@ -67,4 +67,22 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
     it('mantiene la advertencia de fill manual (no ejecución de mercado)', () => {
         assert.match(ticket, /no es una ejecución de\s+mercado/i);
     });
+
+    it('resumen de coste previo visible, calculado solo con los datos del usuario', () => {
+        // Bloque propio (no la frase enterrada en la nota pequeña).
+        assert.match(ticket, /Resumen antes de registrar/);
+        assert.doesNotMatch(ticket, /Importe estimado/);
+        // Desglose: lado, cantidad, precio, multiplicador de opción y comisión con signo según lado.
+        assert.match(ticket, /\{sideLabel\} · \{formatNumber\(parsedQuantity\)\} \{kindLabel\}/);
+        assert.match(ticket, /× 100 \(multiplicador\)/);
+        assert.match(ticket, /side === 'buy' \? '\+' : '−'/);
+        // Etiqueta honesta según lado y sin presentarlo como cotización.
+        assert.match(ticket, /Coste total estimado: /);
+        assert.match(ticket, /Ingreso neto estimado: /);
+        assert.match(ticket, /no es una cotización ni una ejecución de mercado/);
+        // Comisión inválida no ensucia el total.
+        assert.match(ticket, /Number\.isFinite\(parsedFee\) \? parsedFee : 0/);
+        // Sin red: el bloque no consulta cotización (sigue presentacional).
+        assert.doesNotMatch(ticket, /quote|markPrice|refreshValuation/i);
+    });
 });
