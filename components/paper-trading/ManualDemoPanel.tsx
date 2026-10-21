@@ -72,7 +72,7 @@ function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
             ) : null}
             <p className="text-xs text-gray-500">
                 Las opciones no se valoran (no hay cotización de su prima). Solo se valora con Finnhub y con la divisa verificada en su listado; el resto sale N/D.
-                Se actualiza aproximadamente cada minuto mientras esta pestaña está visible (si el proveedor falla, espera más a propósito); el botón la refresca al momento
+                Se actualiza aproximadamente cada minuto mientras esta pestaña está visible (si el proveedor falla, espera más a propósito). También puedes solicitar una actualización con el botón
                 {asOf ? ` · consultado a las ${ASOF_FORMAT.format(new Date(asOf))} (hora de Madrid)` : ''}.
             </p>
             {error ? <p role="alert" className="text-xs text-amber-300">{error}</p> : null}
@@ -230,8 +230,8 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                             <div className="mb-3 space-y-2">
                                 <p className="text-xs text-gray-500">
                                     {valuation
-                                        ? 'Sin actualizar: las posiciones han cambiado desde la última consulta de cotizaciones. Se reconsultan solas en el próximo minuto con la pestaña visible, o ahora con el botón.'
-                                        : 'Valoración no disponible todavía: sin cotizaciones consultadas. Se consultan solas en el próximo minuto con la pestaña visible, o ahora con el botón.'}
+                                        ? 'Sin actualizar: las posiciones han cambiado desde la última consulta de cotizaciones. Se reconsultan solas con la pestaña visible, o puedes pedirlo con el botón.'
+                                        : 'Valoración no disponible todavía: sin cotizaciones consultadas. Se consultan solas con la pestaña visible, o puedes pedirlo con el botón.'}
                                 </p>
                                 {refreshError ? <p role="alert" className="text-xs text-amber-300">{refreshError}</p> : null}
                                 <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={refreshBusy}>

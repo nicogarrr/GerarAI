@@ -87,6 +87,14 @@ describe('auto-refresco de la valoración demo', () => {
         assert.match(panel, /Se actualiza aproximadamente cada minuto mientras esta pestaña está visible/);
         assert.match(panel, /si el proveedor falla, espera más a propósito/);
         assert.doesNotMatch(panel, /Se actualiza cada minuto mientras/);
+        // El botón y los estados sin valoración tampoco prometen plazo ni
+        // inmediatez («al momento», «en el próximo minuto», «ahora»).
+        assert.match(panel, /También puedes solicitar una actualización con el botón/);
+        assert.match(panel, /Se reconsultan solas con la pestaña visible, o puedes pedirlo con el botón/);
+        assert.match(panel, /Se consultan solas con la pestaña visible, o puedes pedirlo con el botón/);
+        assert.doesNotMatch(panel, /el botón la refresca al momento/);
+        assert.doesNotMatch(panel, /en el próximo minuto/);
+        assert.doesNotMatch(panel, /o ahora con el botón/);
     });
 
     it('el registro de operaciones sigue manual: nada de autoprellenar fills con cotización', () => {
