@@ -90,13 +90,28 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(search, /avoidCollisions=\{dropdownSide === undefined\}/);
         assert.match(search, /max-h-\[min\(15rem,40dvh\)\]/);
         // El tope fijo no basta: con el teclado abierto la lista puede quedar
-        // bajo él. Se centra el input en el visual viewport al enfocar y la
-        // altura se mide contra el espacio real bajo el input (visualViewport),
-        // acotada entre 96 y 240 px, con scroll propio en la lista.
+        // bajo él. La altura se mide contra el espacio real bajo el input en
+        // el visualViewport; si no caben 96px se crea hueco con UN solo
+        // ajuste de scroll por apertura (guardia scrolledForSpace, sin saltos
+        // repetidos), el suelo es 64px y la lista se re-mide al cambiar el
+        // visual viewport (resize/scroll = teclado, offset, barras).
         assert.match(search, /scrollIntoView\(\{ block: 'center' \}\)/);
         assert.match(search, /window\.visualViewport/);
-        assert.match(search, /Math\.max\(96, Math\.min\(240, Math\.floor\(spaceBelow\)\)\)/);
+        assert.match(search, /spaceBelow < 96/);
+        assert.match(search, /scrolledForSpace\.current = true/);
+        assert.match(search, /Math\.max\(64, spaceBelow\)/);
+        assert.match(search, /Math\.min\(240, spaceBelow\)/);
+        assert.match(search, /vv\?\.addEventListener\('resize', measureBelowInput\)/);
+        assert.match(search, /vv\?\.addEventListener\('scroll', measureBelowInput\)/);
         assert.match(search, /style=\{dropdownSide && listMaxHeight/);
+    });
+
+    it('los mensajes de estado del buscador se anuncian a lectores de pantalla', () => {
+        const search = readFileSync('components/search/TickerSearchInput.tsx', 'utf8');
+        // QA de formularios (21-oct-2026): «Sin resultados» y «No se pudo
+        // buscar» eran <p> sin role ni aria-live — invisibles para AT.
+        assert.match(search, /<p role="alert" className="mt-1 text-xs text-red-400">/);
+        assert.match(search, /<p role="status" aria-live="polite" className="mt-1 text-sm text-gray-500">Sin resultados/);
     });
 
     it('la identidad del contrato de opción sigue manual y etiquetada (sin cadena fabricada)', () => {

@@ -63,16 +63,44 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
     const searchGateRef = useRef(createLatestRequestGate());
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Altura medida contra el visual viewport (solo con dropdownSide):
-    // espacio real bajo el input, acotado entre 6 y 15 rem.
+    // espacio real bajo el input. Si no caben ni 96px, se crea hueco
+    // desplazando la página UNA vez por apertura (sin saltos repetidos);
+    // el suelo es 64px para no forzar la lista bajo el teclado.
     const [listMaxHeight, setListMaxHeight] = useState<number | null>(null);
+    const scrolledForSpace = useRef(false);
     const measureBelowInput = useCallback(() => {
         if (!root.current || typeof window === 'undefined') return;
         const vv = window.visualViewport;
         const rect = root.current.getBoundingClientRect();
         const viewportBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
-        const spaceBelow = viewportBottom - rect.bottom - 8;
-        setListMaxHeight(Math.max(96, Math.min(240, Math.floor(spaceBelow))));
+        const spaceBelow = Math.floor(viewportBottom - rect.bottom - 8);
+        if (spaceBelow < 96) {
+            if (!scrolledForSpace.current) {
+                scrolledForSpace.current = true;
+                root.current.scrollIntoView({ block: 'center' });
+                // El listener de resize/scroll del visualViewport re-medirá.
+            }
+            setListMaxHeight(Math.max(64, spaceBelow));
+            return;
+        }
+        setListMaxHeight(Math.min(240, spaceBelow));
     }, []);
+
+    // Con la lista abierta y dirección forzada, re-medir cuando cambia el
+    // visual viewport (teclado que abre/cierra, offset por barras, scroll).
+    useEffect(() => {
+        if (!dropdownSide || !open || typeof window === 'undefined') return;
+        measureBelowInput();
+        const vv = window.visualViewport;
+        vv?.addEventListener('resize', measureBelowInput);
+        vv?.addEventListener('scroll', measureBelowInput);
+        window.addEventListener('resize', measureBelowInput);
+        return () => {
+            vv?.removeEventListener('resize', measureBelowInput);
+            vv?.removeEventListener('scroll', measureBelowInput);
+            window.removeEventListener('resize', measureBelowInput);
+        };
+    }, [dropdownSide, open, measureBelowInput]);
 
     const runSearch = useCallback(async (query: string) => {
         const ticket = searchGateRef.current.begin();
@@ -164,9 +192,9 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                 onFocus={() => {
                 focused.current = true;
                 if (dropdownSide) {
-                    // Que haya hueco bajo el input: con el teclado abriéndose,
-                    // centrar en el visual viewport antes de medir.
-                    root.current?.scrollIntoView({ block: 'center' });
+                    // Nueva apertura: permitir un único ajuste de scroll si
+                    // no hay hueco bajo el input (lo decide la medición).
+                    scrolledForSpace.current = false;
                     measureBelowInput();
                 }
                 if (value.trim() && selected.current !== value) void runSearch(value.trim());
@@ -198,12 +226,12 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                 <Loader2 aria-hidden="true" className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-500" />
             ) : null}
             {error ? (
-                <p className="mt-1 text-xs text-red-400">
+                <p role="alert" className="mt-1 text-xs text-red-400">
                     No se pudo buscar ahora mismo (fallo del proveedor de datos). Inténtalo de nuevo en unos segundos.
                 </p>
             ) : null}
             {open && !loading && !error && results.length === 0 && trimmed ? (
-                <p className="mt-1 text-sm text-gray-500">Sin resultados para «{trimmed}».</p>
+                <p role="status" aria-live="polite" className="mt-1 text-sm text-gray-500">Sin resultados para «{trimmed}».</p>
             ) : null}
             </div></PopoverAnchor>
                 <PopoverContent align="start" side={dropdownSide} avoidCollisions={dropdownSide === undefined} onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => event.preventDefault()} onInteractOutside={(event) => { if (event.target instanceof Node && root.current?.contains(event.target)) event.preventDefault(); }} className="z-[80] w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] border-gray-700 bg-gray-800 p-0 shadow-lg">
