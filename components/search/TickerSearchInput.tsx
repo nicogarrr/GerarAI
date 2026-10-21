@@ -1,7 +1,7 @@
 'use client';
 
 import { createLatestRequestGate } from '@/lib/latest-request';
-import { computeListFit, computeSpaceBelow } from './list-fit';
+import { computeListFit, computeSpaceBelow, listMaxHeightStyle } from './list-fit';
 import { withFetchDeadline } from '@/lib/upstream/fetch-deadline';
 import { formatCompanyName } from '@/lib/format';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -241,7 +241,7 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                     Radix (sin colisiones): tope de clase 15rem/40dvh y, si se
                     pudo medir, la altura real bajo el input (visual viewport
                     con teclado). La lista lleva su propio scroll. */}
-                <div id={listId} role="listbox" aria-label="Empresas" style={dropdownSide && listMaxHeight ? { maxHeight: listMaxHeight } : undefined} className={`${dropdownSide ? 'max-h-[min(15rem,40dvh)]' : 'max-h-[min(15rem,var(--radix-popover-content-available-height))]'} w-full overscroll-contain overflow-auto rounded-md`}>
+                <div id={listId} role="listbox" aria-label="Empresas" style={dropdownSide ? listMaxHeightStyle(listMaxHeight) : undefined} className={`${dropdownSide ? 'max-h-[min(15rem,40dvh)]' : 'max-h-[min(15rem,var(--radix-popover-content-available-height))]'} w-full overscroll-contain overflow-auto rounded-md`}>
                     {results.map((stock, index) => (
                         <button
                             key={`${stock.symbol}-${index}`}

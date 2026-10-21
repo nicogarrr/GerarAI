@@ -9,7 +9,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { computeListFit, computeSpaceBelow, LIST_COMFORTABLE_SPACE, LIST_GAP, LIST_MAX_HEIGHT_CAP } from '../components/search/list-fit.ts';
+import { computeListFit, computeSpaceBelow, listMaxHeightStyle, LIST_COMFORTABLE_SPACE, LIST_GAP, LIST_MAX_HEIGHT_CAP } from '../components/search/list-fit.ts';
 
 describe('computeSpaceBelow (espacio real bajo el input)', () => {
     it('descuenta el offset del visual viewport (teclado/barras de Safari)', () => {
@@ -53,14 +53,29 @@ describe('computeListFit (espacios 0 / 20 / 63 / 95 / 240 / grandes)', () => {
     });
 });
 
+describe('listMaxHeightStyle (integración espacio 0: el edge del auditor)', () => {
+    it('maxHeight 0 se APLICA como estilo inline; no cae al fallback de 15rem', () => {
+        assert.deepEqual(listMaxHeightStyle(0), { maxHeight: 0 });
+        assert.deepEqual(listMaxHeightStyle(63), { maxHeight: 63 });
+        assert.deepEqual(listMaxHeightStyle(240), { maxHeight: 240 });
+    });
+    it('null (sin medir) devuelve undefined: manda el tope de clase', () => {
+        assert.equal(listMaxHeightStyle(null), undefined);
+    });
+});
+
 describe('wiring del componente con la geometría pura', () => {
     it('el componente consume las funciones puras y no reimplementa clamps', async () => {
         const { readFileSync } = await import('node:fs');
         const search = readFileSync('components/search/TickerSearchInput.tsx', 'utf8');
-        assert.match(search, /import \{ computeListFit, computeSpaceBelow \} from '\.\/list-fit'/);
+        assert.match(search, /import \{ computeListFit, computeSpaceBelow, listMaxHeightStyle \} from '\.\/list-fit'/);
         assert.match(search, /computeSpaceBelow\(rect\.bottom/);
         assert.match(search, /computeListFit\(spaceBelow, scrolledForSpace\.current\)/);
         // Sin mínimos mágicos reintroducidos en el componente.
         assert.doesNotMatch(search, /Math\.max\((64|96), /);
+        // El estilo pasa por la función pura: la truthiness no decide (0px
+        // era el edge que caía al fallback de clase).
+        assert.match(search, /style=\{dropdownSide \? listMaxHeightStyle\(listMaxHeight\) : undefined\}/);
+        assert.doesNotMatch(search, /listMaxHeight \? \{ maxHeight/);
     });
 });

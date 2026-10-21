@@ -37,3 +37,12 @@ export function computeListFit(spaceBelow: number, alreadyScrolled: boolean): Li
     const maxHeight = Math.max(0, Math.min(LIST_MAX_HEIGHT_CAP, spaceBelow));
     return { maxHeight, shouldScroll: spaceBelow < LIST_COMFORTABLE_SPACE && !alreadyScrolled };
 }
+
+/** Estilo inline de la lista. La invariante se rompe con truthiness:
+ *  maxHeight 0 (hueco real 0) DEBE aplicar { maxHeight: 0 }, no caer al
+ *  fallback de clase (15rem) — eso era el edge del auditor (21-oct-2026).
+ *  null = aún no medido: manda el tope de clase. Sin dropdownSide, el
+ *  llamador ni siquiera invoca esto. */
+export function listMaxHeightStyle(listMaxHeight: number | null): { maxHeight: number } | undefined {
+    return listMaxHeight !== null ? { maxHeight: listMaxHeight } : undefined;
+}

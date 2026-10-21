@@ -104,7 +104,7 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(search, /vv\?\.addEventListener\('scroll', measureBelowInput\)/);
         assert.match(search, /vv\?\.removeEventListener\('resize', measureBelowInput\)/);
         assert.match(search, /if \(!open\) \{\s*scrolledForSpace\.current = false;/);
-        assert.match(search, /style=\{dropdownSide && listMaxHeight/);
+        assert.match(search, /style=\{dropdownSide \? listMaxHeightStyle\(listMaxHeight\) : undefined\}/);
         // El comportamiento de la geometría se prueba con espacios reales.
         assert.match(readFileSync('scripts/ticker-search-list-fit.test.ts', 'utf8'), /computeListFit\(0, true\)/);
     });
