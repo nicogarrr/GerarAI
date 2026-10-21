@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, FileText, ShieldCheck, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { OverflowScrollRegion } from '@/components/ui/overflow-scroll-region';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { MutationForm } from '@/components/forms/MutationForm';
@@ -152,7 +153,7 @@ export default async function ResearchSourcesPage({
             por fecha de publicación; los documentos sin fecha van al final.
           </p>
         ) : null}
-        <div aria-label="Documentos importados" className="overflow-x-auto" role="region" tabIndex={0}>
+        <OverflowScrollRegion label="Documentos importados">
           <table className="w-full min-w-[820px] text-left text-sm">
             <caption className="sr-only">Documentos, transcripts y auditorías que alimentan la evidencia, con fuente, nivel y fecha de publicación</caption>
             <thead className="text-xs uppercase text-gray-500">
@@ -210,7 +211,7 @@ export default async function ResearchSourcesPage({
               ) : null}
             </tbody>
           </table>
-        </div>
+        </OverflowScrollRegion>
         {pageInfo && pageInfo.pages > 1 ? (
           <nav aria-label="Paginación de documentos" className="mt-4 flex flex-wrap items-center gap-3 text-sm">
             {pageInfo.page > 1 ? (

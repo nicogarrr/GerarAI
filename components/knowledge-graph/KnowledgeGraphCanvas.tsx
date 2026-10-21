@@ -24,6 +24,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Download, ExternalLink, Focus, Maximize2, Minus, Plus, RotateCcw, Search, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { OverflowScrollRegion } from '@/components/ui/overflow-scroll-region';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { t } from '@/lib/i18n/t';
@@ -669,7 +670,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                     </h2>
                     <p className="mt-1 text-xs text-gray-500">{t('knowledgeGraph.listing.description')}</p>
                     {scene.nodes.length ? (
-                        <div aria-label={t('knowledgeGraph.listing.title')} className="mt-3 overflow-x-auto" role="region" tabIndex={0}>
+                        <OverflowScrollRegion label={t('knowledgeGraph.listing.title')} className="mt-3">
                             <table className="w-full min-w-[520px] text-left text-sm">
                                 <caption className="sr-only">{t('knowledgeGraph.listing.caption')}</caption>
                                 <thead className="text-xs uppercase text-gray-500">
@@ -706,7 +707,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
+                        </OverflowScrollRegion>
                     ) : (
                         <p className="mt-3 text-sm text-gray-500">{t('knowledgeGraph.listing.empty')}</p>
                     )}
