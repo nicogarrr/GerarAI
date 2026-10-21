@@ -72,7 +72,7 @@ function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
             ) : null}
             <p className="text-xs text-gray-500">
                 Las opciones no se valoran (no hay cotización de su prima). Solo se valora con Finnhub y con la divisa verificada en su listado; el resto sale N/D.
-                Se actualiza cada minuto mientras esta pestaña está visible; el botón la refresca al momento
+                Se actualiza aproximadamente cada minuto mientras esta pestaña está visible (si el proveedor falla, espera más a propósito); el botón la refresca al momento
                 {asOf ? ` · consultado a las ${ASOF_FORMAT.format(new Date(asOf))} (hora de Madrid)` : ''}.
             </p>
             {error ? <p role="alert" className="text-xs text-amber-300">{error}</p> : null}
@@ -157,6 +157,11 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
     // compartido y backoff exponencial tras fallos (60s×2^n, tope 16 min).
     // Al volver a la pestaña se repone si el último intento ya cumplió su
     // espera. Sin endpoint nuevo: reutiliza la acción de valoración.
+    // La cadencia es APROXIMADA: el intervalo marca los ticks y due() mide
+    // desde el inicio de la última consulta, así que el ritmo real es
+    // 60-120 s según fase y duración del fetch, y mayor con backoff o
+    // Retry-After. El copy lo dice («aproximadamente»): nada de prometer
+    // una monitorización exacta.
     const hasPositions = positions.length > 0;
     useEffect(() => {
         if (!refreshValuation || !hasPositions) return;

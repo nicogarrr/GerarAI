@@ -81,7 +81,12 @@ describe('auto-refresco de la valoración demo', () => {
 
     it('el copy ya no afirma que no se actualiza sola y sigue siendo honesto', () => {
         assert.doesNotMatch(panel, /No se actualiza sola/);
-        assert.match(panel, /Se actualiza cada minuto mientras esta pestaña está visible/);
+        // Cadencia aproximada y sin promesa exacta: el tick del intervalo no
+        // está alineado con el fin de cada fetch y el backoff/Retry-After
+        // alarga la espera a propósito. Nada de «cada minuto» a secas.
+        assert.match(panel, /Se actualiza aproximadamente cada minuto mientras esta pestaña está visible/);
+        assert.match(panel, /si el proveedor falla, espera más a propósito/);
+        assert.doesNotMatch(panel, /Se actualiza cada minuto mientras/);
     });
 
     it('el registro de operaciones sigue manual: nada de autoprellenar fills con cotización', () => {
