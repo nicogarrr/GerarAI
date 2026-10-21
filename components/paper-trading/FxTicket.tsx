@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { formatMoney } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import type { Currency } from '@/lib/paper-trading/types';
-import { NUM_INPUT_HINT, parseEsNumber, type SubmitFx } from './submit';
+import { clientOrderIdAfter, NUM_INPUT_HINT, parseEsNumber, type SubmitFx } from './submit';
 
 function newClientOrderId(): string {
     return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -98,16 +98,21 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
             if (result.ok) {
                 if (result.outcome === 'filled') {
                     setNotice('Conversión registrada en la cuenta demo.');
-                    clientOrderId.current = newClientOrderId();
                     setAmount('');
                     setRate('');
                     router.refresh();
                 } else if (result.outcome === 'duplicate') {
-                    setDuplicate('Ya estaba registrada (mismo identificador): no se duplicó.');
+                    setDuplicate(
+                        result.reason
+                            ? `Ya consta como rechazada con ese identificador: ${result.reason}. Corrige y reenvía: cuenta como operación nueva.`
+                            : 'Ya estaba registrada (mismo identificador): no se duplicó.',
+                    );
                 } else {
                     setSubmitError(`Conversión rechazada: ${result.reason ?? 'motivo no indicado'}.`);
                 }
+                clientOrderId.current = clientOrderIdAfter(result, clientOrderId.current, newClientOrderId);
             } else {
+                // Fallo desconocido (red/servidor): id CONSERVADO, reintento idempotente.
                 setSubmitError(result.error);
             }
         } finally {

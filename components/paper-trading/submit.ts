@@ -39,6 +39,23 @@ export type SubmitResult =
     | { ok: true; outcome: SubmitOutcome; reason: string | null; state: DemoStateView }
     | { ok: false; error: string };
 
+/**
+ * Politica de idempotencia del clientOrderId tras cada resultado:
+ * - filled / rejected / duplicate-con-reason (duplicado de un RECHAZO
+ *   persistido): estados terminales confirmados por el servidor -> id nuevo,
+ *   asi corregir y reenviar registra una operacion nueva.
+ * - duplicate-sin-reason (duplicado de un FILL persistido): mismo id; un
+ *   reintento (doble click, red) no genera otra orden.
+ * - !ok (fallo de red o desconocido): mismo id SIEMPRE; pudo haber fill
+ *   persistido y regenerar crearia dobles ordenes. Reintento idempotente
+ *   con el mismo id hasta reconciliar.
+ */
+export function clientOrderIdAfter(result: SubmitResult, current: string, gen: () => string): string {
+    if (!result.ok) return current;
+    if (result.outcome === 'duplicate' && result.reason === null) return current;
+    return gen();
+}
+
 /** Vista de la cuenta tal cual la devuelve la accion (espejo de ManualDemoStateView). */
 export type DemoStateView = {
     cashEUR: number;
@@ -85,11 +102,6 @@ export type HistoryRow = {
     simulated: true;
 };
 
-/**
- * Número tecleado por un usuario español: admite coma decimal y punto de
- * miles ("42,5", "1.234,56", "98.5"). No es contabilidad: solo parseo de
- * formulario; la validación real está en el servidor.
- */
 /**
  * Entrada numérica SIN ambigüedad: un único separador (coma o punto) que
  * siempre es decimal; NO se aceptan separadores de miles. "1.234" es 1.234,

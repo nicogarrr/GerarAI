@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import type { Currency, OptionContract } from '@/lib/paper-trading/types';
-import { NUM_INPUT_HINT, parseEsNumber } from './submit';
+import { clientOrderIdAfter, NUM_INPUT_HINT, parseEsNumber } from './submit';
 import type { FillSubmit, SubmitFill } from './submit';
 
 type Kind = 'accion' | 'opcion';
@@ -145,17 +145,25 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
             if (result.ok) {
                 if (result.outcome === 'filled') {
                     setNotice('Operación registrada en la cuenta demo.');
-                    clientOrderId.current = newClientOrderId();
                     setQuantity('');
                     setPrice('');
                     setFee('');
                     router.refresh();
                 } else if (result.outcome === 'duplicate') {
-                    setDuplicate('Ya estaba registrada (mismo identificador de orden): no se duplicó.');
+                    setDuplicate(
+                        result.reason
+                            ? `Ya consta como rechazada con ese identificador: ${result.reason}. Corrige y reenvía: cuenta como operación nueva.`
+                            : 'Ya estaba registrada (mismo identificador de orden): no se duplicó.',
+                    );
                 } else {
                     setSubmitError(`Orden rechazada: ${result.reason ?? 'motivo no indicado'}.`);
                 }
+                // Rechazo confirmado o duplicado de rechazo: id nuevo para el
+                // próximo intento; duplicado de fill: id conservado (ver helper).
+                clientOrderId.current = clientOrderIdAfter(result, clientOrderId.current, newClientOrderId);
             } else {
+                // Fallo desconocido (red/servidor): id CONSERVADO, el reintento
+                // es idempotente y no puede crear una segunda orden.
                 setSubmitError(result.error);
             }
         } finally {
