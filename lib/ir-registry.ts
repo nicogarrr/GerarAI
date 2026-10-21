@@ -13,7 +13,7 @@
  */
 
 /** Tipo de material enlazado. Cuatro cosas distintas: no se mezclan ni se infieren unas de otras. */
-export type IrAssetKind = 'presentacion' | 'directo' | 'grabacion' | 'transcripcion';
+export type IrAssetKind = 'presentacion' | 'webcast' | 'directo' | 'grabacion' | 'transcripcion';
 /** Enlace directo verificado a un archivo del evento; `source` es la pagina oficial donde se anuncia. */
 export type IrAsset = { kind: IrAssetKind; url: string; source: string };
 export type IrEventPage = { date: string; period: string; url: string; assets?: IrAsset[] };
@@ -29,7 +29,15 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         name: 'Meta Platforms',
         section: { url: 'https://investor.atmeta.com/investor-events/', label: 'Eventos de inversores' },
         events: [
-            { date: '2026-10-21', period: 'T3 2026', url: 'https://investor.atmeta.com/investor-events/event-details/2026/Q3-2026-Earnings-Call/default.aspx' },
+            {
+                date: '2026-10-21',
+                period: 'T3 2026',
+                url: 'https://investor.atmeta.com/investor-events/event-details/2026/Q3-2026-Earnings-Call/default.aspx',
+                assets: [
+                    { kind: 'webcast', url: 'https://events.q4inc.com/attendee/132342320', source: 'https://investor.atmeta.com/investor-events/event-details/2026/Q3-2026-Earnings-Call/default.aspx' },
+                    { kind: 'presentacion', url: 'https://s21.q4cdn.com/399680738/files/content_files/Earnings-Presentation-Q3-2026.pdf', source: 'https://investor.atmeta.com/investor-events/event-details/2026/Q3-2026-Earnings-Call/default.aspx' },
+                ],
+            },
             { date: '2026-07-29', period: 'T2 2026', url: 'https://investor.atmeta.com/investor-events/event-details/2026/Q2-2026-Earnings-Call/default.aspx' },
             {
                 date: '2026-04-29',

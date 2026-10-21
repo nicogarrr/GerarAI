@@ -57,7 +57,7 @@ test('registro IR: BN T2 enlaza grabacion y transcripcion solo con fecha exacta'
 
 test('registro IR: META T1 enlaza presentacion y transcripcion (fecha exacta); T3 aun sin archivos', () => {
     assert.deepEqual(irLinksFor('META', '2026-04-29')?.eventPage?.assets.map((a) => a.kind), ['presentacion', 'transcripcion']);
-    assert.deepEqual(irLinksFor('META', '2026-10-21')?.eventPage?.assets, []);
+    assert.deepEqual(irLinksFor('META', '2026-10-21')?.eventPage?.assets.map((a) => a.kind), ['webcast', 'presentacion']);
 });
 
 test('registro IR: el tooltip no atribuye extraccion de una pagina fuente no leida', () => {

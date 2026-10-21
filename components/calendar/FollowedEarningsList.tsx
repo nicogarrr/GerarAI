@@ -54,7 +54,7 @@ export function MaterialsLine({ materials }: { materials: EventMaterials | undef
     );
 }
 
-const ASSET_LABEL = { presentacion: 'Presentación', directo: 'Directo', grabacion: 'Grabación', transcripcion: 'Transcripción' } as const;
+const ASSET_LABEL = { presentacion: 'Presentación', directo: 'Directo', webcast: 'Webcast', grabacion: 'Grabación', transcripcion: 'Transcripción' } as const;
 
 /** Enlaces oficiales de IR (registro verificado): pagina del evento si la fecha coincide, si no la seccion general. */
 export function IrLine({ ticker, date }: { ticker: string; date: string }) {
