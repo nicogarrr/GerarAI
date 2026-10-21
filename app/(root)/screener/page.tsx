@@ -264,7 +264,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
               </div>
               )
             ) : (
-              <div aria-label="Oportunidades por sector" className="overflow-x-auto" role="region" tabIndex={0}>
+              <div aria-label="Oportunidades por sector" className="scroll-affordance-x overflow-x-auto" role="region" tabIndex={0}>
                 {/*
                   Misma <table> en el DOM en todos los viewports (accesibilidad y
                   tests): en <md las filas se muestran como cards apiladas
