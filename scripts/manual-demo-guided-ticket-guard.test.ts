@@ -116,6 +116,10 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(search, /vv\?\.removeEventListener\('resize', measureBelowInput\)/);
         assert.match(search, /if \(!open\) \{\s*scrolledForSpace\.current = false;/);
         assert.match(search, /style=\{dropdownSide \? listMaxHeightStyle\(listMaxHeight\) : undefined\}/);
+        // Cierre limpio si el scroll de página deja el input fuera del
+        // pliegue (lista abierta no flota offscreen); nunca dirección arriba.
+        assert.match(search, /inputAboveViewport\(rect\.bottom/);
+        assert.doesNotMatch(search, /side="top"/);
         // El comportamiento de la geometría se prueba con espacios reales.
         assert.match(readFileSync('scripts/ticker-search-list-fit.test.ts', 'utf8'), /computeListFit\(0, true\)/);
     });

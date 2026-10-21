@@ -9,7 +9,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { computeListFit, computeSpaceBelow, listMaxHeightStyle, LIST_COMFORTABLE_SPACE, LIST_GAP, LIST_MAX_HEIGHT_CAP } from '../components/search/list-fit.ts';
+import { computeListFit, computeSpaceBelow, inputAboveViewport, listMaxHeightStyle, LIST_COMFORTABLE_SPACE, LIST_GAP, LIST_MAX_HEIGHT_CAP } from '../components/search/list-fit.ts';
 
 describe('computeSpaceBelow (espacio real bajo el input)', () => {
     it('descuenta el offset del visual viewport (teclado/barras de Safari)', () => {
@@ -64,11 +64,25 @@ describe('listMaxHeightStyle (integración espacio 0: el edge del auditor)', () 
     });
 });
 
+describe('inputAboveViewport (cierre limpio con el input fuera del pliegue)', () => {
+    it('true solo cuando el input quedó completamente por encima del viewport', () => {
+        assert.equal(inputAboveViewport(100, 100), true);  // borde exacto: fuera
+        assert.equal(inputAboveViewport(50, 100), true);
+        assert.equal(inputAboveViewport(101, 100), false); // un píxel visible: no cerrar
+        assert.equal(inputAboveViewport(300, 0), false);   // viewport sin offset, input visible
+        assert.equal(inputAboveViewport(0, 0), true);      // input entero arriba
+    });
+    it('NO mira el borde inferior: el teclado no puede provocar cierre', () => {
+        // Input muy bajo (p. ej. teclado abriéndose, offset 0 alto): no cierra.
+        assert.equal(inputAboveViewport(900, 100), false);
+    });
+});
+
 describe('wiring del componente con la geometría pura', () => {
     it('el componente consume las funciones puras y no reimplementa clamps', async () => {
         const { readFileSync } = await import('node:fs');
         const search = readFileSync('components/search/TickerSearchInput.tsx', 'utf8');
-        assert.match(search, /import \{ computeListFit, computeSpaceBelow, listMaxHeightStyle \} from '\.\/list-fit'/);
+        assert.match(search, /import \{ computeListFit, computeSpaceBelow, inputAboveViewport, listMaxHeightStyle \} from '\.\/list-fit'/);
         assert.match(search, /computeSpaceBelow\(rect\.bottom/);
         assert.match(search, /computeListFit\(spaceBelow, scrolledForSpace\.current\)/);
         // Sin mínimos mágicos reintroducidos en el componente.
@@ -77,5 +91,13 @@ describe('wiring del componente con la geometría pura', () => {
         // era el edge que caía al fallback de clase).
         assert.match(search, /style=\{dropdownSide \? listMaxHeightStyle\(listMaxHeight\) : undefined\}/);
         assert.doesNotMatch(search, /listMaxHeight \? \{ maxHeight/);
+        // Cierre limpio con el ancla fuera del pliegue (scroll de página);
+        // cierra SIN scroll ni nueva dirección (nunca hacia arriba).
+        assert.match(search, /if \(inputAboveViewport\(rect\.bottom, vv \? vv\.offsetTop : 0\)\) \{\s*setOpen\(false\);\s*return;\s*\}/);
+        // El scroll de página no siempre dispara vv 'scroll' (Chromium):
+        // la ventana se escucha en capture, con cleanup simétrico.
+        assert.match(search, /window\.addEventListener\('scroll', measureBelowInput, true\)/);
+        assert.match(search, /window\.removeEventListener\('scroll', measureBelowInput, true\)/);
+        assert.doesNotMatch(search, /side="top"|dropdownSide === 'top'/);
     });
 });

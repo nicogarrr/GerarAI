@@ -1,7 +1,7 @@
 'use client';
 
 import { createLatestRequestGate } from '@/lib/latest-request';
-import { computeListFit, computeSpaceBelow, listMaxHeightStyle } from './list-fit';
+import { computeListFit, computeSpaceBelow, inputAboveViewport, listMaxHeightStyle } from './list-fit';
 import { withFetchDeadline } from '@/lib/upstream/fetch-deadline';
 import { formatCompanyName } from '@/lib/format';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -74,6 +74,14 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
         if (!root.current || typeof window === 'undefined') return;
         const vv = window.visualViewport;
         const rect = root.current.getBoundingClientRect();
+        // Cierre limpio: con la lista abierta y dirección forzada hacia
+        // abajo, si el scroll de página deja el input por encima del
+        // pliegue la lista flotaría fuera de la pantalla (QA 21-oct-2026).
+        // No afecta al teclado: solo mira el borde SUPERIOR del viewport.
+        if (inputAboveViewport(rect.bottom, vv ? vv.offsetTop : 0)) {
+            setOpen(false);
+            return;
+        }
         const spaceBelow = computeSpaceBelow(rect.bottom, vv ? vv.height : window.innerHeight, vv ? vv.offsetTop : 0);
         const fit = computeListFit(spaceBelow, scrolledForSpace.current);
         if (fit.shouldScroll) {
@@ -98,10 +106,16 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
         vv?.addEventListener('resize', measureBelowInput);
         vv?.addEventListener('scroll', measureBelowInput);
         window.addEventListener('resize', measureBelowInput);
+        // El scroll de PÁGINA no siempre dispara 'scroll' del visualViewport
+        // (Chromium: no; el ancla puede salir del pliegue sin evento vv):
+        // hace falta el scroll de ventana, en capture para cubrir también
+        // contenedores con scroll propio.
+        window.addEventListener('scroll', measureBelowInput, true);
         return () => {
             vv?.removeEventListener('resize', measureBelowInput);
             vv?.removeEventListener('scroll', measureBelowInput);
             window.removeEventListener('resize', measureBelowInput);
+            window.removeEventListener('scroll', measureBelowInput, true);
         };
     }, [dropdownSide, open, measureBelowInput]);
 
