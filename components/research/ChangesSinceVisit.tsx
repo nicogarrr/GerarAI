@@ -9,7 +9,7 @@ interface ChangesSince {
     since: string;
     documentos: { total: number; items: Array<{ titulo: string; tipo: string; url: string | null; fecha: string | null }> };
     hechos: { total: number; por_metrica: Array<{ metric: string; n: number }> };
-    cambios_tesis: Array<{ resumen: string; direccion: string; requiere_revision: boolean; fecha: string }>;
+    cambios_tesis: Array<{ resumen: string; direccion: string; requiere_revision: boolean; fecha: string; fuente_url?: string | null; fuente_nombre?: string | null; tambien_en?: Array<{ url: string | null; fuente: string | null; fecha?: string | null }> | null }>;
 }
 
 /** Banner "desde tu ultima visita": solo lo guardado despues de tu ultima entrada. */
@@ -64,6 +64,26 @@ export function ChangesSinceVisit({ ticker }: { ticker: string }) {
                 {data.cambios_tesis.slice(0, 3).map((change, index) => (
                     <li key={`${change.fecha}-${index}`}>
                         Tesis: {change.resumen}{change.requiere_revision ? ' (requiere revisión)' : ''}
+                        {/* Procedencia: la fuente del evento y las URLs absorbidas al
+                            agrupar la misma noticia en dos idiomas quedan revisables. */}
+                        {change.fuente_url && /^https:\/\//.test(change.fuente_url) ? (
+                            <>
+                                {' · '}
+                                <a href={change.fuente_url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">
+                                    {change.fuente_nombre || 'Fuente'}
+                                </a>
+                            </>
+                        ) : null}
+                        {change.tambien_en?.map((entry, entryIndex) => (
+                            entry.url && /^https:\/\//.test(entry.url) ? (
+                                <span key={`${entry.url}-${entryIndex}`}>
+                                    {' · también en '}
+                                    <a href={entry.url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">
+                                        {entry.fuente || 'otra fuente'}
+                                    </a>
+                                </span>
+                            ) : null
+                        ))}
                     </li>
                 ))}
             </ul>
