@@ -1,5 +1,6 @@
 'use server';
 
+import { isQuoteLandingEvent } from '@/lib/news-landing';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { revalidatePath } from 'next/cache';
 import { AppError, ExternalAPIError, ValidationError, getSafeErrorMessage } from '@/lib/types/errors';
@@ -1213,7 +1214,12 @@ export async function getResearchNews(
   if (lane === 'empresa' || lane === 'macro') params.set('lane', lane);
   if (ticker) params.set('ticker', ticker);
   if (lane === 'para-ti' && tickers.length) params.set('tickers', tickers.join(','));
-  return getJson<ResearchNewsEvent[]>(`/api/news?${params.toString()}`, []);
+  const events = await getJson<ResearchNewsEvent[]>(`/api/news?${params.toString()}`, []);
+  // Barrera de presentación: la ingesta a veces indexa la página de
+  // cotización de Yahoo como si fuera una noticia (caso HYMC 21-oct-2026).
+  // Una landing no es una noticia en NINGUNA superficie (ficha, «Ver
+  // todas», carriles); la clasificación durable es del backend.
+  return events.filter((event) => !isQuoteLandingEvent(event));
 }
 
 export async function analyzeManualNews(
