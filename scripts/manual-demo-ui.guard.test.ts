@@ -169,3 +169,16 @@ test('los tickets aplican la política de idempotencia y distinguen el duplicate
         assert.match(source, /disabled=\{disabled \|\| pending\}/, `${file}: submit deshabilitado durante pending`);
     }
 });
+
+test('un rechazo confirmado revalida /paper-trading: el Historial no puede quedarse obsoleto (bug QA live 21-oct-2026)', () => {
+    // Repro QA tenant Audit 22:35 CEST: venta BBVA.MC rechazada con ticket
+    // correcto -> la fila del rechazo NO aparecía en Historial hasta recargar
+    // (persistencia correcta; faltaba revalidación tras el outcome rejected).
+    // El fill refresca desde el ticket (router.refresh); el rechazo depende
+    // de esta revalidación en la server action. Si alguien la quita, el
+    // historial vuelve a quedarse obsoleto sin que ningún otro test lo note.
+    const page = readFileSync(PAGE, 'utf8');
+    assert.match(page, /import \{ revalidatePath \} from 'next\/cache'/, 'la página debe importar revalidatePath');
+    const sites = page.match(/if \(result\.outcome === 'rejected'\) revalidatePath\('\/paper-trading'\)/g) ?? [];
+    assert.equal(sites.length, 2, 'submitFill y submitFx deben revalidar tras un rechazo confirmado');
+});
