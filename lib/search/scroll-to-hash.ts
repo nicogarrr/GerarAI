@@ -8,10 +8,15 @@
  * `router.push` cuando la ruta no cambia; al ser la paleta quien construye
  * la URL, el scroll es responsabilidad del llamador.
  *
- * Reintentos durante una ventana corta (~1,5 s): en navegación cruzada el
- * destino puede tardar en renderizarse. Se aborta si el hash de la URL
- * cambia (el usuario navegó a otra cosa mientras tanto). Sin dependencias
- * de React ni de Next: puro e inyectable para probarlo en node.
+ * Tres estados por tick (auditoría #2046: la URL tarda en comprometerse):
+ *  1. current === wanted → navegación comprometida: scroll cuando el
+ *     elemento exista (puede tardar en renderizarse en navegación cruzada).
+ *  2. current === pendingFrom (el hash que había al invocar) → el push aún
+ *     no compromete: seguir esperando dentro de la ventana.
+ *  3. cualquier OTRO valor → el usuario navegó a otra cosa: abortar sin
+ *     secuestrar su scroll.
+ * La ventana es corta y acotada (~1,5 s); al agotarse, se para en silencio.
+ * Sin dependencias de React ni de Next: puro e inyectable para node.
  */
 
 const RETRY_INTERVAL_MS = 100;
@@ -27,6 +32,16 @@ interface ScrollToHashDeps {
     setTimeoutFn?: (callback: () => void, ms: number) => void;
 }
 
+/** Normaliza un hash de URL para compararlo con un id ya decodificado. */
+function normalizeHash(raw: string): string {
+    const value = raw.startsWith('#') ? raw.slice(1) : raw;
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
+}
+
 /** Extrae el ancla de un href (`/ruta?v=1#ancla` → `ancla`); null si no hay. */
 export function hashFromHref(href: string): string | null {
     const index = href.indexOf('#');
@@ -40,31 +55,39 @@ export function hashFromHref(href: string): string | null {
 }
 
 /**
- * Desplaza la vista al elemento con ese id cuando exista. Si aún no existe
- * (navegación cruzada en curso), reintenta hasta agotar la ventana. Si el
- * hash actual deja de coincidir, no hace nada más.
+ * Desplaza la vista al elemento con ese id cuando la URL comprometa el hash
+ * y el elemento exista. `hash` es el id YA decodificado (de hashFromHref);
+ * la comparación normaliza ambos lados por igual.
  */
 export function scrollToHashAnchor(hash: string, deps: ScrollToHashDeps = {}): void {
     const getElementById = deps.getElementById ?? ((id: string) => document.getElementById(id));
     const getCurrentHash = deps.getCurrentHash ?? (() => window.location.hash);
     const setTimeoutFn = deps.setTimeoutFn ?? ((callback: () => void, ms: number) => { setTimeout(callback, ms); });
-    const wanted = `#${hash}`;
+    // Hash visible al invocar, ANTES de que router.push comprometa la nueva
+    // URL: mientras la barra siga en él, la navegación sigue pendiente.
+    const pendingFrom = normalizeHash(getCurrentHash());
     let attempts = 0;
     const attempt = () => {
-        // El usuario navegó a otra cosa: no secuestrar su scroll.
-        if (getCurrentHash() !== wanted) return;
-        const element = getElementById(hash);
-        if (element) {
-            element.scrollIntoView({ block: 'start' });
-            // Las secciones Suspense de arriba (gráfico, cotización) pueden
-            // resolver DESPUÉS y empujar el ancla: una segunda pasada
-            // absorbe ese layout shift si el hash sigue activo.
-            setTimeoutFn(() => {
-                if (getCurrentHash() !== wanted) return;
-                getElementById(hash)?.scrollIntoView({ block: 'start' });
-            }, RETRY_INTERVAL_MS * 4);
+        const current = normalizeHash(getCurrentHash());
+        if (current === hash) {
+            const element = getElementById(hash);
+            if (element) {
+                element.scrollIntoView({ block: 'start' });
+                // Las secciones Suspense de arriba (gráfico, cotización)
+                // pueden resolver DESPUÉS y empujar el ancla: una segunda
+                // pasada absorbe ese layout shift si el hash sigue activo.
+                setTimeoutFn(() => {
+                    if (normalizeHash(getCurrentHash()) !== hash) return;
+                    getElementById(hash)?.scrollIntoView({ block: 'start' });
+                }, RETRY_INTERVAL_MS * 4);
+                return;
+            }
+            // Hash comprometido pero el elemento aún no existe: reintentar.
+        } else if (current !== pendingFrom) {
+            // Tercer hash: el usuario navegó a otra cosa. No secuestrar.
             return;
         }
+        // current === pendingFrom: el push aún no compromete; seguir.
         attempts += 1;
         if (attempts < MAX_ATTEMPTS) setTimeoutFn(attempt, RETRY_INTERVAL_MS);
     };

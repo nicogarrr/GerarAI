@@ -9,7 +9,7 @@ function fakeScheduler() {
     return {
         queue,
         setTimeoutFn: (callback: () => void, ms: number) => { queue.push({ callback, ms }); },
-        flush: (times = 50) => { for (let i = 0; i < times && queue.length; i++) queue.shift()!.callback(); },
+        flush: (times = 60) => { for (let i = 0; i < times && queue.length; i++) queue.shift()!.callback(); },
     };
 }
 
@@ -30,7 +30,7 @@ describe('hashFromHref', () => {
 });
 
 describe('scrollToHashAnchor', () => {
-    it('hace scroll cuando el elemento existe y repite una vez para absorber layout shift', () => {
+    it('hace scroll cuando hash y elemento existen a la primera + asentamiento', () => {
         const sched = fakeScheduler();
         const calls: unknown[] = [];
         scrollToHashAnchor('grafico', {
@@ -40,6 +40,84 @@ describe('scrollToHashAnchor', () => {
         });
         sched.flush();
         assert.deepEqual(calls, [{ block: 'start' }, { block: 'start' }]);
+    });
+    it('la URL tarda en comprometerse (old→wanted en el 2º tick) y aun así desplaza', () => {
+        const sched = fakeScheduler();
+        const calls: unknown[] = [];
+        let current = ''; // hash viejo antes de que router.push comprometa
+        scrollToHashAnchor('alerta', {
+            getElementById: () => ({ scrollIntoView: (o) => calls.push(o) }),
+            getCurrentHash: () => current,
+            setTimeoutFn: sched.setTimeoutFn,
+        });
+        sched.flush(1); // tick 0: current='' (viejo) → espera, sin scroll
+        assert.equal(calls.length, 0);
+        current = '#alerta'; // el push compromete
+        sched.flush();
+        assert.equal(calls.length, 2); // scroll + asentamiento
+    });
+    it('si la URL nunca sale del hash viejo, para acotado y sin desplazar', () => {
+        const sched = fakeScheduler();
+        const calls: unknown[] = [];
+        scrollToHashAnchor('alerta', {
+            getElementById: () => ({ scrollIntoView: (o) => calls.push(o) }),
+            getCurrentHash: () => '', // el push nunca compromete
+            setTimeoutFn: sched.setTimeoutFn,
+        });
+        sched.flush(100);
+        assert.equal(calls.length, 0);
+        assert.equal(sched.queue.length, 0);
+    });
+    it('un TERCER hash (el usuario navegó) aborta sin secuestrar el scroll', () => {
+        const sched = fakeScheduler();
+        const calls: unknown[] = [];
+        let current = '';
+        scrollToHashAnchor('alerta', {
+            getElementById: () => ({ scrollIntoView: (o) => calls.push(o) }),
+            getCurrentHash: () => current,
+            setTimeoutFn: sched.setTimeoutFn,
+        });
+        sched.flush(1);
+        current = '#/otra-cosa';
+        sched.flush();
+        assert.equal(calls.length, 0);
+        assert.equal(sched.queue.length, 0);
+    });
+    it('hash comprometido pero elemento tardío: reintenta hasta que existe', () => {
+        const sched = fakeScheduler();
+        const calls: unknown[] = [];
+        let ticks = 0;
+        scrollToHashAnchor('alerta', {
+            getElementById: () => (++ticks >= 3 ? { scrollIntoView: (o) => calls.push(o) } : null),
+            getCurrentHash: () => '#alerta',
+            setTimeoutFn: sched.setTimeoutFn,
+        });
+        sched.flush();
+        assert.equal(calls.length, 2);
+        assert.ok(ticks >= 3, `esperaba reintentos, ticks=${ticks}`);
+    });
+    it('hash comprometido y elemento inexistente: se rinde acotado', () => {
+        const sched = fakeScheduler();
+        const calls: unknown[] = [];
+        scrollToHashAnchor('fantasma', {
+            getElementById: () => null,
+            getCurrentHash: () => '#fantasma',
+            setTimeoutFn: sched.setTimeoutFn,
+        });
+        sched.flush(100);
+        assert.equal(calls.length, 0);
+        assert.equal(sched.queue.length, 0);
+    });
+    it('ids codificados: compara normalizado (#secci%C3%B3n casa con «sección»)', () => {
+        const sched = fakeScheduler();
+        const calls: unknown[] = [];
+        scrollToHashAnchor('sección', {
+            getElementById: () => ({ scrollIntoView: (o) => calls.push(o) }),
+            getCurrentHash: () => '#secci%C3%B3n',
+            setTimeoutFn: sched.setTimeoutFn,
+        });
+        sched.flush();
+        assert.equal(calls.length, 2);
     });
     it('la pasada de asentamiento se salta si el hash ya cambió', () => {
         const sched = fakeScheduler();
@@ -52,44 +130,6 @@ describe('scrollToHashAnchor', () => {
         });
         sched.flush();
         assert.equal(calls.length, 1);
-    });
-    it('reintenta hasta que el elemento aparece (navegación cruzada)', () => {
-        const sched = fakeScheduler();
-        const calls: unknown[] = [];
-        let ticks = 0;
-        scrollToHashAnchor('alerta', {
-            getElementById: () => (++ticks >= 3 ? { scrollIntoView: (o) => calls.push(o) } : null),
-            getCurrentHash: () => '#alerta',
-            setTimeoutFn: sched.setTimeoutFn,
-        });
-        sched.flush();
-        assert.equal(calls.length, 2); // encontrado al 3er intento + asentamiento
-        assert.ok(ticks >= 3, `esperaba reintentos, ticks=${ticks}`);
-    });
-    it('se rinde tras la ventana sin lanzar ni hacer scroll', () => {
-        const sched = fakeScheduler();
-        const calls: unknown[] = [];
-        scrollToHashAnchor('fantasma', {
-            getElementById: () => null,
-            getCurrentHash: () => '#fantasma',
-            setTimeoutFn: sched.setTimeoutFn,
-        });
-        sched.flush(100);
-        assert.equal(calls.length, 0);
-        assert.equal(sched.queue.length, 0);
-    });
-    it('aborta si el hash de la URL cambia (el usuario navegó)', () => {
-        const sched = fakeScheduler();
-        const calls: unknown[] = [];
-        let current = '#grafico';
-        scrollToHashAnchor('grafico', {
-            getElementById: () => { current = '/otra'; return null; },
-            getCurrentHash: () => current,
-            setTimeoutFn: sched.setTimeoutFn,
-        });
-        sched.flush();
-        assert.equal(calls.length, 0);
-        assert.equal(sched.queue.length, 0);
     });
 });
 
