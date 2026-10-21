@@ -30,5 +30,15 @@ export function splitMemoPages(markdown: string): MemoPage[] {
     }
   }
   flush();
-  return pages.filter((page) => page.body.replace(/^##.*$/m, '').trim().length > 0);
+  const withBody = pages.filter((page) => page.body.replace(/^##.*$/m, '').trim().length > 0);
+  if (withBody.length > 0) return withBody;
+  // Sin encabezados `## ` (markdown de respaldo, p. ej. la valoración
+  // retenida por input inferido: "# Valoración no disponible" + motivo),
+  // antes la función devolvía [] y el paginador no pintaba NADA bajo
+  // «Memorando completo»: el motivo de la retención desaparecía de la UI.
+  // Con contenido visible se devuelve una única página con el memo íntegro;
+  // markdown vacío sigue devolviendo [] (no hay nada que mostrar).
+  if (!markdown.trim()) return withBody;
+  const firstH1 = /^#\s+(.+?)\s*$/m.exec(markdown);
+  return [{ id: 'p0', title: firstH1 ? firstH1[1].replace(/[*_`]/g, '') : 'Memo', body: markdown.trim() }];
 }
