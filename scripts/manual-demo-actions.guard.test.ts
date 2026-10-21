@@ -471,6 +471,7 @@ describe('R3: coherencia temporal (el libro se recalcula por executedAt, no por 
 });
 
 describe('R3b: rediseño insertar→releer→abortar (orden persistido real)', () => {
+    const T0 = NOW - 300_000;
     const T1 = NOW - 200_000;
     const T2 = NOW - 100_000;
 
@@ -607,6 +608,28 @@ describe('R3b: rediseño insertar→releer→abortar (orden persistido real)', (
         }
         // Solo el buy y el rechazo del ganador: este intento no grabó nada.
         assert.equal(modelStub.__counts().trades, 2);
+    });
+
+    it('venta antedatada con comisión que sobregira el cash EN SU FECHA: rechazada por el replay, libro y caché intactos', async () => {
+        // T0 compra 20@10 (cash 99.800) → T2 venta 10@5000 (cash 149.800).
+        // La venta antedatada en T1 con fee 150.000 cabe contra el cash ACTUAL
+        // (149.800+1.000) pero NO en su fecha (99.800+1.000-150.000 = -49.200):
+        // antes del fix de accounting.ts el replay la aplicaba sin violation.
+        await actions.placeManualOrder(buyAccion({ quantity: 20, price: 10, executedAt: T0 }));
+        await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 10, price: 5000, executedAt: T2 });
+        const r = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 10, price: 100, fee: 150_000, executedAt: T1 });
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'rejected');
+            assert.match(r.reason ?? '', /comisión/);
+            assert.equal(r.state.cashEUR, 149_800);
+            assert.equal(r.state.positions[0]?.quantity, 10);
+        }
+        // 2 fills + 1 fila de rechazo; versión solo de los fills confirmados.
+        assert.equal(modelStub.__counts().trades, 3);
+        assert.equal(modelStub.__snapshot().trades.filter((t) => t.status === 'rejected').length, 1);
+        assert.equal(modelStub.__snapshot().accounts[0].version, 2);
+        assert.equal(modelStub.__snapshot().accounts[0].cashEUR, 149_800);
     });
 
     it('reintento con el mismo clientOrderId tras rechazo por divergencia: duplicate sin segunda fila', async () => {
