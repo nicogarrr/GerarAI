@@ -45,6 +45,14 @@ test('el realizado se etiqueta como antes de comisiones en panel y tabla (delta 
     assert.doesNotMatch(actions, /si introduces una, se registra tal cual/);
 });
 
+test('la celda N/D de escritorio no se rompe en líneas: ellipsis + title con el motivo completo', () => {
+    // QA píxeles 21-oct-2026: el aviso de opción sin valorar forzaba ~8
+    // líneas en la columna estrecha. El motivo completo sigue en el DOM y
+    // en title; en móvil se muestra entero bajo el nombre.
+    const table = readFileSync(`${COMPONENTS_DIR}/PositionsTable.tsx`, 'utf8');
+    assert.match(table, /truncate text-xs text-gray-500" title=\{row\?\.note \?\? 'Sin valoración\.'\}/);
+});
+
 test('la UI declara el origen manual simulado sin prometer ejecución real', () => {
     const panel = readFileSync(`${COMPONENTS_DIR}/ManualDemoPanel.tsx`, 'utf8');
     assert.match(panel, /ficticio/i, 'el panel debe declarar el saldo ficticio');

@@ -76,6 +76,14 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.doesNotMatch(ticket, /tarifa de IBKR|IBKR gratis|comisiones de Interactive Brokers/i);
     });
 
+    it('el label de cantidad no envuelve: unidad como sufijo del campo (QA píxeles 21-oct-2026)', () => {
+        // «Cantidad (contratos)» envolvía a 2 líneas a 390px y se pegaba al
+        // borde del input. Label corto + sufijo dentro del campo relativo.
+        assert.match(ticket, /<Label htmlFor=\{`\$\{uid\}-quantity`\}>Cantidad<\/Label>/);
+        assert.doesNotMatch(ticket, /Cantidad \(\{kindLabel\}\)<\/Label>/);
+        assert.match(ticket, /pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-gray-500">\{kindLabel\}<\/span>/);
+    });
+
     it('placeholder del nombre neutro: no parece un valor relleno', () => {
         assert.match(ticket, /placeholder="Nombre de la empresa"/);
         assert.doesNotMatch(ticket, /placeholder="p\. ej\. AST SpaceMobile"/);

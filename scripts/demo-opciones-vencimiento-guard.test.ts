@@ -75,14 +75,19 @@ describe('wiring servidor/UI y honestidad (sin autoejercicio)', () => {
 
     it('los badges se muestran y declaran que el libro NO ejerce ni expira solo', () => {
         assert.match(table, /Vencida el /);
-        assert.match(table, /el libro no ejerce ni expira posiciones automáticamente/);
+        assert.match(table, /[Ee]l libro no ejerce ni expira posiciones automáticamente/);
         // Copy honesto (auditor 21-oct-2026): la API rechaza fechas
         // posteriores al vencimiento y precio 0, así que NO se puede prometer
         // «liquidación a mano» de una opción vencida. El badge indica el
         // cierre con fecha real (≤ vencimiento) y declara la limitación.
-        assert.match(table, /Para registrar el cierre usa la fecha real de ejecución \(el vencimiento o antes\)/);
-        assert.match(table, /la liquidación de\s+opciones vencidas sin valor aún no está soportada/);
+        assert.match(table, /Para registrar el cierre usa la fecha\s+real de ejecución \(el vencimiento o antes\)/);
+        assert.match(table, /la liquidación de\s+opciones vencidas sin valor aún\s+no está soportada/);
         assert.doesNotMatch(table, /el cierre o la liquidación se registran a mano/);
+        // Sin párrafo permanente (QA píxeles 21-oct-2026): etiqueta corta +
+        // detalle expandible nativo (details/summary, seguro en móvil).
+        assert.match(table, /Vencida el \{formatContractDate\(position\.optionExpiry\)\}\s*<\/span>/);
+        assert.match(table, /<details className="mt-1 text-xs text-gray-400">/);
+        assert.match(table, /<summary className="[^"]*">Qué significa<\/summary>/);
         // Sin lógica de cierre/liquidación automática por vencimiento.
         assert.doesNotMatch(actions, /autoejerc|asignaci[oó]n autom[aá]tica|closeExpired|expirePosition|liquidaci[oó]n autom[aá]tica/i);
     });

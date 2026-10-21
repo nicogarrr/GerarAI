@@ -333,16 +333,22 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     </div>
                 </div>
                 <div className="space-y-1.5">
-                    <Label htmlFor={`${uid}-quantity`}>Cantidad ({kindLabel})</Label>
-                    <Input
-                        className="placeholder:text-gray-600"
-                        id={`${uid}-quantity`}
-                        value={quantity}
-                        onChange={(event) => setQuantity(event.target.value)}
-                        inputMode="numeric"
-                        placeholder="p. ej. 10"
-                        required
-                    />
+                    {/* Label corto: «Cantidad (contratos)» envolvía a 2 líneas
+                        a 390px y quedaba pegado al borde del input (QA piloto
+                        21-oct-2026). La unidad va como sufijo del campo. */}
+                    <Label htmlFor={`${uid}-quantity`}>Cantidad</Label>
+                    <div className="relative">
+                        <Input
+                            className="pr-20 placeholder:text-gray-600"
+                            id={`${uid}-quantity`}
+                            value={quantity}
+                            onChange={(event) => setQuantity(event.target.value)}
+                            inputMode="numeric"
+                            placeholder="p. ej. 10"
+                            required
+                        />
+                        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-gray-500">{kindLabel}</span>
+                    </div>
                 </div>
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-price`}>{kind === 'opcion' ? 'Prima por acción' : 'Precio por acción'}</Label>
