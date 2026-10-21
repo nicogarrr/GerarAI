@@ -84,8 +84,11 @@ function AlertsManager() {
             setTriggered(recent);
         } catch (error) {
             if (isNextRedirectError(error)) throw error;
+            // El fallo de CARGA queda en el estado inline con Reintentar;
+            // un segundo toast con el mismo fallo era ruido duplicado.
+            // Los errores de MUTACIÓN (crear/borrar/revisar) sí conservan
+            // su toast: no tienen otro feedback visible.
             setLoadError(t('common.states.alertsLoadError'));
-            showErrorToast(error, { onRetry: loadAlerts });
         } finally {
             setLoading(false);
         }
