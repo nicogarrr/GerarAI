@@ -11,7 +11,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const crumbs = readFileSync(join(here, '..', 'components/layout/Breadcrumbs.tsx'), 'utf8');
+// La jerarquia vive en lib/nav/build-crumbs.ts (funcion pura); el componente
+// solo presenta. Las guardas miran ambos.
+const crumbs = readFileSync(join(here, '..', 'components/layout/Breadcrumbs.tsx'), 'utf8')
+    + readFileSync(join(here, '..', 'lib/nav/build-crumbs.ts'), 'utf8');
 
 void test('ninguna miga enlaza a un hash inerte', () => {
     assert.ok(!crumbs.includes('href: `#'), 'sin enlaces a hashes de seccion');

@@ -7,7 +7,9 @@ import test from 'node:test';
 import { newLabel } from '../app/(root)/inversores/_components/labels.ts';
 
 const read = (path: string) => readFileSync(path, 'utf8');
-const crumbs = read('components/layout/Breadcrumbs.tsx');
+// La jerarquia de migas vive en lib/nav/build-crumbs.ts (funcion pura); el
+// componente solo presenta. La guarda mira ambos.
+const crumbs = read('components/layout/Breadcrumbs.tsx') + read('lib/nav/build-crumbs.ts');
 const grid = read('app/(root)/inversores/page.tsx');
 const portfolios = read('app/(root)/inversores/page.tsx'); // carteras fusionada en el hub (decision de Nico, 2026-10-20)
 // Mas compradas es ahora una vista de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.

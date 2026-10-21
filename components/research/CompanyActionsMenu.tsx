@@ -22,7 +22,7 @@ export default function CompanyActionsMenu({ ticker, changeCount }: { ticker: st
                     <MoreHorizontal aria-hidden="true" className="h-5 w-5" />
                 </button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-60 border-gray-700 bg-gray-900 p-2">
+            <PopoverContent align="end" className="max-h-[min(75dvh,34rem)] w-60 overflow-y-auto border-gray-700 bg-gray-900 p-2">
                 <nav aria-label="Enlaces de la empresa" className="flex flex-col">
                     <GuideBrainButton ticker={ticker} />
                     <Link className={ITEM} href={`/research/${t}?view=changes`}>
