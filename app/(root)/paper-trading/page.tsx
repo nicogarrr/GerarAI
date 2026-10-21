@@ -1,7 +1,13 @@
 import type { Metadata } from 'next';
 
 import { ManualDemoPanel } from '@/components/paper-trading/ManualDemoPanel';
-import type { DemoStateView, HistoryRow, SubmitResult } from '@/components/paper-trading/submit';
+import {
+    convertManualDemoCurrency,
+    getManualDemoAccount,
+    getManualDemoOrders,
+    placeManualOrder,
+} from '@/lib/actions/manual-demo.actions';
+import type { DemoStateView, FillSubmit, FxSubmit, HistoryRow, SubmitResult } from '@/components/paper-trading/submit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -12,7 +18,7 @@ export const metadata: Metadata = {
         'Cuenta de práctica con saldo ficticio y operaciones manuales: registras compras y ventas con el precio que introduces tú.',
 };
 
-type DemoData = { account: DemoStateView | null; ledger: HistoryRow[] };
+type DemoData = { account: DemoStateView | null; ledger: HistoryRow[]; loadError: string | null };
 
 /**
  * Datos de ejemplo SOLO para desarrollo local (qa visual de la pantalla).
@@ -110,34 +116,46 @@ const DEV_DATA: DemoData = {
             simulated: true,
         },
     ],
+    loadError: null,
 };
 
 /**
- * PUNTO DE CABLEADO (pilot): sustituir por la acción real de
- * lib/actions/manual-demo.actions.ts cuando esté integrada. Hasta entonces:
- * desarrollo ve los fixtures de arriba; producción ve la cuenta sin
- * conectar (formulario desactivado, sin datos inventados).
+ * Cableado real: las server actions de lib/actions/manual-demo.actions.ts
+ * (cuenta propia de la sesión, libro FIFO en Mongo). Los fixtures de arriba
+ * SOLO se usan en desarrollo sin base de datos configurada, y van
+ * etiquetados en la propia pantalla; nunca aparecen como operaciones del
+ * usuario en producción. Si la acción falla, se muestra el error, no un
+ * estado neutro que lo oculte.
  */
 async function loadDemoData(): Promise<DemoData> {
-    if (process.env.NODE_ENV !== 'production') return DEV_DATA;
-    return { account: null, ledger: [] };
+    if (process.env.NODE_ENV !== 'production' && !process.env.MONGODB_URI) return { ...DEV_DATA, loadError: null };
+    const [accountResult, ordersResult] = await Promise.all([getManualDemoAccount(), getManualDemoOrders()]);
+    if (!accountResult.ok) return { account: null, ledger: [], loadError: accountResult.message };
+    return {
+        account: accountResult.state,
+        ledger: ordersResult.ok ? ordersResult.orders : [],
+        loadError: ordersResult.ok ? null : ordersResult.message,
+    };
 }
 
 export default async function PaperTradingPage() {
-    const { account, ledger } = await loadDemoData();
+    const { account, ledger, loadError } = await loadDemoData();
 
-    // PUNTO DE CABLEADO (pilot): sustituir por placeManualOrder /
-    // convertManualDemoCurrency de lib/actions/manual-demo.actions.ts. El
-    // resultado de la acción encaja directo en SubmitResult (ok+outcome+
-    // reason+state, o fallo con message -> error).
-    async function submitFillNotWired(): Promise<SubmitResult> {
+    // Cableado real: la acción valida TODO en servidor dentro de la
+    // transacción (saldo, posición, idempotencia); el cliente solo manda el
+    // formulario. El fallo de la acción llega como message -> error.
+    async function submitFill(input: FillSubmit): Promise<SubmitResult> {
         'use server';
-        return { ok: false, error: 'El registro en servidor todavía no está conectado.' };
+        const result = await placeManualOrder(input);
+        if (!result.ok) return { ok: false, error: result.message };
+        return { ok: true, outcome: result.outcome, reason: result.reason, state: result.state };
     }
 
-    async function submitFxNotWired(): Promise<SubmitResult> {
+    async function submitFx(input: FxSubmit): Promise<SubmitResult> {
         'use server';
-        return { ok: false, error: 'El registro en servidor todavía no está conectado.' };
+        const result = await convertManualDemoCurrency(input);
+        if (!result.ok) return { ok: false, error: result.message };
+        return { ok: true, outcome: result.outcome, reason: result.reason, state: result.state };
     }
 
     return (
@@ -146,7 +164,12 @@ export default async function PaperTradingPage() {
             <p className="mt-1 text-sm text-gray-400">
                 Práctica con dinero ficticio: 100.000 € iniciales, operaciones manuales y contabilidad FIFO.
             </p>
-            <ManualDemoPanel account={account} ledger={ledger} submitFill={submitFillNotWired} submitFx={submitFxNotWired} />
+            {loadError ? (
+                <p role="alert" className="mt-4 rounded-lg border border-amber-900/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
+                    No se pudo cargar la cuenta demo: {loadError}
+                </p>
+            ) : null}
+            <ManualDemoPanel account={account} ledger={ledger} submitFill={submitFill} submitFx={submitFx} />
         </div>
     );
 }
