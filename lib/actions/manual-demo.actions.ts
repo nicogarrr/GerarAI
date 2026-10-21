@@ -133,6 +133,9 @@ const failure = (message: string, field?: string): ManualDemoFailure =>
     field ? { ok: false, message, field } : { ok: false, message };
 
 const money = (n: number): string => (Math.round(n * 100) / 100).toFixed(2);
+/** Mismo redondeo a céntimos que el libro (P3, accounting r2): el fast path
+ * decide con la cifra EXACTA que aplicaría el replay, sin deriva de floats. */
+const r2 = (n: number): number => Math.round(n * 100) / 100;
 
 function toView(state: AccountState): ManualDemoStateView {
     return {
@@ -796,7 +799,7 @@ export async function placeManualOrder(raw: unknown): Promise<ManualDemoOrderRes
             });
             if (!fill) return { kind: 'reject', reason: 'Los datos de la orden no forman un fill válido.' };
             if (parsed.side === 'buy') {
-                const cost = parsed.quantity * parsed.price + parsed.fee;
+                const cost = r2(parsed.quantity * parsed.price + parsed.fee);
                 const cash = state.cashByCurrency[parsed.currency];
                 if (cost > cash + 1e-9) {
                     return { kind: 'reject', reason: `Saldo ${parsed.currency} insuficiente: la compra cuesta ${money(cost)} y hay ${money(cash)}. Si es en USD, convierte EUR antes (conversión manual simulada).` };
@@ -808,7 +811,8 @@ export async function placeManualOrder(raw: unknown): Promise<ManualDemoOrderRes
                 }
                 // Sin sobregiro: la comisión también debe caber en el cash que
                 // queda tras abonar la venta (la compra ya lo chequea).
-                const cashAfterSale = state.cashByCurrency[parsed.currency] + parsed.quantity * parsed.price;
+                const proceeds = r2(parsed.quantity * parsed.price);
+                const cashAfterSale = state.cashByCurrency[parsed.currency] + proceeds;
                 if (parsed.fee > cashAfterSale + 1e-9) {
                     return { kind: 'reject', reason: `La comisión (${money(parsed.fee)} ${parsed.currency}) supera el efectivo disponible tras la venta (${money(cashAfterSale)}): la demo no admite sobregiro.` };
                 }
