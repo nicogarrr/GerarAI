@@ -696,7 +696,7 @@ class ThesisService:
         invalidation = self._invalidation_criteria(company, valuation)
         scenario_probabilities = self._scenario_probabilities(long_term_model)
 
-        summary = self._card_summary(company, valuation, hypothesis, news_items)
+        summary = self._card_summary(company, valuation, hypothesis, news_items, long_term_model)
         # El resumen conserva los datos deterministas; el LLM redacta el
         # análisis de noticias debajo, sin otra llamada de selección de plantillas.
         # Narrativa libre INFERIDA desde noticias reales; fallo => "Sin datos".
@@ -1101,6 +1101,7 @@ class ThesisService:
         valuation: dict,
         hypothesis: str,
         news_items: list[dict] | None = None,
+        long_term_model: dict | None = None,
     ) -> str:
         """Resumen de la tarjeta "Ultima tesis": legible y en el idioma de la UI.
 
@@ -1139,19 +1140,35 @@ class ThesisService:
                 )
                 + "."
             )
+        # Los datos que faltan de verdad son la union de la valoracion y el
+        # modelo de largo plazo (mismo criterio que la seccion 21): la tarjeta
+        # no puede decir «faltan datos basicos» cuando los pendings concretos
+        # (margen FCF, WACC) vienen del modelo y se listan al lado.
+        missing_all = list(valuation.get("missing_inputs") or [])
+        if long_term_model:
+            for key in (long_term_model.get("missing_inputs") or []):
+                if key not in missing_all:
+                    missing_all.append(key)
+        ask = [k for k in missing_all if k not in excluded_keys]
         if valuation.get("status") == "insufficient_data":
-            missing = ", ".join(
-                term_es(k) for k in (valuation.get("missing_inputs") or []) if k not in excluded_keys
-            ) or "datos financieros basicos"
+            if ask:
+                missing = ", ".join(term_es(k) for k in ask)
+                faltan = f"faltan {missing}. "
+            elif excluded_items:
+                # Todo lo que falta esta presente-excluido: no se pide nada
+                # como ausente (seria falso) y los excluidos se explican en
+                # la nota. No decimos «ya tenemos los datos que faltan»: un
+                # dato fuera de periodo o no utilizable no alimenta el calculo.
+                faltan = "la valoración no es calculable con los datos utilizables en el periodo ancla. "
+            else:
+                faltan = "faltan datos financieros basicos. "
             base = (
-                f"Tesis de {company.ticker} no publicable todavía: faltan {missing}. "
+                f"Tesis de {company.ticker} no publicable todavía: {faltan}"
                 "Ningún valor justo debe considerarse fiable hasta completar las fuentes."
                 f"{excluded_note}"
             )
         elif valuation.get("status") == "partial":
-            missing = ", ".join(
-                term_es(k) for k in (valuation.get("missing_inputs") or []) if k not in excluded_keys
-            ) or "algunos inputs"
+            missing = ", ".join(term_es(k) for k in ask) or "algunos inputs"
             base = f"{hypothesis} Faltan {missing} (ver sección 13 del memo).{excluded_note}"
         else:
             base = hypothesis
