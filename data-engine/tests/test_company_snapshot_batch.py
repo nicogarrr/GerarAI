@@ -5,7 +5,7 @@ agrega con window functions + GROUP BY: las queries no crecen con N y el
 resultado es IDENTICO al de build() empresa a empresa.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -163,6 +163,27 @@ def test_build_many_matches_build_company_by_company(db: Session):
     assert len(batch[second.id].recent_changes) == 2
 
 
+def test_build_many_tie_created_at_matches_single_build(db: Session):
+    """Empate total de created_at: el desempate por id hace determinista el
+    orden y build_many coincide con build() empresa a empresa (sin el, el
+    orden de los empates era libre del plan y podia divergir entre caminos)."""
+    company = _company(db, "TIE")
+    same = datetime(2026, 10, 1, tzinfo=UTC)
+    for index in range(12):
+        db.add(ThesisChange(company_id=company.id, summary=f"cambio {index}", created_at=same))
+    db.commit()
+
+    service = CompanySnapshotService()
+    batch = service.build_many(db, [company])
+    single = service.build(db, company)
+
+    batch_summaries = [c.summary for c in batch[company.id].recent_changes]
+    single_summaries = [c.summary for c in single.recent_changes]
+    assert batch_summaries == single_summaries
+    # Determinista: id DESC dentro del empate (el mas reciente primero).
+    assert batch_summaries == [f"cambio {i}" for i in range(11, 1, -1)]
+
+
 def test_build_many_queries_do_not_grow_with_n(db: Session):
     companies = [_company(db, f"T{i}") for i in range(5)]
     for company in companies:
@@ -234,7 +255,7 @@ def test_recent_changes_many_returns_deterministic_order(db: Session):
     ]
     assert len(changes_queries) == 1
     assert changes_queries[0].rstrip().endswith(
-        "ORDER BY anon_1.company_id, anon_1.created_at DESC"
+        "ORDER BY anon_1.company_id, anon_1.created_at DESC, anon_1.id DESC"
     )
 
     ordered = [change.summary for change in batch[company.id].recent_changes]

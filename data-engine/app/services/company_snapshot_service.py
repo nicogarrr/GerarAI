@@ -84,7 +84,7 @@ class CompanySnapshotService:
                     db.scalars(
                         select(ThesisChange)
                         .where(ThesisChange.company_id == company.id)
-                        .order_by(desc(ThesisChange.created_at))
+                        .order_by(desc(ThesisChange.created_at), desc(ThesisChange.id))
                         .limit(10)
                     ).all()
                 )
@@ -191,7 +191,7 @@ class CompanySnapshotService:
                 func.row_number()
                 .over(
                     partition_by=ThesisChange.company_id,
-                    order_by=[desc(ThesisChange.created_at)],
+                    order_by=[desc(ThesisChange.created_at), desc(ThesisChange.id)],
                 )
                 .label("rank_"),
             )
@@ -204,7 +204,7 @@ class CompanySnapshotService:
         rows = db.scalars(
             select(aliased_change)
             .where(ranked.c.rank_ <= per_company)
-            .order_by(ranked.c.company_id, desc(ranked.c.created_at))
+            .order_by(ranked.c.company_id, desc(ranked.c.created_at), desc(ranked.c.id))
         ).all()
         grouped: dict[int, list[ThesisChange]] = {}
         for row in rows:
