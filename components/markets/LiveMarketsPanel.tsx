@@ -196,7 +196,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                     );
                 })}
             </Tabs>
-            <p className="mt-4 text-xs leading-5 text-gray-500">
+            <div className="mt-4 text-xs leading-5 text-gray-500">
                 Fuente: Yahoo Finance. Cada fila muestra la fecha y hora que el proveedor atribuye al dato;
                 no es una promesa de tiempo real.{' '}
                 <details className="mt-1">
@@ -208,7 +208,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                         oficiales de mercado ni sirven para operar con garantías.
                     </span>
                 </details>
-            </p>
+            </div>
         </div>
     );
 }
