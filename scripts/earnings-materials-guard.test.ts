@@ -46,3 +46,22 @@ test('calendario: el historial dice "Resultados recientes" y el pie habla de la 
     assert.ok(!page.includes('Publicados en los últimos'));
     assert.ok(!page.includes('Sin fecha publicada'));
 });
+
+test('registro IR: BN T2 enlaza grabacion y transcripcion solo con fecha exacta', () => {
+    const hit = irLinksFor('BN', '2026-08-13');
+    assert.deepEqual(hit?.eventPage?.assets.map((a) => a.kind), ['grabacion', 'transcripcion']);
+    for (const a of hit?.eventPage?.assets ?? []) assert.ok(a.url.startsWith('https://bn.brookfield.com/') && a.source.startsWith('https://bn.brookfield.com/events/'));
+    assert.equal(irLinksFor('BN', '2026-08-14')?.eventPage, null);
+    assert.deepEqual(irLinksFor('BN', '2026-11-12')?.eventPage?.assets, []);
+});
+
+test('registro IR: META T1 enlaza presentacion y transcripcion (fecha exacta); T3 aun sin archivos', () => {
+    assert.deepEqual(irLinksFor('META', '2026-04-29')?.eventPage?.assets.map((a) => a.kind), ['presentacion', 'transcripcion']);
+    assert.deepEqual(irLinksFor('META', '2026-10-21')?.eventPage?.assets, []);
+});
+
+test('registro IR: el tooltip no atribuye extraccion de una pagina fuente no leida', () => {
+    const list = readFileSync('components/calendar/FollowedEarningsList.tsx', 'utf8');
+    assert.ok(list.includes('Archivo oficial · verificado el'));
+    assert.ok(!list.includes('anunciado en'));
+});
