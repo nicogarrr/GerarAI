@@ -7,7 +7,6 @@ import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, C
 import { CornerDownLeft, Loader2, Search, Terminal, TrendingUp } from "lucide-react";
 import { searchStocksWithStatus, getPopularStocks } from "@/lib/actions/finnhub.actions";
 import { loadPopularStocks } from "@/lib/popular-stocks-loader";
-import { showErrorToast } from "@/lib/toast";
 import { isNextRedirectError } from "@/lib/types/errors";
 import { flattenNavItems, ROUTE_CATALOG } from "@/lib/constants";
 import { navItemMatchesSearch, navSectionMatchesSearch } from "@/lib/search/nav-search";
@@ -89,7 +88,6 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
 
     // Reintento: handleSearch no puede referirse a si misma dentro de su propio
     // useCallback (react-hooks/immutability); se pasa por ref.
-    const retrySearchRef = useRef<(query: string) => void>(() => {});
     const handleSearch = useCallback(async (query: string) => {
         // Cancelar búsqueda anterior si existe
         if (abortControllerRef.current) {
@@ -134,8 +132,10 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
             const aborted = error instanceof Error && error.name === 'AbortError';
             if (!aborted && !controller.signal.aborted) {
                 if (isNextRedirectError(error)) throw error;
+                // Superficie ÚNICA: el indicador inline role="alert" dentro de
+                // la paleta (donde está la atención y reintentar es seguir
+                // escribiendo). Un toast encima duplicaba el aviso.
                 setSearchError(true);
-                showErrorToast(error, { onRetry: () => retrySearchRef.current(query.trim()) });
             }
         } finally {
             if (!controller.signal.aborted) {
@@ -143,9 +143,6 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
             }
         }
     }, [popular]);
-    useEffect(() => {
-        retrySearchRef.current = (query: string) => { void handleSearch(query); };
-    }, [handleSearch]);
 
     // Debounce efectivo
     useEffect(() => {
@@ -217,8 +214,8 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                 // con "no hay acciones") y la proxima apertura reintenta —
                 // la cache compartida nunca guarda fallos.
                 if (active && !isNextRedirectError(error)) {
+                    // Misma superficie única: inline, sin toast duplicado.
                     setSearchError(true);
-                    showErrorToast(error, {});
                 }
             })
             .finally(() => {
