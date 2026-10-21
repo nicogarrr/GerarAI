@@ -6,7 +6,7 @@
 
 // @ts-expect-error -- node --test (--experimental-strip-types) exige la extension
 // .ts en runtime; tsc la prohibe (TS5097). Mismo patron que los guards.
-import { toFill, type Fill, type FxConversion, type LedgerEntry } from './types.ts';
+import { toFill, type Fill, type LedgerEntry } from './types.ts';
 
 export type PersistedTradeDoc = {
     _id?: unknown;
@@ -40,11 +40,24 @@ export type AdaptedLedger = { entries: LedgerEntry[]; violations: string[] };
 
 const docId = (doc: PersistedTradeDoc) => String(doc._id ?? doc.clientOrderId ?? 'desconocido');
 
+/** Orden total persistido: (executedAt, createdAt, _id). NUNCA depende del
+ * orden en que lleguen los docs (índice de array): todas las lecturas del
+ * libro recalculan en el mismo orden. */
+export function persistedOrder(a: PersistedTradeDoc, b: PersistedTradeDoc): number {
+    const ta = a.executedAt instanceof Date ? a.executedAt.getTime() : 0;
+    const tb = b.executedAt instanceof Date ? b.executedAt.getTime() : 0;
+    if (ta !== tb) return ta - tb;
+    const ca = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;
+    const cb = b.createdAt instanceof Date ? b.createdAt.getTime() : 0;
+    if (ca !== cb) return ca - cb;
+    return String(a._id ?? '').localeCompare(String(b._id ?? ''));
+}
+
 /** Documentos persistidos -> entradas del libro; lo corrupto queda en violations. */
 export function docsToLedger(docs: PersistedTradeDoc[]): AdaptedLedger {
     const entries: LedgerEntry[] = [];
     const violations: string[] = [];
-    for (const doc of docs) {
+    for (const doc of docs.slice().sort(persistedOrder)) {
         // Los rechazos no son movimientos del libro: viven en el historial,
         // no en la contabilidad. Un rechazo CON precio es corrupción y se avisa.
         if (doc.status === 'rejected') {

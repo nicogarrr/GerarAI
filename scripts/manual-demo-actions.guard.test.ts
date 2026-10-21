@@ -18,6 +18,8 @@ const modelStub = (await import('@/database/models/manual-demo.model')) as unkno
     __reset(): void;
     __failNextVersionUpdates(n: number): void;
     __counts(): { accounts: number; trades: number };
+    __snapshot(): { accounts: Array<Record<string, unknown>>; trades: Array<Record<string, unknown>> };
+    __seedTrade(doc: Record<string, unknown>): Record<string, unknown>;
 };
 const connStub = (await import('@/database/mongoose')) as unknown as { __setStartSessionError(e: unknown): void };
 
@@ -310,5 +312,214 @@ describe('concurrencia y aislamiento', () => {
         assert.equal(r.ok, false);
         if (!r.ok) assert.match(r.message, /transacciones/);
         assert.equal(modelStub.__counts().trades, 0);
+    });
+});
+
+describe('R3: coherencia temporal (el libro se recalcula por executedAt, no por orden de alta)', () => {
+    const T0 = NOW - 300_000;
+    const T1 = NOW - 200_000;
+    const T2 = NOW - 100_000;
+
+    it('compra USD antedatada ANTES de la conversión que la financia: rechazada, nada grabado como fill', async () => {
+        await actions.convertManualDemoCurrency({ from: 'EUR', to: 'USD', amount: 1000, rate: 1.2, executedAt: T2, clientOrderId: oid() });
+        const r = await actions.placeManualOrder(
+            buyAccion({ instrument: { kind: 'accion', symbol: 'ASTS', name: 'ASTS' }, quantity: 10, price: 40, currency: 'USD', executedAt: T1 }),
+        );
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'rejected');
+            assert.match(r.reason ?? '', /fecha de ejecución/);
+            assert.equal(r.state.cashUSD, 1_200);
+            assert.equal(r.state.positions.length, 0);
+        }
+    });
+
+    it('venta antedatada ANTES de su compra: rechazada', async () => {
+        await actions.placeManualOrder(buyAccion({ quantity: 10, price: 10, executedAt: T2 }));
+        const r = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 5, price: 12, executedAt: T1 });
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'rejected');
+            assert.equal(r.state.positions[0]?.quantity, 10);
+        }
+    });
+
+    it('compra antedatada que gasta el efectivo que una compra POSTERIOR ya gastó: rechazada por descuadrar la posterior', async () => {
+        await actions.placeManualOrder(buyAccion({ quantity: 9000, price: 10, executedAt: T2 })); // 90.000 EUR en T2
+        const r = await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'IBE.MC', name: 'Iberdrola' }, quantity: 5000, price: 10, executedAt: T1 }));
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'rejected');
+            // La compra posterior existente sigue intacta.
+            assert.equal(r.state.positions.length, 1);
+            assert.equal(r.state.cashEUR, 10_000);
+        }
+    });
+
+    it('venta antedatada que consumiría lotes que una venta POSTERIOR ya cerró: rechazada', async () => {
+        await actions.placeManualOrder(buyAccion({ quantity: 10, price: 10, executedAt: T0 }));
+        await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 10, price: 12, executedAt: T2 });
+        const r = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 4, price: 11, executedAt: T1 });
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'rejected');
+            assert.equal(r.state.positions.length, 0);
+            assert.equal(r.state.realizedEUR, 20);
+        }
+    });
+
+    it('antedatación COHERENTE (no descuadra nada): aceptada y el libro posterior sigue válido', async () => {
+        await actions.placeManualOrder(buyAccion({ quantity: 10, price: 10, executedAt: T2 }));
+        const r = await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'ITX.MC', name: 'Inditex' }, quantity: 5, price: 20, executedAt: T1 }));
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'filled');
+            assert.equal(r.state.cashEUR, 100_000 - 100 - 100);
+            assert.equal(r.state.positions.length, 2);
+            assert.deepEqual(r.state.violations, []);
+        }
+        // Y una venta posterior de la posición antedatada funciona con FIFO correcto.
+        const sell = await actions.placeManualOrder({ ...buyAccion(), instrument: { kind: 'accion', symbol: 'ITX.MC', name: 'Inditex' }, side: 'sell', quantity: 5, price: 25, executedAt: NOW - 1_000 });
+        assert.ok(sell.ok);
+        if (sell.ok) {
+            assert.equal(sell.outcome, 'filled');
+            assert.equal(sell.state.realizedEUR, 25);
+        }
+    });
+});
+
+describe('R3b: rediseño insertar→releer→abortar (orden persistido real)', () => {
+    const T1 = NOW - 200_000;
+    const T2 = NOW - 100_000;
+
+    function seedTrade(over: Record<string, unknown> = {}) {
+        const id = oid();
+        return modelStub.__seedTrade({
+            userId: USER.id,
+            clientOrderId: id,
+            kind: 'accion',
+            symbol: 'BBVA.MC',
+            name: 'BBVA',
+            contract: null,
+            side: 'buy',
+            openClose: 'open',
+            fxFrom: null,
+            fxTo: null,
+            quantity: 10,
+            status: 'filled',
+            fillPrice: 10,
+            currency: 'EUR',
+            fee: 0,
+            fillSource: 'manual-simulado',
+            executedAt: new Date(T1),
+            rejectReason: null,
+            _id: `seed-${id}`,
+            createdAt: new Date(T1),
+            ...over,
+        });
+    }
+
+    it('rechazo por divergencia: rollback SIN fill y caché/versión intactos; rechazo grabado aparte', async () => {
+        const buy = await actions.placeManualOrder(buyAccion({ quantity: 10, price: 10, executedAt: T2 }));
+        assert.ok(buy.ok);
+        if (buy.ok) assert.equal(buy.outcome, 'filled');
+        const before = modelStub.__snapshot().accounts[0];
+        assert.equal(before.version, 1);
+        assert.equal(before.cashEUR, 100_000 - 100);
+
+        const r = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 5, price: 12, executedAt: T1 });
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'rejected');
+            assert.match(r.reason ?? '', /fecha de ejecución/);
+        }
+        // Sin fill ni escritura parcial: la cuenta cacheada no se movió.
+        const after = modelStub.__snapshot().accounts[0];
+        assert.equal(after.version, 1);
+        assert.equal(after.cashEUR, 100_000 - 100);
+        // 1 fill + 1 rechazo grabado en escritura separada.
+        assert.equal(modelStub.__counts().trades, 2);
+        const rows = modelStub.__snapshot().trades;
+        assert.equal(rows.filter((t) => t.status === 'filled').length, 1);
+        assert.equal(rows.filter((t) => t.status === 'rejected').length, 1);
+    });
+
+    it('empate exacto (executedAt, createdAt): desempate por _id determinista sin importar el orden de inserción', async () => {
+        const run = async (pushSellFirst: boolean) => {
+            modelStub.__reset();
+            const created = new Date(T1);
+            const sell = { side: 'sell', quantity: 10, fillPrice: 12, _id: 'seed-aa', createdAt: created, executedAt: new Date(T1) };
+            const buy = { side: 'buy', quantity: 10, fillPrice: 10, _id: 'seed-zz', createdAt: created, executedAt: new Date(T1) };
+            if (pushSellFirst) { seedTrade(sell); seedTrade(buy); } else { seedTrade(buy); seedTrade(sell); }
+            // _id aa < zz: la venta se ordena ANTES, se total-rechaza por falta de
+            // posición y la compra queda (posición 10). Una venta posterior de 5
+            // solo cuadra con ese orden.
+            const r = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 5, price: 12, executedAt: NOW - 1_000 });
+            assert.ok(r.ok);
+            if (r.ok) {
+                assert.equal(r.outcome, 'filled');
+                assert.equal(r.state.positions[0]?.quantity, 5);
+            }
+        };
+        await run(true);
+        await run(false);
+    });
+
+    it('createdAt futuro en un doc existente: la nueva op se ordena antes y se rechaza sin fill (rollback real)', async () => {
+        // FX EUR→USD persistida con createdAt FUTURO (dato anómalo preexistente).
+        modelStub.__seedTrade({
+            userId: USER.id,
+            clientOrderId: oid(),
+            kind: 'fx',
+            symbol: 'EURUSD',
+            name: 'Conversión manual EUR→USD',
+            contract: null,
+            side: 'buy',
+            openClose: 'open',
+            fxFrom: 'EUR',
+            fxTo: 'USD',
+            quantity: 1000,
+            status: 'filled',
+            fillPrice: 1.2,
+            currency: 'EUR',
+            fee: 0,
+            fillSource: 'manual-simulado',
+            executedAt: new Date(T2),
+            rejectReason: null,
+            _id: 'seed-fx-futura',
+            createdAt: new Date(NOW + 3_600_000),
+        });
+        const r = await actions.placeManualOrder(
+            buyAccion({ instrument: { kind: 'accion', symbol: 'ASTS', name: 'ASTS' }, quantity: 10, price: 40, currency: 'USD', executedAt: T2 }),
+        );
+        assert.ok(r.ok);
+        if (r.ok) {
+            // Mismo executedAt, createdAt menor → la compra se ordena ANTES de
+            // la FX que la financia: violación nueva → divergencia → rechazo.
+            assert.equal(r.outcome, 'rejected');
+            assert.match(r.reason ?? '', /fecha de ejecución/);
+            assert.equal(r.state.cashUSD, 1_200);
+        }
+        // Solo queda la semilla: el fill se deshizo con la transacción.
+        assert.equal(modelStub.__counts().trades, 2); // semilla + rechazo grabado aparte
+        assert.equal(modelStub.__snapshot().trades.filter((t) => t.status === 'filled').length, 1);
+        // Sin bump de versión (nunca hubo fill confirmado).
+        assert.equal(modelStub.__snapshot().accounts[0].version, 0);
+    });
+
+    it('reintento con el mismo clientOrderId tras rechazo por divergencia: duplicate sin segunda fila', async () => {
+        await actions.placeManualOrder(buyAccion({ quantity: 10, price: 10, executedAt: T2 }));
+        const retryId = 'retry-divergence-1';
+        const first = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 5, price: 12, executedAt: T1, clientOrderId: retryId });
+        assert.ok(first.ok);
+        if (first.ok) assert.equal(first.outcome, 'rejected');
+        const second = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 5, price: 12, executedAt: T1, clientOrderId: retryId });
+        assert.ok(second.ok);
+        if (second.ok) {
+            assert.equal(second.outcome, 'duplicate');
+            assert.match(second.reason ?? '', /fecha de ejecución/);
+        }
+        // buy + 1 única fila de rechazo.
+        assert.equal(modelStub.__counts().trades, 2);
     });
 });

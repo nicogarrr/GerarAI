@@ -304,13 +304,13 @@ function parseFx(raw: unknown): ParsedFx | ManualDemoFailure {
 
 /* --------------------------- estado y libro ---------------------------- */
 
-async function readState(userId: string, session?: ClientSession): Promise<AccountState> {
-    const query = ManualDemoTrade.find({ userId, status: 'filled' }).sort({ executedAt: 1 });
+async function readLedger(userId: string, session?: ClientSession): Promise<{ state: AccountState; entries: LedgerEntry[] }> {
+    const query = ManualDemoTrade.find({ userId, status: 'filled' }).sort({ executedAt: 1, _id: 1 });
     if (session) query.session(session);
     const docs = (await query) as unknown as ManualDemoTradeDoc[];
     const { entries, violations } = docsToLedger(docs);
     const state = computeManualDemoAccount(STARTING_CASH, entries);
-    return { ...state, violations: [...violations, ...state.violations] };
+    return { state: { ...state, violations: [...violations, ...state.violations] }, entries };
 }
 
 async function ensureAccount(userId: string): Promise<void> {
@@ -331,6 +331,35 @@ class VersionConflictError extends Error {
     }
 }
 
+/** La validación temporal tras la inserción real descuadró el libro: abortar. */
+class TemporalDivergenceError extends Error {
+    public readonly detail: string;
+    constructor(detail: string) {
+        super(detail);
+        this.name = 'TemporalDivergenceError';
+        this.detail = detail;
+    }
+}
+
+/**
+ * Graba un rechazo en escritura SEPARADA e idempotente: si otro reintento
+ * (u otra petición con el mismo clientOrderId) ya grabó el resultado, se
+ * devuelve lo persistido ('duplicate'), nunca una segunda fila.
+ */
+async function recordRejection(userId: string, clientOrderId: string, docFor: DocBuilder, reason: string): Promise<TxnOutcome> {
+    try {
+        await ManualDemoTrade.create([docFor('rejected', reason)]);
+    } catch (error) {
+        if (!isDuplicateKey(error)) throw error;
+    }
+    const stored = await ManualDemoTrade.findOne({ userId, clientOrderId });
+    const { state } = await readLedger(userId);
+    if (stored && stored.status === 'filled') {
+        return { outcome: 'duplicate', reason: null, state };
+    }
+    return { outcome: 'rejected', reason, state };
+}
+
 function isDuplicateKey(error: unknown): boolean {
     return (error as { code?: number })?.code === 11000;
 }
@@ -344,15 +373,19 @@ type TxnDecision = { kind: 'fill'; entry: LedgerEntry } | { kind: 'reject'; reas
 
 type DocBuilder = (status: 'filled' | 'rejected', reason: string | null) => Record<string, unknown>;
 
-type TxnOutcome = { outcome: 'filled' | 'rejected'; reason: string | null; state: AccountState };
+type TxnOutcome = { outcome: 'filled' | 'rejected' | 'duplicate'; reason: string | null; state: AccountState };
 
 /**
- * Lee el libro DENTRO de una transacción, decide fill o rechazo, graba y
- * actualiza la cuenta con escritura condicional { userId, version }: dos
- * órdenes concurrentes en la misma cuenta chocan (write conflict) y la
- * perdedora reintenta desde cero. Sin transacciones no hay escritura.
+ * Lee el libro DENTRO de una transacción, decide fill o rechazo; el fill se
+ * inserta y se RELEE el libro persistido (orden executedAt, createdAt, _id)
+ * para revalidar: cualquier violation nueva aborta sin fill ni caché y el
+ * rechazo se graba aparte (idempotente). La caché y la versión solo se
+ * actualizan al confirmar un fill, con escritura condicional
+ * { userId, version }: dos órdenes concurrentes en la misma cuenta chocan
+ * (write conflict) y la perdedora reintenta desde cero. Sin transacciones
+ * no hay escritura.
  */
-async function executeLedgerChange(userId: string, decide: (state: AccountState) => TxnDecision, docFor: DocBuilder): Promise<TxnOutcome> {
+async function executeLedgerChange(userId: string, clientOrderId: string, decide: (state: AccountState) => TxnDecision, docFor: DocBuilder): Promise<TxnOutcome> {
     let lastConflict: VersionConflictError | null = null;
     for (let attempt = 1; attempt <= MAX_TXN_ATTEMPTS; attempt++) {
         const conn = await connectToDatabase();
@@ -362,28 +395,46 @@ async function executeLedgerChange(userId: string, decide: (state: AccountState)
             await session.withTransaction(async () => {
                 const account = await ManualDemoAccount.findOne({ userId }).session(session);
                 if (!account) throw new Error('manual-demo: cuenta no encontrada tras ensureAccount');
-                const state = await readState(userId, session);
+                const { state } = await readLedger(userId, session);
                 const decision = decide(state);
                 if (decision.kind === 'reject') {
                     await ManualDemoTrade.create([docFor('rejected', decision.reason)], { session });
                     outcome = { outcome: 'rejected', reason: decision.reason, state };
                     return;
                 }
+                // Se inserta el fill PRIMERO y se RELEE el libro dentro de la
+                // misma transacción (visible para sí misma): la validación se
+                // hace sobre el orden persistido REAL (executedAt, createdAt,
+                // _id), no sobre un cálculo previo en memoria. Si el replay completo
+                // produce CUALQUIER violation nueva (de esta operación o de
+                // una posterior que quedaría descuadrada), la transacción
+                // aborta: no queda fill ni cambio de caché, y el rechazo se
+                // graba aparte de forma idempotente.
                 await ManualDemoTrade.create([docFor('filled', null)], { session });
-                const post = computeManualDemoAccount(STARTING_CASH, [
-                    ...docsToLedger((await ManualDemoTrade.find({ userId, status: 'filled' }).sort({ executedAt: 1 }).session(session)) as unknown as ManualDemoTradeDoc[]).entries,
-                ]);
+                const post = await readLedger(userId, session);
+                const baseline = new Set(state.violations);
+                const freshViolations = post.state.violations.filter((v) => !baseline.has(v));
+                if (freshViolations.length > 0) {
+                    throw new TemporalDivergenceError(
+                        `La operación no cuadra en su fecha de ejecución (el libro se recalcula por fecha, no por orden de alta): ${freshViolations[0]}`,
+                    );
+                }
+                // El bump de versión SOLO confirma fills; los rechazos no
+                // cambian el estado y no lo tocan.
                 const updated = await ManualDemoAccount.findOneAndUpdate(
                     { userId, version: account.version },
-                    { $set: { cashEUR: post.cashByCurrency.EUR, cashUSD: post.cashByCurrency.USD }, $inc: { version: 1 } },
-                    { session, new: true },
+                    { $set: { cashEUR: post.state.cashByCurrency.EUR, cashUSD: post.state.cashByCurrency.USD }, $inc: { version: 1 } },
+                    { session, returnDocument: 'after' },
                 );
                 if (!updated) throw new VersionConflictError();
-                outcome = { outcome: 'filled', reason: null, state: post };
+                outcome = { outcome: 'filled', reason: null, state: post.state };
             });
             if (!outcome) throw new Error('manual-demo: transacción sin resultado');
             return outcome;
         } catch (error) {
+            if (error instanceof TemporalDivergenceError) {
+                return await recordRejection(userId, clientOrderId, docFor, error.detail);
+            }
             if (error instanceof VersionConflictError) {
                 lastConflict = error;
                 continue;
@@ -467,7 +518,7 @@ function toRow(doc: ManualDemoTradeDoc): ManualDemoOrderRow {
 async function duplicateResult(userId: string, clientOrderId: string): Promise<ManualDemoOrderResult | null> {
     const stored = await ManualDemoTrade.findOne({ userId, clientOrderId });
     if (!stored) return null;
-    const state = await readState(userId);
+    const { state } = await readLedger(userId);
     return {
         ok: true,
         outcome: 'duplicate',
@@ -494,7 +545,7 @@ export async function getManualDemoAccount(): Promise<ManualDemoAccountResult> {
     try {
         await connectToDatabase();
         await ensureAccount(user.id);
-        const state = await readState(user.id);
+        const { state } = await readLedger(user.id);
         // Reparación de la caché de saldos si se descuadró del libro (la
         // fuente de verdad es el libro; la caché solo acelera lecturas).
         const account = await ManualDemoAccount.findOne({ userId: user.id });
@@ -506,6 +557,7 @@ export async function getManualDemoAccount(): Promise<ManualDemoAccountResult> {
             await ManualDemoAccount.findOneAndUpdate(
                 { userId: user.id, version: account.version },
                 { $set: { cashEUR: state.cashByCurrency.EUR, cashUSD: state.cashByCurrency.USD }, $inc: { version: 1 } },
+                { returnDocument: 'after' },
             );
         }
         return { ok: true, state: toView(state) };
@@ -520,7 +572,7 @@ export async function getManualDemoOrders(): Promise<ManualDemoOrdersResult> {
     if (!isDemoUser(user)) return user;
     try {
         await connectToDatabase();
-        const docs = (await ManualDemoTrade.find({ userId: user.id }).sort({ createdAt: -1 })) as unknown as ManualDemoTradeDoc[];
+        const docs = (await ManualDemoTrade.find({ userId: user.id }).sort({ createdAt: -1, _id: -1 })) as unknown as ManualDemoTradeDoc[];
         return { ok: true, orders: docs.map(toRow) };
     } catch (error) {
         return unexpectedError('getManualDemoOrders', error);
@@ -591,7 +643,7 @@ export async function placeManualOrder(raw: unknown): Promise<ManualDemoOrderRes
             return { kind: 'fill', entry: fill };
         };
 
-        const outcome = await executeLedgerChange(user.id, decide, orderDocFor(parsed, user.id));
+        const outcome = await executeLedgerChange(user.id, parsed.clientOrderId, decide, orderDocFor(parsed, user.id));
         return { ok: true, outcome: outcome.outcome, reason: outcome.reason, state: toView(outcome.state) };
     } catch (error) {
         if (isDuplicateKey(error)) {
@@ -639,7 +691,7 @@ export async function convertManualDemoCurrency(raw: unknown): Promise<ManualDem
             return { kind: 'fill', entry };
         };
 
-        const outcome = await executeLedgerChange(user.id, decide, fxDocFor(parsed, user.id));
+        const outcome = await executeLedgerChange(user.id, parsed.clientOrderId, decide, fxDocFor(parsed, user.id));
         return { ok: true, outcome: outcome.outcome, reason: outcome.reason, state: toView(outcome.state) };
     } catch (error) {
         if (isDuplicateKey(error)) {
