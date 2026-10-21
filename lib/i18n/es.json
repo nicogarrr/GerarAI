@@ -22,7 +22,10 @@
       "noResults": "Sin resultados",
       "error": "Se produjo un error inesperado",
       "errorHint": "Inténtalo de nuevo. Si el problema persiste, revisa tu conexión.",
-      "backendOfflineTitle": "Servicio no disponible"
+      "backendOfflineTitle": "Servicio no disponible",
+      "alertsLoadErrorSession": "Tu sesión ha caducado. Vuelve a entrar para ver tus alertas.",
+      "alertsLoadErrorForbidden": "No tienes permiso para ver estas alertas.",
+      "alertsLoadErrorRate": "Demasiadas peticiones. Espera un momento y reintenta."
     },
     "labels": {
       "ticker": "Ticker",

@@ -4,7 +4,7 @@ import { jsonBody, researchRequest } from '@/lib/research/client';
 import { cachedFetch } from '@/lib/cache/memoryTTL';
 import { requestCache } from '@/lib/cache/requestCache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
-import { ValidationError } from '@/lib/types/errors';
+import { AppError, isNextRedirectError, ValidationError } from '@/lib/types/errors';
 
 export type AlertType = 'price_above' | 'price_below' | 'price_change' | 'news' | 'earnings';
 
@@ -122,6 +122,42 @@ export async function getUserAlerts(): Promise<Alert[]> {
     const keys = await alertCacheKeys();
     const alerts = await cachedFetch(keys.active, () => researchRequest<ResearchAlertRule[]>('/api/alerts/rules?active=true'), 15);
     return alerts.map(toAlert);
+}
+
+export type AlertsLoadCause = 'session' | 'forbidden' | 'rate' | 'offline' | 'unknown';
+export type UserAlertsResult =
+    | { ok: true; alerts: Alert[] }
+    | { ok: false; cause: AlertsLoadCause };
+
+/**
+ * Variante con causa explícita para la vista: el AppError pierde su
+ * statusCode al cruzar la frontera de la server action, así que la causa se
+ * resuelve aquí, en servidor, donde el código de estado es real. Nunca se
+ * inventa: solo una sesión local ausente/expirada (AuthenticationError,
+ * code AUTH_ERROR, lanzada antes de llamar al backend) prueba 'session' y
+ * justifica el enlace de re-login. Un 401 del backend (RESEARCH_API_ERROR)
+ * NO prueba sesión caducada — también lo produce una firma de servidor
+ * errónea — así que queda 'unknown' con mensaje neutro: nunca se induce al
+ * usuario a re-entrar por un fallo del servidor. 403 -> forbidden (permiso
+ * denegado, sin re-login), 429 -> rate, AppError 5xx / fallo de red ->
+ * offline, cualquier otra cosa -> unknown.
+ */
+export async function getUserAlertsResult(): Promise<UserAlertsResult> {
+    try {
+        return { ok: true, alerts: await getUserAlerts() };
+    } catch (error) {
+        if (isNextRedirectError(error)) throw error;
+        let cause: AlertsLoadCause = 'unknown';
+        if (error instanceof AppError) {
+            if (error.code === 'AUTH_ERROR') cause = 'session';
+            else if (error.statusCode === 403) cause = 'forbidden';
+            else if (error.statusCode === 429) cause = 'rate';
+            else if (error.statusCode >= 500) cause = 'offline';
+        } else if (error instanceof Error && /fetch|network|econn|timeout|abort/i.test(error.message)) {
+            cause = 'offline';
+        }
+        return { ok: false, cause };
+    }
 }
 
 export async function deleteAlert(alertId: string): Promise<void> {
