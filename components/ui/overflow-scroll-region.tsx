@@ -6,6 +6,8 @@ type OverflowScrollRegionProps = {
     /** Nombre accesible de la region (aria-label). */
     label: string;
     className?: string;
+    /** Clases extra de la region scrollable (p.ej. overscroll-x-contain). */
+    regionClassName?: string;
     children: ReactNode;
 };
 
@@ -18,7 +20,7 @@ type OverflowScrollRegionProps = {
  *  - desaparece al llegar al final (nunca anuncia scroll que no existe),
  *  - se enlaza con aria-describedby para lectores de pantalla.
  */
-export function OverflowScrollRegion({ label, className, children }: OverflowScrollRegionProps) {
+export function OverflowScrollRegion({ label, className, regionClassName, children }: OverflowScrollRegionProps) {
     const ref = useRef<HTMLDivElement>(null);
     const hintId = useId();
     const [moreRight, setMoreRight] = useState(false);
@@ -56,7 +58,7 @@ export function OverflowScrollRegion({ label, className, children }: OverflowScr
                 ref={ref}
                 aria-describedby={moreRight ? hintId : undefined}
                 aria-label={label}
-                className="scroll-affordance-x overflow-x-auto"
+                className={`scroll-affordance-x overflow-x-auto${regionClassName ? ' ' + regionClassName : ''}`}
                 role="region"
                 tabIndex={0}
             >
