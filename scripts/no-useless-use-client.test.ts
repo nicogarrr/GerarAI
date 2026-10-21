@@ -136,8 +136,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/layout/IntentLink.tsx': 'useState, jsx-onClick',
   'components/layout/SectionNav.tsx': 'usePathname',
   'components/layout/Sidebar.tsx': 'usePathname, useState, browser:document, jsx-onClick',
-  // pestañas, sondeo cada minuto y botón de refresco manual del panel /mercados.
-  'components/markets/LiveMarketsPanel.tsx': 'useState, useEffect, useCallback, jsx-onClick',
+  // pestañas propias e inyección del script del widget oficial de TradingView.
+  'components/markets/TradingViewMarkets.tsx': 'useEffect, useRef, browser:document',
   'components/media/YouTubeEmbed.tsx': 'useState, jsx-onClick',
   'components/plan/PlanSetupDialog.tsx': 'useRouter, useState, browser:document, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx',
   'components/plan/PlanView.tsx': 'importa cliente: components/data/RecordViews.tsx, importa cliente: components/plan/PlanSetupDialog.tsx',
