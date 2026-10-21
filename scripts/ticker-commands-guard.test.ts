@@ -75,6 +75,9 @@ describe('integración en el buscador Ctrl+K', () => {
         assert.ok(search.includes('value={`stock:${stock.symbol}`}'));
         assert.ok(search.includes('setSelectedValue(result.stocks[0]'));
     });
+    it('con comando tecleado no se pinta «Sin resultados» aunque no haya acciones (QA 21-oct: «asts fa»)', () => {
+        assert.ok(search.includes('displayStocks?.length === 0 && !commandQuery'));
+    });
 });
 
 describe('anclas de destino en la ficha', () => {

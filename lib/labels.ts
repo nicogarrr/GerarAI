@@ -171,6 +171,13 @@ const TIPOS_INSTRUMENTO: Record<string, string> = {
   Warrant: 'Warrant',
   Right: 'Derecho',
   Unit: 'Unidad',
+  // «PUBLIC» es un securityType OpenFIGI (el estándar que usa Finnhub).
+  // OpenFIGI no le da un significado de clase de activo: aparece también en
+  // preferentes 144A (p. ej. BBG0001JJNS5 «SANTAN 6.41 PERP», marketSector
+  // Pfd), así que cualquier traducción («acción», «emisión pública»…)
+  // inferiría semántica que la fuente no afirma. Se muestra el código crudo
+  // del estándar, sin traducir.
+  PUBLIC: 'PUBLIC',
 };
 
 export function etiquetaTipoInstrumento(value: string): string {
