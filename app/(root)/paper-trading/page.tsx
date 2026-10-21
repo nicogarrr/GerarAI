@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { revalidatePath } from 'next/cache';
 
 import { ManualDemoPanel } from '@/components/paper-trading/ManualDemoPanel';
 import {
@@ -178,6 +179,12 @@ export default async function PaperTradingPage() {
         'use server';
         const result = await placeManualOrder(input);
         if (!result.ok) return { ok: false, error: result.message };
+        // Un RECHAZO también persiste fila en el historial (append-only):
+        // sin revalidar, el ledger (prop del server component) no la muestra
+        // hasta recargar a mano (bug QA live 21-oct-2026: venta rechazada
+        // ausente del Historial hasta F5). El fill ya refresca desde el
+        // ticket (router.refresh); el rechazo no tenía ninguna vía.
+        if (result.outcome === 'rejected') revalidatePath('/paper-trading');
         return { ok: true, outcome: result.outcome, reason: result.reason, state: result.state };
     }
 
@@ -185,6 +192,9 @@ export default async function PaperTradingPage() {
         'use server';
         const result = await convertManualDemoCurrency(input);
         if (!result.ok) return { ok: false, error: result.message };
+        // Misma vía que submitFill: una conversión rechazada también persiste
+        // fila y debe aparecer en el Historial sin recarga manual.
+        if (result.outcome === 'rejected') revalidatePath('/paper-trading');
         return { ok: true, outcome: result.outcome, reason: result.reason, state: result.state };
     }
 
