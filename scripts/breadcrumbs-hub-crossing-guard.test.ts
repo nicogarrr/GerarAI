@@ -12,6 +12,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
 import { buildCrumbs } from '../lib/nav/build-crumbs.ts';
+// @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
+import { NAV_SECTIONS } from '../lib/constants.ts';
 
 const labels = (path: string) => buildCrumbs(path).map((crumb) => crumb.label);
 
@@ -46,4 +48,28 @@ void test('el menú de acciones de la ficha tiene scroll propio (10 destinos no 
     const menu = readFileSync('components/research/CompanyActionsMenu.tsx', 'utf8');
     assert.match(menu, /overflow-y-auto/, 'sin scroll interno las últimas entradas caen fuera del viewport');
     assert.match(menu, /max-h-\[/, 'altura máxima acotada al viewport');
+});
+
+void test('el hub /knowledge se nombra Biblioteca también en su propia ruta', () => {
+    assert.deepEqual(labels('/knowledge'), ['Inicio', 'Análisis', 'Biblioteca']);
+    assert.deepEqual(labels('/knowledge-graph'), ['Inicio', 'Análisis', 'Biblioteca', 'Grafo']);
+});
+
+void test('dedupe: /portfolio no repite Cartera cuando la sección ya lo dice', () => {
+    assert.deepEqual(labels('/portfolio'), ['Inicio', 'Cartera', 'Resumen']);
+});
+
+void test('ningún hub muestra un nombre divergente del canónico del menú lateral', () => {
+    for (const hub of NAV_SECTIONS.flatMap((section) => section.items)) {
+        if (hub.href === '/inicio') continue;
+        const crumbs = buildCrumbs(hub.href);
+        const last = crumbs[crumbs.length - 1];
+        const section = crumbs.length > 2 ? crumbs[crumbs.length - 2].label : undefined;
+        // Etiqueta de catálogo distinta solo vale cuando el nombre canónico
+        // ya lo ocupa el nivel de sección (/portfolio -> Cartera > Resumen).
+        assert.ok(
+            last.label === hub.label || section === hub.label,
+            `${hub.href}: miga «${last.label}» diverge del nombre canónico «${hub.label}» del menú lateral`,
+        );
+    }
 });

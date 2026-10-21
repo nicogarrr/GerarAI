@@ -91,18 +91,24 @@ export function buildCrumbs(pathname: string): Crumb[] {
   if (sectionTitle && sectionTitle !== 'Principal') {
     crumbs.push({ label: sectionTitle });
   }
+  // Cualquier nivel que sea un HUB (padre por cruce o el propio ancla) se
+  // nombra como en el menu lateral (NAV_SECTIONS): el catalogo etiqueta
+  // /knowledge como «Conocimiento» porque esa es la cabecera de su subnav
+  // contextual, pero la miga dice «Biblioteca» como el sidebar - un mismo
+  // sitio, un mismo nombre. Si el nombre canonico repite el de la seccion
+  // (/portfolio en Cartera), se conserva la etiqueta del catalogo
+  // («Resumen») para no duplicar niveles.
+  const canonicalName = (href: string) => {
+    const name = HUB_LABELS.get(href);
+    return name && name !== sectionTitle ? name : undefined;
+  };
   // Si el ancla es un hijo declarado (/research/news), su padre (/research)
   // es un nivel real de la jerarquia: sin el la miga saltaba de la seccion
   // al hijo ("Analisis > Noticias") y el padre dejaba de ser alcanzable.
   if (crumbParent && crumbParent.href !== anchor.href) {
-    // Al cruzar de hub, el nivel intermedio se nombra como en el menu lateral
-    // (NAV_SECTIONS): el catalogo etiqueta /knowledge como «Conocimiento»
-    // porque esa es la cabecera de su subnav contextual, pero la miga debe
-    // decir «Biblioteca» como el sidebar - un mismo sitio, un mismo nombre.
-    const label = crossesHub ? (HUB_LABELS.get(crumbParent.href) ?? crumbParent.label) : crumbParent.label;
-    crumbs.push({ href: crumbParent.href, label });
+    crumbs.push({ href: crumbParent.href, label: canonicalName(crumbParent.href) ?? crumbParent.label });
   }
-  crumbs.push({ href: anchor.href, label: anchor.label });
+  crumbs.push({ href: anchor.href, label: canonicalName(anchor.href) ?? anchor.label });
 
   // Segmentos restantes: hijo declarado del nav, sub-ruta con nombre o el
   // propio identificador (ticker, screenId).
