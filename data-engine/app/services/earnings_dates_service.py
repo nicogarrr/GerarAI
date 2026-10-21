@@ -280,6 +280,20 @@ def is_fresh(row: EarningsDate, now: datetime | None = None) -> bool:
     return row.source == "manual" or _aware(row.fetched_at) >= (now or datetime.now(UTC)) - STALE_AFTER
 
 
+def _keep_auto_row(row: EarningsDate, today: date, cutoff: datetime) -> bool:
+    """Fila automatica vigente: futura y renovada; o ya ocurrida y confirmada por la fuente.
+
+    El refresco solo toca fechas >= hoy, asi que una fila pasada deja de renovarse y
+    caducaria a los 3 dias aunque el hecho (resultados ya publicados) no cambie. Una
+    fecha pasada solo es historia si la fuente la daba confirmada (``True``): una fecha
+    estimada o sin dato puede no haber ocurrido nunca ese dia (fantasma) y no se muestra
+    como "publicado".
+    """
+    if row.event_date < today:
+        return row.confirmed is True
+    return _aware(row.fetched_at) >= cutoff
+
+
 def followed_calendar(
     db: Session, desde: date, hasta: date, *, now: datetime | None = None, scope: str = "followed"
 ) -> dict[str, Any]:
@@ -287,6 +301,7 @@ def followed_calendar(
     if scope == "watchlist":
         followed = {t: v for t, v in followed.items() if v["origin"] == "watchlist"}
     cutoff = (now or datetime.now(UTC)) - STALE_AFTER
+    today = (now or datetime.now(UTC)).date()
     rows = [
         row
         for row in db.scalars(
@@ -295,32 +310,45 @@ def followed_calendar(
                    EarningsDate.event_date >= desde, EarningsDate.event_date <= hasta)
             .order_by(EarningsDate.event_date, EarningsDate.ticker)
         ).all()
-        if row.source == "manual" or _aware(row.fetched_at) >= cutoff
+        if row.source == "manual" or _keep_auto_row(row, today, cutoff)
     ]
     # Si hay fila manual y automatica el mismo ticker, la manual (empresa) gana.
     by_ticker: dict[str, list[EarningsDate]] = {}
     for row in rows:
         by_ticker.setdefault(row.ticker, []).append(row)
     events: list[dict[str, Any]] = []
+    covered: set[str] = set()
     for ticker, group in by_ticker.items():
-        chosen = next((r for r in group if r.source == "manual"), group[0])
         company = followed[ticker]["company"]
-        events.append({
-            "ticker": ticker,
-            "company": company.name,
-            "origin": followed[ticker]["origin"],
-            "date": chosen.event_date.isoformat(),
-            "session": chosen.session,
-            "fiscal_label": chosen.fiscal_label,
-            "confirmed": chosen.confirmed,
-            "source": chosen.source_label,
-            "source_url": chosen.source_url,
-        })
+        upcoming = [r for r in group if r.event_date >= today]
+        past = [r for r in group if r.event_date < today]
+        # Futuro: la manual (empresa) gana, si no la mas proxima. Historia: solo la ultima ya ocurrida;
+        # nunca mezclar ambas, o la proxima fecha desapareceria detras de la antigua.
+        chosen_rows: list[EarningsDate] = []
+        if upcoming:
+            chosen_rows.append(next((r for r in upcoming if r.source == "manual"), upcoming[0]))
+            covered.add(ticker)
+        if past:
+            latest = max(r.event_date for r in past)
+            same_day = [r for r in past if r.event_date == latest]
+            chosen_rows.append(next((r for r in same_day if r.source == "manual"), same_day[0]))
+        for chosen in chosen_rows:
+            events.append({
+                "ticker": ticker,
+                "company": company.name,
+                "origin": followed[ticker]["origin"],
+                "date": chosen.event_date.isoformat(),
+                "session": chosen.session,
+                "fiscal_label": chosen.fiscal_label,
+                "confirmed": chosen.confirmed,
+                "source": chosen.source_label,
+                "source_url": chosen.source_url,
+            })
     events.sort(key=lambda e: (e["date"], e["ticker"]))
     days: dict[str, list[dict]] = {}
     for event in events:
         days.setdefault(event["date"], []).append(event)
-    covered = {e["ticker"] for e in events}
+    # "Sin fecha" = sin proxima fecha: tener solo historia no cuenta como cobertura.
     return {
         "desde": desde.isoformat(), "hasta": hasta.isoformat(),
         "followed_count": len(followed), "count": len(events),
