@@ -205,7 +205,14 @@ def test_card_summary_insufficient_excluye_presente_excluido():
         "status": "insufficient_data",
         "missing_inputs": ["revenue", "shares_diluted", "wacc"],
         "excluded_inputs": [
-            {"metric": "shares_diluted", "period": "2025-12-31:FY", "reason": "period_mismatch"}
+            # Estructura REAL producida por financial_snapshot.excluded_present
+            # (available_period/anchor_period/reason), no period/required_period.
+            {
+                "metric": "shares_diluted",
+                "available_period": "2025-12-31:FY",
+                "anchor_period": "2026-03-31:Q1",
+                "reason": "period_mismatch",
+            }
         ],
         "trace": {"engine": "dcf_v2"},
     }
@@ -214,7 +221,11 @@ def test_card_summary_insufficient_excluye_presente_excluido():
     assert "Ingresos, WACC" in text
     assert "faltan Ingresos, shares diluted" not in text
     assert "ya los tenemos" in text
-    assert "desalineación de periodos" in text
+    # El periodo real del dato y el ancla aparecen en la explicación, no
+    # «periodo desconocido»: el dato existe y no se omite.
+    assert "disponible de 2025-12-31:FY" in text
+    assert "ancla de ingresos es 2026-03-31:Q1" in text
+    assert "no hace falta aportarlo" in text
     assert "shares" in text  # explicado como presente-excluido, no pedido
     # gating: missing_inputs sigue bloqueando internamente
     assert valuation["missing_inputs"] == ["revenue", "shares_diluted", "wacc"]
