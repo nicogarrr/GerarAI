@@ -190,7 +190,13 @@ def test_no_news_or_disabled_flag_skip_llm(context, monkeypatch):
     provider = Provider()
     assert call(context, provider, []) == svc.sin_datos()
     monkeypatch.setenv("THESIS_NARRATIVE_LLM_ENABLED", "0")
-    assert call(context, provider) == svc.sin_datos()
+    # Flag apagado con titulares reales: compendio factual rotulado (no LLM),
+    # nunca presentado como analisis. El proveedor NO se llama.
+    result = call(context, provider)
+    assert result != svc.sin_datos()
+    text = "\n".join(parrafo for sec in result for parrafo in sec["parrafos"])
+    assert ITEM["source_headline"] in text
+    assert "sin análisis" in text
     assert provider.calls == 0
 
 

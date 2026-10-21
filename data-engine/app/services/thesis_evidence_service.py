@@ -63,6 +63,10 @@ SEC_EVIDENCE_TAGS: dict[str, tuple[list[str], str]] = {
     "total_assets": (["Assets"], "USD"),
     "net_income": (["NetIncomeLoss", "ProfitLoss"], "USD"),
     "operating_cash_flow": (["NetCashProvidedByUsedInOperatingActivities"], "USD"),
+    "capital_expenditure": (
+        ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"],
+        "USD",
+    ),
     "cash_and_equivalents": (
         ["CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsAndShortTermInvestments"],
         "USD",
@@ -249,7 +253,7 @@ class ThesisEvidenceService:
         except Exception as exc:  # noqa: BLE001 - best-effort
             return _pending("SEC EDGAR companyfacts", f"EDGAR inaccesible: {exc}"[:200])
         us_gaap = ((facts_payload or {}).get("facts") or {}).get("us-gaap") or {}
-        extracted = self._extract_latest_annual(us_gaap)
+        extracted = self._extract_recent_annuals(us_gaap)
         if not extracted:
             return _pending(
                 "SEC EDGAR companyfacts",
@@ -286,29 +290,30 @@ class ThesisEvidenceService:
         }
         imported = 0
         skipped_existing = 0
-        for metric, info in extracted.items():
-            if (metric, info["period"]) in existing:
-                skipped_existing += 1
-                continue
-            value = _decimal(info["value"])
-            if value is None:
-                continue
-            db.add(
-                FinancialFact(
-                    company_id=company.id,
-                    metric=metric,
-                    value=value,
-                    unit=info["unit"],
-                    period=info["period"],
-                    fiscal_year=info["fiscal_year"],
-                    fiscal_quarter=info.get("fiscal_quarter"),
-                    source_id=document.id,
-                    source_type="SEC",
-                    is_reported=True,
-                    confidence=Decimal("0.95"),
+        for metric, infos in extracted.items():
+            for info in infos:
+                if (metric, info["period"]) in existing:
+                    skipped_existing += 1
+                    continue
+                value = _decimal(info["value"])
+                if value is None:
+                    continue
+                db.add(
+                    FinancialFact(
+                        company_id=company.id,
+                        metric=metric,
+                        value=value,
+                        unit=info["unit"],
+                        period=info["period"],
+                        fiscal_year=info["fiscal_year"],
+                        fiscal_quarter=info.get("fiscal_quarter"),
+                        source_id=document.id,
+                        source_type="SEC",
+                        is_reported=True,
+                        confidence=Decimal("0.95"),
+                    )
                 )
-            )
-            imported += 1
+                imported += 1
         db.flush()
         if imported == 0 and skipped_existing == 0:
             return _pending("SEC EDGAR companyfacts", "Hechos sin valor numerico aprovechable.")
@@ -346,6 +351,74 @@ class ThesisEvidenceService:
         except (TypeError, ValueError):
             return False
         return 300 <= days <= 400
+
+    # Serie anual reciente por metrica (por defecto 3 ejercicios): el modelo
+    # a largo plazo necesita historial (p. ej. dos periodos de ingresos) y la
+    # SEC lo publica aunque el ultimo 10-K ya no traiga la linea (HYMC: la
+    # linea de ingresos desaparece tras FY2023, pero FY2022 sigue en
+    # companyfacts). Aditivo: cada (metrica, periodo) se inserta una sola vez.
+    RECENT_ANNUAL_YEARS = 3
+
+    def _extract_recent_annuals(
+        self, us_gaap: dict[str, Any], max_years: int | None = None
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Hasta ``max_years`` hechos ANUALES por metrica, del mas reciente al mas antiguo.
+
+        Mismas reglas que ``_extract_latest_annual`` (F133): duracion anual
+        probada, nunca sumar tags, preferencia declarada entre tags a igual
+        periodo. Si una metrica no tiene NINGUN hecho anual, conserva el
+        comportamiento anterior: un unico hecho con el fallback de
+        ``_extract_latest_annual`` (ultimo trimestre), para no perder
+        empresas que solo reportan trimestres.
+        """
+        limit = max_years or self.RECENT_ANNUAL_YEARS
+        out: dict[str, list[dict[str, Any]]] = {}
+        for metric, (tags, unit) in SEC_EVIDENCE_TAGS.items():
+            # periodo (end) -> (preferencia de tag, filed, entry): a igual
+            # periodo manda el tag preferido; a mismo tag, el envio reciente.
+            by_end: dict[str, tuple[int, str, str, dict[str, Any]]] = {}
+            for preference, tag in enumerate(tags):
+                entries = ((us_gaap.get(tag) or {}).get("units") or {}).get(unit, [])
+                for entry in entries:
+                    if not isinstance(entry, dict) or entry.get("val") is None or not entry.get("end"):
+                        continue
+                    if str(entry.get("form", "")).upper() not in ANNUAL_FORMS:
+                        continue
+                    if not self._is_annual_duration(entry, metric):
+                        continue
+                    end = str(entry["end"])
+                    filed = str(entry.get("filed", ""))
+                    current = by_end.get(end)
+                    if current is None or preference < current[0] or (
+                        preference == current[0] and filed > current[1]
+                    ):
+                        by_end[end] = (preference, filed, tag, entry)
+            if not by_end:
+                legacy_map = self._extract_latest_annual(us_gaap)
+                legacy = legacy_map.get(metric)
+                if legacy is not None:
+                    out[metric] = [legacy]
+                continue
+            infos: list[dict[str, Any]] = []
+            for end in sorted(by_end.keys(), reverse=True)[:limit]:
+                _, _, tag, entry = by_end[end]
+                try:
+                    fiscal_year = int(end[:4])
+                except ValueError:
+                    fiscal_year = None
+                infos.append(
+                    {
+                        "value": entry["val"],
+                        "unit": unit,
+                        "period": f"{end}:FY",
+                        "fiscal_year": fiscal_year,
+                        "fiscal_quarter": "FY",
+                        "concept": tag,
+                        "form": entry.get("form"),
+                    }
+                )
+            out[metric] = infos
+        return out
 
     def _extract_latest_annual(self, us_gaap: dict[str, Any]) -> dict[str, dict[str, Any]]:
         """Ultimo hecho anual por metrica (fallback: ultimo trimestre).
