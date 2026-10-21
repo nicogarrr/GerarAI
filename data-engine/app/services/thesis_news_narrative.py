@@ -300,13 +300,34 @@ def prepare_news_narrative(db: Session, ticker: str, *, provider=None, now=None)
             if company is None:
                 return sin_datos()
             company_copy = SimpleNamespace(ticker=company.ticker)
-            rows = short.scalars(select(NewsEvent).where(NewsEvent.company_id == company.id)
-                                 .order_by(NewsEvent.date.desc()).limit(8)).all()
-            items = [{"id": row.id, "title": row.title, "date": row.date.isoformat(),
-                      "source": row.source, "url": row.url,
-                      "source_headline": (row.metadata_ or {}).get("source_headline"),
-                      "date_source": (row.metadata_ or {}).get("date_source"),
-                      "requires_update": row.requires_update} for row in rows]
+            now_utc = now or datetime.now(UTC)
+            # Sin fecha en SQL (None) ni futuras: ambas consumirian huecos del
+            # limite y news_context las descarta despues. 40 filas de margen
+            # (como evidence: MAX_NEWS_ITEMS * 8) para que filas invalidas no
+            # dejen el compendio vacio habiendo evidencia valida.
+            rows = short.scalars(
+                select(NewsEvent)
+                .where(NewsEvent.company_id == company.id)
+                .where(NewsEvent.date.is_not(None))
+                .where(NewsEvent.date <= now_utc)
+                .order_by(NewsEvent.date.desc())
+                .limit(40)
+            ).all()
+            # Defensivo como _collect_news: una fila envenenada (fecha None,
+            # metadata no dict) nunca tira TODO el snapshot a «Sin datos».
+            items = []
+            for row in rows:
+                try:
+                    metadata = row.metadata_ if isinstance(row.metadata_, dict) else {}
+                    items.append({
+                        "id": row.id, "title": row.title,
+                        "date": row.date.isoformat() if row.date else None,
+                        "source": row.source, "url": row.url,
+                        "source_headline": metadata.get("source_headline"),
+                        "date_source": metadata.get("date_source"),
+                        "requires_update": row.requires_update})
+                except Exception:  # noqa: BLE001 - se salta la fila, no el snapshot
+                    continue
         return maybe_news_narrative_sections(db, company_copy, items, provider=provider, now=now)
     except Exception as exc:  # noqa: BLE001 - preflight no bloquea persistencia
         logger.warning("Snapshot de narrativa: %s; Sin datos", type(exc).__name__)
