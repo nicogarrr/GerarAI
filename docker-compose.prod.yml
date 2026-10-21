@@ -164,6 +164,7 @@ services:
     container_name: cavaai-backend
     restart: unless-stopped
     environment:
+      - EIA_API_KEY=${EIA_API_KEY:-}
       - IBKR_FLEX_TOKEN=${IBKR_FLEX_TOKEN:-}
       - IBKR_FLEX_QUERY_ID=${IBKR_FLEX_QUERY_ID:-}
       - IBKR_FLEX_TENANT_ID=${IBKR_FLEX_TENANT_ID:-}
@@ -274,6 +275,7 @@ services:
     restart: unless-stopped
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "6", "-Q", "default", "prices"]
     environment:
+      - EIA_API_KEY=${EIA_API_KEY:-}
       - IBKR_FLEX_TOKEN=${IBKR_FLEX_TOKEN:-}
       - IBKR_FLEX_QUERY_ID=${IBKR_FLEX_QUERY_ID:-}
       - IBKR_FLEX_TENANT_ID=${IBKR_FLEX_TENANT_ID:-}
@@ -679,6 +681,7 @@ services:
     restart: unless-stopped
     command: ["python", "-m", "app.workers.scheduler"]
     environment:
+      - EIA_API_KEY=${EIA_API_KEY:-}
       - IBKR_FLEX_TOKEN=${IBKR_FLEX_TOKEN:-}
       - IBKR_FLEX_QUERY_ID=${IBKR_FLEX_QUERY_ID:-}
       - IBKR_FLEX_TENANT_ID=${IBKR_FLEX_TENANT_ID:-}
