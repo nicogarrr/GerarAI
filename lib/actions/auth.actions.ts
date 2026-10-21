@@ -24,9 +24,9 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
         let errorMessage: string = ERROR_MESSAGES.AUTH_FAILED;
 
         if (appError.message.includes('email') || appError.message.includes('Email')) {
-            errorMessage = 'This email is already registered. Please sign in instead.';
+            errorMessage = 'Este email ya está registrado. Inicia sesión.';
         } else if (appError.message.includes('password') || appError.message.includes('Password')) {
-            errorMessage = 'Password must be at least 8 characters long.';
+            errorMessage = 'La contraseña debe tener al menos 8 caracteres.';
         } else if (appError.message.includes('unavailable') || appError.message.includes('temporarily')) {
             errorMessage = ERROR_MESSAGES.AUTH_UNAVAILABLE;
         } else {
@@ -71,7 +71,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
         let errorMessage: string = ERROR_MESSAGES.AUTH_FAILED;
 
         if (appError.message.includes('Invalid') || appError.message.includes('invalid')) {
-            errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+            errorMessage = 'Email o contraseña no válidos. Revisa los datos e inténtalo de nuevo.';
         } else if (appError.message.includes('unavailable') || appError.message.includes('temporarily')) {
             errorMessage = ERROR_MESSAGES.AUTH_UNAVAILABLE;
         } else {
@@ -100,7 +100,7 @@ export const verifyTwoFactorTotp = async ({ email, password, totpCode }: { email
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('2FA verification failed:', appError);
-        return { success: false, error: 'Invalid authentication code. Please try again.' };
+        return { success: false, error: 'Código de autenticación no válido. Inténtalo de nuevo.' };
     }
 }
 
@@ -146,7 +146,7 @@ export const activateTwoFactorTotp = async ({ totpCode }: { totpCode: string }):
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('Activate 2FA failed:', appError);
-        return { success: false, error: 'Invalid authentication code. Please try again.' };
+        return { success: false, error: 'Código de autenticación no válido. Inténtalo de nuevo.' };
     }
 }
 
