@@ -30,6 +30,7 @@ import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
+import SectionLoadError from '@/components/system/SectionLoadError';
 import { isNextRedirectError } from '@/lib/types/errors';
 import { formatDate, formatNumber, formatUserDateTime } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
@@ -368,12 +369,11 @@ function AlertsManager() {
                     <div className="text-center text-sm text-gray-500">{t('common.states.loadingAlerts')}</div>
                 </div>
             ) : loadError ? (
-                <div className="rounded-lg border border-red-900/60 bg-red-950/20 p-5 text-sm text-red-200" role="alert">
-                    <p>{loadError}</p>
-                    <Button type="button" variant="outline" size="sm" className="mt-3 min-h-[44px]" onClick={() => void loadAlerts()}>
-                        <RefreshCcw aria-hidden="true" className="mr-2 h-4 w-4" />{t('common.actions.retry')}
-                    </Button>
-                </div>
+                <SectionLoadError
+                    message={loadError}
+                    onRetry={() => void loadAlerts()}
+                    retryLabel={t('common.actions.retry')}
+                />
             ) : alerts.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                     <Bell aria-hidden="true" className="h-12 w-12 mx-auto mb-3 text-gray-500" />
