@@ -46,3 +46,13 @@ export function computeListFit(spaceBelow: number, alreadyScrolled: boolean): Li
 export function listMaxHeightStyle(listMaxHeight: number | null): { maxHeight: number } | undefined {
     return listMaxHeight !== null ? { maxHeight: listMaxHeight } : undefined;
 }
+
+/** true si el input quedó COMPLETAMENTE por encima del pliegue del visual
+ *  viewport (scroll de página con la lista abierta). Con dirección forzada
+ *  hacia abajo, la lista flotaría fuera de pantalla: el componente la
+ *  cierra limpio. Solo mira el borde superior: con el teclado abriéndose
+ *  el input puede quedar un instante bajo el borde inferior y NO se debe
+ *  cerrar (el navegador lo pone a la vista y la re-medición ajusta). */
+export function inputAboveViewport(inputBottom: number, viewportOffsetTop: number): boolean {
+    return inputBottom <= viewportOffsetTop;
+}
