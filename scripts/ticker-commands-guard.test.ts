@@ -11,14 +11,14 @@ describe('comandos de ficha tipo terminal (ASTS FA)', () => {
             ['DES', 'FA', 'HDS', 'N', 'GP', 'TESIS', 'ALERT'],
         );
     });
-    it('cada comando apunta a una ruta real de la ficha', () => {
+    it('cada comando apunta a una ruta real', () => {
         assert.equal(TICKER_COMMANDS.find((c) => c.code === 'DES')!.href('ASTS'), '/research/ASTS');
         assert.equal(TICKER_COMMANDS.find((c) => c.code === 'FA')!.href('ASTS'), '/research/ASTS?view=financials');
         assert.equal(TICKER_COMMANDS.find((c) => c.code === 'HDS')!.href('ASTS'), '/research/ASTS?view=holders');
         assert.equal(TICKER_COMMANDS.find((c) => c.code === 'N')!.href('ASTS'), '/research/news?ticker=ASTS');
         assert.equal(TICKER_COMMANDS.find((c) => c.code === 'GP')!.href('ASTS'), '/research/ASTS#grafico');
         assert.equal(TICKER_COMMANDS.find((c) => c.code === 'TESIS')!.href('ASTS'), '/research/ASTS/tesis');
-        assert.equal(TICKER_COMMANDS.find((c) => c.code === 'ALERT')!.href('ASTS'), '/research/ASTS#alerta');
+        assert.equal(TICKER_COMMANDS.find((c) => c.code === 'ALERT')!.href('ASTS'), '/alerts?symbol=ASTS');
     });
     it('el ticker se escapa en la ruta (BRK.B y tickers con mercado)', () => {
         assert.equal(TICKER_COMMANDS.find((c) => c.code === 'FA')!.href('BRK.B'), '/research/BRK.B?view=financials');
@@ -80,7 +80,10 @@ describe('integración en el buscador Ctrl+K', () => {
     });
 });
 
-describe('anclas de destino en la ficha', () => {
+describe('anclas en la ficha', () => {
+    // `#alerta` ya NO es destino del comando ALERT (ahora /alerts?symbol=);
+    // queda para enlaces directos y su retirada/limpieza del comentario en
+    // page.tsx espera la reserva de esa ficha con pilot.
     const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
     it('#grafico envuelve la cotización de cabecera y #alerta el botón de alerta', () => {
         assert.ok(page.includes('id="grafico"'));
