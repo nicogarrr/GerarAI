@@ -56,7 +56,7 @@ import type { ClientSession } from 'mongoose';
 const DEMO_NOTICES = [
     'Cuenta demo manual: el dinero es ficticio y no toca tu broker real.',
     'Cada ejecución es un fill manual simulado: introduces tú el precio; no se comprueba contra ninguna cotización en vivo y no equivale a una ejecución real.',
-    'Comisiones: en fase 1 no hay comisión automática; si introduces una, se registra tal cual como simulada.',
+    'Comisiones: las órdenes registradas desde este formulario se anotan con comisión 0 simulada (simplificación de la demo, no la tarifa de ningún bróker); las comisiones históricas registradas se conservan tal cual y solo mueven el efectivo.',
     'El libro no aplica acciones corporativas (splits, dividendos): una posición mantenida a través de una queda descuadrada.',
 ];
 

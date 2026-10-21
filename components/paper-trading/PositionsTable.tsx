@@ -55,7 +55,7 @@ export function PositionsTable({ positions, valuation }: { positions: DemoPositi
                     ))}
                 </TableBody>
             </Table>
-            <p className="text-xs text-gray-500">Sin ajustes por splits ni dividendos (simplificación de la demo).</p>
+            <p className="text-xs text-gray-500">Realizado antes de comisiones (las comisiones solo mueven el efectivo). Sin ajustes por splits ni dividendos (simplificación de la demo).</p>
         </div>
     );
 }
