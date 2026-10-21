@@ -45,6 +45,17 @@ test('el realizado se etiqueta como antes de comisiones en panel y tabla (delta 
     assert.doesNotMatch(actions, /si introduces una, se registra tal cual/);
 });
 
+test('la celda N/D de escritorio no se rompe en líneas: motivo expandible y accesible', () => {
+    // QA píxeles 21-oct-2026: el aviso de opción sin valorar forzaba ~8
+    // líneas; y title/truncate solo NO vale (auditor): el motivo completo
+    // debe ser visible/expandible con teclado y táctil (details nativo).
+    // En móvil se muestra entero bajo el nombre.
+    const table = readFileSync(`${COMPONENTS_DIR}/PositionsTable.tsx`, 'utf8');
+    assert.match(table, /<summary className="[^"]*">Motivo<\/summary>/);
+    assert.match(table, /<p className="mt-1 max-w-56 whitespace-normal">\{row\?\.note \?\? 'Sin valoración\.'\}<\/p>/);
+    assert.doesNotMatch(table, /truncate text-xs text-gray-500" title=/);
+});
+
 test('la UI declara el origen manual simulado sin prometer ejecución real', () => {
     const panel = readFileSync(`${COMPONENTS_DIR}/ManualDemoPanel.tsx`, 'utf8');
     assert.match(panel, /ficticio/i, 'el panel debe declarar el saldo ficticio');
