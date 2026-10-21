@@ -29,6 +29,12 @@ const SUBROUTE_LABELS: Record<string, string> = {
   // Modulo Inversores: sub-paginas fijas (no son un slug de inversor).
   // Sub-pestaña de Calendarios (#1777): sin entrada, la miga salia cruda.
   'suscripcion': 'Suscripción',
+  'resultados': 'Resultados',
+  // Sub-paginas de ficha: sin entrada la miga salia en minuscula cruda
+  // ("… > ASTS > tesis") mientras el H1 dice "Tesis de inversión".
+  'tesis': 'Tesis',
+  'shorts': 'Cortos públicos',
+  'filings': 'Documentos',
 };
 
 /** Slug sin etiqueta propia (p. ej. "warren-buffett") -> "Warren Buffett" en vez del slug crudo. */
