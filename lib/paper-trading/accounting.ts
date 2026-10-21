@@ -102,7 +102,19 @@ export function computeManualDemoAccount(
                 return;
             }
             const closing = fill.quantity;
-            cash[fill.currency] = r2(cash[fill.currency] + closing * fill.price * mult - fill.fee);
+            const proceeds = r2(closing * fill.price * mult);
+            // Sin sobregiro TAMBIÉN en el replay: la comisión debe caber en
+            // el cash que queda tras abonar la venta EN SU FECHA (espejo del
+            // chequeo de compra). El fast-path mira el cash actual; una venta
+            // antedatada con comisión alta podía quedar en negativo en su
+            // fecha sin violation y el estado final parecía sano.
+            if (cash[fill.currency] + proceeds < fill.fee) {
+                violations.push(
+                    `venta ${fill.clientOrderId} (${key}): comisión ${fill.fee} supera el efectivo disponible tras la venta (${cash[fill.currency]} + ${proceeds}); orden rechazada entera, sin movimiento`
+                );
+                return;
+            }
+            cash[fill.currency] = r2(cash[fill.currency] + proceeds - fill.fee);
             let remaining = closing;
             let pnl = realized.get(key) ?? 0;
             while (remaining > 0 && queue.length > 0) {
