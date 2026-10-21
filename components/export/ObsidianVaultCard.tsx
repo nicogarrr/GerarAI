@@ -32,7 +32,9 @@ export default function ObsidianVaultCard() {
             link.href = url;
             link.download = 'gerarai-obsidian-vault.zip';
             link.click();
-            URL.revokeObjectURL(url);
+            // Revocación diferida: revocar en el mismo tick puede cortar la
+            // descarga en Safari/iOS antes de que empiece.
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
         } catch {
             setError('No se pudo descargar el vault. Inténtalo de nuevo en unos segundos.');
         } finally {
