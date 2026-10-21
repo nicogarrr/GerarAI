@@ -13,6 +13,7 @@ import { t } from '@/lib/i18n/t';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { OverflowScrollRegion } from '@/components/ui/overflow-scroll-region';
 import Link from 'next/link';
 import { RefreshCcw } from 'lucide-react';
 import FollowButton from '@/components/screener/FollowButton';
@@ -264,7 +265,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
               </div>
               )
             ) : (
-              <div aria-label="Oportunidades por sector" className="scroll-affordance-x overflow-x-auto" role="region" tabIndex={0}>
+              <OverflowScrollRegion label="Oportunidades por sector">
                 {/*
                   Misma <table> en el DOM en todos los viewports (accesibilidad y
                   tests): en <md las filas se muestran como cards apiladas
@@ -326,7 +327,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </OverflowScrollRegion>
             )}
           </CardContent>
         </Card>

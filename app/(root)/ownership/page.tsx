@@ -5,6 +5,7 @@ import { ExternalLink, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import BackendOffline from '@/components/system/BackendOffline';
+import { OverflowScrollRegion } from '@/components/ui/overflow-scroll-region';
 import { SyncPortfoliosButton } from '../inversores/_components/SyncPortfoliosButton';
 import {
     getManagerChanges,
@@ -172,7 +173,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                 cobertura {holdings.coverage}
                             </Badge>
                         </div>
-                        <div aria-label="Posiciones 13F declaradas" className="mt-4 overflow-x-auto" role="region" tabIndex={0}>
+                        <OverflowScrollRegion label="Posiciones 13F declaradas" className="mt-4">
                             <table className="w-full min-w-[820px] text-left text-sm">
                                 <caption className="sr-only">Posiciones declaradas en el último informe 13F del gestor, tal como constan en EDGAR</caption>
                                 <thead className="text-xs uppercase text-gray-500">
@@ -216,7 +217,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
+                        </OverflowScrollRegion>
                         {holdings.provenance ? (
                             <p className="mt-3 text-xs text-gray-500">
                                 Fuente: {holdings.provenance.source} ({holdings.provenance.source_kind}),
@@ -245,7 +246,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                             </Badge>
                         </div>
                         <p className="mt-2 text-xs text-gray-500">{changes.compared_accessions?.rule}</p>
-                        <div aria-label="Cambios 13F trimestre a trimestre" className="mt-4 overflow-x-auto" role="region" tabIndex={0}>
+                        <OverflowScrollRegion label="Cambios 13F trimestre a trimestre" className="mt-4">
                             <table className="w-full min-w-[720px] text-left text-sm">
                                 <caption className="sr-only">Cambios de cada emisor entre los dos últimos informes 13F, con acciones y valor antes y ahora</caption>
                                 <thead className="text-xs uppercase text-gray-500">
@@ -275,7 +276,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
+                        </OverflowScrollRegion>
                         {changes.changes.every((c) => c.change === 'unchanged') ? (
                             <p className="mt-3 text-sm text-gray-400">Sin movimientos entre los dos últimos informes.</p>
                         ) : null}
