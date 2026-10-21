@@ -4,8 +4,11 @@
  * raton: `ASTS FA` -> financieros, `ASTS N` -> noticias, etc.
  *
  * Cada comando apunta a una ruta que YA existe (vista `?view=` de la ficha,
- * subruta propia o ancla de la cabecera); ningun comando inventa una pagina.
- * Las anclas `#grafico` y `#alerta` las expone la propia ficha.
+ * subruta propia, ancla de la cabecera o el gestor de alertas); ningun
+ * comando inventa una pagina. El ancla `#grafico` la expone la propia ficha.
+ * ALERT lleva a `/alerts?symbol=<ticker>`, el deep-link que ya usa
+ * QuickAlertButton: el gestor abre el dialogo de creacion pre-rellenado y
+ * no se crea nada hasta el envio explicito del formulario por el usuario.
  *
  * Test funcional: scripts/ticker-commands-guard.test.ts.
  */
@@ -25,7 +28,7 @@ export const TICKER_COMMANDS: readonly TickerCommand[] = [
   { code: 'N', label: 'Noticias', href: (t) => `/research/news?ticker=${encodeURIComponent(t)}` },
   { code: 'GP', label: 'Gráfico', href: (t) => `/research/${encodeURIComponent(t)}#grafico` },
   { code: 'TESIS', label: 'Tesis', href: (t) => `/research/${encodeURIComponent(t)}/tesis` },
-  { code: 'ALERT', label: 'Alertas', href: (t) => `/research/${encodeURIComponent(t)}#alerta` },
+  { code: 'ALERT', label: 'Alertas', href: (t) => `/alerts?symbol=${encodeURIComponent(t)}` },
 ] as const;
 
 export type TickerCommandQuery = {
