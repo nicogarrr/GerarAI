@@ -53,11 +53,15 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
             preferredIndustry: { type: 'string', required: false },
         },
     },
+    // nextCookies() SIEMPRE el ultimo: su hook `after` copia a next/headers los
+    // Set-Cookie acumulados hasta ese momento. Si va antes de twoFactor(), el
+    // navegador recibe el session_token previo al 2FA y nunca la cookie
+    // two_factor (ni el borrado de sesion), y el paso TOTP no puede completarse.
     plugins: [
-        nextCookies(),
         twoFactor({
             issuer: "CavaAI",
         }),
+        nextCookies(),
     ],
 });
 

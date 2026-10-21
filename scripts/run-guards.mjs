@@ -47,7 +47,7 @@ const files = guards.map((name) => path.posix.join('scripts', name));
 
 console.log(`run-guards: ${files.length} guard(s) descubiertos en scripts/*.test.{ts,mjs}`);
 
-const result = spawnSync(process.execPath, ['--experimental-strip-types', '--test', ...files], {
+const result = spawnSync(process.execPath, ['--experimental-strip-types', '--experimental-test-module-mocks', '--test', ...files], {
   cwd: REPO_ROOT,
   stdio: 'inherit',
 });
