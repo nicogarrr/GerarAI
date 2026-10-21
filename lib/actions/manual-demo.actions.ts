@@ -602,17 +602,21 @@ async function finnhubOnlyQuote(symbol: string): Promise<ValuationQuote | null> 
 
 const LISTING_TTL_MS = 6 * 3_600_000;
 let usListing: { at: number; map: Map<string, string> } | null = null;
+let listingInflight: Promise<Map<string, string> | null> | null = null;
 
 /**
- * Divisa de cotizacion de un simbolo segun el listado US de Finnhub
- * (/stock/symbol?exchange=US, tier gratis; campo currency). null si no hay
- * clave, el listado falla o el simbolo no esta: entonces la fila sale N/D.
- * Un fallo NO se cachea; un listado correcto se reutiliza 6 h en memoria.
+ * Listado US de Finnhub (/stock/symbol?exchange=US, tier gratis; campo
+ * currency) para verificar la divisa. Una sola descarga a la vez: las
+ * llamadas concurrentes comparten la misma promesa. Un fallo (red, 429,
+ * vacio) devuelve null y NO se cachea, asi que la siguiente invocacion
+ * reintenta; un listado correcto se reutiliza 6 h en memoria.
  */
-async function finnhubListingCurrency(symbol: string): Promise<string | null> {
+function getUsListing(): Promise<Map<string, string> | null> {
     const token = process.env.FINNHUB_API_KEY;
-    if (!token) return null;
-    if (!usListing || Date.now() - usListing.at > LISTING_TTL_MS) {
+    if (!token) return Promise.resolve(null);
+    if (usListing && Date.now() - usListing.at <= LISTING_TTL_MS) return Promise.resolve(usListing.map);
+    if (listingInflight) return listingInflight;
+    listingInflight = (async () => {
         try {
             const base = process.env.FINNHUB_BASE_URL || 'https://finnhub.io/api/v1';
             const response = await fetch(`${base}/stock/symbol?exchange=US&token=${encodeURIComponent(token)}`, {
@@ -623,11 +627,14 @@ async function finnhubListingCurrency(symbol: string): Promise<string | null> {
             const map = parseListingCurrencies(await response.json());
             if (map.size === 0) return null;
             usListing = { at: Date.now(), map };
+            return map;
         } catch {
             return null;
+        } finally {
+            listingInflight = null;
         }
-    }
-    return usListing.map.get(symbol.toUpperCase()) ?? null;
+    })();
+    return listingInflight;
 }
 
 /**
@@ -665,16 +672,18 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
         ];
         const symbols = allSymbols.slice(0, MAX_VALUATION_SYMBOLS);
         const notQueried = new Set(allSymbols.slice(MAX_VALUATION_SYMBOLS));
-        const settled = await Promise.allSettled(symbols.map((symbol) => finnhubOnlyQuote(symbol)));
         const quotes: Record<string, ValuationQuote | null> = {};
-        await Promise.all(
-            symbols.map(async (symbol, i) => {
-                const r = settled[i];
-                const quote = r.status === 'fulfilled' ? r.value : null;
-                // La divisa se verifica contra el listado de Finnhub; sin ella, N/D.
-                quotes[symbol] = quote ? { ...quote, currency: await finnhubListingCurrency(symbol) } : null;
-            }),
-        );
+        // Un solo lookup de divisa ANTES del reparto: sin listado no se piden
+        // cotizaciones (serian inutiles: sin divisa verificada la fila es N/D).
+        const listing = symbols.length > 0 ? await getUsListing() : null;
+        const verifiable = listing ? symbols.filter((s) => listing.has(s)) : [];
+        const settled = await Promise.allSettled(verifiable.map((symbol) => finnhubOnlyQuote(symbol)));
+        for (const symbol of symbols) quotes[symbol] = null;
+        verifiable.forEach((symbol, i) => {
+            const r = settled[i];
+            const quote = r.status === 'fulfilled' ? r.value : null;
+            quotes[symbol] = quote ? { ...quote, currency: listing?.get(symbol) ?? null } : null;
+        });
         return { ok: true, valuation: valuePositions(positions, quotes, { notQueried }), asOf: Date.now() };
     } catch (error) {
         return unexpectedError('getManualDemoValuation', error);
