@@ -73,8 +73,14 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
   // banner visible en español, nunca escalar al boundary global.
   let result: ScreenResult | null = null;
   let screenError: string | null = null;
+  // Envío con la condición incompleta (sin métrica o sin valor): el usuario
+  // sí intentó ejecutar (la URL trae los parámetros del formulario) pero
+  // runAdHocScreen no llega a consultar. Antes la página se recargaba sin
+  // resultados y sin ningún aviso (bug QA live 21-oct-2026).
+  const attemptedRun = query.left !== undefined || query.right !== undefined || query.ranking !== undefined;
+  const incompleteRun = attemptedRun && (!query.left || !query.right);
   try {
-    result = await runAdHocScreen({
+    result = incompleteRun ? null : await runAdHocScreen({
       left: query.left ?? '',
       operator,
       right: query.right ?? '',
@@ -107,6 +113,11 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
 
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2"><Filter aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Ejecutar un filtro ad-hoc</h2></div>
+        {incompleteRun ? (
+          <p role="alert" className="mb-4 rounded-lg border border-amber-800 bg-amber-950/40 p-3 text-sm text-amber-200">
+            El filtro no se ejecutó: falta la métrica o el valor de la condición. Complétalos y pulsa Ejecutar.
+          </p>
+        ) : null}
         <form className="space-y-4" method="get">
           <CriterionFields availableMetrics={metricCoverage ?? undefined} customMetrics={metrics} initialLeft={query.left ?? ''} initialOperator={operator} initialRight={query.right ?? ''} required />
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"><RankingFields availableMetrics={metricCoverage ?? undefined} customMetrics={metrics} initialDirection={query.direction} initialFormula={query.ranking} /><SubmitButton /></div>
