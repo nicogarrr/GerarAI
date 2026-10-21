@@ -13,30 +13,52 @@ const panel = readFileSync('components/paper-trading/ManualDemoPanel.tsx', 'utf8
 
 describe('auto-refresco de la valoración demo', () => {
     it('reutiliza la acción de valoración existente (sin endpoint ni fanout nuevo)', () => {
-        // Solo llama a refreshValuation (prop): nada de fetch propio ni actions.
         assert.doesNotMatch(panel, /fetch\(|lib\/actions\//);
-        assert.match(panel, /refreshValuation\(\)/);
+        assert.match(panel, /await refreshValuation\(\)/);
     });
 
-    it('cadencia de 60 s, la del patrón Mercados del mismo proveedor', () => {
+    it('cadencia base de 60 s sin afirmar cuota de proveedor verificada', () => {
         assert.match(panel, /VALUATION_REFRESH_MS = 60_000/);
         assert.match(panel, /window\.setInterval\(tick, VALUATION_REFRESH_MS\)/);
-        assert.match(panel, /window\.clearInterval\(timer\)/);
+        // Finnhub ≠ Yahoo de Mercados: la cuota del plan no se da por verificada.
+        assert.match(panel, /la cuota del plan Finnhub NO está verificada/);
     });
 
-    it('puertas de sostenibilidad: pestaña visible, posiciones abiertas y sin solapes en vuelo', () => {
-        assert.match(panel, /document\.visibilityState !== 'visible' \|\| inFlight\) return/);
+    it('candado y secuencia COMPARTIDOS entre botón manual y auto', () => {
+        // Un solo candado ref compartido; nada de contadores locales del efecto.
+        assert.match(panel, /refreshLock = useRef\(\{ inFlight: false, seq: 0, failures: 0, lastStart: 0 \}\)/);
+        assert.doesNotMatch(panel, /let inFlight = false/);
+        assert.match(panel, /if \(lock\.inFlight\) return/);
+        // Descarte de respuestas viejas: solo aplica si su secuencia sigue al frente.
+        assert.match(panel, /const mySeq = \+\+lock\.seq/);
+        assert.match(panel, /if \(mySeq !== lock\.seq\) return/);
+        // El candado se libera siempre.
+        assert.match(panel, /finally \{\s*lock\.inFlight = false/);
+        // Manual y auto usan la MISMA ruta protegida.
+        assert.match(panel, /startTransition\(\(\) => runRefresh\(\)\)/);
+    });
+
+    it('puertas de sostenibilidad: visible, con posiciones, backoff exponencial ante fallos', () => {
+        assert.match(panel, /document\.visibilityState !== 'visible' \|\| !due\(\)\) return/);
         assert.match(panel, /if \(!refreshValuation \|\| !hasPositions\) return/);
-        assert.match(panel, /let inFlight = false/);
-        assert.match(panel, /inFlight = false/);
-        // Repuesta al volver a la pestaña solo si pasó un ciclo completo.
+        // Backoff 60s×2^fallos con tope; reset en éxito. Cubre también los
+        // reintentos del listado US (un fallo no se cachea server-side).
+        assert.match(panel, /MAX_REFRESH_BACKOFF_MS = 16 \* 60_000/);
+        assert.match(panel, /VALUATION_REFRESH_MS \* 2 \*\* lock\.failures/);
+        assert.match(panel, /lock\.failures = 0/);
+        assert.match(panel, /lock\.failures \+= 1/);
+        // Repuesta al volver a la pestaña respetando la espera vigente y
+        // limpieza al desmontar (timer + listener).
         assert.match(panel, /visibilitychange/);
-        assert.match(panel, /Date\.now\(\) - lastAttempt >= VALUATION_REFRESH_MS/);
+        assert.match(panel, /window\.clearInterval\(timer\)/);
+        assert.match(panel, /document\.removeEventListener\('visibilitychange', onVisible\)/);
     });
 
-    it('el botón manual se conserva como refresco inmediato', () => {
+    it('el botón manual se conserva como refresco inmediato y sin botón no-op', () => {
         assert.match(panel, /Actualizar cotizaciones|Consultar cotizaciones/);
         assert.match(panel, /onClick=\{onRefresh\}/);
+        // Sin refreshValuation no se ofrece botón que no hace nada.
+        assert.match(panel, /onRefresh=\{refreshValuation \? onRefresh : null\}/);
     });
 
     it('el copy ya no afirma que no se actualiza sola y sigue siendo honesto', () => {

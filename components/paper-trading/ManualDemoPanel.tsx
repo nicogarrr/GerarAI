@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
@@ -35,11 +35,15 @@ export type RefreshResult = { ok: true; valuation: DemoValuation; asOf: number }
 
 const ASOF_FORMAT = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
-/** Cadencia del auto-refresco de la valoración: la misma que Mercados
- *  (LiveMarketsPanel), patrón ya asumido de la app para cotizaciones del
- *  mismo proveedor. Sin endpoint nuevo: cada ciclo reutiliza la acción de
- *  valoración existente (1 llamada Finnhub por símbolo distinto, tope 25). */
+/** Cadencia base del auto-refresco: 60 s, el patrón de sondeo ya usado por
+ *  la app (LiveMarketsPanel). OJO: Mercados usa Yahoo y esta valoración usa
+ *  Finnhub; la cuota del plan Finnhub NO está verificada, así que el diseño
+ *  no depende de ella: solo cuenta con pestaña visible, 1 llamada por
+ *  símbolo distinto por ciclo (tope 25, acción existente) y backoff
+ *  exponencial ante fallos (también cubre reintentos del listado US, que un
+ *  fallo no cachea). */
 const VALUATION_REFRESH_MS = 60_000;
+const MAX_REFRESH_BACKOFF_MS = 16 * 60_000;
 
 function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
     valuation: DemoValuation;
@@ -101,41 +105,61 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
     const positions = account?.positions ?? [];
     const valuationIsCurrent = valuation !== null && valuationMatches(valuation, positions);
     const activeValuation = valuationIsCurrent ? valuation : null;
+    // Candado y secuencia COMPARTIDOS entre el botón manual y el
+    // auto-refresco (refs: solo se tocan en handlers/efectos, no en render):
+    // nunca hay dos consultas en vuelo y una respuesta vieja no pisa el
+    // resultado de una más nueva (p. ej. manual tras un tick lento).
+    const refreshLock = useRef({ inFlight: false, seq: 0, failures: 0, lastStart: 0 });
     const runRefresh = useCallback(async () => {
         if (!refreshValuation) return;
-        const result = await refreshValuation();
-        if (result.ok) {
-            setValuation(result.valuation);
-            setAsOf(result.asOf);
-            setRefreshError(null);
-        } else {
-            setRefreshError(`No se pudieron actualizar las cotizaciones: ${result.error}`);
+        const lock = refreshLock.current;
+        if (lock.inFlight) return;
+        lock.inFlight = true;
+        const mySeq = ++lock.seq;
+        lock.lastStart = Date.now();
+        try {
+            const result = await refreshValuation();
+            if (mySeq !== lock.seq) return; // llegó una consulta más nueva: esta se descarta
+            if (result.ok) {
+                lock.failures = 0;
+                setValuation(result.valuation);
+                setAsOf(result.asOf);
+                setRefreshError(null);
+            } else {
+                lock.failures += 1;
+                setRefreshError(`No se pudieron actualizar las cotizaciones: ${result.error}`);
+            }
+        } catch {
+            lock.failures += 1;
+            if (mySeq === lock.seq) setRefreshError('No se pudieron actualizar las cotizaciones: fallo de red o del servidor.');
+        } finally {
+            lock.inFlight = false;
         }
     }, [refreshValuation]);
-    const onRefresh = refreshValuation ? () => startTransition(() => runRefresh()) : null;
+    const onRefresh = () => {
+        if (refreshValuation) startTransition(() => runRefresh());
+    };
 
     // Auto-refresco de la valoración (pedido de Nico, 21-oct-2026: «No se
-    // actualiza sola»). Puertas: pestaña visible, posiciones abiertas y sin
-    // consulta en vuelo (nada de fanout invisible ni solapes). Al volver a la
-    // pestaña se repone si el último intento tiene más de un ciclo. Los
-    // contadores son locales del efecto (patrón CompanyHeaderQuote): no son
-    // estado de render.
+    // actualiza sola»). Puertas: pestaña visible, posiciones abiertas, candado
+    // compartido y backoff exponencial tras fallos (60s×2^n, tope 16 min).
+    // Al volver a la pestaña se repone si el último intento ya cumplió su
+    // espera. Sin endpoint nuevo: reutiliza la acción de valoración.
     const hasPositions = positions.length > 0;
     useEffect(() => {
         if (!refreshValuation || !hasPositions) return;
-        let inFlight = false;
-        let lastAttempt = 0;
+        const due = () => {
+            const lock = refreshLock.current;
+            const wait = Math.min(VALUATION_REFRESH_MS * 2 ** lock.failures, MAX_REFRESH_BACKOFF_MS);
+            return Date.now() - lock.lastStart >= wait;
+        };
         const tick = () => {
-            if (document.visibilityState !== 'visible' || inFlight) return;
-            inFlight = true;
-            lastAttempt = Date.now();
-            void runRefresh().finally(() => {
-                inFlight = false;
-            });
+            if (document.visibilityState !== 'visible' || !due()) return;
+            void runRefresh();
         };
         const timer = window.setInterval(tick, VALUATION_REFRESH_MS);
         const onVisible = () => {
-            if (document.visibilityState === 'visible' && Date.now() - lastAttempt >= VALUATION_REFRESH_MS) tick();
+            if (document.visibilityState === 'visible' && due()) tick();
         };
         document.addEventListener('visibilitychange', onVisible);
         return () => {
@@ -184,8 +208,8 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                 <TabsContent value="posiciones" className="mt-4">
                     <Panel title="Posiciones abiertas">
                         {activeValuation ? (
-                            <ValuationSummary valuation={activeValuation} asOf={asOf} onRefresh={onRefresh} pending={pending} error={refreshError} />
-                        ) : onRefresh && positions.length > 0 ? (
+                            <ValuationSummary valuation={activeValuation} asOf={asOf} onRefresh={refreshValuation ? onRefresh : null} pending={pending} error={refreshError} />
+                        ) : refreshValuation && positions.length > 0 ? (
                             <div className="mb-3 space-y-2">
                                 <p className="text-xs text-gray-500">
                                     {valuation
