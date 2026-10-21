@@ -16,6 +16,7 @@ import {
   Home,
   Library,
   Lightbulb,
+  FlaskConical,
   LineChart,
   Newspaper,
   Receipt,
@@ -149,6 +150,7 @@ export const ROUTE_CATALOG: NavSection[] = [
       { href: '/corporate-actions', label: 'Acciones corp.', icon: Building2, hub: '/portfolio' },
       { href: '/calendar', label: 'Calendario', icon: CalendarDays, hub: '/portfolio' },
       { href: '/portfolio/stress', label: 'Estrés histórico', icon: LineChart, hub: '/portfolio' },
+      { href: '/paper-trading', label: 'Cuenta demo manual', icon: FlaskConical, hub: '/portfolio' },
     ],
   },
   {
