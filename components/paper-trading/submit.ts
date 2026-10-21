@@ -100,7 +100,10 @@ export type HistoryRow = {
 export const NUM_INPUT_HINT = 'decimales con coma o punto, sin separador de miles (1234,56)';
 
 export function parseEsNumber(raw: string): number {
-    const cleaned = raw.trim().replace(/\s/g, '');
+    // Se recortan espacios solo en los extremos (pegar desde otra app).
+    // Cualquier espacio INTERNO invalida: no se fusionan dígitos a ciegas
+    // ("1 2" NO es 12, "1 234,5" es un miles encubierto y se rechaza).
+    const cleaned = raw.trim();
     if (!/^-?\d+([.,]\d+)?$/.test(cleaned)) return Number.NaN;
     return Number(cleaned.replace(',', '.'));
 }
