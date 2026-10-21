@@ -119,6 +119,36 @@ ManualDemoTradeSchema.index({ userId: 1, clientOrderId: 1 }, { unique: true });
 ManualDemoTradeSchema.index({ userId: 1, executedAt: 1 });
 ManualDemoTradeSchema.index({ userId: 1, createdAt: -1 });
 
+// Validaciones cruzadas (P1 del auditor): la integridad NO depende solo
+// de las actions. Un fill grabado lleva precio>0 y fecha; un rechazo nunca
+// lleva precio; fx exige origen/destino distintos; opción exige contrato
+// completo y acción lo prohíbe.
+// Mongoose 9: middleware de documento async (sin callback next).
+ManualDemoTradeSchema.pre('validate', async function validateManualDemoCross(this: ManualDemoTradeDoc) {
+    const bad = (msg: string): never => { throw new Error(`manual-demo: ${msg}`); };
+    if (this.kind === 'fx') {
+        if (!this.fxFrom || !this.fxTo) bad('fx requiere fxFrom y fxTo');
+        if (this.fxFrom === this.fxTo) bad('fx con origen === destino crearía dinero');
+        if (!(this.fillPrice == null || this.fillPrice > 0)) bad('fx: tipo de cambio (fillPrice) debe ser > 0');
+    } else if (this.status === 'filled' && !this.currency) {
+        bad('fill de acción/opción requiere divisa (currency)');
+    }
+    if (this.kind === 'opcion') {
+        const c = this.contract as { underlying?: string; expiry?: string; strike?: number } | null;
+        if (!c || !c.underlying || !c.expiry || !(typeof c.strike === 'number' && c.strike > 0)) {
+            bad('opción requiere contrato completo (underlying, expiry, strike>0)');
+        }
+    } else if (this.contract != null) {
+        bad('acción no lleva contrato de opción');
+    }
+    if (this.status === 'filled') {
+        if (!(typeof this.fillPrice === 'number' && this.fillPrice > 0)) bad('filled requiere fillPrice > 0');
+        if (!(this.executedAt instanceof Date) || Number.isNaN(this.executedAt.getTime())) bad('filled requiere executedAt');
+    } else if (this.fillPrice != null) {
+        bad('rejected no puede llevar fillPrice');
+    }
+});
+
 export const ManualDemoTrade: Model<ManualDemoTradeDoc> =
     (models?.ManualDemoTrade as Model<ManualDemoTradeDoc>) ||
     model<ManualDemoTradeDoc>('ManualDemoTrade', ManualDemoTradeSchema);

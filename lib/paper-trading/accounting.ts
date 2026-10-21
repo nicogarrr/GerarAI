@@ -34,6 +34,10 @@ type Lot = { quantity: number; price: number };
 
 const multiplierOf = (fill: Fill) => (fill.instrument.kind === 'opcion' ? fill.instrument.contract.multiplier : 1);
 
+/** Movimientos de cash a CÉNTIMOS (P3): alineado con optionCashDelta del
+ * módulo de opciones; evita deriva de floats entre validación y libro. */
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
 export function computeManualDemoAccount(
     starting: Record<Currency, number>,
     entries: LedgerEntry[]
@@ -66,8 +70,8 @@ export function computeManualDemoAccount(
             violations.push(`fx ${fx.clientOrderId}: saldo ${fx.from} insuficiente (${cash[fx.from]} < ${fx.amountFrom})`);
             return;
         }
-        cash[fx.from] -= fx.amountFrom;
-        cash[fx.to] += fx.amountFrom * fx.rate;
+        cash[fx.from] = r2(cash[fx.from] - fx.amountFrom);
+        cash[fx.to] = r2(cash[fx.to] + fx.amountFrom * fx.rate);
     };
 
     const applyFill = (fill: Fill) => {
@@ -77,14 +81,14 @@ export function computeManualDemoAccount(
         const mult = multiplierOf(fill);
         const queue = lots.get(key) ?? [];
         if (fill.side === 'buy') {
-            const cost = fill.quantity * fill.price * mult + fill.fee;
+            const cost = r2(fill.quantity * fill.price * mult + fill.fee);
             if (cash[fill.currency] < cost) {
                 violations.push(
                     `compra ${fill.clientOrderId} (${key} x${fill.quantity}): saldo ${fill.currency} insuficiente (${cash[fill.currency]} < ${cost})`
                 );
                 return;
             }
-            cash[fill.currency] -= cost;
+            cash[fill.currency] = r2(cash[fill.currency] - cost);
             queue.push({ quantity: fill.quantity, price: fill.price });
             lots.set(key, queue);
         } else {
@@ -98,7 +102,7 @@ export function computeManualDemoAccount(
                 return;
             }
             const closing = fill.quantity;
-            cash[fill.currency] += closing * fill.price * mult - fill.fee;
+            cash[fill.currency] = r2(cash[fill.currency] + closing * fill.price * mult - fill.fee);
             let remaining = closing;
             let pnl = realized.get(key) ?? 0;
             while (remaining > 0 && queue.length > 0) {

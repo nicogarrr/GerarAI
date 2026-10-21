@@ -57,7 +57,8 @@ export interface Fill {
     price: number;
     currency: Currency;
     fee: number;
-    /** Cuándo se ejecutó de verdad (FIFO ordena por esto, no por createdAt). */
+    /** Cuándo se ejecutó de verdad, en MILISEGUNDOS epoch UTC (Date.getTime()).
+     *  El FIFO ordena por esto, no por createdAt del documento. */
     executedAt: number;
     source: 'manual-simulado';
     clientOrderId: string;
@@ -78,6 +79,7 @@ export interface FxConversion {
     amountFrom: number;
     /** Unidades de `to` por 1 de `from`, introducido por el usuario (simulado). */
     rate: number;
+    /** MILISEGUNDOS epoch UTC (Date.getTime()). */
     executedAt: number;
     source: 'manual-simulado';
     clientOrderId: string;
