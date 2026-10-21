@@ -126,8 +126,8 @@ async function loadDemoData(): Promise<DemoData> {
 export default async function PaperTradingPage() {
     const { account, ledger } = await loadDemoData();
 
-    // PUNTO DE CABLEADO (pilot): sustituir por registerManualDemoOrder /
-    // registerManualDemoFx de lib/actions/manual-demo.actions.ts. El
+    // PUNTO DE CABLEADO (pilot): sustituir por placeManualOrder /
+    // convertManualDemoCurrency de lib/actions/manual-demo.actions.ts. El
     // resultado de la acción encaja directo en SubmitResult (ok+outcome+
     // reason+state, o fallo con message -> error).
     async function submitFillNotWired(): Promise<SubmitResult> {

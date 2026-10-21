@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import type { Currency, OptionContract } from '@/lib/paper-trading/types';
+import { parseEsNumber } from './submit';
 import type { FillSubmit, SubmitFill } from './submit';
 
 type Kind = 'accion' | 'opcion';
@@ -57,12 +58,13 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     });
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
+    const [duplicate, setDuplicate] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
-    const parsedQuantity = Number(quantity);
-    const parsedPrice = Number(price);
-    const parsedStrike = Number(strike);
-    const parsedFee = fee.trim() === '' ? 0 : Number(fee);
+    const parsedQuantity = parseEsNumber(quantity);
+    const parsedPrice = parseEsNumber(price);
+    const parsedStrike = parseEsNumber(strike);
+    const parsedFee = fee.trim() === '' ? 0 : parseEsNumber(fee);
 
     const total = useMemo(() => {
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return null;
@@ -74,14 +76,18 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     function validate(): string | null {
         if (!symbol.trim()) return 'Indica el símbolo.';
         if (!name.trim()) return 'Indica el nombre (no hay buscador en la fase manual).';
+        if (!Number.isFinite(parsedQuantity)) return 'La cantidad no es un número válido (usa coma o punto para decimales).';
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return 'La cantidad debe ser un entero mayor que cero.';
-        if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) return 'El precio debe ser mayor que cero.';
-        if (!Number.isFinite(parsedFee) || parsedFee < 0) return 'La comisión no puede ser negativa.';
+        if (!Number.isFinite(parsedPrice)) return 'El precio no es un número válido (usa coma o punto para decimales).';
+        if (parsedPrice <= 0) return 'El precio debe ser mayor que cero.';
+        if (!Number.isFinite(parsedFee)) return 'La comisión no es un número válido (usa coma o punto para decimales).';
+        if (parsedFee < 0) return 'La comisión no puede ser negativa.';
         const executedAt = new Date(executedAtLocal).getTime();
         if (!Number.isFinite(executedAt)) return 'Indica la fecha de ejecución.';
         if (executedAt > Date.now()) return 'La fecha de ejecución no puede ser futura.';
         if (kind === 'opcion') {
-            if (!(parsedStrike > 0)) return 'El strike debe ser mayor que cero.';
+            if (!Number.isFinite(parsedStrike)) return 'El strike no es un número válido (usa coma o punto para decimales).';
+            if (parsedStrike <= 0) return 'El strike debe ser mayor que cero.';
             if (!EXPIRY_RE.test(expiry)) return 'Indica el vencimiento (fecha del contrato).';
         }
         return null;
@@ -90,6 +96,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     async function onSubmit(event: React.FormEvent) {
         event.preventDefault();
         setNotice(null);
+        setDuplicate(null);
         const validationError = validate();
         if (validationError) {
             setError(validationError);
@@ -135,7 +142,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     setFee('');
                     router.refresh();
                 } else if (result.outcome === 'duplicate') {
-                    setNotice('Ya estaba registrada (mismo identificador de orden): no se duplicó.');
+                    setDuplicate('Ya estaba registrada (mismo identificador de orden): no se duplicó.');
                 } else {
                     setError(`Orden rechazada: ${result.reason ?? 'motivo no indicado'}.`);
                 }
@@ -313,7 +320,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                         placeholder="0"
                     />
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
+                <div className="col-span-2 space-y-1.5">
                     <Label htmlFor={`${uid}-executed`}>Fecha de ejecución</Label>
                     <Input
                         id={`${uid}-executed`}
@@ -349,6 +356,11 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
             {notice ? (
                 <p role="status" className="text-sm text-teal-300">
                     {notice}
+                </p>
+            ) : null}
+            {duplicate ? (
+                <p role="status" className="text-sm text-warn">
+                    {duplicate}
                 </p>
             ) : null}
 

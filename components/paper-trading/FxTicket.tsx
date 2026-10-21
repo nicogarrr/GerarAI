@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { formatMoney } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import type { Currency } from '@/lib/paper-trading/types';
-import type { SubmitFx } from './submit';
+import { parseEsNumber, type SubmitFx } from './submit';
 
 function newClientOrderId(): string {
     return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -35,11 +35,12 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
     });
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
+    const [duplicate, setDuplicate] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
     const to: Currency = from === 'EUR' ? 'USD' : 'EUR';
-    const parsedAmount = Number(amount);
-    const parsedRate = Number(rate);
+    const parsedAmount = parseEsNumber(amount);
+    const parsedRate = parseEsNumber(rate);
     const received =
         Number.isFinite(parsedAmount) && parsedAmount > 0 && Number.isFinite(parsedRate) && parsedRate > 0
             ? parsedAmount * parsedRate
@@ -48,11 +49,20 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
     async function onSubmit(event: React.FormEvent) {
         event.preventDefault();
         setNotice(null);
-        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        setDuplicate(null);
+        if (!Number.isFinite(parsedAmount)) {
+            setError('El importe no es un número válido (usa coma o punto para decimales).');
+            return;
+        }
+        if (parsedAmount <= 0) {
             setError('Indica un importe mayor que cero.');
             return;
         }
-        if (!Number.isFinite(parsedRate) || parsedRate <= 0) {
+        if (!Number.isFinite(parsedRate)) {
+            setError('El tipo de cambio no es un número válido (usa coma o punto para decimales).');
+            return;
+        }
+        if (parsedRate <= 0) {
             setError('Indica el tipo de cambio (simulado) mayor que cero.');
             return;
         }
@@ -71,7 +81,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
             const result = await submitFx({
                 from,
                 to,
-                amountFrom: parsedAmount,
+                amount: parsedAmount,
                 rate: parsedRate,
                 executedAt,
                 clientOrderId: clientOrderId.current,
@@ -84,7 +94,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                     setRate('');
                     router.refresh();
                 } else if (result.outcome === 'duplicate') {
-                    setNotice('Ya estaba registrada (mismo identificador): no se duplicó.');
+                    setDuplicate('Ya estaba registrada (mismo identificador): no se duplicó.');
                 } else {
                     setError(`Conversión rechazada: ${result.reason ?? 'motivo no indicado'}.`);
                 }
@@ -172,6 +182,11 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
             {notice ? (
                 <p role="status" className="text-sm text-teal-300">
                     {notice}
+                </p>
+            ) : null}
+            {duplicate ? (
+                <p role="status" className="text-sm text-warn">
+                    {duplicate}
                 </p>
             ) : null}
 
