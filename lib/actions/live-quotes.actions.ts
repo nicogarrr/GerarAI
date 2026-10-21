@@ -13,14 +13,25 @@ import {
 } from '@/lib/market/live-quotes';
 
 const PER_SYMBOL_TIMEOUT_MS = 8_000;
+/**
+ * Tope global de la ronda: el repo exige SSR < 10 s. 38 simbolos en lotes
+ * de 6 con 8 s por simbolo daban 56 s de peor caso. Pasado el tope se
+ * cancela lo pendiente y esas filas llegan null (N/D honesto), nunca se
+ * sigue trabajando tras el abort.
+ */
+const GLOBAL_TIMEOUT_MS = 9_000;
 const CONCURRENCY = 6;
 /** Bajo el segundo de cache del panel (60s) para que un poll no reciba lo mismo. */
 const CACHE_TTL_SECONDS = 55;
 
-async function fetchOne(spec: LiveQuoteSpec): Promise<LiveQuote | null> {
+async function fetchOne(spec: LiveQuoteSpec, global: AbortSignal): Promise<LiveQuote | null> {
     try {
         const { url, init } = yahooChartRequest(spec.symbol);
-        const resp = await fetch(url, { ...init, signal: AbortSignal.timeout(PER_SYMBOL_TIMEOUT_MS), cache: 'no-store' });
+        const resp = await fetch(url, {
+            ...init,
+            signal: AbortSignal.any([AbortSignal.timeout(PER_SYMBOL_TIMEOUT_MS), global]),
+            cache: 'no-store',
+        });
         if (!resp.ok) return null;
         const payload = await resp.json();
         const meta = payload?.chart?.result?.[0]?.meta as YahooChartMeta | undefined;
@@ -31,11 +42,13 @@ async function fetchOne(spec: LiveQuoteSpec): Promise<LiveQuote | null> {
 }
 
 async function fetchAll(): Promise<LiveMarketsResult> {
+    const global = AbortSignal.timeout(GLOBAL_TIMEOUT_MS);
     const specs = LIVE_QUOTE_GROUPS.flatMap((group) => group.specs.map((spec) => ({ group: group.key, spec })));
     const results = new Map<string, LiveQuote | null>();
     for (let i = 0; i < specs.length; i += CONCURRENCY) {
+        if (global.aborted) break; // tras el tope, el resto queda en N/D
         const batch = specs.slice(i, i + CONCURRENCY);
-        const quotes = await Promise.all(batch.map(({ spec }) => fetchOne(spec)));
+        const quotes = await Promise.all(batch.map(({ spec }) => fetchOne(spec, global)));
         batch.forEach(({ spec }, j) => results.set(spec.symbol, quotes[j]));
     }
     return {

@@ -56,10 +56,6 @@ export interface LiveQuote extends LiveQuoteSpec {
     timestamp: number | null;
     /** Divisa que informa Yahoo (informativa; no fija la unidad). */
     currency: string | null;
-    /** Estado del mercado segun Yahoo (REGULAR, PRE, POST, CLOSED...); null si no lo informa. */
-    marketState: string | null;
-    /** Mercado/centro segun Yahoo (informativo). */
-    exchangeName: string | null;
 }
 
 /** Meta de la chart API de Yahoo: solo los campos que leemos. */
@@ -80,6 +76,14 @@ const isFiniteNumber = (value: unknown): value is number =>
 /**
  * Convierte el meta de Yahoo en una LiveQuote, o null si no hay precio
  * utilizable (la UI pinta N/D para ese valor, nunca un 0 inventado).
+ *
+ * Cambio de sesion: previousClose si Yahoo lo informa; si no,
+ * chartPreviousClose SIEMPRE con la peticion anclada a range=1d, donde
+ * Yahoo lo define como el cierre de la sesion anterior (verificado
+ * 21-oct-2026 contra los signos oficiales: ^IXIC -0,02 %, WTI +0,9 %).
+ * Con range=2d ese campo pasa a ser el cierre de hace DOS sesiones y los
+ * signos se invertian (bug encontrado en auditoria). Si falta ambos:
+ * change/changePercent a null y la UI pinta N/D, nunca un 0 inventado.
  */
 export function parseYahooQuote(spec: LiveQuoteSpec, meta: YahooChartMeta | null | undefined): LiveQuote | null {
     if (!meta || !isFiniteNumber(meta.regularMarketPrice) || meta.regularMarketPrice <= 0) return null;
@@ -97,13 +101,6 @@ export function parseYahooQuote(spec: LiveQuoteSpec, meta: YahooChartMeta | null
         changePercent,
         timestamp: isFiniteNumber(meta.regularMarketTime) ? meta.regularMarketTime : null,
         currency: typeof meta.currency === 'string' ? meta.currency : null,
-        marketState: typeof meta.marketState === 'string' ? meta.marketState : null,
-        exchangeName:
-            typeof meta.fullExchangeName === 'string'
-                ? meta.fullExchangeName
-                : typeof meta.exchangeName === 'string'
-                    ? meta.exchangeName
-                    : null,
     };
 }
 
@@ -111,7 +108,7 @@ export const YAHOO_CHART_URL = 'https://query1.finance.yahoo.com/v8/finance/char
 
 export function yahooChartRequest(symbol: string): { url: string; init: RequestInit } {
     return {
-        url: `${YAHOO_CHART_URL}/${encodeURIComponent(symbol)}?range=2d&interval=1d`,
+        url: `${YAHOO_CHART_URL}/${encodeURIComponent(symbol)}?range=1d&interval=1d`,
         init: {
             headers: {
                 // Sin UA de navegador Yahoo responde 429/403 a peticiones de servidor.

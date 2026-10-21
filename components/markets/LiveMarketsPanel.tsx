@@ -34,25 +34,37 @@ const TABS: { key: LiveQuoteKind; label: string; note: string }[] = [
     { key: 'divisa', label: 'Divisas', note: 'Tipo de cambio spot entre divisas.' },
 ];
 
-const priceFormatter = (unit: LiveQuote['unit']) =>
+// Moneda: formato nativo de cada divisa (USD en en-US con '$', EUR en es-ES).
+// Indices en puntos (decimal es-ES). Divisas con 4 decimales: un EUR/USD a
+// 2 decimales mostraria cambios de "+0,00", que no aportan.
+const priceFormatter = (unit: LiveQuote['unit']) => {
+    if (unit === 'USD') return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (unit === 'EUR') return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (unit === 'cruz') return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const changeFormatter = (unit: LiveQuote['unit']) =>
     new Intl.NumberFormat('es-ES', {
-        style: unit === 'index' || unit === 'cruz' ? 'decimal' : 'currency',
-        currency: unit === 'index' || unit === 'cruz' ? undefined : unit,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        minimumFractionDigits: unit === 'cruz' ? 4 : 2,
+        maximumFractionDigits: unit === 'cruz' ? 4 : 2,
+        signDisplay: 'always',
     });
 
-const changeFormatter = new Intl.NumberFormat('es-ES', {
+const changePercentFormatter = new Intl.NumberFormat('es-ES', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
     signDisplay: 'always',
 });
 
+// Fecha Y hora del dato: una hora suelta ("22:45") no dice si es de hoy o
+// del cierre de ayer, y eso induce a error.
 const timeFormatter = new Intl.DateTimeFormat('es-ES', {
     timeZone: 'Europe/Madrid',
+    day: 'numeric',
+    month: 'short',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: false,
 });
 
@@ -75,10 +87,8 @@ function QuoteRow({ quote }: { quote: LiveQuote | null }) {
                 <div className="text-gray-100">{quote.name}</div>
                 <div className="text-xs text-gray-500">
                     {quote.timestamp
-                        ? `dato de las ${timeFormatter.format(new Date(quote.timestamp * 1000))}`
-                        : 'sin hora del dato'}
-                    {quote.marketState === 'REGULAR' ? ' · mercado abierto' : ''}
-                    {quote.marketState && quote.marketState !== 'REGULAR' ? ' · mercado cerrado' : ''}
+                        ? `dato: ${timeFormatter.format(new Date(quote.timestamp * 1000))}`
+                        : 'sin fecha del dato'}
                 </div>
             </td>
             <td className="py-2.5 px-2 text-right whitespace-nowrap">
@@ -90,8 +100,8 @@ function QuoteRow({ quote }: { quote: LiveQuote | null }) {
                     'N/D'
                 ) : (
                     <>
-                        <div>{changeFormatter.format(quote.change)}</div>
-                        <div className="text-xs">({changeFormatter.format(quote.changePercent)}%)</div>
+                        <div>{changeFormatter(quote.unit).format(quote.change)}</div>
+                        <div className="text-xs">({changePercentFormatter.format(quote.changePercent)}%)</div>
                     </>
                 )}
             </td>
@@ -118,9 +128,31 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
         }
     }, []);
 
+    // Sondeo solo con la pestaña visible: 38 peticiones/minuto por pestaña
+    // oculta es carga que nadie ve (y cold starts la multiplican).
     useEffect(() => {
-        const timer = setInterval(refresh, POLL_MS);
-        return () => clearInterval(timer);
+        let timer: ReturnType<typeof setInterval> | null = null;
+        const start = () => {
+            if (timer === null) timer = setInterval(refresh, POLL_MS);
+        };
+        const stop = () => {
+            if (timer !== null) clearInterval(timer);
+            timer = null;
+        };
+        const onVisibility = () => {
+            if (document.hidden) {
+                stop();
+            } else {
+                start();
+                void refresh();
+            }
+        };
+        start();
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            stop();
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
     }, [refresh]);
 
     return (
