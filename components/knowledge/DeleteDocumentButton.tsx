@@ -4,14 +4,15 @@ import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { deleteKnowledgeDocument } from '@/lib/actions/research-tools.actions';
 
 // Interactivo (confirmación + estado + server action en onClick): no puede ser servidor.
 export function DeleteDocumentButton({ documentId, title, className }: { documentId: number; title: string; className?: string }) {
     const [state, setState] = useState<'idle' | 'deleting' | 'error'>('idle');
+    const [confirmOpen, setConfirmOpen] = useState(false);
 
     const handleDelete = async () => {
-        if (!window.confirm(`¿Eliminar «${title}»? Se eliminan el documento, sus fragmentos y principios extraídos, también los ya aprobados. Los casos de estudio se conservan sin el enlace y el archivo original sigue en el almacén. Esta acción no se puede deshacer.`)) return;
         setState('deleting');
         const result = await deleteKnowledgeDocument(documentId);
         setState(result.success ? 'idle' : 'error');
@@ -23,7 +24,7 @@ export function DeleteDocumentButton({ documentId, title, className }: { documen
                 aria-label={`Eliminar documento: ${title}`}
                 className={className}
                 disabled={state === 'deleting'}
-                onClick={handleDelete}
+                onClick={() => setConfirmOpen(true)}
                 size="sm"
                 type="button"
                 variant="outline"
@@ -34,6 +35,13 @@ export function DeleteDocumentButton({ documentId, title, className }: { documen
             {state === 'error' ? (
                 <span className="text-xs text-red-400" role="alert">No se pudo eliminar. Inténtalo de nuevo.</span>
             ) : null}
+            <ConfirmDialog
+                open={confirmOpen}
+                onOpenChange={setConfirmOpen}
+                title={`¿Eliminar «${title}»?`}
+                description="Se eliminan el documento, sus fragmentos y principios extraídos, también los ya aprobados. Los casos de estudio se conservan sin el enlace y el archivo original sigue en el almacén. Esta acción no se puede deshacer."
+                onConfirm={handleDelete}
+            />
         </span>
     );
 }

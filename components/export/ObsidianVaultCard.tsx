@@ -1,14 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import { BookDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 /**
  * Descarga del vault Obsidian del tenant (cartera + watchlist) vía la ruta
  * proxy same-origin /api/obsidian/vault.zip: el navegador nunca ve la firma
  * Research OS. Sin coste: el backend solo empaqueta datos persistidos.
  */
+const VAULT_URL = '/api/obsidian/vault.zip';
+
 export default function ObsidianVaultCard() {
+    const [confirmOpen, setConfirmOpen] = useState(false);
     return (
         <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
             <CardHeader className="border-b border-gray-700/50 pb-4">
@@ -23,17 +28,23 @@ export default function ObsidianVaultCard() {
                 </div>
             </CardHeader>
             <CardContent className="pt-4">
-                <a
+                <button
                     className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 sm:min-h-0"
-                    href="/api/obsidian/vault.zip"
-                    onClick={(event) => {
-                        if (!window.confirm('¿Descargar tus tesis y datos de cartera en un archivo ZIP en este dispositivo?')) event.preventDefault();
-                    }}
-                    download
+                    onClick={() => setConfirmOpen(true)}
+                    type="button"
                 >
                     <BookDown className="h-4 w-4" />
                     Descargar para Obsidian (.zip)
-                </a>
+                </button>
+                <ConfirmDialog
+                    open={confirmOpen}
+                    onOpenChange={setConfirmOpen}
+                    title="Descargar para Obsidian"
+                    description="¿Descargar tus tesis y datos de cartera en un archivo ZIP en este dispositivo?"
+                    confirmLabel="Descargar"
+                    tone="default"
+                    onConfirm={() => { window.location.assign(VAULT_URL); }}
+                />
             </CardContent>
         </Card>
     );

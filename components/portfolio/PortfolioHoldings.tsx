@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw } from 'lucide-react';
 import AddTransactionButton from '@/components/portfolio/AddTransactionButton';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 import ImportIBKRButton from '@/components/portfolio/ImportIBKRButton';
 import { cn } from '@/lib/utils';
@@ -64,6 +65,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
   const router = useRouter();
   const [currentHoldings, setCurrentHoldings] = useState<PortfolioHolding[]>(holdings);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmSymbol, setConfirmSymbol] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const format = (value: number, currency: string) => formatMoney(value, currency, { maximumFractionDigits: 2 });
   const cashCurrency = baseCurrency ?? holdings[0]?.baseCurrency ?? 'EUR';
@@ -81,8 +83,6 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
   }, [holdings]);
 
   const handleDelete = async (symbol: string) => {
-    if (!confirm(`¿Estás seguro de eliminar toda la posición en ${symbol}? Esto borrará todas las transacciones asociadas.`)) return;
-
     setDeleting(symbol);
     try {
       await deleteHolding(userId, symbol);
@@ -197,7 +197,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDelete(holding.symbol)}
+                        onClick={() => setConfirmSymbol(holding.symbol)}
                         disabled={deleting === holding.symbol}
                         aria-busy={deleting === holding.symbol}
                         className="min-h-[44px] min-w-[44px] text-red-400 hover:text-red-300 hover:bg-red-950/20"
@@ -312,7 +312,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                                 )}
                                 <span className="block text-gray-500">En cartera desde: {formatDate(holding.firstBuyDate)}</span>
                               </div>
-                              <Button variant="ghost" size="sm" onClick={() => handleDelete(holding.symbol)} disabled={deleting === holding.symbol} aria-busy={deleting === holding.symbol} className="min-h-10 w-full justify-start gap-2 text-red-300" aria-label={`Eliminar ${holding.symbol} de la cartera`}><Trash2 aria-hidden="true" className="h-4 w-4" />Eliminar posición</Button>
+                              <Button variant="ghost" size="sm" onClick={() => setConfirmSymbol(holding.symbol)} disabled={deleting === holding.symbol} aria-busy={deleting === holding.symbol} className="min-h-10 w-full justify-start gap-2 text-red-300" aria-label={`Eliminar ${holding.symbol} de la cartera`}><Trash2 aria-hidden="true" className="h-4 w-4" />Eliminar posición</Button>
                             </div>
                           </details>
                         </div>
@@ -374,6 +374,13 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
           </>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={confirmSymbol !== null}
+        onOpenChange={(next) => { if (!next) setConfirmSymbol(null); }}
+        title="Eliminar posición"
+        description={confirmSymbol ? `¿Estás seguro de eliminar toda la posición en ${confirmSymbol}? Esto borrará todas las transacciones asociadas.` : ''}
+        onConfirm={() => { if (confirmSymbol) handleDelete(confirmSymbol); }}
+      />
     </Card>
   );
 }

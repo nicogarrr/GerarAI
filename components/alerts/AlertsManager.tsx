@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Bell, History, Plus, RefreshCcw, Send, Trash2 } from 'lucide-react';
 import { createAlert, getRecentTriggeredAlerts, getTelegramStatus, getUserAlerts, deleteAlert, type Alert, type CreateAlertInput, type AlertType, type TelegramStatus, type TriggeredAlertDelivery } from '@/lib/actions/alerts.actions';
 import { parseLocalizedNumber } from '@/lib/format';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
     Dialog,
     DialogContent,
@@ -57,6 +58,7 @@ function AlertsManager() {
     const [reviewing, setReviewing] = useState<string | null>(null);
     /** Borrado en curso: sin esto el boton se puede pulsar dos veces. */
     const [deleting, setDeleting] = useState<string | null>(null);
+    const [confirmAlert, setConfirmAlert] = useState<Alert | null>(null);
     /** Alta en curso: igual que el borrado, doble click = alerta duplicada. */
     const [creating, setCreating] = useState(false);
     /** Estado de entrega del motor (evaluacion cada 5 min + Telegram). */
@@ -166,7 +168,7 @@ function AlertsManager() {
 
     const handleDeleteAlert = async (alertId: string) => {
         const alert = alerts.find(item => item._id === alertId);
-        if (!alert || !window.confirm(`¿Eliminar ${getAlertLabel(alert)}? Esta acción no se puede deshacer.`)) return;
+        if (!alert) return;
         setDeleting(alertId);
         try {
             await deleteAlert(alertId);
@@ -440,7 +442,7 @@ function AlertsManager() {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleDeleteAlert(alert._id)}
+                                    onClick={() => setConfirmAlert(alert)}
                                     disabled={deleting === alert._id}
                                     aria-busy={deleting === alert._id}
                                     aria-label={`Eliminar alerta: ${getAlertLabel(alert)}`}
@@ -538,6 +540,13 @@ function AlertsManager() {
                     </div>
                 </div>
             ) : null}
+            <ConfirmDialog
+                open={confirmAlert !== null}
+                onOpenChange={(next) => { if (!next) setConfirmAlert(null); }}
+                title="Eliminar alerta"
+                description={confirmAlert ? `¿Eliminar ${getAlertLabel(confirmAlert)}? Esta acción no se puede deshacer.` : ''}
+                onConfirm={() => { if (confirmAlert) handleDeleteAlert(confirmAlert._id); }}
+            />
         </Card>
     );
 }
