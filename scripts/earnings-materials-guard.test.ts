@@ -38,3 +38,11 @@ test('registro IR: pagina de evento solo con fecha exacta; si no, seccion genera
         assert.match(entry.verifiedOn, /^\d{4}-\d{2}-\d{2}$/);
     }
 });
+
+test('calendario: el historial dice "Resultados recientes" y el pie habla de la proxima fecha', () => {
+    const page = readFileSync('app/(root)/calendar/resultados/page.tsx', 'utf8');
+    assert.ok(page.includes('Resultados recientes (últimos {HISTORY_DAYS} días)'));
+    assert.ok(page.includes('Próxima fecha aún sin publicar:'));
+    assert.ok(!page.includes('Publicados en los últimos'));
+    assert.ok(!page.includes('Sin fecha publicada'));
+});

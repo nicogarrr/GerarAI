@@ -86,7 +86,7 @@ export default async function FollowedEarningsPage() {
                     {recent.length > 0 ? (
                         <>
                             <h2 className="mt-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
-                                Publicados en los últimos {HISTORY_DAYS} días
+                                Resultados recientes (últimos {HISTORY_DAYS} días)
                             </h2>
                             {recent.map((day) => renderDay(day))}
                         </>
@@ -96,7 +96,7 @@ export default async function FollowedEarningsPage() {
 
             {calendar.without_date_in_range.length > 0 && calendar.days.length > 0 ? (
                 <p className="text-sm text-gray-500">
-                    Sin fecha publicada: {calendar.without_date_in_range.join(', ')}
+                    Próxima fecha aún sin publicar: {calendar.without_date_in_range.join(', ')}
                 </p>
             ) : null}
         </main>
