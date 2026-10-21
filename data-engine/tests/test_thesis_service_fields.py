@@ -226,7 +226,10 @@ def test_card_summary_insufficient_excluye_presente_excluido():
     assert "disponible de 2025-12-31:FY" in text
     assert "ancla de ingresos es 2026-03-31:Q1" in text
     assert "no hace falta aportarlo" in text
-    assert "shares" in text  # explicado como presente-excluido, no pedido
+    # term_es(shares_diluted) = «Acciones diluidas»: la tarjeta habla en
+    # castellano y la clave técnica cruda nunca se muestra.
+    assert "Acciones diluidas" in text
+    assert "shares_diluted" not in text
     # gating: missing_inputs sigue bloqueando internamente
     assert valuation["missing_inputs"] == ["revenue", "shares_diluted", "wacc"]
 
