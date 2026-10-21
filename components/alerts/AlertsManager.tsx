@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Bell, History, Plus, RefreshCcw, Send, Trash2 } from 'lucide-react';
-import { createAlert, getRecentTriggeredAlerts, getTelegramStatus, getUserAlerts, deleteAlert, type Alert, type CreateAlertInput, type AlertType, type TelegramStatus, type TriggeredAlertDelivery } from '@/lib/actions/alerts.actions';
+import { createAlert, getRecentTriggeredAlerts, getTelegramStatus, getUserAlertsResult, deleteAlert, type Alert, type AlertsLoadCause, type CreateAlertInput, type AlertType, type TelegramStatus, type TriggeredAlertDelivery } from '@/lib/actions/alerts.actions';
 import { parseLocalizedNumber } from '@/lib/format';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -54,7 +54,7 @@ function AlertsManager() {
     const searchParams = useSearchParams();
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [loading, setLoading] = useState(true);
-    const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState<{ message: string; cause: AlertsLoadCause } | null>(null);
     const [open, setOpen] = useState(false);
     const [reviewing, setReviewing] = useState<string | null>(null);
     /** Borrado en curso: sin esto el boton se puede pulsar dos veces. */
@@ -77,12 +77,28 @@ function AlertsManager() {
     const loadAlerts = async () => {
         setLoadError(null);
         try {
-            const [data, telegramStatus, recent] = await Promise.all([
-                getUserAlerts(),
+            // getUserAlertsResult resuelve la causa en servidor, donde el
+            // código del AppError aún existe: session (local, probada),
+            // forbidden (403), rate (429), offline (5xx/red), unknown
+            // (incluido un 401 del backend, causa no probada). La vista no
+            // adivina causas ni induce re-login sin prueba.
+            const [result, telegramStatus, recent] = await Promise.all([
+                getUserAlertsResult(),
                 getTelegramStatus().catch(() => null),
                 getRecentTriggeredAlerts(10).catch(() => [] as TriggeredAlertDelivery[]),
             ]);
-            setAlerts(data);
+            if (!result.ok) {
+                const message = result.cause === 'session'
+                    ? t('common.states.alertsLoadErrorSession')
+                    : result.cause === 'forbidden'
+                        ? t('common.states.alertsLoadErrorForbidden')
+                        : result.cause === 'rate'
+                            ? t('common.states.alertsLoadErrorRate')
+                            : t('common.states.alertsLoadError');
+                setLoadError({ message, cause: result.cause });
+                return;
+            }
+            setAlerts(result.alerts);
             setTelegram(telegramStatus);
             setTriggered(recent);
         } catch (error) {
@@ -91,7 +107,7 @@ function AlertsManager() {
             // un segundo toast con el mismo fallo era ruido duplicado.
             // Los errores de MUTACIÓN (crear/borrar/revisar) sí conservan
             // su toast: no tienen otro feedback visible.
-            setLoadError(t('common.states.alertsLoadError'));
+            setLoadError({ message: t('common.states.alertsLoadError'), cause: 'unknown' });
         } finally {
             setLoading(false);
         }
@@ -370,9 +386,14 @@ function AlertsManager() {
                 </div>
             ) : loadError ? (
                 <SectionLoadError
-                    message={loadError}
+                    message={loadError.message}
                     onRetry={() => void loadAlerts()}
                     retryLabel={t('common.actions.retry')}
+                    extra={loadError.cause === 'session' ? (
+                        <Link href="/sign-in" className="mt-3 inline-flex min-h-[44px] items-center text-sm text-teal-300 hover:underline">
+                            Iniciar sesión
+                        </Link>
+                    ) : undefined}
                 />
             ) : alerts.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">

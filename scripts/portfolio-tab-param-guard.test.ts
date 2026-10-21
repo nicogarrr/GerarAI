@@ -30,9 +30,15 @@ describe('portfolio tab param guard (F137)', () => {
   });
 
   it('escribe la pestaña a la URL al cambiar y cae a resumen', () => {
-    assert.match(source, /router\.replace\(`?\$?\{?pathname\}?\?\$\{params\.toString\(\)\}/, 'debe escribir ?tab= al cambiar');
+    // replaceState nativo: la escritura es inmediata; router.replace esperaba
+    // a la navegación RSC y dejaba la pestaña anterior en la URL ~1-2 s.
+    assert.match(source, /window\.history\.replaceState\(null, '', `\$\{pathname\}\?\$\{params\.toString\(\)\}`\)/, 'debe escribir ?tab= al cambiar con replaceState (sincronía inmediata)');
     assert.match(source, /new URLSearchParams\(searchParams\.toString\(\)\)/, 'debe preservar los query params no-tab');
     assert.match(source, /'resumen'/, 'resumen es la caida segura');
     assert.equal(source.includes("useState('resumen')"), false, 'el estado ya no nace fijo ignorando la URL');
+  });
+
+  it('atrás/adelante sigue sincronizando el estado desde la URL', () => {
+    assert.match(source, /useEffect\(\(\) => \{[\s\S]*?\}, \[tabParam\]\)/, 'el efecto de sincronización depende de tabParam');
   });
 });

@@ -3,7 +3,7 @@
 import { formatDate, formatMoney, formatPercent } from '@/lib/format';
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import dynamic from 'next/dynamic';
 import PortfolioDataNotice from '@/components/portfolio/PortfolioDataNotice';
@@ -66,7 +66,6 @@ function normalizeTab(value: string | null): PortfolioTab {
 
 export default function PortfolioTabs({ summary, transactions, scores, tearsheet, forecast, dividends, userId, partialMessage }: Props) {
     const searchParams = useSearchParams();
-    const router = useRouter();
     const pathname = usePathname();
     const tabParam = searchParams.get('tab');
     const [activeTab, setActiveTab] = useState<PortfolioTab>(() => normalizeTab(tabParam));
@@ -85,7 +84,11 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
         // los borraba todos (revisión #456).
         const params = new URLSearchParams(searchParams.toString());
         params.set('tab', next);
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+        // replaceState nativo en vez de router.replace: el cambio de pestaña
+        // es client-side y router.replace esperaba a la navegación RSC, así
+        // que la URL enseñaba la pestaña anterior ~1-2 s (reproducido 21-oct):
+        // copiar el enlace o recargar en ese rato compartía la pestaña vieja.
+        window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
     };
     const [chartPeriod, setChartPeriod] = useState('1M');
 

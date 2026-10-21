@@ -11,6 +11,8 @@ type Props = {
   onRetry: () => void;
   /** Etiqueta del botón; por defecto "Reintentar". */
   retryLabel?: string;
+  /** Contenido extra bajo el botón (p. ej. enlace Iniciar sesión en 401/403). */
+  extra?: React.ReactNode;
 };
 
 /**
@@ -20,7 +22,7 @@ type Props = {
  * (rojo) ni un vacío (gris). El rojo queda reservado a acciones
  * destructivas; el vacío NO_DATOS sigue siendo neutro.
  */
-export default function SectionLoadError({ message, onRetry, retryLabel = 'Reintentar' }: Props) {
+export default function SectionLoadError({ message, onRetry, retryLabel = 'Reintentar', extra }: Props) {
   return (
     <div
       className="rounded-lg border border-amber-900/60 bg-amber-950/40 p-5 text-sm text-amber-200"
@@ -37,6 +39,7 @@ export default function SectionLoadError({ message, onRetry, retryLabel = 'Reint
         <RefreshCcw aria-hidden="true" className="mr-2 h-4 w-4" />
         {retryLabel}
       </Button>
+      {extra}
     </div>
   );
 }

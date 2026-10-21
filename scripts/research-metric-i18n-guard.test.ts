@@ -18,6 +18,7 @@ const BACKEND_CATALOG = [
     'goodwill', 'intangible_assets', 'operating_lease_liabilities',
     'operating_cash_flow', 'capital_expenditure', 'depreciation_amortization',
     'free_cash_flow', 'dividends_paid', 'common_stock_repurchased',
+    'common_stock_issued',
     'fcf_margin', 'gross_margin', 'operating_margin', 'net_margin',
     'effective_tax_rate', 'debt_to_equity', 'revenue_growth',
     'roic', 'roic_adjusted', 'roe', 'roa', 'fcf_conversion',
@@ -37,6 +38,15 @@ test('F321: el mapa cubre todo el catalogo canonico del backend', () => {
 test('F321: el fallback humaniza claves desconocidas sin ocultarlas', () => {
     assert.equal(metricLabel('metrica_nueva_del_backend'), 'metrica nueva del backend');
     assert.equal(metricLabel('revenue'), 'Ingresos');
+});
+
+test('QA 21-oct: claves vista en prod con fallback en inglés tienen etiqueta', () => {
+    // Verificado en la ficha de ASTS (21-oct-2026): «common stock issued» y
+    // «products revenue» se pintaban en inglés en Hechos financieros canónicos.
+    assert.equal(metricLabel('common_stock_issued'), 'Emisión de acciones ordinarias');
+    assert.equal(metricLabel('common stock issued'), 'Emisión de acciones ordinarias');
+    assert.equal(metricLabel('products_revenue'), 'Ingresos por productos');
+    assert.equal(metricLabel('products revenue'), 'Ingresos por productos');
 });
 
 test('F321: la ficha usa metricLabel en hechos y metricas calculadas', () => {

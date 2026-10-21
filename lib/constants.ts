@@ -16,6 +16,7 @@ import {
   Home,
   Library,
   Lightbulb,
+  FlaskConical,
   LineChart,
   Newspaper,
   Receipt,
@@ -149,6 +150,7 @@ export const ROUTE_CATALOG: NavSection[] = [
       { href: '/corporate-actions', label: 'Acciones corp.', icon: Building2, hub: '/portfolio' },
       { href: '/calendar', label: 'Calendario', icon: CalendarDays, hub: '/portfolio' },
       { href: '/portfolio/stress', label: 'Estrés histórico', icon: LineChart, hub: '/portfolio' },
+      { href: '/paper-trading', label: 'Cuenta demo manual', icon: FlaskConical, hub: '/portfolio' },
     ],
   },
   {
@@ -172,6 +174,13 @@ export const ROUTE_CATALOG: NavSection[] = [
         hub: '/discover',
         description: 'Busca con métricas y filtros guardados.',
         children: [{ href: '/screener', label: 'Mercado', icon: LineChart, hub: '/discover', description: 'Explora empresas por sector y mira subidas, bajadas y más activas.' }],
+      },
+      {
+        href: '/mercados',
+        label: 'Cotizaciones',
+        icon: LineChart,
+        hub: '/discover',
+        description: 'Índices, futuros, acciones, materias primas y divisas con la hora de cada cotización.',
       },
       {
         href: '/knowledge',

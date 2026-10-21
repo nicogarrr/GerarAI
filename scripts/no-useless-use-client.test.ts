@@ -85,6 +85,13 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+    'components/paper-trading/ManualDemoPanel.tsx':
+        'tabs interactivas de la cuenta demo (estado de pestana en cliente)',
+    'components/paper-trading/OrderTicket.tsx':
+        'formulario controlado del ticket manual (estado, validacion y envio)',
+    'components/paper-trading/FxTicket.tsx':
+        'formulario controlado de la conversion de divisa manual',
+
   // selector de inversor y contenido con navegación por URL.
   'app/(root)/inversores/_components/InvestorSelector.tsx': 'useRouter, jsx-onChange',
   'app/(root)/inversores/_components/InvestorViewSelector.tsx': 'useRouter, jsx-onChange',
@@ -136,6 +143,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/layout/IntentLink.tsx': 'useState, jsx-onClick',
   'components/layout/SectionNav.tsx': 'usePathname',
   'components/layout/Sidebar.tsx': 'usePathname, useState, browser:document, jsx-onClick',
+  // pestañas, sondeo cada minuto y botón de refresco manual del panel /mercados.
+  'components/markets/LiveMarketsPanel.tsx': 'useState, useEffect, useCallback, jsx-onClick',
   'components/media/YouTubeEmbed.tsx': 'useState, jsx-onClick',
   'components/plan/PlanSetupDialog.tsx': 'useRouter, useState, browser:document, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx',
   'components/plan/PlanView.tsx': 'importa cliente: components/data/RecordViews.tsx, importa cliente: components/plan/PlanSetupDialog.tsx',
