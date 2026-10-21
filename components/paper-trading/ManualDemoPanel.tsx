@@ -12,13 +12,18 @@ import { OrderTicket } from './OrderTicket';
 import { PositionsTable } from './PositionsTable';
 import { formatMoney } from '@/lib/format';
 import { valuationMatches, type DemoValuation } from '@/lib/market/demo-valuation';
-import type { DemoStateView, HistoryRow, SubmitFill, SubmitFx } from './submit';
+import type { DemoStateView, HistoryPageResult, HistoryRow, SubmitFill, SubmitFx } from './submit';
 
 export type ManualDemoPanelProps = {
     /** Vista de la cuenta devuelta por la acción; null mientras no está conectada. */
     account: DemoStateView | null;
-    /** Historial de órdenes (ejecutadas y rechazadas, append-only). */
+    /** Historial de órdenes (ejecutadas y rechazadas, append-only): PRIMERA página. */
     ledger: HistoryRow[];
+    /** ¿Hay más historial tras la primera página y con qué cursor pedirlo? */
+    historyHasMore?: boolean;
+    historyNextBefore?: string | null;
+    /** Pide la página siguiente del historial (cursor estable, sin offset). */
+    loadMoreHistory?: (before: string) => Promise<HistoryPageResult>;
     submitFill: SubmitFill;
     submitFx: SubmitFx;
     /** Valoración inicial con cotizaciones reales (null = no disponible). */
@@ -95,12 +100,53 @@ function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
  * Lo único automático es la reconsulta de la valoración mostrada (cada 60 s
  * con la pestaña visible), nunca el precio de los fills.
  */
-export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuation: initialValuation = null, valuationAsOf = null, refreshValuation }: ManualDemoPanelProps) {
+export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuation: initialValuation = null, valuationAsOf = null, refreshValuation, historyHasMore = false, historyNextBefore = null, loadMoreHistory }: ManualDemoPanelProps) {
     const wired = account !== null;
     const [valuation, setValuation] = useState<DemoValuation | null>(initialValuation);
     const [asOf, setAsOf] = useState<number | null>(valuationAsOf);
     const [refreshError, setRefreshError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    // Paginación del historial: `ledger` (prop) es la primera página; las
+    // siguientes se acumulan aquí. Transición PROPIA (no comparte `pending`
+    // con el refresco de cotizaciones): son consultas independientes.
+    const [extraRows, setExtraRows] = useState<HistoryRow[]>([]);
+    const [historyCursor, setHistoryCursor] = useState<string | null>(historyNextBefore);
+    const [moreHistory, setMoreHistory] = useState(historyHasMore);
+    const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+    const [loadingMore, startLoadMore] = useTransition();
+    // Un refresh del servidor (fill, rechazo, F5) trae una PRIMERA página
+    // nueva en `ledger`: se descartan las extra acumuladas (siguen pudiendo
+    // cargarse con el botón) para no mezclar filas de la foto anterior.
+    // Ajuste DURANTE el render (patrón oficial de React para resetear estado
+    // cuando cambia una prop), no un efecto: así nunca se pinta la mezcla.
+    const [prevLedger, setPrevLedger] = useState(ledger);
+    if (prevLedger !== ledger) {
+        setPrevLedger(ledger);
+        setExtraRows([]);
+        setHistoryCursor(historyNextBefore);
+        setMoreHistory(historyHasMore);
+        setLoadMoreError(null);
+    }
+    const onLoadMoreHistory = () => {
+        if (!loadMoreHistory || !historyCursor) return;
+        const before = historyCursor;
+        startLoadMore(async () => {
+            setLoadMoreError(null);
+            const result = await loadMoreHistory(before);
+            if (!result.ok) {
+                setLoadMoreError(result.message);
+                return;
+            }
+            // Dedupe por clientOrderId (único por cuenta): si entre página y
+            // página hubo refresh, una fila no puede aparecer dos veces.
+            setExtraRows((prev) => {
+                const seen = new Set([...ledger, ...prev].map((r) => r.clientOrderId));
+                return [...prev, ...result.orders.filter((r) => !seen.has(r.clientOrderId))];
+            });
+            setMoreHistory(result.hasMore);
+            setHistoryCursor(result.nextBefore);
+        });
+    };
     // Si cambian posiciones, cantidades o costes tras valorar, la valoracion
     // guardada ya no describe la cuenta: se oculta (nada de totales viejos
     // mezclados con filas nuevas) hasta pulsar el boton.
@@ -152,9 +198,10 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
     };
     const refreshBusy = pending || refreshing;
 
-    // Auto-refresco de la valoración (pedido de Nico, 21-oct-2026: «No se
-    // actualiza sola»). Puertas: pestaña visible, posiciones abiertas, candado
-    // compartido y backoff exponencial tras fallos (60s×2^n, tope 16 min).
+    // Auto-refresco de la valoración: una cotización servida envejece sola,
+    // así que el panel la reconsulta periódicamente sin acción del usuario.
+    // Puertas: pestaña visible, posiciones abiertas, candado compartido y
+    // backoff exponencial tras fallos (60s×2^n, tope 16 min).
     // Al volver a la pestaña se repone si el último intento ya cumplió su
     // espera. Sin endpoint nuevo: reutiliza la acción de valoración.
     // La cadencia es APROXIMADA: el intervalo marca los ticks y due() mide
@@ -244,7 +291,19 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                 </TabsContent>
                 <TabsContent value="historial" className="mt-4">
                     <Panel title="Historial de operaciones">
-                        <LedgerTable entries={ledger} />
+                        <LedgerTable entries={[...ledger, ...extraRows]} />
+                        {loadMoreHistory && moreHistory ? (
+                            <div className="mt-3">
+                                <Button type="button" variant="outline" size="sm" onClick={onLoadMoreHistory} disabled={loadingMore}>
+                                    {loadingMore ? 'Cargando…' : 'Cargar más'}
+                                </Button>
+                            </div>
+                        ) : null}
+                        {loadMoreError ? (
+                            <p role="alert" className="mt-2 text-xs text-amber-300">
+                                No se pudo cargar más historial: {loadMoreError}
+                            </p>
+                        ) : null}
                     </Panel>
                 </TabsContent>
             </Tabs>

@@ -1,7 +1,8 @@
 /**
- * Guarda del auto-refresco de la valoración demo (pedido de Nico 21-oct-2026:
- * «No se actualiza sola»). La valoración mostrada se reconsulta sola, pero el
- * registro de operaciones sigue manual y el fanout al proveedor queda acotado.
+ * Guarda del auto-refresco de la valoración demo: una cotización servida
+ * envejece sola, así que el panel la reconsulta con la pestaña visible,
+ * pero el registro de operaciones sigue manual y el fanout al proveedor
+ * queda acotado (backoff y Retry-After).
  *
  * Ejecución: node --experimental-strip-types --test scripts/manual-demo-autorefresh-guard.test.ts
  */

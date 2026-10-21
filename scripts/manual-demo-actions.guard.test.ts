@@ -849,3 +849,185 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         assert.equal(r.listingUnavailable, false, 'el listado respondió');
     });
 });
+
+/* ------------------------------------------------------------------ */
+/* Historial PAGINADO (manual-demo-history.actions): keyset cursor     */
+/* (createdAt, _id), autorización por página, empates, concurrencia.   */
+/* ------------------------------------------------------------------ */
+
+// @ts-expect-error TS5097: la extensión .ts explícita la exige node --experimental-strip-types.
+const historyActions = await import('../lib/actions/manual-demo-history.actions.ts');
+
+type HistoryPage =
+    | { ok: true; orders: Array<{ clientOrderId: string; status: string; fillPrice: number | null; rejectReason: string | null }>; hasMore: boolean; nextBefore: string | null }
+    | { ok: false; message: string; field?: string };
+
+/** Siembra `count` filas de historial: row-0 la más reciente (createdAt y _id
+ * decrecen con i, así el orden esperado es simplemente row-0..row-(n-1)). */
+function seedHistoryRows(userId: string, count: number, opts: { startMs?: number; stepMs?: number; tag?: string } = {}) {
+    const start = opts.startMs ?? NOW - 3_600_000;
+    const step = opts.stepMs ?? 1_000;
+    const tag = opts.tag ?? 'hist';
+    for (let i = 0; i < count; i++) {
+        modelStub.__seedTrade({
+            userId,
+            clientOrderId: `${userId}-${tag}-${i}`,
+            kind: 'accion', symbol: 'BBVA.MC', name: 'BBVA',
+            contract: null, side: 'buy', openClose: 'open',
+            fxFrom: null, fxTo: null,
+            quantity: 1, status: 'filled', fillPrice: 10,
+            currency: 'EUR', fee: 0, fillSource: 'manual-simulado',
+            executedAt: new Date(start - i * step),
+            rejectReason: null,
+            createdAt: new Date(start - i * step),
+            updatedAt: new Date(start - i * step),
+            _id: `${userId}-${tag}-row-${String(i).padStart(6, '0')}`,
+        });
+    }
+}
+
+const expectedIds = (userId: string, count: number, tag = 'hist') =>
+    Array.from({ length: count }, (_, i) => `${userId}-${tag}-${i}`);
+
+describe('historial paginado (cursor estable)', () => {
+    it('recorre 250 filas sin perder ni repetir (páginas de 200 + 50)', async () => {
+        seedHistoryRows(USER.id, 250);
+        const p1 = (await historyActions.getManualDemoHistory()) as unknown as HistoryPage;
+        assert.ok(p1.ok);
+        assert.equal(p1.orders.length, 200, 'primera página: el defecto es 200');
+        assert.equal(p1.hasMore, true);
+        assert.ok(p1.nextBefore, 'hay cursor para la siguiente página');
+        const p2 = (await historyActions.getManualDemoHistory({ before: p1.nextBefore })) as unknown as HistoryPage;
+        assert.ok(p2.ok);
+        assert.equal(p2.orders.length, 50);
+        assert.equal(p2.hasMore, false);
+        assert.equal(p2.nextBefore, null, 'última página: sin cursor');
+        const all = [...p1.orders, ...p2.orders].map((r) => r.clientOrderId);
+        assert.deepEqual(all, expectedIds(USER.id, 250), 'orden exacto, sin pérdidas ni duplicados');
+    });
+
+    it('autoriza por usuario en CADA página: ni fuga con cursor propio ni con cursor ajeno', async () => {
+        const OTHER = 'guard-user-otro';
+        seedHistoryRows(USER.id, 250);
+        seedHistoryRows(OTHER, 10, { tag: 'ajena' });
+        // Recorrido completo del usuario: solo filas suyas.
+        let before: string | null = null;
+        const seen: string[] = [];
+        do {
+            const p = (await historyActions.getManualDemoHistory(before ? { before } : undefined)) as unknown as HistoryPage;
+            assert.ok(p.ok);
+            seen.push(...p.orders.map((r) => r.clientOrderId));
+            before = p.hasMore ? p.nextBefore : null;
+        } while (before);
+        assert.equal(seen.length, 250);
+        assert.ok(seen.every((id) => id.startsWith(`${USER.id}-`)), 'ninguna fila ajena en todo el recorrido');
+        // Cursor forjado apuntando a una fila AJENA: el filtro userId manda.
+        const foreignBefore = `${NOW - 3_600_000 - 5 * 1_000}:${OTHER}-ajena-row-000005`;
+        const p = (await historyActions.getManualDemoHistory({ before: foreignBefore })) as unknown as HistoryPage;
+        assert.ok(p.ok, 'un cursor ajeno bien formado no rompe la consulta');
+        assert.ok(p.orders.every((r) => r.clientOrderId.startsWith(`${USER.id}-`)), 'cero fuga con cursor ajeno');
+    });
+
+    it('rechaza cursores inválidos o manipulados (campo before)', async () => {
+        seedHistoryRows(USER.id, 5);
+        for (const bad of ['', 'abc', '123', '1:', '1:bad id!', `${NOW}:${'x'.repeat(100)}`, 'no-es-cursor:trd-1']) {
+            const r = (await historyActions.getManualDemoHistory({ before: bad })) as unknown as HistoryPage;
+            assert.equal(r.ok, false, `rechazado: ${JSON.stringify(bad)}`);
+            if (!r.ok) assert.equal(r.field, 'before');
+        }
+        for (const bad of [123, {}, [], true] as unknown[]) {
+            const r = (await historyActions.getManualDemoHistory({ before: bad })) as unknown as HistoryPage;
+            assert.equal(r.ok, false, 'tipos no string también se rechazan');
+        }
+    });
+
+    it('empates de createdAt: orden determinista por _id y recorrido exacto entre páginas', async () => {
+        // 5 filas con el MISMO createdAt (empate total) + ids ordenables.
+        const tieMs = NOW - 60_000;
+        const tieIds = ['tie-a', 'tie-b', 'tie-c', 'tie-d', 'tie-e'];
+        for (const id of tieIds) {
+            modelStub.__seedTrade({
+                userId: USER.id, clientOrderId: `${USER.id}-${id}`,
+                kind: 'accion', symbol: 'BBVA.MC', name: 'BBVA',
+                contract: null, side: 'buy', openClose: 'open', fxFrom: null, fxTo: null,
+                quantity: 1, status: 'filled', fillPrice: 10, currency: 'EUR', fee: 0,
+                fillSource: 'manual-simulado', executedAt: new Date(tieMs), rejectReason: null,
+                createdAt: new Date(tieMs), updatedAt: new Date(tieMs),
+                _id: `${USER.id}-${id}`,
+            });
+        }
+        // Orden esperado: _id descendente (tie-e, tie-d, tie-c, tie-b, tie-a).
+        const p1 = (await historyActions.getManualDemoHistory({ limit: 2 })) as unknown as HistoryPage;
+        assert.ok(p1.ok);
+        assert.deepEqual(p1.orders.map((r) => r.clientOrderId), [`${USER.id}-tie-e`, `${USER.id}-tie-d`]);
+        assert.equal(p1.hasMore, true);
+        // El cursor parte el empate a mitad: ni pérdida ni duplicado.
+        const ids: string[] = [...p1.orders.map((r) => r.clientOrderId)];
+        let before: string | null = p1.nextBefore;
+        while (before) {
+            const p = (await historyActions.getManualDemoHistory({ before, limit: 2 })) as unknown as HistoryPage;
+            assert.ok(p.ok);
+            ids.push(...p.orders.map((r) => r.clientOrderId));
+            before = p.hasMore ? p.nextBefore : null;
+        }
+        assert.deepEqual(ids, tieIds.map((t) => `${USER.id}-${t}`).reverse(), 'recorrido exacto sobre el empate');
+    });
+
+    it('filas nuevas entre páginas no desplazan el recorrido (sin offset)', async () => {
+        seedHistoryRows(USER.id, 250);
+        const p1 = (await historyActions.getManualDemoHistory()) as unknown as HistoryPage;
+        assert.ok(p1.ok && p1.nextBefore);
+        // Llegan 3 filas NUEVAS (más recientes) antes de pedir la página 2.
+        seedHistoryRows(USER.id, 3, { startMs: NOW, stepMs: 100, tag: 'nueva' });
+        const p2 = (await historyActions.getManualDemoHistory({ before: p1.nextBefore })) as unknown as HistoryPage;
+        assert.ok(p2.ok);
+        assert.deepEqual(
+            p2.orders.map((r) => r.clientOrderId),
+            expectedIds(USER.id, 250).slice(200),
+            'la página 2 es exactamente la cola esperada, sin corrimientos',
+        );
+        // Y un refresh (página 1 otra vez) muestra las nuevas arriba.
+        const fresh = (await historyActions.getManualDemoHistory()) as unknown as HistoryPage;
+        assert.ok(fresh.ok);
+        assert.deepEqual(
+            fresh.orders.slice(0, 3).map((r) => r.clientOrderId),
+            [`${USER.id}-nueva-0`, `${USER.id}-nueva-1`, `${USER.id}-nueva-2`],
+            'las filas nuevas encabezan el refresh',
+        );
+    });
+
+    it('límite: defecto 200, tope 500 y valores absurdos saneados', async () => {
+        seedHistoryRows(USER.id, 600);
+        const def = (await historyActions.getManualDemoHistory()) as unknown as HistoryPage;
+        assert.ok(def.ok && def.orders.length === 200 && def.hasMore);
+        const max = (await historyActions.getManualDemoHistory({ limit: 500 })) as unknown as HistoryPage;
+        assert.ok(max.ok && max.orders.length === 500 && max.hasMore);
+        const clamped = (await historyActions.getManualDemoHistory({ limit: 99999 })) as unknown as HistoryPage;
+        assert.ok(clamped.ok && clamped.orders.length === 500, 'limit por encima del tope se acota a 500');
+        const min = (await historyActions.getManualDemoHistory({ limit: 0 })) as unknown as HistoryPage;
+        assert.ok(min.ok && min.orders.length === 1, 'limit 0 se acota a 1');
+        const junk = (await historyActions.getManualDemoHistory({ limit: 'x' })) as unknown as HistoryPage;
+        assert.ok(junk.ok && junk.orders.length === 200, 'limit no numérico vuelve al defecto');
+    });
+
+    it('los rechazos siguen visibles en el historial paginado', async () => {
+        // 20000 x 10 EUR = 200.000 > 100.000 iniciales: rechazo por saldo (no
+        // validación de entrada: la cantidad está dentro del rango admitido).
+        const r = (await actions.placeManualOrder(buyAccion({ quantity: 20000, price: 10 }))) as unknown as { ok: boolean; outcome?: string };
+        assert.ok(r.ok && r.outcome === 'rejected', 'la orden se rechaza por saldo');
+        const p = (await historyActions.getManualDemoHistory()) as unknown as HistoryPage;
+        assert.ok(p.ok);
+        assert.equal(p.orders.length, 1);
+        const row = p.orders[0];
+        assert.equal(row.status, 'rejected');
+        assert.equal(row.fillPrice, null);
+        assert.ok(row.rejectReason, 'el motivo del rechazo viaja en la fila');
+    });
+
+    it('sin sesión: error claro y ninguna fila', async () => {
+        login(null);
+        const r = (await historyActions.getManualDemoHistory()) as unknown as HistoryPage;
+        assert.equal(r.ok, false);
+        if (!r.ok) assert.match(r.message, /Inicia sesión/);
+    });
+});
