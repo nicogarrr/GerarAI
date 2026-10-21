@@ -36,6 +36,8 @@ class ChangeItem:
     titular_original: str | None = None
     traduccion_titular: str | None = None
     tambien_en: list[dict] = field(default_factory=list)
+    # Carga del caller (p. ej. el ThesisChange origen) que viaja con el grupo.
+    extra: dict = field(default_factory=dict)
 
 
 def identity_keys(item: ChangeItem) -> set[str]:

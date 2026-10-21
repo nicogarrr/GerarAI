@@ -1111,6 +1111,25 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     </span>
                   </div>
                   <p className="break-words leading-6 [overflow-wrap:anywhere]">{changeSummaryText(change.summary)}</p>
+                  {/* Procedencia: fuente del evento y URLs absorbidas al agrupar
+                      la misma noticia en dos idiomas (identidad atribuida). */}
+                  {change.fuente_url && /^https:\/\//.test(change.fuente_url) ? (
+                    <p className="mt-1 text-xs text-gray-500">
+                      <a href={change.fuente_url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">
+                        {change.fuente_nombre || 'Fuente'}
+                      </a>
+                      {(change.tambien_en ?? []).map((entry, entryIndex) => {
+                        const url = typeof entry?.url === 'string' ? entry.url : null;
+                        const nombre = typeof entry?.fuente === 'string' ? entry.fuente : 'otra fuente';
+                        return url && /^https:\/\//.test(url) ? (
+                          <span key={`${url}-${entryIndex}`}>
+                            {' · también en '}
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">{nombre}</a>
+                          </span>
+                        ) : null;
+                      })}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>

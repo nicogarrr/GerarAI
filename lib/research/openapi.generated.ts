@@ -7575,6 +7575,10 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Fuente Nombre */
+            fuente_nombre?: string | null;
+            /** Fuente Url */
+            fuente_url?: string | null;
             /** Id */
             id: number;
             /** Impact Direction */
@@ -7585,6 +7589,10 @@ export interface components {
             requires_review: boolean;
             /** Summary */
             summary: string;
+            /** Tambien En */
+            tambien_en?: {
+                [key: string]: unknown;
+            }[] | null;
         };
         /** SnapshotThesisSummaryOut */
         SnapshotThesisSummaryOut: {

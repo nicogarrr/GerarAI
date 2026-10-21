@@ -316,8 +316,9 @@ def test_company_snapshot_query_budget(perf_db) -> None:
     assert company is not None
     _reset(counter)
     snapshot = CompanySnapshotService().build(db, company)
-    # 4 lecturas + recent_changes + conteos en 1 query = 6.
-    assert counter["n"] <= 6, f"company snapshot usó {counter['n']} queries (>6)"
+    # 4 lecturas + recent_changes + conteos en 1 query + 2 del enriquecimiento
+    # por lote (reviews puente + eventos, una cada una, no N+1) = 8.
+    assert counter["n"] <= 8, f"company snapshot usó {counter['n']} queries (>8)"
     assert snapshot.counts.facts == 1
     assert snapshot.counts.thesis_versions == 1
 

@@ -7411,6 +7411,28 @@
             "title": "Created At",
             "type": "string"
           },
+          "fuente_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fuente Nombre"
+          },
+          "fuente_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fuente Url"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -7430,6 +7452,21 @@
           "summary": {
             "title": "Summary",
             "type": "string"
+          },
+          "tambien_en": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tambien En"
           }
         },
         "required": [
