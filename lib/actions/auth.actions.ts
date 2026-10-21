@@ -193,7 +193,7 @@ export const signOut = async (): Promise<{ success: boolean; error?: string }> =
     try {
         const auth = await getAuth();
         if (!auth) {
-            throw new AuthenticationError('Unable to sign out. Authentication service is unavailable.');
+            throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
         }
 
         await auth.api.signOut({ headers: await headers() });
@@ -201,6 +201,6 @@ export const signOut = async (): Promise<{ success: boolean; error?: string }> =
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('Sign out failed:', appError);
-        return { success: false, error: 'Unable to sign out. Please refresh the page and try again.' };
+        return { success: false, error: 'No se pudo cerrar la sesión. Recarga la página e inténtalo de nuevo.' };
     }
 }

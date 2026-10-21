@@ -13,12 +13,22 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, CircleHelp, LogOut, Settings, ShieldCheck } from "lucide-react";
 import { signOut } from "@/lib/actions/auth.actions";
+import { toast } from "sonner";
 
 const UserDropdown = ({ user }: { user: User }) => {
     const router = useRouter();
     const handleSignOut = async () => {
-        await signOut();
+        const result = await signOut();
+        if (!result.success) {
+            // Antes se navegaba a /sign-in igualmente: la sesión seguía viva y el
+            // layout de auth devolvía al usuario a /inicio sin explicación.
+            toast.error('No se pudo cerrar la sesión', {
+                description: result.error ?? 'Recarga la página e inténtalo de nuevo.',
+            });
+            return;
+        }
         router.push("/sign-in");
+        router.refresh();
     }
 
     return (
