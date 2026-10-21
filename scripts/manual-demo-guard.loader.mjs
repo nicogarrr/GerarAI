@@ -8,7 +8,8 @@
  * - `@/database/mongoose` -> stub de conexion con sesiones/transacciones falsas.
  * - `@/database/models/manual-demo.model` -> colecciones en memoria con
  *   unicidad (userId, clientOrderId) y escritura condicional por version.
- * - `@/lib/paper-trading/{types,accounting,options,ledger-adapter}` ->
+ * - `@/lib/paper-trading/{types,accounting,options,ledger-adapter}` y
+ *   `@/lib/market/{demo-valuation,quote-freshness}` ->
  *   ficheros REALES del repo (el codigo bajo test es el fuente real).
  */
 const REAL = {
@@ -16,6 +17,8 @@ const REAL = {
     '@/lib/paper-trading/accounting': '../lib/paper-trading/accounting.ts',
     '@/lib/paper-trading/options': '../lib/paper-trading/options.ts',
     '@/lib/paper-trading/ledger-adapter': '../lib/paper-trading/ledger-adapter.ts',
+    '@/lib/market/demo-valuation': '../lib/market/demo-valuation.ts',
+    '@/lib/market/quote-freshness': '../lib/market/quote-freshness.ts',
 };
 
 export async function resolve(specifier, context, nextResolve) {

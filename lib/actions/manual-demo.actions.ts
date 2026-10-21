@@ -35,6 +35,8 @@ import {
     type ManualDemoTradeDoc,
 } from '@/database/models/manual-demo.model';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { sanitizeFinnhubQuote } from '@/lib/market/quote-freshness';
+import { parseListingCurrencies, symbolFromKey, valuePositions, type DemoValuation, type ValuationQuote } from '@/lib/market/demo-valuation';
 import { computeManualDemoAccount } from '@/lib/paper-trading/accounting';
 import { docsToLedger } from '@/lib/paper-trading/ledger-adapter';
 import { buildOptionFill } from '@/lib/paper-trading/options';
@@ -568,6 +570,124 @@ export async function getManualDemoAccount(): Promise<ManualDemoAccountResult> {
         return { ok: true, state: toView(state) };
     } catch (error) {
         return unexpectedError('getManualDemoAccount', error);
+    }
+}
+
+export type ManualDemoValuationResult =
+    | { ok: true; valuation: DemoValuation; asOf: number }
+    | ManualDemoFailure;
+
+const MAX_VALUATION_SYMBOLS = 25;
+/**
+ * Cotización SOLO de Finnhub (/quote) con la frescura validada por
+ * sanitizeFinnhubQuote (stale => null). Deliberadamente NO usa getStockQuote:
+ * ese camino cae a Yahoo Finance si Finnhub falla, y aquí nunca debe haber
+ * ninguna llamada a Yahoo. Sin clave, error de red o dato viejo => null.
+ */
+async function finnhubOnlyQuote(symbol: string): Promise<ValuationQuote | null> {
+    const token = process.env.FINNHUB_API_KEY;
+    if (!token) return null;
+    try {
+        const base = process.env.FINNHUB_BASE_URL || 'https://finnhub.io/api/v1';
+        const response = await fetch(`${base}/quote?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(token)}`, {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(8_000),
+        });
+        if (!response.ok) return null;
+        return sanitizeFinnhubQuote(await response.json());
+    } catch {
+        return null;
+    }
+}
+
+const LISTING_TTL_MS = 6 * 3_600_000;
+let usListing: { at: number; map: Map<string, string> } | null = null;
+let listingInflight: Promise<Map<string, string> | null> | null = null;
+
+/**
+ * Listado US de Finnhub (/stock/symbol?exchange=US, tier gratis; campo
+ * currency) para verificar la divisa. Una sola descarga a la vez: las
+ * llamadas concurrentes comparten la misma promesa. Un fallo (red, 429,
+ * vacio) devuelve null y NO se cachea, asi que la siguiente invocacion
+ * reintenta; un listado correcto se reutiliza 6 h en memoria.
+ */
+function getUsListing(): Promise<Map<string, string> | null> {
+    const token = process.env.FINNHUB_API_KEY;
+    if (!token) return Promise.resolve(null);
+    if (usListing && Date.now() - usListing.at <= LISTING_TTL_MS) return Promise.resolve(usListing.map);
+    if (listingInflight) return listingInflight;
+    listingInflight = (async () => {
+        try {
+            const base = process.env.FINNHUB_BASE_URL || 'https://finnhub.io/api/v1';
+            const response = await fetch(`${base}/stock/symbol?exchange=US&token=${encodeURIComponent(token)}`, {
+                cache: 'no-store',
+                signal: AbortSignal.timeout(15_000),
+            });
+            if (!response.ok) return null;
+            const map = parseListingCurrencies(await response.json());
+            if (map.size === 0) return null;
+            usListing = { at: Date.now(), map };
+            return map;
+        } catch {
+            return null;
+        } finally {
+            listingInflight = null;
+        }
+    })();
+    return listingInflight;
+}
+
+/**
+ * Valoración BAJO DEMANDA de las posiciones abiertas con cotizaciones reales
+ * (Finnhub /quote directo, validada por frescura; sin fallback a Yahoo ni a
+ * getStockQuote). No hay auto-refresco ni caché propia: cada llamada vuelve a
+ * pedir a Finnhub (la hora de cada fila es la del proveedor). Sin cotización => N/D por posición; nunca se usa el precio de
+ * un fill como precio de mercado. Más de 25 símbolos distintos: los
+ * sobrantes salen "No consultada: límite de 25 símbolos por consulta".
+ * Estrictamente de solo lectura: ni siquiera crea la cuenta vacía (a
+ * diferencia de getManualDemoAccount); el libro vacío valora a "sin posiciones".
+ */
+export async function getManualDemoValuation(): Promise<ManualDemoValuationResult> {
+    const user = await requireDemoUser();
+    if (!isDemoUser(user)) return user;
+    try {
+        await connectToDatabase();
+        const { state } = await readLedger(user.id);
+        const positions = state.positions.map((p) => ({
+            instrumentKey: p.instrumentKey,
+            name: p.name,
+            kind: p.kind,
+            currency: p.currency,
+            quantity: p.quantity,
+            avgCost: p.avgCost,
+        }));
+        const allSymbols = [
+            ...new Set(
+                positions
+                    .filter((p) => p.kind === 'accion')
+                    .map((p) => symbolFromKey(p.instrumentKey))
+                    .filter((s): s is string => Boolean(s))
+                    .map((s) => s.toUpperCase()),
+            ),
+        ];
+        const symbols = allSymbols.slice(0, MAX_VALUATION_SYMBOLS);
+        const notQueried = new Set(allSymbols.slice(MAX_VALUATION_SYMBOLS));
+        const quotes: Record<string, ValuationQuote | null> = {};
+        // Un solo lookup de divisa ANTES del reparto: sin listado no se piden
+        // cotizaciones (serian inutiles: sin divisa verificada la fila es N/D).
+        const listing = symbols.length > 0 ? await getUsListing() : null;
+        const verifiable = listing ? symbols.filter((s) => listing.has(s)) : [];
+        const settled = await Promise.allSettled(verifiable.map((symbol) => finnhubOnlyQuote(symbol)));
+        for (const symbol of symbols) quotes[symbol] = null;
+        const currencyUnverified = new Set(symbols.filter((s) => !verifiable.includes(s)));
+        verifiable.forEach((symbol, i) => {
+            const r = settled[i];
+            const quote = r.status === 'fulfilled' ? r.value : null;
+            quotes[symbol] = quote ? { ...quote, currency: listing?.get(symbol) ?? null } : null;
+        });
+        return { ok: true, valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified }), asOf: Date.now() };
+    } catch (error) {
+        return unexpectedError('getManualDemoValuation', error);
     }
 }
 

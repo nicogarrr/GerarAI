@@ -6,7 +6,7 @@
  *
  * Ejecución: node --experimental-strip-types --test scripts/manual-demo-actions.guard.test.ts
  */
-import { beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 
@@ -542,5 +542,172 @@ describe('R3b: rediseño insertar→releer→abortar (orden persistido real)', (
         }
         // buy + 1 única fila de rechazo.
         assert.equal(modelStub.__counts().trades, 2);
+    });
+});
+
+type VRow = { status: string; note: string; marketValue: number | null; currencyBasis: string | null };
+type VResult = { ok: boolean; valuation: { rows: VRow[]; coverage: { valued: number; total: number } } };
+
+describe('valoración bajo demanda (getManualDemoValuation)', () => {
+    const g = globalThis as Record<string, unknown>;
+    const realFetch = globalThis.fetch;
+    // Payload crudo de Finnhub /quote (el modulo lo sanea y valida frescura por t).
+    const finnhub = (c: number, over: Record<string, unknown> = {}) => ({ c, d: 0, dp: 0, h: c, l: c, o: c, pc: c, t: Math.floor(Date.now() / 1000), ...over });
+    let listing: Array<{ symbol: string; currency: string }> | 'fail';
+    let listingCalls = 0;
+    let urls: string[] = [];
+    const realNow = Date.now;
+    let skewMs = 0;
+    beforeEach(() => {
+        // El listado de Finnhub se cachea 6 h en memoria del módulo: cada test avanza
+        // el reloj 7 h para partir sin caché (y los fills se firman con el reloj real).
+        skewMs += 7 * 3_600_000;
+        Date.now = () => realNow() + skewMs;
+        g.__GUARD_QUOTES__ = {};
+        g.__GUARD_QUOTE_CALLS__ = [];
+        urls = [];
+        listingCalls = 0;
+        listing = [{ symbol: 'BBVA', currency: 'USD' }, { symbol: 'T00', currency: 'USD' }];
+        process.env.FINNHUB_API_KEY = 'guard-key';
+        globalThis.fetch = (async (input: RequestInfo | URL) => {
+            const url = String(input);
+            urls.push(url);
+            if (url.includes('/stock/symbol')) {
+                listingCalls++;
+                if (listing === 'fail') return new Response('no', { status: 500 });
+                return new Response(JSON.stringify(listing), { status: 200 });
+            }
+            if (url.includes('/quote?')) {
+                const symbol = decodeURIComponent(new URL(url).searchParams.get('symbol') ?? '');
+                g.__GUARD_QUOTE_CALLS__ = (g.__GUARD_QUOTE_CALLS__ as string[]).concat(symbol);
+                const q = (g.__GUARD_QUOTES__ as Record<string, unknown>)[symbol];
+                if (q instanceof Error) throw q;
+                if (!q) return new Response(JSON.stringify({ c: 0, pc: 0, t: 0 }), { status: 200 });
+                return new Response(JSON.stringify(q), { status: 200 });
+            }
+            throw new Error(`fetch inesperado en el guard: ${url}`);
+        }) as typeof fetch;
+    });
+    afterEach(() => {
+        Date.now = realNow;
+        globalThis.fetch = realFetch;
+        delete process.env.FINNHUB_API_KEY;
+    });
+
+    it('sin sesión devuelve error y no consulta cotizaciones ni base de datos', async () => {
+        login(null);
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.ok, false);
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, []);
+        assert.deepEqual(modelStub.__counts(), { accounts: 0, trades: 0 });
+    });
+
+    it('es de solo lectura: con libro vacío NO crea la cuenta', async () => {
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.ok, true);
+        assert.deepEqual(r.valuation.coverage, { valued: 0, total: 0 });
+        assert.deepEqual(modelStub.__counts(), { accounts: 0, trades: 0 });
+    });
+
+    it('Finnhub + divisa verificada en el listado: valora; libro intacto', async () => {
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'BBVA', name: 'BBVA' }, currency: 'EUR', quantity: 10, price: 10 }));
+        const before = JSON.stringify(modelStub.__snapshot());
+        // La posición está en EUR y el listado dice USD: no coincide => N/D (sin conversión).
+        g.__GUARD_QUOTES__ = { BBVA: finnhub(12) };
+        const r1 = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r1.valuation.rows[0].status, 'divisa-no-coincide');
+        assert.equal(JSON.stringify(modelStub.__snapshot()), before);
+    });
+
+    it('listado caído => N/D sin pedir cotizaciones; el fallo no se cachea y se reintenta', async () => {
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'BBVA', name: 'BBVA' }, currency: 'EUR', quantity: 10, price: 10 }));
+        g.__GUARD_QUOTES__ = { BBVA: finnhub(12) };
+        listing = 'fail';
+        let r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.valuation.rows[0].status, 'divisa-no-coincide');
+        assert.equal(r.valuation.rows[0].note, 'No se pudo verificar la divisa de la cotización.');
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, [], 'sin divisa verificable no se pide la cotización');
+        assert.equal(listingCalls, 1);
+        listing = [{ symbol: 'BBVA', currency: 'EUR' }];
+        r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.valuation.rows[0].status, 'valorada', 'el fallo no se cacheó: reintenta y valora');
+        assert.equal(listingCalls, 2);
+        r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(listingCalls, 2, 'un listado correcto se reutiliza');
+    });
+
+    it('Finnhub sin dato (falla o precio viejo): N/D y NINGUNA llamada a Yahoo ni al backend', async () => {
+        await actions.placeManualOrder(buyAccion());
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'OLD', name: 'Viejo' } }));
+        listing = [{ symbol: 'BBVA.MC', currency: 'EUR' }, { symbol: 'OLD', currency: 'USD' }];
+        g.__GUARD_QUOTES__ = { 'BBVA.MC': new Error('finnhub caido'), OLD: finnhub(5, { t: 1_000_000_000 }) };
+        process.env.FMP_BACKEND_URL = 'http://backend.invalid';
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        delete process.env.FMP_BACKEND_URL;
+        assert.deepEqual(r.valuation.rows.map((x) => x.status), ['sin-cotizacion', 'sin-cotizacion']);
+        assert.equal(r.valuation.rows[0].note, 'Sin cotización disponible de las fuentes admitidas (no se usa el precio de tus operaciones).');
+        assert.ok(urls.every((u) => u.startsWith('https://finnhub.io/api/v1/')), urls.join(' | '));
+        assert.ok(!urls.some((u) => /yahoo|backend|api\/market/.test(u)));
+        assert.equal(listingCalls, 1);
+    });
+
+    it('proveedor caído en un símbolo: N/D en esa fila, sin romper la acción', async () => {
+        await actions.placeManualOrder(buyAccion());
+        listing = [{ symbol: 'BBVA.MC', currency: 'EUR' }];
+        g.__GUARD_QUOTES__ = { 'BBVA.MC': new Error('proveedor caido') };
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.ok, true);
+        assert.equal(r.valuation.rows[0].status, 'sin-cotizacion');
+    });
+
+    it('USD verificado: acción en USD con cotización Finnhub se valora', async () => {
+        await actions.convertManualDemoCurrency({ from: 'EUR', to: 'USD', amount: 1000, rate: 1.1, executedAt: NOW - 120_000, clientOrderId: oid() });
+        const o = await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'BBVA', name: 'BBVA' }, currency: 'USD', quantity: 10, price: 10 }));
+        assert.equal(o.ok && o.outcome, 'filled');
+        g.__GUARD_QUOTES__ = { BBVA: finnhub(12) };
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        const row = r.valuation.rows[0];
+        assert.equal(row.status, 'valorada');
+        assert.equal(row.marketValue, 120);
+        assert.equal(row.currencyBasis, 'finnhub-listado');
+        assert.deepEqual(r.valuation.coverage, { valued: 1, total: 1 });
+    });
+
+    it('más de 25 símbolos: los sobrantes salen "No consultada" y solo se piden 25', async () => {
+        for (let i = 0; i < 27; i++) {
+            const r = await actions.placeManualOrder(
+                buyAccion({ instrument: { kind: 'accion', symbol: `T${String(i).padStart(2, '0')}`, name: `T${i}` }, currency: 'EUR', quantity: 1, price: 1 }),
+            );
+            assert.equal(r.ok && r.outcome, 'filled');
+        }
+        g.__GUARD_QUOTE_CALLS__ = [];
+        listing = Array.from({ length: 27 }, (_, i) => ({ symbol: `T${String(i).padStart(2, '0')}`, currency: 'EUR' }));
+        const v = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(v.ok, true);
+        assert.equal((g.__GUARD_QUOTE_CALLS__ as string[]).length, 25);
+        assert.equal(listingCalls, 1, '25 símbolos => una sola descarga del listado');
+        const rows = v.valuation.rows;
+        assert.equal(rows.filter((x) => x.status === 'no-consultada').length, 2);
+        assert.match(rows.find((x) => x.status === 'no-consultada')?.note ?? '', /límite de 25/);
+    });
+
+    it('llamadas concurrentes comparten una sola descarga del listado (inflight)', async () => {
+        await actions.convertManualDemoCurrency({ from: 'EUR', to: 'USD', amount: 1000, rate: 1.1, executedAt: NOW - 120_000, clientOrderId: oid() });
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'BBVA', name: 'BBVA' }, currency: 'USD', quantity: 1, price: 1 }));
+        g.__GUARD_QUOTES__ = { BBVA: finnhub(2) };
+        await Promise.all([actions.getManualDemoValuation(), actions.getManualDemoValuation(), actions.getManualDemoValuation()]);
+        assert.equal(listingCalls, 1);
+    });
+
+    it('causas distintas: símbolo ausente del listado vs proveedor de cotización caído', async () => {
+        await actions.placeManualOrder(buyAccion());
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'DOWN', name: 'Down' } }));
+        listing = [{ symbol: 'DOWN', currency: 'EUR' }];
+        g.__GUARD_QUOTES__ = { DOWN: new Error('proveedor caido') };
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        const byNote = r.valuation.rows.map((x) => x.note);
+        assert.ok(byNote.includes('No se pudo verificar la divisa de la cotización.'), 'ausente del listado');
+        assert.ok(byNote.some((n) => n.startsWith('Sin cotización disponible')), 'proveedor caído con divisa verificada');
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['DOWN'], 'solo se pide la cotización con divisa verificable');
     });
 });
