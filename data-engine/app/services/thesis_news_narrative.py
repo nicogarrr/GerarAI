@@ -279,11 +279,13 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
                                   response.usage.total_tokens, commit=False)
                     db.flush()
     except (ProviderHTTPError, ProviderTransportError, ProviderDisabledError) as exc:
-        # SOLO indisponibilidad del proveedor (429 free tier agotado, timeout
+        # SOLO indisponibilidad del proveedor (HTTP 429/5xx/401/403, timeout
         # de transporte, proveedor deshabilitado): la evidencia EXISTE y
         # «Sin datos» mentiría. Compendio factual extractivo (sin LLM, EUR 0)
-        # que declara la indisponibilidad del análisis automático.
-        logger.warning("Narrativa de noticias: %s; compendio factual", type(exc).__name__)
+        # que declara la indisponibilidad del análisis automático SIN
+        # diagnosticar la causa (el copy nunca afirma cuota/auth: 429 no es
+        # el único origen posible y el status es diagnóstico interno, en log).
+        logger.warning("Narrativa de noticias: %s; compendio factual", exc)
         return compendio_factual(list(news_items or []), now or datetime.now(UTC))
     except Exception as exc:  # noqa: BLE001 - upstream inestable nunca rompe la tesis
         # Salida LLM rechazada (cifras inventadas, URLs, JSON inválido,

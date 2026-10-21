@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from app.llm import LLMRequest, Message
-from app.llm.errors import ProviderHTTPError
+from app.llm.errors import ProviderHTTPError, ProviderResponseError
 from app.services import thesis_news_narrative as svc
 from app.services.llm_proposal_runner import paid_model_risk
 
@@ -476,14 +476,23 @@ def test_cita_sin_id_crudo_ni_redirect_de_google_news():
     assert _canonical_url(None) is None
 
 
-def test_provider_error_degrades_to_factual_compendium_not_sin_datos(context):
-    """429/agotamiento del proveedor (v6 HYMC prod 2026-10-22): la evidencia
-    EXISTE; «Sin datos» mentiría. Compendio factual declarado, EUR 0."""
-    provider = Provider(error=ProviderHTTPError("opencode-go", 429))
+@pytest.mark.parametrize("status", [429, 401, 403, 500, 502])
+def test_provider_error_degrades_to_factual_compendium_not_sin_datos(context, status):
+    """Indisponibilidad HTTP del proveedor (429 free tier v6 HYMC prod
+    2026-10-22, auth 401/403, 5xx): la evidencia EXISTE; «Sin datos»
+    mentiría. Compendio factual declarado, EUR 0. El copy NUNCA diagnostica
+    la causa (cuota/agotamiento/auth): solo declara indisponibilidad."""
+    provider = Provider(error=ProviderHTTPError("opencode-go", status))
     result = call(context, provider)
     assert result[0]["titulo"].startswith("Compendio factual")
     assert any("no está disponible" in parrafo for parrafo in result[0]["parrafos"])
     assert any("Meta presenta Muse" in parrafo for parrafo in result[0]["parrafos"])
+    # Sin diagnóstico inventado EN EL ROTULO: ni cuota, ni agotamiento, ni
+    # causa de auth, ni status. (Los titulares enumerados son evidencia real
+    # y pueden contener cifras; el rotulo es parrafos[0].)
+    rotulo = result[0]["parrafos"][0]
+    for prohibido in ("cuota", "agotad", "límite", "401", "403", "429", "500", "502"):
+        assert prohibido not in rotulo
     assert result != svc.sin_datos()
     # Sin evidencia, el mismo fallo sí produce «Sin datos» (ausencia real).
     assert call(context, provider, items=[]) == svc.sin_datos()
