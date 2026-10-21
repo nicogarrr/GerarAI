@@ -1813,7 +1813,16 @@ class LongTermModelService:
         wacc = assumptions["wacc"].value
         terminal = assumptions["terminal_growth"].value
         net_debt = self._value_for_year(fact_cache["net_debt"], source_year)
-        if current_price is None or revenue is None or shares in (None, 0) or margin is None or wacc is None or terminal is None or net_debt is None:
+        # Un valor no positivo (ingreso anual 0 tras parar la actividad, acciones
+        # <= 0, precio <= 0) no es un dato utilizable: sin esto el solver lanzaba
+        # ValueError y tumbaba la generacion entera de la tesis (HYMC).
+        if current_price is not None and current_price <= 0:
+            current_price = None
+        if revenue is not None and revenue <= 0:
+            revenue = None
+        if shares is not None and shares <= 0:
+            shares = None
+        if current_price is None or revenue is None or shares is None or margin is None or wacc is None or terminal is None or net_debt is None or wacc <= terminal:
             # Missing net debt is never treated as "debt-free": the forward
             # DCF refuses without it, the reverse DCF does the same.
             # Solo se declara lo que falta de verdad: la lista fija decia "falta el
@@ -1826,7 +1835,7 @@ class LongTermModelService:
                     ("fcf_margin", margin),
                     ("wacc", wacc),
                     ("terminal_growth", terminal),
-                    ("shares_diluted", shares or None),
+                    ("shares_diluted", shares),
                     ("net_debt", net_debt),
                 )
                 if value is None
