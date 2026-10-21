@@ -97,3 +97,10 @@ test('el precio de cierre se rotula con fecha y lleva gráfico técnico', () => 
     assert.match(component, /extendedQuoteLabel\(quote\)/);
     assert.match(component, /CompanyTechnicalWorkspace snapshot=\{snapshot\}/);
 });
+
+test('la variación en divisa usa formatPrice con dígitos significativos (F35), nunca redondeo a 0', () => {
+  // TEF 21-oct-2026: variación -0,002 € se pintaba «0 · -0,06 %».
+  assert.match(component, /formatPrice/);
+  assert.doesNotMatch(component, /formatNumber\(quote\.change/);
+  assert.doesNotMatch(component, /formatNumber\(quote\.close_change/);
+});

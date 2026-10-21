@@ -171,6 +171,9 @@ const TIPOS_INSTRUMENTO: Record<string, string> = {
   Warrant: 'Warrant',
   Right: 'Derecho',
   Unit: 'Unidad',
+  // Finnhub marca PUBLIC valores cotizados de algunas plazas (LSE): se
+  // mostraba crudo en inglés en el buscador («SAN.L | LSE | PUBLIC»).
+  PUBLIC: 'Cotizada',
 };
 
 export function etiquetaTipoInstrumento(value: string): string {

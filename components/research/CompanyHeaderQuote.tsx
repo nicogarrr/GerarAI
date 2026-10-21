@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useEffect, useRef, useState } from 'react';
-import { NA, formatMarketDate, formatMoney, formatNumber, formatPercent, isValidCurrencyCode } from '@/lib/format';
+import { NA, formatMarketDate, formatMoney, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
 import { extendedQuoteLabel, quoteDate, quoteTime, quoteSessionDate, type ExtendedQuote } from '@/lib/market/extended-quote';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { CompanyTechnicalWorkspace } from './CompanyTechnicalWorkspace';
@@ -13,6 +13,13 @@ function headerMoney(value: number | null | undefined, currency: string): string
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
     }
     return formatMoney(value, currency);
+}
+
+/** Variación en divisa: magnitudes < 0,01 con dígitos significativos (F35),
+ *  nunca un «0» redondeado junto a un porcentaje distinto de cero (TEF:
+ *  «0 · -0,06 %» cuando la variación real era -0,002 €). */
+function headerChangeMoney(value: number, currency: string): string {
+    return formatPrice(value, currency, { signDisplay: 'exceptZero' });
 }
 
 /** One timestamped Yahoo payload supplies the price and all header metrics. */
@@ -144,7 +151,7 @@ export function CompanyHeaderQuote({
                 {showPrice && quote && quote.session !== 'cerrado' && (quote.change != null || quote.change_percent != null) && signBase !== 0 ? (
                     <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${signBase > 0 ? 'bg-emerald-500/10 text-emerald-300' : signBase < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
                         {[
-                            quote.change != null ? (currency === 'USD' ? new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', signDisplay:'exceptZero', minimumFractionDigits:2, maximumFractionDigits:2}).format(quote.change) : formatNumber(quote.change, { signDisplay: 'exceptZero', maximumFractionDigits: 2 })) : null,
+                            quote.change != null ? headerChangeMoney(quote.change, currency) : null,
                             quote.change_percent != null ? formatPercent(quote.change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }) : null,
                         ].filter(Boolean).join(' · ')}
                     </div>
@@ -153,7 +160,7 @@ export function CompanyHeaderQuote({
                     <div data-testid="close-change">
                         <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${quote.close_change_percent > 0 ? 'bg-emerald-500/10 text-emerald-300' : quote.close_change_percent < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
                             {[
-                                quote.close_change != null ? (currency === 'USD' ? new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', signDisplay:'exceptZero', minimumFractionDigits:2, maximumFractionDigits:2}).format(quote.close_change) : formatNumber(quote.close_change, { signDisplay: 'exceptZero', maximumFractionDigits: 2 })) : null,
+                                quote.close_change != null ? headerChangeMoney(quote.close_change, currency) : null,
                                 formatPercent(quote.close_change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }),
                             ].filter(Boolean).join(' · ')}
                         </div>
