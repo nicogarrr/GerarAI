@@ -9,6 +9,13 @@ import type { DemoPositionView } from './submit';
  * Sin ajustes por splits, dividendos ni ampliaciones (limitación declarada
  * de la demo): una posición que cruce una de ellas queda descuadrada.
  */
+/** dd/mm/yyyy desde la fecha civil del contrato, SIN crear Date: la fecha
+ *  OCC es civil (Nueva York) y convertirla cambiaría el día según la tz. */
+function formatContractDate(iso: string): string {
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+}
+
 function pnlTone(value: number | null): string {
     return value === null || value === 0 ? 'text-gray-400' : value > 0 ? 'text-teal-300' : 'text-red-400';
 }
@@ -39,6 +46,19 @@ export function PositionsTable({ positions, valuation }: { positions: DemoPositi
                                 <span className="block text-xs text-gray-500">
                                     {position.kind === 'opcion' ? 'Opción' : 'Acción'} · {position.instrumentKey}
                                 </span>
+                                {position.optionBadge === 'vencida' && position.optionExpiry ? (
+                                    <span className="mt-1 block rounded border border-amber-800 bg-amber-950/40 px-1.5 py-0.5 text-xs text-amber-300">
+                                        Vencida el {formatContractDate(position.optionExpiry)}: el libro no ejerce ni expira posiciones automáticamente.
+                                        Para registrar el cierre usa la fecha real de ejecución (el vencimiento o antes); la liquidación de
+                                        opciones vencidas sin valor aún no está soportada.
+                                    </span>
+                                ) : null}
+                                {position.optionBadge === 'vence-hoy' && position.optionExpiry ? (
+                                    <span className="mt-1 block rounded border border-amber-800 bg-amber-950/40 px-1.5 py-0.5 text-xs text-amber-300">
+                                        Vence hoy ({formatContractDate(position.optionExpiry)}, fecha del contrato): sin ejercicio ni expiración
+                                        automáticos; el cierre se registra a mano.
+                                    </span>
+                                ) : null}
                                 {valuation ? <MobileValuation row={valued.get(valuationRowKey(position)) ?? null} currency={position.currency} /> : null}
                             </TableCell>
                             <TableCell className="text-right">{formatNumber(position.quantity, { maximumFractionDigits: 0 })}</TableCell>

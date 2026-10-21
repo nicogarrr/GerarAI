@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import type { Currency, OptionContract } from '@/lib/paper-trading/types';
+import { expirationState, isRealDate } from '@/lib/paper-trading/options';
 import { clientOrderIdAfter, NUM_INPUT_HINT, parseEsNumber } from './submit';
 import type { FillSubmit, SubmitFill } from './submit';
 
@@ -130,7 +131,20 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
         if (kind === 'opcion') {
             if (!Number.isFinite(parsedStrike)) return `El strike no es un número válido (${NUM_INPUT_HINT}).`;
             if (parsedStrike <= 0) return 'El strike debe ser mayor que cero.';
-            if (!EXPIRY_RE.test(expiry)) return 'Indica el vencimiento (fecha del contrato).';
+            if (!EXPIRY_RE.test(expiry) || !isRealDate(expiry)) return 'Indica el vencimiento (fecha del contrato, yyyy-mm-dd real).';
+            // Misma regla que el servidor (buildOptionFill): una opción no se
+            // puede ejecutar después de su vencimiento (fecha civil en Nueva
+            // York, la del vencimiento OCC). El día del vencimiento SÍ se
+            // admite, y registrar historia anterior al vencimiento también:
+            // la comparación es contra la fecha de ejecución, no contra hoy.
+            if (
+                expirationState(
+                    { underlying: symbol.trim().toUpperCase(), callPut, strike: parsedStrike, expiry, multiplier: 100, deliverable: 'acciones', adjusted: false },
+                    executedAt,
+                ).status === 'vencido'
+            ) {
+                return 'La fecha de ejecución es posterior al vencimiento del contrato: una opción no se puede ejecutar una vez vencida. Si registras una operación histórica, indica su fecha real de ejecución.';
+            }
         }
         return null;
     }

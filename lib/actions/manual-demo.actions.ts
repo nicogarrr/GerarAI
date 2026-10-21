@@ -39,7 +39,8 @@ import { sanitizeFinnhubQuote } from '@/lib/market/quote-freshness';
 import { parseListingCurrencies, symbolFromKey, valuePositions, type DemoValuation, type ValuationQuote } from '@/lib/market/demo-valuation';
 import { computeManualDemoAccount } from '@/lib/paper-trading/accounting';
 import { docsToLedger } from '@/lib/paper-trading/ledger-adapter';
-import { buildOptionFill } from '@/lib/paper-trading/options';
+import { buildOptionFill, expiryBadge } from '@/lib/paper-trading/options';
+import { parseOptionKey } from '@/lib/paper-trading/types';
 import {
     instrumentKey,
     toFill,
@@ -82,6 +83,11 @@ export type ManualDemoPositionView = {
     quantity: number;
     avgCost: number;
     realizedPnl: number;
+    /** Solo opciones: fecha civil del contrato (yyyy-mm-dd) y su estado de
+     *  vencimiento calculado en el servidor con la zona del vencimiento
+     *  (Nueva York, OCC). Informativo: el libro no ejerce ni expira solo. */
+    optionExpiry: string | null;
+    optionBadge: 'vigente' | 'vence-hoy' | 'vencida' | null;
 };
 
 export type ManualDemoStateView = {
@@ -134,15 +140,20 @@ function toView(state: AccountState): ManualDemoStateView {
         cashUSD: state.cashByCurrency.USD,
         realizedEUR: state.realizedPnlByCurrency.EUR,
         realizedUSD: state.realizedPnlByCurrency.USD,
-        positions: state.positions.map((p) => ({
-            instrumentKey: p.instrumentKey,
-            name: p.name,
-            kind: p.kind,
-            currency: p.currency,
-            quantity: p.quantity,
-            avgCost: p.avgCost,
-            realizedPnl: p.realizedPnl,
-        })),
+        positions: state.positions.map((p) => {
+            const option = p.kind === 'opcion' ? parseOptionKey(p.instrumentKey) : null;
+            return {
+                instrumentKey: p.instrumentKey,
+                name: p.name,
+                kind: p.kind,
+                currency: p.currency,
+                quantity: p.quantity,
+                avgCost: p.avgCost,
+                realizedPnl: p.realizedPnl,
+                optionExpiry: option?.expiry ?? null,
+                optionBadge: option ? expiryBadge(option.expiry, Date.now()) : null,
+            };
+        }),
         violations: state.violations,
         notices: DEMO_NOTICES,
     };
