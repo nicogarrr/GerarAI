@@ -322,22 +322,31 @@ def _notice_es(trace: dict) -> str:
 
 
 def _excluded_reason_es(item: dict) -> str:
-    """Frase honesta por razon de exclusion (presente-excluido, nunca gating)."""
+    """Frase honesta por razon de exclusion (presente-excluido, nunca gating).
+
+    present_not_usable NO cierra con «no hace falta aportarlo»: un 0 reportado
+    existe y no alimenta el DCF, pero evidencia reciente de ingresos positivos
+    siempre puede aportarse y regenera la tesis. Los demas motivos (periodo,
+    derivado de componentes) si son datos que no hace falta aportar.
+    """
     metric_es = term_es(str(item.get("metric")))
     reason = item.get("reason")
     available = item.get("available_period") or "periodo desconocido"
     anchor_p = item.get("anchor_period") or "desconocida"
     if reason == "present_not_usable":
         detail = item.get("detail") or "el valor reportado no alimenta una valoración calculable"
-        return f"{metric_es}: {detail} ({available})"
+        return (
+            f"{metric_es}: {detail} ({available}); no se pide como dato ausente "
+            "y, si hay evidencia reciente de ingresos positivos, aportarla regenera la tesis"
+        )
     if reason == "components_excluded":
         return (
             f"{metric_es}: se deriva de deuda total y efectivo que tenemos fuera "
-            f"del periodo ancla ({available})"
+            f"del periodo ancla ({available}); no hace falta aportarlo"
         )
     return (
         f"{metric_es}: disponible de {available}; el ancla de ingresos es "
-        f"{anchor_p} y un DCF no mezcla ejercicios distintos"
+        f"{anchor_p} y un DCF no mezcla ejercicios distintos; no hace falta aportarlo"
     )
 
 
@@ -1128,7 +1137,7 @@ class ThesisService:
                     _excluded_reason_es(item)
                     for item in sorted(excluded_items, key=lambda i: str(i.get("metric")))
                 )
-                + ". No hace falta aportarlos."
+                + "."
             )
         if valuation.get("status") == "insufficient_data":
             missing = ", ".join(
@@ -1687,8 +1696,7 @@ class ThesisService:
             if lines:
                 lines.append("")
             lines.append(
-                "Datos que YA tenemos aunque no alimentan la valoración "
-                "(no hace falta aportarlos):"
+                "Datos que ya tenemos aunque no alimentan la valoración:"
             )
             for item in sorted(excluded, key=lambda i: str(i.get("metric"))):
                 lines.append(

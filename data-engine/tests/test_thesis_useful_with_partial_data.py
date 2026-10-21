@@ -216,6 +216,20 @@ def test_zero_revenue_anchor_is_explained_not_requested(db):
     assert excluded["revenue"]["available_period"] == "2023-12-31:FY"
 
 
+def test_negative_revenue_anchor_detail_reflects_value(db):
+    """El detalle del presente-no-utilizable refleja el valor real: 0 →
+    «reportados 0»; negativo → «no positivos». Nunca se inventa un 0 para
+    un valor negativo."""
+    company = _company(db)
+    _fact(db, company, "revenue", -5_000, "2023-12-31:FY", 2023)
+    snapshot = FinancialSnapshotBuilder().build(db, company)
+    assert "revenue" in snapshot.missing_inputs
+    excluded = {item["metric"]: item for item in snapshot.excluded_present}
+    assert excluded["revenue"]["reason"] == "present_not_usable"
+    assert excluded["revenue"]["detail"] == "ingresos reportados no positivos en el periodo ancla"
+    assert excluded["revenue"]["reported_value"] == -5_000
+
+
 def test_net_debt_with_excluded_components_is_explained_not_requested(db):
     """net_debt solo se deriva de componentes del periodo ancla. Si deuda y
     efectivo existen pero estan excluidos por periodo, net_debt sigue

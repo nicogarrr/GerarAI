@@ -453,13 +453,24 @@ class FinancialSnapshotBuilder:
         # - net_debt derivable solo de componentes excluidos por periodo: se
         #   explica como presente-excluido derivado, no como ausente.
         if "revenue" in missing and anchor is not None:
+            try:
+                anchor_value = float(anchor.value)
+            except (TypeError, ValueError):
+                anchor_value = float("nan")
+            if not math.isfinite(anchor_value):
+                detail = "ingresos reportados no finitos en el periodo ancla"
+            elif anchor_value == 0:
+                detail = "ingresos reportados 0 en el periodo ancla"
+            else:
+                detail = "ingresos reportados no positivos en el periodo ancla"
             snapshot.excluded_present.append(
                 {
                     "metric": "revenue",
                     "available_period": anchor.period,
                     "anchor_period": anchor.period,
                     "reason": "present_not_usable",
-                    "detail": "ingresos reportados 0 en el periodo ancla",
+                    "detail": detail,
+                    "reported_value": anchor_value if math.isfinite(anchor_value) else None,
                 }
             )
         if "net_debt" in missing:

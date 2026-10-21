@@ -211,13 +211,41 @@ def test_card_summary_insufficient_excluye_presente_excluido():
     }
     text = service._card_summary(_company(), valuation, "hipotesis")
     assert "no publicable todavía" in text
-    assert "Ingresos, wacc" in text
+    assert "Ingresos, WACC" in text
     assert "faltan Ingresos, shares diluted" not in text
     assert "ya los tenemos" in text
     assert "desalineación de periodos" in text
     assert "shares" in text  # explicado como presente-excluido, no pedido
     # gating: missing_inputs sigue bloqueando internamente
     assert valuation["missing_inputs"] == ["revenue", "shares_diluted", "wacc"]
+
+
+def test_card_summary_revenue_cero_no_se_pide_pero_invita_evidencia():
+    """Revenue reportado 0 (HYMC FY2023): existe, no es ausente; no se pide
+    «no hace falta aportarlo» (eso desincentivaria evidencia de ingresos
+    positivos) sino que se invita a aportar esa evidencia."""
+    service = ThesisService()
+    valuation = {
+        "status": "insufficient_data",
+        "missing_inputs": ["revenue", "wacc"],
+        "excluded_inputs": [
+            {
+                "metric": "revenue",
+                "available_period": "2023-12-31:FY",
+                "anchor_period": "2023-12-31:FY",
+                "reason": "present_not_usable",
+                "detail": "ingresos reportados 0 en el periodo ancla",
+            }
+        ],
+        "trace": {"engine": "dcf_v2"},
+    }
+    text = service._card_summary(_company(), valuation, "hipotesis")
+    assert "faltan WACC" in text
+    assert "faltan Ingresos" not in text
+    assert "ingresos reportados 0" in text
+    assert "evidencia reciente de ingresos positivos" in text
+    assert "no hace falta aportarlo" not in text
+    assert valuation["missing_inputs"] == ["revenue", "wacc"]  # gating intacto
 
 
 def test_card_summary_partial_es_indicativo():
