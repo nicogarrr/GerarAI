@@ -590,10 +590,10 @@ describe('R3b: rediseño insertar→releer→abortar (orden persistido real)', (
         assert.equal(modelStub.__snapshot().accounts[0].version, 0);
     });
 
-    it('carrera mismo clientOrderId con payload distinto: devuelve el reason PERSISTIDO, no el local', async () => {
+    it('carrera mismo clientOrderId con payload distinto: conflicto explícito (H17), no duplicado silencioso', async () => {
         await actions.placeManualOrder(buyAccion({ quantity: 10, price: 10, executedAt: T2 }));
         const raceId = 'race-reason-1';
-        // El ganador de la carrera ya grabó un rechazo con OTRO reason (payload distinto).
+        // El ganador de la carrera ya grabó una fila con OTRO payload.
         modelStub.__dupNextTradeCreate({
             userId: USER.id, clientOrderId: raceId, kind: 'accion', symbol: 'BBVA.MC', name: 'BBVA',
             contract: null, side: 'sell', openClose: 'open', fxFrom: null, fxTo: null, quantity: 3,
@@ -601,12 +601,15 @@ describe('R3b: rediseño insertar→releer→abortar (orden persistido real)', (
             executedAt: null, rejectReason: 'REASON-PERSISTIDO-DEL-GANADOR',
         });
         const r = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 5, price: 12, executedAt: T1, clientOrderId: raceId });
-        assert.ok(r.ok);
-        if (r.ok) {
-            assert.equal(r.outcome, 'rejected');
-            assert.equal(r.reason, 'REASON-PERSISTIDO-DEL-GANADOR');
+        // El idempotency-key pertenece a UN payload: reusarlo con otra
+        // operación es un error explícito (campo clientOrderId), nunca el
+        // resultado viejo devuelto como si esta orden hubiera corrido.
+        assert.ok(!r.ok);
+        if (!r.ok) {
+            assert.equal(r.field, 'clientOrderId');
+            assert.match(r.message, /ya se usó con una operación distinta/);
         }
-        // Solo el buy y el rechazo del ganador: este intento no grabó nada.
+        // Solo el buy y la fila del ganador: este intento no grabó nada.
         assert.equal(modelStub.__counts().trades, 2);
     });
 
