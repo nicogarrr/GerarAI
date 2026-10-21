@@ -262,6 +262,62 @@ def test_card_summary_revenue_cero_no_se_pide_pero_invita_evidencia():
     assert valuation["missing_inputs"] == ["revenue", "wacc"]  # gating intacto
 
 
+def test_card_summary_une_missing_del_modelo_y_los_nombra():
+    """Caso real HYMC v4: valuation solo echa de menos revenue (excluido 0) y
+    el modelo de largo plazo echa de menos margen FCF y WACC. La tarjeta debe
+    nombrar EXACTAMENTE esos dos (mismo criterio que §21), no el fallback
+    genérico «datos financieros basicos» que contradice la lista de al lado."""
+    service = ThesisService()
+    valuation = {
+        "status": "insufficient_data",
+        "missing_inputs": ["revenue"],
+        "excluded_inputs": [
+            {
+                "metric": "revenue",
+                "available_period": "2023-12-31:FY",
+                "anchor_period": "2023-12-31:FY",
+                "reason": "present_not_usable",
+                "detail": "ingresos reportados 0 en el periodo ancla",
+            }
+        ],
+        "trace": {"engine": "dcf_v2"},
+    }
+    long_term_model = {"missing_inputs": ["normalized_fcf_margin", "wacc"]}
+    text = service._card_summary(_company(), valuation, "hipotesis", None, long_term_model)
+    assert "faltan margen FCF normalizado, WACC." in text
+    assert "datos financieros basicos" not in text
+    assert "ya los tenemos" in text  # revenue excluido se explica, no se pide
+    assert valuation["missing_inputs"] == ["revenue"]  # gating intacto
+
+
+def test_card_summary_todo_excluido_no_dice_faltan_ni_fallback():
+    """Si TODO lo que falta está presente-excluido, la tarjeta no pide nada
+    como ausente (sería falso) ni cae al fallback genérico: declara que la
+    valoración no es calculable con los datos utilizables. No dice «ya
+    tenemos los datos que faltan»: fuera de periodo no alimentan el cálculo."""
+    service = ThesisService()
+    valuation = {
+        "status": "insufficient_data",
+        "missing_inputs": ["revenue"],
+        "excluded_inputs": [
+            {
+                "metric": "revenue",
+                "available_period": "2023-12-31:FY",
+                "anchor_period": "2023-12-31:FY",
+                "reason": "present_not_usable",
+                "detail": "ingresos reportados 0 en el periodo ancla",
+            }
+        ],
+        "trace": {"engine": "dcf_v2"},
+    }
+    text = service._card_summary(_company(), valuation, "hipotesis", None, {})
+    assert "faltan" not in text
+    assert "datos financieros basicos" not in text
+    assert "no es calculable con los datos utilizables" in text
+    assert "ya los tenemos" in text
+    assert valuation["missing_inputs"] == ["revenue"]  # gating intacto
+
+
 def test_card_summary_partial_es_indicativo():
     service = ThesisService()
     valuation = {"status": "partial", "missing_inputs": ["beta"], "trace": {"engine": "dcf_v2"}}
