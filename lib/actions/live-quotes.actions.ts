@@ -54,5 +54,5 @@ async function fetchAll(): Promise<LiveMarketsResult> {
  */
 export async function getLiveMarkets(): Promise<LiveMarketsResult> {
     await requireAuthenticatedUser();
-    return cachedFetch('live-markets:v1', fetchAll, CACHE_TTL_SECONDS);
+    return cachedFetch('live-markets:v2', fetchAll, CACHE_TTL_SECONDS);
 }
