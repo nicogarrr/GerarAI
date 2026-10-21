@@ -70,3 +70,39 @@ test('legacy title plus identical summary displays once without removing real wo
   assert.equal(dedupeRepeatedHeadline('New York New York reports earnings'), 'New York New York reports earnings');
   assert.equal(newsDisplayTitle(`${headline} ${headline}`, 'ASTS', true), headline);
 });
+
+test('dedupe EN/ES por traducción atribuida cacheada (identidad, no similitud)', () => {
+    const es = {
+        title: 'Datos clave: NASDAQ:ASTS: más de 3,000 celdas en EE. UU.; acuerdo de bonos convertibles por $1 mil millones',
+        url: 'https://news.google.com/rss/articles/CBMiES?oc=5',
+        headline_translation: null,
+    };
+    const en = {
+        title: 'Key facts: NASDAQ:ASTS 3,000+ U.S. Cells; $1B Convertible-Note Deal',
+        url: 'https://news.google.com/rss/articles/CBMiEN?oc=5',
+        headline_translation: {
+            text: 'Datos clave: NASDAQ:ASTS: más de 3,000 celdas en EE. UU.; acuerdo de bonos convertibles por $1 mil millones',
+            target_language: 'es',
+            machine_translation: true,
+        },
+    };
+    const out = dedupeNewsEvents([es, en]);
+    assert.equal(out.length, 1, 'la traducción atribuida del EN coincide con el original ES: una sola fila');
+    assert.equal(out[0].title, es.title, 'sobrevive la primera aparición');
+});
+
+test('dedupe no junta historias distintas aunque se parezcan', () => {
+    const a = { title: 'ASTS firma acuerdo de bonos convertibles por $1 mil millones', url: 'https://a.example/1' };
+    const b = {
+        title: 'AST SpaceMobile closes convertible notes offering',
+        url: 'https://b.example/2',
+        headline_translation: { text: 'AST SpaceMobile cierra la emisión de bonos convertibles', target_language: 'es', machine_translation: true },
+    };
+    assert.equal(dedupeNewsEvents([a, b]).length, 2, 'sin igualdad exacta no hay agrupación');
+});
+
+test('dedupe usa el titular original de la fuente aunque el display recorte el ticker', () => {
+    const a = { title: 'ASTS Launch Delays continue', original_headline: 'Launch Delays continue', url: 'https://a.example/1' };
+    const b = { title: 'Launch Delays continue', url: 'https://b.example/2' };
+    assert.equal(dedupeNewsEvents([a, b]).length, 1);
+});

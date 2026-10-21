@@ -42,6 +42,30 @@ class ThesisImpact:
     trace: dict
 
 
+
+def impact_summary_text(affected_claim_count: int, labels: list[str]) -> str:
+    """Texto del impacto semántico para los resúmenes de cambio.
+
+    Honestidad con cero coincidencias: la forma antigua «Afecta a 0
+    afirmaciones y nodos de la tesis: …» se leía como si nada estuviera
+    afectado pese a listar apartados. Con 0 afirmaciones y apartados
+    afectados se dice explícitamente que no hay afirmación concreta y se
+    nombran los apartados. La forma con afirmaciones usa «…y a estos
+    apartados de la tesis: », la cadena que el frontend (change-copy.ts)
+    reconoce para traducir las etiquetas de los apartados al español.
+    """
+    if not labels:
+        return "Ningún nodo estructural de la tesis coincide con confianza suficiente."
+    if affected_claim_count:
+        return (
+            f"Afecta a {affected_claim_count} afirmaciones y a estos apartados de la tesis: "
+            f"{', '.join(labels)}."
+        )
+    return (
+        "No afecta a ninguna afirmación concreta; toca estos apartados de la tesis: "
+        f"{', '.join(labels)}."
+    )
+
 class ThesisGraphService:
     def latest_thesis(self, db: Session, company: Company) -> ThesisVersion | None:
         return db.scalar(
@@ -258,12 +282,7 @@ class ThesisGraphService:
         )
         impact_score = min(10, base_materiality + semantic_boost)
         labels = [node.label for node in affected_nodes[:4]]
-        summary = (
-            f"Afecta a {len(affected_claim_ids)} afirmaciones y nodos de la tesis: "
-            f"{', '.join(labels)}."
-            if labels
-            else "Ningún nodo estructural de la tesis coincide con confianza suficiente."
-        )
+        summary = impact_summary_text(len(affected_claim_ids), labels)
         return ThesisImpact(
             affected_claim_ids=affected_claim_ids,
             affected_node_ids=[node.id for node in affected_nodes],

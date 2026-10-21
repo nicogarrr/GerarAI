@@ -12,3 +12,21 @@ test('traduce el impacto antiguo incluso después del titular', () => {
 test('no inventa la continuación de un texto antiguo truncado', () => {
   assert.equal(changeSummaryText('ASTS recibe una autorizaci'), 'ASTS recibe una autorizaci');
 });
+
+test('reescribe la forma antigua en español «0 afirmaciones y nodos» a la forma honesta', () => {
+  assert.equal(
+    changeSummaryText('Noticia. Afecta a 0 afirmaciones y nodos de la tesis: Technology, Funding.'),
+    'Noticia. No afecta a ninguna afirmación concreta; toca estos apartados de la tesis: Tecnología, Financiación.',
+  );
+  assert.equal(
+    changeSummaryText('Noticia. Afecta a 2 afirmaciones y nodos de la tesis: Regulatory.'),
+    'Noticia. Afecta a 2 afirmaciones y a estos apartados de la tesis: Regulación.',
+  );
+});
+
+test('la forma nueva del backend (0 afirmaciones) también traduce las etiquetas', () => {
+  assert.equal(
+    changeSummaryText('Noticia. No afecta a ninguna afirmación concreta; toca estos apartados de la tesis: Technology, Funding.'),
+    'Noticia. No afecta a ninguna afirmación concreta; toca estos apartados de la tesis: Tecnología, Financiación.',
+  );
+});
