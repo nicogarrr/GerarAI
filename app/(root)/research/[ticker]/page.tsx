@@ -106,6 +106,7 @@ import { getCompanyHolders } from '@/lib/actions/investors.actions';
 import { getWatchlist } from '@/lib/actions/watchlist.actions';
 import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
+import { findUnavailableViewFailure, viewRetryHref } from '@/lib/research/view-outage';
 import QuickAlertButton from '@/components/research/QuickAlertButton';
 import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
@@ -901,6 +902,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // degradación honesta.
   const [watchlist, viewSettled] = await Promise.all([watchlistPromise, viewPromise]);
   const watchlistUnknown = watchlist === null;
+  // La lectura de la vista activa (una por render) que falla por caída
+  // reconocida del motor (red/timeout o 5xx) degrada a BackendOffline, igual que
+  // snapshot y market arriba. Cualquier otro error (4xx, auth, programación) sigue
+  // relanzándose desde `viewData` al error boundary sin rebajarlo a "offline".
+  const unavailableView = findUnavailableViewFailure(viewSettled, isBackendUnavailableError);
+  if (unavailableView) {
+    console.warn(`[research] ${ticker} · ${activeView} motor no disponible: ${unavailableView.key}=${unavailableView.reason}`);
+    return <BackendOffline feature={`Research de ${ticker}`} retryHref={viewRetryHref(ticker, activeView)} />;
+  }
   const isFollowed = watchlist?.some((item) => item.symbol.toUpperCase() === ticker) ?? false;
   /**
    * Dato del workspace de esta vista. Si la lectura degradó sale el estado
