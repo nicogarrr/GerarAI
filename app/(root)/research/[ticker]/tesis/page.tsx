@@ -157,8 +157,11 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                   download
                   className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-teal-700 hover:text-teal-200 sm:min-h-0"
                 >
-                  <FileDown className="h-4 w-4" />PDF (borrador v{latest.version}, sin cifras)
+                  <FileDown className="h-4 w-4" />Ficha del borrador (PDF, v{latest.version})
                 </a>
+                <span className="text-xs text-gray-500">
+                  El PDF solo lleva la ficha del borrador (lista blanca del backend); el documento completo es esta página. PDF completo de tesis: pendiente.
+                </span>
                 <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink>
               </div>
             </header>
@@ -221,7 +224,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             <footer className="border-t border-gray-800 pt-4 text-xs leading-6 text-gray-500">
               <p>
-                Calidad de la evidencia: confianza de datos {latest.data_confidence_score}/100 ·
+                Puntuaciones del pipeline sobre este borrador (no son una medida de la calidad o
+                completitud de la tesis): confianza de datos {latest.data_confidence_score}/100 ·
                 cobertura de fuentes {latest.source_coverage_score}/100 · red-team {latest.red_team_score}/100.
               </p>
               <p className="mt-2">
