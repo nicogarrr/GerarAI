@@ -785,6 +785,7 @@ class ThesisService:
             audit.as_dict(),
             facts,
             long_term_model=long_term_model,
+            excluded_present=snapshot.excluded_present,
             version=version,
             evidence=evidence,
             hypothesis=hypothesis,
@@ -997,7 +998,16 @@ class ThesisService:
                 # Un input PRESENTE pero no utilizable (excluded_present, p. ej.
                 # ingresos reportados 0) NO es un dato ausente: listarlo como
                 # "(Ingresos)" contradice el compendio. Se separan ambos casos.
-                excl = {str(e.get("metric")): e for e in (excluded_present or [])}
+                if not excluded_present:
+                    # Formato legado EXACTO (call-sites sin snapshot).
+                    missing_txt = ", ".join(term_es(k) for k in missing) or "inputs del modelo"
+                    return (
+                        "Sin hipótesis comprobable todavía: hay precio de mercado, "
+                        "pero la valoración no es calculable con los datos actuales "
+                        f"({missing_txt}), así que no hay un valor justo contra el "
+                        "que contrastarla. Se declara, no se inventa."
+                    )
+                excl = {str(e.get("metric")): e for e in excluded_present}
                 ausentes = [k for k in missing if str(k) not in excl]
                 partes = []
                 if ausentes:
@@ -1471,20 +1481,39 @@ class ThesisService:
             )
         return "\n".join(rows)
 
-    def _valuation_markdown(self, valuation: dict) -> str:
+    @staticmethod
+    def _missing_split(valuation: dict, excluded_present: list | None) -> tuple[str, str]:
+        """Ausentes reales vs presentes-no-utilizables (p. ej. ingresos
+        reportados 0): listar los segundos como «Faltan» contradice el
+        compendio. Devuelve (bloque_faltan, bloque_presentes)."""
+        excl = {str(e.get("metric")): e for e in (excluded_present or [])}
+        ausentes = [k for k in (valuation.get("missing_inputs") or []) if str(k) not in excl]
+        faltan = "\n".join(f"- {term_es(item)}" for item in ausentes)
+        presentes = "\n".join(
+            f"- {e.get('detail') or term_es(k)} (presente, no utilizable: no es un dato ausente)"
+            for k in (valuation.get("missing_inputs") or [])
+            if (e := excl.get(str(k))) is not None
+        )
+        return faltan, presentes
+
+    def _valuation_markdown(self, valuation: dict, excluded_present: list | None = None) -> str:
         if valuation.get("status") == "insufficient_data":
-            missing = "\n".join(f"- {term_es(item)}" for item in (valuation.get("missing_inputs") or []))
+            faltan, presentes = self._missing_split(valuation, excluded_present)
+            presentes_block = (
+                f"\n\nPresentes pero no utilizables:\n{presentes}" if presentes else ""
+            )
             return (
                 "**SIN VALORACIÓN — datos insuficientes**\n\n"
                 f"Motor: {term_es((valuation.get('trace') or {}).get('engine', 'unknown'))}\n\n"
-                f"Faltan:\n{missing or '- inputs requeridos'}\n\n"
+                f"Faltan:\n{faltan or '- inputs requeridos'}{presentes_block}\n\n"
                 "GerarAI no publica un valor justo a partir de supuestos de arranque."
             )
 
         if valuation.get("status") == "partial":
             trace = valuation.get("trace") or {}
             assumed = trace.get("assumed") or {}
-            missing = "\n".join(f"- {term_es(item)}" for item in (valuation.get("missing_inputs") or []))
+            faltan_p, presentes_p = self._missing_split(valuation, excluded_present)
+            missing = faltan_p + ("\n" + presentes_p if presentes_p else "")
             supuestos = (
                 f"margen FCF base {_pct_es(assumed.get('fcf_margin_base'))} "
                 f"(banda {_band_es(assumed.get('fcf_margin_band'))})"
@@ -1839,6 +1868,7 @@ class ThesisService:
         invalidation_criteria: list | None = None,
         scenario_probabilities: dict | None = None,
         fact_sources: dict[int, dict] | None = None,
+        excluded_present: list | None = None,
     ) -> str:
         reverse = valuation.get("reverse_dcf") or {}
         required_growth = reverse.get("required_revenue_growth")
@@ -1930,7 +1960,7 @@ Recompras, dilución y dividendos se consultan en las pestañas «Dilución y re
 {self._moat_markdown(company, valuation)}
 
 ## 13. Valoración
-{self._valuation_markdown(valuation)}
+{self._valuation_markdown(valuation, excluded_present=excluded_present)}
 
 ### Motor fundamental de largo plazo
 Versión persistida del modelo: `{(long_term_model.get("persistence") or {}).get("version")}`.

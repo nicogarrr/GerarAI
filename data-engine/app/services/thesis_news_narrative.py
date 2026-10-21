@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
+from app.llm.errors import ProviderDisabledError, ProviderHTTPError, ProviderTransportError
 from app.models.entities import Company, NewsEvent
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
@@ -277,12 +278,18 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
                     budget.record(db, response.model, "thesis_news_narrative", 0,
                                   response.usage.total_tokens, commit=False)
                     db.flush()
-    except Exception as exc:  # noqa: BLE001 - upstream inestable nunca rompe la tesis
-        # Proveedor caído/agotado (p. ej. 429 free tier): la evidencia EXISTE;
+    except (ProviderHTTPError, ProviderTransportError, ProviderDisabledError) as exc:
+        # SOLO indisponibilidad del proveedor (429 free tier agotado, timeout
+        # de transporte, proveedor deshabilitado): la evidencia EXISTE y
         # «Sin datos» mentiría. Compendio factual extractivo (sin LLM, EUR 0)
         # que declara la indisponibilidad del análisis automático.
         logger.warning("Narrativa de noticias: %s; compendio factual", type(exc).__name__)
         return compendio_factual(list(news_items or []), now or datetime.now(UTC))
+    except Exception as exc:  # noqa: BLE001 - upstream inestable nunca rompe la tesis
+        # Salida LLM rechazada (cifras inventadas, URLs, JSON inválido,
+        # inyección) y cualquier otro fallo: FAIL-CLOSED como antes.
+        logger.warning("Narrativa de noticias: %s; Sin datos", type(exc).__name__)
+        return sin_datos()
 
 
 def prepare_news_narrative(db: Session, ticker: str, *, provider=None, now=None) -> list[dict]:

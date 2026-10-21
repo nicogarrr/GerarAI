@@ -614,3 +614,27 @@ def test_hypothesis_present_not_usable_is_not_called_missing():
     # Sin excluded_present (llamadas antiguas) se conserva el texto anterior.
     legacy = service._hypothesis(_company(), valuation)
     assert "(Ingresos" in legacy or "Ingresos" in legacy
+
+
+def test_valuation_markdown_separates_present_not_usable():
+    """El memo no puede decir «Faltan: Ingresos» cuando están reportados (0):
+    se separan ausentes reales de presentes-no-utilizables."""
+    service = ThesisService()
+    valuation = {
+        "status": "insufficient_data",
+        "trace": {"engine": "dcf_standard"},
+        "missing_inputs": ["revenue", "normalized_fcf_or_fcf_margin"],
+    }
+    excluded = [{
+        "metric": "revenue",
+        "detail": "ingresos reportados 0 en el periodo ancla",
+        "reason": "present_not_usable",
+    }]
+    md = service._valuation_markdown(valuation, excluded_present=excluded)
+    assert "Presentes pero no utilizables" in md
+    assert "ingresos reportados 0 en el periodo ancla" in md
+    faltan_idx = md.index("Faltan:")
+    assert "Ingresos" not in md[faltan_idx:md.index("Presentes")], md
+    # Sin excluded_present: formato legado intacto (Ingresos dentro de Faltan).
+    legacy = service._valuation_markdown(valuation)
+    assert "- Ingresos" in legacy

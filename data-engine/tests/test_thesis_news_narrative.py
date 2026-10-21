@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from app.llm import LLMRequest, Message
-from app.llm.errors import ProviderResponseError
+from app.llm.errors import ProviderHTTPError
 from app.services import thesis_news_narrative as svc
 from app.services.llm_proposal_runner import paid_model_risk
 
@@ -242,8 +242,12 @@ def test_no_budget_never_calls(context, monkeypatch):
             return False
     monkeypatch.setattr(svc, "BudgetController", NoBudget)
     provider = Provider()
-    assert call(context, provider) == svc.sin_datos()
+    # Presupuesto agotado = modelo no disponible: compendio factual con
+    # evidencia, nunca llamada al modelo. «Sin datos» solo sin evidencia.
+    result = call(context, provider)
+    assert result[0]["titulo"].startswith("Compendio factual")
     assert provider.calls == 0
+    assert call(context, provider, items=[]) == svc.sin_datos()
 
 
 def test_new_numbers_are_rejected_in_every_section(context):
@@ -475,7 +479,7 @@ def test_cita_sin_id_crudo_ni_redirect_de_google_news():
 def test_provider_error_degrades_to_factual_compendium_not_sin_datos(context):
     """429/agotamiento del proveedor (v6 HYMC prod 2026-10-22): la evidencia
     EXISTE; «Sin datos» mentiría. Compendio factual declarado, EUR 0."""
-    provider = Provider(error=ProviderResponseError("HTTP 429 free tier agotado"))
+    provider = Provider(error=ProviderHTTPError("opencode-go", 429))
     result = call(context, provider)
     assert result[0]["titulo"].startswith("Compendio factual")
     assert any("no está disponible" in parrafo for parrafo in result[0]["parrafos"])
@@ -483,3 +487,12 @@ def test_provider_error_degrades_to_factual_compendium_not_sin_datos(context):
     assert result != svc.sin_datos()
     # Sin evidencia, el mismo fallo sí produce «Sin datos» (ausencia real).
     assert call(context, provider, items=[]) == svc.sin_datos()
+
+
+def test_invalid_llm_output_stays_fail_closed_with_evidence(context):
+    """La degradación a compendio es SOLO por indisponibilidad del proveedor;
+    una salida LLM rechazada por validación (cifras inventadas) sigue
+    fail-closed «Sin datos» aunque exista evidencia."""
+    provider = Provider(text=json.dumps({"hipotesis": {"texto": "subirá un 400% seguro", "evidence_ids": ["news:17"]}}))
+    assert call(context, provider) == svc.sin_datos()
+    assert provider.calls == 1
