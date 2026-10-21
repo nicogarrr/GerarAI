@@ -108,9 +108,16 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     const total = useMemo(() => {
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return null;
         if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) return null;
+        // Comisión inválida o negativa: NO mostrar resumen. Sumar una fee
+        // negativa abarataría el coste (o inflaría el neto de una venta) y
+        // tratar una fee ilegible como 0 ocultaría la comisión: en ambos
+        // casos el total sería engañoso antes de que validate() bloquee.
+        // El multiplicador es constante (100 en opciones), no input: no
+        // admite valor inválido.
+        if (!Number.isFinite(parsedFee) || parsedFee < 0) return null;
         const multiplier = kind === 'opcion' ? 100 : 1;
         return parsedQuantity * parsedPrice * multiplier;
-    }, [kind, parsedQuantity, parsedPrice]);
+    }, [kind, parsedQuantity, parsedPrice, parsedFee]);
 
     function validate(): string | null {
         if (!symbol.trim()) return 'Indica el símbolo.';
@@ -387,18 +394,28 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 Decimales con coma o punto, sin separador de miles (1234,56).
                 Registras una operación ya ejecutada con el precio que introduces tú: no es una ejecución de
                 mercado. Comisión 0 por defecto (déjala vacía): la demo no reproduce comisiones reales.
-                {total !== null ? (
-                    <>
-                        {' '}
-                        Importe estimado:{' '}
-                        <span className="font-medium text-gray-300">
-                            {formatMoney(total, currency)}
-                            {kind === 'opcion' ? ` (${formatNumber(parsedQuantity)} × ${formatMoney(parsedPrice, currency)} × 100)` : ''}
-                        </span>
-                        .
-                    </>
-                ) : null}
             </p>
+
+            {/* Resumen claro del coste ANTES de registrar (flujo guiado tipo
+                ticket de bróker): se calcula solo con los datos introducidos,
+                sin consultar mercado. Compra = coste total; venta = neto. */}
+            {total !== null ? (
+                <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-3" aria-label="Resumen de la operación antes de registrar">
+                    <p className="text-sm font-medium text-gray-200">Resumen antes de registrar</p>
+                    <p className="mt-1 text-sm text-gray-300">
+                        {sideLabel} · {formatNumber(parsedQuantity)} {kindLabel} × {formatMoney(parsedPrice, currency)}
+                        {kind === 'opcion' ? ' × 100 (multiplicador)' : ''}
+                        {parsedFee > 0 ? ` ${side === 'buy' ? '+' : '−'} ${formatMoney(parsedFee, currency)} de comisión` : ''}
+                    </p>
+                    <p className="mt-1 text-base font-semibold text-gray-100">
+                        {side === 'buy' ? 'Coste total estimado: ' : 'Ingreso neto estimado: '}
+                        {formatMoney(side === 'buy' ? total + parsedFee : total - parsedFee, currency)}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                        Calculado con tus datos: no es una cotización ni una ejecución de mercado.
+                    </p>
+                </div>
+            ) : null}
 
             {validationError || submitError ? (
                 <p role="alert" className="text-sm text-red-400">

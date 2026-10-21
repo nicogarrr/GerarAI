@@ -67,4 +67,32 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
     it('mantiene la advertencia de fill manual (no ejecución de mercado)', () => {
         assert.match(ticket, /no es una ejecución de\s+mercado/i);
     });
+
+    it('resumen de coste previo visible, calculado solo con los datos del usuario', () => {
+        // Bloque propio (no la frase enterrada en la nota pequeña).
+        assert.match(ticket, /Resumen antes de registrar/);
+        assert.doesNotMatch(ticket, /Importe estimado/);
+        // Desglose: lado, cantidad, precio, multiplicador de opción y comisión con signo según lado.
+        assert.match(ticket, /\{sideLabel\} · \{formatNumber\(parsedQuantity\)\} \{kindLabel\}/);
+        assert.match(ticket, /× 100 \(multiplicador\)/);
+        assert.match(ticket, /side === 'buy' \? '\+' : '−'/);
+        // Etiqueta honesta según lado y sin presentarlo como cotización.
+        assert.match(ticket, /Coste total estimado: /);
+        assert.match(ticket, /Ingreso neto estimado: /);
+        assert.match(ticket, /no es una cotización ni una ejecución de mercado/);
+        // Inputs inválidos => SIN resumen (nada de total engañoso antes del
+        // bloqueo de validate): fee ilegible no se trata como 0 y fee
+        // negativa no abarata el coste ni infla el neto.
+        assert.match(ticket, /if \(!Number\.isFinite\(parsedFee\) \|\| parsedFee < 0\) return null/);
+        assert.doesNotMatch(ticket, /Number\.isFinite\(parsedFee\) \? parsedFee : 0/);
+        // Con el resumen visible la fee ya es finita y >= 0: el desglose y el
+        // total la usan directamente, sin coerciones.
+        assert.match(ticket, /\{parsedFee > 0 \? ` \$\{side === 'buy' \? '\+' : '−'\}/);
+        assert.match(ticket, /total \+ parsedFee : total - parsedFee/);
+        // Cantidad/precio ya tenían validación equivalente en el mismo useMemo.
+        assert.match(ticket, /!Number\.isInteger\(parsedQuantity\) \|\| parsedQuantity <= 0\) return null/);
+        assert.match(ticket, /!Number\.isFinite\(parsedPrice\) \|\| parsedPrice <= 0\) return null/);
+        // Sin red: el bloque no consulta cotización (sigue presentacional).
+        assert.doesNotMatch(ticket, /quote|markPrice|refreshValuation/i);
+    });
 });
