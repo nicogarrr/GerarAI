@@ -224,7 +224,7 @@ export default function AddTransactionButton({ userId }: Props) {
                 type="number"
                 step="any"
                 min="0"
-                placeholder="150.00"
+                placeholder="150,00"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 required
