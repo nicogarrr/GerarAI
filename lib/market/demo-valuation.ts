@@ -169,7 +169,7 @@ const cents = (n: number): number => Math.round(n * 100) / 100;
 export function valuePositions(
     positions: ValuationPosition[],
     quotes: Record<string, ValuationQuote | null | undefined>,
-    options: { notQueried?: ReadonlySet<string> } = {},
+    options: { notQueried?: ReadonlySet<string>; currencyUnverified?: ReadonlySet<string> } = {},
 ): DemoValuation {
     const rows: ValuedPosition[] = positions.map((position) => {
         if (position.kind === 'opcion') {
@@ -183,6 +183,10 @@ export function valuePositions(
         if (!symbol) return unvalued(position, 'sin-cotizacion', 'Instrumento sin símbolo reconocible.');
         if (options.notQueried?.has(symbol.toUpperCase())) {
             return unvalued(position, 'no-consultada', 'No consultada: límite de 25 símbolos por consulta.');
+        }
+        if (options.currencyUnverified?.has(symbol.toUpperCase())) {
+            // No se intento ninguna cotizacion: no hay divisa verificable (listado caido o simbolo ausente).
+            return unvalued(position, 'divisa-no-coincide', 'No se pudo verificar la divisa de la cotización.');
         }
         const quote = quotes[symbol.toUpperCase()];
         if (!quote || !Number.isFinite(quote.c) || quote.c <= 0) {

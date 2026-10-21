@@ -679,12 +679,13 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
         const verifiable = listing ? symbols.filter((s) => listing.has(s)) : [];
         const settled = await Promise.allSettled(verifiable.map((symbol) => finnhubOnlyQuote(symbol)));
         for (const symbol of symbols) quotes[symbol] = null;
+        const currencyUnverified = new Set(symbols.filter((s) => !verifiable.includes(s)));
         verifiable.forEach((symbol, i) => {
             const r = settled[i];
             const quote = r.status === 'fulfilled' ? r.value : null;
             quotes[symbol] = quote ? { ...quote, currency: listing?.get(symbol) ?? null } : null;
         });
-        return { ok: true, valuation: valuePositions(positions, quotes, { notQueried }), asOf: Date.now() };
+        return { ok: true, valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified }), asOf: Date.now() };
     } catch (error) {
         return unexpectedError('getManualDemoValuation', error);
     }

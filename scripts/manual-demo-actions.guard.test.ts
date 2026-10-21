@@ -624,7 +624,8 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         g.__GUARD_QUOTES__ = { BBVA: finnhub(12) };
         listing = 'fail';
         let r = (await actions.getManualDemoValuation()) as unknown as VResult;
-        assert.equal(r.valuation.rows[0].status, 'sin-cotizacion');
+        assert.equal(r.valuation.rows[0].status, 'divisa-no-coincide');
+        assert.equal(r.valuation.rows[0].note, 'No se pudo verificar la divisa de la cotización.');
         assert.deepEqual(g.__GUARD_QUOTE_CALLS__, [], 'sin divisa verificable no se pide la cotización');
         assert.equal(listingCalls, 1);
         listing = [{ symbol: 'BBVA', currency: 'EUR' }];
@@ -696,5 +697,17 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         g.__GUARD_QUOTES__ = { BBVA: finnhub(2) };
         await Promise.all([actions.getManualDemoValuation(), actions.getManualDemoValuation(), actions.getManualDemoValuation()]);
         assert.equal(listingCalls, 1);
+    });
+
+    it('causas distintas: símbolo ausente del listado vs proveedor de cotización caído', async () => {
+        await actions.placeManualOrder(buyAccion());
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'DOWN', name: 'Down' } }));
+        listing = [{ symbol: 'DOWN', currency: 'EUR' }];
+        g.__GUARD_QUOTES__ = { DOWN: new Error('proveedor caido') };
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        const byNote = r.valuation.rows.map((x) => x.note);
+        assert.ok(byNote.includes('No se pudo verificar la divisa de la cotización.'), 'ausente del listado');
+        assert.ok(byNote.some((n) => n.startsWith('Sin cotización disponible')), 'proveedor caído con divisa verificada');
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['DOWN'], 'solo se pide la cotización con divisa verificable');
     });
 });
