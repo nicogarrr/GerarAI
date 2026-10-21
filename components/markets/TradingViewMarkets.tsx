@@ -1,5 +1,3 @@
-'use client';
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 /**
@@ -19,8 +17,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
  *   existen como CFD (FOREXCOM/OANDA/PEPPERSTONE/FX). No son el índice
  *   ni el futuro oficial: pestaña y nombre lo dicen.
  * - Sin cobertura encontrada en esta prueba: futuros CME/COMEX/NYMEX
- *   (ES1!, GC1!, CL1!...), VIX. Quedan FUERA hasta tener fuente; la
- *   prueba es de este widget, no de todo TradingView.
+ *   (ES1!, GC1!, CL1!...), VIX, Russell 2000. Quedan FUERA hasta tener
+ *   fuente; la prueba es de este widget, no de todo TradingView.
  */
 
 type SymbolSpec = { s: string; d: string };
@@ -104,32 +102,43 @@ const GROUPS: Group[] = [
 ];
 
 /** Cabecera de pestaña + filas + atribución: medida sobre el widget real. */
-const widgetHeight = (rows: number) => 46 + rows * 108 + 30;
+// Medida real del widget (QA 21-oct): ~64 px por fila, no 108.
+const widgetHeight = (rows: number) => 46 + rows * 64 + 30;
 
 function TradingViewMarketRows({ group }: { group: Group }) {
     /*
-     * El script oficial de TradingView lee document.currentScript, que es
-     * null en scripts inyectados dinámicamente. Por eso el snippet va en un
-     * iframe con srcDoc: dentro se parsea como documento y funciona igual
-     * que el embebido estático documentado. La CSP ya lo permite
-     * (s3.tradingview.com en script-src, tradingview-widget.com en frame-src).
+     * iframe DIRECTO al documento oficial del widget en el origen de
+     * TradingView (https://www.tradingview-widget.com/embed-widget/market-overview/?locale=es#<config>),
+     * estructura y claves observadas en el DOM real por QA (21-oct-2026,
+     * config decodificada completa). Aislamiento REAL por origen cruzado
+     * (SOP): el script de TradingView corre en SU origen, sin acceso al
+     * DOM, cookies ni almacenamiento de la app; por eso ya no hace falta
+     * s3.tradingview.com en script-src. El sandbox refuerza: allow-scripts
+     * + allow-same-origin (del ORIGEN DEL WIDGET, no de la app) +
+     * popups para su atribución/enlaces. QA verificó render 4/4 filas y 0
+     * errores; sandbox sin allow-same-origin deja el widget en blanco.
      */
-    const srcDoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent}</style></head><body><div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div><scr` + `ipt type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js">${JSON.stringify({
+    const config = {
         colorTheme: 'dark',
         dateRange: '1D',
         showChart: false,
-        locale: 'es',
         width: '100%',
         height: '100%',
         isTransparent: true,
         showSymbolLogo: true,
         showFloatingTooltip: false,
         tabs: [{ title: group.label, symbols: group.symbols }],
-    })}</scr` + `ipt></div></body></html>`;
+        utm_source: '',
+        utm_medium: 'widget',
+        utm_campaign: 'market-overview',
+        'page-uri': '__NHTTP__',
+    };
+    const src = `https://www.tradingview-widget.com/embed-widget/market-overview/?locale=es#${encodeURIComponent(JSON.stringify(config))}`;
     return (
         <iframe
             title={group.label}
-            srcDoc={srcDoc}
+            src={src}
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
             style={{ width: '100%', height: widgetHeight(group.symbols.length), border: 0 }}
         />
     );
@@ -161,9 +170,9 @@ export function TradingViewMarkets() {
                 <details className="mt-1">
                     <summary className="cursor-pointer text-gray-400">Cobertura pendiente</summary>
                     <span className="mt-1 block">
-                        Sin cobertura encontrada en esta fuente: futuros reales (CME/COMEX/NYMEX), VIX. Si
-                        aparecen en el widget con permiso, se añadirán; hasta entonces no se muestran para no
-                        falsear la cobertura.
+                        Sin cobertura encontrada en esta fuente: futuros reales (CME/COMEX/NYMEX), VIX y
+                        Russell 2000 (tampoco como CFD verificado). Si aparecen en el widget con permiso, se
+                        añadirán; hasta entonces no se muestran para no falsear la cobertura.
                     </span>
                 </details>
             </div>

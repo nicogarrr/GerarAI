@@ -178,7 +178,7 @@ export const ROUTE_CATALOG: NavSection[] = [
         label: 'Cotizaciones',
         icon: LineChart,
         hub: '/discover',
-        description: 'Índices, futuros, acciones, materias primas y divisas con la hora de cada cotización.',
+        description: 'Índices, acciones del IBEX 35, materias primas y divisas con el widget oficial de TradingView. CFD etiquetados como CFD; futuros y VIX: cobertura pendiente declarada.',
       },
       {
         href: '/knowledge',
