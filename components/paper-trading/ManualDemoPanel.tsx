@@ -31,7 +31,7 @@ export type ManualDemoPanelProps = {
     refreshValuation?: () => Promise<RefreshResult>;
 };
 
-export type RefreshResult = { ok: true; valuation: DemoValuation; asOf: number } | { ok: false; error: string };
+export type RefreshResult = { ok: true; valuation: DemoValuation; asOf: number; listingUnavailable: boolean } | { ok: false; error: string };
 
 const ASOF_FORMAT = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
@@ -105,23 +105,28 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
     const positions = account?.positions ?? [];
     const valuationIsCurrent = valuation !== null && valuationMatches(valuation, positions);
     const activeValuation = valuationIsCurrent ? valuation : null;
-    // Candado y secuencia COMPARTIDOS entre el botón manual y el
-    // auto-refresco (refs: solo se tocan en handlers/efectos, no en render):
-    // nunca hay dos consultas en vuelo y una respuesta vieja no pisa el
-    // resultado de una más nueva (p. ej. manual tras un tick lento).
-    const refreshLock = useRef({ inFlight: false, seq: 0, failures: 0, lastStart: 0 });
+    // Candado COMPARTIDO entre el botón manual y el auto-refresco (ref:
+    // solo se toca en handlers/efectos, no en render). Como nunca hay más de
+    // una consulta en vuelo, ninguna respuesta vieja puede pisar el resultado
+    // de una más nueva. `refreshing` es el busy real (manual u automático):
+    // los botones se deshabilitan y muestran «Consultando…» mientras tanto,
+    // así un clic durante una consulta no muere sin aviso.
+    const refreshLock = useRef({ inFlight: false, failures: 0, lastStart: 0 });
+    const [refreshing, setRefreshing] = useState(false);
     const runRefresh = useCallback(async () => {
         if (!refreshValuation) return;
         const lock = refreshLock.current;
         if (lock.inFlight) return;
         lock.inFlight = true;
-        const mySeq = ++lock.seq;
         lock.lastStart = Date.now();
+        setRefreshing(true);
         try {
             const result = await refreshValuation();
-            if (mySeq !== lock.seq) return; // llegó una consulta más nueva: esta se descarta
             if (result.ok) {
-                lock.failures = 0;
+                // Listado de divisas caído: respuesta ok con filas N/D, pero
+                // el intento costó su fetch y no valora nada: cuenta como
+                // fallo transitorio para el backoff de reintentos.
+                lock.failures = result.listingUnavailable ? lock.failures + 1 : 0;
                 setValuation(result.valuation);
                 setAsOf(result.asOf);
                 setRefreshError(null);
@@ -131,14 +136,16 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
             }
         } catch {
             lock.failures += 1;
-            if (mySeq === lock.seq) setRefreshError('No se pudieron actualizar las cotizaciones: fallo de red o del servidor.');
+            setRefreshError('No se pudieron actualizar las cotizaciones: fallo de red o del servidor.');
         } finally {
             lock.inFlight = false;
+            setRefreshing(false);
         }
     }, [refreshValuation]);
     const onRefresh = () => {
         if (refreshValuation) startTransition(() => runRefresh());
     };
+    const refreshBusy = pending || refreshing;
 
     // Auto-refresco de la valoración (pedido de Nico, 21-oct-2026: «No se
     // actualiza sola»). Puertas: pestaña visible, posiciones abiertas, candado
@@ -208,7 +215,7 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                 <TabsContent value="posiciones" className="mt-4">
                     <Panel title="Posiciones abiertas">
                         {activeValuation ? (
-                            <ValuationSummary valuation={activeValuation} asOf={asOf} onRefresh={refreshValuation ? onRefresh : null} pending={pending} error={refreshError} />
+                            <ValuationSummary valuation={activeValuation} asOf={asOf} onRefresh={refreshValuation ? onRefresh : null} pending={refreshBusy} error={refreshError} />
                         ) : refreshValuation && positions.length > 0 ? (
                             <div className="mb-3 space-y-2">
                                 <p className="text-xs text-gray-500">
@@ -217,8 +224,8 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                                         : 'Valoración no disponible todavía: sin cotizaciones consultadas. Se consultan solas en el próximo minuto con la pestaña visible, o ahora con el botón.'}
                                 </p>
                                 {refreshError ? <p role="alert" className="text-xs text-amber-300">{refreshError}</p> : null}
-                                <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={pending}>
-                                    {pending ? 'Consultando…' : 'Consultar cotizaciones'}
+                                <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={refreshBusy}>
+                                    {refreshBusy ? 'Consultando…' : 'Consultar cotizaciones'}
                                 </Button>
                             </div>
                         ) : null}

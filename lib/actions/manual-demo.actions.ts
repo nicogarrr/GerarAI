@@ -574,7 +574,11 @@ export async function getManualDemoAccount(): Promise<ManualDemoAccountResult> {
 }
 
 export type ManualDemoValuationResult =
-    | { ok: true; valuation: DemoValuation; asOf: number }
+    // listingUnavailable: había símbolos a valorar pero el listado US de
+    // divisas no respondió (fallo transitorio o clave ausente): no se pidió
+    // ninguna cotización y las filas salen N/D. El cliente lo usa para
+    // tratar el intento como fallo transitorio en su backoff de reintentos.
+    | { ok: true; valuation: DemoValuation; asOf: number; listingUnavailable: boolean }
     | ManualDemoFailure;
 
 const MAX_VALUATION_SYMBOLS = 25;
@@ -685,7 +689,7 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
             const quote = r.status === 'fulfilled' ? r.value : null;
             quotes[symbol] = quote ? { ...quote, currency: listing?.get(symbol) ?? null } : null;
         });
-        return { ok: true, valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified }), asOf: Date.now() };
+        return { ok: true, valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified }), asOf: Date.now(), listingUnavailable: symbols.length > 0 && listing === null };
     } catch (error) {
         return unexpectedError('getManualDemoValuation', error);
     }

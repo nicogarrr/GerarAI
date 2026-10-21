@@ -24,29 +24,43 @@ describe('auto-refresco de la valoración demo', () => {
         assert.match(panel, /la cuota del plan Finnhub NO está verificada/);
     });
 
-    it('candado y secuencia COMPARTIDOS entre botón manual y auto', () => {
+    it('candado COMPARTIDO entre botón manual y auto, sin secuencia muerta', () => {
         // Un solo candado ref compartido; nada de contadores locales del efecto.
-        assert.match(panel, /refreshLock = useRef\(\{ inFlight: false, seq: 0, failures: 0, lastStart: 0 \}\)/);
+        assert.match(panel, /refreshLock = useRef\(\{ inFlight: false, failures: 0, lastStart: 0 \}\)/);
         assert.doesNotMatch(panel, /let inFlight = false/);
         assert.match(panel, /if \(lock\.inFlight\) return/);
-        // Descarte de respuestas viejas: solo aplica si su secuencia sigue al frente.
-        assert.match(panel, /const mySeq = \+\+lock\.seq/);
-        assert.match(panel, /if \(mySeq !== lock\.seq\) return/);
+        // Sin seq: el candado ya impide dos consultas en vuelo, así que una
+        // respuesta vieja no puede pisar una nueva; un seq sería código muerto.
+        assert.doesNotMatch(panel, /lock\.seq/);
         // El candado se libera siempre.
         assert.match(panel, /finally \{\s*lock\.inFlight = false/);
         // Manual y auto usan la MISMA ruta protegida.
         assert.match(panel, /startTransition\(\(\) => runRefresh\(\)\)/);
     });
 
+    it('un clic durante una consulta no muere: botón deshabilitado y «Consultando…»', () => {
+        // Busy real = transición del botón manual O consulta automática en vuelo.
+        assert.match(panel, /const \[refreshing, setRefreshing\] = useState\(false\)/);
+        assert.match(panel, /setRefreshing\(true\)/);
+        assert.match(panel, /setRefreshing\(false\)/);
+        assert.match(panel, /const refreshBusy = pending \|\| refreshing/);
+        assert.match(panel, /pending=\{refreshBusy\}/);
+        assert.match(panel, /disabled=\{refreshBusy\}/);
+        assert.match(panel, /refreshBusy \? 'Consultando…'/);
+    });
+
     it('puertas de sostenibilidad: visible, con posiciones, backoff exponencial ante fallos', () => {
         assert.match(panel, /document\.visibilityState !== 'visible' \|\| !due\(\)\) return/);
         assert.match(panel, /if \(!refreshValuation \|\| !hasPositions\) return/);
-        // Backoff 60s×2^fallos con tope; reset en éxito. Cubre también los
-        // reintentos del listado US (un fallo no se cachea server-side).
+        // Backoff 60s×2^fallos con tope; reset en éxito real.
         assert.match(panel, /MAX_REFRESH_BACKOFF_MS = 16 \* 60_000/);
         assert.match(panel, /VALUATION_REFRESH_MS \* 2 \*\* lock\.failures/);
-        assert.match(panel, /lock\.failures = 0/);
         assert.match(panel, /lock\.failures \+= 1/);
+        // El listado US caído devuelve ok con filas N/D pero su fetch NO se
+        // cachea server-side: reintentarlo cada 60 s quemaría fanout. La
+        // acción lo señala de forma estructurada (listingUnavailable) y aquí
+        // ese intento cuenta como fallo transitorio del backoff.
+        assert.match(panel, /lock\.failures = result\.listingUnavailable \? lock\.failures \+ 1 : 0/);
         // Repuesta al volver a la pestaña respetando la espera vigente y
         // limpieza al desmontar (timer + listener).
         assert.match(panel, /visibilitychange/);
