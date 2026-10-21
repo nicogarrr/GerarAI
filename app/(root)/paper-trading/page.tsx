@@ -5,8 +5,11 @@ import {
     convertManualDemoCurrency,
     getManualDemoAccount,
     getManualDemoOrders,
+    getManualDemoValuation,
     placeManualOrder,
 } from '@/lib/actions/manual-demo.actions';
+import type { RefreshResult } from '@/components/paper-trading/ManualDemoPanel';
+import type { DemoValuation } from '@/lib/market/demo-valuation';
 import type { DemoStateView, FillSubmit, FxSubmit, HistoryRow, SubmitResult } from '@/components/paper-trading/submit';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +21,13 @@ export const metadata: Metadata = {
         'Cuenta de práctica con saldo ficticio y operaciones manuales: registras compras y ventas con el precio que introduces tú.',
 };
 
-type DemoData = { account: DemoStateView | null; ledger: HistoryRow[]; loadError: string | null };
+type DemoData = {
+    account: DemoStateView | null;
+    ledger: HistoryRow[];
+    loadError: string | null;
+    valuation?: DemoValuation | null;
+    valuationAsOf?: number | null;
+};
 
 /**
  * Datos de ejemplo SOLO para desarrollo local (qa visual de la pantalla).
@@ -129,17 +138,23 @@ const DEV_DATA: DemoData = {
  */
 async function loadDemoData(): Promise<DemoData> {
     if (process.env.NODE_ENV !== 'production' && !process.env.MONGODB_URI) return { ...DEV_DATA, loadError: null };
-    const [accountResult, ordersResult] = await Promise.all([getManualDemoAccount(), getManualDemoOrders()]);
+    const [accountResult, ordersResult, valuationResult] = await Promise.all([
+        getManualDemoAccount(),
+        getManualDemoOrders(),
+        getManualDemoValuation(),
+    ]);
     if (!accountResult.ok) return { account: null, ledger: [], loadError: accountResult.message };
     return {
         account: accountResult.state,
+        valuation: valuationResult.ok ? valuationResult.valuation : null,
+        valuationAsOf: valuationResult.ok ? valuationResult.asOf : null,
         ledger: ordersResult.ok ? ordersResult.orders : [],
         loadError: ordersResult.ok ? null : ordersResult.message,
     };
 }
 
 export default async function PaperTradingPage() {
-    const { account, ledger, loadError } = await loadDemoData();
+    const { account, ledger, loadError, valuation, valuationAsOf } = await loadDemoData();
 
     // Cableado real: la acción valida TODO en servidor dentro de la
     // transacción (saldo, posición, idempotencia); el cliente solo manda el
@@ -158,6 +173,13 @@ export default async function PaperTradingPage() {
         return { ok: true, outcome: result.outcome, reason: result.reason, state: result.state };
     }
 
+    async function refreshValuation(): Promise<RefreshResult> {
+        'use server';
+        const result = await getManualDemoValuation();
+        if (!result.ok) return { ok: false, error: result.message };
+        return { ok: true, valuation: result.valuation, asOf: result.asOf };
+    }
+
     return (
         <div className="mx-auto w-full max-w-3xl px-4 py-6">
             <h1 className="text-2xl font-semibold break-words text-gray-100">Cuenta demo</h1>
@@ -169,7 +191,15 @@ export default async function PaperTradingPage() {
                     No se pudo cargar la cuenta demo: {loadError}
                 </p>
             ) : null}
-            <ManualDemoPanel account={account} ledger={ledger} submitFill={submitFill} submitFx={submitFx} />
+            <ManualDemoPanel
+                account={account}
+                ledger={ledger}
+                submitFill={submitFill}
+                submitFx={submitFx}
+                valuation={valuation}
+                valuationAsOf={valuationAsOf}
+                refreshValuation={refreshValuation}
+            />
         </div>
     );
 }

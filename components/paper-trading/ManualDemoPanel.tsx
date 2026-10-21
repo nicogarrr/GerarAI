@@ -1,5 +1,8 @@
 'use client';
 
+import { useState, useTransition } from 'react';
+
+import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountSummary } from './AccountSummary';
@@ -7,6 +10,8 @@ import { FxTicket } from './FxTicket';
 import { LedgerTable } from './LedgerTable';
 import { OrderTicket } from './OrderTicket';
 import { PositionsTable } from './PositionsTable';
+import { formatMoney } from '@/lib/format';
+import { valuationMatches, type DemoValuation } from '@/lib/market/demo-valuation';
 import type { DemoStateView, HistoryRow, SubmitFill, SubmitFx } from './submit';
 
 export type ManualDemoPanelProps = {
@@ -16,7 +21,55 @@ export type ManualDemoPanelProps = {
     ledger: HistoryRow[];
     submitFill: SubmitFill;
     submitFx: SubmitFx;
+    /** Valoración inicial con cotizaciones reales (null = no disponible). */
+    valuation?: DemoValuation | null;
+    /** Epoch ms en que se consultaron las cotizaciones de `valuation`. */
+    valuationAsOf?: number | null;
+    /** Vuelve a consultar cotizaciones bajo demanda; sin auto-refresco. */
+    refreshValuation?: () => Promise<RefreshResult>;
 };
+
+export type RefreshResult = { ok: true; valuation: DemoValuation; asOf: number } | { ok: false; error: string };
+
+const ASOF_FORMAT = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+
+function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
+    valuation: DemoValuation;
+    asOf: number | null;
+    onRefresh: (() => void) | null;
+    pending: boolean;
+    error: string | null;
+}) {
+    return (
+        <div className="mb-3 space-y-2 rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-300">
+            <p>
+                Valoradas {valuation.coverage.valued} de {valuation.coverage.total} posiciones con cotización del proveedor.
+                {valuation.totals.length > 0 ? ' Los totales suman solo las valoradas, por divisa:' : ' Sin totales: ninguna posición tiene cotización.'}
+            </p>
+            {valuation.totals.length > 0 ? (
+                <ul className="space-y-0.5">
+                    {valuation.totals.map((total) => (
+                        <li key={total.currency}>
+                            {total.currency}: valor {formatMoney(total.marketValue, total.currency)} · PyG no realizada{' '}
+                            {formatMoney(total.unrealizedPnl, total.currency)}
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
+            <p className="text-xs text-gray-500">
+                Las opciones no se valoran (no hay cotización de su prima). Solo se valora con Finnhub y con la divisa verificada en su listado; el resto sale N/D.
+                No se actualiza sola
+                {asOf ? `: consultado a las ${ASOF_FORMAT.format(new Date(asOf))} (hora de Madrid)` : ''}.
+            </p>
+            {error ? <p role="alert" className="text-xs text-amber-300">{error}</p> : null}
+            {onRefresh ? (
+                <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={pending}>
+                    {pending ? 'Consultando…' : 'Actualizar cotizaciones'}
+                </Button>
+            ) : null}
+        </div>
+    );
+}
 
 /**
  * Panel de la cuenta demo MANUAL (paper trading). Todo es presentacional por
@@ -26,8 +79,31 @@ export type ManualDemoPanelProps = {
  * con el precio que introduce el usuario (manual simulada). No hay feed
  * automático, ni motor de órdenes límite, ni conexión con un broker.
  */
-export function ManualDemoPanel({ account, ledger, submitFill, submitFx }: ManualDemoPanelProps) {
+export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuation: initialValuation = null, valuationAsOf = null, refreshValuation }: ManualDemoPanelProps) {
     const wired = account !== null;
+    const [valuation, setValuation] = useState<DemoValuation | null>(initialValuation);
+    const [asOf, setAsOf] = useState<number | null>(valuationAsOf);
+    const [refreshError, setRefreshError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+    // Si cambian posiciones, cantidades o costes tras valorar, la valoracion
+    // guardada ya no describe la cuenta: se oculta (nada de totales viejos
+    // mezclados con filas nuevas) hasta pulsar el boton.
+    const positions = account?.positions ?? [];
+    const valuationIsCurrent = valuation !== null && valuationMatches(valuation, positions);
+    const activeValuation = valuationIsCurrent ? valuation : null;
+    const onRefresh = refreshValuation
+        ? () =>
+              startTransition(async () => {
+                  const result = await refreshValuation();
+                  if (result.ok) {
+                      setValuation(result.valuation);
+                      setAsOf(result.asOf);
+                      setRefreshError(null);
+                  } else {
+                      setRefreshError(`No se pudieron actualizar las cotizaciones: ${result.error}`);
+                  }
+              })
+        : null;
     return (
         <div className="mt-6 space-y-6">
             <p className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-400">
@@ -68,7 +144,22 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx }: Manua
                 </TabsContent>
                 <TabsContent value="posiciones" className="mt-4">
                     <Panel title="Posiciones abiertas">
-                        <PositionsTable positions={account?.positions ?? []} />
+                        {activeValuation ? (
+                            <ValuationSummary valuation={activeValuation} asOf={asOf} onRefresh={onRefresh} pending={pending} error={refreshError} />
+                        ) : onRefresh && positions.length > 0 ? (
+                            <div className="mb-3 space-y-2">
+                                <p className="text-xs text-gray-500">
+                                    {valuation
+                                        ? 'Sin actualizar: las posiciones han cambiado desde la última consulta de cotizaciones.'
+                                        : 'Valoración no disponible todavía: sin cotizaciones consultadas.'}
+                                </p>
+                                {refreshError ? <p role="alert" className="text-xs text-amber-300">{refreshError}</p> : null}
+                                <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={pending}>
+                                    {pending ? 'Consultando…' : 'Consultar cotizaciones'}
+                                </Button>
+                            </div>
+                        ) : null}
+                        <PositionsTable positions={positions} valuation={activeValuation} />
                     </Panel>
                 </TabsContent>
                 <TabsContent value="historial" className="mt-4">
