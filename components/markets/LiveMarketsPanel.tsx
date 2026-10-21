@@ -9,9 +9,11 @@ import {
     formatQuoteChange,
     localizeInstrumentType,
     quoteAgeSeconds,
+    resolveGroupRows,
     type LiveMarketsResult,
     type LiveQuote,
     type LiveQuoteKind,
+    type LiveQuoteSpec,
 } from '@/lib/market/live-quotes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -70,11 +72,17 @@ function identityLine(quote: LiveQuote): string {
     return parts.join(' · ');
 }
 
-function QuoteRow({ quote, fetchedAt }: { quote: LiveQuote | null; fetchedAt: number }) {
+function QuoteRow({ spec, quote, fetchedAt }: { spec: LiveQuoteSpec; quote: LiveQuote | null; fetchedAt: number }) {
     if (!quote) {
+        // El proveedor fallo para ESTE instrumento: la fila conserva su
+        // identidad (nombre + simbolo) y solo el dato queda N/D.
         return (
             <tr className="border-b border-gray-800/60">
-                <td className="py-2.5 pr-2 text-gray-500" colSpan={3}>N/D</td>
+                <td className="py-2.5 pr-2">
+                    <div className="text-gray-100">{spec.name}</div>
+                    <div className="text-xs text-gray-500">{spec.symbol}</div>
+                </td>
+                <td className="py-2.5 px-2 text-right text-gray-500 whitespace-nowrap" colSpan={2}>N/D</td>
             </tr>
         );
     }
@@ -161,8 +169,8 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                             {group ? (
                                 <table className="w-full text-sm">
                                     <tbody>
-                                        {group.quotes.map((quote, i) => (
-                                            <QuoteRow key={i} quote={quote} fetchedAt={data?.fetchedAt ?? 0} />
+                                        {resolveGroupRows(tab.key, group.quotes).map(({ spec, quote }) => (
+                                            <QuoteRow key={spec.symbol} spec={spec} quote={quote} fetchedAt={data?.fetchedAt ?? 0} />
                                         ))}
                                     </tbody>
                                 </table>
@@ -177,8 +185,8 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
             </Tabs>
             <p className="mt-4 text-xs leading-5 text-gray-500">
                 Fuente: Yahoo Finance. Cada fila muestra la hora que informa el proveedor y su antigüedad
-                calculada (hora de Madrid); el panel se actualiza cada minuto. No son datos oficiales de
-                mercado ni sirven para operar con garantías.
+                al consultar la fuente (hora de Madrid); el panel se actualiza cada minuto. No son datos
+                oficiales de mercado ni sirven para operar con garantías.
             </p>
         </div>
     );

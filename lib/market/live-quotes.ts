@@ -365,3 +365,26 @@ export interface LiveMarketsResult {
     /** Por grupo, una entrada por simbolo del catalogo (null = Yahoo fallo: N/D). */
     groups: { key: LiveQuoteKind; quotes: (LiveQuote | null)[] }[];
 }
+
+/** Fila del panel: la identidad del instrumento siempre presente, cotice o no. */
+export interface LiveQuoteRow {
+    spec: LiveQuoteSpec;
+    quote: LiveQuote | null;
+}
+
+/**
+ * Empareja las cotizaciones de un grupo con las specs del catalogo de forma
+ * ROBUSTA: por simbolo cuando la cotizacion existe (autosana cualquier
+ * reordenacion del array) y por posicion cuando el proveedor fallo (null).
+ * Devuelve las filas en el orden del catalogo, de modo que una fila N/D
+ * nunca sea anonima: la UI siempre puede pintar nombre y simbolo.
+ */
+export function resolveGroupRows(groupKey: LiveQuoteKind, quotes: (LiveQuote | null)[] | null | undefined): LiveQuoteRow[] {
+    const specs = LIVE_QUOTE_GROUPS.find((g) => g.key === groupKey)?.specs ?? [];
+    return specs.map((spec, i) => {
+        const positional = quotes?.[i] ?? null;
+        if (positional && positional.symbol === spec.symbol) return { spec, quote: positional };
+        const bySymbol = quotes?.find((q) => q !== null && q.symbol === spec.symbol) ?? null;
+        return { spec, quote: bySymbol };
+    });
+}
