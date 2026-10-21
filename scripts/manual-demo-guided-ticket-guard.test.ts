@@ -52,11 +52,43 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(ticket, /Busca por nombre o ticker y elige/);
     });
 
-    it('las fechas nativas llevan la mitigación de desborde móvil (min-w-0/texto reducido; verificación visual iOS pendiente en QA)', () => {
+    it('la fecha lleva contención reforzada: fila propia + overflow-hidden (fallo real iPhone 21-oct-2026; verificación en dispositivo pendiente)', () => {
         const fechaEjecucion = ticket.match(/id=\{`\$\{uid\}-executed`\}[\s\S]{0,400}/)?.[0] ?? '';
         const bloqueInput = ticket.match(/<Input\s+className="[^"]*min-w-0[^"]*"\s+id=\{`\$\{uid\}-executed`\}/);
         assert.ok(bloqueInput, 'el datetime-local lleva min-w-0/max-w-full y texto reducido');
         assert.match(fechaEjecucion, /datetime-local/);
+        // min-w-0/max-w-full no bastaron en iOS Safari: barrera dura de
+        // recorte y sin grid multi-columna en la fila.
+        assert.match(ticket, /<div className="w-full overflow-hidden">/);
+        assert.doesNotMatch(ticket, /col-span-2 space-y-1\.5">\s*<Label htmlFor=\{`\$\{uid\}-executed`\}/);
+    });
+
+    it('sin campo de comisión en el ticket (Nico 21-oct-2026): 0 simulado, libro y fills históricos intactos', () => {
+        // Ni input ni label de comisión ni validación de un input inexistente.
+        assert.doesNotMatch(ticket, /Comisión \(\{currency\}\)/);
+        assert.doesNotMatch(ticket, /setFee\(/);
+        // Fee fija 0 SIMULADA con etiqueta honesta: no es tarifa de bróker
+        // ni afirmación de operar gratis; el envío conserva el campo fee del
+        // libro (contrato intacto).
+        assert.match(ticket, /const parsedFee = 0;/);
+        assert.match(ticket, /Sin comisión en la demo \(0 simulado\): no reproduce la tarifa de ningún bróker/);
+        assert.match(ticket, /fee: parsedFee/);
+        assert.doesNotMatch(ticket, /tarifa de IBKR|IBKR gratis|comisiones de Interactive Brokers/i);
+    });
+
+    it('placeholder del nombre neutro: no parece un valor relleno', () => {
+        assert.match(ticket, /placeholder="Nombre de la empresa"/);
+        assert.doesNotMatch(ticket, /placeholder="p\. ej\. AST SpaceMobile"/);
+    });
+
+    it('la lista del buscador abre hacia abajo en el ticket (captura iPhone 21-oct-2026)', () => {
+        assert.match(ticket, /dropdownSide="bottom"/);
+        const search = readFileSync('components/search/TickerSearchInput.tsx', 'utf8');
+        // Dirección fija = sin volteo de Radix y tope 40dvh (visual viewport
+        // con teclado), con scroll propio; sin la prop, comportamiento previo.
+        assert.match(search, /side=\{dropdownSide\}/);
+        assert.match(search, /avoidCollisions=\{dropdownSide === undefined\}/);
+        assert.match(search, /max-h-\[min\(15rem,40dvh\)\]/);
     });
 
     it('la identidad del contrato de opción sigue manual y etiquetada (sin cadena fabricada)', () => {
@@ -80,13 +112,9 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(ticket, /Coste total estimado: /);
         assert.match(ticket, /Ingreso neto estimado: /);
         assert.match(ticket, /no es una cotización ni una ejecución de mercado/);
-        // Inputs inválidos => SIN resumen (nada de total engañoso antes del
-        // bloqueo de validate): fee ilegible no se trata como 0 y fee
-        // negativa no abarata el coste ni infla el neto.
-        assert.match(ticket, /if \(!Number\.isFinite\(parsedFee\) \|\| parsedFee < 0\) return null/);
-        assert.doesNotMatch(ticket, /Number\.isFinite\(parsedFee\) \? parsedFee : 0/);
-        // Con el resumen visible la fee ya es finita y >= 0: el desglose y el
-        // total la usan directamente, sin coerciones.
+        // La comisión ya no es input (0 simulada fija): el resumen no la
+        // muestra (condición > 0) y el total la suma como 0. Cantidad y
+        // precio inválidos siguen SIN resumen.
         assert.match(ticket, /\{parsedFee > 0 \? ` \$\{side === 'buy' \? '\+' : '−'\}/);
         assert.match(ticket, /total \+ parsedFee : total - parsedFee/);
         // Cantidad/precio ya tenían validación equivalente en el mismo useMemo.

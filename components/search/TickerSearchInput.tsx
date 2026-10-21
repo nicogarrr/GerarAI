@@ -29,6 +29,12 @@ interface TickerSearchInputProps {
     maxLength?: number;
     ariaLabel?: string;
     onBlur?: () => void;
+    /** Dirección fija del desplegable. Con 'bottom' la lista abre SIEMPRE
+     *  hacia abajo (Nico, 21-oct-2026: la vio abrirse hacia arriba con el
+     *  teclado del iPhone) y se limita a 40dvh para quedar dentro del
+     *  visual viewport con su propio scroll. Sin la prop: comportamiento
+     *  automático de Radix (colisiones y volteo) como antes. */
+    dropdownSide?: 'bottom';
 }
 
 /** Buscador de ticker/nombre con autocompletado inline, compartido en la
@@ -38,7 +44,7 @@ interface TickerSearchInputProps {
  *  (F215), debounce de 300 ms y deadline de 6 s (patrón de la watchlist).
  *  El dropdown usa el Popover existente con portal y colisiones: se superpone
  *  al contenido sin quedar recortado por el scroll de un diálogo. */
-export function TickerSearchInput({ value: controlledValue, defaultValue = '', name, required, options, disabled = false, disabledSymbols = [], onValueChange, onSelect, onBlur, placeholder = 'Buscar por ticker o empresa', id, className = 'h-11 w-full bg-gray-900 text-base text-gray-100', maxLength, ariaLabel }: TickerSearchInputProps) {
+export function TickerSearchInput({ value: controlledValue, defaultValue = '', name, required, options, disabled = false, disabledSymbols = [], onValueChange, onSelect, onBlur, placeholder = 'Buscar por ticker o empresa', id, className = 'h-11 w-full bg-gray-900 text-base text-gray-100', maxLength, ariaLabel, dropdownSide }: TickerSearchInputProps) {
     const [localValue, setLocalValue] = useState(defaultValue);
     const value = controlledValue ?? localValue;
     const update = (next: string) => { setLocalValue(next); onValueChange?.(next); };
@@ -176,8 +182,11 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                 <p className="mt-1 text-sm text-gray-500">Sin resultados para «{trimmed}».</p>
             ) : null}
             </div></PopoverAnchor>
-                <PopoverContent align="start" onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => event.preventDefault()} onInteractOutside={(event) => { if (event.target instanceof Node && root.current?.contains(event.target)) event.preventDefault(); }} className="z-[80] w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] border-gray-700 bg-gray-800 p-0 shadow-lg">
-                <div id={listId} role="listbox" aria-label="Empresas" className="max-h-[min(15rem,var(--radix-popover-content-available-height))] w-full overscroll-contain overflow-auto rounded-md">
+                <PopoverContent align="start" side={dropdownSide} avoidCollisions={dropdownSide === undefined} onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => event.preventDefault()} onInteractOutside={(event) => { if (event.target instanceof Node && root.current?.contains(event.target)) event.preventDefault(); }} className="z-[80] w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] border-gray-700 bg-gray-800 p-0 shadow-lg">
+                {/* Con dirección forzada no hay var de espacio disponible de
+                    Radix (sin colisiones): tope fijo 15rem y 40dvh para no
+                    salirse del visual viewport con el teclado abierto. */}
+                <div id={listId} role="listbox" aria-label="Empresas" className={`${dropdownSide ? 'max-h-[min(15rem,40dvh)]' : 'max-h-[min(15rem,var(--radix-popover-content-available-height))]'} w-full overscroll-contain overflow-auto rounded-md`}>
                     {results.map((stock, index) => (
                         <button
                             key={`${stock.symbol}-${index}`}
