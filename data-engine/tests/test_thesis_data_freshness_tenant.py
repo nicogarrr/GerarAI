@@ -70,9 +70,30 @@ def test_freshness_market_price_stays_global(db: Session):
     company = _company(db)
     from datetime import date as date_type
 
+    # El criterio de precios cambió (ver test_thesis_data_freshness_material):
+    # solo cuenta una barra de CIERRE OFICIAL (source="yfinance") de sesión
+    # posterior a la última cerrada que la versión pudo conocer; el precio
+    # sigue siendo GLOBAL (sin filtro de tenant).
     db.info["tenant_id"] = "tenant-test"
-    db.add(MarketPrice(company_id=company.id, date=date_type(2026, 9, 20)))
+    db.add(MarketPrice(company_id=company.id, date=date_type(2026, 9, 22),
+                       source="yfinance",
+                       updated_at=datetime(2026, 9, 22, 21, 35, tzinfo=UTC)))
     db.commit()
     db.info["tenant_id"] = 999  # el precio cuenta aunque la sesión sea de otro tenant
     service = ThesisService()
-    assert service.data_freshness(db, company.id) is not None
+    # as_of martes 22 sep 14:00 NY (sesión abierta): ancla lunes 21 < barra 22.
+    seen = service.data_freshness(db, company.id, as_of=datetime(2026, 9, 22, 18, 0, tzinfo=UTC))
+    assert seen is not None
+    # Y una fila spot (source distinto de cierre oficial) ya NO alimenta frescura.
+    company2 = Company(
+        ticker="PEP", name="PEP Co", exchange="NASDAQ", currency="USD",
+        sector="Tech", industry="Tech", company_type="holding",
+        valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company2)
+    db.commit()
+    db.add(MarketPrice(company_id=company2.id, date=date_type(2026, 9, 22),
+                       source="yahoo_finance_intraday",
+                       updated_at=datetime(2026, 9, 22, 21, 35, tzinfo=UTC)))
+    db.commit()
+    assert service.data_freshness(db, company2.id, as_of=datetime(2026, 9, 22, 18, 0, tzinfo=UTC)) is None
