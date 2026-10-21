@@ -368,6 +368,43 @@ def test_prepare_flag_off_persiste_compendio_rotulado_sin_llm(context, monkeypat
     engine.dispose()
 
 
+def test_prepare_filas_futuras_no_dejan_vacio_el_snapshot(context, monkeypatch, tmp_path):
+    """Regresión v5: el snapshot limitaba a las 8 filas más recientes ANTES de
+    filtrar; si las más recientes son futuras/inválidas, la evidencia válida
+    quedaba fuera y la narrativa salía «Sin datos» existiendo titulares.
+    Ahora el SQL excluye None/futuras y trae margen: el compendio enumera la
+    evidencia válida y el proveedor sigue sin llamarse."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.models.entities import Base, Company, NewsEvent
+    monkeypatch.setenv("THESIS_NARRATIVE_LLM_ENABLED", "0")
+    engine = create_engine(f"sqlite:///{tmp_path / 'f.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as seed:
+        company = Company(ticker="META", name="Meta", exchange="NASDAQ",
+                          company_type="holding", valuation_model="unassigned")
+        seed.add(company)
+        seed.flush()
+        valida = NewsEvent(id=17, company_id=company.id, title=ITEM["source_headline"],
+                           date=datetime(2026, 10, 8, 10, tzinfo=UTC), source="Medio",
+                           url=ITEM["url"], metadata_={"source_headline": ITEM["source_headline"]})
+        seed.add(valida)
+        for i in range(8):  # 8 filas futuras más recientes: antes ahogaban el límite
+            seed.add(NewsEvent(id=100 + i, company_id=company.id, title=f"Futura {i}",
+                               date=datetime(2026, 10, 15, tzinfo=UTC), source="Medio"))
+        seed.commit()
+    with Session(engine) as db:
+        provider = Provider()
+        result = svc.prepare_news_narrative(db, "META", provider=provider, now=NOW)
+        assert result != svc.sin_datos()
+        assert provider.calls == 0
+        text = "\n".join(parrafo for sec in result for parrafo in sec["parrafos"])
+        assert ITEM["source_headline"] in text
+        assert "Futura" not in text
+    engine.dispose()
+
+
 def test_prepare_flag_off_sin_evidencia_es_sin_datos(context, monkeypatch, tmp_path):
     """Sin noticias persistidas, flag apagado: «Sin datos» honesto (nada que
     enumerar), proveedor intacto."""
