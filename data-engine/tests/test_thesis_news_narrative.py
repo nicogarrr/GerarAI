@@ -151,13 +151,23 @@ def test_numbers_must_be_in_cited_news_not_any_input():
 ])
 def test_paid_routes_never_call_model(context, model, fallback):
     provider = Provider(model=model, fallback=fallback)
-    assert call(context, provider) == svc.sin_datos()
+    # Modelo de pago bloqueado (EUR 0): con evidencia presente NO se dice
+    # «Sin datos»; se devuelve el compendio factual declarado, sin llamar.
+    result = call(context, provider)
+    assert result[0]["titulo"].startswith("Compendio factual")
+    assert any("Meta presenta Muse" in parrafo for parrafo in result[0]["parrafos"])
     assert provider.calls == 0
+    # Sin evidencia sí es «Sin datos» (ausencia real).
+    assert call(context, provider, items=[]) == svc.sin_datos()
 
 
 def test_unverifiable_or_disabled_provider_never_calls(context):
     for provider in [SimpleNamespace(name="disabled"), SimpleNamespace(name="unverified")]:
-        assert call(context, provider) == svc.sin_datos()
+        # Proveedor no disponible: compendio factual con evidencia, no «Sin datos».
+        result = call(context, provider)
+        assert result[0]["titulo"].startswith("Compendio factual")
+        assert any("Meta presenta Muse" in parrafo for parrafo in result[0]["parrafos"])
+        assert call(context, provider, items=[]) == svc.sin_datos()
 
 
 def test_free_guard_uses_real_request_not_only_task_probe():
@@ -460,3 +470,16 @@ def test_cita_sin_id_crudo_ni_redirect_de_google_news():
     assert _canonical_url("https://news.google.com/rss/articles/CBMi123") is None
     assert _canonical_url("https://finance.yahoo.com/news/x.html") == "https://finance.yahoo.com/news/x.html"
     assert _canonical_url(None) is None
+
+
+def test_provider_error_degrades_to_factual_compendium_not_sin_datos(context):
+    """429/agotamiento del proveedor (v6 HYMC prod 2026-10-22): la evidencia
+    EXISTE; «Sin datos» mentiría. Compendio factual declarado, EUR 0."""
+    provider = Provider(error=ProviderResponseError("HTTP 429 free tier agotado"))
+    result = call(context, provider)
+    assert result[0]["titulo"].startswith("Compendio factual")
+    assert any("no está disponible" in parrafo for parrafo in result[0]["parrafos"])
+    assert any("Meta presenta Muse" in parrafo for parrafo in result[0]["parrafos"])
+    assert result != svc.sin_datos()
+    # Sin evidencia, el mismo fallo sí produce «Sin datos» (ausencia real).
+    assert call(context, provider, items=[]) == svc.sin_datos()

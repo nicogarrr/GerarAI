@@ -766,7 +766,7 @@ class ThesisService:
             status = "draft"
 
         _phase("compose_thesis")
-        hypothesis = self._hypothesis(company, valuation)
+        hypothesis = self._hypothesis(company, valuation, excluded_present=snapshot.excluded_present)
         catalysts = self._catalysts(evidence)
         invalidation = self._invalidation_criteria(company, valuation)
         scenario_probabilities = self._scenario_probabilities(long_term_model)
@@ -983,7 +983,7 @@ class ThesisService:
         return max(0, min(100, round(score)))
 
 
-    def _hypothesis(self, company: Company, valuation: dict) -> str:
+    def _hypothesis(self, company: Company, valuation: dict, excluded_present: list | None = None) -> str:
         """Hipotesis comprobable derivada solo de datos del modelo (nunca inventada)."""
         price = valuation.get("current_price")
         base = valuation.get("base_value")
@@ -994,11 +994,24 @@ class ThesisService:
                 # Lo que falta es una valoracion calculable contra la que
                 # contrastar ese precio, y por que.
                 missing = (valuation.get("missing_inputs") or [])[:4]
-                missing_txt = ", ".join(term_es(k) for k in missing) or "inputs del modelo"
+                # Un input PRESENTE pero no utilizable (excluded_present, p. ej.
+                # ingresos reportados 0) NO es un dato ausente: listarlo como
+                # "(Ingresos)" contradice el compendio. Se separan ambos casos.
+                excl = {str(e.get("metric")): e for e in (excluded_present or [])}
+                ausentes = [k for k in missing if str(k) not in excl]
+                partes = []
+                if ausentes:
+                    partes.append("faltan " + ", ".join(term_es(k) for k in ausentes))
+                for k in missing:
+                    e = excl.get(str(k))
+                    if e is not None:
+                        detalle = str(e.get("detail") or term_es(k))
+                        partes.append(f"{detalle} (presente, no utilizable: no es un dato ausente)")
+                motivo = "; ".join(partes) or "inputs del modelo"
                 return (
                     "Sin hipótesis comprobable todavía: hay precio de mercado, "
-                    "pero la valoración no es calculable con los datos actuales "
-                    f"({missing_txt}), así que no hay un valor justo contra el "
+                    "pero la valoración no es calculable con los datos actuales: "
+                    f"{motivo}, así que no hay un valor justo contra el "
                     "que contrastarla. Se declara, no se inventa."
                 )
             return (

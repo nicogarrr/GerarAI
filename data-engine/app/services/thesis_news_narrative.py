@@ -234,7 +234,9 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
         request = build_request(company.ticker, headlines)
         provider = provider or create_llm_provider()
         if provider.name == "disabled" or paid_model_risk(provider, request=request):
-            return sin_datos()
+            # Modelo no disponible NO es ausencia de evidencia: compendio
+            # factual (fuentes explícitas, sin LLM, EUR 0) en vez de «Sin datos».
+            return compendio_factual(list(news_items or []), now or datetime.now(UTC))
         budget = BudgetController()
         responses = []
 
@@ -246,7 +248,7 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
                 return budget.can_spend(short, 0)
 
         if not allowed():
-            return sin_datos()
+            return compendio_factual(list(news_items or []), now or datetime.now(UTC))
 
         async def complete():
             # Únicamente escalares y proveedor en el puente. Ninguna Session.
@@ -276,8 +278,11 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
                                   response.usage.total_tokens, commit=False)
                     db.flush()
     except Exception as exc:  # noqa: BLE001 - upstream inestable nunca rompe la tesis
-        logger.warning("Narrativa de noticias: %s; Sin datos", type(exc).__name__)
-        return sin_datos()
+        # Proveedor caído/agotado (p. ej. 429 free tier): la evidencia EXISTE;
+        # «Sin datos» mentiría. Compendio factual extractivo (sin LLM, EUR 0)
+        # que declara la indisponibilidad del análisis automático.
+        logger.warning("Narrativa de noticias: %s; compendio factual", type(exc).__name__)
+        return compendio_factual(list(news_items or []), now or datetime.now(UTC))
 
 
 def prepare_news_narrative(db: Session, ticker: str, *, provider=None, now=None) -> list[dict]:

@@ -585,3 +585,32 @@ def test_margin_claim_is_percent_not_decimal():
 
     fact = FinancialFact(metric="fcf_margin", value=Decimal("0.237"), unit="decimal", period="2026")
     assert "23,7 %" in _metric_claim_statement("AAPL", "fcf_margin", fact)
+
+
+def test_hypothesis_present_not_usable_is_not_called_missing():
+    """HYMC v6 (prod 2026-10-22): ingresos reportados 0 FY2023 es PRESENTE no
+    utilizable; la hipótesis no puede listarlo como dato ausente "(Ingresos)"
+    cuando el compendio dice que está reportado. La causa bloqueante real son
+    los inputs ausentes (FCF/WACC)."""
+    service = ThesisService()
+    valuation = {
+        "current_price": 17.09,
+        "base_value": None,
+        "margin_of_safety": None,
+        "missing_inputs": ["revenue", "normalized_fcf_or_fcf_margin", "wacc"],
+    }
+    excluded = [{
+        "metric": "revenue",
+        "available_period": "2023-12-31:FY",
+        "anchor_period": "2023-12-31:FY",
+        "reason": "present_not_usable",
+        "detail": "ingresos reportados 0 en el periodo ancla",
+        "reported_value": 0,
+    }]
+    text = service._hypothesis(_company(), valuation, excluded_present=excluded)
+    assert "ingresos reportados 0 en el periodo ancla" in text
+    assert "no es un dato ausente" in text
+    assert "faltan" in text  # la causa ausente real se nombra
+    # Sin excluded_present (llamadas antiguas) se conserva el texto anterior.
+    legacy = service._hypothesis(_company(), valuation)
+    assert "(Ingresos" in legacy or "Ingresos" in legacy
