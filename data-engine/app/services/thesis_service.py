@@ -666,8 +666,11 @@ class ThesisService:
                 sources = evidence.setdefault("sources", {})
                 for key, block in (stored.get("sources") or {}).items():
                     sources.setdefault(key, block)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001 - la tesis tracked no se rompe, pero se registra
+                logger.warning(
+                    "tracked stored evidence merge falló (%s); solo recibo SEC",
+                    type(exc).__name__,
+                )
 
         _phase("build_fundamental_model")
         long_term_model = LongTermModelService().build(
