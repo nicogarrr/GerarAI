@@ -214,6 +214,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/ui/dialog.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-dialog',
   'components/ui/dropdown-menu.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-dropdown-menu',
   'components/ui/label.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-label',
+  'components/ui/overflow-scroll-region.tsx': 'useState, useRef, useEffect, useCallback, useId, browser:ResizeObserver, addEventListener scroll (pista visible de scroll horizontal solo con overflow real)',
   'components/ui/panel.tsx': 'browser:HTMLElement, browser:window, jsx-spread, jsx-onClick',
   'components/ui/popover.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-popover',
   'components/ui/select.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-select',
