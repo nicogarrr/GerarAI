@@ -216,7 +216,7 @@ def latest_thesis(ticker: str, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=404, detail="No thesis for ticker")
     # Senal de frescura: hay datos mas nuevos que esta version (hechos,
     # precios, noticias o documentos) -> conviene regenerar la tesis.
-    latest_data_at = service.data_freshness(db, thesis.company_id)
+    latest_data_at = service.data_freshness(db, thesis.company_id, as_of=thesis.updated_at)
     stale = latest_data_at is not None and latest_data_at > thesis.updated_at
     payload = ThesisOut.model_validate(thesis).model_dump()
     payload["stale"] = stale
@@ -405,7 +405,7 @@ def thesis_memo(
     if not thesis:
         raise HTTPException(status_code=404, detail="No thesis for ticker")
     company = resolve_company(db, ticker)
-    latest_data_at = service.data_freshness(db, thesis.company_id)
+    latest_data_at = service.data_freshness(db, thesis.company_id, as_of=thesis.updated_at)
     stale = latest_data_at is not None and latest_data_at > thesis.updated_at
     markdown = build_memo_markdown(
         db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=draft
@@ -438,7 +438,7 @@ def _audio_context(db: Session, ticker: str, version: int | None = None) -> tupl
         if not thesis:
             raise HTTPException(status_code=404, detail=f"No thesis version {version} for ticker")
     company = resolve_company(db, ticker)
-    latest_data_at = service.data_freshness(db, thesis.company_id)
+    latest_data_at = service.data_freshness(db, thesis.company_id, as_of=thesis.updated_at)
     stale = latest_data_at is not None and latest_data_at > thesis.updated_at
     # Un borrador no puede locutar veredicto, margen de seguridad ni valoracion:
     # mismo modo borrador que memo.md?draft=1.

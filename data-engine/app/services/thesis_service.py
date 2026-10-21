@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import desc, func, select
@@ -350,17 +350,46 @@ def _excluded_reason_es(item: dict) -> str:
     )
 
 
+def _last_official_close_date(as_of: datetime | None):
+    """Última fecha de sesión US con cierre oficial que ``as_of`` pudo conocer.
+
+    Reutiliza la regla REAL del escritor de cierres (market_close_sync:
+    sesión cerrada a partir de las 16:30 NY, lunes-viernes); no es una hora
+    inventada aquí. Festivos US no modelados: igual que el escritor.
+    """
+    if as_of is None:
+        return None
+    from app.services.market_close_sync import _NY, _SESSION_CLOSED_AFTER
+
+    if as_of.tzinfo is None:
+        as_of = as_of.replace(tzinfo=UTC)
+    local = as_of.astimezone(_NY)
+    day = local.date()
+    if local.weekday() >= 5 or (local.hour, local.minute) < _SESSION_CLOSED_AFTER:
+        day -= timedelta(days=1)
+        while day.weekday() >= 5:
+            day -= timedelta(days=1)
+    return day
+
+
 class ThesisService:
     def __init__(self) -> None:
         self.valuation_service = ValuationService()
         self.auditor = SourceAuditor()
 
-    def data_freshness(self, db: Session, company_id: int) -> datetime | None:
+    def data_freshness(
+        self, db: Session, company_id: int, *, as_of: datetime | None = None
+    ) -> datetime | None:
         """Marca temporal del dato mas reciente que alimenta una tesis.
 
         Mira hechos financieros, precios, noticias y documentos de la empresa;
         si alguno es posterior a thesis.created_at, la version esta obsoleta
         (stale) y conviene regenerar.
+
+        ``as_of`` es el updated_at de la versión contra la que se mide: sin
+        él no hay ancla de sesión y el criterio de precios se omite (los
+        hechos/noticias/documentos se miran igual). Los llamadores con una
+        versión concreta deben pasarlo siempre.
         """
         from app.models import Document, FinancialFact, MarketPrice, NewsEvent
 
@@ -370,13 +399,43 @@ class ThesisService:
         # de otro tenant marcaría obsoleta esta tesis sin cambiar su
         # información. MarketPrice es global por diseño y sigue global.
         tenant_id = db.info.get("tenant_id")
-        for model in (FinancialFact, MarketPrice, NewsEvent, Document):
+        for model in (FinancialFact, NewsEvent, Document):
             stmt = select(func.max(model.updated_at)).where(model.company_id == company_id)
-            if tenant_id is not None and model is not MarketPrice:
+            if tenant_id is not None:
                 stmt = stmt.where(model.tenant_id == tenant_id)
             stamp = db.scalar(stmt)
             if stamp is not None and (latest_seen is None or stamp > latest_seen):
                 latest_seen = stamp
+
+        # Precios: el refresco spot PISA updated_at de la fila de HOY en cada
+        # tick sin cambiar nada material, así que updated_at no vale aquí.
+        # Solo cuenta una barra de CIERRE OFICIAL (source="yfinance", la única
+        # fuente que el ecosistema considera cierre —ver market_close_sync—)
+        # cuya fecha de sesión sea posterior a la última sesión cerrada que la
+        # versión pudo conocer. Así: tick intradía NO, barra de sesión cerrada
+        # nueva SÍ, backfill de fechas viejas NO. Las correcciones de cierres
+        # viejos no se distinguen de un backfill con estos campos (limitación
+        # declarada); hechos/noticias/documentos sí las capturan.
+        anchor = _last_official_close_date(as_of)
+        if anchor is not None:
+            official = db.scalar(
+                select(func.max(MarketPrice.date)).where(
+                    MarketPrice.company_id == company_id,
+                    MarketPrice.source == "yfinance",
+                )
+            )
+            if official is not None and official > anchor:
+                # date > anchor ⇒ la barra se escribió al cerrar esa sesión,
+                # siempre después de as_of: su updated_at la delata sin
+                # comparaciones sintéticas.
+                stamp = db.scalar(
+                    select(func.max(MarketPrice.updated_at)).where(
+                        MarketPrice.company_id == company_id,
+                        MarketPrice.source == "yfinance",
+                    )
+                )
+                if stamp is not None and (latest_seen is None or stamp > latest_seen):
+                    latest_seen = stamp
         return latest_seen
 
     def latest(self, db: Session, ticker: str) -> ThesisVersion | None:

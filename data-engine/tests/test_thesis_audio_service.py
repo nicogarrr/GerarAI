@@ -117,7 +117,8 @@ def test_audio_context_default_uses_latest_published_not_newer_draft(monkeypatch
         def by_version(self, db, ticker, version):
             raise AssertionError("por defecto no se pide por version")
 
-        def data_freshness(self, db, company_id):
+        def data_freshness(self, db, company_id, as_of=None):
+            assert as_of == 0, f"as_of debe ser updated_at de la publicada, no {as_of}"
             return None
 
     route, calls = _fake_route(monkeypatch, FakeService, "# Memo\n\nVersión 11.")
@@ -137,7 +138,7 @@ def test_audio_context_default_404_without_published(monkeypatch):
         def latest_published(self, db, ticker):
             return None
 
-        def data_freshness(self, db, company_id):
+        def data_freshness(self, db, company_id, as_of=None):
             return None
 
     route, _ = _fake_route(monkeypatch, FakeService)
@@ -188,7 +189,8 @@ def test_audio_context_explicit_draft_version_keeps_draft_memo(monkeypatch):
         def latest_published(self, db, ticker):
             raise AssertionError("version explicita no consulta la publicada")
 
-        def data_freshness(self, db, company_id):
+        def data_freshness(self, db, company_id, as_of=None):
+            assert as_of == 0, f"as_of debe ser updated_at del borrador pedido, no {as_of}"
             return None
 
     route, calls = _fake_route(monkeypatch, FakeService, "# Memo\n\nVersión 13 sin veredicto.")
@@ -206,7 +208,7 @@ def test_audio_context_explicit_version_missing_404(monkeypatch):
         def by_version(self, db, ticker, version):
             return None
 
-        def data_freshness(self, db, company_id):
+        def data_freshness(self, db, company_id, as_of=None):
             return None
 
     route, _ = _fake_route(monkeypatch, FakeService)
