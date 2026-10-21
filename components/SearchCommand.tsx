@@ -369,7 +369,10 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                         </div>
                     ) : (
                         <>
-                            {displayStocks?.length === 0 ? (
+                            {/* Con un comando de ficha tecleado («ASTS FA») hay
+                                resultado valido aunque el texto no coincida con
+                                ninguna accion: «Sin resultados» mentiria. */}
+                            {displayStocks?.length === 0 && !commandQuery ? (
                                 <div className="search-list-indicator">
                                     {isSearchMode ? 'Sin resultados' : 'No hay acciones disponibles'}
                                 </div>
