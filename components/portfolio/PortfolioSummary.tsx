@@ -35,7 +35,9 @@ export default function PortfolioSummary({ summary }: Props) {
           cuando cada tarjeta tiene sitio real para el valor. */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:[grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))]">
       <div className="bg-[#111111] border border-gray-800 rounded-xl p-4 sm:p-5 relative overflow-hidden group hover:border-teal-500/30 transition-colors">
-        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        {/* Marca de agua decorativa: en <sm queda sobre el valor y estorba la
+            lectura (revisión móvil 21-oct); solo adorna desde sm. */}
+        <div className="absolute top-0 right-0 hidden p-4 opacity-10 transition-opacity group-hover:opacity-20 sm:block">
           <DollarSign className="h-12 w-12 text-teal-400" />
         </div>
         <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Valor Total (neto)</p>
@@ -48,7 +50,9 @@ export default function PortfolioSummary({ summary }: Props) {
       </div>
 
       <div className="bg-[#111111] border border-gray-800 rounded-xl p-4 sm:p-5 relative overflow-hidden group hover:border-blue-500/30 transition-colors">
-        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        {/* Marca de agua decorativa: en <sm queda sobre el valor y estorba la
+            lectura (revisión móvil 21-oct); solo adorna desde sm. */}
+        <div className="absolute top-0 right-0 hidden p-4 opacity-10 transition-opacity group-hover:opacity-20 sm:block">
           <PiggyBank className="h-12 w-12 text-blue-400" />
         </div>
         <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Coste de las posiciones</p>
@@ -63,7 +67,9 @@ export default function PortfolioSummary({ summary }: Props) {
       </div>
 
       <div className="bg-[#111111] border border-gray-800 rounded-xl p-4 sm:p-5 relative overflow-hidden group hover:border-purple-500/30 transition-colors">
-        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        {/* Marca de agua decorativa: en <sm queda sobre el valor y estorba la
+            lectura (revisión móvil 21-oct); solo adorna desde sm. */}
+        <div className="absolute top-0 right-0 hidden p-4 opacity-10 transition-opacity group-hover:opacity-20 sm:block">
           {!noData ? (
             isPositive ? (
               <TrendingUp className="h-12 w-12 text-green-500" />
