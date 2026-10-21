@@ -59,7 +59,6 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     const [strike, setStrike] = useState('');
     const [expiry, setExpiry] = useState('');
 
-    const [fee, setFee] = useState('');
     const [executedAtLocal, setExecutedAtLocal] = useState(() => {
         const now = new Date();
         now.setSeconds(0, 0);
@@ -97,27 +96,26 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
         setSymbol(value);
     }
 
-    const fieldKey = JSON.stringify([kind, symbol, name, side, quantity, price, currency, callPut, strike, expiry, fee, executedAtLocal]);
+    const fieldKey = JSON.stringify([kind, symbol, name, side, quantity, price, currency, callPut, strike, expiry, executedAtLocal]);
     const validationError = invalid !== null && invalid.key === fieldKey ? invalid.message : null;
 
     const parsedQuantity = parseEsNumber(quantity);
     const parsedPrice = parseEsNumber(price);
     const parsedStrike = parseEsNumber(strike);
-    const parsedFee = fee.trim() === '' ? 0 : parseEsNumber(fee);
+    // Sin campo de comisión (Nico, 21-oct-2026: «comisiones, olvídate»):
+    // la demo registra comisión 0 SIMULADA. El libro y las operaciones ya
+    // registradas con comisión se conservan; esto no es la tarifa de
+    // ningún bróker ni una afirmación de que operar sea gratis.
+    const parsedFee = 0;
 
     const total = useMemo(() => {
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return null;
         if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) return null;
-        // Comisión inválida o negativa: NO mostrar resumen. Sumar una fee
-        // negativa abarataría el coste (o inflaría el neto de una venta) y
-        // tratar una fee ilegible como 0 ocultaría la comisión: en ambos
-        // casos el total sería engañoso antes de que validate() bloquee.
-        // El multiplicador es constante (100 en opciones), no input: no
-        // admite valor inválido.
-        if (!Number.isFinite(parsedFee) || parsedFee < 0) return null;
+        // La comisión ya no es input (0 simulada fija): nada que validar.
+        // El multiplicador es constante (100 en opciones), tampoco input.
         const multiplier = kind === 'opcion' ? 100 : 1;
         return parsedQuantity * parsedPrice * multiplier;
-    }, [kind, parsedQuantity, parsedPrice, parsedFee]);
+    }, [kind, parsedQuantity, parsedPrice]);
 
     function validate(): string | null {
         if (!symbol.trim()) return 'Indica el símbolo.';
@@ -126,8 +124,6 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return 'La cantidad debe ser un entero mayor que cero.';
         if (!Number.isFinite(parsedPrice)) return `El precio no es un número válido (${NUM_INPUT_HINT}).`;
         if (parsedPrice <= 0) return 'El precio debe ser mayor que cero.';
-        if (!Number.isFinite(parsedFee)) return `La comisión no es un número válido (${NUM_INPUT_HINT}).`;
-        if (parsedFee < 0) return 'La comisión no puede ser negativa.';
         const executedAt = new Date(executedAtLocal).getTime();
         if (!Number.isFinite(executedAt)) return 'Indica la fecha de ejecución.';
         if (executedAt > Date.now()) return 'La fecha de ejecución no puede ser futura.';
@@ -185,7 +181,6 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     setNotice('Operación registrada en la cuenta demo.');
                     setQuantity('');
                     setPrice('');
-                    setFee('');
                     router.refresh();
                 } else if (result.outcome === 'duplicate') {
                     setDuplicate(
@@ -240,6 +235,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                         placeholder={kind === 'accion' ? 'p. ej. ASTS' : 'p. ej. AAPL'}
                         ariaLabel={kind === 'accion' ? 'Buscar acción por nombre o ticker' : 'Buscar subyacente por nombre o ticker'}
                         className="h-10 w-full bg-gray-800/50 uppercase placeholder:text-gray-600"
+                        dropdownSide="bottom"
                         required
                     />
                     <p className="text-xs text-gray-500">Busca por nombre o ticker y elige: se rellenan símbolo y nombre.</p>
@@ -251,7 +247,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                         id={`${uid}-name`}
                         value={name}
                         onChange={(event) => setName(event.target.value)}
-                        placeholder="p. ej. AST SpaceMobile"
+                        placeholder="Nombre de la empresa"
                         autoComplete="off"
                         required
                     />
@@ -365,20 +361,14 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${uid}-fee`}>Comisión ({currency})</Label>
-                    <Input
-                        className="placeholder:text-gray-600"
-                        id={`${uid}-fee`}
-                        value={fee}
-                        onChange={(event) => setFee(event.target.value)}
-                        inputMode="decimal"
-                        placeholder="0"
-                    />
-                </div>
-                <div className="col-span-2 space-y-1.5">
-                    <Label htmlFor={`${uid}-executed`}>Fecha de ejecución</Label>
+            <div className="space-y-1.5">
+                <Label htmlFor={`${uid}-executed`}>Fecha de ejecución</Label>
+                {/* iOS Safari da al datetime-local un ancho intrínseco mayor
+                    que la tarjeta y los min-w-0/max-w-full no bastan (fallo
+                    real visto en iPhone 21-oct-2026): fila propia a una
+                    columna y recorte duro con overflow-hidden como última
+                    barrera. Verificación en dispositivo real pendiente. */}
+                <div className="w-full overflow-hidden">
                     <Input
                         className="w-full min-w-0 max-w-full px-3 text-sm"
                         id={`${uid}-executed`}
@@ -393,7 +383,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
             <p className="text-xs text-gray-500">
                 Decimales con coma o punto, sin separador de miles (1234,56).
                 Registras una operación ya ejecutada con el precio que introduces tú: no es una ejecución de
-                mercado. Comisión 0 por defecto (déjala vacía): la demo no reproduce comisiones reales.
+                mercado. Sin comisión en la demo (0 simulado): no reproduce la tarifa de ningún bróker.
             </p>
 
             {/* Resumen claro del coste ANTES de registrar (flujo guiado tipo
