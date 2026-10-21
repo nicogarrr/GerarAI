@@ -82,6 +82,9 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(ticket, /<Label htmlFor=\{`\$\{uid\}-quantity`\}>Cantidad<\/Label>/);
         assert.doesNotMatch(ticket, /Cantidad \(\{kindLabel\}\)<\/Label>/);
         assert.match(ticket, /pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-gray-500">\{kindLabel\}<\/span>/);
+        // El sufijo queda asociado al input (auditor 21-oct-2026).
+        assert.match(ticket, /aria-describedby=\{`\$\{uid\}-quantity-unit`\}/);
+        assert.match(ticket, /<span id=\{`\$\{uid\}-quantity-unit`\} className="pointer-events-none/);
     });
 
     it('placeholder del nombre neutro: no parece un valor relleno', () => {

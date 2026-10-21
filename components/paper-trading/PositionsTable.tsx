@@ -47,7 +47,7 @@ export function PositionsTable({ positions, valuation }: { positions: DemoPositi
                                     {position.kind === 'opcion' ? 'Opción' : 'Acción'} · {position.instrumentKey}
                                 </span>
                                 {position.optionBadge === 'vencida' && position.optionExpiry ? (
-                                    <span className="mt-1 block">
+                                    <div className="mt-1">
                                         <span className="inline-block rounded border border-amber-800 bg-amber-950/40 px-1.5 py-0.5 text-xs text-amber-300">
                                             Vencida el {formatContractDate(position.optionExpiry)}
                                         </span>
@@ -61,7 +61,7 @@ export function PositionsTable({ positions, valuation }: { positions: DemoPositi
                                                 no está soportada.
                                             </p>
                                         </details>
-                                    </span>
+                                    </div>
                                 ) : null}
                                 {position.optionBadge === 'vence-hoy' && position.optionExpiry ? (
                                     <span className="mt-1 block rounded border border-amber-800 bg-amber-950/40 px-1.5 py-0.5 text-xs text-amber-300">
@@ -96,9 +96,12 @@ function ValuationCells({ row, currency }: { row: ValuedPosition | null; currenc
             <>
                 <TableCell className="hidden text-right md:table-cell">
                     <span className="block text-gray-300">N/D</span>
-                    {/* El motivo completo queda en title (y un lector de pantalla
-                        lee el texto del DOM); la celda no se rompe en líneas. */}
-                    <span className="ml-auto block max-w-40 truncate text-xs text-gray-500" title={row?.note ?? 'Sin valoración.'}>{row?.note ?? 'Sin valoración.'}</span>
+                    {/* El motivo no va solo en title/truncate (auditor 21-oct-2026):
+                        expandible nativo, accesible con teclado y táctil. */}
+                    <details className="mt-0.5 text-xs text-gray-500">
+                        <summary className="ml-auto w-fit cursor-pointer select-none text-gray-400 underline decoration-dotted underline-offset-2">Motivo</summary>
+                        <p className="mt-1 max-w-56 whitespace-normal">{row?.note ?? 'Sin valoración.'}</p>
+                    </details>
                     {row?.quoteLabel ? <span className="block text-xs text-gray-500">{row.quoteLabel}</span> : null}
                 </TableCell>
                 <TableCell className="hidden text-right text-gray-400 md:table-cell">N/D</TableCell>

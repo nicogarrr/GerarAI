@@ -341,13 +341,14 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                         <Input
                             className="pr-20 placeholder:text-gray-600"
                             id={`${uid}-quantity`}
+                            aria-describedby={`${uid}-quantity-unit`}
                             value={quantity}
                             onChange={(event) => setQuantity(event.target.value)}
                             inputMode="numeric"
                             placeholder="p. ej. 10"
                             required
                         />
-                        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-gray-500">{kindLabel}</span>
+                        <span id={`${uid}-quantity-unit`} className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-gray-500">{kindLabel}</span>
                     </div>
                 </div>
                 <div className="space-y-1.5">

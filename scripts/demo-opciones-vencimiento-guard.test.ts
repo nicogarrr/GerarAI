@@ -86,6 +86,9 @@ describe('wiring servidor/UI y honestidad (sin autoejercicio)', () => {
         // Sin párrafo permanente (QA píxeles 21-oct-2026): etiqueta corta +
         // detalle expandible nativo (details/summary, seguro en móvil).
         assert.match(table, /Vencida el \{formatContractDate\(position\.optionExpiry\)\}\s*<\/span>/);
+        // Contenedor de bloque válido (details/p no pueden ir dentro de span).
+        assert.match(table, /<div className="mt-1">\s*<span className="inline-block rounded border border-amber-800/);
+        assert.doesNotMatch(table, /<span className="mt-1 block">\s*<span className="inline-block rounded border border-amber-800/);
         assert.match(table, /<details className="mt-1 text-xs text-gray-400">/);
         assert.match(table, /<summary className="[^"]*">Qué significa<\/summary>/);
         // Sin lógica de cierre/liquidación automática por vencimiento.
