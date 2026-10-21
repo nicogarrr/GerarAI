@@ -174,6 +174,13 @@ export const ROUTE_CATALOG: NavSection[] = [
         children: [{ href: '/screener', label: 'Mercado', icon: LineChart, hub: '/discover', description: 'Explora empresas por sector y mira subidas, bajadas y más activas.' }],
       },
       {
+        href: '/mercados',
+        label: 'Cotizaciones',
+        icon: LineChart,
+        hub: '/discover',
+        description: 'Índices, futuros, acciones, materias primas y divisas con la hora de cada cotización.',
+      },
+      {
         href: '/knowledge',
         label: 'Conocimiento',
         icon: BookOpen,
