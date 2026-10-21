@@ -225,6 +225,12 @@ const OFFLINE_MARKERS = [
   'no responde',
   'motor de análisis no',
   'backend no configurado',
+  // Prefijo/detalle que genera lib/research/client.ts cuando falla el
+  // motor. Al cruzar la frontera de una server action el AppError
+  // pierde su code y solo queda el mensaje: sin estos marcadores el
+  // texto crudo (ingles + ruta interna) llegaba al toast.
+  'research engine unavailable',
+  'fetch fallido',
 ];
 
 const DUPLICATE_MARKERS = [
