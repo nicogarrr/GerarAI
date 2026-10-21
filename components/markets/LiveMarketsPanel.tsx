@@ -7,6 +7,7 @@ import { getLiveMarkets } from '@/lib/actions/live-quotes.actions';
 import {
     formatQuoteAge,
     formatQuoteChange,
+    formatQuoteChangePercent,
     localizeInstrumentType,
     quoteAgeSeconds,
     resolveGroupRows,
@@ -39,12 +40,6 @@ const priceFormatter = (unit: LiveQuote['unit'], decimals: number) =>
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
     });
-
-const changePercentFormatter = new Intl.NumberFormat('es-ES', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    signDisplay: 'always',
-});
 
 const timeFormatter = new Intl.DateTimeFormat('es-ES', {
     timeZone: 'Europe/Madrid',
@@ -107,7 +102,7 @@ function QuoteRow({ spec, quote, fetchedAt }: { spec: LiveQuoteSpec; quote: Live
                 ) : (
                     <>
                         <div>{formatQuoteChange(quote.change, quote.decimals)}</div>
-                        <div className="text-xs">({changePercentFormatter.format(quote.changePercent)}%)</div>
+                        <div className="text-xs">({formatQuoteChangePercent(quote.changePercent)}%)</div>
                     </>
                 )}
             </td>

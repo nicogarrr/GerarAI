@@ -229,11 +229,24 @@ export function quoteAgeSeconds(fetchedAtMs: number, timestampSec: number | null
     return Math.max(0, Math.round(fetchedAtMs / 1000 - timestampSec));
 }
 
-/** Antiguedad legible: "hace 40 s", "hace 3 min", "hace 2 h". */
+/**
+ * Antiguedad legible y explicita, sin aproximacion implicita:
+ * - <60 s: exacta ("hace 40 s");
+ * - <60 min: redondeada y MARCADA como aproximada ("hace ~3 min");
+ * - >=60 min: horas y minutos exactos a suelo ("hace 1 h 59 min"),
+ *   porque el suelo de horas solo subestimaba en la unidad oculta.
+ * Valores no finitos, cero o futuros (desfase de reloj) => "hace 0 s".
+ */
 export function formatQuoteAge(ageSeconds: number): string {
-    if (ageSeconds < 60) return `hace ${ageSeconds} s`;
-    if (ageSeconds < 3600) return `hace ${Math.floor(ageSeconds / 60)} min`;
-    return `hace ${Math.floor(ageSeconds / 3600)} h`;
+    if (!Number.isFinite(ageSeconds) || ageSeconds <= 0) return 'hace 0 s';
+    if (ageSeconds < 60) return `hace ${Math.floor(ageSeconds)} s`;
+    if (ageSeconds < 3600) {
+        const m = Math.round(ageSeconds / 60);
+        return m >= 60 ? 'hace 1 h' : `hace ~${m} min`;
+    }
+    const h = Math.floor(ageSeconds / 3600);
+    const m = Math.floor((ageSeconds % 3600) / 60);
+    return m === 0 ? `hace ${h} h` : `hace ${h} h ${m} min`;
 }
 
 const numberFormat = (decimals: number, sign: boolean) =>
@@ -254,6 +267,20 @@ export function formatQuoteChange(value: number, decimals: number): string {
     const formatted = numberFormat(decimals, true).format(value);
     if (value !== 0 && ZERO_PATTERN.test(formatted)) {
         return numberFormat(Math.min(decimals + 2, 8), true).format(value);
+    }
+    return formatted;
+}
+
+/**
+ * Porcentaje de cambio con 2 decimales. Misma regla anti-cero que
+ * formatQuoteChange: si redondea a "+0,00%" sin ser cero, amplia a 4
+ * decimales para que signo y magnitud sean reales (un cruce moviendose
+ * un pip no es "no moverse").
+ */
+export function formatQuoteChangePercent(value: number): string {
+    const formatted = numberFormat(2, true).format(value);
+    if (value !== 0 && ZERO_PATTERN.test(formatted)) {
+        return numberFormat(4, true).format(value);
     }
     return formatted;
 }
