@@ -11,6 +11,7 @@ from app.models import (
     Document,
     FinancialFact,
     FundamentalModelVersion,
+    NewsEvent,
     Position,
     ResearchAlert,
     ResearchReview,
@@ -20,6 +21,8 @@ from app.models import (
 )
 from app.schemas import CompanySnapshotOut
 from app.services.document_visibility import without_archive_duplicates
+from app.services.news_headline_translation import display_translation, original_headline
+from app.services.thesis_change_identity import ChangeItem, group_change_items
 
 
 class CompanySnapshotService:
@@ -74,14 +77,19 @@ class CompanySnapshotService:
             .order_by(desc(ValuationModel.version), desc(ValuationModel.created_at))
             .limit(1)
         )
-        recent_changes = list(
-            db.scalars(
-                select(ThesisChange)
-                .where(ThesisChange.company_id == company.id)
-                .order_by(desc(ThesisChange.created_at))
-                .limit(10)
-            ).all()
-        )
+        recent_changes = self._enrich_changes_many(
+            db,
+            {
+                company.id: list(
+                    db.scalars(
+                        select(ThesisChange)
+                        .where(ThesisChange.company_id == company.id)
+                        .order_by(desc(ThesisChange.created_at))
+                        .limit(10)
+                    ).all()
+                )
+            },
+        )[company.id]
         counts = self._counts(db, company.id)
         held = self._held_company_ids(db, [company.id])
         return self._assemble(
@@ -137,7 +145,7 @@ class CompanySnapshotService:
             desc(ValuationModel.version),
             desc(ValuationModel.created_at),
         )
-        changes = self._recent_changes_many(db, company_ids)
+        changes = self._enrich_changes_many(db, self._recent_changes_many(db, company_ids))
         counts = self._counts_many(db, company_ids)
         held = self._held_company_ids(db, company_ids)
         return {
@@ -202,6 +210,84 @@ class CompanySnapshotService:
         for row in rows:
             grouped.setdefault(row.company_id, []).append(row)
         return grouped
+
+    @staticmethod
+    def _enrich_changes_many(
+        db: Session, changes_by_company: dict[int, list[ThesisChange]]
+    ) -> dict[int, list[dict]]:
+        """Cambios recientes con identidad atribuida de su evento, en lote.
+
+        La misma noticia en dos idiomas genera un ThesisChange por idioma
+        (QA ASTS 21-oct-2026: el par ES/EN salía duplicado en «Últimos
+        cambios»). ThesisChange no enlaza con NewsEvent; la ResearchReview
+        creada con él sí. Dos queries para TODO el lote (reviews + eventos),
+        no una por empresa ni por cambio; la agrupación es la misma regla de
+        identidad atribuida que «Desde tu última visita» (nunca similitud) y
+        conserva las fuentes absorbidas en ``tambien_en`` con su URL.
+        """
+        all_changes = [change for rows in changes_by_company.values() for change in rows]
+        if not all_changes:
+            return {cid: [] for cid in changes_by_company}
+        review_rows = db.execute(
+            select(ResearchReview.thesis_change_id, ResearchReview.news_event_id).where(
+                ResearchReview.thesis_change_id.in_([c.id for c in all_changes]),
+                ResearchReview.news_event_id.is_not(None),
+            )
+        ).all()
+        event_id_by_change: dict[int, int] = {}
+        for change_id, event_id in review_rows:
+            event_id_by_change.setdefault(change_id, event_id)
+        event_ids = set(event_id_by_change.values())
+        events = (
+            {e.id: e for e in db.scalars(select(NewsEvent).where(NewsEvent.id.in_(event_ids))).all()}
+            if event_ids
+            else {}
+        )
+        out: dict[int, list[dict]] = {}
+        for company_id, rows in changes_by_company.items():
+            items: list[ChangeItem] = []
+            for orden, change in enumerate(rows):
+                event = events.get(event_id_by_change.get(change.id))
+                translation = display_translation(event) if event is not None else None
+                items.append(
+                    ChangeItem(
+                        resumen=change.summary,
+                        direccion=change.impact_direction,
+                        requiere_revision=bool(change.requires_review),
+                        fecha=None,
+                        orden=orden,
+                        news_event_id=event.id if event is not None else None,
+                        fuente_url=event.url if event is not None else None,
+                        fuente_nombre=event.source if event is not None else None,
+                        titular_original=original_headline(event) if event is not None else None,
+                        traduccion_titular=(
+                            translation["text"]
+                            if isinstance(translation, dict) and isinstance(translation.get("text"), str)
+                            else None
+                        ),
+                        extra={"change": change},
+                    )
+                )
+            out[company_id] = []
+            for item in group_change_items(items):
+                change = item.extra["change"]
+                out[company_id].append(
+                    {
+                        "id": change.id,
+                        "company_id": change.company_id,
+                        "change_type": change.change_type,
+                        "impact_direction": change.impact_direction,
+                        "materiality_score": change.materiality_score,
+                        "summary": change.summary,
+                        "affected_metrics": change.affected_metrics or [],
+                        "requires_review": item.requiere_revision,
+                        "created_at": change.created_at,
+                        "fuente_url": item.fuente_url,
+                        "fuente_nombre": item.fuente_nombre,
+                        "tambien_en": item.tambien_en or None,
+                    }
+                )
+        return out
 
     @staticmethod
     def _counts_many(db: Session, company_ids: list[int]) -> dict[int, dict[str, int]]:
@@ -273,7 +359,7 @@ class CompanySnapshotService:
         thesis: ThesisVersion | None,
         model: FundamentalModelVersion | None,
         valuation_model: ValuationModel | None,
-        recent_changes: list[ThesisChange],
+        recent_changes: list[dict],
         counts: dict[str, int],
         in_portfolio: bool = False,
     ) -> CompanySnapshotOut:

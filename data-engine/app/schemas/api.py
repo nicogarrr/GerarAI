@@ -225,6 +225,11 @@ class SnapshotRecentChangeOut(BaseModel):
     affected_metrics: list[str]
     requires_review: bool
     created_at: datetime
+    # Procedencia del evento origen (puente ResearchReview -> NewsEvent) y
+    # fuentes absorbidas al agrupar la misma noticia en dos idiomas.
+    fuente_url: str | None = None
+    fuente_nombre: str | None = None
+    tambien_en: list[dict] | None = None
 
 
 class CompanySnapshotOut(BaseModel):

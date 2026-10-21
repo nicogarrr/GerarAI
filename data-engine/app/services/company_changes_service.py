@@ -13,7 +13,9 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Document, FinancialFact, ThesisChange
+from app.models import Document, FinancialFact, NewsEvent, ResearchReview, ThesisChange
+from app.services.news_headline_translation import display_translation, original_headline
+from app.services.thesis_change_identity import ChangeItem, group_change_items
 
 MAX_ITEMS = 8
 
@@ -71,13 +73,69 @@ def changes_since(db: Session, company_id: int, since: datetime) -> dict[str, An
             "total": facts_total,
             "por_metrica": [{"metric": metric, "n": n} for metric, n in fact_rows],
         },
-        "cambios_tesis": [
-            {
-                "resumen": c.summary,
-                "direccion": c.impact_direction,
-                "requiere_revision": bool(c.requires_review),
-                "fecha": _aware(c.created_at).date().isoformat(),
-            }
-            for c in changes
-        ],
+        "cambios_tesis": _project_changes(db, changes),
     }
+
+
+def _project_changes(db: Session, changes: list[ThesisChange]) -> list[dict[str, Any]]:
+    """Proyección de presentación con identidad atribuida del evento origen.
+
+    El ThesisChange no enlaza con su NewsEvent; la ResearchReview creada con
+    él sí. Por ese puente se recuperan URL, titular original y traducción
+    cacheada del evento y se agrupa el mismo cambio publicado en dos idiomas
+    (QA ASTS 21-oct-2026: el par ES/EN de TradingView salía dos veces en
+    «Desde tu última visita»). Solo identidad atribuida, nunca similitud;
+    las fuentes absorbidas quedan en ``tambien_en`` con su URL revisable.
+    Sin puente (cambios antiguos o sin evento) el cambio se muestra tal cual.
+    """
+    if not changes:
+        return []
+    review_rows = db.execute(
+        select(ResearchReview.thesis_change_id, ResearchReview.news_event_id).where(
+            ResearchReview.thesis_change_id.in_([c.id for c in changes]),
+            ResearchReview.news_event_id.is_not(None),
+        )
+    ).all()
+    event_id_by_change: dict[int, int] = {}
+    for change_id, event_id in review_rows:
+        event_id_by_change.setdefault(change_id, event_id)
+    event_ids = set(event_id_by_change.values())
+    events = (
+        {e.id: e for e in db.scalars(select(NewsEvent).where(NewsEvent.id.in_(event_ids))).all()}
+        if event_ids
+        else {}
+    )
+    items: list[ChangeItem] = []
+    for orden, change in enumerate(changes):
+        event = events.get(event_id_by_change.get(change.id))
+        translation = display_translation(event) if event is not None else None
+        items.append(
+            ChangeItem(
+                resumen=change.summary,
+                direccion=change.impact_direction,
+                requiere_revision=bool(change.requires_review),
+                fecha=_aware(change.created_at).date().isoformat(),
+                orden=orden,
+                news_event_id=event.id if event is not None else None,
+                fuente_url=event.url if event is not None else None,
+                fuente_nombre=event.source if event is not None else None,
+                titular_original=original_headline(event) if event is not None else None,
+                traduccion_titular=(
+                    translation["text"]
+                    if isinstance(translation, dict) and isinstance(translation.get("text"), str)
+                    else None
+                ),
+            )
+        )
+    return [
+        {
+            "resumen": item.resumen,
+            "direccion": item.direccion,
+            "requiere_revision": item.requiere_revision,
+            "fecha": item.fecha,
+            "fuente_url": item.fuente_url,
+            "fuente_nombre": item.fuente_nombre,
+            "tambien_en": item.tambien_en or None,
+        }
+        for item in group_change_items(items)
+    ]

@@ -75,17 +75,39 @@ function stripTickerPrefix(
     return trimmed.slice(normalizedTicker.length + 1);
 }
 
-/** Claves de deduplicación de una noticia: título normalizado (sin mayúsculas,
- *  tildes ni puntuación) y URL sin parámetros. */
-export function newsDedupeKeys(event: { title?: string | null; url?: string | null }): string[] {
-    const keys: string[] = [];
-    const title = (event.title ?? '')
+/** Una noticia con la traducción atribuida cacheada por GerarAI (la que
+ *  NewsHeadline pide al backend cuando el titular entra en pantalla). */
+export type NewsDedupeEvent = {
+    title?: string | null;
+    url?: string | null;
+    original_headline?: string | null;
+    headline_translation?: { text?: string | null } | null;
+};
+
+function headlineKey(value: string | null | undefined): string {
+    return (value ?? '')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, ' ')
         .trim();
-    if (title) keys.push(`t:${title}`);
+}
+
+/** Claves de deduplicación de una noticia (identidad, nunca similitud):
+ *  - `t:` título, titular original de la fuente y traducción española
+ *    atribuida cacheada, todos normalizados (sin mayúsculas, tildes ni
+ *    puntuación). La traducción comparte el espacio `t:` porque es la
+ *    traducción atribuida de ESE evento: si coincide exactamente con el
+ *    titular de otro evento, ambos son la misma historia en dos idiomas
+ *    (pares ES/EN del mismo medio, QA ASTS 21-oct-2026). Solo la igualdad
+ *    exacta agrupa; textos parecidos sin coincidir no se juntan.
+ *  - `u:` URL sin parámetros. */
+export function newsDedupeKeys(event: NewsDedupeEvent): string[] {
+    const keys: string[] = [];
+    for (const value of [event.title, event.original_headline, event.headline_translation?.text]) {
+        const title = headlineKey(value);
+        if (title) keys.push(`t:${title}`);
+    }
     if (event.url) {
         try {
             const parsed = new URL(event.url);
@@ -97,9 +119,11 @@ export function newsDedupeKeys(event: { title?: string | null; url?: string | nu
     return keys;
 }
 
-/** Quita noticias repetidas (mismo título normalizado o misma URL), conservando
- *  la primera aparición: el orden de entrada decide cuál sobrevive. */
-export function dedupeNewsEvents<T extends { title?: string | null; url?: string | null }>(events: T[]): T[] {
+/** Quita noticias repetidas por identidad (ver newsDedupeKeys), conservando
+ *  la primera aparición: el orden de entrada decide cuál sobrevive (la ficha
+ *  la ordena por materialidad antes de deduplicar). Los originales absorbidos
+ *  no se borran: solo se dejan de pintar en esta lista. */
+export function dedupeNewsEvents<T extends NewsDedupeEvent>(events: T[]): T[] {
     const seen = new Set<string>();
     const out: T[] = [];
     for (const event of events) {
