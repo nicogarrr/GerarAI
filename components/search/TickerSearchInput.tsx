@@ -31,9 +31,12 @@ interface TickerSearchInputProps {
     onBlur?: () => void;
     /** Dirección fija del desplegable. Con 'bottom' la lista abre SIEMPRE
      *  hacia abajo (Nico, 21-oct-2026: la vio abrirse hacia arriba con el
-     *  teclado del iPhone) y se limita a 40dvh para quedar dentro del
-     *  visual viewport con su propio scroll. Sin la prop: comportamiento
-     *  automático de Radix (colisiones y volteo) como antes. */
+     *  teclado del iPhone), se centra el input en el visual viewport al
+     *  enfocar y la altura se mide contra el espacio real bajo el input
+     *  (visualViewport, con teclado), no solo con un tope fijo: la lista
+     *  nunca queda bajo el teclado ni fuera de pantalla, con scroll propio.
+     *  Sin la prop: comportamiento automático de Radix (colisiones y
+     *  volteo) como antes. */
     dropdownSide?: 'bottom';
 }
 
@@ -59,6 +62,17 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
     const [error, setError] = useState(false);
     const searchGateRef = useRef(createLatestRequestGate());
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Altura medida contra el visual viewport (solo con dropdownSide):
+    // espacio real bajo el input, acotado entre 6 y 15 rem.
+    const [listMaxHeight, setListMaxHeight] = useState<number | null>(null);
+    const measureBelowInput = useCallback(() => {
+        if (!root.current || typeof window === 'undefined') return;
+        const vv = window.visualViewport;
+        const rect = root.current.getBoundingClientRect();
+        const viewportBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+        const spaceBelow = viewportBottom - rect.bottom - 8;
+        setListMaxHeight(Math.max(96, Math.min(240, Math.floor(spaceBelow))));
+    }, []);
 
     const runSearch = useCallback(async (query: string) => {
         const ticket = searchGateRef.current.begin();
@@ -75,6 +89,7 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
             } else {
                 setError(false);
                 setResults(result.stocks.slice(0, 8));
+                if (dropdownSide) measureBelowInput();
                 setOpen(focused.current);
                 setActive(-1);
             }
@@ -86,7 +101,7 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
         } finally {
             if (searchGateRef.current.isLatest(ticket)) setLoading(false);
         }
-    }, [options]);
+    }, [options, dropdownSide, measureBelowInput]);
 
     useEffect(() => {
         // La query cambió: invalida YA cualquier búsqueda en vuelo. No esperar
@@ -146,7 +161,16 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                 aria-expanded={open && results.length > 0}
                 aria-controls={listId}
                 aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined}
-                onFocus={() => { focused.current = true; if (value.trim() && selected.current !== value) void runSearch(value.trim()); }}
+                onFocus={() => {
+                focused.current = true;
+                if (dropdownSide) {
+                    // Que haya hueco bajo el input: con el teclado abriéndose,
+                    // centrar en el visual viewport antes de medir.
+                    root.current?.scrollIntoView({ block: 'center' });
+                    measureBelowInput();
+                }
+                if (value.trim() && selected.current !== value) void runSearch(value.trim());
+            }}
                 onChange={(event) => {
                     searchGateRef.current.invalidate();
                     selected.current = null;
@@ -184,9 +208,10 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
             </div></PopoverAnchor>
                 <PopoverContent align="start" side={dropdownSide} avoidCollisions={dropdownSide === undefined} onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => event.preventDefault()} onInteractOutside={(event) => { if (event.target instanceof Node && root.current?.contains(event.target)) event.preventDefault(); }} className="z-[80] w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] border-gray-700 bg-gray-800 p-0 shadow-lg">
                 {/* Con dirección forzada no hay var de espacio disponible de
-                    Radix (sin colisiones): tope fijo 15rem y 40dvh para no
-                    salirse del visual viewport con el teclado abierto. */}
-                <div id={listId} role="listbox" aria-label="Empresas" className={`${dropdownSide ? 'max-h-[min(15rem,40dvh)]' : 'max-h-[min(15rem,var(--radix-popover-content-available-height))]'} w-full overscroll-contain overflow-auto rounded-md`}>
+                    Radix (sin colisiones): tope de clase 15rem/40dvh y, si se
+                    pudo medir, la altura real bajo el input (visual viewport
+                    con teclado). La lista lleva su propio scroll. */}
+                <div id={listId} role="listbox" aria-label="Empresas" style={dropdownSide && listMaxHeight ? { maxHeight: listMaxHeight } : undefined} className={`${dropdownSide ? 'max-h-[min(15rem,40dvh)]' : 'max-h-[min(15rem,var(--radix-popover-content-available-height))]'} w-full overscroll-contain overflow-auto rounded-md`}>
                     {results.map((stock, index) => (
                         <button
                             key={`${stock.symbol}-${index}`}

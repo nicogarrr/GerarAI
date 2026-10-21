@@ -89,6 +89,14 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(search, /side=\{dropdownSide\}/);
         assert.match(search, /avoidCollisions=\{dropdownSide === undefined\}/);
         assert.match(search, /max-h-\[min\(15rem,40dvh\)\]/);
+        // El tope fijo no basta: con el teclado abierto la lista puede quedar
+        // bajo él. Se centra el input en el visual viewport al enfocar y la
+        // altura se mide contra el espacio real bajo el input (visualViewport),
+        // acotada entre 96 y 240 px, con scroll propio en la lista.
+        assert.match(search, /scrollIntoView\(\{ block: 'center' \}\)/);
+        assert.match(search, /window\.visualViewport/);
+        assert.match(search, /Math\.max\(96, Math\.min\(240, Math\.floor\(spaceBelow\)\)\)/);
+        assert.match(search, /style=\{dropdownSide && listMaxHeight/);
     });
 
     it('la identidad del contrato de opción sigue manual y etiquetada (sin cadena fabricada)', () => {
