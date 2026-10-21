@@ -239,6 +239,22 @@ class ThesisEvidenceService:
         db.flush()
         return bundle
 
+    def collect_stored(self, db: Session, company: Company) -> dict[str, Any]:
+        """Bloques de evidencia que SOLO leen la base (sin red, sin escritura).
+
+        La generacion de empresas seguidas (stored_evidence_only) no recolecta
+        por red, pero noticias, transcripciones y tesis externas ya estan en la
+        base: omitirlas dejaba la tesis sin noticias aunque existieran.
+        """
+        return {
+            "ticker": company.ticker.upper(),
+            "sources": {
+                "news": self._collect_news(db, company),
+                "transcript": self._collect_transcript(db, company),
+                "external_theses": self._collect_external_theses(db, company),
+            },
+        }
+
     # -- 1. fundamentales SEC -------------------------------------------------
     def _ingest_fundamentals(
         self, db: Session, company: Company, cik: str | None
