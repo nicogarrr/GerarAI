@@ -285,7 +285,16 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
         # que declara la indisponibilidad del análisis automático SIN
         # diagnosticar la causa (el copy nunca afirma cuota/auth: 429 no es
         # el único origen posible y el status es diagnóstico interno, en log).
-        logger.warning("Narrativa de noticias: %s; compendio factual", exc)
+        # Log con whitelist tipada, JAMAS str(exc) genérico: un mensaje de
+        # proveedor podría volcar URL/token/body/contenido de la fuente.
+        if isinstance(exc, ProviderHTTPError):
+            detalle = f"HTTP {exc.status_code}"
+        elif isinstance(exc, ProviderTransportError):
+            detalle = f"transport {exc.reason} attempts={exc.attempts}"
+        else:
+            detalle = "disabled"
+        logger.warning("Narrativa de noticias: %s %s; compendio factual",
+                       type(exc).__name__, detalle)
         return compendio_factual(list(news_items or []), now or datetime.now(UTC))
     except Exception as exc:  # noqa: BLE001 - upstream inestable nunca rompe la tesis
         # Salida LLM rechazada (cifras inventadas, URLs, JSON inválido,
