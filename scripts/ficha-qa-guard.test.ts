@@ -23,6 +23,16 @@ describe('QA ficha: tesis en borrador sin callejon sin salida (4)', () => {
         assert.ok(tesis.includes('EmptyLink'), 'usa EmptyLink');
         assert.ok(tesis.includes('?view=thesis`}>Revisar la v'), 'accion al borrador en la ficha');
     });
+    it('una version datos insuficientes se lee como PROVISIONAL rotulada, nunca vacia (Nico HYMC, 2026-10-21)', () => {
+        assert.ok(tesis.includes("latest.status === 'insufficient_data'"), 'rama provisional solo para datos insuficientes (sin cifras por construccion)');
+        assert.ok(tesis.includes('PROVISIONAL — no publicada'), 'badge provisional explicito');
+        assert.ok(tesis.includes('/pdf?draft=1'), 'PDF del borrador por la ruta draft existente (lista blanca backend, sin cifras)');
+        assert.ok(tesis.includes('Sin cifras de valoración en esta vista'), 'declara la ausencia de valoracion con causa, sin tabla de escenarios');
+        // Rechazada/sustituida/obsoleta/borrador CON cifras: caen al estado
+        // vacio honesto con salida a la ficha; nunca se presentan como
+        // provisional valida.
+        assert.ok(tesis.indexOf("latest.status === 'insufficient_data'") < tesis.indexOf('!published ? ('), 'el resto de estados sigue al estado vacio');
+    });
     it('los botones de exportacion se ocultan sin version publicada (eran un 404)', () => {
         assert.ok(tesis.includes('{published ? ('), 'exportacion condicionada a publicada');
     });
