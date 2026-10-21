@@ -197,6 +197,29 @@ def test_card_summary_insufficient_data_es_honesto():
     assert "NOT PUBLISHABLE" not in text
 
 
+def test_card_summary_insufficient_excluye_presente_excluido():
+    """Matiz auditor: la tarjeta no pide como ausente un dato presente-excluido
+    por periodo; lo explica aparte. Gating intacto (missing_inputs no cambia)."""
+    service = ThesisService()
+    valuation = {
+        "status": "insufficient_data",
+        "missing_inputs": ["revenue", "shares_diluted", "wacc"],
+        "excluded_inputs": [
+            {"metric": "shares_diluted", "period": "2025-12-31:FY", "reason": "period_mismatch"}
+        ],
+        "trace": {"engine": "dcf_v2"},
+    }
+    text = service._card_summary(_company(), valuation, "hipotesis")
+    assert "no publicable todavía" in text
+    assert "Ingresos, wacc" in text
+    assert "faltan Ingresos, shares diluted" not in text
+    assert "ya los tenemos" in text
+    assert "desalineación de periodos" in text
+    assert "shares" in text  # explicado como presente-excluido, no pedido
+    # gating: missing_inputs sigue bloqueando internamente
+    assert valuation["missing_inputs"] == ["revenue", "shares_diluted", "wacc"]
+
+
 def test_card_summary_partial_es_indicativo():
     service = ThesisService()
     valuation = {"status": "partial", "missing_inputs": ["beta"], "trace": {"engine": "dcf_v2"}}

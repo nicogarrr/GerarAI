@@ -446,6 +446,43 @@ class FinancialSnapshotBuilder:
         if not has_margin and not has_fcf:
             missing.append("normalized_fcf_or_fcf_margin")
 
+        # Presente pero NO utilizable (explicacion al usuario, nunca gating):
+        # - revenue con hecho persistido (el ancla) cuyo valor no alimenta el
+        #   modelo (p. ej. 0 reportado): no es un dato ausente, pedirlo seria
+        #   falso.
+        # - net_debt derivable solo de componentes excluidos por periodo: se
+        #   explica como presente-excluido derivado, no como ausente.
+        if "revenue" in missing and anchor is not None:
+            snapshot.excluded_present.append(
+                {
+                    "metric": "revenue",
+                    "available_period": anchor.period,
+                    "anchor_period": anchor.period,
+                    "reason": "present_not_usable",
+                    "detail": "ingresos reportados 0 en el periodo ancla",
+                }
+            )
+        if "net_debt" in missing:
+            excluded_metrics = {
+                str(item.get("metric")) for item in snapshot.excluded_present
+            }
+            if {"total_debt", "cash_and_equivalents"} <= excluded_metrics:
+                periods = sorted(
+                    str(item.get("available_period"))
+                    for item in snapshot.excluded_present
+                    if item.get("metric") in ("total_debt", "cash_and_equivalents")
+                )
+                snapshot.excluded_present.append(
+                    {
+                        "metric": "net_debt",
+                        "available_period": periods[-1] if periods else None,
+                        "anchor_period": anchor.period,
+                        "reason": "components_excluded",
+                        "detail": "se deriva de deuda total y efectivo presentes "
+                        "fuera del periodo ancla",
+                    }
+                )
+
         snapshot.missing_inputs = missing
         snapshot.coherent = not missing
         return snapshot

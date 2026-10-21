@@ -321,6 +321,26 @@ def _notice_es(trace: dict) -> str:
     return ""
 
 
+def _excluded_reason_es(item: dict) -> str:
+    """Frase honesta por razon de exclusion (presente-excluido, nunca gating)."""
+    metric_es = term_es(str(item.get("metric")))
+    reason = item.get("reason")
+    available = item.get("available_period") or "periodo desconocido"
+    anchor_p = item.get("anchor_period") or "desconocida"
+    if reason == "present_not_usable":
+        detail = item.get("detail") or "el valor reportado no alimenta una valoración calculable"
+        return f"{metric_es}: {detail} ({available})"
+    if reason == "components_excluded":
+        return (
+            f"{metric_es}: se deriva de deuda total y efectivo que tenemos fuera "
+            f"del periodo ancla ({available})"
+        )
+    return (
+        f"{metric_es}: disponible de {available}; el ancla de ingresos es "
+        f"{anchor_p} y un DCF no mezcla ejercicios distintos"
+    )
+
+
 class ThesisService:
     def __init__(self) -> None:
         self.valuation_service = ValuationService()
@@ -1090,15 +1110,40 @@ class ThesisService:
         ingeridas no se anade nada.
         """
         base: str
+        # Presente-excluido (tenemos el dato, fuera de periodo del ancla) NO se
+        # lista como ausente en la tarjeta: pedirlo al usuario seria falso.
+        # Sigue bloqueando la valoracion (gating intacto en missing_inputs);
+        # aqui solo se explica aparte, igual que en la seccion 21 del memo.
+        excluded_items = [
+            item
+            for item in (valuation.get("excluded_inputs") or [])
+            if isinstance(item, dict) and item.get("metric")
+        ]
+        excluded_keys = {str(item.get("metric")) for item in excluded_items}
+        excluded_note = ""
+        if excluded_items:
+            excluded_note = (
+                " Otros datos ya los tenemos: "
+                + "; ".join(
+                    _excluded_reason_es(item)
+                    for item in sorted(excluded_items, key=lambda i: str(i.get("metric")))
+                )
+                + ". No hace falta aportarlos."
+            )
         if valuation.get("status") == "insufficient_data":
-            missing = ", ".join(term_es(k) for k in (valuation.get("missing_inputs") or [])) or "datos financieros basicos"
+            missing = ", ".join(
+                term_es(k) for k in (valuation.get("missing_inputs") or []) if k not in excluded_keys
+            ) or "datos financieros basicos"
             base = (
                 f"Tesis de {company.ticker} no publicable todavía: faltan {missing}. "
                 "Ningún valor justo debe considerarse fiable hasta completar las fuentes."
+                f"{excluded_note}"
             )
         elif valuation.get("status") == "partial":
-            missing = ", ".join(term_es(k) for k in (valuation.get("missing_inputs") or [])) or "algunos inputs"
-            base = f"{hypothesis} Faltan {missing} (ver sección 13 del memo)."
+            missing = ", ".join(
+                term_es(k) for k in (valuation.get("missing_inputs") or []) if k not in excluded_keys
+            ) or "algunos inputs"
+            base = f"{hypothesis} Faltan {missing} (ver sección 13 del memo).{excluded_note}"
         else:
             base = hypothesis
 
@@ -1642,15 +1687,13 @@ class ThesisService:
             if lines:
                 lines.append("")
             lines.append(
-                "Datos que YA tenemos pero no alimentan la valoración por "
-                "desalineación de periodos (no hace falta aportarlos):"
+                "Datos que YA tenemos aunque no alimentan la valoración "
+                "(no hace falta aportarlos):"
             )
             for item in sorted(excluded, key=lambda i: str(i.get("metric"))):
                 lines.append(
                     f"- `{item['metric']}` ({term_es(str(item['metric']))}): "
-                    f"disponible de {item.get('available_period') or 'periodo desconocido'}; "
-                    f"el ancla de ingresos es {item.get('anchor_period') or 'desconocida'} "
-                    "y un DCF no mezcla ejercicios distintos."
+                    f"{_excluded_reason_es(item)}."
                 )
         pending_sources = [
             (name, block.get("source"), block.get("detail"))

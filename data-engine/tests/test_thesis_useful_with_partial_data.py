@@ -200,6 +200,40 @@ def test_snapshot_three_year_history_resolves_shares_and_net_debt(db):
     assert "net_debt" not in snapshot.missing_inputs
 
 
+def test_zero_revenue_anchor_is_explained_not_requested(db):
+    """HYMC real: ingresos FY2023 = 0 persistidos. El 0 no alimenta el DCF
+    (sigue bloqueando: revenue en missing_inputs), pero el dato EXISTE:
+    pedirlo al usuario como ausente seria falso -> excluded_present con
+    reason present_not_usable."""
+    company = _company(db)
+    _fact(db, company, "revenue", 0, "2023-12-31:FY", 2023)
+    _fact(db, company, "shares_diluted", 43_260_501, "2025-12-31:FY", 2025)
+    snapshot = FinancialSnapshotBuilder().build(db, company)
+    assert "revenue" in snapshot.missing_inputs  # gating intacto
+    assert snapshot.coherent is False
+    excluded = {item["metric"]: item for item in snapshot.excluded_present}
+    assert excluded["revenue"]["reason"] == "present_not_usable"
+    assert excluded["revenue"]["available_period"] == "2023-12-31:FY"
+
+
+def test_net_debt_with_excluded_components_is_explained_not_requested(db):
+    """net_debt solo se deriva de componentes del periodo ancla. Si deuda y
+    efectivo existen pero estan excluidos por periodo, net_debt sigue
+    bloqueando (missing) pero se explica como presente-excluido derivado,
+    no se pide como dato ausente."""
+    company = _company(db)
+    _fact(db, company, "revenue", 0, "2023-12-31:FY", 2023)
+    _fact(db, company, "shares_diluted", 43_260_501, "2025-12-31:FY", 2025)
+    _fact(db, company, "total_debt", 0, "2025-12-31:FY", 2025)
+    _fact(db, company, "cash_and_equivalents", 181_740_000, "2025-12-31:FY", 2025)
+    snapshot = FinancialSnapshotBuilder().build(db, company)
+    assert "net_debt" in snapshot.missing_inputs  # gating intacto
+    assert snapshot.coherent is False
+    excluded = {item["metric"]: item for item in snapshot.excluded_present}
+    assert excluded["net_debt"]["reason"] == "components_excluded"
+    assert excluded["net_debt"]["available_period"] == "2025-12-31:FY"
+
+
 # -- compendio factual sin LLM -------------------------------------------------
 
 def test_compendio_factual_lists_real_headlines_and_disclaims_analysis():
