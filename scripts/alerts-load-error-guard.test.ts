@@ -21,3 +21,25 @@ test('crear, borrar y revisar conservan showErrorToast con reintento', () => {
     assert.ok(mutations.length >= 3, `esperados >=3 toasts de mutación, hay ${mutations.length}`);
     assert.match(source, /duplicateMessage: 'Ya tienes esta alerta configurada.'/);
 });
+
+test('la carga distingue causa probada en servidor, sin inventarla', () => {
+    const actions = readFileSync('lib/actions/alerts.actions.ts', 'utf8');
+    assert.match(actions, /getUserAlertsResult/);
+    // session SOLO desde AuthenticationError local (code AUTH_ERROR), nunca
+    // desde un statusCode 401: un 401 del backend no prueba sesión caducada.
+    assert.match(actions, /error\.code === 'AUTH_ERROR'\) cause = 'session'/);
+    assert.doesNotMatch(actions, /statusCode === 401/);
+    assert.match(actions, /statusCode === 403\) cause = 'forbidden'/);
+    assert.match(actions, /statusCode === 429\) cause = 'rate'/);
+    assert.match(actions, /statusCode >= 500\) cause = 'offline'/);
+    assert.match(source, /getUserAlertsResult\(\)/);
+    assert.match(source, /alertsLoadErrorSession/);
+    assert.match(source, /alertsLoadErrorForbidden/);
+    assert.match(source, /alertsLoadErrorRate/);
+    // El enlace de re-login solo se ofrece con causa session probada.
+    assert.match(source, /cause === 'session' \? \(/);
+    assert.match(source, /Iniciar sesión/);
+    assert.doesNotMatch(source, /alertsLoadErrorAuth/);
+    // La vista ya no consume la variante que lanza sin causa.
+    assert.doesNotMatch(source, /getUserAlerts\(\)/);
+});
