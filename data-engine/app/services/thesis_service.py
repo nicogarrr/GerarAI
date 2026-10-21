@@ -596,6 +596,19 @@ class ThesisService:
                 evidence = ThesisEvidenceService().collect(db, company) or {}
         except Exception:
             evidence = {}
+        if stored_evidence_only:
+            # Empresas seguidas: sin red, pero las noticias/transcripciones/tesis
+            # externas ya guardadas SI cuentan (antes se omitian y la tesis salia
+            # sin noticias aunque estuvieran en la base).
+            try:
+                from app.services.thesis_evidence_service import ThesisEvidenceService
+
+                stored = ThesisEvidenceService().collect_stored(db, company)
+                sources = evidence.setdefault("sources", {})
+                for key, block in (stored.get("sources") or {}).items():
+                    sources.setdefault(key, block)
+            except Exception:
+                pass
 
         _phase("build_fundamental_model")
         long_term_model = LongTermModelService().build(
