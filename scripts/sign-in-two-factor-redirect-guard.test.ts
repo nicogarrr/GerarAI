@@ -73,8 +73,12 @@ describe('orden de plugins de better-auth', () => {
         const si = await auth.api.signInEmail({ body: { email: 'a@b.co', password: 'password123' }, asResponse: true });
         const cookie = si.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
         const en = await auth.api.enableTwoFactor({ body: { password: 'password123' }, headers: new Headers({ cookie }) });
+        // enableTwoFactor devuelve una union (TOTP u OTP): sin totpURI no hay secreto que probar.
+        assert.ok('totpURI' in en && typeof en.totpURI === 'string', 'enableTwoFactor debe devolver totpURI');
+        const secret = new URL(en.totpURI).searchParams.get('secret');
+        assert.ok(secret, 'totpURI debe llevar secret');
         await auth.api.verifyTOTP({
-            body: { code: totp(new URL(en.totpURI).searchParams.get('secret') as string) },
+            body: { code: totp(secret) },
             headers: new Headers({ cookie }),
         });
         sets.length = 0;
