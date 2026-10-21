@@ -194,6 +194,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/security/TwoFactorSettings.tsx': 'useState, browser:navigator, jsx-onSubmit, jsx-onClick, libreria cliente: sonner, libreria cliente: react-hook-form',
   'components/settings/TaxDeclarantForm.tsx': 'useState, jsx-onSubmit, jsx-onChange, libreria cliente: sonner',
   'components/system/BackendOfflineAutoRetry.tsx': 'useRouter, useState, useEffect',
+  // Estado de error en línea compartido: botón Reintentar con onClick.
+  'components/system/SectionLoadError.tsx': 'jsx-onClick',
   'components/taxes/FilingSections.tsx': 'browser:document, jsx-onPreview, jsx-onReset, useState, jsx-onClick, importa cliente: components/data/RecordViews.tsx, importa cliente: components/taxes/TmePreviewForm.tsx',
   'components/taxes/TaxesView.tsx': 'browser:document, useRouter, useState, useEffect, jsx-onChange, jsx-onClick, jsx-onPreview, jsx-onReset, libreria cliente: sonner, importa cliente: components/data/RecordViews.tsx, importa cliente: components/taxes/FilingSections.tsx',
   'components/taxes/TmePreviewForm.tsx': 'useState, jsx-onSubmit, jsx-onChange, jsx-onClick',
