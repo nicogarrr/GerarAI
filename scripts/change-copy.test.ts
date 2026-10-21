@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error TS5097: ejecución directa con Node.
 import { changeSummaryText } from '../lib/research/change-copy.ts';
+import { readFileSync } from 'node:fs';
 
 test('traduce el impacto antiguo incluso después del titular', () => {
   assert.equal(changeSummaryText('Noticia. Affects 0 claims and thesis nodes: Funding, Regulatory.'), 'Noticia. Afecta a 0 afirmaciones y a estos apartados de la tesis: Financiación, Regulación.');
@@ -29,4 +30,12 @@ test('la forma nueva del backend (0 afirmaciones) también traduce las etiquetas
     changeSummaryText('Noticia. No afecta a ninguna afirmación concreta; toca estos apartados de la tesis: Technology, Funding.'),
     'Noticia. No afecta a ninguna afirmación concreta; toca estos apartados de la tesis: Tecnología, Financiación.',
   );
+});
+
+test('el banner «Desde tu última visita» aplica la misma reescritura de copy que la tarjeta', () => {
+  // El banner renderiza resúmenes persistidos (pueden ser anteriores al copy
+  // honesto): sin esta reescritura mostraba «Afecta a 0 afirmaciones y nodos»
+  // mientras la tarjeta «Últimos cambios» ya decía la forma honesta.
+  const banner = readFileSync(new URL('../components/research/ChangesSinceVisit.tsx', import.meta.url), 'utf8');
+  assert.match(banner, /changeSummaryText\(change\.resumen\)/);
 });
