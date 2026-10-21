@@ -1,7 +1,7 @@
 "use client"
 
 import { formatCompanyName } from '@/lib/format';
-import { useEffect, useState, useCallback, useMemo, useRef } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef, useId, useSyncExternalStore } from "react"
 import { useRouter } from "next/navigation"
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { CornerDownLeft, Loader2, Search, Terminal, TrendingUp } from "lucide-react";
@@ -10,12 +10,19 @@ import { loadPopularStocks } from "@/lib/popular-stocks-loader";
 import { isNextRedirectError } from "@/lib/types/errors";
 import { flattenNavItems, ROUTE_CATALOG } from "@/lib/constants";
 import { navItemMatchesSearch, navSectionMatchesSearch } from "@/lib/search/nav-search";
+import {
+    subscribeSearchCommand,
+    getSearchCommandSnapshot,
+    registerSearchCommandInstance,
+    ensureSearchCommandShortcutListener,
+    openSearchCommand,
+    closeSearchCommand,
+} from "@/lib/search/search-command-store";
 import { parseTickerCommand } from "@/lib/research/ticker-commands";
 import { etiquetaTipoInstrumento } from "@/lib/labels";
 
 export default function SearchCommand({ renderAs = 'button', label = 'Añadir acción', initialStocks }: SearchCommandProps) {
     const router = useRouter()
-    const [open, setOpen] = useState(false)
     const [searchTerm, setSearchTerm] = useState("")
     const [loading, setLoading] = useState(false)
     const [searchError, setSearchError] = useState(false)
@@ -34,11 +41,34 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
 
     const triggerRef = useRef<HTMLButtonElement | null>(null);
     const returnFocusRef = useRef<HTMLElement | null>(null);
-    const openSearch = () => {
-        returnFocusRef.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-            ? document.activeElement : triggerRef.current;
-        setOpen(true);
-    };
+
+    // Owner único (lib/search/search-command-store): el estado open/ownerId
+    // es compartido; solo la instancia dueña monta el CommandDialog, así que
+    // Ctrl+K ya no abre varios diálogos apilados (desktop + icono + drawer).
+    const instanceId = useId();
+    const { open: storeOpen, ownerId } = useSyncExternalStore(
+        subscribeSearchCommand,
+        getSearchCommandSnapshot,
+        getSearchCommandSnapshot,
+    );
+    const isDialogOpen = storeOpen && ownerId === instanceId;
+
+    useEffect(() => {
+        ensureSearchCommandShortcutListener();
+        return registerSearchCommandInstance({
+            id: instanceId,
+            isTriggerVisible: () => {
+                const el = triggerRef.current;
+                return !!el && el.getClientRects().length > 0;
+            },
+            captureReturnFocus: () => {
+                returnFocusRef.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+                    ? document.activeElement : triggerRef.current;
+            },
+        });
+    }, [instanceId]);
+
+    const openSearch = () => openSearchCommand(instanceId);
 
     const isSearchMode = !!searchTerm.trim();
 
@@ -55,32 +85,6 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
     const exactCommand = commandQuery?.exact
         ? { ticker: commandQuery.ticker, command: commandQuery.exact }
         : null;
-
-    // Atajos: Ctrl/Cmd+K y "/". "/" solo cuando el foco no esta en un campo de
-    // texto, para no secuestrar la escritura.
-    useEffect(() => {
-        const onKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-                e.preventDefault()
-                if (!document.querySelector('[data-slot="dialog-content"]')) {
-                    returnFocusRef.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-                        ? document.activeElement : triggerRef.current;
-                }
-                setOpen(v => !v)
-                return
-            }
-            if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
-                const target = e.target as HTMLElement | null
-                const tag = target?.tagName
-                if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
-                e.preventDefault()
-                returnFocusRef.current = target && target !== document.body ? target : triggerRef.current;
-                setOpen(true)
-            }
-        }
-        window.addEventListener("keydown", onKeyDown)
-        return () => window.removeEventListener("keydown", onKeyDown)
-    }, [])
 
     useEffect(() => {
         setMounted(true);
@@ -183,7 +187,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
 
     // Limpiar cuando se cierra el diálogo
     useEffect(() => {
-        if (!open) {
+        if (!isDialogOpen) {
             setSearchTerm("");
             setStocks(popular);
             setSearchError(false);
@@ -227,10 +231,10 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
         // popular/searchTerm leidos del cierre actual: popular.length ya esta
         // en deps; searchTerm fresco solo decide si volcar la lista cargada.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, popular.length]);
+    }, [isDialogOpen, popular.length]);
 
     const go = useCallback((href: string) => {
-        setOpen(false);
+        closeSearchCommand();
         setSearchTerm("");
         router.push(href);
     }, [router]);
@@ -312,10 +316,11 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     </kbd>
                 </button>
             )}
+            {ownerId === instanceId && (
             <CommandDialog
-                open={open}
+                open={isDialogOpen}
                 commandProps={{shouldFilter:false, value:selectedValue || (exactCommand ? `cmd:${exactCommand.command.code}` : displayStocks[0] ? `stock:${displayStocks[0].symbol}` : undefined), onValueChange:setSelectedValue}}
-                onOpenChange={setOpen}
+                onOpenChange={(nextOpen) => { if (!nextOpen) closeSearchCommand(); }}
                 onCloseAutoFocus={(event) => {
                     event.preventDefault();
                     const target = returnFocusRef.current?.isConnected ? returnFocusRef.current : triggerRef.current;
@@ -443,6 +448,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     )}
                 </CommandList>
             </CommandDialog>
+            )}
         </>
     )
 }
