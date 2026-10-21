@@ -27,6 +27,8 @@ void test('tipos de instrumento del buscador en español (F174)', () => {
     assert.equal(etiquetaTipoInstrumento('Common Stock'), 'Acción ordinaria');
     assert.equal(etiquetaTipoInstrumento('Canadian DR'), 'Recibo de depósito canadiense');
     assert.equal(etiquetaTipoInstrumento('Otro tipo'), 'Otro tipo');
+    // OpenFIGI securityType sin significado de clase de activo: literal, sin traducción inferida.
+    assert.equal(etiquetaTipoInstrumento('PUBLIC'), 'PUBLIC');
 });
 
 void test('los ocho tiers del catálogo backend tienen etiqueta (F175)', () => {
