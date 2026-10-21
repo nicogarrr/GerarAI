@@ -262,6 +262,20 @@ def test_card_summary_revenue_cero_no_se_pide_pero_invita_evidencia():
     assert valuation["missing_inputs"] == ["revenue", "wacc"]  # gating intacto
 
 
+def test_term_es_cubre_claves_dcf_inverso_sin_crudas():
+    """Las claves missing del DCF inverso tienen traducción: la tarjeta nunca
+    muestra la clave técnica con guiones bajos."""
+    from app.services.memo_text_es import term_es
+    for key, esperado in (
+        ("maintenance_capex", "capex de mantenimiento"),
+        ("normalized_working_capital", "capital de trabajo normalizado"),
+        ("m_and_a_purchase_price_and_post_deal_returns",
+         "precio de compra de M&A y retornos post-operación"),
+    ):
+        assert term_es(key) == esperado
+        assert "_" not in term_es(key)
+
+
 def test_card_summary_une_missing_del_modelo_y_los_nombra():
     """Caso real HYMC v4: valuation solo echa de menos revenue (excluido 0) y
     el modelo de largo plazo echa de menos margen FCF y WACC. La tarjeta debe

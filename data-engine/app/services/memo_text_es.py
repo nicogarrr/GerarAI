@@ -33,6 +33,13 @@ TERMS_ES: dict[str, str] = {
     "capex_to_revenue": "Capex sobre ingresos",
     "effective_tax_rate": "Tipo impositivo efectivo",
     "traceable_wacc": "WACC trazable",
+    # Claves del DCF inverso (long_term_model_service): sin ellas la tarjeta
+    # mostraria la clave cruda con guiones bajos.
+    "maintenance_capex": "capex de mantenimiento",
+    "normalized_working_capital": "capital de trabajo normalizado",
+    "m_and_a_purchase_price_and_post_deal_returns": (
+        "precio de compra de M&A y retornos post-operación"
+    ),
     "wacc": "WACC",
     "terminal_growth": "Crecimiento terminal",
     "revenue_growth": "Crecimiento de ingresos",
