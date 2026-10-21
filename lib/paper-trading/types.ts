@@ -61,6 +61,12 @@ export interface Fill {
     executedAt: number;
     source: 'manual-simulado';
     clientOrderId: string;
+    /**
+     * Desempate ESTABLE para fills con el mismo executedAt: el servidor lo
+     * rellena con el createdAt (ms) de la fila persistida. Nunca se usa el
+     * orden del array para desempatar (N-auditoría).
+     */
+    tiebreak?: number;
 }
 
 /** Conversión manual simulada entre saldos (EUR<->USD). from != to SIEMPRE:
