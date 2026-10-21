@@ -28,6 +28,12 @@ export default function CompanyActionsMenu({ ticker, changeCount }: { ticker: st
                     <Link className={ITEM} href={`/research/${t}?view=changes`}>
                         Qué ha cambiado{changeCount ? ` (${changeCount})` : ''}
                     </Link>
+                    <p className="mt-1 border-t border-gray-700/60 px-0 pb-0.5 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Análisis profundo</p>
+                    <Link className={ITEM} href={`/research/${t}/financial-terminal`}>Terminal financiero</Link>
+                    <Link className={ITEM} href={`/research/${t}/driver-assumptions`}>Supuestos de drivers</Link>
+                    <Link className={ITEM} href={`/research/${t}/decision-lessons`}>Lecciones de decisiones</Link>
+                    <Link className={ITEM} href={`/research/${t}/management-credibility`}>Credibilidad de la directiva</Link>
+                    <p className="mt-1 border-t border-gray-700/60 px-0 pb-0.5 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Señales externas</p>
                     <Link className={ITEM} href={`/research/${t}/shorts`}>Cortos públicos</Link>
                     <Link className={ITEM} href={`/research/news?ticker=${t}`}>Noticias</Link>
                     <Link className={ITEM} href={`/insider?ticker=${t}`}>Insiders</Link>
