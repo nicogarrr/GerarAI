@@ -19,6 +19,7 @@ import {
     closeSearchCommand,
 } from "@/lib/search/search-command-store";
 import { parseTickerCommand } from "@/lib/research/ticker-commands";
+import { hashFromHref, scrollToHashAnchor } from "@/lib/search/scroll-to-hash";
 import { etiquetaTipoInstrumento } from "@/lib/labels";
 
 export default function SearchCommand({ renderAs = 'button', label = 'Añadir acción', initialStocks }: SearchCommandProps) {
@@ -237,6 +238,11 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
         closeSearchCommand();
         setSearchTerm("");
         router.push(href);
+        // El App Router no desplaza al ancla en navegaciones a la MISMA ruta
+        // (bug 22-oct-2026: «MSFT GP» fijaba #grafico sin mover la vista);
+        // scroll propio con reintentos cortos (lib/search/scroll-to-hash).
+        const hash = hashFromHref(href);
+        if (hash) scrollToHashAnchor(hash);
     }, [router]);
 
     const handleSelectStock = useCallback((symbol: string) => {
