@@ -159,7 +159,7 @@ export default function PortfolioTransactions({ transactions, userId }: Props) {
         open={confirmId !== null}
         onOpenChange={(next) => { if (!next) setConfirmId(null); }}
         title="Eliminar transacción"
-        description="¿Estás seguro de eliminar esta transacción? Esta acción no se puede deshacer."
+        description="¿Estás seguro de eliminar esta transacción?"
         onConfirm={() => { if (confirmId) handleDelete(confirmId); }}
       />
     </Card>
