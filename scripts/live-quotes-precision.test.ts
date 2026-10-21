@@ -203,3 +203,36 @@ test('referencia: sin zona horaria del mercado o sin hora de cotizacion => N/D',
     assert.ok(sinHora);
     assert.equal(sinHora.change, null);
 });
+
+test('referencia postmercado: contra el cierre regular de HOY probado por barra, nunca el de ayer', () => {
+    const spec = { symbol: 'BBVA.MC', name: 'BBVA', kind: 'accion' as const, unit: 'EUR' as const, decimals: 2 };
+    const ayer = Date.UTC(2026, 9, 20, 7, 0) / 1000;
+    const hoy = Date.UTC(2026, 9, 21, 7, 0) / 1000;
+    const postTime = Date.UTC(2026, 9, 21, 17, 30) / 1000; // hoy, tras el cierre regular
+    const quote = parseYahooQuote(spec, {
+        regularMarketPrice: 103,
+        regularMarketTime: Date.UTC(2026, 9, 21, 15, 30) / 1000,
+        postMarketPrice: 104,
+        postMarketTime: postTime,
+        exchangeTimezoneName: 'Europe/Madrid',
+    }, { timestamps: [ayer, hoy], closes: [100, 103] });
+    assert.ok(quote);
+    assert.equal(quote.session, 'post');
+    // 104 vs cierre regular de hoy (103) => +1; NO +4 contra ayer.
+    assert.equal(quote.change, 1);
+});
+
+test('referencia postmercado sin barra de hoy => N/D, sin fallback al cierre de ayer', () => {
+    const spec = { symbol: 'BBVA.MC', name: 'BBVA', kind: 'accion' as const, unit: 'EUR' as const, decimals: 2 };
+    const ayer = Date.UTC(2026, 9, 20, 7, 0) / 1000;
+    const postTime = Date.UTC(2026, 9, 21, 17, 30) / 1000;
+    const quote = parseYahooQuote(spec, {
+        postMarketPrice: 104,
+        postMarketTime: postTime,
+        exchangeTimezoneName: 'Europe/Madrid',
+    }, { timestamps: [ayer], closes: [100] });
+    assert.ok(quote);
+    assert.equal(quote.session, 'post');
+    assert.equal(quote.change, null);
+    assert.equal(quote.changePercent, null);
+});

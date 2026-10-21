@@ -127,7 +127,12 @@ export function parseYahooQuote(spec: LiveQuoteSpec, meta: YahooChartMeta | null
     // previousClose/chartPreviousClose del meta son poco fiables (21-oct-2026,
     // ^GSPC: chartPreviousClose 7690,73 vs cierre real del dia anterior
     // 7712,57). Sin referencia demostrable => cambio N/D, nunca inventado.
-    const prevClose = referenceCloseFromBars(bars, best.time, meta.exchangeTimezoneName ?? null);
+    const timezone = typeof meta.exchangeTimezoneName === 'string' && meta.exchangeTimezoneName.trim()
+        ? meta.exchangeTimezoneName.trim()
+        : null;
+    const prevClose = best.session === 'post'
+        ? postReferenceCloseFromBars(bars, best.time, timezone)
+        : referenceCloseFromBars(bars, best.time, timezone);
     const change = prevClose === null ? null : best.price - prevClose;
     const changePercent = prevClose === null ? null : (best.price - prevClose) / prevClose * 100;
     return {
@@ -167,12 +172,8 @@ function marketDayKey(epochSec: number, tz: string): string | null {
  * - barras vacias, cierres null, hora de cotizacion ausente o zona horaria
  *   desconocida => null (N/D), nunca un dato inventado.
  */
-export function referenceCloseFromBars(
-    bars: YahooBars | null | undefined,
-    quoteTimeSec: number | null,
-    exchangeTimezone: string | null,
-): number | null {
-    if (!bars || quoteTimeSec === null || !exchangeTimezone) return null;
+function validDailyBars(bars: YahooBars | null | undefined): { t: number; c: number }[] {
+    if (!bars) return [];
     const ts = Array.isArray(bars.timestamps) ? bars.timestamps : [];
     const cl = Array.isArray(bars.closes) ? bars.closes : [];
     const valid: { t: number; c: number }[] = [];
@@ -181,6 +182,16 @@ export function referenceCloseFromBars(
         const c = cl[i];
         if (isFiniteNumber(t) && isFiniteNumber(c) && c > 0) valid.push({ t, c });
     }
+    return valid;
+}
+
+export function referenceCloseFromBars(
+    bars: YahooBars | null | undefined,
+    quoteTimeSec: number | null,
+    exchangeTimezone: string | null,
+): number | null {
+    if (quoteTimeSec === null || !exchangeTimezone) return null;
+    const valid = validDailyBars(bars);
     if (valid.length === 0) return null;
     const quoteDay = marketDayKey(quoteTimeSec, exchangeTimezone);
     const lastDay = marketDayKey(valid[valid.length - 1].t, exchangeTimezone);
@@ -188,6 +199,27 @@ export function referenceCloseFromBars(
     if (quoteDay === lastDay) {
         return valid.length >= 2 ? valid[valid.length - 2].c : null;
     }
+    return valid[valid.length - 1].c;
+}
+
+/**
+ * Referencia para una cotizacion de POSTMERCADO: el cierre regular de HOY,
+ * probado por una barra diaria de hoy con cierre valido. Sin barra de hoy
+ * no hay referencia demostrable => null (N/D); NUNCA se cae al cierre de
+ * ayer, que pintaria el movimiento de dos sesiones como si fuera el del
+ * postmercado (reserva del auditor, 21-oct-2026).
+ */
+export function postReferenceCloseFromBars(
+    bars: YahooBars | null | undefined,
+    quoteTimeSec: number | null,
+    exchangeTimezone: string | null,
+): number | null {
+    if (quoteTimeSec === null || !exchangeTimezone) return null;
+    const valid = validDailyBars(bars);
+    if (valid.length === 0) return null;
+    const quoteDay = marketDayKey(quoteTimeSec, exchangeTimezone);
+    const lastDay = marketDayKey(valid[valid.length - 1].t, exchangeTimezone);
+    if (quoteDay === null || lastDay === null || quoteDay !== lastDay) return null;
     return valid[valid.length - 1].c;
 }
 
