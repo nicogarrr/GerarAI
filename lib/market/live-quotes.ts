@@ -65,8 +65,6 @@ export interface LiveQuote extends LiveQuoteSpec {
 /** Meta de la chart API de Yahoo: solo los campos que leemos. */
 export interface YahooChartMeta {
     regularMarketPrice?: number | null;
-    previousClose?: number | null;
-    chartPreviousClose?: number | null;
     regularMarketTime?: number | null;
     preMarketPrice?: number | null;
     preMarketTime?: number | null;
@@ -76,6 +74,14 @@ export interface YahooChartMeta {
     exchangeName?: string | null;
     fullExchangeName?: string | null;
     instrumentType?: string | null;
+    /** Zona horaria del mercado (p.ej. 'America/New_York'); necesaria para el cierre de referencia. */
+    exchangeTimezoneName?: string | null;
+}
+
+/** Barras diarias del MISMO response de la chart API (range=2d&interval=1d). */
+export interface YahooBars {
+    timestamps?: (number | null)[] | null;
+    closes?: (number | null)[] | null;
 }
 
 const isFiniteNumber = (value: unknown): value is number =>
@@ -87,7 +93,7 @@ const isFiniteNumber = (value: unknown): value is number =>
  * Se elige el precio de la sesion mas reciente segun las horas del
  * proveedor; a igualdad de hora (o sin hora) gana la sesion regular.
  */
-export function parseYahooQuote(spec: LiveQuoteSpec, meta: YahooChartMeta | null | undefined): LiveQuote | null {
+export function parseYahooQuote(spec: LiveQuoteSpec, meta: YahooChartMeta | null | undefined, bars?: YahooBars | null): LiveQuote | null {
     if (!meta) return null;
     const candidates: { price: number; time: number | null; session: LiveQuoteSession; prio: number }[] = [];
     if (isFiniteNumber(meta.regularMarketPrice) && meta.regularMarketPrice > 0) {
@@ -117,11 +123,11 @@ export function parseYahooQuote(spec: LiveQuoteSpec, meta: YahooChartMeta | null
     if (candidates.length === 0) return null;
     candidates.sort((a, b) => (b.time ?? -Infinity) - (a.time ?? -Infinity) || a.prio - b.prio);
     const best = candidates[0];
-    const prevClose = isFiniteNumber(meta.previousClose) && meta.previousClose > 0
-        ? meta.previousClose
-        : isFiniteNumber(meta.chartPreviousClose) && meta.chartPreviousClose > 0
-            ? meta.chartPreviousClose
-            : null;
+    // Cierre de referencia SOLO desde barras diarias reales del proveedor:
+    // previousClose/chartPreviousClose del meta son poco fiables (21-oct-2026,
+    // ^GSPC: chartPreviousClose 7690,73 vs cierre real del dia anterior
+    // 7712,57). Sin referencia demostrable => cambio N/D, nunca inventado.
+    const prevClose = referenceCloseFromBars(bars, best.time, meta.exchangeTimezoneName ?? null);
     const change = prevClose === null ? null : best.price - prevClose;
     const changePercent = prevClose === null ? null : (best.price - prevClose) / prevClose * 100;
     return {
@@ -137,6 +143,52 @@ export function parseYahooQuote(spec: LiveQuoteSpec, meta: YahooChartMeta | null
             : null,
         instrumentType: typeof meta.instrumentType === 'string' && meta.instrumentType.trim() ? meta.instrumentType.trim() : null,
     };
+}
+
+/** Dia civil ('YYYY-MM-DD') de un epoch en la zona horaria del mercado; null si la tz no es valida. */
+function marketDayKey(epochSec: number, tz: string): string | null {
+    try {
+        return new Intl.DateTimeFormat('en-CA', {
+            timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+        }).format(new Date(epochSec * 1000));
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Cierre de referencia para el cambio, por dia de sesion y en la zona del
+ * mercado, usando SOLO barras diarias reales:
+ * - la cotizacion es de un dia CON barra (sesion en curso o cerrada): la
+ *   referencia es el cierre de la barra anterior; si no hay barra anterior
+ *   (una sola barra) no hay referencia demostrable => null (N/D);
+ * - la cotizacion es de un dia SIN barra (premercado, finde, festivo): la
+ *   referencia es el cierre de la ultima barra existente;
+ * - barras vacias, cierres null, hora de cotizacion ausente o zona horaria
+ *   desconocida => null (N/D), nunca un dato inventado.
+ */
+export function referenceCloseFromBars(
+    bars: YahooBars | null | undefined,
+    quoteTimeSec: number | null,
+    exchangeTimezone: string | null,
+): number | null {
+    if (!bars || quoteTimeSec === null || !exchangeTimezone) return null;
+    const ts = Array.isArray(bars.timestamps) ? bars.timestamps : [];
+    const cl = Array.isArray(bars.closes) ? bars.closes : [];
+    const valid: { t: number; c: number }[] = [];
+    for (let i = 0; i < Math.min(ts.length, cl.length); i++) {
+        const t = ts[i];
+        const c = cl[i];
+        if (isFiniteNumber(t) && isFiniteNumber(c) && c > 0) valid.push({ t, c });
+    }
+    if (valid.length === 0) return null;
+    const quoteDay = marketDayKey(quoteTimeSec, exchangeTimezone);
+    const lastDay = marketDayKey(valid[valid.length - 1].t, exchangeTimezone);
+    if (quoteDay === null || lastDay === null) return null;
+    if (quoteDay === lastDay) {
+        return valid.length >= 2 ? valid[valid.length - 2].c : null;
+    }
+    return valid[valid.length - 1].c;
 }
 
 /** Antiguedad de una cotizacion en segundos; nunca negativa (desfase de reloj => 0). */

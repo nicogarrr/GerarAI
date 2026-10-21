@@ -48,10 +48,10 @@ test('parse premercado: precio pre mas reciente que el regular, con hora pasada 
     const quote = parseYahooQuote(spec, {
         regularMarketPrice: 7700,
         regularMarketTime: regularTime,
-        previousClose: 7690,
         preMarketPrice: 7712.5,
         preMarketTime: regularTime + 8 * 3600, // 8 h despues: premercado de hoy
-    });
+        exchangeTimezoneName: 'UTC',
+    }, { timestamps: [regularTime], closes: [7690] });
     assert.ok(quote);
     assert.equal(quote.session, 'pre');
     assert.equal(quote.price, 7712.5);
@@ -65,7 +65,6 @@ test('parse postmercado: post mas reciente que el regular', () => {
     const quote = parseYahooQuote(spec, {
         regularMarketPrice: 22.9,
         regularMarketTime: regularTime,
-        previousClose: 22.6,
         postMarketPrice: 22.98,
         postMarketTime: regularTime + 3600,
     });
@@ -80,7 +79,6 @@ test('parse: en sesion regular el precio regular es el mas reciente', () => {
     const quote = parseYahooQuote(spec, {
         regularMarketPrice: 7720,
         regularMarketTime: preTime + 7200,
-        previousClose: 7700,
         preMarketPrice: 7710,
         preMarketTime: preTime,
     });
@@ -110,7 +108,7 @@ test('antigüedad: segundos reales desde la hora del proveedor, nunca negativa',
 test('identidad: exchangeName e instrumentType vienen del meta; ausentes => null', () => {
     const spec = { symbol: 'ES=F', name: 'Futuro S&P 500 (E-mini)', kind: 'futuro' as const, unit: 'index' as const, decimals: 2 };
     const quote = parseYahooQuote(spec, {
-        regularMarketPrice: 7700, regularMarketTime: 100, previousClose: 7690,
+        regularMarketPrice: 7700, regularMarketTime: 100,
         exchangeName: 'CME', instrumentType: 'FUTURE',
     });
     assert.ok(quote);
@@ -124,4 +122,84 @@ test('identidad: exchangeName e instrumentType vienen del meta; ausentes => null
     assert.equal(localizeInstrumentType('EQUITY'), 'acción');
     assert.equal(localizeInstrumentType('OTRA_COSA'), null);
     assert.equal(localizeInstrumentType(null), null);
+});
+
+/* ---- Cierre de referencia por dia/sesion con barras reales (auditor 21-oct) ----
+   Caso real ^GSPC: el meta chartPreviousClose (7690,73) NO era el cierre del
+   dia anterior (7712,57); con la referencia vieja el cambio salia +40,01 en
+   vez de +18,17. La referencia ahora sale SOLO de las barras diarias. */
+
+test('referencia: el meta con chartPreviousClose erroneo NO se usa; barras mandan', () => {
+    const spec = { symbol: '^GSPC', name: 'S&P 500', kind: 'indice' as const, unit: 'index' as const, decimals: 2 };
+    const bar1 = Date.UTC(2026, 9, 20, 13, 30) / 1000; // 20-oct 09:30 ET
+    const bar2 = Date.UTC(2026, 9, 21, 13, 30) / 1000; // 21-oct 09:30 ET (barra de hoy, en formacion)
+    const quoteTime = Date.UTC(2026, 9, 21, 20, 23) / 1000; // 21-oct 16:23 ET
+    const meta = {
+        regularMarketPrice: 7730.74,
+        regularMarketTime: quoteTime,
+        chartPreviousClose: 7690.73, // valor erroneo que traia el meta real
+        exchangeTimezoneName: 'America/New_York',
+    };
+    const quote = parseYahooQuote(spec, meta, { timestamps: [bar1, bar2], closes: [7712.57, 7730.74] });
+    assert.ok(quote);
+    assert.ok(Math.abs((quote.change ?? 0) - 18.17) < 0.005, `change=${quote.change}`);
+    assert.ok(Math.abs((quote.changePercent ?? 0) - 0.2356) < 0.01, `pct=${quote.changePercent}`);
+});
+
+test('referencia premercado: dia sin barra => cierre de la ultima barra existente', () => {
+    const spec = { symbol: 'ES=F', name: 'Futuro S&P 500 (E-mini)', kind: 'futuro' as const, unit: 'index' as const, decimals: 2 };
+    const bar1 = Date.UTC(2026, 9, 20, 13, 30) / 1000; // ultima sesion con barra
+    const preTime = Date.UTC(2026, 9, 21, 11, 0) / 1000; // 21-oct 07:00 ET, premercado
+    const quote = parseYahooQuote(spec, {
+        preMarketPrice: 7720,
+        preMarketTime: preTime,
+        exchangeTimezoneName: 'America/New_York',
+    }, { timestamps: [bar1], closes: [7712.57] });
+    assert.ok(quote);
+    assert.equal(quote.session, 'pre');
+    assert.ok(Math.abs((quote.change ?? 0) - 7.43) < 0.005);
+});
+
+test('referencia fin de semana: cotizacion del sabado contra el cierre del viernes', () => {
+    const spec = { symbol: 'EURUSD=X', name: 'EUR/USD', kind: 'divisa' as const, unit: 'cruz' as const, decimals: 4 };
+    const friday = Date.UTC(2026, 9, 23, 13, 30) / 1000;
+    const saturday = Date.UTC(2026, 9, 24, 14, 0) / 1000;
+    const quote = parseYahooQuote(spec, {
+        regularMarketPrice: 1.1234,
+        regularMarketTime: saturday,
+        exchangeTimezoneName: 'America/New_York',
+    }, { timestamps: [friday], closes: [1.1200] });
+    assert.ok(quote);
+    assert.ok(Math.abs((quote.change ?? 0) - 0.0034) < 0.00001);
+});
+
+test('referencia: barra con close null se descarta; una sola barra del mismo dia => N/D', () => {
+    const spec = { symbol: 'X', name: 'X', kind: 'accion' as const, unit: 'EUR' as const, decimals: 2 };
+    const d1 = Date.UTC(2026, 9, 19, 7, 0) / 1000;
+    const d2 = Date.UTC(2026, 9, 20, 7, 0) / 1000;
+    // close null en la barra de hoy: solo queda la de ayer; cotizacion de hoy => referencia = ayer.
+    const conNull = parseYahooQuote(spec, {
+        regularMarketPrice: 105, regularMarketTime: d2 + 3600, exchangeTimezoneName: 'Europe/Madrid',
+    }, { timestamps: [d1, d2], closes: [100, null] });
+    assert.ok(conNull);
+    assert.equal(conNull.change, 5);
+    // Una sola barra del mismo dia: no hay sesion anterior demostrable => N/D.
+    const unaBarra = parseYahooQuote(spec, {
+        regularMarketPrice: 105, regularMarketTime: d2 + 3600, exchangeTimezoneName: 'Europe/Madrid',
+    }, { timestamps: [d2], closes: [104] });
+    assert.ok(unaBarra);
+    assert.equal(unaBarra.change, null);
+    assert.equal(unaBarra.changePercent, null);
+});
+
+test('referencia: sin zona horaria del mercado o sin hora de cotizacion => N/D', () => {
+    const spec = { symbol: 'X', name: 'X', kind: 'accion' as const, unit: 'EUR' as const, decimals: 2 };
+    const d1 = Date.UTC(2026, 9, 19, 7, 0) / 1000;
+    const d2 = Date.UTC(2026, 9, 20, 7, 0) / 1000;
+    const sinTz = parseYahooQuote(spec, { regularMarketPrice: 105, regularMarketTime: d2 }, { timestamps: [d1], closes: [100] });
+    assert.ok(sinTz);
+    assert.equal(sinTz.change, null);
+    const sinHora = parseYahooQuote(spec, { regularMarketPrice: 105, exchangeTimezoneName: 'Europe/Madrid' }, { timestamps: [d1], closes: [100] });
+    assert.ok(sinHora);
+    assert.equal(sinHora.change, null);
 });
