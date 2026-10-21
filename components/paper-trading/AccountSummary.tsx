@@ -9,6 +9,10 @@ import type { DemoStateView } from './submit';
  * Saldos de la cuenta demo manual: efectivo y realizado por divisa, sin
  * mezclar EUR con USD (el contrato prohibe la conversion implicita). La
  * divisa de cada cifra ES la clave del saldo, nunca una fija.
+ * El realizado es ANTES DE COMISIONES: el FIFO lo calcula como
+ * cantidad x (precio venta - precio lote), y las comisiones solo mueven el
+ * efectivo (verificado en lib/paper-trading/accounting.ts, 21-oct-2026).
+ * La etiqueta lo dice junto a la cifra; no se reescribe el historico.
  * Las violaciones de integridad NUNCA se ocultan: si el recalculo detecta
  * una sobreventa o un sobregiro, se muestra tal cual.
  */
@@ -36,6 +40,7 @@ export function AccountSummary({ account }: { account: DemoStateView }) {
                     <Stat
                         key={bucket.label}
                         label={bucket.label}
+                        hint="antes de comisiones"
                         size="sm"
                         value={formatMoney(bucket.value, bucket.currency)}
                         tone={bucket.value > 0 ? 'good' : bucket.value < 0 ? 'bad' : 'default'}

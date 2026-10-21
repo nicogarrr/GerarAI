@@ -26,6 +26,25 @@ test('la ruta /paper-trading existe, es dinámica y etiqueta la demo', () => {
     assert.match(page, /ficticio/i, 'la página debe declarar el dinero ficticio');
 });
 
+test('el realizado se etiqueta como antes de comisiones en panel y tabla (delta 21-oct-2026)', () => {
+    // Verificado en lib/paper-trading/accounting.ts: el FIFO calcula
+    // realizado = cantidad x (precio venta - precio lote); las comisiones
+    // solo mueven el efectivo. La UI debe decirlo junto a la cifra.
+    const summary = readFileSync(`${COMPONENTS_DIR}/AccountSummary.tsx`, 'utf8');
+    assert.match(summary, /hint="antes de comisiones"/, 'los totales realizados deben llevar el hint');
+    const table = readFileSync(`${COMPONENTS_DIR}/PositionsTable.tsx`, 'utf8');
+    assert.match(table, /Realizado antes de comisiones \(las comisiones solo mueven el efectivo\)/, 'la tabla debe declararlo');
+    // Aviso de cuenta (QA live 21-oct-2026): el campo de comisión ya no
+    // existe (#2011); el aviso describe el 0 simulado y los históricos sin
+    // sugerir tarifa 0 de ningún bróker.
+    const actions = readFileSync('lib/actions/manual-demo.actions.ts', 'utf8');
+    // Acotado al formulario: la API placeManualOrder aún admite fee>0
+    // (auditor 21-oct-2026); el aviso no puede prometer nada del backend.
+    assert.match(actions, /las órdenes registradas desde este formulario se anotan con comisión 0 simulada \(simplificación de la demo, no la tarifa de ningún bróker\)/);
+    assert.match(actions, /las comisiones históricas registradas se conservan tal cual y solo mueven el efectivo/);
+    assert.doesNotMatch(actions, /si introduces una, se registra tal cual/);
+});
+
 test('la UI declara el origen manual simulado sin prometer ejecución real', () => {
     const panel = readFileSync(`${COMPONENTS_DIR}/ManualDemoPanel.tsx`, 'utf8');
     assert.match(panel, /ficticio/i, 'el panel debe declarar el saldo ficticio');
