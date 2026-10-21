@@ -147,6 +147,87 @@ describe('órdenes de acciones con dinero ficticio multidivisa', () => {
             assert.equal(ok.state.realizedEUR, 20);
         }
     });
+
+    it('venta con comisión que supera el efectivo tras la venta: rechazada (sin sobregiro), libro intacto', async () => {
+        // cash 100.000 -> compra 1x99.990 fee 10 = cash 0 -> venta @10 fee 50: 0+10-50 = -40
+        await actions.placeManualOrder(buyAccion({ quantity: 1, price: 99_990, fee: 10 }));
+        const r = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 1, price: 10, fee: 50 });
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'rejected');
+            assert.match(r.reason ?? '', /sobregiro/);
+            assert.equal(r.state.cashEUR, 0);
+            assert.equal(r.state.positions[0].quantity, 1);
+        }
+    });
+
+    it('venta con comisión exactamente igual al efectivo tras la venta: aceptada (frontera)', async () => {
+        await actions.placeManualOrder(buyAccion({ quantity: 1, price: 99_990, fee: 10 }));
+        const r = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 1, price: 10, fee: 10 });
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'filled');
+            assert.equal(r.state.cashEUR, 0);
+            assert.equal(r.state.positions.length, 0);
+        }
+    });
+
+    it('rechazo por sobregiro de comisión es idempotente (mismo clientOrderId, un solo rejected)', async () => {
+        await actions.placeManualOrder(buyAccion({ quantity: 1, price: 99_990, fee: 10 }));
+        const dupId = 'guard-fee-dup-0001';
+        const order = { ...buyAccion(), side: 'sell', quantity: 1, price: 10, fee: 50, clientOrderId: dupId };
+        const r1 = await actions.placeManualOrder(order);
+        const r2 = await actions.placeManualOrder(order);
+        assert.ok(r1.ok && r2.ok);
+        if (r1.ok && r2.ok) {
+            assert.equal(r1.outcome, 'rejected');
+            assert.equal(r2.outcome, 'duplicate');
+            assert.equal(r2.reason, r1.reason);
+        }
+        const history = await actions.getManualDemoOrders();
+        assert.ok(history.ok);
+        if (history.ok) {
+            const rows = history.orders.filter((o: { clientOrderId: string }) => o.clientOrderId === dupId);
+            assert.equal(rows.length, 1);
+            assert.equal(rows[0].status, 'rejected');
+        }
+    });
+
+    const optionOrder = (over: Record<string, unknown> = {}) => ({
+        instrument: { kind: 'opcion', contract: { underlying: 'ASTS', expiry: '2027-01-15', strike: 50, callPut: 'call', multiplier: 100, deliverable: 'acciones', adjusted: false } },
+        side: 'buy',
+        openClose: 'open',
+        quantity: 1,
+        price: 1,
+        currency: 'EUR',
+        fee: 0,
+        executedAt: NOW - 50_000,
+        clientOrderId: oid(),
+        ...over,
+    });
+
+    it('cierre de opción con comisión exactamente igual al efectivo tras la prima: aceptado (frontera)', async () => {
+        await actions.placeManualOrder(optionOrder()); // cash 100.000 -> 99.900
+        const r = await actions.placeManualOrder(optionOrder({ side: 'sell', openClose: 'close', fee: 100_000 }));
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'filled'); // 99.900 + 100 - 100.000 = 0
+            assert.equal(r.state.cashEUR, 0);
+            assert.equal(r.state.positions.length, 0);
+        }
+    });
+
+    it('cierre de opción con comisión que supera el efectivo tras la prima: rechazado (sin sobregiro), libro intacto', async () => {
+        await actions.placeManualOrder(optionOrder()); // cash 100.000 -> 99.900
+        const r = await actions.placeManualOrder(optionOrder({ side: 'sell', openClose: 'close', fee: 100_000.01 }));
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'rejected'); // 99.900 + 100 - 100.000,01 < 0
+            assert.match(r.reason ?? '', /sobregiro/);
+            assert.equal(r.state.cashEUR, 99_900);
+            assert.equal(r.state.positions[0].quantity, 1);
+        }
+    });
 });
 
 describe('conversión manual simulada EUR<->USD', () => {
