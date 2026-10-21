@@ -59,7 +59,12 @@ export type FollowedEarningsCalendar = {
 };
 
 /** GET /api/calendar/followed — resultados de cartera + watchlist agrupados por día (60 días). */
-export async function getFollowedEarnings(): Promise<FollowedEarningsCalendar> {
+export async function getFollowedEarnings(options?: { desde?: string; hasta?: string }): Promise<FollowedEarningsCalendar> {
     await requireAuthenticatedUser();
-    return researchRequest<FollowedEarningsCalendar>('/api/calendar/followed');
+    const isoDay = /^\d{4}-\d{2}-\d{2}$/;
+    const params = new URLSearchParams();
+    if (options?.desde && isoDay.test(options.desde)) params.set('desde', options.desde);
+    if (options?.hasta && isoDay.test(options.hasta)) params.set('hasta', options.hasta);
+    const query = params.size > 0 ? `?${params.toString()}` : '';
+    return researchRequest<FollowedEarningsCalendar>(`/api/calendar/followed${query}`);
 }

@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import BackendOffline from '@/components/system/BackendOffline';
-import { FollowedDaySources, FollowedEarningsRow, dayHeading } from '@/components/calendar/FollowedEarningsList';
+import { EventMaterialsLine, FollowedDaySources, FollowedEarningsRow, dayHeading } from '@/components/calendar/FollowedEarningsList';
 import { getFollowedEarnings, type FollowedEarningsCalendar } from '@/lib/actions/catalysts.actions';
+import { getEarningsMaterials } from '@/lib/actions/earnings-materials.actions';
+import { HISTORY_DAYS, type EventMaterials } from '@/lib/earnings-materials';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +15,12 @@ export const metadata: Metadata = {
     description: 'Próximos resultados de las empresas de tu cartera y tu watchlist.',
 };
 
+function addDays(iso: string, days: number): string {
+    const date = new Date(`${iso}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+}
+
 function todayInMadrid(): string {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
 }
@@ -19,7 +28,7 @@ function todayInMadrid(): string {
 export default async function FollowedEarningsPage() {
     let calendar: FollowedEarningsCalendar;
     try {
-        calendar = await getFollowedEarnings();
+        calendar = await getFollowedEarnings({ desde: addDays(todayInMadrid(), -HISTORY_DAYS), hasta: addDays(todayInMadrid(), 60) });
     } catch (error) {
         if (isBackendUnavailableError(error)) {
             return <BackendOffline feature="Calendario de resultados" retryHref="/calendar/resultados" />;
@@ -27,6 +36,34 @@ export default async function FollowedEarningsPage() {
         throw error;
     }
     const today = todayInMadrid();
+    // Material de la SEC de resultados ya publicados: promesa que nunca rechaza (la acción traga fallos); cada fila la espera
+    // dentro de Suspense, asi la pagina sale al instante y un fallo de tercero no la rompe.
+    const materialsPromise: Promise<Record<string, EventMaterials>> = getEarningsMaterials();
+    const upcoming = calendar.days.filter((day) => day.date >= today);
+    const recent = calendar.days.filter((day) => day.date < today).reverse();
+    const renderDay = (day: FollowedEarningsCalendar['days'][number]) => (
+        <section key={day.date} aria-labelledby={`d-${day.date}`}>
+            <h2 id={`d-${day.date}`} className="mb-2 text-lg font-semibold text-gray-100 first-letter:uppercase">
+                {dayHeading(day.date, today)}
+            </h2>
+            <ul className="divide-y divide-gray-800 overflow-hidden rounded-2xl bg-surface-1">
+                {day.events.map((event) => (
+                    <FollowedEarningsRow
+                        key={`${event.ticker}-${event.date}`}
+                        event={event}
+                        materialsSlot={
+                            event.date <= today ? (
+                                <Suspense fallback={null}>
+                                    <EventMaterialsLine promise={materialsPromise} eventKey={`${event.ticker}|${event.date}`} />
+                                </Suspense>
+                            ) : null
+                        }
+                    />
+                ))}
+            </ul>
+            <FollowedDaySources events={day.events} />
+        </section>
+    );
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6">
@@ -45,19 +82,15 @@ export default async function FollowedEarningsPage() {
                 </p>
             ) : (
                 <div className="flex flex-col gap-6">
-                    {calendar.days.map((day) => (
-                        <section key={day.date} aria-labelledby={`d-${day.date}`}>
-                            <h2 id={`d-${day.date}`} className="mb-2 text-lg font-semibold text-gray-100 first-letter:uppercase">
-                                {dayHeading(day.date, today)}
+                    {upcoming.map((day) => renderDay(day))}
+                    {recent.length > 0 ? (
+                        <>
+                            <h2 className="mt-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
+                                Publicados en los últimos {HISTORY_DAYS} días
                             </h2>
-                            <ul className="divide-y divide-gray-800 overflow-hidden rounded-2xl bg-surface-1">
-                                {day.events.map((event) => (
-                                    <FollowedEarningsRow key={`${event.ticker}-${event.date}`} event={event} />
-                                ))}
-                            </ul>
-                            <FollowedDaySources events={day.events} />
-                        </section>
-                    ))}
+                            {recent.map((day) => renderDay(day))}
+                        </>
+                    ) : null}
                 </div>
             )}
 

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 
@@ -84,7 +84,9 @@ def test_refresh_writes_rows_keeps_manual_and_reports_missing():
         )
         assert result["followed"] == 3 and result["written"] == 1
         assert result["without_date"] == [n["ZQB"]]
-        cal = followed_calendar(db, TODAY, date(2026, 12, 31))
+        cal = followed_calendar(
+            db, TODAY, date(2026, 12, 31), now=datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
+        )
         by = {e["ticker"]: e for d in cal["days"] for e in d["events"]}
         assert by[n["ZQA"]]["confirmed"] is True and by[n["ZQA"]]["session"] is None
         assert by[n["ZQC.L"]]["source_url"] == "https://example.test/rns"
@@ -195,3 +197,64 @@ def test_is_fresh_expires_automatic_rows_only():
     assert not is_fresh(EarningsDate(ticker="X", event_date=date(2026, 11, 1), source="yahoo", fetched_at=old), now)
     assert is_fresh(EarningsDate(ticker="X", event_date=date(2026, 11, 1), source="yahoo", fetched_at=now), now)
     assert is_fresh(EarningsDate(ticker="X", event_date=date(2026, 11, 1), source="manual", fetched_at=old), now)
+
+
+def test_followed_calendar_keeps_history_without_hiding_next_date_or_ghosts():
+    from datetime import UTC, datetime, timedelta
+
+    init_db()
+    db = SessionLocal()
+    try:
+        n = _tenant_with_watch(db, ["ZHA", "ZHB", "ZHC", "ZHD"])
+        now = datetime(2026, 10, 21, 12, 0, tzinfo=UTC)
+        old = now - timedelta(days=9)
+        fresh = now - timedelta(hours=1)
+        # ZHA: ultimo resultado confirmado (pasado, sin renovar) + proxima fecha vigente.
+        db.add(EarningsDate(ticker=n["ZHA"], event_date=date(2026, 10, 15), source="yahoo",
+                            source_label="Yahoo", confirmed=True, fetched_at=old))
+        db.add(EarningsDate(ticker=n["ZHA"], event_date=date(2027, 1, 20), source="yahoo",
+                            source_label="Yahoo", confirmed=False, fetched_at=fresh))
+        # ZHB: solo historia confirmada -> aparece, pero sigue "sin fecha" (no hay proxima).
+        db.add(EarningsDate(ticker=n["ZHB"], event_date=date(2026, 10, 19), source="nasdaq+yahoo",
+                            source_label="N+Y", confirmed=True, fetched_at=old))
+        # ZHC: pasada estimada/desconocida = fantasma, no se muestra como publicada.
+        db.add(EarningsDate(ticker=n["ZHC"], event_date=date(2026, 10, 16), source="yahoo",
+                            source_label="Yahoo", confirmed=False, fetched_at=old))
+        db.add(EarningsDate(ticker=n["ZHD"], event_date=date(2026, 10, 17), source="nasdaq",
+                            source_label="N", confirmed=None, fetched_at=old))
+        db.commit()
+        cal = followed_calendar(db, date(2026, 10, 14), date(2027, 1, 31), now=now)
+        events = [e for d in cal["days"] for e in d["events"]]
+        by = {}
+        for e in events:
+            by.setdefault(e["ticker"], []).append(e["date"])
+        assert by[n["ZHA"]] == ["2026-10-15", "2027-01-20"]
+        assert by[n["ZHB"]] == ["2026-10-19"]
+        assert n["ZHC"] not in by and n["ZHD"] not in by
+        assert cal["without_date_in_range"] == sorted([n["ZHB"], n["ZHC"], n["ZHD"]])
+    finally:
+        db.rollback()
+        db.close()
+
+
+def test_followed_calendar_manual_wins_per_side_and_default_horizon_unchanged():
+    from datetime import UTC, datetime, timedelta
+
+    init_db()
+    db = SessionLocal()
+    try:
+        n = _tenant_with_watch(db, ["ZMA"])
+        now = datetime(2026, 10, 21, 12, 0, tzinfo=UTC)
+        fresh = now - timedelta(hours=1)
+        db.add(EarningsDate(ticker=n["ZMA"], event_date=date(2026, 10, 25), source="yahoo",
+                            source_label="Yahoo", confirmed=False, fetched_at=fresh))
+        db.add(EarningsDate(ticker=n["ZMA"], event_date=date(2026, 10, 28), source="manual",
+                            source_label="Comunicado", fetched_at=now - timedelta(days=30)))
+        db.commit()
+        cal = followed_calendar(db, date(2026, 10, 21), date(2026, 12, 20), now=now)
+        dates = [e["date"] for d in cal["days"] for e in d["events"] if e["ticker"] == n["ZMA"]]
+        assert dates == ["2026-10-28"]
+        assert cal["without_date_in_range"] == []
+    finally:
+        db.rollback()
+        db.close()

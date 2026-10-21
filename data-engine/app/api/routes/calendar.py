@@ -1,7 +1,8 @@
 """Calendario de mercado (earnings, dividendos y catalizadores de cartera)."""
 
 import asyncio
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
@@ -88,6 +89,28 @@ def followed_earnings_calendar(
     if (end - start).days > 366:
         raise HTTPException(status_code=400, detail="rango maximo: 366 dias")
     return followed_calendar(db, start, end)
+
+
+@router.get("/followed/materials")
+async def followed_materials(db: Session = Depends(get_db)) -> dict:
+    """Material oficial (SEC) de resultados ya publicados de las empresas seguidas.
+
+    Hoy y ultimos 7 dias, solo eventos con fecha confirmada. Usa SECClient (identidad,
+    ritmo y cache ya configurados); un fallo de la SEC devuelve ``no_disponible`` por
+    evento y nunca rompe el calendario. Clave: ``TICKER|YYYY-MM-DD``.
+    """
+    from app.services.connectors.sec import SECClient
+    from app.services.earnings_dates_service import followed_calendar
+    from app.services.earnings_materials_service import HISTORY_DAYS, materials_for_events
+
+    # Mismo "hoy" que la pagina del calendario (Europe/Madrid), no el dia UTC del servidor.
+    today = datetime.now(ZoneInfo("Europe/Madrid")).date()
+    calendar = await run_in_threadpool(followed_calendar, db, today - timedelta(days=HISTORY_DAYS), today)
+    events = [
+        e for day in calendar["days"] for e in day["events"] if e.get("confirmed") is True
+    ]
+    items = await materials_for_events(events, today, sec=SECClient())
+    return {"as_of": today.isoformat(), "items": items}
 
 
 @router.get("/catalysts")

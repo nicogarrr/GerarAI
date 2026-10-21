@@ -516,6 +516,36 @@ class SECClient:
         response = await self._get(url)
         return response.content, response.headers.get("content-type")
 
+    async def filing_document_head(self, url: str, max_bytes: int = 32_768) -> bytes:
+        """Primeros ``max_bytes`` de un documento de sec.gov (misma identidad y ritmo).
+
+        Los exhibits 99.x de resultados pesan varios MB y aqui solo hace falta el encabezado:
+        se lee en streaming y se corta la conexion al llegar al tope. Sin reintentos: un fallo
+        se propaga y el llamante lo trata como no disponible, nunca como ausencia.
+        """
+
+        hostname = urlparse(url).hostname or ""
+        if hostname.lower() not in {"sec.gov", "www.sec.gov"}:
+            raise ValueError("SEC filing URL must use sec.gov")
+        await self._throttle()
+
+        async def _read(client: httpx.AsyncClient) -> bytes:
+            async with client.stream("GET", url, headers=self.headers) as response:
+                response.raise_for_status()
+                chunks: list[bytes] = []
+                total = 0
+                async for chunk in response.aiter_bytes():
+                    chunks.append(chunk)
+                    total += len(chunk)
+                    if total >= max_bytes:
+                        break
+                return b"".join(chunks)[:max_bytes]
+
+        if self.client is not None:
+            return await _read(self.client)
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            return await _read(client)
+
     @staticmethod
     def _column(recent: dict, name: str, index: int):
         values = recent.get(name, [])

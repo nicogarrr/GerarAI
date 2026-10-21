@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ChevronRight, ExternalLink } from 'lucide-react';
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { formatMarketDate } from '@/lib/format';
 import type { FollowedEarningsEvent } from '@/lib/actions/catalysts.actions';
+import type { EventMaterials } from '@/lib/earnings-materials';
+import { irLinksFor } from '@/lib/ir-registry';
 
 const SESSION_LABEL = { pre_market: 'Antes de apertura', after_market: 'Tras el cierre' } as const;
 
@@ -22,7 +25,65 @@ export function dayHeading(day: string, today: string): string {
     return base;
 }
 
-export function FollowedEarningsRow({ event }: { event: FollowedEarningsEvent }) {
+/** Material oficial de la SEC para resultados ya publicados; sin dato = no se pinta nada. */
+export function MaterialsLine({ materials }: { materials: EventMaterials | undefined }) {
+    if (!materials || materials.status === 'sin_cobertura_sec' || materials.status === 'periodo_no_coincide') return null;
+    if (materials.status === 'no_disponible') {
+        return <p className="mt-1 text-xs text-gray-500">Enlace no disponible</p>;
+    }
+    if (materials.status === 'sin_filing' || materials.documents.length === 0) {
+        return <p className="mt-1 text-xs text-gray-500">Sin 8-K de resultados en la SEC (revisado)</p>;
+    }
+    return (
+        <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+            {materials.documents.map((doc) => (
+                <a
+                    key={doc.url}
+                    href={doc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Documento de la SEC (${doc.exhibit}), presentado el ${materials.filed_at}`}
+                    className="inline-flex items-center gap-1 rounded-md border border-teal-800/60 px-1.5 py-0.5 font-medium text-teal-300 hover:bg-gray-800"
+                >
+                    {doc.label}
+                    <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                </a>
+            ))}
+            <span className="text-gray-500">SEC · {materials.filed_at}</span>
+        </p>
+    );
+}
+
+/** Enlaces oficiales de IR (registro verificado): pagina del evento si la fecha coincide, si no la seccion general. */
+export function IrLine({ ticker, date }: { ticker: string; date: string }) {
+    const links = irLinksFor(ticker, date);
+    if (!links) return null;
+    const tip = `Enlace oficial de la empresa, verificado el ${links.verifiedOn}. El directo, la grabación y la transcripción aparecen ahí si la empresa los publica.`;
+    const chip = 'inline-flex items-center gap-1 rounded-md border border-gray-700 px-1.5 py-0.5 font-medium text-gray-300 hover:bg-gray-800';
+    return (
+        <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+            {links.eventPage ? (
+                <a href={links.eventPage.url} target="_blank" rel="noopener noreferrer" title={tip} className={chip}>
+                    Evento {links.eventPage.period} en IR
+                    <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                </a>
+            ) : (
+                <a href={links.section.url} target="_blank" rel="noopener noreferrer" title={`${tip} Es la sección general, no la página de este evento.`} className={chip}>
+                    {links.section.label} (IR)
+                    <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                </a>
+            )}
+        </p>
+    );
+}
+
+/** Espera la promesa compartida de materiales (dentro de Suspense) y pinta solo la linea de esta fila. */
+export async function EventMaterialsLine({ promise, eventKey }: { promise: Promise<Record<string, EventMaterials>>; eventKey: string }) {
+    const all = await promise;
+    return <MaterialsLine materials={all[eventKey]} />;
+}
+
+export function FollowedEarningsRow({ event, materialsSlot }: { event: FollowedEarningsEvent; materialsSlot?: ReactNode }) {
     const session = event.session ? SESSION_LABEL[event.session] : null;
     const label = fiscalLabel(event.fiscal_label);
     return (
@@ -42,6 +103,8 @@ export function FollowedEarningsRow({ event }: { event: FollowedEarningsEvent })
                         <span className="rounded border border-amber-800/60 px-1.5 py-0.5 text-xs text-amber-300">Estimada</span>
                     ) : null}
                 </p>
+                {materialsSlot}
+                <IrLine ticker={event.ticker} date={event.date} />
             </div>
             {event.source_url ? (
                 <a
