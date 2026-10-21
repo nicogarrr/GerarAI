@@ -137,7 +137,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                 </Button>
             </div>
             <Tabs defaultValue="indice" className="mt-3">
-                <TabsList className="flex-wrap">
+                <TabsList className="h-auto flex-wrap">
                     {TABS.map((tab) => (
                         <TabsTrigger key={tab.key} value={tab.key}>{tab.label}</TabsTrigger>
                     ))}
