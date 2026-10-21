@@ -90,20 +90,23 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(search, /avoidCollisions=\{dropdownSide === undefined\}/);
         assert.match(search, /max-h-\[min\(15rem,40dvh\)\]/);
         // El tope fijo no basta: con el teclado abierto la lista puede quedar
-        // bajo él. La altura se mide contra el espacio real bajo el input en
-        // el visualViewport; si no caben 96px se crea hueco con UN solo
-        // ajuste de scroll por apertura (guardia scrolledForSpace, sin saltos
-        // repetidos), el suelo es 64px y la lista se re-mide al cambiar el
-        // visual viewport (resize/scroll = teclado, offset, barras).
+        // bajo él. La altura se mide con geometría pura (components/search/
+        // list-fit.ts, con tests de comportamiento en ticker-search-list-fit):
+        // NUNCA supera el espacio real (suelo 0, sin mínimos mágicos), pide
+        // UN solo reposicionamiento por apertura (guardia scrolledForSpace,
+        // reseteada al cerrar) y se re-mide con los eventos del visual
+        // viewport (resize/scroll = teclado, offset, barras) con cleanup.
+        assert.match(search, /computeListFit\(spaceBelow, scrolledForSpace\.current\)/);
         assert.match(search, /scrollIntoView\(\{ block: 'center' \}\)/);
         assert.match(search, /window\.visualViewport/);
-        assert.match(search, /spaceBelow < 96/);
         assert.match(search, /scrolledForSpace\.current = true/);
-        assert.match(search, /Math\.max\(64, spaceBelow\)/);
-        assert.match(search, /Math\.min\(240, spaceBelow\)/);
         assert.match(search, /vv\?\.addEventListener\('resize', measureBelowInput\)/);
         assert.match(search, /vv\?\.addEventListener\('scroll', measureBelowInput\)/);
+        assert.match(search, /vv\?\.removeEventListener\('resize', measureBelowInput\)/);
+        assert.match(search, /if \(!open\) \{\s*scrolledForSpace\.current = false;/);
         assert.match(search, /style=\{dropdownSide && listMaxHeight/);
+        // El comportamiento de la geometría se prueba con espacios reales.
+        assert.match(readFileSync('scripts/ticker-search-list-fit.test.ts', 'utf8'), /computeListFit\(0, true\)/);
     });
 
     it('los mensajes de estado del buscador se anuncian a lectores de pantalla', () => {

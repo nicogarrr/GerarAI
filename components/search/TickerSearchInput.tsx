@@ -1,6 +1,7 @@
 'use client';
 
 import { createLatestRequestGate } from '@/lib/latest-request';
+import { computeListFit, computeSpaceBelow } from './list-fit';
 import { withFetchDeadline } from '@/lib/upstream/fetch-deadline';
 import { formatCompanyName } from '@/lib/format';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -31,10 +32,11 @@ interface TickerSearchInputProps {
     onBlur?: () => void;
     /** Dirección fija del desplegable. Con 'bottom' la lista abre SIEMPRE
      *  hacia abajo (Nico, 21-oct-2026: la vio abrirse hacia arriba con el
-     *  teclado del iPhone), se centra el input en el visual viewport al
-     *  enfocar y la altura se mide contra el espacio real bajo el input
-     *  (visualViewport, con teclado), no solo con un tope fijo: la lista
-     *  nunca queda bajo el teclado ni fuera de pantalla, con scroll propio.
+     *  teclado del iPhone) y su altura se mide contra el espacio real bajo
+     *  el input en el visual viewport (geometría pura en ./list-fit): no
+     *  supera ese espacio (suelo 0, sin mínimos mágicos) y, si el hueco es
+     *  incómodo, se crea espacio desplazando la página una única vez por
+     *  apertura. Re-medición viva con los eventos del visualViewport.
      *  Sin la prop: comportamiento automático de Radix (colisiones y
      *  volteo) como antes. */
     dropdownSide?: 'bottom';
@@ -63,33 +65,34 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
     const searchGateRef = useRef(createLatestRequestGate());
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Altura medida contra el visual viewport (solo con dropdownSide):
-    // espacio real bajo el input. Si no caben ni 96px, se crea hueco
-    // desplazando la página UNA vez por apertura (sin saltos repetidos);
-    // el suelo es 64px para no forzar la lista bajo el teclado.
+    // geometría pura de ./list-fit. La altura NO supera el espacio real
+    // (suelo 0); si el hueco es incómodo se crea espacio con UN único
+    // scroll por apertura (guardia scrolledForSpace, sin saltos repetidos).
     const [listMaxHeight, setListMaxHeight] = useState<number | null>(null);
     const scrolledForSpace = useRef(false);
     const measureBelowInput = useCallback(() => {
         if (!root.current || typeof window === 'undefined') return;
         const vv = window.visualViewport;
         const rect = root.current.getBoundingClientRect();
-        const viewportBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
-        const spaceBelow = Math.floor(viewportBottom - rect.bottom - 8);
-        if (spaceBelow < 96) {
-            if (!scrolledForSpace.current) {
-                scrolledForSpace.current = true;
-                root.current.scrollIntoView({ block: 'center' });
-                // El listener de resize/scroll del visualViewport re-medirá.
-            }
-            setListMaxHeight(Math.max(64, spaceBelow));
-            return;
+        const spaceBelow = computeSpaceBelow(rect.bottom, vv ? vv.height : window.innerHeight, vv ? vv.offsetTop : 0);
+        const fit = computeListFit(spaceBelow, scrolledForSpace.current);
+        if (fit.shouldScroll) {
+            scrolledForSpace.current = true;
+            root.current.scrollIntoView({ block: 'center' });
+            // El listener de resize/scroll del visualViewport re-medirá.
         }
-        setListMaxHeight(Math.min(240, spaceBelow));
+        setListMaxHeight(fit.maxHeight);
     }, []);
 
     // Con la lista abierta y dirección forzada, re-medir cuando cambia el
     // visual viewport (teclado que abre/cierra, offset por barras, scroll).
+    // Al cerrar, la guardia de scroll se resetea para la próxima apertura.
     useEffect(() => {
-        if (!dropdownSide || !open || typeof window === 'undefined') return;
+        if (!dropdownSide || typeof window === 'undefined') return;
+        if (!open) {
+            scrolledForSpace.current = false;
+            return;
+        }
         measureBelowInput();
         const vv = window.visualViewport;
         vv?.addEventListener('resize', measureBelowInput);
@@ -192,9 +195,8 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                 onFocus={() => {
                 focused.current = true;
                 if (dropdownSide) {
-                    // Nueva apertura: permitir un único ajuste de scroll si
-                    // no hay hueco bajo el input (lo decide la medición).
-                    scrolledForSpace.current = false;
+                    // Medición inicial; el ajuste de scroll lo decide la
+                    // geometría (una única vez por apertura).
                     measureBelowInput();
                 }
                 if (value.trim() && selected.current !== value) void runSearch(value.trim());
