@@ -235,10 +235,13 @@ export function quoteAgeSeconds(fetchedAtMs: number, timestampSec: number | null
  * - <60 min: redondeada y MARCADA como aproximada ("hace ~3 min");
  * - >=60 min: horas y minutos exactos a suelo ("hace 1 h 59 min"),
  *   porque el suelo de horas solo subestimaba en la unidad oculta.
- * Valores no finitos, cero o futuros (desfase de reloj) => "hace 0 s".
+ * Valores NO finitos => "N/D": frescura desconocida, nunca disfrazada de 0 s.
+ * Cero o futuros (desfase de reloj; clamp preexistente de quoteAgeSeconds)
+ * => "hace 0 s" (comportamiento anterior, registrado, sin ampliar).
  */
 export function formatQuoteAge(ageSeconds: number): string {
-    if (!Number.isFinite(ageSeconds) || ageSeconds <= 0) return 'hace 0 s';
+    if (!Number.isFinite(ageSeconds)) return 'N/D';
+    if (ageSeconds <= 0) return 'hace 0 s';
     if (ageSeconds < 60) return `hace ${Math.floor(ageSeconds)} s`;
     if (ageSeconds < 3600) {
         const m = Math.round(ageSeconds / 60);

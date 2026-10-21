@@ -126,6 +126,8 @@ test('formatQuoteAge: explicita, sin aproximacion implicita', () => {
     assert.equal(formatQuoteAge(45), 'hace 45 s');
     assert.equal(formatQuoteAge(0), 'hace 0 s');
     assert.equal(formatQuoteAge(-30), 'hace 0 s');
-    assert.equal(formatQuoteAge(NaN), 'hace 0 s');
-    assert.equal(formatQuoteAge(Infinity), 'hace 0 s');
+    // No finitos: frescura desconocida como N/D, nunca como "0 s" (parecería dato nuevo).
+    assert.equal(formatQuoteAge(NaN), 'N/D');
+    assert.equal(formatQuoteAge(Infinity), 'N/D');
+    assert.equal(formatQuoteAge(-Infinity), 'N/D');
 });
