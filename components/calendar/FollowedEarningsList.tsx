@@ -54,6 +54,8 @@ export function MaterialsLine({ materials }: { materials: EventMaterials | undef
     );
 }
 
+const ASSET_LABEL = { presentacion: 'Presentación', directo: 'Directo', grabacion: 'Grabación', transcripcion: 'Transcripción' } as const;
+
 /** Enlaces oficiales de IR (registro verificado): pagina del evento si la fecha coincide, si no la seccion general. */
 export function IrLine({ ticker, date }: { ticker: string; date: string }) {
     const links = irLinksFor(ticker, date);
@@ -73,6 +75,12 @@ export function IrLine({ ticker, date }: { ticker: string; date: string }) {
                     <ExternalLink aria-hidden="true" className="h-3 w-3" />
                 </a>
             )}
+            {links.eventPage?.assets.map((a) => (
+                <a key={a.url} href={a.url} target="_blank" rel="noopener noreferrer" title={`Archivo oficial · verificado el ${links.verifiedOn}`} className={chip}>
+                    {ASSET_LABEL[a.kind]}
+                    <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                </a>
+            ))}
         </p>
     );
 }
