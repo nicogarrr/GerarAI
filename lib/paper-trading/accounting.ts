@@ -38,9 +38,14 @@ export function computeManualDemoAccount(
     starting: Record<Currency, number>,
     entries: LedgerEntry[]
 ): AccountState {
+    // FIFO por executedAt; desempate por tiebreak estable (createdAt de la
+    // fila) si viene; el índice SOLO ordena lecturas sin persistencia (tests).
     const ordered = entries
         .map((entry, index) => ({ entry, index }))
-        .sort((a, b) => a.entry.executedAt - b.entry.executedAt || a.index - b.index);
+        .sort((a, b) =>
+            a.entry.executedAt - b.entry.executedAt ||
+            (a.entry.tiebreak ?? a.index) - (b.entry.tiebreak ?? b.index)
+        );
 
     const cash: Record<Currency, number> = { ...starting };
     const lots = new Map<string, Lot[]>();
@@ -48,6 +53,11 @@ export function computeManualDemoAccount(
     const violations: string[] = [];
 
     const applyFx = (fx: FxConversion) => {
+        if (fx.from === fx.to) {
+            // N1: convertir una divisa en sí misma crearía dinero.
+            violations.push(`fx ${fx.clientOrderId}: divisa origen y destino iguales (${fx.from}); rechazada`);
+            return;
+        }
         if (!Number.isFinite(fx.amountFrom) || fx.amountFrom <= 0 || !Number.isFinite(fx.rate) || fx.rate <= 0) {
             violations.push(`fx ${fx.clientOrderId}: importe o tipo inválido`);
             return;
@@ -61,7 +71,9 @@ export function computeManualDemoAccount(
     };
 
     const applyFill = (fill: Fill) => {
-        const key = instrumentKey(fill.instrument);
+        // N2: el libro separa por divisa: comprar SAN en EUR y vender SAN en
+        // USD NO se cruzan en el mismo FIFO.
+        const key = `${fill.currency}|${instrumentKey(fill.instrument)}`;
         const mult = multiplierOf(fill);
         const queue = lots.get(key) ?? [];
         if (fill.side === 'buy') {
@@ -77,17 +89,15 @@ export function computeManualDemoAccount(
             lots.set(key, queue);
         } else {
             const held = queue.reduce((acc, lot) => acc + lot.quantity, 0);
-            if (held === 0) {
-                violations.push(`venta ${fill.clientOrderId} (${key} x${fill.quantity}): no hay posición que cerrar`);
+            // Sin fills parciales en fase 1: si no cubre la posición entera,
+            // la orden NO se aplica (ni cash ni lotes) y queda registrada.
+            if (held < fill.quantity) {
+                violations.push(
+                    `venta ${fill.clientOrderId} (${key}): pedida x${fill.quantity}, posición x${held}; orden rechazada entera, sin movimiento`
+                );
                 return;
             }
-            // Se cierra como mucho lo que hay; el exceso se rechaza y no crea dinero.
-            const closing = Math.min(fill.quantity, held);
-            if (closing < fill.quantity) {
-                violations.push(
-                    `venta ${fill.clientOrderId} (${key}): pedida x${fill.quantity}, posición x${held}; ejecutada x${closing}, exceso rechazado`
-                );
-            }
+            const closing = fill.quantity;
             cash[fill.currency] += closing * fill.price * mult - fill.fee;
             let remaining = closing;
             let pnl = realized.get(key) ?? 0;
@@ -110,18 +120,14 @@ export function computeManualDemoAccount(
 
     const positions: PaperPosition[] = [];
     const realizedByCurrency: Record<Currency, number> = { EUR: 0, USD: 0 };
-    const realizedCurrency = new Map<string, Currency>();
-    for (const { entry } of ordered) {
-        if (!('kind' in entry) || entry.kind !== 'fx') realizedCurrency.set(instrumentKey((entry as Fill).instrument), (entry as Fill).currency);
-    }
     for (const [key, queue] of lots) {
         const quantity = queue.reduce((acc, lot) => acc + lot.quantity, 0);
         if (quantity <= 0) continue;
         const last = ordered.map((o) => o.entry).filter((e): e is Fill => !('kind' in e) || e.kind !== 'fx')
-            .filter((f) => instrumentKey(f.instrument) === key).at(-1);
+            .filter((f) => `${f.currency}|${instrumentKey(f.instrument)}` === key).at(-1);
         const cost = queue.reduce((acc, lot) => acc + lot.quantity * lot.price, 0);
         positions.push({
-            instrumentKey: key,
+            instrumentKey: key.split('|').slice(1).join('|'),
             name: last?.instrument.name ?? key,
             kind: last?.instrument.kind ?? 'accion',
             currency: last?.currency ?? 'EUR',
@@ -131,7 +137,7 @@ export function computeManualDemoAccount(
         });
     }
     for (const [key, pnl] of realized) {
-        const cur = realizedCurrency.get(key) ?? 'EUR';
+        const cur = (key.split('|')[0] as Currency) ?? 'EUR';
         realizedByCurrency[cur] += pnl;
     }
     positions.sort((a, b) => a.instrumentKey.localeCompare(b.instrumentKey));

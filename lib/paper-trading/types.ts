@@ -63,7 +63,8 @@ export interface Fill {
     clientOrderId: string;
 }
 
-/** Conversión manual simulada entre saldos (EUR<->USD). */
+/** Conversión manual simulada entre saldos (EUR<->USD). from != to SIEMPRE:
+ * convertir una divisa en sí misma crearía dinero (N1 del auditor). */
 export interface FxConversion {
     kind: 'fx';
     from: Currency;
@@ -74,6 +75,12 @@ export interface FxConversion {
     executedAt: number;
     source: 'manual-simulado';
     clientOrderId: string;
+    /**
+     * Desempate ESTABLE para fills con el mismo executedAt: el servidor lo
+     * rellena con el createdAt (ms) de la fila persistida. Nunca se usa el
+     * orden del array para desempatar (N-auditoría).
+     */
+    tiebreak?: number;
 }
 
 export type LedgerEntry = Fill | FxConversion;

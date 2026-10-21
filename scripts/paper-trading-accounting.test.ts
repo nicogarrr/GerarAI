@@ -36,15 +36,50 @@ test('FIFO con ejecutadas desordenadas: ordena por executedAt, no por el array',
     assert.equal(state.cashByCurrency.EUR, 100_000);
 });
 
-test('sobreventa: se cierra solo lo que hay, el exceso no crea dinero y queda registrado', () => {
+test('sobreventa sin fills parciales: la orden se rechaza ENTERA sin mover cash ni lotes', () => {
     const state = computeManualDemoAccount({ EUR: 10, USD: 0 }, [
         fill('Y', 'buy', 1, 10, 100),
         fill('Y', 'sell', 5, 20, 200),
     ]);
-    assert.equal(state.cashByCurrency.EUR, 20); // 10 inicial - 10 compra + 20 por la acción real
+    assert.equal(state.cashByCurrency.EUR, 0); // 10 - 10; la venta no se aplicó
+    assert.equal(state.realizedPnlByCurrency.EUR, 0);
+    assert.equal(state.positions.length, 1);
+    assert.equal(state.positions[0].quantity, 1);
+    assert.ok(state.violations.some((v) => v.includes('rechazada entera')));
+});
+
+test('N1: fx EUR->EUR no crea dinero; se rechaza con violation', () => {
+    const state = computeManualDemoAccount({ EUR: 100, USD: 0 }, [
+        { kind: 'fx', from: 'EUR', to: 'EUR', amountFrom: 100, rate: 2, executedAt: 50, source: 'manual-simulado', clientOrderId: 'fxbad' },
+    ]);
+    assert.equal(state.cashByCurrency.EUR, 100);
+    assert.equal(state.cashByCurrency.USD, 0);
+    assert.ok(state.violations.some((v) => v.includes('origen y destino iguales')));
+});
+
+test('N2: mismo símbolo en dos divisas son libros separados (no se cruza el FIFO)', () => {
+    const state = computeManualDemoAccount({ EUR: 1000, USD: 0 }, [
+        fill('SAN', 'buy', 10, 5, 100, 'EUR'),
+        fill('SAN', 'sell', 5, 6, 200, 'USD'), // posición USD inexistente
+    ]);
+    assert.equal(state.cashByCurrency.EUR, 950);
+    assert.equal(state.cashByCurrency.USD, 0); // la venta USD no tocó el libro EUR ni creó USD
+    assert.equal(state.positions.length, 1);
+    assert.equal(state.positions[0].currency, 'EUR');
+    assert.equal(state.positions[0].quantity, 10);
+    assert.ok(state.violations.some((v) => v.includes('USD')));
+});
+
+test('desempate estable: mismo executedAt se ordena por tiebreak (createdAt persistido), no por array', () => {
+    const entries = [
+        { ...fill('Z', 'sell', 5, 12, 300), tiebreak: 200 },
+        { ...fill('Z', 'buy', 10, 10, 300), tiebreak: 100 },
+    ];
+    const state = computeManualDemoAccount({ EUR: 1000, USD: 0 }, entries);
+    // Con tiebreak: compra primero -> venta válida; sin él (orden del array) sería violación.
+    assert.equal(state.violations.length, 0);
+    assert.equal(state.positions[0].quantity, 5);
     assert.equal(state.realizedPnlByCurrency.EUR, 10);
-    assert.equal(state.positions.length, 0);
-    assert.ok(state.violations.some((v) => v.includes('exceso rechazado')));
 });
 
 test('compra sin saldo no se aplica y queda en violations (no hay sobregiro implícito)', () => {
