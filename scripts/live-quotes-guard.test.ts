@@ -29,23 +29,34 @@ test('catalogo: simbolos unicos, nombre y kind/unit coherentes', () => {
 });
 
 test('parse: sin cierre previo el cambio es null, nunca 0 inventado', () => {
-    const spec = { symbol: 'X', name: 'X', kind: 'accion' as const, unit: 'EUR' as const };
+    const spec = { symbol: 'X', name: 'X', kind: 'accion' as const, unit: 'EUR' as const, decimals: 2 };
     const quote = parseYahooQuote(spec, { regularMarketPrice: 10, regularMarketTime: 100 });
     assert.ok(quote);
     assert.equal(quote.change, null);
     assert.equal(quote.changePercent, null);
 });
 
-test('parse: chartPreviousClose sirve de cierre previo si previousClose falta', () => {
-    const spec = { symbol: '^X', name: 'X', kind: 'indice' as const, unit: 'index' as const };
-    const quote = parseYahooQuote(spec, { regularMarketPrice: 110, chartPreviousClose: 100, regularMarketTime: 100 });
+test('parse: el cierre de referencia sale de las barras diarias, no del meta', () => {
+    const spec = { symbol: '^X', name: 'X', kind: 'indice' as const, unit: 'index' as const, decimals: 2 };
+    const d1 = 1_700_000_000; // dia 1
+    const d2 = d1 + 86_400; // dia 2 (misma zona en el test: UTC por defecto)
+    const quote = parseYahooQuote(
+        spec,
+        { regularMarketPrice: 110, regularMarketTime: d2, exchangeTimezoneName: 'UTC' },
+        { timestamps: [d1, d2], closes: [100, 110] },
+    );
     assert.ok(quote);
     assert.equal(quote.change, 10);
     assert.equal(quote.changePercent, 10);
+    // Sin barras no hay referencia demostrable: cambio N/D, nunca inventado.
+    const sinBarras = parseYahooQuote(spec, { regularMarketPrice: 110, regularMarketTime: d2, exchangeTimezoneName: 'UTC' });
+    assert.ok(sinBarras);
+    assert.equal(sinBarras.change, null);
+    assert.equal(sinBarras.changePercent, null);
 });
 
 test('parse: precio ausente o roto devuelve null (N/D honesto)', () => {
-    const spec = { symbol: 'X', name: 'X', kind: 'materia' as const, unit: 'USD' as const };
+    const spec = { symbol: 'X', name: 'X', kind: 'materia' as const, unit: 'USD' as const, decimals: 2 };
     assert.equal(parseYahooQuote(spec, null), null);
     assert.equal(parseYahooQuote(spec, {}), null);
     assert.equal(parseYahooQuote(spec, { regularMarketPrice: 0 }), null);

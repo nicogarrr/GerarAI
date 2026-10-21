@@ -4,7 +4,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { RefreshCcw } from 'lucide-react';
 
 import { getLiveMarkets } from '@/lib/actions/live-quotes.actions';
-import type { LiveMarketsResult, LiveQuote, LiveQuoteKind } from '@/lib/market/live-quotes';
+import {
+    formatQuoteAge,
+    formatQuoteChange,
+    localizeInstrumentType,
+    quoteAgeSeconds,
+    type LiveMarketsResult,
+    type LiveQuote,
+    type LiveQuoteKind,
+} from '@/lib/market/live-quotes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 
@@ -22,15 +30,15 @@ const TABS: { key: LiveQuoteKind; label: string; note: string }[] = [
     { key: 'divisa', label: 'Divisas', note: 'Tipo de cambio entre divisas.' },
 ];
 
-const priceFormatter = (unit: LiveQuote['unit']) =>
+const priceFormatter = (unit: LiveQuote['unit'], decimals: number) =>
     new Intl.NumberFormat('es-ES', {
         style: unit === 'index' || unit === 'cruz' ? 'decimal' : 'currency',
         currency: unit === 'index' || unit === 'cruz' ? undefined : unit,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
     });
 
-const changeFormatter = new Intl.NumberFormat('es-ES', {
+const changePercentFormatter = new Intl.NumberFormat('es-ES', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
     signDisplay: 'always',
@@ -45,10 +53,24 @@ const timeFormatter = new Intl.DateTimeFormat('es-ES', {
 });
 
 function formatPrice(quote: LiveQuote): string {
-    return priceFormatter(quote.unit).format(quote.price);
+    return priceFormatter(quote.unit, quote.decimals).format(quote.price);
 }
 
-function QuoteRow({ quote }: { quote: LiveQuote | null }) {
+function sessionLabel(session: LiveQuote['session']): string | null {
+    if (session === 'pre') return 'premercado';
+    if (session === 'post') return 'postmercado';
+    return null;
+}
+
+function identityLine(quote: LiveQuote): string {
+    const parts = [quote.symbol];
+    if (quote.exchangeName) parts.push(quote.exchangeName);
+    const kindLabel = localizeInstrumentType(quote.instrumentType);
+    if (kindLabel) parts.push(kindLabel);
+    return parts.join(' · ');
+}
+
+function QuoteRow({ quote, fetchedAt }: { quote: LiveQuote | null; fetchedAt: number }) {
     if (!quote) {
         return (
             <tr className="border-b border-gray-800/60">
@@ -57,12 +79,17 @@ function QuoteRow({ quote }: { quote: LiveQuote | null }) {
         );
     }
     const changeClass = quote.changePercent === null ? 'text-gray-500' : quote.changePercent >= 0 ? 'text-teal-300' : 'text-red-400';
+    const age = quoteAgeSeconds(fetchedAt, quote.timestamp);
+    const session = sessionLabel(quote.session);
     return (
         <tr className="border-b border-gray-800/60">
             <td className="py-2.5 pr-2">
                 <div className="text-gray-100">{quote.name}</div>
+                <div className="text-xs text-gray-500">{identityLine(quote)}</div>
                 <div className="text-xs text-gray-500">
                     {quote.timestamp ? timeFormatter.format(new Date(quote.timestamp * 1000)) : 'sin hora'}
+                    {age !== null ? ` · ${formatQuoteAge(age)}` : ''}
+                    {session ? ` · ${session}` : ''}
                 </div>
             </td>
             <td className="py-2.5 px-2 text-right font-medium text-gray-100 whitespace-nowrap">{formatPrice(quote)}</td>
@@ -71,8 +98,8 @@ function QuoteRow({ quote }: { quote: LiveQuote | null }) {
                     'N/D'
                 ) : (
                     <>
-                        <div>{changeFormatter.format(quote.change)}</div>
-                        <div className="text-xs">({changeFormatter.format(quote.changePercent)}%)</div>
+                        <div>{formatQuoteChange(quote.change, quote.decimals)}</div>
+                        <div className="text-xs">({changePercentFormatter.format(quote.changePercent)}%)</div>
                     </>
                 )}
             </td>
@@ -92,7 +119,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
             setData(next);
             setFailed(false);
         } catch {
-            // Conservamos lo ultimo bueno; el aviso dice que puede ir con retraso extra.
+            // Conservamos lo ultimo bueno; la antigüedad por fila sigue siendo honesta.
             setFailed(true);
         } finally {
             setRefreshing(false);
@@ -118,7 +145,10 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                 </Button>
             </div>
             <Tabs defaultValue="indice" className="mt-3">
-                <TabsList className="flex-wrap">
+                {/* h-auto: con flex-wrap la lista crece a 2 filas en móvil; con la
+                    altura fija base (h-9) la 2ª fila se montaba sobre el texto
+                    siguiente y esas tabs no respondían al toque (21-oct-2026). */}
+                <TabsList className="h-auto flex-wrap gap-y-1">
                     {TABS.map((tab) => (
                         <TabsTrigger key={tab.key} value={tab.key}>{tab.label}</TabsTrigger>
                     ))}
@@ -132,7 +162,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                                 <table className="w-full text-sm">
                                     <tbody>
                                         {group.quotes.map((quote, i) => (
-                                            <QuoteRow key={i} quote={quote} />
+                                            <QuoteRow key={i} quote={quote} fetchedAt={data?.fetchedAt ?? 0} />
                                         ))}
                                     </tbody>
                                 </table>
@@ -146,9 +176,9 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                 })}
             </Tabs>
             <p className="mt-4 text-xs leading-5 text-gray-500">
-                Fuente: Yahoo Finance. Las acciones suelen llevar unos 15 minutos de retraso; índices, futuros y
-                divisas van casi en tiempo. La hora de cada cotización es la que informa el proveedor (hora de
-                Madrid). No son datos oficiales de mercado ni sirven para operar con garantías.
+                Fuente: Yahoo Finance. Cada fila muestra la hora que informa el proveedor y su antigüedad
+                calculada (hora de Madrid); el panel se actualiza cada minuto. No son datos oficiales de
+                mercado ni sirven para operar con garantías.
             </p>
         </div>
     );

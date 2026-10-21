@@ -23,8 +23,15 @@ async function fetchOne(spec: LiveQuoteSpec): Promise<LiveQuote | null> {
         const resp = await fetch(url, { ...init, signal: AbortSignal.timeout(PER_SYMBOL_TIMEOUT_MS), cache: 'no-store' });
         if (!resp.ok) return null;
         const payload = await resp.json();
-        const meta = payload?.chart?.result?.[0]?.meta as YahooChartMeta | undefined;
-        return parseYahooQuote(spec, meta ?? null);
+        const result = payload?.chart?.result?.[0];
+        const meta = result?.meta as YahooChartMeta | undefined;
+        // Barras diarias del MISMO response: el cierre de referencia sale de
+        // ellas (por dia/sesion en la tz del mercado), no del meta.
+        const bars = {
+            timestamps: result?.timestamp as (number | null)[] | undefined,
+            closes: result?.indicators?.quote?.[0]?.close as (number | null)[] | undefined,
+        };
+        return parseYahooQuote(spec, meta ?? null, bars);
     } catch {
         return null;
     }
@@ -54,5 +61,5 @@ async function fetchAll(): Promise<LiveMarketsResult> {
  */
 export async function getLiveMarkets(): Promise<LiveMarketsResult> {
     await requireAuthenticatedUser();
-    return cachedFetch('live-markets:v1', fetchAll, CACHE_TTL_SECONDS);
+    return cachedFetch('live-markets:v2', fetchAll, CACHE_TTL_SECONDS);
 }
