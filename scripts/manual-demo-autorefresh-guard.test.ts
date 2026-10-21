@@ -26,7 +26,7 @@ describe('auto-refresco de la valoración demo', () => {
 
     it('candado COMPARTIDO entre botón manual y auto, sin secuencia muerta', () => {
         // Un solo candado ref compartido; nada de contadores locales del efecto.
-        assert.match(panel, /refreshLock = useRef\(\{ inFlight: false, failures: 0, lastStart: 0 \}\)/);
+        assert.match(panel, /refreshLock = useRef\(\{ inFlight: false, failures: 0, lastStart: 0, holdUntil: 0 \}\)/);
         assert.doesNotMatch(panel, /let inFlight = false/);
         assert.match(panel, /if \(lock\.inFlight\) return/);
         // Sin seq: el candado ya impide dos consultas en vuelo, así que una
@@ -56,11 +56,15 @@ describe('auto-refresco de la valoración demo', () => {
         assert.match(panel, /MAX_REFRESH_BACKOFF_MS = 16 \* 60_000/);
         assert.match(panel, /VALUATION_REFRESH_MS \* 2 \*\* lock\.failures/);
         assert.match(panel, /lock\.failures \+= 1/);
-        // El listado US caído devuelve ok con filas N/D pero su fetch NO se
-        // cachea server-side: reintentarlo cada 60 s quemaría fanout. La
-        // acción lo señala de forma estructurada (listingUnavailable) y aquí
-        // ese intento cuenta como fallo transitorio del backoff.
-        assert.match(panel, /lock\.failures = result\.listingUnavailable \? lock\.failures \+ 1 : 0/);
+        // Fallos transitorios con respuesta ok (filas N/D): listado US caído
+        // (su fetch no se cachea server-side) o TODAS las cotizaciones
+        // fallidas (429/red/timeout). La acción los señala de forma
+        // estructurada (listingUnavailable / quoteFetchFailed) y aquí arman
+        // el backoff; un dato genuinamente ausente o viejo NO lo arma.
+        assert.match(panel, /lock\.failures = result\.listingUnavailable \|\| result\.quoteFetchFailed \? lock\.failures \+ 1 : 0/);
+        // Retry-After del proveedor (cuando lo expone): no reintentar antes.
+        assert.match(panel, /lock\.holdUntil = result\.retryAfterSeconds \? Date\.now\(\) \+ result\.retryAfterSeconds \* 1000 : 0/);
+        assert.match(panel, /Date\.now\(\) >= lock\.holdUntil/);
         // Repuesta al volver a la pestaña respetando la espera vigente y
         // limpieza al desmontar (timer + listener).
         assert.match(panel, /visibilitychange/);

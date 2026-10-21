@@ -546,7 +546,7 @@ describe('R3b: rediseño insertar→releer→abortar (orden persistido real)', (
 });
 
 type VRow = { status: string; note: string; marketValue: number | null; currencyBasis: string | null };
-type VResult = { ok: boolean; valuation: { rows: VRow[]; coverage: { valued: number; total: number } }; listingUnavailable?: boolean };
+type VResult = { ok: boolean; valuation: { rows: VRow[]; coverage: { valued: number; total: number } }; listingUnavailable?: boolean; quoteFetchFailed?: boolean; retryAfterSeconds?: number | null };
 
 describe('valoración bajo demanda (getManualDemoValuation)', () => {
     const g = globalThis as Record<string, unknown>;
@@ -582,6 +582,7 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
                 g.__GUARD_QUOTE_CALLS__ = (g.__GUARD_QUOTE_CALLS__ as string[]).concat(symbol);
                 const q = (g.__GUARD_QUOTES__ as Record<string, unknown>)[symbol];
                 if (q instanceof Error) throw q;
+                if (q instanceof Response) return q;
                 if (!q) return new Response(JSON.stringify({ c: 0, pc: 0, t: 0 }), { status: 200 });
                 return new Response(JSON.stringify(q), { status: 200 });
             }
@@ -712,5 +713,32 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         assert.ok(byNote.includes('No se pudo verificar la divisa de la cotización.'), 'ausente del listado');
         assert.ok(byNote.some((n) => n.startsWith('Sin cotización disponible')), 'proveedor caído con divisa verificada');
         assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['DOWN'], 'solo se pide la cotización con divisa verificable');
+    });
+
+    it('quoteFetchFailed: solo si TODAS las cotizaciones verificables fallan; Retry-After propagado', async () => {
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'BBVA', name: 'BBVA' }, currency: 'EUR', quantity: 1, price: 1 }));
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'T00', name: 'T00' }, currency: 'EUR', quantity: 1, price: 1 }));
+        listing = [{ symbol: 'BBVA', currency: 'EUR' }, { symbol: 'T00', currency: 'EUR' }];
+        // Todas fallan (429 con Retry-After y red): señal + espera del proveedor.
+        g.__GUARD_QUOTES__ = { BBVA: new Response('throttled', { status: 429, headers: { 'retry-after': '120' } }), T00: new Error('timeout') };
+        let r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.quoteFetchFailed, true, 'todas las cotizaciones verificables fallaron');
+        assert.equal(r.retryAfterSeconds, 120, 'Retry-After del proveedor propagado');
+        assert.equal(r.valuation.coverage.valued, 0);
+        // Dato genuinamente ausente o viejo (respuesta OK saneada a null): NO es fallo de fetch.
+        g.__GUARD_QUOTES__ = { BBVA: finnhub(5, { t: 1_000_000_000 }) }; // vieja; T00 sin entrada => { c: 0 }
+        r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.quoteFetchFailed, false, 'dato ausente/viejo no arma backoff');
+        assert.equal(r.retryAfterSeconds, null);
+        // Éxito parcial: una falla y otra valora => no es fallo total.
+        g.__GUARD_QUOTES__ = { BBVA: finnhub(12), T00: new Error('cae uno') };
+        r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.quoteFetchFailed, false, 'éxito parcial no es fallo total');
+        assert.equal(r.valuation.coverage.valued, 1);
+        // Sin símbolos verificables (listado OK sin esos símbolos): no hay fetch que fallar.
+        listing = [];
+        r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.quoteFetchFailed, false, 'sin verificables no aplica');
+        assert.equal(r.listingUnavailable, false, 'el listado respondió');
     });
 });

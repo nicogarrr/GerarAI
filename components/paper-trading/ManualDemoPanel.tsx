@@ -31,7 +31,9 @@ export type ManualDemoPanelProps = {
     refreshValuation?: () => Promise<RefreshResult>;
 };
 
-export type RefreshResult = { ok: true; valuation: DemoValuation; asOf: number; listingUnavailable: boolean } | { ok: false; error: string };
+export type RefreshResult =
+    | { ok: true; valuation: DemoValuation; asOf: number; listingUnavailable: boolean; quoteFetchFailed: boolean; retryAfterSeconds: number | null }
+    | { ok: false; error: string };
 
 const ASOF_FORMAT = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
@@ -111,7 +113,7 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
     // de una más nueva. `refreshing` es el busy real (manual u automático):
     // los botones se deshabilitan y muestran «Consultando…» mientras tanto,
     // así un clic durante una consulta no muere sin aviso.
-    const refreshLock = useRef({ inFlight: false, failures: 0, lastStart: 0 });
+    const refreshLock = useRef({ inFlight: false, failures: 0, lastStart: 0, holdUntil: 0 });
     const [refreshing, setRefreshing] = useState(false);
     const runRefresh = useCallback(async () => {
         if (!refreshValuation) return;
@@ -123,10 +125,13 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
         try {
             const result = await refreshValuation();
             if (result.ok) {
-                // Listado de divisas caído: respuesta ok con filas N/D, pero
-                // el intento costó su fetch y no valora nada: cuenta como
-                // fallo transitorio para el backoff de reintentos.
-                lock.failures = result.listingUnavailable ? lock.failures + 1 : 0;
+                // Fallos transitorios con respuesta ok (filas N/D): listado
+                // de divisas caído o TODAS las cotizaciones fallidas (429,
+                // red, timeout). Cuestan fetch y no valoran nada: arman el
+                // backoff. Un dato genuinamente ausente o viejo NO lo arma.
+                lock.failures = result.listingUnavailable || result.quoteFetchFailed ? lock.failures + 1 : 0;
+                // Retry-After expuesto por el proveedor: no reintentar antes.
+                lock.holdUntil = result.retryAfterSeconds ? Date.now() + result.retryAfterSeconds * 1000 : 0;
                 setValuation(result.valuation);
                 setAsOf(result.asOf);
                 setRefreshError(null);
@@ -158,7 +163,7 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
         const due = () => {
             const lock = refreshLock.current;
             const wait = Math.min(VALUATION_REFRESH_MS * 2 ** lock.failures, MAX_REFRESH_BACKOFF_MS);
-            return Date.now() - lock.lastStart >= wait;
+            return Date.now() - lock.lastStart >= wait && Date.now() >= lock.holdUntil;
         };
         const tick = () => {
             if (document.visibilityState !== 'visible' || !due()) return;

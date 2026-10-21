@@ -574,11 +574,15 @@ export async function getManualDemoAccount(): Promise<ManualDemoAccountResult> {
 }
 
 export type ManualDemoValuationResult =
-    // listingUnavailable: había símbolos a valorar pero el listado US de
-    // divisas no respondió (fallo transitorio o clave ausente): no se pidió
-    // ninguna cotización y las filas salen N/D. El cliente lo usa para
-    // tratar el intento como fallo transitorio en su backoff de reintentos.
-    | { ok: true; valuation: DemoValuation; asOf: number; listingUnavailable: boolean }
+    // Señales estructuradas de fallo transitorio para el backoff del cliente:
+    // - listingUnavailable: había símbolos a valorar pero el listado US de
+    //   divisas no respondió (no se pidió ninguna cotización; filas N/D).
+    // - quoteFetchFailed: había símbolos verificables y TODAS las consultas
+    //   de cotización fallaron (429, red, timeout). Un dato genuinamente
+    //   ausente o viejo (fetch OK, saneado a null) NO lo activa.
+    // - retryAfterSeconds: Retry-After expuesto por el proveedor en un fallo
+    //   (p. ej. 429); el cliente no debe reintentar antes. null si no vino.
+    | { ok: true; valuation: DemoValuation; asOf: number; listingUnavailable: boolean; quoteFetchFailed: boolean; retryAfterSeconds: number | null }
     | ManualDemoFailure;
 
 const MAX_VALUATION_SYMBOLS = 25;
@@ -586,21 +590,31 @@ const MAX_VALUATION_SYMBOLS = 25;
  * Cotización SOLO de Finnhub (/quote) con la frescura validada por
  * sanitizeFinnhubQuote (stale => null). Deliberadamente NO usa getStockQuote:
  * ese camino cae a Yahoo Finance si Finnhub falla, y aquí nunca debe haber
- * ninguna llamada a Yahoo. Sin clave, error de red o dato viejo => null.
+ * ninguna llamada a Yahoo.
+ * fetchFailed distingue el fallo transitorio (sin clave, HTTP no-OK como un
+ * 429, red o timeout) del dato genuinamente ausente o viejo (respuesta OK
+ * que el saneado descarta): solo el primero debe armar el backoff del
+ * cliente. retryAfterSeconds recoge el Retry-After cuando el proveedor lo
+ * expone en un no-OK (cabecera estándar de throttle, en segundos).
  */
-async function finnhubOnlyQuote(symbol: string): Promise<ValuationQuote | null> {
+type QuoteAttempt = { quote: ValuationQuote | null; fetchFailed: boolean; retryAfterSeconds: number | null };
+
+async function finnhubOnlyQuote(symbol: string): Promise<QuoteAttempt> {
     const token = process.env.FINNHUB_API_KEY;
-    if (!token) return null;
+    if (!token) return { quote: null, fetchFailed: true, retryAfterSeconds: null };
     try {
         const base = process.env.FINNHUB_BASE_URL || 'https://finnhub.io/api/v1';
         const response = await fetch(`${base}/quote?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(token)}`, {
             cache: 'no-store',
             signal: AbortSignal.timeout(8_000),
         });
-        if (!response.ok) return null;
-        return sanitizeFinnhubQuote(await response.json());
+        if (!response.ok) {
+            const retryAfter = Number.parseInt(response.headers.get('retry-after') ?? '', 10);
+            return { quote: null, fetchFailed: true, retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null };
+        }
+        return { quote: sanitizeFinnhubQuote(await response.json()), fetchFailed: false, retryAfterSeconds: null };
     } catch {
-        return null;
+        return { quote: null, fetchFailed: true, retryAfterSeconds: null };
     }
 }
 
@@ -684,12 +698,25 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
         const settled = await Promise.allSettled(verifiable.map((symbol) => finnhubOnlyQuote(symbol)));
         for (const symbol of symbols) quotes[symbol] = null;
         const currencyUnverified = new Set(symbols.filter((s) => !verifiable.includes(s)));
+        let fetchFailures = 0;
+        let retryAfterSeconds: number | null = null;
         verifiable.forEach((symbol, i) => {
             const r = settled[i];
-            const quote = r.status === 'fulfilled' ? r.value : null;
-            quotes[symbol] = quote ? { ...quote, currency: listing?.get(symbol) ?? null } : null;
+            const attempt: QuoteAttempt = r.status === 'fulfilled' ? r.value : { quote: null, fetchFailed: true, retryAfterSeconds: null };
+            quotes[symbol] = attempt.quote ? { ...attempt.quote, currency: listing?.get(symbol) ?? null } : null;
+            if (attempt.fetchFailed) {
+                fetchFailures += 1;
+                if (attempt.retryAfterSeconds !== null) retryAfterSeconds = Math.max(retryAfterSeconds ?? 0, attempt.retryAfterSeconds);
+            }
         });
-        return { ok: true, valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified }), asOf: Date.now(), listingUnavailable: symbols.length > 0 && listing === null };
+        return {
+            ok: true,
+            valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified }),
+            asOf: Date.now(),
+            listingUnavailable: symbols.length > 0 && listing === null,
+            quoteFetchFailed: verifiable.length > 0 && fetchFailures === verifiable.length,
+            retryAfterSeconds,
+        };
     } catch (error) {
         return unexpectedError('getManualDemoValuation', error);
     }
