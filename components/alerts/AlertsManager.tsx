@@ -160,6 +160,16 @@ function AlertsManager() {
                 ...formData,
                 condition: {
                     ...formData.condition,
+                    // Cinturón y tirantes: aunque el select de tipo ya sincroniza
+                    // la dirección, el alta deriva el operador del tipo para que
+                    // un estado viejo (deep-link, HMR) nunca guarde la alerta al
+                    // revés de lo que anuncia su etiqueta.
+                    operator:
+                        formData.type === 'price_above'
+                            ? '>'
+                            : formData.type === 'price_below'
+                              ? '<'
+                              : formData.condition.operator,
                     value: numericValue,
                 },
             });
@@ -292,7 +302,26 @@ function AlertsManager() {
                                 <Label htmlFor="type" className="text-gray-300">Tipo de Alerta</Label>
                                 <Select
                                     value={formData.type}
-                                    onValueChange={(value: AlertType) => setFormData({ ...formData, type: value })}
+                                    onValueChange={(value: AlertType) =>
+                                        setFormData({
+                                            ...formData,
+                                            type: value,
+                                            // La dirección de price_above/price_below ya la anuncia el
+                                            // tipo y el motor evalúa el OPERADOR: sin sincronizarlos se
+                                            // guardaba price_below con '>' y la alerta saltaba al revés
+                                            // de lo que prometía su etiqueta. En price_change la
+                                            // dirección sí la elige el usuario, así que se conserva.
+                                            condition: {
+                                                ...formData.condition,
+                                                operator:
+                                                    value === 'price_above'
+                                                        ? '>'
+                                                        : value === 'price_below'
+                                                          ? '<'
+                                                          : formData.condition.operator,
+                                            },
+                                        })
+                                    }
                                 >
                                     <SelectTrigger className="bg-gray-900 border-gray-600 text-gray-100 h-11 text-base sm:h-9 sm:text-sm">
                                         <SelectValue />
@@ -306,10 +335,11 @@ function AlertsManager() {
                             </div>
                             {(formData.type === 'price_above' || formData.type === 'price_below' || formData.type === 'price_change') && (
                                 <>
+                                    {formData.type === 'price_change' && (
                                     <div>
                                         <Label htmlFor="operator" className="text-gray-300">Operador</Label>
                                         <Select
-                                            value={formData.condition.operator}
+                                            value={formData.condition.operator === '<' ? '<' : '>'}
                                             onValueChange={(value: CreateAlertInput['condition']['operator']) =>
                                                 setFormData({
                                                     ...formData,
@@ -321,14 +351,15 @@ function AlertsManager() {
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-gray-900 border-gray-600">
+                                                {/* Solo las dos direcciones que la etiqueta sabe pintar
+                                                    («mayor/menor a X%»): '>=', '<=' y '==' se disparaban
+                                                    bien pero se anunciaban como «menor». */}
                                                 <SelectItem value=">">Mayor que (&gt;)</SelectItem>
                                                 <SelectItem value="<">Menor que (&lt;)</SelectItem>
-                                                <SelectItem value=">=">Mayor o igual (&gt;=)</SelectItem>
-                                                <SelectItem value="<=">Menor o igual (&lt;=)</SelectItem>
-                                                <SelectItem value="==">Igual a (==)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
+                                    )}
                                     <div>
                                         <Label htmlFor="value" className="text-gray-300">
                                             {formData.type === 'price_change' ? 'Porcentaje (%)' : 'Precio (divisa de la cotización)'}
