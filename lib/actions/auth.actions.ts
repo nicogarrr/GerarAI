@@ -47,6 +47,14 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
 
         const response = await auth.api.signInEmail({ body: { email, password } });
 
+        // better-auth (plugin twoFactor) NO lanza con 2FA activo: responde 200 con
+        // `twoFactorRedirect: true`, sin sesion, solo con la cookie pendiente de
+        // 2FA. Tratarlo como exito mandaba a /inicio sin sesion y el middleware
+        // devolvia a /sign-in: un usuario con 2FA no podia entrar nunca.
+        if ((response as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) {
+            return { success: false, twoFactorRequired: true };
+        }
+
         return { success: true, data: response };
     } catch (error: unknown) {
         const appError = toAppError(error);
