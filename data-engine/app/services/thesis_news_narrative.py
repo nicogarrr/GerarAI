@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
+from app.llm.errors import ProviderDisabledError, ProviderHTTPError, ProviderTransportError
 from app.models.entities import Company, NewsEvent
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
@@ -234,7 +235,9 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
         request = build_request(company.ticker, headlines)
         provider = provider or create_llm_provider()
         if provider.name == "disabled" or paid_model_risk(provider, request=request):
-            return sin_datos()
+            # Modelo no disponible NO es ausencia de evidencia: compendio
+            # factual (fuentes explícitas, sin LLM, EUR 0) en vez de «Sin datos».
+            return compendio_factual(list(news_items or []), now or datetime.now(UTC))
         budget = BudgetController()
         responses = []
 
@@ -246,7 +249,7 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
                 return budget.can_spend(short, 0)
 
         if not allowed():
-            return sin_datos()
+            return compendio_factual(list(news_items or []), now or datetime.now(UTC))
 
         async def complete():
             # Únicamente escalares y proveedor en el puente. Ninguna Session.
@@ -275,7 +278,27 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
                     budget.record(db, response.model, "thesis_news_narrative", 0,
                                   response.usage.total_tokens, commit=False)
                     db.flush()
+    except (ProviderHTTPError, ProviderTransportError, ProviderDisabledError) as exc:
+        # SOLO indisponibilidad del proveedor (HTTP 429/5xx/401/403, timeout
+        # de transporte, proveedor deshabilitado): la evidencia EXISTE y
+        # «Sin datos» mentiría. Compendio factual extractivo (sin LLM, EUR 0)
+        # que declara la indisponibilidad del análisis automático SIN
+        # diagnosticar la causa (el copy nunca afirma cuota/auth: 429 no es
+        # el único origen posible y el status es diagnóstico interno, en log).
+        # Log con whitelist tipada, JAMAS str(exc) genérico: un mensaje de
+        # proveedor podría volcar URL/token/body/contenido de la fuente.
+        if isinstance(exc, ProviderHTTPError):
+            detalle = f"HTTP {exc.status_code}"
+        elif isinstance(exc, ProviderTransportError):
+            detalle = f"transport {exc.reason} attempts={exc.attempts}"
+        else:
+            detalle = "disabled"
+        logger.warning("Narrativa de noticias: %s %s; compendio factual",
+                       type(exc).__name__, detalle)
+        return compendio_factual(list(news_items or []), now or datetime.now(UTC))
     except Exception as exc:  # noqa: BLE001 - upstream inestable nunca rompe la tesis
+        # Salida LLM rechazada (cifras inventadas, URLs, JSON inválido,
+        # inyección) y cualquier otro fallo: FAIL-CLOSED como antes.
         logger.warning("Narrativa de noticias: %s; Sin datos", type(exc).__name__)
         return sin_datos()
 
