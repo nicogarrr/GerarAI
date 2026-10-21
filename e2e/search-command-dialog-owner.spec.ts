@@ -62,3 +62,30 @@ test.describe('buscador global: una sola instancia de diálogo', () => {
         await expect(page.locator('[role="dialog"] [role="alert"]')).toHaveCount(0, { timeout: 15000 });
     });
 });
+
+test.describe('owner huérfano (objeción auditor)', () => {
+    test.skip(process.env.E2E_UI_RUN !== '1', 'Necesita frontend E2E');
+    test.setTimeout(90000);
+
+    test('desmontar a la dueña (drawer -> resize) no deja diálogo fantasma', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 860 });
+        await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
+        await page.locator('button[aria-label="Abrir buscador"]:visible').first().waitFor();
+        await page.waitForTimeout(500);
+
+        // Drawer móvil: su SearchCommand es una instancia más.
+        await page.click('button[aria-label="Abrir menú de navegación"]');
+        await expect(page.locator('[role="dialog"]')).toHaveCount(1); // el drawer
+        await page.locator('[role="dialog"] button[aria-label="Abrir buscador"]').click();
+        await expect(page.locator('[role="dialog"]')).toHaveCount(2); // drawer + paleta (dueña: drawer)
+
+        // Cruzar el breakpoint desmonta el drawer (y a la dueña) con la paleta abierta.
+        await page.setViewportSize({ width: 1280, height: 860 });
+        await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+
+        // El store no puede quedar open=true huérfano: Ctrl+K ABRE (no cierra fantasma).
+        await page.keyboard.press('Control+k');
+        await expect(page.locator('[role="dialog"]')).toHaveCount(1);
+        await expect(page.locator('[role="dialog"] input')).toBeFocused();
+    });
+});

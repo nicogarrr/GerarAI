@@ -52,6 +52,16 @@ export function registerSearchCommandInstance(instance: SearchCommandInstance): 
         instances.delete(instance.id);
         const index = registrationOrder.indexOf(instance.id);
         if (index >= 0) registrationOrder.splice(index, 1);
+        // Dueña desmontada con el diálogo abierto (p. ej. el drawer móvil se
+        // cierra por Escape o al cruzar el breakpoint): sin este cierre el
+        // store quedaba open=true con owner huérfano y el siguiente Ctrl+K
+        // solo "cerraba" un diálogo fantasma en vez de abrir. El foco cae al
+        // body: el gatillo original ya no existe. No afecta al cierre normal
+        // (closeSearchCommand mantiene owner sticky para animación/foco).
+        if (state.ownerId === instance.id) {
+            state = { open: false, ownerId: null };
+            emit();
+        }
     };
 }
 

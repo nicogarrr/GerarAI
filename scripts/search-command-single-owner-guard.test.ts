@@ -37,3 +37,12 @@ void test('el atajo elige la instancia cuyo gatillo está visible', () => {
     assert.match(store, /isTriggerVisible/, 'sin criterio de visibilidad el atajo no sabe qué instancia abrir');
     assert.match(store, /captureReturnFocus/, 'la devolución de foco necesita saber de dónde se abrió');
 });
+
+void test('desmontar a la dueña con el diálogo abierto cierra el store (sin owner huérfano)', () => {
+    // Objeción auditor PR#1998: unregister sin cierre dejaba open=true con
+    // ownerId muerto y el siguiente Ctrl+K cerraba un fantasma.
+    assert.match(store, /state\.ownerId === instance\.id/, 'el unregister no comprueba si la instancia es la dueña');
+    const idx = store.indexOf('state.ownerId === instance.id');
+    const bloque = store.slice(idx, idx + 200);
+    assert.match(bloque, /open: false/, 'el unregister de la dueña no cierra el diálogo');
+});
