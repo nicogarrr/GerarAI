@@ -13,12 +13,18 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, CircleHelp, LogOut, Settings, ShieldCheck } from "lucide-react";
 import { signOut } from "@/lib/actions/auth.actions";
+import { toast } from "sonner";
+import { runSignOut } from "@/lib/auth/sign-out-flow";
 
 const UserDropdown = ({ user }: { user: User }) => {
     const router = useRouter();
     const handleSignOut = async () => {
-        await signOut();
-        router.push("/sign-in");
+        await runSignOut({
+            signOut,
+            push: (path) => router.push(path),
+            refresh: () => router.refresh(),
+            notifyError: (title, description) => toast.error(title, { description }),
+        });
     }
 
     return (
