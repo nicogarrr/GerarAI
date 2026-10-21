@@ -5,7 +5,6 @@ import { Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { runThesisDebate, type ThesisDebateResult } from '@/lib/actions/thesis-jobs.actions';
-import { showErrorToast } from '@/lib/toast';
 import { isNextRedirectError } from '@/lib/types/errors';
 
 interface ThesisDebatePanelProps {
@@ -33,12 +32,10 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
                 setDebate(outcome.debate);
             } else {
                 setError(outcome.error);
-                showErrorToast(new Error(outcome.error), { onRetry: run });
             }
         } catch (exc) {
             if (isNextRedirectError(exc)) throw exc;
             setError(exc instanceof Error ? exc.message : 'No se pudo generar el debate');
-            showErrorToast(exc, { onRetry: run });
         } finally {
             setRunning(false);
         }
