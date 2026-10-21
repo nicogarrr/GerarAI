@@ -79,7 +79,7 @@ const SignIn = () => {
 
     if (twoFactorRequired) {
         return (
-            <>
+            <React.Fragment key="two-factor">
                 <h1 className="form-title">Verificación en dos pasos</h1>
                 <p className="text-sm text-gray-500 mb-6">
                     Introduce el código de 6 dígitos de tu app de autenticación para continuar.
@@ -117,12 +117,12 @@ const SignIn = () => {
                         Volver a iniciar sesión
                     </button>
                 </form>
-            </>
+            </React.Fragment>
         );
     }
 
     return (
-        <>
+        <React.Fragment key="credentials">
             <h1 className="form-title">Bienvenido de nuevo</h1>
 
             {/* Contexto de producto: qué es GerarAI y qué se obtiene al entrar.
@@ -164,7 +164,7 @@ const SignIn = () => {
 
                 <FooterLink text="¿No tienes cuenta?" linkText="Crear cuenta" href="/sign-up" />
             </form>
-        </>
+        </React.Fragment>
     );
 };
 export default SignIn;
