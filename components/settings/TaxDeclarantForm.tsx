@@ -117,14 +117,19 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                                 <div className="rounded-md border border-gray-800 p-3 text-sm text-gray-300" key={key}>
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <span className="min-w-0 break-words font-medium">{partidaLabel(key)}</span>
-                                        <Input
-                                            aria-label={`País de custodia de ${partidaLabel(key)}`}
-                                            className="w-20 uppercase"
-                                            disabled={busy}
-                                            maxLength={2}
-                                            onChange={(event) => setCustody((current) => ({ ...current, [key]: event.target.value }))}
-                                            value={custody[key] ?? ''}
-                                        />
+                                        <label className="flex items-center gap-2 text-xs text-gray-400" htmlFor={`custody-country-${key}`}>
+                                            <span>País de custodia</span>
+                                            <Input
+                                                aria-label={`País de custodia de ${partidaLabel(key)}`}
+                                                className="w-24 uppercase"
+                                                id={`custody-country-${key}`}
+                                                placeholder="Ej. ES"
+                                                disabled={busy}
+                                                maxLength={2}
+                                                onChange={(event) => setCustody((current) => ({ ...current, [key]: event.target.value }))}
+                                                value={custody[key] ?? ''}
+                                            />
+                                        </label>
                                     </div>
                                     <details className="mt-3">
                                         <summary className="min-h-10 cursor-pointer py-2 text-teal-300">Entidad depositaria y fecha</summary>
