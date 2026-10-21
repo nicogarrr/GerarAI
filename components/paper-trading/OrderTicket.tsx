@@ -108,9 +108,16 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     const total = useMemo(() => {
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return null;
         if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) return null;
+        // Comisión inválida o negativa: NO mostrar resumen. Sumar una fee
+        // negativa abarataría el coste (o inflaría el neto de una venta) y
+        // tratar una fee ilegible como 0 ocultaría la comisión: en ambos
+        // casos el total sería engañoso antes de que validate() bloquee.
+        // El multiplicador es constante (100 en opciones), no input: no
+        // admite valor inválido.
+        if (!Number.isFinite(parsedFee) || parsedFee < 0) return null;
         const multiplier = kind === 'opcion' ? 100 : 1;
         return parsedQuantity * parsedPrice * multiplier;
-    }, [kind, parsedQuantity, parsedPrice]);
+    }, [kind, parsedQuantity, parsedPrice, parsedFee]);
 
     function validate(): string | null {
         if (!symbol.trim()) return 'Indica el símbolo.';
@@ -398,11 +405,11 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     <p className="mt-1 text-sm text-gray-300">
                         {sideLabel} · {formatNumber(parsedQuantity)} {kindLabel} × {formatMoney(parsedPrice, currency)}
                         {kind === 'opcion' ? ' × 100 (multiplicador)' : ''}
-                        {Number.isFinite(parsedFee) && parsedFee > 0 ? ` ${side === 'buy' ? '+' : '−'} ${formatMoney(parsedFee, currency)} de comisión` : ''}
+                        {parsedFee > 0 ? ` ${side === 'buy' ? '+' : '−'} ${formatMoney(parsedFee, currency)} de comisión` : ''}
                     </p>
                     <p className="mt-1 text-base font-semibold text-gray-100">
                         {side === 'buy' ? 'Coste total estimado: ' : 'Ingreso neto estimado: '}
-                        {formatMoney(side === 'buy' ? total + (Number.isFinite(parsedFee) ? parsedFee : 0) : total - (Number.isFinite(parsedFee) ? parsedFee : 0), currency)}
+                        {formatMoney(side === 'buy' ? total + parsedFee : total - parsedFee, currency)}
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
                         Calculado con tus datos: no es una cotización ni una ejecución de mercado.

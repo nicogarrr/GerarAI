@@ -80,8 +80,18 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(ticket, /Coste total estimado: /);
         assert.match(ticket, /Ingreso neto estimado: /);
         assert.match(ticket, /no es una cotización ni una ejecución de mercado/);
-        // Comisión inválida no ensucia el total.
-        assert.match(ticket, /Number\.isFinite\(parsedFee\) \? parsedFee : 0/);
+        // Inputs inválidos => SIN resumen (nada de total engañoso antes del
+        // bloqueo de validate): fee ilegible no se trata como 0 y fee
+        // negativa no abarata el coste ni infla el neto.
+        assert.match(ticket, /if \(!Number\.isFinite\(parsedFee\) \|\| parsedFee < 0\) return null/);
+        assert.doesNotMatch(ticket, /Number\.isFinite\(parsedFee\) \? parsedFee : 0/);
+        // Con el resumen visible la fee ya es finita y >= 0: el desglose y el
+        // total la usan directamente, sin coerciones.
+        assert.match(ticket, /\{parsedFee > 0 \? ` \$\{side === 'buy' \? '\+' : '−'\}/);
+        assert.match(ticket, /total \+ parsedFee : total - parsedFee/);
+        // Cantidad/precio ya tenían validación equivalente en el mismo useMemo.
+        assert.match(ticket, /!Number\.isInteger\(parsedQuantity\) \|\| parsedQuantity <= 0\) return null/);
+        assert.match(ticket, /!Number\.isFinite\(parsedPrice\) \|\| parsedPrice <= 0\) return null/);
         // Sin red: el bloque no consulta cotización (sigue presentacional).
         assert.doesNotMatch(ticket, /quote|markPrice|refreshValuation/i);
     });
