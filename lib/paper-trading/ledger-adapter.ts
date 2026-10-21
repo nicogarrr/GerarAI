@@ -54,14 +54,26 @@ export function docsToLedger(docs: PersistedTradeDoc[]): AdaptedLedger {
         const executedAtMs = doc.executedAt instanceof Date ? doc.executedAt.getTime() : NaN;
         const tiebreak = doc.createdAt instanceof Date ? doc.createdAt.getTime() : undefined;
         if (doc.kind === 'fx') {
-            if (!doc.fxFrom || !doc.fxTo || doc.fxFrom === doc.fxTo || !(doc.fillPrice != null && doc.fillPrice > 0)) {
-                violations.push(`doc ${docId(doc)}: fx inválida (from/to/tipo); no entra en el libro`);
+            if (!Number.isFinite(executedAtMs) || executedAtMs <= 0) {
+                violations.push(`doc ${docId(doc)}: fx sin executedAt válido; no entra en el libro`);
+                continue;
+            }
+            if (!doc.fxFrom || !doc.fxTo || doc.fxFrom === doc.fxTo || !(doc.fillPrice != null && doc.fillPrice > 0) || !(doc.quantity > 0)) {
+                violations.push(`doc ${docId(doc)}: fx inválida (from/to/tipo/importe); no entra en el libro`);
                 continue;
             }
             entries.push({
                 kind: 'fx', from: doc.fxFrom, to: doc.fxTo, amountFrom: doc.quantity, rate: doc.fillPrice,
                 executedAt: executedAtMs, source: 'manual-simulado', clientOrderId: doc.clientOrderId, tiebreak,
             });
+            continue;
+        }
+        if (doc.kind === 'opcion' && (!doc.contract || typeof doc.contract !== 'object')) {
+            violations.push(`doc ${docId(doc)}: opción sin contrato (corrupción); no entra en el libro`);
+            continue;
+        }
+        if (!Number.isFinite(executedAtMs)) {
+            violations.push(`doc ${docId(doc)}: fill sin executedAt válido; no entra en el libro`);
             continue;
         }
         const instrument: Fill['instrument'] = doc.kind === 'opcion'

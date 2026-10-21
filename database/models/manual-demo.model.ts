@@ -101,7 +101,21 @@ const ManualDemoTradeSchema = new Schema<ManualDemoTradeDoc>(
         openClose: { type: String, enum: ['open', 'close'], required: true },
         fxFrom: { type: String, enum: ['EUR', 'USD', null], default: null },
         fxTo: { type: String, enum: ['EUR', 'USD', null], default: null },
-        quantity: { type: Number, required: true, min: 1, validate: { validator: Number.isInteger, message: 'cantidad entera (sin fracciones en fase 1)' } },
+        // @ts-expect-error -- validador condicional por kind; el tipo de
+        // Mongoose no admite `this` en validator de path.
+        quantity: {
+            type: Number,
+            required: true,
+            min: [0.00000001, 'cantidad positiva'],
+            validate: {
+                // Acciones y contratos: enteros. FX: importe con decimales
+                // permitido (convertir 50,50 EUR no puede exigir entero).
+                validator(this: { kind?: string }, v: number) {
+                    return this.kind === 'fx' ? v > 0 : Number.isInteger(v) && v >= 1;
+                },
+                message: 'acciones/contratos enteros; fx admite importe con decimales',
+            },
+        },
         status: { type: String, enum: ['filled', 'rejected'], required: true },
         fillPrice: { type: Number, default: null },
         currency: { type: String, enum: ['EUR', 'USD'], required: true },

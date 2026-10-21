@@ -133,6 +133,7 @@ export function toFill(input: Omit<Fill, 'source'> & { source?: Fill['source'] }
     if (!input.clientOrderId) return null;
     if (input.instrument.kind === 'opcion') {
         const c = input.instrument.contract;
+        if (!c || typeof c !== 'object') return null; // runtime: contrato ausente (doc corrupto)
         if (c.adjusted) return null; // fase 1: contratos ajustados rechazados
         if (c.multiplier !== 100) return null; // fase 1: solo estándar
         if (!(c.strike > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(c.expiry)) return null;
