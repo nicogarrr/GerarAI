@@ -197,11 +197,18 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                 })}
             </Tabs>
             <p className="mt-4 text-xs leading-5 text-gray-500">
-                Fuente: Yahoo Finance (endpoint público sin documentación oficial: no hay SLA ni confirmación de
-                derechos de redistribución; es un riesgo de viabilidad pendiente de resolver, no un
-                proveedor garantizado). La hora que ves en cada fila es la hora que el proveedor atribuye
-                al dato: no es una promesa de tiempo real y el retraso exacto de cada mercado no lo informa
-                la fuente. No son datos oficiales de mercado ni sirven para operar con garantías.</p>
+                Fuente: Yahoo Finance. Cada fila muestra la fecha y hora que el proveedor atribuye al dato;
+                no es una promesa de tiempo real.{' '}
+                <details className="mt-1">
+                    <summary className="cursor-pointer text-gray-400">Condiciones y límites de la fuente</summary>
+                    <span className="mt-1 block">
+                        Endpoint público sin documentación oficial: no hay SLA ni confirmación de derechos de
+                        redistribución; es un riesgo de viabilidad pendiente de resolver, no un proveedor
+                        garantizado. El retraso exacto de cada mercado no lo informa la fuente. No son datos
+                        oficiales de mercado ni sirven para operar con garantías.
+                    </span>
+                </details>
+            </p>
         </div>
     );
 }
