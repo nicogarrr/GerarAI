@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.services.news_headline_translation import display_translation, original_headline
 from app.services.news_identity import normalize_headline, normalize_url
 
 
