@@ -1589,11 +1589,23 @@ class ThesisService:
         sources: dict,
         fact_sources: dict[int, dict] | None = None,
     ) -> str:
+        excluded_keys = {
+            str(item.get("metric"))
+            for item in (valuation.get("excluded_inputs") or [])
+            if isinstance(item, dict) and item.get("metric")
+        }
+        # Presente-excluido (tenemos el dato, fuera de periodo del ancla) NO
+        # se lista como ausente: pedirlo al usuario seria falso. Sigue
+        # bloqueando la valoracion internamente; aqui solo se explica aparte.
         missing = sorted(
-            set(
-                (valuation.get("missing_inputs") or [])
-                + (long_term_model.get("missing_inputs") or [])
-            )
+            {
+                key
+                for key in set(
+                    (valuation.get("missing_inputs") or [])
+                    + (long_term_model.get("missing_inputs") or [])
+                )
+                if key not in excluded_keys
+            }
         )
         lines: list[str] = []
         if missing:

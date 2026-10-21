@@ -432,14 +432,13 @@ class FinancialSnapshotBuilder:
         self._derive_free_cash_flow(snapshot)
 
         missing: list[str] = []
-        excluded_metrics = {item["metric"] for item in snapshot.excluded_present}
         for metric in REQUIRED_FOR_DCF:
             fact = snapshot.facts.get(metric)
             if fact is None or not math.isfinite(float(fact.value)) or metric in POSITIVE_REQUIRED_FOR_DCF and float(fact.value) <= 0:
-                if fact is None and metric in excluded_metrics:
-                    # Presente en DB pero excluido por periodo: no es una
-                    # entrada ausente y no se pide al usuario como tal.
-                    continue
+                # Un required excluido por periodo SIGUE bloqueando el DCF
+                # (coherent=False): la coherencia interna no se negocia. La
+                # distincion "presente pero excluido" vs "ausente" es solo
+                # explicacion al usuario (excluded_present), nunca gating.
                 missing.append(metric)
 
         has_margin = "fcf_margin" in snapshot.facts

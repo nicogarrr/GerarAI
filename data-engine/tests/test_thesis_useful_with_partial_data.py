@@ -142,17 +142,47 @@ def _fact(db, company, metric, value, period, year):
     return fact
 
 
-def test_snapshot_excluded_present_is_not_requested_as_missing(db):
+def test_snapshot_excluded_present_still_blocks_but_is_explained(db):
+    """Un required excluido por periodo SIGUE bloqueando (coherent=False):
+    la coherencia interna no se negocia. La distincion es solo explicacion
+    al usuario via excluded_present."""
     company = _company(db)
     _fact(db, company, "revenue", 0, "2023-12-31:FY", 2023)
     _fact(db, company, "shares_diluted", 43_260_501, "2025-12-31:FY", 2025)
     snapshot = FinancialSnapshotBuilder().build(db, company)
-    assert "shares_diluted" not in snapshot.missing_inputs
+    assert "shares_diluted" in snapshot.missing_inputs
+    assert snapshot.coherent is False
     excluded = {item["metric"]: item for item in snapshot.excluded_present}
     assert excluded["shares_diluted"]["available_period"] == "2025-12-31:FY"
     assert excluded["shares_diluted"]["anchor_period"] == "2023-12-31:FY"
-    # revenue=0 (presente pero no positivo) SI sigue bloqueando: es la causa real.
     assert "revenue" in snapshot.missing_inputs
+
+
+def test_positive_revenue_with_excluded_shares_is_insufficient_not_crash(db):
+    """Caso del auditor: revenue FY positivo + acciones solo de un FY
+    incompatible -> insufficient_data sin AssertionError (el assert de
+    shares del motor nunca se alcanza porque coherent=False)."""
+    from app.valuation.engines.standard_dcf import StandardDCFEngine
+
+    company = _company(db)
+    _fact(db, company, "revenue", 33_229_000, "2023-12-31:FY", 2023)
+    _fact(db, company, "operating_cash_flow", -41_448_000, "2023-12-31:FY", 2023)
+    _fact(db, company, "capital_expenditure", 5_000_000, "2023-12-31:FY", 2023)
+    _fact(db, company, "total_debt", 142_617_000, "2023-12-31:FY", 2023)
+    _fact(db, company, "cash_and_equivalents", 106_210_000, "2023-12-31:FY", 2023)
+    _fact(db, company, "shares_diluted", 43_260_501, "2025-12-31:FY", 2025)
+    snapshot = FinancialSnapshotBuilder().build(db, company)
+    assert snapshot.coherent is False
+    assert "shares_diluted" in snapshot.missing_inputs
+    engine = StandardDCFEngine()
+    context = engine.build_context(db, company, 17.13)
+    result = engine.value(context)
+    assert result["status"] == "insufficient_data"
+    assert result["publishable"] is False
+    assert "shares_diluted" in result["missing_inputs"]
+    assert any(
+        item["metric"] == "shares_diluted" for item in result["excluded_inputs"]
+    )
 
 
 def test_snapshot_three_year_history_resolves_shares_and_net_debt(db):
