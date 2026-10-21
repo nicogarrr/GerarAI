@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 // @ts-expect-error -- node --test (--experimental-strip-types) exige la extension .ts
 // en runtime; tsc la prohibe (TS5097). El supresor vive solo en este test.
-import { LIVE_QUOTE_GROUPS, parseYahooQuote, yahooChartRequest } from '../lib/market/live-quotes.ts';
+import { LIVE_QUOTE_GROUPS, parseYahooQuote, resolveGroupRows, yahooChartRequest } from '../lib/market/live-quotes.ts';
 
 test('catalogo: simbolos unicos, nombre y kind/unit coherentes', () => {
     const seen = new Set<string>();
@@ -68,4 +68,32 @@ test('request: URL con el simbolo codificado y UA de navegador', () => {
     assert.match(url, /finance\/chart\/EURUSD%3DX\?range=2d&interval=1d$/);
     const headers = init.headers as Record<string, string>;
     assert.match(headers['User-Agent'], /Mozilla/);
+});
+
+test('resolveGroupRows: una fila N/D conserva la identidad del instrumento', () => {
+    // Yahoo fallo para todo el grupo: ni una sola fila pierde nombre/simbolo.
+    const rows = resolveGroupRows('indice', [null, null]);
+    const specs = LIVE_QUOTE_GROUPS.find((g) => g.key === 'indice')!.specs;
+    assert.equal(rows.length, specs.length);
+    assert.equal(rows[0].spec.symbol, '^GSPC');
+    assert.equal(rows[0].spec.name, 'S&P 500');
+    assert.equal(rows[0].quote, null);
+    assert.equal(rows[1].spec.symbol, '^IXIC');
+});
+
+test('resolveGroupRows: empareja por simbolo aunque el array llegue reordenado', () => {
+    const specs = LIVE_QUOTE_GROUPS.find((g) => g.key === 'divisa')!.specs;
+    const meta = { regularMarketPrice: 1.12, regularMarketTime: 1_700_000_000, instrumentType: 'CURRENCY' };
+    const eurusd = parseYahooQuote(specs[0], meta)!;
+    const eurgbp = parseYahooQuote(specs[1], meta)!;
+    // Llegan al reves del catalogo: el emparejamiento es por simbolo.
+    const rows = resolveGroupRows('divisa', [eurgbp, eurusd, null, null, null]);
+    assert.equal(rows[0].quote?.symbol, 'EURUSD=X');
+    assert.equal(rows[1].quote?.symbol, 'EURGBP=X');
+    assert.equal(rows[2].quote, null);
+    assert.equal(rows[2].spec.name, 'GBP/USD');
+    // Cotizacion de un simbolo que no esta en el catalogo: no cuela.
+    const intruso = parseYahooQuote({ ...specs[0], symbol: 'XXXX=X' }, meta)!;
+    const rows2 = resolveGroupRows('divisa', [intruso]);
+    assert.ok(rows2.every((r) => r.quote?.symbol !== 'XXXX=X'));
 });
