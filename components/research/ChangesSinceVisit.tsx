@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { formatDate } from '@/lib/format';
 import { metricLabel } from '@/lib/research/metric-labels';
+import { changeSummaryText } from '@/lib/research/change-copy';
 import { resolveVisitBaseline } from '@/lib/research/visit-baseline';
 
 interface ChangesSince {
@@ -63,7 +64,7 @@ export function ChangesSinceVisit({ ticker }: { ticker: string }) {
                 ) : null}
                 {data.cambios_tesis.slice(0, 3).map((change, index) => (
                     <li key={`${change.fecha}-${index}`}>
-                        Tesis: {change.resumen}{change.requiere_revision ? ' (requiere revisión)' : ''}
+                        Tesis: {changeSummaryText(change.resumen)}{change.requiere_revision ? ' (requiere revisión)' : ''}
                         {/* Procedencia: la fuente del evento y las URLs absorbidas al
                             agrupar la misma noticia en dos idiomas quedan revisables. */}
                         {change.fuente_url && /^https:\/\//.test(change.fuente_url) ? (
