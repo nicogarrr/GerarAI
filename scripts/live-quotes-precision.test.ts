@@ -101,7 +101,7 @@ test('antigüedad: segundos reales desde la hora del proveedor, nunca negativa',
     assert.equal(quoteAgeSeconds((ts - 60) * 1000, ts), 0); // desfase de reloj => 0
     assert.equal(quoteAgeSeconds(0, null), null);
     assert.equal(formatQuoteAge(45), 'hace 45 s');
-    assert.equal(formatQuoteAge(600), 'hace 10 min');
+    assert.equal(formatQuoteAge(600), 'hace ~10 min');
     assert.equal(formatQuoteAge(7200), 'hace 2 h');
 });
 
