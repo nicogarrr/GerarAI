@@ -24,10 +24,23 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(ticket, /setName\(stock\.name\)/);
     });
 
-    it('la divisa solo se preselecciona con identidad verificada (BME/CNMV), nunca inferida', () => {
-        assert.match(ticket, /stock\.exchange === 'BME'\) setCurrency\('EUR'\)/);
-        // Sin heurísticas de divisa por nombre de bolsa o ticker.
-        assert.doesNotMatch(ticket, /exchange === 'NASDAQ'|exchange === 'NYSE'|setCurrency\('USD'\)/);
+    it('la divisa NUNCA se preselecciona desde el buscador (exchange no prueba divisa)', () => {
+        // La exchange del resultado puede venir inferida del search del
+        // proveedor, no solo del listado CNMV: ningun preset es seguro.
+        assert.doesNotMatch(ticket, /setCurrency\('EUR'\)|setCurrency\('USD'\)/);
+        assert.doesNotMatch(ticket, /stock\.exchange === 'BME'|exchange === 'NASDAQ'|exchange === 'NYSE'/);
+        // El toggle manual sigue intacto.
+        assert.match(ticket, /onClick=\{\(\) => setCurrency\(value\)\}/);
+    });
+
+    it('editar el símbolo tras elegir limpia el nombre autocompletado (no registra A con nombre de B)', () => {
+        assert.match(ticket, /function onSymbolFieldChange\(value: string\)/);
+        assert.match(ticket, /onValueChange=\{onSymbolFieldChange\}/);
+        // La limpieza solo actua cuando el valor se aparta de la seleccion.
+        assert.match(ticket, /selectedSymbol\.current !== null && value !== selectedSymbol\.current/);
+        assert.match(ticket, /selectedSymbol\.current = null;\s*setName\(''\)/);
+        // La seleccion marca el simbolo elegido y rellena identidad.
+        assert.match(ticket, /selectedSymbol\.current = stock\.symbol/);
     });
 
     it('sigue siendo presentacional: nada de servidor dentro del ticket', () => {
@@ -39,7 +52,7 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(ticket, /Busca por nombre o ticker y elige/);
     });
 
-    it('las fechas nativas no desbordan en móvil (iOS no recorta date/datetime-local)', () => {
+    it('las fechas nativas llevan la mitigación de desborde móvil (min-w-0/texto reducido; verificación visual iOS pendiente en QA)', () => {
         const fechaEjecucion = ticket.match(/id=\{`\$\{uid\}-executed`\}[\s\S]{0,400}/)?.[0] ?? '';
         const bloqueInput = ticket.match(/<Input\s+className="[^"]*min-w-0[^"]*"\s+id=\{`\$\{uid\}-executed`\}/);
         assert.ok(bloqueInput, 'el datetime-local lleva min-w-0/max-w-full y texto reducido');

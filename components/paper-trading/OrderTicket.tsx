@@ -39,6 +39,8 @@ function newClientOrderId(): string {
  * ticket sigue manual porque registra una operacion YA ejecutada. No hay
  * selector de cadena de opciones: sin fuente gratuita verificable de
  * strikes/vencimientos, la identidad del contrato queda manual y etiquetada.
+ * La divisa nunca se preselecciona desde el buscador (su exchange no es
+ * prueba de divisa): el toggle manual manda.
  */
 export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; disabled?: boolean }) {
     const uid = useId();
@@ -75,14 +77,24 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     const [pending, setPending] = useState(false);
 
     // Al elegir una empresa del buscador se rellenan simbolo y nombre con la
-    // identidad real del resultado. Divisa: solo se preselecciona EUR cuando
-    // el resultado viene del listado español revisado por CNMV (exchange
-    // 'BME', identidad estatica del repo); para el resto no se infiere divisa
-    // y el toggle del usuario manda.
+    // identidad real del resultado. La divisa NO se preselecciona: el
+    // exchange del buscador no es prueba de divisa verificada, asi que el
+    // toggle manual del usuario manda siempre.
+    const selectedSymbol = useRef<string | null>(null);
     function onSelectInstrument(stock: StockWithWatchlistStatus) {
+        selectedSymbol.current = stock.symbol;
         setSymbol(stock.symbol);
         setName(stock.name);
-        if (stock.exchange === 'BME') setCurrency('EUR');
+    }
+    // Si tras elegir se EDITA el simbolo, el nombre autocompletado ya no
+    // corresponde: se limpia para no registrar una empresa con el nombre de
+    // otra. El nombre escrito a mano (sin seleccion) no se toca.
+    function onSymbolFieldChange(value: string) {
+        if (selectedSymbol.current !== null && value !== selectedSymbol.current) {
+            selectedSymbol.current = null;
+            setName('');
+        }
+        setSymbol(value);
     }
 
     const fieldKey = JSON.stringify([kind, symbol, name, side, quantity, price, currency, callPut, strike, expiry, fee, executedAtLocal]);
@@ -216,7 +228,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     <TickerSearchInput
                         id={`${uid}-symbol`}
                         value={symbol}
-                        onValueChange={setSymbol}
+                        onValueChange={onSymbolFieldChange}
                         onSelect={onSelectInstrument}
                         placeholder={kind === 'accion' ? 'p. ej. ASTS' : 'p. ej. AAPL'}
                         ariaLabel={kind === 'accion' ? 'Buscar acción por nombre o ticker' : 'Buscar subyacente por nombre o ticker'}
