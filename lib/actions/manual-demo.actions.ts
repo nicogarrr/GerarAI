@@ -795,6 +795,12 @@ export async function placeManualOrder(raw: unknown): Promise<ManualDemoOrderRes
                 if (held < parsed.quantity) {
                     return { kind: 'reject', reason: `No puedes vender ${parsed.quantity} acciones de ${parsed.instrument.symbol}: la posición en ${parsed.currency} es ${held}.` };
                 }
+                // Sin sobregiro: la comisión también debe caber en el cash que
+                // queda tras abonar la venta (la compra ya lo chequea).
+                const cashAfterSale = state.cashByCurrency[parsed.currency] + parsed.quantity * parsed.price;
+                if (parsed.fee > cashAfterSale + 1e-9) {
+                    return { kind: 'reject', reason: `La comisión (${money(parsed.fee)} ${parsed.currency}) supera el efectivo disponible tras la venta (${money(cashAfterSale)}): la demo no admite sobregiro.` };
+                }
             }
             return { kind: 'fill', entry: fill };
         };

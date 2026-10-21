@@ -154,6 +154,15 @@ export function buildOptionFill(input: OptionOrderInput): Result<Fill> {
     if (sellClose && input.contracts > input.heldContracts) {
         return fail(`No se pueden cerrar ${input.contracts} contratos: solo hay ${input.heldContracts} abiertos.`);
     }
+    if (sellClose) {
+        // Sin sobregiro: la comision del cierre tambien debe caber en el cash
+        // que queda tras abonar la prima (la apertura ya lo chequea).
+        const proceeds = premiumTotal(input.premium, input.contracts, input.contract.multiplier);
+        if (!Number.isFinite(input.availableCash) || input.fee > input.availableCash + proceeds + 1e-9) {
+            const disponible = Number.isFinite(input.availableCash) ? (input.availableCash + proceeds).toFixed(2) : 'N/D';
+            return fail(`La comision (${input.fee.toFixed(2)}) supera el efectivo disponible tras el cierre (${disponible}): la demo no admite sobregiro.`);
+        }
+    }
     if (buyOpen) {
         const cost = -optionCashDelta({
             side: 'buy',
