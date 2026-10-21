@@ -2,19 +2,18 @@
 
 import { Panel } from '@/components/ui/panel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { AccountState, LedgerEntry } from '@/lib/paper-trading/types';
 import { AccountSummary } from './AccountSummary';
 import { FxTicket } from './FxTicket';
 import { LedgerTable } from './LedgerTable';
 import { OrderTicket } from './OrderTicket';
 import { PositionsTable } from './PositionsTable';
-import type { SubmitFill, SubmitFx } from './submit';
+import type { DemoStateView, HistoryRow, SubmitFill, SubmitFx } from './submit';
 
 export type ManualDemoPanelProps = {
-    /** Estado recalculado en servidor; null mientras la cuenta no está conectada. */
-    account: AccountState | null;
-    /** Operaciones ejecutadas registradas (append-only). */
-    ledger: LedgerEntry[];
+    /** Vista de la cuenta devuelta por la acción; null mientras no está conectada. */
+    account: DemoStateView | null;
+    /** Historial de órdenes (ejecutadas y rechazadas, append-only). */
+    ledger: HistoryRow[];
     submitFill: SubmitFill;
     submitFx: SubmitFx;
 };

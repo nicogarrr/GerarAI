@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatMoney } from '@/lib/format';
+import { useRouter } from 'next/navigation';
 import type { Currency } from '@/lib/paper-trading/types';
 import type { SubmitFx } from './submit';
 
@@ -21,11 +22,17 @@ function newClientOrderId(): string {
  */
 export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?: boolean }) {
     const uid = useId();
+    const router = useRouter();
     const clientOrderId = useRef<string>(newClientOrderId());
 
     const [from, setFrom] = useState<Currency>('EUR');
     const [amount, setAmount] = useState('');
     const [rate, setRate] = useState('');
+    const [executedAtLocal, setExecutedAtLocal] = useState(() => {
+        const now = new Date();
+        now.setSeconds(0, 0);
+        return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+    });
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
@@ -49,6 +56,15 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
             setError('Indica el tipo de cambio (simulado) mayor que cero.');
             return;
         }
+        const executedAt = new Date(executedAtLocal).getTime();
+        if (!Number.isFinite(executedAt)) {
+            setError('Indica la fecha de la conversión.');
+            return;
+        }
+        if (executedAt > Date.now()) {
+            setError('La fecha de la conversión no puede ser futura.');
+            return;
+        }
         setError(null);
         setPending(true);
         try {
@@ -57,13 +73,21 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                 to,
                 amountFrom: parsedAmount,
                 rate: parsedRate,
+                executedAt,
                 clientOrderId: clientOrderId.current,
             });
             if (result.ok) {
-                setNotice('Conversión registrada en la cuenta demo.');
-                clientOrderId.current = newClientOrderId();
-                setAmount('');
-                setRate('');
+                if (result.outcome === 'filled') {
+                    setNotice('Conversión registrada en la cuenta demo.');
+                    clientOrderId.current = newClientOrderId();
+                    setAmount('');
+                    setRate('');
+                    router.refresh();
+                } else if (result.outcome === 'duplicate') {
+                    setNotice('Ya estaba registrada (mismo identificador): no se duplicó.');
+                } else {
+                    setError(`Conversión rechazada: ${result.reason ?? 'motivo no indicado'}.`);
+                }
             } else {
                 setError(result.error);
             }
@@ -74,7 +98,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
 
     return (
         <form onSubmit={onSubmit} aria-label="Conversión de divisa simulada" className="space-y-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-from`}>De</Label>
                     <div className="flex gap-2" role="group" aria-label="Divisa de origen">
@@ -115,6 +139,16 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                         onChange={(event) => setRate(event.target.value)}
                         inputMode="decimal"
                         placeholder={from === 'EUR' ? 'p. ej. 1,12' : 'p. ej. 0,89'}
+                        required
+                    />
+                </div>
+                <div className="space-y-1.5">
+                    <Label htmlFor={`${uid}-executed`}>Fecha</Label>
+                    <Input
+                        id={`${uid}-executed`}
+                        type="datetime-local"
+                        value={executedAtLocal}
+                        onChange={(event) => setExecutedAtLocal(event.target.value)}
                         required
                     />
                 </div>

@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 
 import { ManualDemoPanel } from '@/components/paper-trading/ManualDemoPanel';
-import type { SubmitResult } from '@/components/paper-trading/submit';
-import type { AccountState, LedgerEntry } from '@/lib/paper-trading/types';
+import type { DemoStateView, HistoryRow, SubmitResult } from '@/components/paper-trading/submit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -13,7 +12,7 @@ export const metadata: Metadata = {
         'Cuenta de práctica con saldo ficticio y operaciones manuales: registras compras y ventas con el precio que introduces tú.',
 };
 
-type DemoData = { account: AccountState | null; ledger: LedgerEntry[] };
+type DemoData = { account: DemoStateView | null; ledger: HistoryRow[] };
 
 /**
  * Datos de ejemplo SOLO para desarrollo local (qa visual de la pantalla).
@@ -23,8 +22,10 @@ type DemoData = { account: AccountState | null; ledger: LedgerEntry[] };
  */
 const DEV_DATA: DemoData = {
     account: {
-        cashByCurrency: { EUR: 98_500, USD: 2_240 },
-        realizedPnlByCurrency: { EUR: 250, USD: 0 },
+        cashEUR: 98_500,
+        cashUSD: 2_240,
+        realizedEUR: 250,
+        realizedUSD: 0,
         positions: [
             {
                 instrumentKey: 'A:ASTS',
@@ -37,41 +38,76 @@ const DEV_DATA: DemoData = {
             },
         ],
         violations: [],
+        notices: [],
     },
     ledger: [
         {
-            instrument: { kind: 'accion', symbol: 'ASTS', name: 'AST SpaceMobile' },
-            side: 'buy',
-            openClose: 'open',
-            quantity: 10,
-            price: 40,
-            currency: 'USD',
-            fee: 0,
-            executedAt: Date.now() - 86_400_000 * 2,
-            source: 'manual-simulado',
-            clientOrderId: 'dev-fixture-1',
-        },
-        {
-            instrument: { kind: 'accion', symbol: 'ASTS', name: 'AST SpaceMobile' },
+            clientOrderId: 'dev-fixture-2',
+            kind: 'accion',
+            symbol: 'ASTS',
+            name: 'AST SpaceMobile',
             side: 'sell',
             openClose: 'close',
             quantity: 5,
-            price: 60,
+            status: 'filled',
+            fillPrice: 60,
             currency: 'USD',
             fee: 0,
             executedAt: Date.now() - 86_400_000,
-            source: 'manual-simulado',
-            clientOrderId: 'dev-fixture-2',
+            rejectReason: null,
+            createdAt: Date.now() - 86_400_000,
+            simulated: true,
         },
         {
-            kind: 'fx',
-            from: 'EUR',
-            to: 'USD',
-            amountFrom: 2_000,
-            rate: 1.12,
-            executedAt: Date.now() - 86_400_000 * 3,
-            source: 'manual-simulado',
+            clientOrderId: 'dev-fixture-1',
+            kind: 'accion',
+            symbol: 'ASTS',
+            name: 'AST SpaceMobile',
+            side: 'buy',
+            openClose: 'open',
+            quantity: 10,
+            status: 'filled',
+            fillPrice: 40,
+            currency: 'USD',
+            fee: 0,
+            executedAt: Date.now() - 86_400_000 * 2,
+            rejectReason: null,
+            createdAt: Date.now() - 86_400_000 * 2,
+            simulated: true,
+        },
+        {
             clientOrderId: 'dev-fixture-3',
+            kind: 'fx',
+            symbol: 'EURUSD',
+            name: 'Conversión manual EUR→USD',
+            side: 'buy',
+            openClose: 'open',
+            quantity: 2_000,
+            status: 'filled',
+            fillPrice: 1.12,
+            currency: 'EUR',
+            fee: 0,
+            executedAt: Date.now() - 86_400_000 * 3,
+            rejectReason: null,
+            createdAt: Date.now() - 86_400_000 * 3,
+            simulated: true,
+        },
+        {
+            clientOrderId: 'dev-fixture-4',
+            kind: 'accion',
+            symbol: 'NVDA',
+            name: 'NVIDIA',
+            side: 'buy',
+            openClose: 'open',
+            quantity: 100,
+            status: 'rejected',
+            fillPrice: null,
+            currency: 'USD',
+            fee: 0,
+            executedAt: null,
+            rejectReason: 'Saldo USD insuficiente para esa compra',
+            createdAt: Date.now() - 3_600_000,
+            simulated: true,
         },
     ],
 };
@@ -90,6 +126,10 @@ async function loadDemoData(): Promise<DemoData> {
 export default async function PaperTradingPage() {
     const { account, ledger } = await loadDemoData();
 
+    // PUNTO DE CABLEADO (pilot): sustituir por registerManualDemoOrder /
+    // registerManualDemoFx de lib/actions/manual-demo.actions.ts. El
+    // resultado de la acción encaja directo en SubmitResult (ok+outcome+
+    // reason+state, o fallo con message -> error).
     async function submitFillNotWired(): Promise<SubmitResult> {
         'use server';
         return { ok: false, error: 'El registro en servidor todavía no está conectado.' };

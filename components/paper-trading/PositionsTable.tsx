@@ -1,14 +1,14 @@
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatMoney, formatNumber } from '@/lib/format';
-import type { PaperPosition } from '@/lib/paper-trading/types';
+import type { DemoPositionView } from './submit';
 
 /**
  * Posiciones abiertas de la cuenta demo, derivadas del libro por FIFO.
  * Sin ajustes por splits, dividendos ni ampliaciones (limitación declarada
  * de la demo): una posición que cruce una de ellas queda descuadrada.
  */
-export function PositionsTable({ positions }: { positions: PaperPosition[] }) {
+export function PositionsTable({ positions }: { positions: DemoPositionView[] }) {
     if (positions.length === 0) {
         return <EmptyState title="Sin posiciones abiertas" description="Las compras que registres aparecerán aquí." />;
     }

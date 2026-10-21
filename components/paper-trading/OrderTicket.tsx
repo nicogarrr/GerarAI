@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatMoney, formatNumber } from '@/lib/format';
+import { useRouter } from 'next/navigation';
 import type { Currency, OptionContract } from '@/lib/paper-trading/types';
 import type { FillSubmit, SubmitFill } from './submit';
 
@@ -32,6 +33,7 @@ function newClientOrderId(): string {
  */
 export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; disabled?: boolean }) {
     const uid = useId();
+    const router = useRouter();
     const clientOrderId = useRef<string>(newClientOrderId());
 
     const [kind, setKind] = useState<Kind>('accion');
@@ -46,6 +48,13 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     const [strike, setStrike] = useState('');
     const [expiry, setExpiry] = useState('');
 
+    const [fee, setFee] = useState('');
+    const [executedAtLocal, setExecutedAtLocal] = useState(() => {
+        const now = new Date();
+        now.setSeconds(0, 0);
+        // datetime-local espera hora local sin zona
+        return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+    });
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
@@ -53,6 +62,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     const parsedQuantity = Number(quantity);
     const parsedPrice = Number(price);
     const parsedStrike = Number(strike);
+    const parsedFee = fee.trim() === '' ? 0 : Number(fee);
 
     const total = useMemo(() => {
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return null;
@@ -66,6 +76,10 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
         if (!name.trim()) return 'Indica el nombre (no hay buscador en la fase manual).';
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return 'La cantidad debe ser un entero mayor que cero.';
         if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) return 'El precio debe ser mayor que cero.';
+        if (!Number.isFinite(parsedFee) || parsedFee < 0) return 'La comisión no puede ser negativa.';
+        const executedAt = new Date(executedAtLocal).getTime();
+        if (!Number.isFinite(executedAt)) return 'Indica la fecha de ejecución.';
+        if (executedAt > Date.now()) return 'La fecha de ejecución no puede ser futura.';
         if (kind === 'opcion') {
             if (!(parsedStrike > 0)) return 'El strike debe ser mayor que cero.';
             if (!EXPIRY_RE.test(expiry)) return 'Indica el vencimiento (fecha del contrato).';
@@ -108,13 +122,23 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 quantity: parsedQuantity,
                 price: parsedPrice,
                 currency,
+                fee: parsedFee,
+                executedAt: new Date(executedAtLocal).getTime(),
                 clientOrderId: clientOrderId.current,
             });
             if (result.ok) {
-                setNotice('Operación registrada en la cuenta demo.');
-                clientOrderId.current = newClientOrderId();
-                setQuantity('');
-                setPrice('');
+                if (result.outcome === 'filled') {
+                    setNotice('Operación registrada en la cuenta demo.');
+                    clientOrderId.current = newClientOrderId();
+                    setQuantity('');
+                    setPrice('');
+                    setFee('');
+                    router.refresh();
+                } else if (result.outcome === 'duplicate') {
+                    setNotice('Ya estaba registrada (mismo identificador de orden): no se duplicó.');
+                } else {
+                    setError(`Orden rechazada: ${result.reason ?? 'motivo no indicado'}.`);
+                }
             } else {
                 setError(result.error);
             }
@@ -277,9 +301,33 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="space-y-1.5">
+                    <Label htmlFor={`${uid}-fee`}>Comisión ({currency})</Label>
+                    <Input
+                        className="placeholder:text-gray-600"
+                        id={`${uid}-fee`}
+                        value={fee}
+                        onChange={(event) => setFee(event.target.value)}
+                        inputMode="decimal"
+                        placeholder="0"
+                    />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor={`${uid}-executed`}>Fecha de ejecución</Label>
+                    <Input
+                        id={`${uid}-executed`}
+                        type="datetime-local"
+                        value={executedAtLocal}
+                        onChange={(event) => setExecutedAtLocal(event.target.value)}
+                        required
+                    />
+                </div>
+            </div>
+
             <p className="text-xs text-gray-500">
                 Registras una operación ya ejecutada con el precio que introduces tú: no es una ejecución de
-                mercado. Comisión 0 por defecto: la demo no reproduce comisiones reales.
+                mercado. Comisión 0 por defecto (déjala vacía): la demo no reproduce comisiones reales.
                 {total !== null ? (
                     <>
                         {' '}

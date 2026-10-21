@@ -1,10 +1,9 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
 
 import { Stat } from '@/components/ui/stat';
 import { formatMoney } from '@/lib/format';
-import type { AccountState, Currency } from '@/lib/paper-trading/types';
-
-const CURRENCIES: Currency[] = ['EUR', 'USD'];
+import type { Currency } from '@/lib/paper-trading/types';
+import type { DemoStateView } from './submit';
 
 /**
  * Saldos de la cuenta demo manual: efectivo y realizado por divisa, sin
@@ -13,30 +12,35 @@ const CURRENCIES: Currency[] = ['EUR', 'USD'];
  * Las violaciones de integridad NUNCA se ocultan: si el recalculo detecta
  * una sobreventa o un sobregiro, se muestra tal cual.
  */
-export function AccountSummary({ account }: { account: AccountState }) {
+export function AccountSummary({ account }: { account: DemoStateView }) {
+    const cash: { label: string; value: number; currency: Currency }[] = [
+        { label: 'Efectivo EUR', value: account.cashEUR, currency: 'EUR' },
+        { label: 'Efectivo USD', value: account.cashUSD, currency: 'USD' },
+    ];
+    const realized: { label: string; value: number; currency: Currency }[] = [
+        { label: 'Realizado EUR', value: account.realizedEUR, currency: 'EUR' },
+        { label: 'Realizado USD', value: account.realizedUSD, currency: 'USD' },
+    ];
     return (
         <section aria-label="Saldo de la cuenta demo" className="space-y-3">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {CURRENCIES.map((currency) => (
+                {cash.map((bucket) => (
                     <Stat
-                        key={`cash-${currency}`}
-                        label={`Efectivo ${currency}`}
+                        key={bucket.label}
+                        label={bucket.label}
                         size="sm"
-                        value={formatMoney(account.cashByCurrency[currency], currency)}
+                        value={formatMoney(bucket.value, bucket.currency)}
                     />
                 ))}
-                {CURRENCIES.map((currency) => {
-                    const realized = account.realizedPnlByCurrency[currency];
-                    return (
-                        <Stat
-                            key={`realized-${currency}`}
-                            label={`Realizado ${currency}`}
-                            size="sm"
-                            value={formatMoney(realized, currency)}
-                            tone={realized > 0 ? 'good' : realized < 0 ? 'bad' : 'default'}
-                        />
-                    );
-                })}
+                {realized.map((bucket) => (
+                    <Stat
+                        key={bucket.label}
+                        label={bucket.label}
+                        size="sm"
+                        value={formatMoney(bucket.value, bucket.currency)}
+                        tone={bucket.value > 0 ? 'good' : bucket.value < 0 ? 'bad' : 'default'}
+                    />
+                ))}
             </div>
             {account.violations.length > 0 ? (
                 <div
@@ -50,6 +54,19 @@ export function AccountSummary({ account }: { account: AccountState }) {
                     <ul className="mt-1 list-disc space-y-0.5 pl-6">
                         {account.violations.map((violation) => (
                             <li key={violation}>{violation}</li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+            {account.notices.length > 0 ? (
+                <div className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-400">
+                    <p className="flex items-center gap-2 font-semibold text-gray-300">
+                        <Info className="size-4 shrink-0" aria-hidden="true" />
+                        Avisos de la cuenta demo
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-6">
+                        {account.notices.map((notice) => (
+                            <li key={notice}>{notice}</li>
                         ))}
                     </ul>
                 </div>

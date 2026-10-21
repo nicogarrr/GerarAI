@@ -28,7 +28,9 @@ test('la UI declara el origen manual simulado sin prometer ejecución real', () 
     assert.match(panel, /ficticio/i, 'el panel debe declarar el saldo ficticio');
     assert.match(panel, /no es una ejecución de\s+mercado/i, 'debe negar la ejecución de mercado');
     const ledger = readFileSync(`${COMPONENTS_DIR}/LedgerTable.tsx`, 'utf8');
-    assert.match(ledger, /Manual simulada/, 'cada fila del historial etiqueta su fuente');
+    assert.match(ledger, /Manual simulada/, 'cada fila ejecutada etiqueta su fuente');
+    assert.match(ledger, /Rechazada/, 'las órdenes rechazadas llevan badge propio');
+    assert.match(ledger, /rejectReason/, 'las rechazadas muestran el motivo, nunca un fill');
     const ticket = readFileSync(`${COMPONENTS_DIR}/OrderTicket.tsx`, 'utf8');
     assert.match(ticket, /no es una ejecución de\s+mercado/i, 'el ticket advierte del fill manual');
     assert.doesNotMatch(ticket, /orderType|limitPrice/, 'sin órdenes límite ficticias en el ticket manual');
