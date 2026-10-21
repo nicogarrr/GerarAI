@@ -91,7 +91,15 @@ function QuoteRow({ spec, quote, fetchedAt }: { spec: LiveQuoteSpec; quote: Live
                 <div className="text-xs text-gray-500">{identityLine(quote)}</div>
                 <div className="text-xs text-gray-500">
                     {quote.timestamp ? timeFormatter.format(new Date(quote.timestamp * 1000)) : 'sin hora'}
-                    {age !== null ? ` · ${formatQuoteAge(age)}` : ''}
+                    {/* La frase de edad es una unidad inseparable: si la linea
+                        no cabe (390 + autosizing), salta entera a la 2ª linea
+                        en vez de dejar "min" huerfano. No se recorta dato. */}
+                    {age !== null ? (
+                        <>
+                            {' · '}
+                            <span className="whitespace-nowrap">{formatQuoteAge(age)}</span>
+                        </>
+                    ) : ''}
                     {session ? ` · ${session}` : ''}
                 </div>
             </td>
