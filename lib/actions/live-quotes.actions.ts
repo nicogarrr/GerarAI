@@ -53,6 +53,11 @@ async function fetchAll(): Promise<LiveMarketsResult> {
  * UI pinta N/D solo en su fila.
  */
 export async function getLiveMarkets(): Promise<LiveMarketsResult> {
+    // Cache COMPARTIDA POR INSTANCIA caliente de Vercel: a lo sumo una
+    // ronda de ~38 peticiones a Yahoo por instancia y TTL. NO es un limite
+    // global demostrado: cold starts y varias instancias la multiplican, y
+    // no lo afirmamos como cota. Si el uso crece y el burden aparece, la
+    // palanca es subir el TTL o recortar el catalogo.
     await requireAuthenticatedUser();
     return cachedFetch('live-markets:v1', fetchAll, CACHE_TTL_SECONDS);
 }

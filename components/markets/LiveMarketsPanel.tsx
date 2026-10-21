@@ -11,15 +11,27 @@ import { Button } from '@/components/ui/button';
 const POLL_MS = 60_000;
 
 const TABS: { key: LiveQuoteKind; label: string; note: string }[] = [
-    { key: 'indice', label: 'Índices', note: 'Nivel del índice en puntos.' },
-    { key: 'futuro', label: 'Futuros', note: 'Futuros sobre índices USA, en puntos.' },
+    {
+        key: 'indice',
+        label: 'Índices',
+        note: 'Nivel del índice de contado en puntos: un índice se calcula, no se negocia directamente.',
+    },
+    {
+        key: 'futuro',
+        label: 'Futuros',
+        note: 'Contratos continuos que informa Yahoo; la fuente no indica el vencimiento concreto, así que no lo mostramos.',
+    },
     {
         key: 'accion',
         label: 'Acciones ES',
         note: 'Selección de valores del IBEX 35. No es un ranking por volumen: sin una fuente gratuita de «más negociadas» no sostenemos esa etiqueta.',
     },
-    { key: 'materia', label: 'Materias primas', note: 'Futuros de referencia en dólares.' },
-    { key: 'divisa', label: 'Divisas', note: 'Tipo de cambio entre divisas.' },
+    {
+        key: 'materia',
+        label: 'Materias primas',
+        note: 'Contratos continuos de referencia. Ojo a la unidad de cada fila: no todo son dólares genéricos (el cobre son USD/libra).',
+    },
+    { key: 'divisa', label: 'Divisas', note: 'Tipo de cambio spot entre divisas.' },
 ];
 
 const priceFormatter = (unit: LiveQuote['unit']) =>
@@ -62,10 +74,17 @@ function QuoteRow({ quote }: { quote: LiveQuote | null }) {
             <td className="py-2.5 pr-2">
                 <div className="text-gray-100">{quote.name}</div>
                 <div className="text-xs text-gray-500">
-                    {quote.timestamp ? timeFormatter.format(new Date(quote.timestamp * 1000)) : 'sin hora'}
+                    {quote.timestamp
+                        ? `dato de las ${timeFormatter.format(new Date(quote.timestamp * 1000))}`
+                        : 'sin hora del dato'}
+                    {quote.marketState === 'REGULAR' ? ' · mercado abierto' : ''}
+                    {quote.marketState && quote.marketState !== 'REGULAR' ? ' · mercado cerrado' : ''}
                 </div>
             </td>
-            <td className="py-2.5 px-2 text-right font-medium text-gray-100 whitespace-nowrap">{formatPrice(quote)}</td>
+            <td className="py-2.5 px-2 text-right whitespace-nowrap">
+                <div className="font-medium text-gray-100">{formatPrice(quote)}</div>
+                <div className="text-xs text-gray-500">{quote.unitLabel}</div>
+            </td>
             <td className={`py-2.5 pl-2 text-right whitespace-nowrap ${changeClass}`}>
                 {quote.change === null || quote.changePercent === null ? (
                     'N/D'
@@ -146,10 +165,11 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                 })}
             </Tabs>
             <p className="mt-4 text-xs leading-5 text-gray-500">
-                Fuente: Yahoo Finance. Las acciones suelen llevar unos 15 minutos de retraso; índices, futuros y
-                divisas van casi en tiempo. La hora de cada cotización es la que informa el proveedor (hora de
-                Madrid). No son datos oficiales de mercado ni sirven para operar con garantías.
-            </p>
+                Fuente: Yahoo Finance (endpoint público sin documentación oficial: no hay SLA ni confirmación de
+                derechos de redistribución; es un riesgo de viabilidad pendiente de resolver, no un
+                proveedor garantizado). La hora que ves en cada fila es la hora que el proveedor atribuye
+                al dato: no es una promesa de tiempo real y el retraso exacto de cada mercado no lo informa
+                la fuente. No son datos oficiales de mercado ni sirven para operar con garantías.</p>
         </div>
     );
 }

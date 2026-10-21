@@ -18,6 +18,7 @@ test('catalogo: simbolos unicos, nombre y kind/unit coherentes', () => {
         assert.ok(group.specs.length > 0, `grupo ${group.key} vacio`);
         for (const spec of group.specs) {
             assert.ok(spec.symbol.length > 0 && spec.name.trim().length > 0, `spec incompleto: ${JSON.stringify(spec)}`);
+            assert.ok(spec.unitLabel && spec.unitLabel.length > 0, `${spec.symbol} sin unitLabel: la unidad real de la cifra la fija el catalogo`);
             assert.equal(spec.kind, group.key, `${spec.symbol} en grupo equivocado`);
             assert.ok(!seen.has(spec.symbol), `simbolo repetido: ${spec.symbol}`);
             seen.add(spec.symbol);
@@ -29,7 +30,7 @@ test('catalogo: simbolos unicos, nombre y kind/unit coherentes', () => {
 });
 
 test('parse: sin cierre previo el cambio es null, nunca 0 inventado', () => {
-    const spec = { symbol: 'X', name: 'X', kind: 'accion' as const, unit: 'EUR' as const };
+    const spec = { symbol: 'X', name: 'X', kind: 'accion' as const, unit: 'EUR' as const, unitLabel: 'EUR/acción' };
     const quote = parseYahooQuote(spec, { regularMarketPrice: 10, regularMarketTime: 100 });
     assert.ok(quote);
     assert.equal(quote.change, null);
@@ -37,7 +38,7 @@ test('parse: sin cierre previo el cambio es null, nunca 0 inventado', () => {
 });
 
 test('parse: chartPreviousClose sirve de cierre previo si previousClose falta', () => {
-    const spec = { symbol: '^X', name: 'X', kind: 'indice' as const, unit: 'index' as const };
+    const spec = { symbol: '^X', name: 'X', kind: 'indice' as const, unit: 'index' as const, unitLabel: 'puntos' };
     const quote = parseYahooQuote(spec, { regularMarketPrice: 110, chartPreviousClose: 100, regularMarketTime: 100 });
     assert.ok(quote);
     assert.equal(quote.change, 10);
@@ -45,7 +46,7 @@ test('parse: chartPreviousClose sirve de cierre previo si previousClose falta', 
 });
 
 test('parse: precio ausente o roto devuelve null (N/D honesto)', () => {
-    const spec = { symbol: 'X', name: 'X', kind: 'materia' as const, unit: 'USD' as const };
+    const spec = { symbol: 'X', name: 'X', kind: 'materia' as const, unit: 'USD' as const, unitLabel: 'USD/barril' };
     assert.equal(parseYahooQuote(spec, null), null);
     assert.equal(parseYahooQuote(spec, {}), null);
     assert.equal(parseYahooQuote(spec, { regularMarketPrice: 0 }), null);
