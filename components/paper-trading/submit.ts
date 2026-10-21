@@ -106,6 +106,16 @@ export type HistoryRow = {
 };
 
 /**
+ * Página del historial paginado (espejo de ManualDemoHistoryPage de
+ * lib/actions/manual-demo-history.actions.ts): cursor estable
+ * (createdAt, _id) sin offset — las filas nuevas entran por arriba y no
+ * desplazan el recorrido entre páginas.
+ */
+export type HistoryPageResult =
+    | { ok: true; orders: HistoryRow[]; hasMore: boolean; nextBefore: string | null }
+    | { ok: false; message: string };
+
+/**
  * Entrada numérica SIN ambigüedad: un único separador (coma o punto) que
  * siempre es decimal; NO se aceptan separadores de miles. "1.234" es 1.234,
  * nunca 1234. Cadenas con dos tipos de separador o separadores repetidos

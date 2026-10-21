@@ -5,13 +5,13 @@ import { ManualDemoPanel } from '@/components/paper-trading/ManualDemoPanel';
 import {
     convertManualDemoCurrency,
     getManualDemoAccount,
-    getManualDemoOrders,
     getManualDemoValuation,
     placeManualOrder,
 } from '@/lib/actions/manual-demo.actions';
+import { getManualDemoHistory } from '@/lib/actions/manual-demo-history.actions';
 import type { RefreshResult } from '@/components/paper-trading/ManualDemoPanel';
 import type { DemoValuation } from '@/lib/market/demo-valuation';
-import type { DemoStateView, FillSubmit, FxSubmit, HistoryRow, SubmitResult } from '@/components/paper-trading/submit';
+import type { DemoStateView, FillSubmit, FxSubmit, HistoryPageResult, HistoryRow, SubmitResult } from '@/components/paper-trading/submit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -25,6 +25,9 @@ export const metadata: Metadata = {
 type DemoData = {
     account: DemoStateView | null;
     ledger: HistoryRow[];
+    /** Primera página del historial: ¿hay más y con qué cursor pedirla? */
+    historyHasMore: boolean;
+    historyNextBefore: string | null;
     loadError: string | null;
     valuation?: DemoValuation | null;
     valuationAsOf?: number | null;
@@ -141,6 +144,8 @@ const DEV_DATA: DemoData = {
             simulated: true,
         },
     ],
+    historyHasMore: false,
+    historyNextBefore: null,
     loadError: null,
 };
 
@@ -154,23 +159,25 @@ const DEV_DATA: DemoData = {
  */
 async function loadDemoData(): Promise<DemoData> {
     if (process.env.NODE_ENV !== 'production' && !process.env.MONGODB_URI) return { ...DEV_DATA, loadError: null };
-    const [accountResult, ordersResult, valuationResult] = await Promise.all([
+    const [accountResult, historyResult, valuationResult] = await Promise.all([
         getManualDemoAccount(),
-        getManualDemoOrders(),
+        getManualDemoHistory(),
         getManualDemoValuation(),
     ]);
-    if (!accountResult.ok) return { account: null, ledger: [], loadError: accountResult.message };
+    if (!accountResult.ok) return { account: null, ledger: [], historyHasMore: false, historyNextBefore: null, loadError: accountResult.message };
     return {
         account: accountResult.state,
         valuation: valuationResult.ok ? valuationResult.valuation : null,
         valuationAsOf: valuationResult.ok ? valuationResult.asOf : null,
-        ledger: ordersResult.ok ? ordersResult.orders : [],
-        loadError: ordersResult.ok ? null : ordersResult.message,
+        ledger: historyResult.ok ? historyResult.orders : [],
+        historyHasMore: historyResult.ok ? historyResult.hasMore : false,
+        historyNextBefore: historyResult.ok ? historyResult.nextBefore : null,
+        loadError: historyResult.ok ? null : historyResult.message,
     };
 }
 
 export default async function PaperTradingPage() {
-    const { account, ledger, loadError, valuation, valuationAsOf } = await loadDemoData();
+    const { account, ledger, historyHasMore, historyNextBefore, loadError, valuation, valuationAsOf } = await loadDemoData();
 
     // Cableado real: la acción valida TODO en servidor dentro de la
     // transacción (saldo, posición, idempotencia); el cliente solo manda el
@@ -205,6 +212,17 @@ export default async function PaperTradingPage() {
         return { ok: true, valuation: result.valuation, asOf: result.asOf, listingUnavailable: result.listingUnavailable, quoteFetchFailed: result.quoteFetchFailed, retryAfterSeconds: result.retryAfterSeconds };
     }
 
+    // Página siguiente del historial: cursor estable (createdAt, _id), sin
+    // offset — las filas nuevas entran por arriba y no desplazan el
+    // recorrido. La autorización (userId de sesión) la aplica la acción en
+    // CADA página; el cursor solo marca posición dentro del propio historial.
+    async function loadMoreHistory(before: string): Promise<HistoryPageResult> {
+        'use server';
+        const result = await getManualDemoHistory({ before });
+        if (!result.ok) return { ok: false, message: result.message };
+        return { ok: true, orders: result.orders, hasMore: result.hasMore, nextBefore: result.nextBefore };
+    }
+
     return (
         <div className="mx-auto w-full max-w-3xl px-4 py-6">
             <h1 className="text-2xl font-semibold break-words text-gray-100">Cuenta demo</h1>
@@ -219,6 +237,9 @@ export default async function PaperTradingPage() {
             <ManualDemoPanel
                 account={account}
                 ledger={ledger}
+                historyHasMore={historyHasMore}
+                historyNextBefore={historyNextBefore}
+                loadMoreHistory={loadMoreHistory}
                 submitFill={submitFill}
                 submitFx={submitFx}
                 valuation={valuation}

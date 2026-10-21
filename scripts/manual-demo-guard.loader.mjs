@@ -8,6 +8,7 @@
  * - `@/database/mongoose` -> stub de conexion con sesiones/transacciones falsas.
  * - `@/database/models/manual-demo.model` -> colecciones en memoria con
  *   unicidad (userId, clientOrderId) y escritura condicional por version.
+ * - `mongoose` -> stub de Types.ObjectId (cursor del historial paginado).
  * - `@/lib/paper-trading/{types,accounting,options,ledger-adapter}` y
  *   `@/lib/market/{demo-valuation,quote-freshness}` ->
  *   ficheros REALES del repo (el codigo bajo test es el fuente real).
@@ -25,6 +26,7 @@ export async function resolve(specifier, context, nextResolve) {
     if (specifier === '@/lib/auth/require-user') return { url: 'guard-stub:require-user', shortCircuit: true };
     if (specifier === '@/database/mongoose') return { url: 'guard-stub:mongoose', shortCircuit: true };
     if (specifier === '@/database/models/manual-demo.model') return { url: 'guard-stub:manual-demo-model', shortCircuit: true };
+    if (specifier === 'mongoose') return { url: 'guard-stub:mongoose-types', shortCircuit: true };
     if (REAL[specifier]) return { url: new URL(REAL[specifier], import.meta.url).href, shortCircuit: true };
     if (specifier.startsWith('@/')) throw new Error(`manual-demo guard loader: import no esperado: ${specifier}`);
     return nextResolve(specifier, context);
@@ -73,6 +75,7 @@ const MODEL_STUB = [
     '    const q = {',
     '        session: () => q,',
     '        lean: () => q,',
+    '        limit: (n) => makeQuery(() => getDocs().slice(0, n)),',
     '        sort: (spec) => {',
     '            const keys = Object.entries(spec);',
     '            const val = (d, f) => (d[f] instanceof Date ? d[f].getTime() : d[f]);',
@@ -95,7 +98,33 @@ const MODEL_STUB = [
     '    return q;',
     '}',
     'const dupError = () => { const e = new Error("E11000 duplicate key error"); e.code = 11000; return e; };',
-    'const match = (doc, filter) => Object.entries(filter).every(([k, v]) => doc[k] === v);',
+    '// Igualdad por VALOR (Date compara por ms; los ObjectId del stub por su',
+    '// hex), $or/$and y operadores de comparacion: el historial paginado filtra',
+    '// con cursor compuesto {createdAt, _id} y necesita la misma semantica.',
+    'const scalar = (v) => {',
+    '    if (v instanceof Date) return v.getTime();',
+    '    if (v !== null && typeof v === "object" && "__oid" in v) return v.__oid;',
+    '    return v;',
+    '};',
+    'const ltVal = (a, b) => (typeof a === "string" || typeof b === "string" ? String(a) < String(b) : a < b);',
+    'const matchCond = (actual, cond) => {',
+    '    if (cond !== null && typeof cond === "object" && !(cond instanceof Date) && !Array.isArray(cond) && !("__oid" in cond)) {',
+    '        return Object.entries(cond).every(([op, v]) => {',
+    '            const a = scalar(actual); const b = scalar(v);',
+    '            if (op === "$lt") return ltVal(a, b);',
+    '            if (op === "$lte") return a === b || ltVal(a, b);',
+    '            if (op === "$gt") return ltVal(b, a);',
+    '            if (op === "$gte") return a === b || ltVal(b, a);',
+    '            throw new Error("stub match: operador no soportado: " + op);',
+    '        });',
+    '    }',
+    '    return scalar(actual) === scalar(cond);',
+    '};',
+    'const match = (doc, filter) => Object.entries(filter).every(([k, v]) => {',
+    '    if (k === "$or") return v.some((sub) => match(doc, sub));',
+    '    if (k === "$and") return v.every((sub) => match(doc, sub));',
+    '    return matchCond(doc[k], v);',
+    '});',
     'export const MANUAL_DEMO_STARTING_CASH_EUR = 100000;',
     'export const ManualDemoAccount = {',
     '    findOne: (filter) => makeOne(() => accounts.find((a) => match(a, filter)) ?? null),',
@@ -145,9 +174,21 @@ const MODEL_STUB = [
     'export function __dupNextTradeCreate(row) { dupNextTradeCreate = row; }',
 ].join('\n');
 
+// Types.ObjectId minimo: conserva el hex en __oid para que las
+// comparaciones del stub (scalar/matchCond) trabajen sobre el string.
+const MONGOOSE_TYPES_STUB = [
+    'export const Types = {',
+    '    ObjectId: class ObjectId {',
+    '        constructor(id) { this.__oid = String(id); }',
+    '        toString() { return this.__oid; }',
+    '    },',
+    '};',
+].join('\n');
+
 export async function load(url, context, nextLoad) {
     if (url === 'guard-stub:require-user') return { format: 'module', shortCircuit: true, source: REQUIRE_USER_STUB };
     if (url === 'guard-stub:mongoose') return { format: 'module', shortCircuit: true, source: MONGOOSE_STUB };
     if (url === 'guard-stub:manual-demo-model') return { format: 'module', shortCircuit: true, source: MODEL_STUB };
+    if (url === 'guard-stub:mongoose-types') return { format: 'module', shortCircuit: true, source: MONGOOSE_TYPES_STUB };
     return nextLoad(url, context);
 }
