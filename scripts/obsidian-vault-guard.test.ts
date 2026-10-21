@@ -45,6 +45,15 @@ describe('vault Obsidian detrás del proxy same-origin', () => {
         assert.match(page, /<ObsidianVaultCard \/>/);
     });
 
+    it('la descarga confirma, no navega fuera en error y lo dice inline', () => {
+        const card = source(join('components', 'export', 'ObsidianVaultCard.tsx'));
+        assert.match(card, /<ConfirmDialog/, 'la descarga pide confirmación con el diálogo compartido');
+        assert.match(card, /onConfirm=\{handleDownload\}/, 'la descarga solo corre al confirmar');
+        assert.match(card, /response\.ok/, 'un HTTP no-OK se trata como error');
+        assert.doesNotMatch(card, /location\.assign|window\.confirm/, 'ni navegación a un JSON de error ni confirm nativo');
+        assert.match(card, /role="alert"/, 'el fallo de descarga se muestra inline');
+    });
+
     it('la ruta backend del vault existe en el data-engine', () => {
         const route = source(join('data-engine', 'app', 'api', 'routes', 'obsidian.py'));
         assert.match(route, /@vault_router\.get\("\/vault\.zip"\)/);

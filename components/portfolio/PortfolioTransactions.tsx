@@ -10,6 +10,7 @@ import { Trash2 } from 'lucide-react';
 import { deleteTransaction } from '@/lib/actions/portfolio.actions';
 import { useRouter } from 'next/navigation';
 import EditTransactionDialog from './EditTransactionDialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import ImportIBKRButton from './ImportIBKRButton';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
@@ -43,10 +44,9 @@ function transactionCurrency(currency: string | undefined): string | null {
 export default function PortfolioTransactions({ transactions, userId }: Props) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const handleDelete = async (transactionId: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta transacción?')) return;
-
     setDeleting(transactionId);
     try {
       await deleteTransaction(userId, transactionId);
@@ -140,7 +140,7 @@ export default function PortfolioTransactions({ transactions, userId }: Props) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDelete(tx._id)}
+                        onClick={() => setConfirmId(tx._id)}
                         disabled={deleting === tx._id}
                         aria-label="Eliminar transacción"
                         className="h-11 w-11 p-0 text-gray-400 hover:text-red-400 hover:bg-red-950/20 md:h-7 md:w-7"
@@ -155,6 +155,13 @@ export default function PortfolioTransactions({ transactions, userId }: Props) {
           </div>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={confirmId !== null}
+        onOpenChange={(next) => { if (!next) setConfirmId(null); }}
+        title="Eliminar transacción"
+        description="¿Estás seguro de eliminar esta transacción?"
+        onConfirm={() => { if (confirmId) handleDelete(confirmId); }}
+      />
     </Card>
   );
 }

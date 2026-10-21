@@ -1,14 +1,47 @@
 'use client';
 
+import { useState } from 'react';
 import { BookDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 /**
  * Descarga del vault Obsidian del tenant (cartera + watchlist) vía la ruta
  * proxy same-origin /api/obsidian/vault.zip: el navegador nunca ve la firma
  * Research OS. Sin coste: el backend solo empaqueta datos persistidos.
  */
+const VAULT_URL = '/api/obsidian/vault.zip';
+
 export default function ObsidianVaultCard() {
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Descarga por fetch + blob: un 502 del proxy NO saca al usuario a un JSON de error
+    // fuera de la app (una navegación directa al proxy sí lo haría); el fallo queda inline en
+    // la tarjeta. Sin JS el enlace descarga directo (mejora progresiva).
+    const handleDownload = async () => {
+        setDownloading(true);
+        setError(null);
+        try {
+            const response = await fetch(VAULT_URL);
+            if (!response.ok) throw new Error(`vault HTTP ${response.status}`);
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'gerarai-obsidian-vault.zip';
+            link.click();
+            // Revocación diferida: revocar en el mismo tick puede cortar la
+            // descarga en Safari/iOS antes de que empiece.
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {
+            setError('No se pudo descargar el vault. Inténtalo de nuevo en unos segundos.');
+        } finally {
+            setDownloading(false);
+        }
+    };
+
     return (
         <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
             <CardHeader className="border-b border-gray-700/50 pb-4">
@@ -24,16 +57,30 @@ export default function ObsidianVaultCard() {
             </CardHeader>
             <CardContent className="pt-4">
                 <a
+                    aria-busy={downloading}
                     className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 sm:min-h-0"
                     href="/api/obsidian/vault.zip"
                     onClick={(event) => {
-                        if (!window.confirm('¿Descargar tus tesis y datos de cartera en un archivo ZIP en este dispositivo?')) event.preventDefault();
+                        event.preventDefault();
+                        if (!downloading) setConfirmOpen(true);
                     }}
                     download
                 >
                     <BookDown className="h-4 w-4" />
-                    Descargar para Obsidian (.zip)
+                    {downloading ? 'Descargando…' : 'Descargar para Obsidian (.zip)'}
                 </a>
+                {error ? (
+                    <p className="mt-2 text-sm text-red-400" role="alert">{error}</p>
+                ) : null}
+                <ConfirmDialog
+                    open={confirmOpen}
+                    onOpenChange={setConfirmOpen}
+                    title="Descargar para Obsidian"
+                    description="¿Descargar tus tesis y datos de cartera en un archivo ZIP en este dispositivo?"
+                    confirmLabel="Descargar"
+                    tone="default"
+                    onConfirm={handleDownload}
+                />
             </CardContent>
         </Card>
     );

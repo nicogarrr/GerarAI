@@ -17,7 +17,8 @@ test('desktop portfolio and watchlist keep destructive action within symbol menu
   assert.doesNotMatch(portfolio, /<TableHead[^>]*>Fiscal<\/TableHead>|<TableHead[^>]*>Acciones<\/TableHead>/);
   assert.doesNotMatch(watchlist, /<TableHead[^>]*>Acciones<\/TableHead>/);
   assert.match(portfolio, /<summary[^>]*Opciones/);
-  assert.match(portfolio, /handleDelete\(holding.symbol\)/);
+  assert.match(portfolio, /setConfirmSymbol\(holding\.symbol\)/, 'la acción destructiva abre la confirmación');
+  assert.match(portfolio, /onConfirm=\{\(\) => \{ if \(confirmSymbol\) handleDelete\(confirmSymbol\); \}\}/, 'la mutación solo corre al confirmar');
   assert.match(watchlist, /<summary[^>]*Opciones/);
   assert.match(watchlist, /<WatchlistRemoveButton symbol=\{stock.symbol\}/);
 });
