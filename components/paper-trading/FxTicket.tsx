@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { formatMoney } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import type { Currency } from '@/lib/paper-trading/types';
-import { parseEsNumber, type SubmitFx } from './submit';
+import { NUM_INPUT_HINT, parseEsNumber, type SubmitFx } from './submit';
 
 function newClientOrderId(): string {
     return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -33,10 +33,18 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
         now.setSeconds(0, 0);
         return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
     });
-    const [error, setError] = useState<string | null>(null);
+    // Error de validación local ligado a los valores con los que se calculó:
+    // en cuanto el usuario edita cualquier campo la clave cambia y deja de
+    // mostrarse, sin efectos ni renders en cascada.
+    const [invalid, setInvalid] = useState<{ key: string; message: string } | null>(null);
+    // Feedback del envío (rechazo/fallo de la acción): persiste hasta el próximo envío.
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [duplicate, setDuplicate] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
+
+    const fieldKey = JSON.stringify([from, amount, rate, executedAtLocal]);
+    const validationError = invalid !== null && invalid.key === fieldKey ? invalid.message : null;
 
     const to: Currency = from === 'EUR' ? 'USD' : 'EUR';
     const parsedAmount = parseEsNumber(amount);
@@ -51,31 +59,32 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
         setNotice(null);
         setDuplicate(null);
         if (!Number.isFinite(parsedAmount)) {
-            setError('El importe no es un número válido (usa coma o punto para decimales).');
+            setInvalid({ key: fieldKey, message: `El importe no es un número válido (${NUM_INPUT_HINT}).` });
             return;
         }
         if (parsedAmount <= 0) {
-            setError('Indica un importe mayor que cero.');
+            setInvalid({ key: fieldKey, message: 'Indica un importe mayor que cero.' });
             return;
         }
         if (!Number.isFinite(parsedRate)) {
-            setError('El tipo de cambio no es un número válido (usa coma o punto para decimales).');
+            setInvalid({ key: fieldKey, message: `El tipo de cambio no es un número válido (${NUM_INPUT_HINT}).` });
             return;
         }
         if (parsedRate <= 0) {
-            setError('Indica el tipo de cambio (simulado) mayor que cero.');
+            setInvalid({ key: fieldKey, message: 'Indica el tipo de cambio (simulado) mayor que cero.' });
             return;
         }
         const executedAt = new Date(executedAtLocal).getTime();
         if (!Number.isFinite(executedAt)) {
-            setError('Indica la fecha de la conversión.');
+            setInvalid({ key: fieldKey, message: 'Indica la fecha de la conversión.' });
             return;
         }
         if (executedAt > Date.now()) {
-            setError('La fecha de la conversión no puede ser futura.');
+            setInvalid({ key: fieldKey, message: 'La fecha de la conversión no puede ser futura.' });
             return;
         }
-        setError(null);
+        setInvalid(null);
+        setSubmitError(null);
         setPending(true);
         try {
             const result = await submitFx({
@@ -96,10 +105,10 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                 } else if (result.outcome === 'duplicate') {
                     setDuplicate('Ya estaba registrada (mismo identificador): no se duplicó.');
                 } else {
-                    setError(`Conversión rechazada: ${result.reason ?? 'motivo no indicado'}.`);
+                    setSubmitError(`Conversión rechazada: ${result.reason ?? 'motivo no indicado'}.`);
                 }
             } else {
-                setError(result.error);
+                setSubmitError(result.error);
             }
         } finally {
             setPending(false);
@@ -134,7 +143,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                         value={amount}
                         onChange={(event) => setAmount(event.target.value)}
                         inputMode="decimal"
-                        placeholder="p. ej. 1.000"
+                        placeholder="p. ej. 1000"
                         required
                     />
                 </div>
@@ -165,6 +174,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
             </div>
 
             <p className="text-xs text-gray-500">
+                Decimales con coma o punto, sin separador de miles (1234,56).
                 Conversión simulada con el tipo que introduces tú; la demo no consulta el mercado.
                 {received !== null ? (
                     <>
@@ -174,9 +184,9 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                 ) : null}
             </p>
 
-            {error ? (
+            {validationError || submitError ? (
                 <p role="alert" className="text-sm text-red-400">
-                    {error}
+                    {validationError ?? submitError}
                 </p>
             ) : null}
             {notice ? (

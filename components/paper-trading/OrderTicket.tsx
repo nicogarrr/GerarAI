@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import type { Currency, OptionContract } from '@/lib/paper-trading/types';
-import { parseEsNumber } from './submit';
+import { NUM_INPUT_HINT, parseEsNumber } from './submit';
 import type { FillSubmit, SubmitFill } from './submit';
 
 type Kind = 'accion' | 'opcion';
@@ -56,10 +56,18 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
         // datetime-local espera hora local sin zona
         return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
     });
-    const [error, setError] = useState<string | null>(null);
+    // Error de validación local ligado a los valores con los que se calculó:
+    // en cuanto el usuario edita cualquier campo la clave cambia y deja de
+    // mostrarse, sin efectos ni renders en cascada.
+    const [invalid, setInvalid] = useState<{ key: string; message: string } | null>(null);
+    // Feedback del envío (rechazo/fallo de la acción): persiste hasta el próximo envío.
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [duplicate, setDuplicate] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
+
+    const fieldKey = JSON.stringify([kind, symbol, name, side, quantity, price, currency, callPut, strike, expiry, fee, executedAtLocal]);
+    const validationError = invalid !== null && invalid.key === fieldKey ? invalid.message : null;
 
     const parsedQuantity = parseEsNumber(quantity);
     const parsedPrice = parseEsNumber(price);
@@ -76,17 +84,17 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     function validate(): string | null {
         if (!symbol.trim()) return 'Indica el símbolo.';
         if (!name.trim()) return 'Indica el nombre (no hay buscador en la fase manual).';
-        if (!Number.isFinite(parsedQuantity)) return 'La cantidad no es un número válido (usa coma o punto para decimales).';
+        if (!Number.isFinite(parsedQuantity)) return `La cantidad no es un número válido (${NUM_INPUT_HINT}).`;
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return 'La cantidad debe ser un entero mayor que cero.';
-        if (!Number.isFinite(parsedPrice)) return 'El precio no es un número válido (usa coma o punto para decimales).';
+        if (!Number.isFinite(parsedPrice)) return `El precio no es un número válido (${NUM_INPUT_HINT}).`;
         if (parsedPrice <= 0) return 'El precio debe ser mayor que cero.';
-        if (!Number.isFinite(parsedFee)) return 'La comisión no es un número válido (usa coma o punto para decimales).';
+        if (!Number.isFinite(parsedFee)) return `La comisión no es un número válido (${NUM_INPUT_HINT}).`;
         if (parsedFee < 0) return 'La comisión no puede ser negativa.';
         const executedAt = new Date(executedAtLocal).getTime();
         if (!Number.isFinite(executedAt)) return 'Indica la fecha de ejecución.';
         if (executedAt > Date.now()) return 'La fecha de ejecución no puede ser futura.';
         if (kind === 'opcion') {
-            if (!Number.isFinite(parsedStrike)) return 'El strike no es un número válido (usa coma o punto para decimales).';
+            if (!Number.isFinite(parsedStrike)) return `El strike no es un número válido (${NUM_INPUT_HINT}).`;
             if (parsedStrike <= 0) return 'El strike debe ser mayor que cero.';
             if (!EXPIRY_RE.test(expiry)) return 'Indica el vencimiento (fecha del contrato).';
         }
@@ -97,12 +105,13 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
         event.preventDefault();
         setNotice(null);
         setDuplicate(null);
-        const validationError = validate();
-        if (validationError) {
-            setError(validationError);
+        const validation = validate();
+        if (validation) {
+            setInvalid({ key: fieldKey, message: validation });
             return;
         }
-        setError(null);
+        setInvalid(null);
+        setSubmitError(null);
         setPending(true);
         try {
             const openClose = side === 'buy' ? 'open' : 'close';
@@ -144,10 +153,10 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 } else if (result.outcome === 'duplicate') {
                     setDuplicate('Ya estaba registrada (mismo identificador de orden): no se duplicó.');
                 } else {
-                    setError(`Orden rechazada: ${result.reason ?? 'motivo no indicado'}.`);
+                    setSubmitError(`Orden rechazada: ${result.reason ?? 'motivo no indicado'}.`);
                 }
             } else {
-                setError(result.error);
+                setSubmitError(result.error);
             }
         } finally {
             setPending(false);
@@ -333,6 +342,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
             </div>
 
             <p className="text-xs text-gray-500">
+                Decimales con coma o punto, sin separador de miles (1234,56).
                 Registras una operación ya ejecutada con el precio que introduces tú: no es una ejecución de
                 mercado. Comisión 0 por defecto (déjala vacía): la demo no reproduce comisiones reales.
                 {total !== null ? (
@@ -348,9 +358,9 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 ) : null}
             </p>
 
-            {error ? (
+            {validationError || submitError ? (
                 <p role="alert" className="text-sm text-red-400">
-                    {error}
+                    {validationError ?? submitError}
                 </p>
             ) : null}
             {notice ? (

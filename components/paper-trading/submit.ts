@@ -90,20 +90,19 @@ export type HistoryRow = {
  * miles ("42,5", "1.234,56", "98.5"). No es contabilidad: solo parseo de
  * formulario; la validación real está en el servidor.
  */
+/**
+ * Entrada numérica SIN ambigüedad: un único separador (coma o punto) que
+ * siempre es decimal; NO se aceptan separadores de miles. "1.234" es 1.234,
+ * nunca 1234. Cadenas con dos tipos de separador o separadores repetidos
+ * ("1.234,56", "1,2,3", "1.234.567") son ambiguas y se rechazan (NaN) para
+ * pedir formato claro. El formateo es-ES con miles es solo de salida.
+ */
+export const NUM_INPUT_HINT = 'decimales con coma o punto, sin separador de miles (1234,56)';
+
 export function parseEsNumber(raw: string): number {
     const cleaned = raw.trim().replace(/\s/g, '');
-    if (cleaned === '') return Number.NaN;
-    if (cleaned.includes(',')) {
-        // con coma: los puntos son miles ("1.234,56")
-        return Number(cleaned.replace(/\./g, '').replace(',', '.'));
-    }
-    if (/^-?\d{1,3}(\.\d{3})+$/.test(cleaned)) {
-        // sin coma, punto(s) cada 3 dígitos: miles ("1.234", "1.234.567")
-        return Number(cleaned.replace(/\./g, ''));
-    }
-    // punto decimal simple ("98.5") o entero; cualquier otra cosa es NaN
-    // (Number no hace parseo parcial: "42abc" no cuela).
-    return Number(cleaned);
+    if (!/^-?\d+([.,]\d+)?$/.test(cleaned)) return Number.NaN;
+    return Number(cleaned.replace(',', '.'));
 }
 
 export type SubmitFill = (input: FillSubmit) => Promise<SubmitResult>;
