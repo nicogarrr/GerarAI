@@ -46,6 +46,28 @@ describe('orden stale-antes-que-offline', () => {
     });
 });
 
+describe('motor de análisis caído vía server action', () => {
+    // lib/research/client.ts lanza ExternalAPIError con este texto; al cruzar
+    // la frontera de una server action llega como Error plano (sin code) y la
+    // clasificación depende solo de los marcadores. Antes el mensaje crudo en
+    // inglés con la ruta interna terminaba en el toast (visto en /alerts).
+    const rawMessages = [
+        'Research engine unavailable for /api/alerts/rules?active=true (fetch fallido); reintenta en unos segundos.',
+        'Research engine unavailable for /api/home (timeout de 15000 ms); reintenta en unos segundos.',
+        'Research engine unavailable for /api/watchlist (cancelado por el llamador); reintenta en unos segundos.',
+    ];
+    for (const message of rawMessages) {
+        it(`clasifica offline: ${message.slice(0, 52)}…`, () => {
+            assert.equal(classifyError(new Error(message)), 'offline');
+        });
+        it('el toast sale en español, sin ruta interna', () => {
+            const friendly = getFriendlyErrorMessage(new Error(message));
+            assert.equal(friendly, 'El motor de análisis no responde ahora mismo. Reintenta en unos segundos.');
+            assert.ok(!friendly.includes('/api/'));
+        });
+    }
+});
+
 describe('offline markers', () => {
     const offlineMessages = [
         'fetch failed',
