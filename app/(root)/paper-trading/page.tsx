@@ -177,7 +177,7 @@ export default async function PaperTradingPage() {
         'use server';
         const result = await getManualDemoValuation();
         if (!result.ok) return { ok: false, error: result.message };
-        return { ok: true, valuation: result.valuation, asOf: result.asOf };
+        return { ok: true, valuation: result.valuation, asOf: result.asOf, listingUnavailable: result.listingUnavailable, quoteFetchFailed: result.quoteFetchFailed, retryAfterSeconds: result.retryAfterSeconds };
     }
 
     return (
