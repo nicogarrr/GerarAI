@@ -446,6 +446,54 @@ class FinancialSnapshotBuilder:
         if not has_margin and not has_fcf:
             missing.append("normalized_fcf_or_fcf_margin")
 
+        # Presente pero NO utilizable (explicacion al usuario, nunca gating):
+        # - revenue con hecho persistido (el ancla) cuyo valor no alimenta el
+        #   modelo (p. ej. 0 reportado): no es un dato ausente, pedirlo seria
+        #   falso.
+        # - net_debt derivable solo de componentes excluidos por periodo: se
+        #   explica como presente-excluido derivado, no como ausente.
+        if "revenue" in missing and anchor is not None:
+            try:
+                anchor_value = float(anchor.value)
+            except (TypeError, ValueError):
+                anchor_value = float("nan")
+            if not math.isfinite(anchor_value):
+                detail = "ingresos reportados no finitos en el periodo ancla"
+            elif anchor_value == 0:
+                detail = "ingresos reportados 0 en el periodo ancla"
+            else:
+                detail = "ingresos reportados no positivos en el periodo ancla"
+            snapshot.excluded_present.append(
+                {
+                    "metric": "revenue",
+                    "available_period": anchor.period,
+                    "anchor_period": anchor.period,
+                    "reason": "present_not_usable",
+                    "detail": detail,
+                    "reported_value": anchor_value if math.isfinite(anchor_value) else None,
+                }
+            )
+        if "net_debt" in missing:
+            excluded_metrics = {
+                str(item.get("metric")) for item in snapshot.excluded_present
+            }
+            if {"total_debt", "cash_and_equivalents"} <= excluded_metrics:
+                periods = sorted(
+                    str(item.get("available_period"))
+                    for item in snapshot.excluded_present
+                    if item.get("metric") in ("total_debt", "cash_and_equivalents")
+                )
+                snapshot.excluded_present.append(
+                    {
+                        "metric": "net_debt",
+                        "available_period": periods[-1] if periods else None,
+                        "anchor_period": anchor.period,
+                        "reason": "components_excluded",
+                        "detail": "se deriva de deuda total y efectivo presentes "
+                        "fuera del periodo ancla",
+                    }
+                )
+
         snapshot.missing_inputs = missing
         snapshot.coherent = not missing
         return snapshot
