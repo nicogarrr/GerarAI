@@ -164,6 +164,7 @@ def insufficient_result(
             "balance_sheet": snapshot.balance_sheet if snapshot else None,
             "shares": snapshot.shares_period if snapshot else None,
             "warnings": snapshot.warnings if snapshot else [],
+            "excluded_inputs": list(snapshot.excluded_present) if snapshot else [],
         },
     }
     if extra_trace:
@@ -181,6 +182,7 @@ def insufficient_result(
         "expected_value": None,
         "margin_of_safety": None,
         "missing_inputs": missing_inputs,
+        "excluded_inputs": list(snapshot.excluded_present) if snapshot else [],
         "reverse_dcf": {},
         "sensitivity": {"rows": []},
         "trace": trace,

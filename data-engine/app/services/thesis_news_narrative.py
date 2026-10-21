@@ -93,6 +93,32 @@ def sin_datos() -> list[dict]:
     return [{"titulo": "Análisis narrativo", "parrafos": ["Sin datos"]}]
 
 
+def compendio_factual(items: list[dict], now: datetime) -> list[dict]:
+    """Enumeración factual de la evidencia reciente cuando la narrativa LLM
+    está apagada por configuración (THESIS_NARRATIVE_LLM_ENABLED != "1").
+    NO es análisis: lista titulares reales con fecha, medio y enlace, y lo
+    dice. Nunca sustituye a la narrativa LLM ni se presenta como tal.
+    """
+    headlines = news_context(list(items or []), now)
+    if not headlines:
+        return sin_datos()
+    parrafos = [
+        "Compendio factual de evidencia reciente: enumeración de titulares "
+        "con fecha y fuente, sin análisis (el modelo de lenguaje no está "
+        "disponible en esta generación). No es una interpretación.",
+    ]
+    for row in headlines:
+        fecha = str(row.get("fecha") or "")[:10] or "fecha no disponible"
+        linea = f"- {row['titulo']} ({row['medio']}, {fecha}"
+        if row.get("origen_fecha") and row["origen_fecha"] != "no verificado":
+            linea += f", fecha: {row['origen_fecha']}"
+        linea += ")"
+        if row.get("url"):
+            linea += f" {row['url']}"
+        parrafos.append(linea)
+    return [{"titulo": "Compendio factual de evidencia (sin análisis automático)", "parrafos": parrafos}]
+
+
 def news_context(items: list[dict], now: datetime) -> list[dict]:
     """Copias acotadas del pipeline NewsEvent; sin noticias futuras/obsoletas."""
     now = now.replace(tzinfo=UTC) if now.tzinfo is None else now.astimezone(UTC)
@@ -195,7 +221,7 @@ def validate_output(raw: dict, headlines: list[dict]) -> list[dict]:
 def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now=None) -> list[dict]:
     """Invocado solo al generar una versión de tesis. Sin scheduler ni modelo de pago."""
     if os.getenv("THESIS_NARRATIVE_LLM_ENABLED") != "1":
-        return sin_datos()
+        return compendio_factual(news_items, now or datetime.now(UTC))
     try:
         # Nunca finaliza ni mueve la transacción del llamador: lectura y
         # presupuesto usan sesiones cortas propias (otra conexión) y la red solo

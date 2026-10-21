@@ -56,6 +56,11 @@ class FinancialSnapshot:
     facts: dict[str, FinancialFact] = field(default_factory=dict)
     missing_inputs: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # Metricas con hechos PERSISTIDOS pero excluidos del snapshot por
+    # desalineacion de periodo con el ancla (p. ej. acciones FY2025 con ancla
+    # revenue FY2023). No son entradas ausentes: pedirlas al usuario seria
+    # falso. Se exponen aparte para que la tesis lo diga con fechas.
+    excluded_present: list[dict] = field(default_factory=list)
     coherent: bool = False
     # metric -> ids of the persisted facts it was derived from (e.g. net_debt
     # = total_debt - cash_and_equivalents). Derived facts are not persisted.
@@ -374,6 +379,14 @@ class FinancialSnapshotBuilder:
                         f"{metric} latest period {latest[0].period} does not match "
                         f"anchor {anchor.period}; excluded from snapshot."
                     )
+                    snapshot.excluded_present.append(
+                        {
+                            "metric": metric,
+                            "available_period": latest[0].period,
+                            "anchor_period": anchor.period,
+                            "reason": "period_mismatch",
+                        }
+                    )
 
         for metric in INSTANT_METRICS:
             match = _pick_matching(_facts_for_metric(db, company.id, metric), anchor, instant=True)
@@ -401,6 +414,14 @@ class FinancialSnapshotBuilder:
                         f"{metric} latest period {latest[0].period} is incompatible "
                         f"with anchor {anchor.period}; excluded from snapshot."
                     )
+                    snapshot.excluded_present.append(
+                        {
+                            "metric": metric,
+                            "available_period": latest[0].period,
+                            "anchor_period": anchor.period,
+                            "reason": "period_mismatch",
+                        }
+                    )
 
         self._derive_net_debt(
             snapshot,
@@ -414,6 +435,10 @@ class FinancialSnapshotBuilder:
         for metric in REQUIRED_FOR_DCF:
             fact = snapshot.facts.get(metric)
             if fact is None or not math.isfinite(float(fact.value)) or metric in POSITIVE_REQUIRED_FOR_DCF and float(fact.value) <= 0:
+                # Un required excluido por periodo SIGUE bloqueando el DCF
+                # (coherent=False): la coherencia interna no se negocia. La
+                # distincion "presente pero excluido" vs "ausente" es solo
+                # explicacion al usuario (excluded_present), nunca gating.
                 missing.append(metric)
 
         has_margin = "fcf_margin" in snapshot.facts

@@ -885,8 +885,20 @@ class ThesisService:
         base = valuation.get("base_value")
         mos = valuation.get("margin_of_safety")
         if price is None or base is None or mos is None:
+            if price is not None:
+                # El precio EXISTE: decir "faltan datos de mercado" seria falso.
+                # Lo que falta es una valoracion calculable contra la que
+                # contrastar ese precio, y por que.
+                missing = (valuation.get("missing_inputs") or [])[:4]
+                missing_txt = ", ".join(term_es(k) for k in missing) or "inputs del modelo"
+                return (
+                    "Sin hipótesis comprobable todavía: hay precio de mercado, "
+                    "pero la valoración no es calculable con los datos actuales "
+                    f"({missing_txt}), así que no hay un valor justo contra el "
+                    "que contrastarla. Se declara, no se inventa."
+                )
             return (
-                "Hipótesis en formación: faltan datos de mercado o de valoración "
+                "Hipótesis en formación: faltan datos de mercado (precio) "
                 "para formular una hipótesis comprobable."
             )
         currency = valuation.get("currency") or company.currency
@@ -1577,11 +1589,23 @@ class ThesisService:
         sources: dict,
         fact_sources: dict[int, dict] | None = None,
     ) -> str:
+        excluded_keys = {
+            str(item.get("metric"))
+            for item in (valuation.get("excluded_inputs") or [])
+            if isinstance(item, dict) and item.get("metric")
+        }
+        # Presente-excluido (tenemos el dato, fuera de periodo del ancla) NO
+        # se lista como ausente: pedirlo al usuario seria falso. Sigue
+        # bloqueando la valoracion internamente; aqui solo se explica aparte.
         missing = sorted(
-            set(
-                (valuation.get("missing_inputs") or [])
-                + (long_term_model.get("missing_inputs") or [])
-            )
+            {
+                key
+                for key in set(
+                    (valuation.get("missing_inputs") or [])
+                    + (long_term_model.get("missing_inputs") or [])
+                )
+                if key not in excluded_keys
+            }
         )
         lines: list[str] = []
         if missing:
@@ -1609,6 +1633,25 @@ class ThesisService:
             )
             for key in nd_keys:
                 lines.append(f"- `{key}`: N/D (supuesto sin base documentada).")
+        excluded = [
+            item
+            for item in (valuation.get("excluded_inputs") or [])
+            if isinstance(item, dict) and item.get("metric")
+        ]
+        if excluded:
+            if lines:
+                lines.append("")
+            lines.append(
+                "Datos que YA tenemos pero no alimentan la valoración por "
+                "desalineación de periodos (no hace falta aportarlos):"
+            )
+            for item in sorted(excluded, key=lambda i: str(i.get("metric"))):
+                lines.append(
+                    f"- `{item['metric']}` ({term_es(str(item['metric']))}): "
+                    f"disponible de {item.get('available_period') or 'periodo desconocido'}; "
+                    f"el ancla de ingresos es {item.get('anchor_period') or 'desconocida'} "
+                    "y un DCF no mezcla ejercicios distintos."
+                )
         pending_sources = [
             (name, block.get("source"), block.get("detail"))
             for name, block in sorted((sources or {}).items())
