@@ -40,7 +40,15 @@ describe('vídeos de inversores', () => {
     });
     it('CSP permite los reproductores de YouTube explícitamente', () => {
         const config = readFileSync('next.config.ts', 'utf8');
-        assert.match(config, /frame-src https:\/\/www\.youtube-nocookie\.com https:\/\/www\.youtube\.com;/);
+        // Semántica: frame-src existe y CONTIENE los orígenes de YouTube;
+        // orden y orígenes adicionales (p.ej. TradingView) irrelevantes.
+        const directive = config.match(/frame-src[^;]*;/g) ?? [];
+        assert.ok(directive.length >= 1, 'next.config.ts debe definir frame-src');
+        for (const d of directive) {
+            for (const origin of ['https://www.youtube-nocookie.com', 'https://www.youtube.com']) {
+                assert.ok(d.includes(origin), `frame-src sin ${origin}: ${d}`);
+            }
+        }
         assert.match(config, /frame-ancestors 'self'/);
     });
     it('iframe solo tras clic, nocookie, con título y alternativa externa', () => {

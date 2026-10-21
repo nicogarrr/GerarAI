@@ -174,6 +174,13 @@ export const ROUTE_CATALOG: NavSection[] = [
         children: [{ href: '/screener', label: 'Mercado', icon: LineChart, hub: '/discover', description: 'Explora empresas por sector y mira subidas, bajadas y más activas.' }],
       },
       {
+        href: '/mercados',
+        label: 'Cotizaciones',
+        icon: LineChart,
+        hub: '/discover',
+        description: 'Índices, acciones del IBEX 35, materias primas y divisas con el widget oficial de TradingView. CFD etiquetados como CFD; futuros y VIX: cobertura pendiente declarada.',
+      },
+      {
         href: '/knowledge',
         label: 'Conocimiento',
         icon: BookOpen,
