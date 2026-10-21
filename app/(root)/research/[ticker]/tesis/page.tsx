@@ -24,12 +24,14 @@ type PageProps = { params: Promise<{ ticker: string }> };
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'borrador',
+  draft_failed_audit: 'borrador (auditoría no superada)',
   review: 'en revisión',
   approved: 'aprobada',
   published: 'publicada',
   rejected: 'rechazada',
   stale: 'desactualizada',
   superseded: 'sustituida',
+  insufficient_data: 'datos insuficientes',
 };
 
 function statusLabel(status: string | null | undefined): string {
@@ -129,7 +131,105 @@ export default async function ThesisReadingPage({ params }: PageProps) {
           ) : null}
         </div>
 
-        {!published ? (
+        {!published && latest && latest.status === 'insufficient_data' ? (
+          <article className="mt-8 min-w-0 max-w-full space-y-8 [overflow-wrap:anywhere]">
+            <header className="border-b border-gray-800 pb-6">
+              <p className="text-xs uppercase tracking-wide text-gray-500">Tesis de inversión</p>
+              <h1 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="mt-2 text-3xl text-gray-50 sm:text-4xl">
+                {ticker} · {name}
+              </h1>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge variant="outline">PROVISIONAL — no publicada</Badge>
+                <Badge variant="outline">{statusLabel(latest.status)}</Badge>
+                <Badge variant="outline">v{latest.version}</Badge>
+                {latest.created_at ? <span className="text-xs text-gray-500">generada el {formatGeneratedDate(latest.created_at)}</span> : null}
+              </div>
+              <p role="status" className="mt-4 rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
+                Documento provisional generado con la evidencia disponible: no es una versión
+                publicada. El modelo no produjo una valoración calculable (la causa exacta está
+                declarada en el memo, secciones 13 y 21): esta vista no contiene cifras de
+                valoración porque no existen, no porque se oculten.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <PrintButton />
+                <a
+                  href={`/api/thesis/${encoded}/pdf?draft=1`}
+                  download
+                  className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-teal-700 hover:text-teal-200 sm:min-h-0"
+                >
+                  <FileDown className="h-4 w-4" />PDF (borrador v{latest.version}, sin cifras)
+                </a>
+                <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink>
+              </div>
+            </header>
+
+            {latest.executive_summary ? (
+              <section>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Resumen ejecutivo</h2>
+                <p className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(latest.executive_summary)}</p>
+              </section>
+            ) : null}
+
+            {latest.hypothesis ? (
+              <section>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Hipótesis</h2>
+                <p className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(latest.hypothesis)}</p>
+              </section>
+            ) : null}
+
+            <section>
+              <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Escenarios y valoración</h2>
+              <p className="mt-4 text-sm text-gray-400">
+                Sin cifras de valoración en esta vista: el modelo no produjo una valoración
+                calculable con los datos disponibles; la causa exacta está declarada en el memo
+                (sección 13) y los datos pendientes en la sección 21.
+              </p>
+            </section>
+
+            {(latest.narrative_sections ?? []).map((section) => (
+              <section key={section.titulo}>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">{section.titulo}</h2>
+                {section.parrafos.map((parrafo, index) => (
+                  <p key={index} className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(parrafo)}</p>
+                ))}
+              </section>
+            ))}
+
+            {(latest.catalysts ?? []).length > 0 ? (
+              <section>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Catalizadores</h2>
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200">
+                  {(latest.catalysts ?? []).map((catalyst, index) => (
+                    <li key={index}>
+                      {catalyst.label ?? 'Catalizador'}{catalyst.date ? ` (${catalyst.date})` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {(latest.invalidation_criteria ?? []).length > 0 ? (
+              <section>
+                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Qué invalidaría la tesis</h2>
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200">
+                  {(latest.invalidation_criteria ?? []).map((criterion, index) => (
+                    <li key={index}>{criterion}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <footer className="border-t border-gray-800 pt-4 text-xs leading-6 text-gray-500">
+              <p>
+                Calidad de la evidencia: confianza de datos {latest.data_confidence_score}/100 ·
+                cobertura de fuentes {latest.source_coverage_score}/100 · red-team {latest.red_team_score}/100.
+              </p>
+              <p className="mt-2">
+                Documento informativo de investigación, provisional y no publicado. No es asesoramiento financiero ni recomendación de compra o venta.
+              </p>
+            </footer>
+          </article>
+        ) : !published ? (
           <div className="mt-10">
             <EmptyState
               action={latest ? <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink> : undefined}
