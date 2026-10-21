@@ -92,6 +92,9 @@ function listRoutes(dir: string, base: string): string[] {
 // Rutas reales fuera del catálogo A PROPÓSITO. Cada una lleva su motivo; una
 // ruta nueva que no esté en el catálogo ni aquí rompe el guard.
 const CATALOG_EXCEPTIONS: Record<string, string> = {
+    '/paper-trading':
+        'cuenta demo manual: la entrada del ROUTE_CATALOG la añade el pilot en el batch de integración de la ruta (acordado 2026-10-21); quitar esta excepción al integrarla',
+
     '/security': 'menú del avatar (UserDropdown), no es destino de sección',
     '/settings': 'menú del avatar (UserDropdown), no es destino de sección',
     // '/research/data-health' se eliminó entera por decisión de Nico (2026-10-20).

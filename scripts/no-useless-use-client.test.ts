@@ -85,6 +85,13 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+    'components/paper-trading/ManualDemoPanel.tsx':
+        'tabs interactivas de la cuenta demo (estado de pestana en cliente)',
+    'components/paper-trading/OrderTicket.tsx':
+        'formulario controlado del ticket manual (estado, validacion y envio)',
+    'components/paper-trading/FxTicket.tsx':
+        'formulario controlado de la conversion de divisa manual',
+
   // selector de inversor y contenido con navegación por URL.
   'app/(root)/inversores/_components/InvestorSelector.tsx': 'useRouter, jsx-onChange',
   'app/(root)/inversores/_components/InvestorViewSelector.tsx': 'useRouter, jsx-onChange',
