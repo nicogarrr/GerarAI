@@ -124,6 +124,21 @@ export function instrumentKey(instrument: Instrument): string {
     return `O:${c.underlying.toUpperCase()}:${c.expiry}:${c.callPut}:${c.strike}:${c.multiplier}`;
 }
 
+/** Datos de contrato recuperados de una instrumentKey de opción; null si no es opción válida fase 1. */
+export function parseOptionKey(key: string): { underlying: string; expiry: string; callPut: 'call' | 'put'; strike: number; multiplier: number } | null {
+    if (!key.startsWith('O:')) return null;
+    const parts = key.split(':');
+    if (parts.length !== 6) return null;
+    const [, underlying, expiry, callPut, strikeRaw, multiplierRaw] = parts;
+    if (!underlying) return null;
+    if (callPut !== 'call' && callPut !== 'put') return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry)) return null;
+    const strike = Number(strikeRaw);
+    const multiplier = Number(multiplierRaw);
+    if (!(strike > 0) || multiplier !== 100) return null;
+    return { underlying, expiry, callPut, strike, multiplier };
+}
+
 /** Fills válidos o null (las órdenes inválidas no entran en el libro). */
 export function toFill(input: Omit<Fill, 'source'> & { source?: Fill['source'] }): Fill | null {
     if (!Number.isFinite(input.price) || input.price <= 0) return null;

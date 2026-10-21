@@ -50,6 +50,21 @@ const DEV_DATA: DemoData = {
                 quantity: 5,
                 avgCost: 50,
                 realizedPnl: 250,
+                optionExpiry: null,
+                optionBadge: null,
+            },
+            {
+                // Opción vencida de mentira (solo fixture dev, fuera de
+                // producción): ejerce el badge de vencimiento en la tabla.
+                instrumentKey: 'O:ASTS:2026-09-18:call:30:100',
+                name: 'ASTS 2026-09-18 30 Call',
+                kind: 'opcion',
+                currency: 'USD',
+                quantity: 1,
+                avgCost: 1.5,
+                realizedPnl: 0,
+                optionExpiry: '2026-09-18',
+                optionBadge: 'vencida',
             },
         ],
         violations: [],

@@ -76,6 +76,9 @@ export type DemoPositionView = {
     quantity: number;
     avgCost: number;
     realizedPnl: number;
+    /** Solo opciones: fecha del contrato y estado de vencimiento (servidor, zona NY/OCC). */
+    optionExpiry: string | null;
+    optionBadge: 'vigente' | 'vence-hoy' | 'vencida' | null;
 };
 
 /**

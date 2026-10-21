@@ -39,7 +39,8 @@ export function newYorkDate(epochMs: number): string {
     return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
-function isRealDate(iso: string): boolean {
+/** Fecha civil real con forma yyyy-mm-dd (rechaza 2026-13-45 y similares). */
+export function isRealDate(iso: string): boolean {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
     const [y, m, d] = iso.split('-').map(Number);
     const date = new Date(Date.UTC(y, m - 1, d));
@@ -78,6 +79,18 @@ export function validateOptionContract(contract: OptionContract): Result<OptionC
         return fail('Solo se admiten contratos estandar con multiplicador 100.');
     }
     return { ok: true, value: contract };
+}
+
+export type ExpiryBadge = 'vigente' | 'vence-hoy' | 'vencida';
+
+/**
+ * Estado del vencimiento para MOSTRAR una posición de opción, calculado con
+ * la fecha civil del contrato en Nueva York (zona de los vencimientos OCC),
+ * no con la tz del usuario. El día del vencimiento es 'vence-hoy'.
+ */
+export function expiryBadge(expiryIso: string, nowMs: number): ExpiryBadge {
+    const days = daysBetween(newYorkDate(nowMs), expiryIso);
+    return days < 0 ? 'vencida' : days === 0 ? 'vence-hoy' : 'vigente';
 }
 
 export type ExpirationState = {
