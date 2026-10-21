@@ -286,9 +286,13 @@ def prepare_news_narrative(db: Session, ticker: str, *, provider=None, now=None)
     La transacción del llamador, si existe, no se toca: se lee con una sesión
     corta independiente (solo datos ya persistidos) y se cierra antes de
     presupuesto/LLM.
+
+    Con el flag LLM apagado NO hay llamada ni presupuesto, pero la tesis si
+    conserva el compendio factual rotulado (titulares reales con fecha y
+    fuente, declarado como enumeracion SIN analisis): «Sin datos» queda
+    reservado a cuando tampoco hay evidencia que enumerar. El compendio
+    nunca se presenta como narrativa del modelo.
     """
-    if os.getenv("THESIS_NARRATIVE_LLM_ENABLED") != "1":
-        return sin_datos()
     try:
         with Session(bind=db.get_bind()) as short:
             short.info.update(db.info)

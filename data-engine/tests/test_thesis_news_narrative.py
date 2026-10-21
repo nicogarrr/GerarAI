@@ -337,6 +337,58 @@ def test_open_caller_transaction_is_untouched_and_narrative_still_runs(context, 
     engine.dispose()
 
 
+def test_prepare_flag_off_persiste_compendio_rotulado_sin_llm(context, monkeypatch, tmp_path):
+    """Camino de generacion con flag apagado: prepare_news_narrative ya no
+    devuelve «Sin datos» habiendo evidencia — persiste el compendio factual
+    rotulado (sin analisis, no es narrativa LLM) y el proveedor NO se llama."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.models.entities import Base, Company, NewsEvent
+    monkeypatch.setenv("THESIS_NARRATIVE_LLM_ENABLED", "0")
+    engine = create_engine(f"sqlite:///{tmp_path / 'c.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as seed:
+        company = Company(ticker="META", name="Meta", exchange="NASDAQ",
+                          company_type="holding", valuation_model="unassigned")
+        seed.add(company)
+        seed.flush()
+        seed.add(NewsEvent(id=17, company_id=company.id, title=ITEM["source_headline"],
+                           date=datetime(2026, 10, 8, 10, tzinfo=UTC), source="Medio",
+                           url=ITEM["url"], metadata_={"source_headline": ITEM["source_headline"]}))
+        seed.commit()
+    with Session(engine) as db:
+        provider = Provider()
+        result = svc.prepare_news_narrative(db, "META", provider=provider, now=NOW)
+        assert result != svc.sin_datos()
+        assert provider.calls == 0  # flag off: nunca LLM ni presupuesto
+        text = "\n".join(parrafo for sec in result for parrafo in sec["parrafos"])
+        assert "sin análisis" in text  # rotulado: enumeracion, no narrativa
+        assert ITEM["source_headline"] in text
+    engine.dispose()
+
+
+def test_prepare_flag_off_sin_evidencia_es_sin_datos(context, monkeypatch, tmp_path):
+    """Sin noticias persistidas, flag apagado: «Sin datos» honesto (nada que
+    enumerar), proveedor intacto."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.models.entities import Base, Company
+    monkeypatch.setenv("THESIS_NARRATIVE_LLM_ENABLED", "0")
+    engine = create_engine(f"sqlite:///{tmp_path / 'e.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as seed:
+        seed.add(Company(ticker="META", name="Meta", exchange="NASDAQ",
+                         company_type="holding", valuation_model="unassigned"))
+        seed.commit()
+    with Session(engine) as db:
+        provider = Provider()
+        assert svc.prepare_news_narrative(db, "META", provider=provider, now=NOW) == svc.sin_datos()
+        assert provider.calls == 0
+    engine.dispose()
+
+
 def test_generation_wires_preflight_before_savepoint():
     from pathlib import Path
     source = (Path(__file__).parents[1] / "app/services/thesis_service.py").read_text()
