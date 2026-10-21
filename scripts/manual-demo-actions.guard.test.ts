@@ -20,6 +20,7 @@ const modelStub = (await import('@/database/models/manual-demo.model')) as unkno
     __counts(): { accounts: number; trades: number };
     __snapshot(): { accounts: Array<Record<string, unknown>>; trades: Array<Record<string, unknown>> };
     __seedTrade(doc: Record<string, unknown>): Record<string, unknown>;
+    __dupNextTradeCreate(row: Record<string, unknown>): void;
 };
 const connStub = (await import('@/database/mongoose')) as unknown as { __setStartSessionError(e: unknown): void };
 
@@ -505,6 +506,26 @@ describe('R3b: rediseño insertar→releer→abortar (orden persistido real)', (
         assert.equal(modelStub.__snapshot().trades.filter((t) => t.status === 'filled').length, 1);
         // Sin bump de versión (nunca hubo fill confirmado).
         assert.equal(modelStub.__snapshot().accounts[0].version, 0);
+    });
+
+    it('carrera mismo clientOrderId con payload distinto: devuelve el reason PERSISTIDO, no el local', async () => {
+        await actions.placeManualOrder(buyAccion({ quantity: 10, price: 10, executedAt: T2 }));
+        const raceId = 'race-reason-1';
+        // El ganador de la carrera ya grabó un rechazo con OTRO reason (payload distinto).
+        modelStub.__dupNextTradeCreate({
+            userId: USER.id, clientOrderId: raceId, kind: 'accion', symbol: 'BBVA.MC', name: 'BBVA',
+            contract: null, side: 'sell', openClose: 'open', fxFrom: null, fxTo: null, quantity: 3,
+            status: 'rejected', fillPrice: null, currency: 'EUR', fee: 0, fillSource: 'manual-simulado',
+            executedAt: null, rejectReason: 'REASON-PERSISTIDO-DEL-GANADOR',
+        });
+        const r = await actions.placeManualOrder({ ...buyAccion(), side: 'sell', quantity: 5, price: 12, executedAt: T1, clientOrderId: raceId });
+        assert.ok(r.ok);
+        if (r.ok) {
+            assert.equal(r.outcome, 'rejected');
+            assert.equal(r.reason, 'REASON-PERSISTIDO-DEL-GANADOR');
+        }
+        // Solo el buy y el rechazo del ganador: este intento no grabó nada.
+        assert.equal(modelStub.__counts().trades, 2);
     });
 
     it('reintento con el mismo clientOrderId tras rechazo por divergencia: duplicate sin segunda fila', async () => {

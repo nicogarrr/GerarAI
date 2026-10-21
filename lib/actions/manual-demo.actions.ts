@@ -357,6 +357,11 @@ async function recordRejection(userId: string, clientOrderId: string, docFor: Do
     if (stored && stored.status === 'filled') {
         return { outcome: 'duplicate', reason: null, state };
     }
+    if (stored && stored.status === 'rejected') {
+        // Carrera mismo clientOrderId: el ganador ya grabó el rechazo; se
+        // devuelve el reason PERSISTIDO, no el de este intento.
+        return { outcome: 'rejected', reason: stored.rejectReason ?? reason, state };
+    }
     return { outcome: 'rejected', reason, state };
 }
 
