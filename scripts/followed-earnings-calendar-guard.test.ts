@@ -30,6 +30,14 @@ test('resultados seguidos: logos solo via CompanyLogo (FMP, gratis) con fallback
   assert.doesNotMatch(list + page + logo, /logo\.clearbit|img\.logo|logo\.dev|unavatar|google\.com\/s2\/favicons/);
 });
 
+test('resultados seguidos: la pestaña activa solo se desplaza si no es visible (nearest)', () => {
+  // Regresión: el centrado automático recortaba la primera pestaña ("Resultados"
+  // quedaba como "os") incluso cuando la activa cabía entera sin scroll.
+  assert.doesNotMatch(tabs, /clientWidth - active\.clientWidth\) \/ 2/);
+  assert.match(tabs, /left < nav\.scrollLeft/);
+  assert.match(tabs, /right > nav\.scrollLeft \+ nav\.clientWidth/);
+});
+
 test('resultados seguidos: pestaña propia y activa solo la más específica', () => {
   assert.match(tabs, /\["\/calendar\/resultados", "Resultados"\]/);
   assert.match(tabs, /activeHref/);

@@ -18,7 +18,18 @@ export function CalendarTabs() {
   useEffect(() => {
     const nav = navRef.current;
     const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (nav && active) nav.scrollLeft = Math.max(0, active.offsetLeft - nav.offsetLeft - (nav.clientWidth - active.clientWidth) / 2);
+    if (nav && active) {
+      // Scroll mínimo "nearest": solo se desplaza si la pestaña activa no es
+      // ya visible entera. Centrar siempre recortaba la primera pestaña en
+      // móvil aunque la activa cupiera sin desplazamiento.
+      const left = active.offsetLeft - nav.offsetLeft;
+      const right = left + active.offsetWidth;
+      if (left < nav.scrollLeft) {
+        nav.scrollLeft = Math.max(0, left - 8);
+      } else if (right > nav.scrollLeft + nav.clientWidth) {
+        nav.scrollLeft = right - nav.clientWidth + 8;
+      }
+    }
   }, [pathname]);
   // La pestaña activa es la de href más largo que encaja: /calendar/resultados
   // no debe encender también /calendar.
