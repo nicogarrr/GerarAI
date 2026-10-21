@@ -13,7 +13,12 @@ test('thesis long URLs wrap; markdown table/code retain bounded internal scroll'
 });
 test('financial terminal scroll region is bounded and keyboard-accessible', () => {
  const src = readFileSync('app/(root)/research/[ticker]/financial-terminal/page.tsx','utf8');
- assert.match(src,/mt-4 w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain/);
- assert.match(src,/role="region" tabIndex=\{0\}/);
+ assert.match(src,/OverflowScrollRegion/);
+ assert.match(src,/className="mt-4 w-full min-w-0 max-w-full"/);
+ assert.match(src,/regionClassName="overscroll-x-contain"/);
  assert.match(src,/min-w-\[640px\]/);
+ const region = readFileSync('components/ui/overflow-scroll-region.tsx','utf8');
+ assert.match(region,/overflow-x-auto/);
+ assert.match(region,/role="region"/);
+ assert.match(region,/tabIndex=\{0\}/);
 });
