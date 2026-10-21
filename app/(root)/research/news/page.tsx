@@ -72,7 +72,7 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
       if (ticker) retryParams.set('ticker', ticker);
       if (page > 1) retryParams.set('pagina', String(page));
       const retryQuery = retryParams.toString();
-      return <BackendOffline feature="Las noticias" retryHref={retryQuery ? `/research/news?${retryQuery}` : '/research/news'} />;
+      return <BackendOffline feature="La sección de noticias" retryHref={retryQuery ? `/research/news?${retryQuery}` : '/research/news'} />;
     }
     throw error;
   }

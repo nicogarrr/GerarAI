@@ -91,7 +91,7 @@ export default async function ResearchSourcesPage({
       if (ticker) retryParams.set('ticker', ticker);
       if (requestedPageNumber > 1) retryParams.set('page', String(requestedPageNumber));
       const retryQuery = retryParams.toString();
-      return <BackendOffline feature="Las fuentes" retryHref={retryQuery ? `/research/sources?${retryQuery}` : '/research/sources'} />;
+      return <BackendOffline feature="La sección de fuentes" retryHref={retryQuery ? `/research/sources?${retryQuery}` : '/research/sources'} />;
     }
     throw error;
   }
