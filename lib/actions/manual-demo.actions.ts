@@ -362,7 +362,13 @@ class TemporalDivergenceError extends Error {
  * (u otra petición con el mismo clientOrderId) ya grabó el resultado, se
  * devuelve lo persistido ('duplicate'), nunca una segunda fila.
  */
-async function recordRejection(userId: string, clientOrderId: string, docFor: DocBuilder, reason: string): Promise<TxnOutcome> {
+async function recordRejection(
+    userId: string,
+    clientOrderId: string,
+    docFor: DocBuilder,
+    reason: string,
+    matches: (stored: ManualDemoTradeDoc) => boolean,
+): Promise<TxnOutcome> {
     try {
         await ManualDemoTrade.create([docFor('rejected', reason)]);
     } catch (error) {
@@ -370,15 +376,28 @@ async function recordRejection(userId: string, clientOrderId: string, docFor: Do
     }
     const stored = await ManualDemoTrade.findOne({ userId, clientOrderId });
     const { state } = await readLedger(userId);
+    if (stored && !matches(stored)) {
+        // Carrera con el mismo clientOrderId pero OTRO payload: no es un
+        // duplicado; es un conflicto explícito que no graba ni reinterpreta.
+        throw new PayloadConflictError();
+    }
     if (stored && stored.status === 'filled') {
         return { outcome: 'duplicate', reason: null, state };
     }
     if (stored && stored.status === 'rejected') {
-        // Carrera mismo clientOrderId: el ganador ya grabó el rechazo; se
-        // devuelve el reason PERSISTIDO, no el de este intento.
+        // Carrera mismo clientOrderId y mismo payload: el ganador ya grabó el
+        // rechazo; se devuelve el reason PERSISTIDO, no el de este intento.
         return { outcome: 'rejected', reason: stored.rejectReason ?? reason, state };
     }
     return { outcome: 'rejected', reason, state };
+}
+
+/** El clientOrderId persistido pertenece a OTRO payload: conflicto, no duplicado. */
+class PayloadConflictError extends Error {
+    constructor() {
+        super('manual-demo: clientOrderId reutilizado con una operación distinta');
+        this.name = 'PayloadConflictError';
+    }
 }
 
 function isDuplicateKey(error: unknown): boolean {
@@ -406,7 +425,13 @@ type TxnOutcome = { outcome: 'filled' | 'rejected' | 'duplicate'; reason: string
  * (write conflict) y la perdedora reintenta desde cero. Sin transacciones
  * no hay escritura.
  */
-async function executeLedgerChange(userId: string, clientOrderId: string, decide: (state: AccountState) => TxnDecision, docFor: DocBuilder): Promise<TxnOutcome> {
+async function executeLedgerChange(
+    userId: string,
+    clientOrderId: string,
+    decide: (state: AccountState) => TxnDecision,
+    docFor: DocBuilder,
+    matches: (stored: ManualDemoTradeDoc) => boolean,
+): Promise<TxnOutcome> {
     let lastConflict: VersionConflictError | null = null;
     for (let attempt = 1; attempt <= MAX_TXN_ATTEMPTS; attempt++) {
         const conn = await connectToDatabase();
@@ -454,7 +479,7 @@ async function executeLedgerChange(userId: string, clientOrderId: string, decide
             return outcome;
         } catch (error) {
             if (error instanceof TemporalDivergenceError) {
-                return await recordRejection(userId, clientOrderId, docFor, error.detail);
+                return await recordRejection(userId, clientOrderId, docFor, error.detail, matches);
             }
             if (error instanceof VersionConflictError) {
                 lastConflict = error;
@@ -536,9 +561,51 @@ function toRow(doc: ManualDemoTradeDoc): ManualDemoOrderRow {
     };
 }
 
-async function duplicateResult(userId: string, clientOrderId: string): Promise<ManualDemoOrderResult | null> {
+/** Huella comparable del payload: las filas RECHAZADAS no persisten precio,
+ * comisión ni fecha de ejecución (fillPrice/fee/executedAt quedan null/0 en
+ * orderDocFor), así que esos campos solo se comparan cuando la fila original
+ * es un fill. La identidad del instrumento, lado, fase, cantidad y divisa
+ * siempre se comparan. */
+function sameOrderPayload(stored: ManualDemoTradeDoc, p: ParsedOrder): boolean {
+    if (stored.kind !== p.instrument.kind) return false;
+    if (stored.side !== p.side || stored.openClose !== p.openClose) return false;
+    if (stored.quantity !== p.quantity || stored.currency !== p.currency) return false;
+    if (p.instrument.kind === 'accion') {
+        if (stored.symbol !== p.instrument.symbol) return false;
+    } else {
+        const key = stored.contract
+            ? instrumentKey({ kind: 'opcion', contract: stored.contract as OptionContract, name: '' })
+            : null;
+        if (key !== instrumentKey(p.instrument)) return false;
+    }
+    if (stored.status !== 'filled') return true;
+    if (stored.fillPrice !== p.price || stored.fee !== p.fee) return false;
+    const t = stored.executedAt ? stored.executedAt.getTime() : null;
+    return t === p.executedAt;
+}
+
+function sameFxPayload(stored: ManualDemoTradeDoc, p: ParsedFx): boolean {
+    if (stored.kind !== 'fx' || stored.fxFrom !== p.from || stored.fxTo !== p.to) return false;
+    if (stored.quantity !== p.amount) return false;
+    if (stored.status !== 'filled') return true;
+    if (stored.fillPrice !== p.rate) return false;
+    const t = stored.executedAt ? stored.executedAt.getTime() : null;
+    return t === p.executedAt;
+}
+
+async function duplicateResult(
+    userId: string,
+    clientOrderId: string,
+    matches: (stored: ManualDemoTradeDoc) => boolean,
+): Promise<ManualDemoOrderResult | null> {
     const stored = await ManualDemoTrade.findOne({ userId, clientOrderId });
     if (!stored) return null;
+    // La clave de idempotencia pertenece a UN payload: reusarla con otra
+    // operación no es un duplicado silencioso sino un error explícito que no
+    // graba nada (la UI genera un id nuevo al recargar el formulario).
+    if (!matches(stored)) {
+        return failure('Ese identificador de orden ya se usó con una operación distinta. Recarga la página para generar uno nuevo.', 'clientOrderId');
+    }
     const { state } = await readLedger(userId);
     return {
         ok: true,
@@ -763,7 +830,7 @@ export async function placeManualOrder(raw: unknown): Promise<ManualDemoOrderRes
     try {
         await connectToDatabase();
         await ensureAccount(user.id);
-        const duplicate = await duplicateResult(user.id, parsed.clientOrderId);
+        const duplicate = await duplicateResult(user.id, parsed.clientOrderId, (stored) => sameOrderPayload(stored, parsed));
         if (duplicate) return duplicate;
 
         const decide = (state: AccountState): TxnDecision => {
@@ -820,12 +887,15 @@ export async function placeManualOrder(raw: unknown): Promise<ManualDemoOrderRes
             return { kind: 'fill', entry: fill };
         };
 
-        const outcome = await executeLedgerChange(user.id, parsed.clientOrderId, decide, orderDocFor(parsed, user.id));
+        const outcome = await executeLedgerChange(user.id, parsed.clientOrderId, decide, orderDocFor(parsed, user.id), (stored) => sameOrderPayload(stored, parsed));
         return { ok: true, outcome: outcome.outcome, reason: outcome.reason, state: toView(outcome.state) };
     } catch (error) {
         if (isDuplicateKey(error)) {
-            const duplicate = await duplicateResult(user.id, parsed.clientOrderId);
+            const duplicate = await duplicateResult(user.id, parsed.clientOrderId, (stored) => sameOrderPayload(stored, parsed));
             if (duplicate) return duplicate;
+        }
+        if (error instanceof PayloadConflictError) {
+            return failure('Ese identificador de orden ya se usó con una operación distinta. Recarga la página para generar uno nuevo.', 'clientOrderId');
         }
         if (error instanceof VersionConflictError) {
             return failure('La cuenta estaba procesando otra orden a la vez. Inténtalo de nuevo.');
@@ -847,7 +917,7 @@ export async function convertManualDemoCurrency(raw: unknown): Promise<ManualDem
     try {
         await connectToDatabase();
         await ensureAccount(user.id);
-        const duplicate = await duplicateResult(user.id, parsed.clientOrderId);
+        const duplicate = await duplicateResult(user.id, parsed.clientOrderId, (stored) => sameFxPayload(stored, parsed));
         if (duplicate) return duplicate;
 
         const decide = (state: AccountState): TxnDecision => {
@@ -868,12 +938,15 @@ export async function convertManualDemoCurrency(raw: unknown): Promise<ManualDem
             return { kind: 'fill', entry };
         };
 
-        const outcome = await executeLedgerChange(user.id, parsed.clientOrderId, decide, fxDocFor(parsed, user.id));
+        const outcome = await executeLedgerChange(user.id, parsed.clientOrderId, decide, fxDocFor(parsed, user.id), (stored) => sameFxPayload(stored, parsed));
         return { ok: true, outcome: outcome.outcome, reason: outcome.reason, state: toView(outcome.state) };
     } catch (error) {
         if (isDuplicateKey(error)) {
-            const duplicate = await duplicateResult(user.id, parsed.clientOrderId);
+            const duplicate = await duplicateResult(user.id, parsed.clientOrderId, (stored) => sameFxPayload(stored, parsed));
             if (duplicate) return duplicate;
+        }
+        if (error instanceof PayloadConflictError) {
+            return failure('Ese identificador de orden ya se usó con una operación distinta. Recarga la página para generar uno nuevo.', 'clientOrderId');
         }
         if (error instanceof VersionConflictError) {
             return failure('La cuenta estaba procesando otra operación a la vez. Inténtalo de nuevo.');
