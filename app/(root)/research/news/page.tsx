@@ -11,6 +11,8 @@ import { analyzeManualNews, getResearchNews, ingestResearchNewsFeed } from '@/li
 import { NewsEventsFlow } from '@/components/research/NewsEventsFlow';
 import { NEWS_PAGE_SIZE } from '@/lib/news-paging';
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
+import BackendOffline from '@/components/system/BackendOffline';
+import { isBackendUnavailableError } from '@/lib/backend-offline';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -47,16 +49,33 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
   }
   // Sin empresas en cartera ni watchlist no hay nada que filtrar: estado vacío
   // sin llamar al backend (NO FAV auditoría PR #1753).
-  const fetched =
-    lane === 'para-ti' && paraTiTickers.length === 0
-      ? []
-      : await getResearchNews(
-          lane,
-          (page - 1) * NEWS_PAGE_SIZE,
-          NEWS_PAGE_SIZE + 1,
-          ticker,
-          paraTiTickers,
-        );
+  // Solo la caída reconocida del backend (red o 5xx) degrada a BackendOffline;
+  // auth, 4xx y errores de programación siguen al error boundary de la ruta.
+  let fetched: Awaited<ReturnType<typeof getResearchNews>>;
+  try {
+    fetched =
+      lane === 'para-ti' && paraTiTickers.length === 0
+        ? []
+        : await getResearchNews(
+            lane,
+            (page - 1) * NEWS_PAGE_SIZE,
+            NEWS_PAGE_SIZE + 1,
+            ticker,
+            paraTiTickers,
+          );
+  } catch (error) {
+    // Con salida temprana la promesa del contexto quedaría sin consumir.
+    tickerContextPromise.catch(() => undefined);
+    if (isBackendUnavailableError(error)) {
+      const retryParams = new URLSearchParams();
+      if (lane) retryParams.set('lane', lane);
+      if (ticker) retryParams.set('ticker', ticker);
+      if (page > 1) retryParams.set('pagina', String(page));
+      const retryQuery = retryParams.toString();
+      return <BackendOffline feature="Las noticias" retryHref={retryQuery ? `/research/news?${retryQuery}` : '/research/news'} />;
+    }
+    throw error;
+  }
   const tickerContext = await tickerContextPromise;
   const hasMore = fetched.length > NEWS_PAGE_SIZE;
   const events = dedupeNewsEvents(fetched.slice(0, NEWS_PAGE_SIZE));

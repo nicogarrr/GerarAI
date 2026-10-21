@@ -17,6 +17,8 @@ import { firstSearchParam, normalizeSourcesTicker, sourcesHref } from '@/lib/res
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
 import { auditFixLabel } from '@/lib/audit-status-copy';
 import { sourceDisplay } from '@/lib/research/source-display';
+import BackendOffline from '@/components/system/BackendOffline';
+import { isBackendUnavailableError } from '@/lib/backend-offline';
 
 /** F323: tipo y nivel de fuente llegan como ids internos en ingles
  *  (manual_upload, tier_1_regulatory...) y se pintaban en crudo en la tabla.
@@ -77,10 +79,23 @@ export default async function ResearchSourcesPage({
   // Claves repetidas (?ticker=A&ticker=B) llegan como array: primer valor.
   const ticker = normalizeSourcesTicker(firstSearchParam(params.ticker));
   const requestedPage = Number(firstSearchParam(params.page)) || 1;
-  const { documents, audits, documentsTotal, pageInfo } = await getResearchSources({
-    ticker: ticker || undefined,
-    page: Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1,
-  });
+  const requestedPageNumber = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
+  let sources: Awaited<ReturnType<typeof getResearchSources>>;
+  try {
+    sources = await getResearchSources({ ticker: ticker || undefined, page: requestedPageNumber });
+  } catch (error) {
+    // Solo la caída reconocida del backend (red o 5xx) degrada a BackendOffline;
+    // auth, 4xx y errores de programación siguen al error boundary de la ruta.
+    if (isBackendUnavailableError(error)) {
+      const retryParams = new URLSearchParams();
+      if (ticker) retryParams.set('ticker', ticker);
+      if (requestedPageNumber > 1) retryParams.set('page', String(requestedPageNumber));
+      const retryQuery = retryParams.toString();
+      return <BackendOffline feature="Las fuentes" retryHref={retryQuery ? `/research/sources?${retryQuery}` : '/research/sources'} />;
+    }
+    throw error;
+  }
+  const { documents, audits, documentsTotal, pageInfo } = sources;
 
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
