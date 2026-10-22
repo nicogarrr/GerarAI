@@ -8,6 +8,7 @@ suggestions to stay inside the bands.
 
 from __future__ import annotations
 
+import os
 from calendar import monthrange
 from datetime import date
 from decimal import Decimal
@@ -31,6 +32,19 @@ DEFAULT_BAND = Decimal("0.05")  # ±5 percentage points
 # registrada al actualizar; un None EXPLICITO si la desregistra (queda como
 # legacy «divisa no registrada»).
 PLAN_CURRENCY_UNSET: Any = object()
+
+
+def plan_currency_enforced() -> bool:
+    """Capability «contrato de divisa del plan» (default OFF, solo dev).
+
+    ON: la divisa de la cuota se registra y los totales previstos se
+    convierten por cuota. OFF: contrato anterior (cuota == divisa base) SOLO
+    donde es seguro: plan sin divisa registrada o con divisa == base. Un plan
+    con divisa registrada distinta de la base NUNCA se reinterpreta como base:
+    sus totales quedan null con expected_basis=blocked_contract_disabled. Las
+    escrituras con divisa explicita se rechazan (409) en vez de ignorarse.
+    """
+    return os.getenv("PLAN_CURRENCY_ENFORCED") == "1"
 
 
 class InvestmentPlanService:
@@ -189,14 +203,32 @@ class InvestmentPlanService:
         today = today or date.today()
         months_elapsed = self._months_between(plan.start_date, today)
         plan_currency = (plan.monthly_contribution_currency or "").upper() or None
-        expected, expected_partial, expected_missing_fx, expected_periods = self._expected_base(
-            db,
-            plan=plan,
-            plan_currency=plan_currency,
-            base_currency=base_currency,
-            months_elapsed=months_elapsed,
-            today=today,
-        )
+        enforced = plan_currency_enforced()
+        if enforced:
+            expected, expected_partial, expected_missing_fx, expected_periods = (
+                self._expected_base(
+                    db,
+                    plan=plan,
+                    plan_currency=plan_currency,
+                    base_currency=base_currency,
+                    months_elapsed=months_elapsed,
+                    today=today,
+                )
+            )
+            expected_basis = "plan_currency" if plan_currency else "unknown_currency"
+        elif plan_currency is not None and plan_currency != base_currency:
+            # Capability OFF con divisa registrada distinta de la base: el
+            # contrato anterior no puede representarla. Bloqueo honesto.
+            expected, expected_partial, expected_missing_fx, expected_periods = (
+                None, None, [], [],
+            )
+            expected_basis = "blocked_contract_disabled"
+        else:
+            # Contrato anterior, seguro aqui: sin divisa registrada o == base.
+            legacy_total = plan.monthly_contribution * Decimal(months_elapsed)
+            expected, expected_partial = legacy_total, legacy_total
+            expected_missing_fx, expected_periods = [], []
+            expected_basis = "legacy_monthly_as_base"
         totals_known = expected is not None
         return {
             "plan_exists": True,
@@ -207,6 +239,8 @@ class InvestmentPlanService:
             # DESCONOCIDA y los totales quedan sin inventar hasta que el
             # usuario la fije conscientemente.
             "monthly_currency_recorded": plan_currency is not None,
+            "currency_contract_enabled": enforced,
+            "expected_basis": expected_basis,
             "start_date": plan.start_date.isoformat(),
             "horizon_years": plan.horizon_years,
             "months_elapsed": months_elapsed,

@@ -23,6 +23,12 @@ from app.services.investment_plan_service import (
 )
 
 
+@pytest.fixture(autouse=True)
+def contract_on(monkeypatch):
+    """Los tests de este fichero ejercitan el contrato ON salvo los marcados OFF."""
+    monkeypatch.setenv("PLAN_CURRENCY_ENFORCED", "1")
+
+
 @pytest.fixture
 def db():
     engine = create_engine("sqlite:///:memory:")
@@ -200,3 +206,78 @@ def test_inverse_rate_reports_inverse_source_and_reciprocal(db):
     assert period["rate"] == pytest.approx(0.5)
     assert period["source"] == "inv-src"
     assert period["rate_date"] == "2026-02-01"
+
+
+# --- Capability OFF (default): combinaciones seguras, sin reinterpretar ---
+
+def test_off_legacy_null_keeps_previous_math(db, monkeypatch):
+    monkeypatch.delenv("PLAN_CURRENCY_ENFORCED", raising=False)
+    service = InvestmentPlanService()
+    _plan(service, db, start_date=date(2026, 1, 15))  # NULL
+    m = service.plan_metrics(db, today=TODAY)
+    assert m["currency_contract_enabled"] is False
+    assert m["expected_basis"] == "legacy_monthly_as_base"
+    assert m["expected_contributions_base"] == pytest.approx(1000)
+
+
+def test_off_registered_same_as_base_keeps_previous_math(db, monkeypatch):
+    monkeypatch.delenv("PLAN_CURRENCY_ENFORCED", raising=False)
+    service = InvestmentPlanService()
+    _plan(service, db, start_date=date(2026, 1, 15), monthly_contribution_currency="EUR")
+    m = service.plan_metrics(db, today=TODAY)
+    assert m["expected_basis"] == "legacy_monthly_as_base"
+    assert m["expected_contributions_base"] == pytest.approx(1000)
+
+
+def test_off_registered_usd_in_eur_base_is_blocked_not_reinterpreted(db, monkeypatch):
+    """Plan guardado con ON como USD y flag apagado despues: NO se calcula
+    500 USD como 500 EUR; totales null y base explicita."""
+    monkeypatch.setenv("PLAN_CURRENCY_ENFORCED", "1")
+    service = InvestmentPlanService()
+    _usd_plan(service, db, date(2026, 1, 15))
+    monkeypatch.delenv("PLAN_CURRENCY_ENFORCED")
+    m = service.plan_metrics(db, today=TODAY)
+    assert m["expected_basis"] == "blocked_contract_disabled"
+    assert m["expected_contributions_base"] is None
+    assert m["gap_base"] is None and m["on_track"] is None
+    assert m["monthly_contribution_currency"] == "USD"  # dato conservado
+
+
+def test_on_exposes_capability_and_basis(db):
+    service = InvestmentPlanService()
+    _plan(service, db, monthly_contribution_currency="EUR")
+    m = service.plan_metrics(db, today=TODAY)
+    assert m["currency_contract_enabled"] is True
+    assert m["expected_basis"] == "plan_currency"
+    _plan(service, db, monthly_contribution_currency=None)
+    assert service.plan_metrics(db, today=TODAY)["expected_basis"] == "unknown_currency"
+
+
+def _put(db, **fields):
+    from app.api.routes.plan import PlanUpsertInput, upsert_plan
+    base = {"monthly_contribution": 500, "start_date": date(2026, 1, 15)}
+    return upsert_plan(PlanUpsertInput(**base, **fields), db)
+
+
+def test_off_rejects_explicit_currency_write_instead_of_ignoring(db, monkeypatch):
+    from fastapi import HTTPException
+    monkeypatch.delenv("PLAN_CURRENCY_ENFORCED", raising=False)
+    for fields in ({"monthly_contribution_currency": "EUR"},
+                   {"monthly_contribution_currency": None}):
+        with pytest.raises(HTTPException) as err:
+            _put(db, **fields)
+        assert err.value.status_code == 409
+        assert err.value.detail == "plan_currency_contract_disabled"
+    assert InvestmentPlanService().get_plan(db) is None  # nada guardado
+
+
+def test_off_accepts_old_client_write_without_currency(db, monkeypatch):
+    monkeypatch.delenv("PLAN_CURRENCY_ENFORCED", raising=False)
+    out = _put(db)
+    assert out["monthly_contribution_currency"] is None
+
+
+def test_on_put_explicit_registers_and_omitted_preserves(db):
+    assert _put(db, monthly_contribution_currency="usd")["monthly_contribution_currency"] == "USD"
+    assert _put(db)["monthly_contribution_currency"] == "USD"  # omitido preserva
+    assert _put(db, monthly_contribution_currency=None)["monthly_contribution_currency"] is None

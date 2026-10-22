@@ -14,6 +14,7 @@ from app.core.database import get_db
 from app.services.investment_plan_service import (
     PLAN_CURRENCY_UNSET,
     InvestmentPlanService,
+    plan_currency_enforced,
 )
 
 router = APIRouter()
@@ -60,6 +61,16 @@ def get_plan(db: Session = Depends(get_db)) -> dict:
 @router.put("")
 def upsert_plan(payload: PlanUpsertInput, db: Session = Depends(get_db)) -> dict:
     service = InvestmentPlanService()
+    if (
+        "monthly_contribution_currency" in payload.model_fields_set
+        and not plan_currency_enforced()
+    ):
+        # Capability apagada: ignorar la divisa en silencio guardaria un
+        # plan que el cliente cree en esa divisa y se calcularia como base.
+        raise HTTPException(
+            status_code=409,
+            detail="plan_currency_contract_disabled",
+        )
     if "monthly_contribution_currency" in payload.model_fields_set:
         currency = (
             payload.monthly_contribution_currency.upper()
