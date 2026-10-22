@@ -858,12 +858,20 @@ type ExtractFromRegistryResult = { outcome?: string; created?: number; candidate
 
 export async function extractManagementCandidatesFromRegistry(ticker: string, formData: FormData) {
   assertCommitmentsUi();
-  const result = await requestJson<ExtractFromRegistryResult>(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-registry`, {
-    method: 'POST',
-    body: JSON.stringify({
-      source_url: required(formData, 'source_url', 'Source URL'),
-    }),
-  });
+  let result: ExtractFromRegistryResult;
+  try {
+    result = await requestJson<ExtractFromRegistryResult>(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-registry`, {
+      method: 'POST',
+      body: JSON.stringify({
+        source_url: required(formData, 'source_url', 'Source URL'),
+      }),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('sin_contexto_tenant')) {
+      throw new Error('No se pudo identificar tu sesión; vuelve a entrar.');
+    }
+    throw err;
+  }
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
   // Contrato backend: 0 creados NUNCA se celebra; el outcome dice la razón real.
   const n = typeof result?.created === 'number' ? result.created : (Array.isArray(result?.candidates) ? result.candidates.length : 0);
@@ -878,7 +886,7 @@ export async function extractManagementCandidatesFromRegistry(ticker: string, fo
   } else {
     message = 'No se han añadido candidatos nuevos.';
   }
-  return { message };
+  return n > 0 ? { message } : { message, tone: 'neutral' };
 }
 
 export async function reviewManagementCandidate(ticker: string, promiseId: number, formData: FormData) {

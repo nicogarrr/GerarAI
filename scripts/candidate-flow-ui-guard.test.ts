@@ -102,3 +102,16 @@ void test('extracción sin candidatos nuevos no celebra: el mensaje sigue el out
     assert.ok(actions.includes("typeof result?.created === 'number'"), 'el mensaje depende del resultado real, no es fijo');
     assert.ok(!actions.includes('No hay compromisos'), 'cero añadidos NUNCA se expresa como ausencia de compromisos');
 });
+
+void test('cero candidatos nuevos no brinda con toast de éxito: tono neutral', () => {
+    const actions = source('lib/actions/research-tools.actions.ts');
+    const form = source('components/forms/MutationForm.tsx');
+    assert.ok(actions.includes("return n > 0 ? { message } : { message, tone: 'neutral' }"), '0-nuevos devuelve tone neutral');
+    assert.ok(form.includes("if (tone === 'neutral') toast(message); else toast.success(message);"), 'MutationForm honra tone neutral');
+});
+
+void test('abstención sin contexto de tenant se explica, no se oculta', () => {
+    const actions = source('lib/actions/research-tools.actions.ts');
+    assert.ok(actions.includes('sin_contexto_tenant'), 'detecta la razón real del backend');
+    assert.ok(actions.includes('No se pudo identificar tu sesión; vuelve a entrar.'), 'mensaje accionable en español');
+});

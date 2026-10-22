@@ -35,8 +35,9 @@ export function MutationForm({
     try {
       const result = await action(formData);
       const message = result && typeof result === 'object' && 'message' in result && typeof result.message === 'string' ? result.message : successMessage;
+      const tone = result && typeof result === 'object' && 'tone' in result ? (result as { tone?: string }).tone : undefined;
       if (resetOnSuccess) formRef.current?.reset();
-      toast.success(message);
+      if (tone === 'neutral') toast(message); else toast.success(message);
       if (showSuccessInline) setSuccess(message);
     } catch (err) {
       // Los redirects de Next forman parte de la navegación: re-lanzarlos.
