@@ -304,16 +304,24 @@ class ManagementCredibilityService:
             )
             if actual is None:
                 continue
+            # Contexto comparable y con fuente valida: siempre se registra el hecho.
             promise.actual_fact_id = actual.id
             promise.actual_value = actual.value
             promise.verified_at = datetime.now(UTC)
-            if promise.target_value is None or promise.operator not in OPERATORS:
-                promise.status = "outcome_recorded"
-            else:
+            verdict = False
+            if (
+                self._has_reviewed_structured_criterion(promise)
+                and not self._is_legacy_heuristic(promise)
+                and promise.operator in OPERATORS
+            ):
                 # Comparacion exacta segun operador/objetivo; sin tolerancia inventada:
                 # un "casi cumplido" ("partial") no se infiere, solo lo declara una persona.
                 met = OPERATORS[promise.operator](actual.value, promise.target_value)
                 promise.status = "met" if met else "missed"
+                verdict = True
+            # Sin criterio revisado por una persona (o target legado inferido) NO se emite
+            # met/missed ni se sobrescribe un juicio previo: el estado y su provenance se
+            # conservan, el hecho queda solo como contexto.
             promise.evidence = [
                 *(promise.evidence or []),
                 {
@@ -322,6 +330,7 @@ class ManagementCredibilityService:
                     "source_type": actual.source_type,
                     "actual_value": str(actual.value),
                     "source_document_id": actual.source_id,
+                    "context_only": not verdict,
                 },
             ]
         db.commit()
@@ -407,6 +416,19 @@ class ManagementCredibilityService:
             item["checks"] = [CommitmentTrackingService.check_payload(c) for c in checks]
             out.append(item)
         return out
+
+    @staticmethod
+    def _has_reviewed_structured_criterion(row: ManagementPromise) -> bool:
+        meta = row.metadata_ or {}
+        return bool(
+            meta.get("reviewed_at")
+            and meta.get("review_kind") == "user_declared"
+            and row.metric
+            and row.operator
+            and row.target_value is not None
+            and row.unit
+            and row.expected_period
+        )
 
     @staticmethod
     def _is_legacy_heuristic(row: ManagementPromise) -> bool:

@@ -222,6 +222,12 @@ def test_financial_terminal_portfolio_intelligence_and_management_scorecard():
         ManagementCredibilityService().set_explanation(
             db, promise, "Cloud demand exceeded the original plan."
         )
+        promise.metadata_ = {
+            **(promise.metadata_ or {}),
+            "reviewed_at": "2026-10-22T12:00:00+00:00",
+            "review_kind": "user_declared",
+        }
+        db.commit()
         ManagementCredibilityService().reconcile(db, company)
         dashboard = ManagementCredibilityService().dashboard(db, company)
         assert dashboard["score"] == 1
