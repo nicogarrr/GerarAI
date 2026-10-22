@@ -185,10 +185,25 @@ _NAME_ONLY_STOP = re.compile(
 ROLE_NOT_IN_DOCUMENT = "cargo no indicado en el documento (comentarios preparados de la compañía)"
 
 
-_QA_MARK = re.compile(r"^(?:Post[\s-]*Q\s*&\s*A|Q\s*&\s*A|Questions?[\s-]+and[\s-]+Answers?)\b", re.I)
+_QA_MARK_RE = re.compile(
+    r"(?:^|[\s(])(?:Post[\s-]*)?Q\s*&\s*A\b|^Questions?[\s-]+and[\s-]+Answers?\b", re.I
+)
 
 
-def _corroboration(name: str, before: str) -> tuple[bool, str | None]:
+class _QaMark:
+    """Linea corta tipo cabecera ("Post Q&A Steve Close", "Steve (Post-Q&A Close)") que marca el Q&A.
+    Falla cerrado: una linea corta sin punto final que mencione Q&A corta el turno (puede perder texto,
+    nunca lo atribuye al hablante anterior)."""
+
+    @staticmethod
+    def match(line: str) -> bool:
+        return len(line) <= 60 and not line.endswith(".") and bool(_QA_MARK_RE.search(line))
+
+
+_QA_MARK = _QaMark()
+
+
+def _corroboration(name: str, before: str, first_name_is_unique: bool = True) -> tuple[bool, str | None]:
     """Evidencia de identidad en el propio documento, ANTES del turno: presentacion con cargo
     ("...over to the chief ... officer of X, Nombre Apellido") o traspaso explicito por nombre/nombre de pila
     ("turn it over to Nombre", "Thanks, Nombre"). Un titulo cualquiera con forma de nombre NO basta."""
@@ -202,7 +217,8 @@ def _corroboration(name: str, before: str) -> tuple[bool, str | None]:
     )
     if m and re.search(r"chief|officer|president|chair|ceo|cfo|coo|head|director|founder|treasurer", m.group("role"), re.I):
         return True, m.group("role").strip()
-    handoff = rf"(?:(?:turn|hand|pass)(?:ing)? (?:it|the (?:call|conference|floor|discussion)) (?:back )?(?:over )?to|(?:Thanks|Thank you),)\s+(?:{full}|{first})\b"
+    who = f"(?:{full}|{first})" if first_name_is_unique else full  # nombre de pila ambiguo: solo nombre completo
+    handoff = rf"(?:(?:turn|hand|pass)(?:ing)? (?:it|the (?:call|conference|floor|discussion)) (?:back )?(?:over )?to|(?:Thanks|Thank you),)\s+{who}\b"
     if re.search(handoff, before, re.I):
         return True, None
     return False, None
@@ -222,6 +238,12 @@ def _turns_name_only(text: str) -> tuple[list[tuple[str, str, str]], dict[str, s
     roster: dict[str, str] = {}
     cur: int | None = None
     seen: list[str] = []
+    shaped = {
+        ln for ln in lines if ln and len(ln) <= 40 and _NAME_ONLY.match(ln) and not _NAME_ONLY_STOP.search(ln)
+    }
+    first_counts: dict[str, int] = {}
+    for n in shaped:
+        first_counts[n.split()[0]] = first_counts.get(n.split()[0], 0) + 1
     for ln in lines:
         if not ln or ln.isdigit():
             continue
@@ -230,7 +252,7 @@ def _turns_name_only(text: str) -> tuple[list[tuple[str, str, str]], dict[str, s
             seen.append(ln)
             continue
         if len(ln) <= 40 and _NAME_ONLY.match(ln) and not _NAME_ONLY_STOP.search(ln) and not ln.endswith(":"):
-            ok, role = _corroboration(ln, " ".join(seen))
+            ok, role = _corroboration(ln, " ".join(seen), first_counts.get(ln.split()[0], 0) <= 1)
             if ok:
                 role = role or ROLE_NOT_IN_DOCUMENT
                 roster.setdefault(ln, role)

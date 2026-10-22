@@ -88,7 +88,28 @@ def test_title_lines_shaped_like_names_are_not_speakers_without_document_evidenc
 
 
 def test_post_qa_variants_cut_the_turn():
-    for mark in ("Post Q&A", "Post-Q&A", "Post Q & A", "Q&A"):
-        doc = DOC.replace("Post-Q&A Jane Close", f"{mark} Jane Close")
+    for mark in ("Post Q&A", "Post-Q&A", "Post Q & A", "Q&A", "(Post-Q&A Close)"):
+        doc = DOC.replace("Post-Q&A Jane Close", f"Jane {mark}" if mark.startswith("(") else f"{mark} Jane Close")
         cs, _ = extract_with_diagnostics(doc, call_date=date(2026, 10, 13))
         assert not any("double the budget" in c.quote_literal for c in cs), mark
+
+
+AMBIG = """Quarterly Teleconference Prepared Remarks
+Moderator:
+Welcome. I will now turn it over to Tim.
+Tim Noel
+We will open 12 new sites by the end of the year.
+Tim Brown
+We expect to reach 30% margin in 2028.
+"""
+
+
+def test_first_name_handoff_is_ignored_when_two_name_lines_share_it():
+    cs, dg = extract_with_diagnostics(AMBIG, call_date=date(2026, 10, 13))
+    assert dg["management_turns"] == 0 and cs == []  # "Tim" no identifica a nadie: fail closed
+
+
+def test_first_name_handoff_still_works_when_unique():
+    doc = AMBIG.replace("Tim Brown", "Ann Brown").replace("turn it over to Tim.", "turn it over to Tim. Ann Brown, thanks.")
+    cs, dg = extract_with_diagnostics(doc, call_date=date(2026, 10, 13))
+    assert {c.speaker for c in cs} == {"Tim Noel"}
