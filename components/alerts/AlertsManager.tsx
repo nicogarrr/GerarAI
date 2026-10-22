@@ -1,7 +1,7 @@
 'use client';
 
 import { alertThesisHref } from '@/lib/alerts/card-destination';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
@@ -31,7 +31,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import SectionLoadError from '@/components/system/SectionLoadError';
-import { isNextRedirectError } from '@/lib/types/errors';
+import { classifyError, getFriendlyErrorMessage, isNextRedirectError } from '@/lib/types/errors';
 import { formatDate, formatNumber, formatUserDateTime } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { reviewResearchExpectations } from '@/lib/actions/research.actions';
@@ -62,6 +62,12 @@ function AlertsManager() {
     const [confirmAlert, setConfirmAlert] = useState<Alert | null>(null);
     /** Alta en curso: igual que el borrado, doble click = alerta duplicada. */
     const [creating, setCreating] = useState(false);
+    // Fallo de ALTA con el motor caído: se muestra y se reintenta DENTRO del
+    // diálogo. El toast con acción quedaba inutilizable bajo el modal: el
+    // click caía en el overlay y cerraba el formulario, y Tab no alcanzaba
+    // el botón dentro del focus-trap de Radix.
+    const [createError, setCreateError] = useState<string | null>(null);
+    const createErrorRef = useRef<HTMLDivElement | null>(null);
     /** Estado de entrega del motor (evaluacion cada 5 min + Telegram). */
     const [telegram, setTelegram] = useState<TelegramStatus | null>(null);
     const [triggered, setTriggered] = useState<TriggeredAlertDelivery[]>([]);
@@ -134,8 +140,13 @@ function AlertsManager() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    useEffect(() => {
+        if (createError) createErrorRef.current?.focus();
+    }, [createError]);
+
     const handleCreateAlert = async () => {
         if (creating) return;
+        setCreateError(null);
         try {
             if (!formData.symbol.trim()) {
                 toast.error('Introduce un símbolo válido');
@@ -187,10 +198,15 @@ function AlertsManager() {
             loadAlerts();
         } catch (error) {
             if (isNextRedirectError(error)) throw error;
-            showErrorToast(error, {
-                duplicateMessage: 'Ya tienes esta alerta configurada.',
-                onRetry: handleCreateAlert,
-            });
+            if (classifyError(error) === 'offline') {
+                // Superficie inline: el reintento debe ser alcanzable con
+                // teclado y no puede cerrar el diálogo al pulsarse.
+                setCreateError(getFriendlyErrorMessage(error));
+            } else {
+                showErrorToast(error, {
+                    duplicateMessage: 'Ya tienes esta alerta configurada.',
+                });
+            }
         } finally {
             setCreating(false);
         }
@@ -271,7 +287,10 @@ function AlertsManager() {
                     <Bell aria-hidden="true" className="h-5 w-5 shrink-0 text-teal-400" />
                     <h2 className="text-sm font-semibold text-gray-200">Mis alertas</h2>
                 </div>
-                <Dialog open={open} onOpenChange={setOpen}>
+                <Dialog open={open} onOpenChange={(next) => {
+                        setOpen(next);
+                        if (!next) setCreateError(null);
+                    }}>
                     <DialogTrigger asChild>
                         <Button size="sm" className="gap-2 min-h-[44px] px-4 text-sm sm:min-h-0 sm:text-xs">
                             <Plus aria-hidden="true" className="h-4 w-4" />
@@ -392,6 +411,27 @@ function AlertsManager() {
                                     </div>
                                 </>
                             )}
+                            {createError ? (
+                                <div
+                                    ref={createErrorRef}
+                                    role="alert"
+                                    tabIndex={-1}
+                                    className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200 outline-none"
+                                >
+                                    <p>{createError}</p>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleCreateAlert}
+                                        disabled={creating}
+                                        className="mt-2 gap-2 border-amber-500/50 text-amber-200 hover:text-amber-100"
+                                    >
+                                        <RefreshCcw aria-hidden="true" className="h-4 w-4" />
+                                        {t('common.actions.retry')}
+                                    </Button>
+                                </div>
+                            ) : null}
                             <Button onClick={handleCreateAlert} disabled={creating} aria-busy={creating} className="w-full min-h-[44px] text-sm sm:text-xs">
                                 {t('alerts.create')}
                             </Button>
