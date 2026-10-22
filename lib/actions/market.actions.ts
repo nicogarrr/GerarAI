@@ -52,21 +52,29 @@ export type MarketMovers = {
   most_active: MarketMover[];
 };
 
-/** Gainers/losers/más activas desde precios locales. Vacío honesto si no hay datos. */
-export async function getMarketMovers(limit = 10): Promise<MarketMovers> {
-  const empty: MarketMovers = { as_of: null, universe: 0, gainers: [], losers: [], most_active: [] };
+/** No confundir una consulta fallida con un universo realmente vacío. */
+export type MarketMoversResult = { data: MarketMovers; error: null } | { data: null; error: unknown };
+
+export async function getMarketMoversResult(limit = 10): Promise<MarketMoversResult> {
   try {
     const payload = await cachedFetch<MarketMovers>(
       `market:movers:${limit}`,
       () => researchRequest<MarketMovers>(`/api/market/movers?limit=${limit}`),
       45,
     );
-    if (!payload || !Array.isArray(payload.gainers)) return empty;
-    return payload;
+    if (!payload || !Array.isArray(payload.gainers) || !Array.isArray(payload.losers) || !Array.isArray(payload.most_active)) {
+      throw new Error('Respuesta de movimientos no válida');
+    }
+    return { data: payload, error: null };
   } catch (error) {
-    console.error('getMarketMovers error:', error);
-    return empty;
+    return { data: null, error };
   }
+}
+
+/** Variante legacy solo-datos. Las pantallas deben usar el resultado discriminado. */
+export async function getMarketMovers(limit = 10): Promise<MarketMovers> {
+  const result = await getMarketMoversResult(limit);
+  return result.data ?? { as_of: null, universe: 0, gainers: [], losers: [], most_active: [] };
 }
 /** Resultado discriminado de índices: datos o error, nunca ambos mezclados. */
 export type MarketIndicesResult = {

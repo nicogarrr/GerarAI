@@ -1,6 +1,6 @@
 import { quoteObserved } from '@/lib/market/quote-observed';
 import type { Metadata } from 'next';
-import { getMarketIndicesResult, getMarketMovers } from '@/lib/actions/market.actions';
+import { getMarketIndicesResult, getMarketMoversResult } from '@/lib/actions/market.actions';
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { MoversTable } from '@/components/market/MoversTable';
 import BackendOffline from '@/components/system/BackendOffline';
@@ -17,6 +17,7 @@ import { OverflowScrollRegion } from '@/components/ui/overflow-scroll-region';
 import Link from 'next/link';
 import { RefreshCcw } from 'lucide-react';
 import FollowButton from '@/components/screener/FollowButton';
+import { getWatchlistState } from '@/lib/actions/watchlist.actions';
 import SectorSelect from '@/components/screener/SectorSelect';
 import { MarketRegimeVista } from '@/components/market/MarketRegime';
 
@@ -87,15 +88,17 @@ function VistaTabs({ vista }: { vista: Vista }) {
 }
 
 async function MoversVista({ vista }: { vista: Exclude<Vista, 'empresas'> }) {
-  let movers, tickerContext;
+  let moversResult, tickerContext;
   try {
-    [movers, tickerContext] = await Promise.all([getMarketMovers(25), getTickerContext()]);
+    [moversResult, tickerContext] = await Promise.all([getMarketMoversResult(25), getTickerContext()]);
+    if (!moversResult.data) throw moversResult.error;
   } catch (error) {
     if (isBackendUnavailableError(error)) {
       return <BackendOffline feature="Mercado" retryHref={`/screener?vista=${vista}`} />;
     }
     throw error;
   }
+  const movers = moversResult.data;
   const tickerSets = {
     portfolioTickers: new Set(tickerContext.portfolioTickers),
     watchlistTickers: new Set(tickerContext.watchlistTickers),
@@ -152,7 +155,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
   // Screener (backend) e índices (backend) son independientes: en paralelo
   // en vez de en serie. El flag distingue "backend caído" (reintentar) de
   // "filtro sin resultados" (cambiar de sector).
-  const [screenerResult, indicesResult, engineScreens] = await Promise.all([
+  const [screenerResult, indicesResult, engineScreens, watchlist] = await Promise.all([
     getScreenerStocksRealWithStatus({ sector, limit: 25 }).then(
       (result) => ({ ...result, error: null as unknown }),
       (error: unknown) => ({
@@ -172,7 +175,9 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
       (screens) => ({ screens, engineDown: false }),
       () => ({ screens: [] as Awaited<ReturnType<typeof getSavedScreenerEngines>>, engineDown: true }),
     ),
+    getWatchlistState(),
   ]);
+  const followed = new Set(watchlist.items.map((item) => item.symbol.trim().toUpperCase()));
   const { rows, refreshing: screenerRefreshing, universeSize, error: screenerError } = screenerResult;
   const backendDown = screenerError !== null;
   // Un indice sin precio real (fallo del proveedor) no se pinta como $0.00.
@@ -304,7 +309,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                           <div className="text-right">
                             <span className="font-semibold text-gray-200">{screenerPrice(r.price, r.currency)}</span>
                             {!isValidCurrencyCode(r.currency) ? <div className="text-[10px] text-gray-500">Divisa N/D: proveedor sin divisa</div> : null}
-                            <div className="text-[10px] text-gray-500">{r.priceDate ? `Cierre ${formatMarketDate(r.priceDate)}` : quoteObserved(r.priceAsOf, r.priceTimestampKind)}</div>
+                            <div className="text-[10px] text-gray-500">{r.priceDate ? `Dato diario del ${formatMarketDate(r.priceDate)}` : quoteObserved(r.priceAsOf, r.priceTimestampKind)}</div>
                           </div>
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
@@ -321,7 +326,9 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                         </td>
                         <td className="mt-2 flex items-center justify-between gap-3 border-t border-gray-800/60 pt-3 md:table-cell md:mt-0 md:border-0 md:py-3 md:pt-3 md:text-right">
                           <span className="text-xs text-gray-500 md:hidden">Seguir</span>
-                          <FollowButton symbol={r.symbol} company={r.name} />
+                          <div className="min-w-0 [&_button]:h-auto [&_button]:whitespace-normal">
+                            <FollowButton symbol={r.symbol} company={r.name} isFollowed={followed.has(r.symbol.trim().toUpperCase())} stateUnknown={watchlist.unavailable} />
+                          </div>
                         </td>
                       </tr>
                     ))}
