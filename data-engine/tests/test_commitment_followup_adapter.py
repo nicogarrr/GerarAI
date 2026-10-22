@@ -1,24 +1,54 @@
 """Read-only SQLite adapter tests; no conftest, source fetch or live account."""
-import os
 import unittest
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
-os.environ['APP_ENV'] = 'test'
-os.environ['DATABASE_URL'] = 'sqlite://'
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
 
-from sqlalchemy import create_engine, select  # noqa: E402
-from sqlalchemy.orm import Session  # noqa: E402
-
-from app.models.entities import Base, Company, Document, DocumentChunk, FinancialFact  # noqa: E402
-from app.services.commitment_followup_service import evaluate_followup, load_reported_evidence  # noqa: E402
-from tests.test_commitment_followup_service import CRITERION, TODAY  # noqa: E402
+from app.models.entities import Base, Company, Document, DocumentChunk, FinancialFact
+from app.services.commitment_followup_service import evaluate_followup, load_reported_evidence
+from tests.test_commitment_followup_service import CRITERION, TODAY
 
 URL = 'https://issuer.invalid/filing/2031'
 
 
 class AdapterTests(unittest.TestCase):
+    def test_collection_preserves_database_url_and_cross_thread_schema(self):
+        # Regression: module-level DATABASE_URL='sqlite://' replaced the
+        # conftest file DB during collection; HTTP's other thread saw no tables.
+        import os
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as directory:
+            database_url = 'sqlite:///' + (Path(directory) / 'collection.db').as_posix()
+            environment = {**os.environ, 'APP_ENV': 'test', 'DATABASE_URL': database_url}
+            script = """
+import os
+from concurrent.futures import ThreadPoolExecutor
+expected = os.environ['DATABASE_URL']
+import tests.test_commitment_followup_adapter
+assert os.environ['DATABASE_URL'] == expected
+from app.core.database import engine
+from sqlalchemy import text
+assert str(engine.url) == expected
+with engine.begin() as connection:
+    connection.execute(text('create table collection_probe (id integer)'))
+def read_from_http_thread():
+    with engine.connect() as connection:
+        connection.execute(text('select * from collection_probe'))
+with ThreadPoolExecutor(max_workers=1) as pool:
+    pool.submit(read_from_http_thread).result()
+"""
+            probe = subprocess.run([sys.executable, '-c', script], env=environment,
+                                   capture_output=True, text=True, timeout=20,
+                                   cwd=Path(__file__).resolve().parents[1])
+            self.assertEqual(probe.returncode, 0, probe.stderr)
+
     def setUp(self):
         self.engine = create_engine('sqlite://')
         Base.metadata.create_all(self.engine)
