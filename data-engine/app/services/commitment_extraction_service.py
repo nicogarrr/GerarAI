@@ -77,7 +77,7 @@ def locator_for(c: Candidate) -> str:
 
 
 _ANALYST_ROLE = re.compile(
-    r"research|analyst|equity|securities|capital markets|bank|asset management|investment|portfolio|sell[- ]side",
+    r"research|analyst|equity|securities|capital markets|bank|asset management|sell[- ]side",
     re.I,
 )
 
@@ -86,7 +86,7 @@ def _roster(lines: list[str]) -> dict[str, str]:
     """Cargos de la presentacion. Solo ANTES del turno del operador (Q&A) y sin cargos de analista."""
     roster: dict[str, str] = {}
     for line in lines:
-        if line.strip().startswith("Operator:"):
+        if roster and line.strip().startswith("Operator:"):
             break
         m = _ROLE_HEADER.match(line.strip())
         if m and not line.startswith(" " * 4) and not _ANALYST_ROLE.search(m.group(2)):

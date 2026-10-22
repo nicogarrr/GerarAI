@@ -86,3 +86,16 @@ def test_locator_declares_normalization_and_context():
     assert flat[c.char_start : c.char_end] == c.quote_literal
     assert text.find(c.quote_literal) == -1  # offsets NO son del original
     assert c.context_before.rstrip().endswith("Intro line.")
+
+
+def test_operator_before_management_header_still_builds_roster():
+    text = "Operator:  Welcome.\n\nAna Perez, CEO\n\nWe expect 5 units in 2030.\n"
+    assert [c.speaker for c in extract_candidates(text)] == ["Ana Perez"]
+
+
+def test_chief_investment_officer_is_management_but_research_head_is_not():
+    text = (
+        "Lia Gomez, Chief Investment Officer\n\nWe expect 5 units in 2030.\n\n"
+        "Cy Rival, Head of Investment Research\n\nWe expect 9 units in 2031.\n"
+    )
+    assert [c.speaker for c in extract_candidates(text)] == ["Lia Gomez"]
