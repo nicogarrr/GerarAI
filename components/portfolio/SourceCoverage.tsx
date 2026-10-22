@@ -281,6 +281,11 @@ export function SourceCoverageView({ report }: { report: SourceCoverageReport })
             <p className="mt-1 text-xs text-gray-400">{COVERAGE_NOTE}</p>
             <div className="mt-3 grid gap-2">
                 <StoreAlerts report={report} />
+                {(report.discarded_companies ?? 0) > 0 ? (
+                    <p role="alert" className="rounded-lg border border-amber-800 bg-amber-950/40 p-3 text-xs text-amber-300">
+                        La respuesta llegó incompleta: {report.discarded_companies} empresa(s) no se pudieron leer y no se muestran. Esto no significa que falten fuentes.
+                    </p>
+                ) : null}
             </div>
             <CoverageSummary companies={companies} />
             {companies.length ? (
@@ -297,6 +302,9 @@ export function SourceCoverageView({ report }: { report: SourceCoverageReport })
                 <summary className="cursor-pointer text-xs text-gray-400 underline">Detalle operativo y chequeos recientes ({historyRows.length})</summary>
                 <div className="mt-2 grid gap-2">
                     <OperationalDetails report={report} />
+                    {(report.discarded_history ?? 0) > 0 ? (
+                        <p className="text-xs text-gray-500">{report.discarded_history} chequeo(s) no legibles omitidos.</p>
+                    ) : null}
                     <HistoryList history={historyRows} />
                 </div>
             </details>

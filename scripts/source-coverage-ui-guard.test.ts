@@ -160,6 +160,15 @@ void test('filas malformadas se filtran sin inventar datos ni tumbar la página'
     assert.ok(view.includes('.filter((h) => h &&'), 'historial no rinde null');
 });
 
+void test('las filas descartadas se cuentan y se avisan: el filtrado nunca aparenta completitud', () => {
+    const actions = source('lib/actions/source-coverage.actions.ts');
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    const page = source('app/(root)/portfolio/commitments/page.tsx');
+    assert.ok(actions.includes('discarded_companies'), 'descartadas contadas');
+    assert.ok(view.includes('no se pudieron leer y no se muestran'), 'aviso de respuesta parcial en cobertura');
+    assert.ok(page.includes('no se pudieron leer y no se muestran'), 'aviso de respuesta parcial en compromisos');
+});
+
 void test('la acción usa firma de identidad y no-store como el resto del cliente research', () => {
     const actions = source('lib/actions/source-coverage.actions.ts');
     assert.ok(actions.includes('researchIdentityHeaders'), 'firma de identidad');

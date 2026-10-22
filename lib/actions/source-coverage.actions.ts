@@ -100,6 +100,9 @@ export type SourceCoverageReport = {
     store: SourceCoverageStore | null;
     /** null = nunca ejecutado o ilegible (NO garantiza 'nunca'); ok=false = fallo del chequeo programado. */
     job_last_run: SourceCoverageJobRun | null;
+    /** Meta LOCAL de normalización (no viene del backend): filas descartadas por malformadas. */
+    discarded_companies?: number;
+    discarded_history?: number;
     companies: SourceCoverageCompany[];
     history: SourceCoverageHistoryItem[];
 };
@@ -123,9 +126,14 @@ export async function getSourceCoverage(): Promise<SourceCoverageResult> {
         if (!data || !Array.isArray(data.companies) || !Array.isArray(data.history)) {
             return { status: 'unavailable' };
         }
-        // Filas malformadas (null, sin ticker) se descartan: nunca se inventan datos ni se rinde un crash.
-        data.companies = data.companies.filter((c) => c && typeof c === 'object' && typeof c.ticker === 'string');
-        data.history = data.history.filter((h) => h && typeof h === 'object' && typeof h.ticker === 'string' && typeof h.url === 'string');
+        // Filas malformadas (null, sin ticker) se descartan y SE CUENTAN: la UI avisa de
+        // respuesta parcial; nunca se inventan datos ni se recalcula el universo a la baja.
+        const companiesOk = data.companies.filter((c) => c && typeof c === 'object' && typeof c.ticker === 'string');
+        const historyOk = data.history.filter((h) => h && typeof h === 'object' && typeof h.ticker === 'string' && typeof h.url === 'string');
+        data.discarded_companies = data.companies.length - companiesOk.length;
+        data.discarded_history = data.history.length - historyOk.length;
+        data.companies = companiesOk;
+        data.history = historyOk;
         // Normalización defensiva: campos lista ausentes nunca tumban la página.
         for (const c of data.companies) {
             c.pending ??= [];

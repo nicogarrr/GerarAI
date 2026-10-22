@@ -38,6 +38,7 @@ export default async function PortfolioCommitmentsPage() {
   }
   // Filas malformadas (sin counts.numérico) se descartan: no cuentan como 0 ni tumban la página.
   const valid = data.companies.filter((c) => c && typeof c === 'object' && typeof c.ticker === 'string' && c.counts && typeof c.counts.total === 'number');
+  const discarded = data.companies.length - valid.length;
   const withItems = valid.filter((c) => c.counts.total > 0);
   const ambiguous = valid.filter((c) => c.company_identity_ambiguous);
   // Sin datos por ausencia REAL: ni compromisos ni identidad ambigua.
@@ -54,6 +55,11 @@ export default async function PortfolioCommitmentsPage() {
       </p>
       <SourceCoverage />
       {!withItems.length ? <EmptyState title="Aún no hay compromisos ni candidatos para las empresas de tu cartera ni de tu watchlist." /> : null}
+      {discarded > 0 ? (
+        <p role="alert" className="text-xs text-amber-300">
+          La respuesta llegó incompleta: {discarded} empresa(s) no se pudieron leer y no se muestran. No significa que no tengan compromisos.
+        </p>
+      ) : null}
       {ambiguous.length ? (
         <p className="text-xs text-amber-300">
           {ambiguous.map((c) => c.ticker).join(', ')}: identidad ambigua, pendiente de revisar. No se muestran compromisos porque la empresa no está resuelta, no porque falten.
