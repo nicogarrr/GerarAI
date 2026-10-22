@@ -153,39 +153,72 @@ class CorporateActionService:
             # Split historico (anterior a la primera operacion): ya reflejado,
             # se marca aplicado sin reescalar la posicion actual.
             if position is not None and not self.is_historical(action, first):
-                # Las operaciones desde la fecha efectiva ya se registraron en
-                # terminos post-split y no se reescalan; solo se reescala el
-                # resto de la posicion. Sin operaciones posteriores el
-                # resultado es el escalado completo de siempre. El coste
-                # total se conserva.
-                post_legs = db.execute(
-                    select(Transaction.action, Transaction.quantity).where(
+                # Replay del libro con las patas ANTERIORES a la fecha efectiva
+                # ajustadas (cantidad*ratio, precio/ratio, comisiones sin
+                # tocar) y las posteriores tal cual (ya estan en terminos
+                # post-split). Da cantidad, coste medio y realizado coherentes
+                # incluso con ventas posteriores. Todo se calcula ANTES de
+                # escribir: si el libro es ambiguo se rechaza sin cambios.
+                legs = db.scalars(
+                    select(Transaction)
+                    .where(
                         Transaction.company_id == action.company_id,
-                        Transaction.trade_date >= action.effective_date,
                         Transaction.action.in_(("buy", "sell")),
                     )
+                    .order_by(
+                        Transaction.trade_date, Transaction.created_at, Transaction.id
+                    )
                 ).all()
-                post_net = sum(
+                ledger_net = sum(
                     (
-                        (quantity or Decimal("0")) * (1 if leg_action == "buy" else -1)
-                        for leg_action, quantity in post_legs
+                        (leg.quantity or Decimal("0"))
+                        * (1 if leg.action == "buy" else -1)
+                        for leg in legs
                     ),
                     Decimal("0"),
                 )
-                post_net = max(Decimal("0"), min(post_net, position.quantity))
-                old_quantity = position.quantity
-                old_cost = (
-                    old_quantity * position.average_cost
-                    if position.average_cost is not None
-                    else None
-                )
-                position.quantity = ((old_quantity - post_net) * ratio + post_net).quantize(
-                    Decimal("0.000001")
-                )
-                if old_cost is not None and position.quantity > 0:
-                    position.average_cost = (old_cost / position.quantity).quantize(
-                        Decimal("0.000001")
+                # Sin ninguna pata en el libro no hay nada que contradecir ni
+                # que reordenar: se conserva el reescalado completo clasico de
+                # la posicion (coste total conservado).
+                if not legs:
+                    qty = position.quantity * ratio
+                    cost = (position.average_cost or Decimal("0")) * position.quantity
+                    realized = position.realized_pnl or Decimal("0")
+                elif ledger_net != position.quantity:
+                    raise ValueError(
+                        "Split rejected: position quantity "
+                        f"{position.quantity} does not match the ledger "
+                        f"({ledger_net}); review the position before applying"
                     )
+                if legs:
+                    qty = Decimal("0")
+                    cost = Decimal("0")
+                    realized = Decimal("0")
+                for leg in legs:
+                    leg_qty = leg.quantity or Decimal("0")
+                    leg_price = leg.price or Decimal("0")
+                    fees = leg.fees or Decimal("0")
+                    if leg.trade_date < action.effective_date:
+                        leg_qty = leg_qty * ratio
+                        leg_price = leg_price / ratio
+                    if leg.action == "buy":
+                        qty += leg_qty
+                        cost += leg_qty * leg_price + fees
+                    else:
+                        if leg_qty > qty:
+                            raise ValueError(
+                                "Split rejected: adjusted ledger would oversell "
+                                f"({leg_qty} > {qty}); review the position"
+                            )
+                        avg = cost / qty
+                        realized += (leg_price - avg) * leg_qty - fees
+                        cost -= avg * leg_qty
+                        qty -= leg_qty
+                if qty <= 0:
+                    raise ValueError("Split rejected: adjusted ledger is empty")
+                position.quantity = qty.quantize(Decimal("0.000001"))
+                position.average_cost = (cost / qty).quantize(Decimal("0.000001"))
+                position.realized_pnl = realized
                 if position.market_price is not None:
                     position.market_price = (position.market_price / ratio).quantize(
                         Decimal("0.000001")
