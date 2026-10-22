@@ -149,20 +149,29 @@ def enqueue_for_all_tenants(actor, **kwargs) -> dict:
 
 def run_source_check_job() -> dict:
     """Corre el job en este proceso (los PDF/HTML se extraen en hijos acotados). Sin tenant/BD."""
+    import logging
     from datetime import date as _date
 
     from app.core.config import get_settings
     from app.services.commitment_source_check_job import (
         JsonSourceCheckStore,
+        record_job_run,
         resolve_store_dir,
         run_job,
     )
 
     store = JsonSourceCheckStore(resolve_store_dir(get_settings().source_check_store_dir))
-    records = run_job(store, today=_date.today())
+    started = _date.today().isoformat()
+    try:
+        records = run_job(store, today=_date.today())
+    except Exception as exc:  # fallo visible: log + estado persistido, sin tragarlo en silencio
+        logging.getLogger(__name__).exception("source_check_job fallo")
+        record_job_run(store, ok=False, day=started, error=type(exc).__name__)
+        raise
     outcomes: dict[str, int] = {}
     for r in records:
         outcomes[r.outcome] = outcomes.get(r.outcome, 0) + 1
+    record_job_run(store, ok=True, day=started, outcomes=outcomes)
     return {"checked": len(records), "outcomes": outcomes,
             "store_quarantined": store.corrupt_quarantined}
 

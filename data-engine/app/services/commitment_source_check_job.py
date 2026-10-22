@@ -216,7 +216,9 @@ class JsonSourceCheckStore:
         # y su last_good_*): se usa para reconstruir y para completar un latest parcial.
         by_url: dict[str, dict] = {}
         for item in events:
-            if item.get("url") and item.get("ticker"):
+            if item.get("event") == "evicted" and item.get("url"):
+                by_url.pop(item["url"], None)  # retencion, NO recuperacion: no se resucita
+            elif item.get("url") and item.get("ticker"):
                 by_url[item["url"]] = item
         recovered = []
         if data is None:
@@ -230,7 +232,7 @@ class JsonSourceCheckStore:
         status["first_run"] = (status["latest"] == "ausente" and not events
                                and status["history_readable"])
         if status["incident"] is not None:
-            later = any(i > incident_idx and e.get("url") for i, e in enumerate(events))
+            later = any(i > incident_idx and e.get("url") and e.get("ticker") for i, e in enumerate(events))
             healthy = status["latest"] == "ok" and not recovered
             status["incident"]["status"] = (
                 "historico_sanado" if later and healthy else "activo_o_sin_sanar")
@@ -324,6 +326,7 @@ class JsonSourceCheckStore:
                 for url in sorted(data, key=lambda u: (data[u].get("checked_on", ""), u))[
                         : len(data) - MAX_RECORDS]:
                     data.pop(url)
+                    events.append({"event": "evicted", "url": url})
             # Diario primero, estado despues: si cae entre ambos, el historial tiene el chequeo y
             # latest queda en el estado anterior (el siguiente chequeo lo reescribe); nunca al reves.
             self._append_history(events)
@@ -349,3 +352,26 @@ def resolve_store_dir(path: Path | str) -> Path:
     """Ruta ABSOLUTA estable: una ruta relativa se ancla a la raiz de data-engine, no al cwd."""
     p = Path(path)
     return p if p.is_absolute() else (Path(__file__).resolve().parents[2] / p).resolve()
+
+
+def record_job_run(store: JsonSourceCheckStore, *, ok: bool, day: str,
+                   outcomes: dict | None = None, error: str | None = None) -> None:
+    """Estado de la ULTIMA ejecucion programada (last_run.json, mejor esfuerzo, atomico).
+
+    Registrar el cron en el scheduler NO prueba que corra bien: esto lo hace visible en la API.
+    """
+    try:
+        store._ensure()
+        with store._locked():
+            store._atomic_write(store.dir / "last_run.json", json.dumps(
+                {"day": day, "ok": ok, "error": error, "outcomes": outcomes or {}}))
+    except OSError:
+        pass  # el propio almacen puede estar roto; el log del scheduler ya lleva el fallo
+
+
+def read_job_run(store: JsonSourceCheckStore) -> dict | None:
+    try:
+        data = json.loads((store.dir / "last_run.json").read_text())
+        return data if isinstance(data, dict) else None
+    except (OSError, ValueError):
+        return None

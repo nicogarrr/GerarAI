@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.services.commitment_financial_release import FINANCIAL_ASSETS
-from app.services.commitment_source_check_job import job_target_tickers
+from app.services.commitment_source_check_job import job_target_tickers, read_job_run
 from app.services.transcript_source_registry import all_entries
 
 UNIVERSE_READ_ON = "2026-10-22"
@@ -135,6 +135,7 @@ def coverage_report(db, store) -> dict:
         "universe_source": "bd_tenant",
         "universe_size": len(universe),
         "store": status,
+        "job_last_run": read_job_run(store),  # None = nunca ejecutado/ilegible; ok=False = fallo
         "note": "fuente_obtenida no equivale a seguimiento completo de compromisos",
         "companies": rows,
         "history": history,

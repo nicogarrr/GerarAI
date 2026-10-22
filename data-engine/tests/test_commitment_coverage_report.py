@@ -166,3 +166,24 @@ def test_incident_labeled_historical_after_healing(db, tmp_path):
                                    reason="texto_obtenido", content_sha256="c" * 64)])
     st = coverage_report(db, JsonSourceCheckStore(tmp_path / "s"))["store"]
     assert st["incident"]["status"] == "historico_sanado" and st["latest"] == "ok"
+
+
+def test_eviction_is_retention_not_recovery_and_does_not_flag_incident(db, tmp_path):
+    from app.services import commitment_source_check_job as mod
+
+    uber = _co(db, "UBER")
+    db.add(Position(company_id=uber.id, quantity=Decimal("1"), as_of=date(2030, 1, 1)))
+    db.commit()
+    store = JsonSourceCheckStore(tmp_path / "s")
+    recs = [SourceCheckRecord(ticker="UBER" if i == 0 else f"T{i}", url=f"https://x.invalid/{i}",
+                              kind="transcript", period="Q2 2026",
+                              checked_on=f"2026-01-{(i % 28) + 1:02d}" if i else "2026-10-22",
+                              outcome="extraido", reason="texto_obtenido",
+                              content_sha256="d" * 64) for i in range(mod.MAX_RECORDS + 5)]
+    store.save(recs)
+    assert len(store.load()) == mod.MAX_RECORDS
+    rep = coverage_report(db, JsonSourceCheckStore(tmp_path / "s"))
+    assert rep["store"]["recovered_urls"] == 0 and not rep["store"]["recovered_from_history"]
+    assert rep["store"]["incident"] is None
+    assert rep["companies"][0]["state"] == "fuente_obtenida"
+    assert rep["companies"][0]["last_checked_on"] == "2026-10-22"
