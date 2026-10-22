@@ -138,7 +138,11 @@ const planNext = (value: unknown, record: DataRecord) =>
         ? formatMoney(value as number | string | null, record.next_contribution_currency)
         : typeof value === 'number' ? `${formatNumber(value)} (divisa no registrada)` : NA;
 /** Resumen de cuotas previstas: «pendiente de vencimiento» no es un error ni un FX faltante. */
-const planExpectedPeriods = (value: unknown) => {
+const planExpectedPeriods = (value: unknown, record: DataRecord) => {
+    // Contrato activo y divisa sin registrar: las cuotas no se pueden calcular, no es «0 cuotas».
+    if (record.currency_contract_enabled === true && record.monthly_currency_recorded !== true) {
+        return 'No calculables: divisa no registrada';
+    }
     if (!Array.isArray(value)) return NA;
     const count = (status: string) => value.filter((p) => p && typeof p === 'object' && (p as Record<string, unknown>).status === status).length;
     const parts = [`${count('converted')} convertidas`, `${count('pending_due_date')} pendientes de vencimiento`];

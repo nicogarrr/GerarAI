@@ -54,4 +54,10 @@ describe('visualizacion del importe', () => {
         assert.match(f[0], /pendientes de vencimiento/);
         assert.match(view, /expected_periods: planExpectedPeriods/);
     });
+    it('divisa sin registrar con contrato activo: cuotas no calculables, no ceros', () => {
+        const f = view.match(/const planExpectedPeriods[\s\S]*?\n};/);
+        assert.ok(f);
+        assert.match(f[0], /No calculables: divisa no registrada/);
+        assert.match(f[0], /monthly_currency_recorded !== true/);
+    });
 });
