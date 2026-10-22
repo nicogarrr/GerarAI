@@ -4,7 +4,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import type { BrainPageContext } from '@/lib/brain/page-context';
 import { toPortfolioChatCitations } from '@/lib/chat/citations';
 import { jsonBody, researchRequest } from '@/lib/research/client';
-import { AuthorizationError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
+import { AppError, AuthorizationError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
 
 type ResearchChatResponse = {
     answer: string;
@@ -68,14 +68,27 @@ export async function chatWithPortfolio(
     } catch (error) {
         // Return known transport errors as data: Next hides server exception
         // details in production, so the browser cannot classify a timeout.
-        if (!(error instanceof ExternalAPIError)) throw error;
-        const timedOut = error.originalError instanceof DOMException
+        // Clasificar solo estados HTTP conocidos, nunca devolver el detalle
+        // del backend: puede incluir diagnósticos internos. Auth y validación
+        // siguen propagándose y no se presentan como falta de datos.
+        const httpMessage = error instanceof AppError && error.code === 'RESEARCH_API_ERROR'
+            ? error.statusCode === 429
+                ? 'Hay demasiadas consultas ahora. Reinténtalo más tarde.'
+                : error.statusCode === 504
+                    ? 'La respuesta tarda más de lo normal. Reinténtalo más tarde.'
+                    : error.statusCode === 502 || error.statusCode === 503
+                        ? 'El asistente no está disponible ahora. Reinténtalo más tarde.'
+                        : null
+            : null;
+        if (!httpMessage && !(error instanceof ExternalAPIError)) throw error;
+        const timedOut = error instanceof ExternalAPIError
+            && error.originalError instanceof DOMException
             && error.originalError.name === 'TimeoutError';
         return {
             success: false,
-            message: timedOut
+            message: httpMessage ?? (timedOut
                 ? 'La respuesta tarda más de lo normal. Reinténtalo en unos segundos.'
-                : 'El asistente no está disponible ahora. Reinténtalo en unos segundos.',
+                : 'El asistente no está disponible ahora. Reinténtalo en unos segundos.'),
             proposedActions: [],
             citations: [],
             context: null,
