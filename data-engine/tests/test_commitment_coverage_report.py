@@ -124,3 +124,45 @@ def test_relative_store_dir_is_anchored_not_cwd(monkeypatch, tmp_path):
     a = resolve_store_dir("./storage/source_checks")
     monkeypatch.chdir(tmp_path)
     assert resolve_store_dir("./storage/source_checks") == a and a.is_absolute()
+
+
+def test_first_run_is_normal_not_failure(db, tmp_path):
+    _co(db, "UBER")
+    db.add(WatchItem(symbol="UBER"))
+    db.commit()
+    rep = coverage_report(db, JsonSourceCheckStore(tmp_path / "nuevo"))
+    assert rep["store"]["first_run"] is True
+    assert {r["state"] for r in rep["companies"]} == {"sin_ejecuciones_aun"}
+
+
+def test_partial_latest_after_quarantine_completes_from_history_keeping_outcome(db, tmp_path):
+    store = _seed(db, tmp_path)
+    err = SourceCheckRecord(ticker="BN", url="https://x.invalid/bn", kind="transcript",
+                            period="Q2 2026", checked_on="2026-10-22", outcome="error",
+                            reason="TimeoutError")
+    store.save([err])
+    data = store.load()
+    (store.dir / "latest.json").write_text(
+        __import__("json").dumps({"https://x.invalid/u": data["https://x.invalid/u"]}))
+    rep = coverage_report(db, JsonSourceCheckStore(tmp_path / "s"))
+    rows = {r["ticker"]: r for r in rep["companies"]}
+    assert rows["BN"]["state"] == "ultimo_chequeo_con_error"  # no "nunca_chequeado", no "ok"
+    assert rows["BN"]["from_history"] is True and rows["UBER"]["from_history"] is False
+    assert rep["store"]["recovered_urls"] == 2
+
+
+def test_incident_labeled_historical_after_healing(db, tmp_path):
+    store = _seed(db, tmp_path)
+    (store.dir / "latest.json").write_text("{bad")
+    JsonSourceCheckStore(tmp_path / "s").load()
+    assert coverage_report(db, JsonSourceCheckStore(tmp_path / "s"))["store"]["incident"][
+        "status"] == "activo_o_sin_sanar"
+    healed = JsonSourceCheckStore(tmp_path / "s")
+    healed.save([SourceCheckRecord(ticker="UBER", url="https://x.invalid/u", kind="transcript",
+                                   period="Q2 2026", checked_on="2026-10-23", outcome="extraido",
+                                   reason="texto_obtenido", content_sha256="c" * 64),
+                 SourceCheckRecord(ticker="OTHER", url="https://x.invalid/o", kind="transcript",
+                                   period="Q2 2026", checked_on="2026-10-23", outcome="extraido",
+                                   reason="texto_obtenido", content_sha256="c" * 64)])
+    st = coverage_report(db, JsonSourceCheckStore(tmp_path / "s"))["store"]
+    assert st["incident"]["status"] == "historico_sanado" and st["latest"] == "ok"

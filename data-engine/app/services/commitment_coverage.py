@@ -92,6 +92,9 @@ def coverage_with_checks(
             state = "abstencion_en_chequeo"
         rows.append({**c.__dict__, "pending": list(c.pending), "state": state,
                      "last_checked_on": last, "outcomes": outcomes,
+                     "from_history": any(r.get("_source") == "historial" for r in mine),
+                     "last_good_checked_on": max(
+                         (r.get("last_good_checked_on") or "" for r in mine), default="") or None,
                      "universe_static_snapshot": UNIVERSE_IS_STATIC_SNAPSHOT})
     return rows
 
@@ -117,12 +120,15 @@ def coverage_report(db, store) -> dict:
     universe, flags = dynamic_universe(db)
     latest, status = store.read_snapshot()
     rows = coverage_with_checks(latest, universe)
-    degraded = status["latest"] != "ok"
+    degraded = status["latest"] != "ok" and not status.get("first_run")
     for r in rows:
         r["in_portfolio"], r["in_watchlist"] = flags[r["ticker"]]
         r["universe_static_snapshot"] = False
-        if degraded and r["state"] == "nunca_chequeado":
-            r["state"] = "estado_del_almacen_no_fiable"  # no se afirma "nunca chequeado"
+        if r["state"] == "nunca_chequeado":
+            if status.get("first_run"):
+                r["state"] = "sin_ejecuciones_aun"  # arranque normal, no averia
+            elif degraded:
+                r["state"] = "estado_del_almacen_no_fiable"  # no se afirma "nunca chequeado"
     wanted = set(universe)
     history = [h for h in store.read_history(limit=500) if h.get("ticker") in wanted][:50]
     return {

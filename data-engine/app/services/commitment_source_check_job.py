@@ -207,15 +207,33 @@ class JsonSourceCheckStore:
                 continue
             if isinstance(item, dict):
                 events.append(item)
-        for item in events:
+        incident_idx = None
+        for idx, item in enumerate(events):
             if item.get("event") == "store_corrupt_quarantined":
                 status["incident"] = {"file": item.get("file")}
+                incident_idx = idx
+        # ultimo evento por URL del historial (conserva su resultado real, incluso error/abstencion,
+        # y su last_good_*): se usa para reconstruir y para completar un latest parcial.
+        by_url: dict[str, dict] = {}
+        for item in events:
+            if item.get("url") and item.get("ticker"):
+                by_url[item["url"]] = item
+        recovered = []
         if data is None:
             data = {}
-            for item in events:
-                if item.get("url") and item.get("ticker"):
-                    data[item["url"]] = item
-            status["recovered_from_history"] = bool(data)
+        for url, item in by_url.items():
+            if url not in data:
+                data[url] = {**item, "_source": "historial"}
+                recovered.append(url)
+        status["recovered_from_history"] = bool(recovered)
+        status["recovered_urls"] = len(recovered)
+        status["first_run"] = (status["latest"] == "ausente" and not events
+                               and status["history_readable"])
+        if status["incident"] is not None:
+            later = any(i > incident_idx and e.get("url") for i, e in enumerate(events))
+            healthy = status["latest"] == "ok" and not recovered
+            status["incident"]["status"] = (
+                "historico_sanado" if later and healthy else "activo_o_sin_sanar")
         return data, status
 
     def read_history(self, url: str | None = None, limit: int = 100) -> list[dict]:
