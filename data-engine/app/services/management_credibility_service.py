@@ -322,7 +322,16 @@ class ManagementCredibilityService:
                 .order_by(desc(ManagementPromise.promise_date))
             ).all()
         )
-        resolved = [row for row in promises if row.status in {"met", "partial", "missed"}]
+        # Promesas importadas ANTES de 0078 desde call claims llevan objetivo
+        # deducido por heuristica (primer numero) sin procedencia: no entran en
+        # la puntuacion para no mostrar credibilidad numerica no fiable.
+        legacy = [row for row in promises if self._is_legacy_heuristic(row)]
+        legacy_ids = {row.id for row in legacy}
+        resolved = [
+            row
+            for row in promises
+            if row.status in {"met", "partial", "missed"} and row.id not in legacy_ids
+        ]
         score = (
             sum(1 if row.status == "met" else 0.5 if row.status == "partial" else 0 for row in resolved)
             / len(resolved)
@@ -345,9 +354,18 @@ class ManagementCredibilityService:
                 "partial": sum(row.status == "partial" for row in promises),
                 "missed": sum(row.status == "missed" for row in promises),
             },
+            "legacy_excluded_from_score": len(legacy),
             "promises": [self.payload(row) for row in promises],
             "method": "resolved promises: met=1, partial=0.5, missed=0",
         }
+
+    @staticmethod
+    def _is_legacy_heuristic(row: ManagementPromise) -> bool:
+        return (
+            (row.metadata_ or {}).get("source") == "call_claim"
+            and row.date_basis is None
+            and row.target_value is not None
+        )
 
     @staticmethod
     def payload(row: ManagementPromise) -> dict[str, Any]:
@@ -380,6 +398,9 @@ class ManagementCredibilityService:
             "fulfillment_criteria": row.fulfillment_criteria,
             "status_reason": row.status_reason,
             "date_basis": row.date_basis,
+            "source_status": (row.metadata_ or {}).get("source_status"),
+            "flags": (row.metadata_ or {}).get("flags") or [],
+            "legacy_heuristic_target": ManagementCredibilityService._is_legacy_heuristic(row),
         }
 
     @staticmethod

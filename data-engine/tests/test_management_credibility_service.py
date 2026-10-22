@@ -270,3 +270,20 @@ def test_extracted_candidates_are_suggested_never_reconciled_and_deduped(db):
     assert again == []
     dash = service.dashboard(db, company)
     assert dash["counts"]["candidate"] == 1 and dash["score"] is None
+
+
+def test_legacy_heuristic_promises_are_excluded_from_score(db):
+    from app.models.entities import ManagementPromise
+
+    company = _company(db)
+    db.add(ManagementPromise(
+        company_id=company.id, promise="In 2025 we will have 25 satellites",
+        promise_date=date(2025, 1, 1), expected_period="2025", metric="revenue",
+        operator=">=", target_value=Decimal("2025"), status="missed",
+        metadata_={"source": "call_claim"}, evidence=[],
+    ))
+    db.commit()
+    dash = ManagementCredibilityService().dashboard(db, company)
+    assert dash["score"] is None and dash["grade"] == "insufficient_history"
+    assert dash["legacy_excluded_from_score"] == 1
+    assert dash["promises"][0]["legacy_heuristic_target"] is True
