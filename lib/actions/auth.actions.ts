@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { AuthenticationError, toAppError, getSafeErrorMessage } from "@/lib/types/errors";
 import { ERROR_MESSAGES } from "@/lib/constants";
 
-export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; data?: unknown; error?: string }> => {
+export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; error?: string }> => {
     try {
         const auth = await getAuth();
         if (!auth) {
@@ -14,9 +14,11 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
 
         // El perfil inversor viaja en el propio sign-up (additionalFields de
         // better-auth, sin migraciones SQL) en vez de perderse en el destructuring.
-        const response = await auth.api.signUpEmail({ body: { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry } });
+        await auth.api.signUpEmail({ body: { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry } });
 
-        return { success: true, data: response };
+        // nextCookies() delivers the session in HttpOnly cookies. Never serialize
+        // Better Auth's response: it also contains the raw bearer session token.
+        return { success: true };
     } catch (error: unknown) {
         const appError = toAppError(error);
 
@@ -38,7 +40,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
     }
 }
 
-export const signInWithEmail = async ({ email, password }: SignInFormData): Promise<{ success: boolean; data?: unknown; error?: string; twoFactorRequired?: boolean }> => {
+export const signInWithEmail = async ({ email, password }: SignInFormData): Promise<{ success: boolean; error?: string; twoFactorRequired?: boolean }> => {
     try {
         const auth = await getAuth();
         if (!auth) {
@@ -55,7 +57,9 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
             return { success: false, twoFactorRequired: true };
         }
 
-        return { success: true, data: response };
+        // nextCookies() delivers the session in HttpOnly cookies. Never serialize
+        // Better Auth's response: it also contains the raw bearer session token.
+        return { success: true };
     } catch (error: unknown) {
         const appError = toAppError(error);
 
@@ -83,7 +87,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
     }
 }
 
-export const verifyTwoFactorTotp = async ({ email, password, totpCode }: { email: string; password: string; totpCode: string }): Promise<{ success: boolean; data?: unknown; error?: string }> => {
+export const verifyTwoFactorTotp = async ({ email, password, totpCode }: { email: string; password: string; totpCode: string }): Promise<{ success: boolean; error?: string }> => {
     void email; void password; // the pending 2FA session is carried by the cookies
     try {
         const auth = await getAuth();
@@ -91,12 +95,14 @@ export const verifyTwoFactorTotp = async ({ email, password, totpCode }: { email
             throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
         }
 
-        const response = await auth.api.verifyTOTP({
+        await auth.api.verifyTOTP({
             body: { code: totpCode },
             headers: await headers(),
         });
 
-        return { success: true, data: response };
+        // nextCookies() delivers the session in HttpOnly cookies. Never serialize
+        // Better Auth's response: it also contains the raw bearer session token.
+        return { success: true };
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('2FA verification failed:', appError);

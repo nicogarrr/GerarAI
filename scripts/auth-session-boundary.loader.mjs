@@ -1,0 +1,17 @@
+// Isolate Next/DB dependencies only. The actions under test are the real source.
+export async function resolve(specifier, context, nextResolve) {
+    if (specifier === '@/lib/better-auth/auth') return { url: 'auth-boundary:auth', shortCircuit: true };
+    if (specifier === 'next/headers') return { url: 'auth-boundary:headers', shortCircuit: true };
+    if (specifier === '@/lib/types/errors') return { url: new URL('../lib/types/errors.ts', import.meta.url).href, shortCircuit: true };
+    if (specifier === '@/lib/constants') return { url: 'auth-boundary:constants', shortCircuit: true };
+    return nextResolve(specifier, context);
+}
+export async function load(url, context, nextLoad) {
+    const sources = {
+        'auth-boundary:auth': 'export async function getAuth() { return globalThis.__authBoundaryTestAuth; }',
+        'auth-boundary:headers': 'export async function headers() { return new Headers(); }',
+        'auth-boundary:constants': 'export const ERROR_MESSAGES = { AUTH_UNAVAILABLE: "No disponible", AUTH_FAILED: "No autenticado" };',
+    };
+    if (url in sources) return { format: 'module', source: sources[url], shortCircuit: true };
+    return nextLoad(url, context);
+}
