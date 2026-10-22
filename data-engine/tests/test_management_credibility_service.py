@@ -393,3 +393,29 @@ def test_portfolio_commitments_aggregates_net_position_without_duplicates(db):
     db.add(Position(company_id=held.id, quantity=Decimal("-5"), as_of=date(2030, 1, 1)))
     db.commit()
     assert management_commitments(db)["held_count"] == 0  # neta 0: no en cartera
+
+
+def test_reconcile_ignores_unreported_and_other_unit_facts(db):
+    c = _company(db)
+    estimated = _fact(db, c, 500)
+    estimated.is_reported = False
+    other_unit = _fact(db, c, 900)
+    other_unit.unit = "EUR"
+    db.commit()
+    _promise(db, c)
+    [p] = ManagementCredibilityService().reconcile(db, c)
+    assert p.status == "open"
+    assert p.actual_fact_id is None
+
+
+def test_reconcile_uses_reported_fact_with_same_unit_case_insensitive(db):
+    c = _company(db)
+    ignored = _fact(db, c, 500)
+    ignored.is_reported = False
+    ok = _fact(db, c, 120, year=2025)
+    ok.unit = "usd"
+    db.commit()
+    _promise(db, c)
+    [p] = ManagementCredibilityService().reconcile(db, c)
+    assert p.status == "met"
+    assert p.actual_fact_id == ok.id

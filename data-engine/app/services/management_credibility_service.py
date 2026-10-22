@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import desc, or_, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -246,10 +246,17 @@ class ManagementCredibilityService:
         for promise in promises:
             if not promise.metric:
                 continue
+            # Solo hechos REPORTADOS y en la misma unidad que la promesa: comparar
+            # cifras estimadas/derivadas o en otra unidad produciria met/missed falsos.
             statement = select(FinancialFact).where(
                 FinancialFact.company_id == company.id,
                 FinancialFact.metric == promise.metric,
+                FinancialFact.is_reported.is_(True),
             )
+            if promise.unit:
+                statement = statement.where(
+                    func.lower(FinancialFact.unit) == promise.unit.strip().lower()
+                )
             year_match = re.search(r"(?:19|20)\d{2}", promise.expected_period)
             if year_match:
                 year = int(year_match.group(0))
