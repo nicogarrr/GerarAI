@@ -2,48 +2,67 @@ import pytest
 
 from app.services import transcript_source_registry as reg
 
+UBER_PDF = (
+    "https://s23.q4cdn.com/407969754/files/doc_events/2026/Aug/05/Uber-Q2-26-Earnings-Call-Transcript.pdf"
+)
+UBER_PREPARED = (
+    "https://s23.q4cdn.com/407969754/files/doc_earnings/2026/q2/transcript/Uber-Q2-26-Prepared-Remarks.pdf"
+)
 
-def test_examples_are_official_for_their_own_ticker():
+
+def test_registered_assets_are_official_for_their_own_ticker():
     for e in reg.all_entries():
-        if e.status == reg.OFFICIAL_TRANSCRIPT_PDF:
-            assert reg.is_official_transcript_url(e.ticker, e.example_pdf)
+        for a in e.assets:
+            assert reg.is_official_transcript_url(e.ticker, a.url)
+            assert a.kind == "transcript"
 
 
-def test_shared_cdn_prefix_does_not_cross_tickers():
-    uber = reg.get_entry("UBER").example_pdf
-    assert not reg.is_official_transcript_url("META", uber)
-    assert not reg.is_official_transcript_url("BN", uber)
-    assert not reg.is_official_transcript_url("UBER", "https://s23.q4cdn.com/999999999/files/x.pdf")
+def test_same_cdn_account_other_pdf_is_not_official():
+    # mismo host y cuenta q4cdn: presentaciones, prepared remarks o notas no son transcripcion
+    assert reg.is_official_transcript_url("UBER", UBER_PDF)
+    assert not reg.is_official_transcript_url("UBER", UBER_PREPARED)
+    assert not reg.is_official_transcript_url(
+        "UBER",
+        "https://s23.q4cdn.com/407969754/files/doc_events/2026/Aug/05/Uber-Q2-26-Earnings-Presentation.pdf",
+    )
+    assert not reg.is_official_transcript_url("UBER", UBER_PDF + "?x=1")
+    assert not reg.is_official_transcript_url("UBER", UBER_PDF.replace("https", "http"))
 
 
-def test_non_official_or_unverified_never_official():
-    assert not reg.is_official_transcript_url("UBER", "http://s23.q4cdn.com/407969754/files/x.pdf")
-    assert not reg.is_official_transcript_url("UBER", "https://stockanalysis.com/stocks/uber/transcripts/1/")
-    for t in ("ASTS", "RKLB", "BABA", "ONDS", "KRKNF", "HYMC", "ZZZZ"):
-        assert not reg.is_official_transcript_url(t, "https://s23.q4cdn.com/407969754/files/x.pdf")
+def test_urls_do_not_cross_tickers():
+    assert not reg.is_official_transcript_url("META", UBER_PDF)
+    assert not reg.is_official_transcript_url("BN", UBER_PDF)
 
 
-def test_webcast_only_is_not_transcript_and_lookup_is_case_insensitive():
+def test_unverified_tickers_never_official():
+    for t in ("ASTS", "RKLB", "BABA", "ONDS", "KRKNF", "HYMC", "ZZZZ", "SDS"):
+        assert not reg.is_official_transcript_url(t, UBER_PDF)
+        assert not reg.get_entry(t) or not reg.get_entry(t).assets
+
+
+def test_third_party_never_official():
+    assert not reg.is_official_transcript_url(
+        "UBER", "https://stockanalysis.com/stocks/uber/transcripts/661328-q2-2026/"
+    )
+
+
+def test_statuses_and_notes_are_honest():
     assert reg.get_entry("rklb").status == reg.WEBCAST_ONLY
+    assert reg.get_entry("KRKNF").status == reg.NOT_LISTED_ON_IR_PAGE
+    assert reg.get_entry("BABA").status == reg.PAGE_MENTIONS_TRANSCRIPT
+    assert "No prueba" in reg.get_entry("HYMC").note
     assert reg.get_entry("SDS") is None
 
 
-def test_invalid_entry_rejected():
+def test_invalid_entries_rejected():
     with pytest.raises(ValueError):
         reg.SourceEntry("X", "inventado", "https://x", "2026-10-22")
     with pytest.raises(ValueError):
         reg.SourceEntry("X", reg.OFFICIAL_TRANSCRIPT_PDF, "https://x", "2026-10-22")
-
-
-def test_link_verified_only_where_href_was_read():
-    verified = {e.ticker for e in reg.all_entries() if e.link_verified_on_ir_page}
-    assert verified == {"META", "BN", "UBER"}
-    for e in reg.all_entries():
-        if e.link_verified_on_ir_page:
-            assert e.status == reg.OFFICIAL_TRANSCRIPT_PDF
-
-
-def test_absence_statuses_are_not_claims_of_non_existence():
-    assert reg.get_entry("KRKNF").status == reg.NOT_LISTED_ON_IR_PAGE
-    assert reg.get_entry("ONDS").status == reg.WEBCAST_ONLY
-    assert "No prueba" in reg.get_entry("HYMC").note
+    asset = reg.VerifiedAsset("https://x.example/a.pdf", "Transcript", "Q1 2026")
+    with pytest.raises(ValueError):
+        reg.SourceEntry("X", reg.WEBCAST_ONLY, "https://x", "2026-10-22", (asset,))
+    with pytest.raises(ValueError):
+        reg.VerifiedAsset("http://x.example/a.pdf", "Transcript", "Q1 2026")
+    with pytest.raises(ValueError):
+        reg.VerifiedAsset("https://x.example/a.pdf", "Presentation", "Q1 2026", kind="presentation")
