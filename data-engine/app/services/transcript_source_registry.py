@@ -94,9 +94,10 @@ _ENTRIES = (
                 "https://bn.brookfield.com/sites/brookfield-bn-v2/files/Brookfield-BN-IR-V2/2026/Q2/BN%20Q2-2026-transcript.pdf",
                 "Transcript",
                 "Q2 2026",
+                "2026-08-13",
             ),
         ),
-        "Enlace leido en la pagina IR; extraido en pruebas previas.",
+        "Enlace leido en la pagina IR; PDF 20 pags, cabecera 'AUGUST 13, 2026, at 10:00 a.m. (ET)' leida en el documento.",
     ),
     SourceEntry(
         "UBER",

@@ -17,7 +17,11 @@ PORTFOLIO = ("ASTS", "BN", "RKLB", "UBER", "BABA", "ONDS", "HYMC", "KRKNF")
 WATCHLIST = ("CGEO.L", "CPT", "BN", "KKR", "POOL", "CB", "UNH", "HIMS", "RXRX",
              "NAUT", "ABCL", "IBRX", "AAPL")
 
+# FOTO ESTATICA leida el 2026-10-22: NO se sincroniza con la cartera/watchlist de Nico.
+# La cobertura dinamica (identidad/tenant desde fuente propia) esta PENDIENTE; mientras tanto
+# todas las funciones aceptan `universe` para inyectar la lista real.
 UNIVERSE: tuple[str, ...] = tuple(dict.fromkeys(PORTFOLIO + WATCHLIST))
+UNIVERSE_IS_STATIC_SNAPSHOT = True
 
 
 @dataclass(frozen=True)
@@ -61,5 +65,40 @@ def coverage_for(ticker: str) -> TickerCoverage:
     )
 
 
-def universe_coverage() -> list[TickerCoverage]:
-    return [coverage_for(t) for t in UNIVERSE]
+def universe_coverage(universe: tuple[str, ...] | None = None) -> list[TickerCoverage]:
+    return [coverage_for(t) for t in (universe or UNIVERSE)]
+
+
+def job_target_tickers() -> set[str]:
+    """Tickers que el job REALMENTE chequea (misma regla que check_transcripts/financial)."""
+    out = {a.ticker for a in FINANCIAL_ASSETS}
+    for e in all_entries():
+        if any(a.call_date for a in e.assets):
+            out.add(e.ticker)
+    return out
+
+
+def coverage_with_checks(
+    latest: dict[str, dict], universe: tuple[str, ...] | None = None,
+) -> list[dict]:
+    """Cobertura + ultimo chequeo REAL del job (latest.json). Sin chequeo => nunca_chequeado."""
+    targets = job_target_tickers()
+    rows = []
+    for c in universe_coverage(universe):
+        mine = [r for r in latest.values() if r.get("ticker") == c.ticker]
+        outcomes = sorted({r.get("outcome", "?") for r in mine})
+        last = max((r.get("checked_on", "") for r in mine), default=None)
+        if not c.checkable_by_job or c.ticker not in targets:
+            state = "sin_chequeo_posible"
+        elif not mine:
+            state = "nunca_chequeado"
+        elif "error" in outcomes:
+            state = "ultimo_chequeo_con_error"
+        elif outcomes == ["extraido"]:
+            state = "fuente_obtenida"  # NO equivale a seguimiento de compromisos completo
+        else:
+            state = "abstencion_en_chequeo"
+        rows.append({**c.__dict__, "pending": list(c.pending), "state": state,
+                     "last_checked_on": last, "outcomes": outcomes,
+                     "universe_static_snapshot": UNIVERSE_IS_STATIC_SNAPSHOT})
+    return rows

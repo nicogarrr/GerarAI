@@ -13,13 +13,38 @@ def test_uber_checkable_and_unresolved_abstain():
     assert "resolver_fuente_oficial_de_transcripcion" in a.pending
 
 
-def test_bn_has_asset_but_no_date_not_checkable():
+def test_bn_date_read_from_document_is_checkable():
     b = coverage_for("BN")
-    assert b.transcript_assets == 1 and not b.checkable_by_job
-    assert "leer_fecha_de_llamada_del_documento" in b.pending
+    assert b.transcript_assets == 1 and b.transcript_assets_with_call_date == 1
+    assert b.checkable_by_job and "leer_fecha_de_llamada_del_documento" not in b.pending
+
+
+def test_meta_assets_without_date_not_checkable():
+    m = coverage_for("META")
+    assert m.transcript_assets == 2 and not m.checkable_by_job
 
 
 def test_every_ticker_reports_honest_pending():
     rows = universe_coverage()
     assert all(r.pending or r.checkable_by_job for r in rows)
-    assert sum(r.checkable_by_job for r in rows) == 1
+    assert sum(r.checkable_by_job for r in rows) == 2
+
+
+def test_checkable_flag_matches_real_job_targets():
+    from app.services.commitment_coverage import job_target_tickers
+    assert {r.ticker for r in universe_coverage() if r.checkable_by_job} == (
+        job_target_tickers() & set(UNIVERSE))
+
+
+def test_coverage_with_checks_states_and_static_flag():
+    from app.services.commitment_coverage import coverage_with_checks
+    latest = {"u1": {"ticker": "UBER", "outcome": "extraido", "checked_on": "2026-10-22"},
+              "u2": {"ticker": "UBER", "outcome": "error", "checked_on": "2026-10-22"}}
+    rows = {r["ticker"]: r for r in coverage_with_checks(latest)}
+    assert rows["UBER"]["state"] == "ultimo_chequeo_con_error"
+    assert rows["BN"]["state"] == "nunca_chequeado"
+    assert rows["AAPL"]["state"] == "sin_chequeo_posible"
+    assert all(r["universe_static_snapshot"] for r in rows.values())
+    ok = coverage_with_checks({"u": {"ticker": "UBER", "outcome": "extraido",
+                                     "checked_on": "2026-10-22"}})
+    assert {r["ticker"]: r["state"] for r in ok}["UBER"] == "fuente_obtenida"
