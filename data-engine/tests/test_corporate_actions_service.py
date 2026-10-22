@@ -75,26 +75,21 @@ def test_split_rejects_manual_position_without_ledger(db):
     assert position.quantity == Decimal("10")
 
 
-def test_split_rescales_only_pre_effective_transactions(db):
+def test_split_rejects_open_ledger_without_position_row(db):
+    # Libro abierto sin fila de posicion: inconsistente, se rechaza sin
+    # escribir. El reescalado solo de patas previas esta cubierto con libro
+    # coherente en tests/test_split_mixed_legs.py.
     company = _company(db)
     before = _tx(db, company, date(2026, 1, 10), "buy", 10, 100)
-    on_date = _tx(db, company, date(2026, 6, 1), "buy", 5, 40)
-    after = _tx(db, company, date(2026, 7, 1), "buy", 2, 38)
-    CorporateActionService().create_action(
-        db, ticker="AAA", action_type="split",
-        effective_date=date(2026, 6, 1), ratio=Decimal("2"),
-    )
+    _tx(db, company, date(2026, 6, 1), "buy", 5, 40)
+    with pytest.raises(ValueError, match="no position row"):
+        CorporateActionService().create_action(
+            db, ticker="AAA", action_type="split",
+            effective_date=date(2026, 6, 1), ratio=Decimal("2"),
+        )
+    db.rollback()
     db.refresh(before)
-    db.refresh(on_date)
-    db.refresh(after)
-    # Pre-effective trade rescaled, money amount preserved (10x100 == 20x50).
-    assert before.quantity == Decimal("20.000000")
-    assert before.price == Decimal("50.000000")
-    assert before.quantity * before.price == Decimal("1000.000000")
-    # Trades on/after the effective date are already post-split: untouched.
-    assert on_date.quantity == Decimal("5") and on_date.price == Decimal("40")
-    assert after.quantity == Decimal("2") and after.price == Decimal("38")
-
+    assert before.quantity == Decimal("10") and before.price == Decimal("100")
 
 def test_reverse_split_rejects_manual_position_without_ledger(db):
     company = _company(db)

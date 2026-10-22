@@ -23,17 +23,21 @@ def test_split_applied_after_post_split_buy_keeps_post_split_shares(db):
     _buy(db, c, "10", "100", date(2025, 1, 10))   # pre-split leg: 10 sh @100
     _buy(db, c, "20", "50", date(2025, 7, 10))    # post-split leg already in post-split terms
     db.commit()
-    CorporateActionService().create_action(
-        db, ticker=c.ticker, action_type="split", effective_date=date(2025, 6, 1), ratio=Decimal("2"))
+    _apply(db, c, "2", date(2025, 6, 1))
     pos = db.query(Position).filter_by(company_id=c.id).one()
     assert pos.quantity == Decimal("40")          # 10*2 + 20 ; buggy code gives 60
     # total cost unchanged: 10*100 + 20*50 = 2000 -> avg 50
     assert pos.average_cost == Decimal("50")      # buggy code gives 30/2=... avg/ratio
 
 
-def _apply(db, c, ratio, eff):
+PRICE_AS_OF = date(2025, 12, 31)
+
+
+def _apply(db, c, ratio, eff, price="25", as_of=PRICE_AS_OF):
     return CorporateActionService().create_action(
-        db, ticker=c.ticker, action_type="split", effective_date=eff, ratio=Decimal(ratio))
+        db, ticker=c.ticker, action_type="split", effective_date=eff, ratio=Decimal(ratio),
+        post_split_price=Decimal(price) if price is not None else None,
+        post_split_price_as_of=as_of)
 
 
 def _sell(db, company, qty, price, d):
@@ -159,18 +163,38 @@ def test_post_split_sell_updates_base_fx_and_unrealized_like_rebuild(db):
     assert after == before
 
 
-def test_split_preserves_as_of_and_divides_stored_price(db):
+def test_split_without_verified_price_rejects_before_any_write(db):
+    import pytest
+
+    from app.models.entities import CorporateAction, Transaction
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    pos.market_price = Decimal("120")  # sin proveniencia: pre o post split?
+    pos.as_of = date(2025, 5, 1)
+    db.commit()
+    with pytest.raises(ValueError, match="no provenance"):
+        _apply(db, c, "4", date(2025, 6, 1), price=None)
+    assert db.query(CorporateAction).count() == 0
+    tx = db.query(Transaction).filter_by(company_id=c.id).one()
+    assert tx.quantity == Decimal("10") and tx.price == Decimal("100")
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.quantity == Decimal("10")
+    assert pos.market_price == Decimal("120") and pos.as_of == date(2025, 5, 1)
+
+
+def test_split_uses_exactly_the_supplied_verified_price_and_date(db):
     c = _company(db)
     _buy(db, c, "10", "100", date(2025, 1, 10))
     pos = db.query(Position).filter_by(company_id=c.id).one()
     pos.market_price = Decimal("120")
     pos.as_of = date(2025, 5, 1)
     db.commit()
-    _apply(db, c, "4", date(2025, 6, 1))
+    _apply(db, c, "4", date(2025, 6, 1), price="31", as_of=date(2025, 6, 2))
     pos = db.query(Position).filter_by(company_id=c.id).one()
-    assert pos.as_of == date(2025, 5, 1)
-    assert pos.market_price == Decimal("30")
-    assert pos.market_value == Decimal("1200")
+    assert pos.market_price == Decimal("31")
+    assert pos.as_of == date(2025, 6, 2)
+    assert pos.market_value == Decimal("40") * Decimal("31")
 
 
 def test_failed_apply_now_leaves_no_residual_action(db):
@@ -226,3 +250,140 @@ def test_ratio_3_with_fees_and_pre_post_sells_matches_rebuild(db):
     before = _snapshot(pos)
     svc.rebuild_position(db, c.id)
     assert _snapshot(db.query(Position).filter_by(company_id=c.id).one()) == before
+
+
+def test_reverse_one_third_matches_rebuild_with_quantization(db):
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+    c = _company(db)
+    _buy(db, c, "30", "10", date(2025, 1, 10))
+    db.commit()
+    CorporateActionService().create_action(
+        db, ticker=c.ticker, action_type="reverse_split",
+        effective_date=date(2025, 6, 1), ratio=Decimal(1) / Decimal(3),
+        post_split_price=Decimal("30"), post_split_price_as_of=PRICE_AS_OF)
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.quantity == Decimal("10")
+    assert pos.cost_basis_native == Decimal("300")
+    before = _snapshot(pos)
+    PortfolioLedgerService().rebuild_position(db, c.id)
+    assert _snapshot(db.query(Position).filter_by(company_id=c.id).one()) == before
+
+
+def test_adjusted_replay_oversell_by_quantization_rejects_with_rollback(db):
+    import pytest
+
+    from app.models.entities import CorporateAction, Transaction
+    c = _company(db)
+    _buy(db, c, "1", "10", date(2025, 1, 10))
+    _buy(db, c, "1", "10", date(2025, 1, 11))
+    _sell(db, c, "1", "10", date(2025, 7, 1))
+    db.commit()
+    with pytest.raises(ValueError, match="oversell"):
+        CorporateActionService().create_action(
+            db, ticker=c.ticker, action_type="reverse_split",
+            effective_date=date(2025, 6, 1), ratio=Decimal("0.333333"),
+            post_split_price=Decimal("30"), post_split_price_as_of=PRICE_AS_OF)
+    assert db.query(CorporateAction).count() == 0
+    qtys = sorted(t.quantity for t in db.query(Transaction).filter_by(company_id=c.id))
+    assert qtys == [Decimal("1"), Decimal("1"), Decimal("1")]
+    assert db.query(Position).filter_by(company_id=c.id).one().quantity == Decimal("1")
+
+
+def test_mixed_currency_ledger_rolls_back_split_completely(db):
+    import pytest
+
+    from app.models.entities import CorporateAction, Transaction
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.add(Transaction(
+        company_id=c.id, trade_date=date(2025, 7, 1), action="buy",
+        quantity=Decimal("5"), price=Decimal("90"), fees=Decimal("0"), currency="EUR"))
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    pos.quantity = Decimal("15")
+    db.commit()
+    with pytest.raises(Exception, match="mix"):
+        _apply(db, c, "2", date(2025, 6, 1))
+    assert db.query(CorporateAction).count() == 0
+    pre = db.query(Transaction).filter_by(company_id=c.id, currency="USD").one()
+    assert pre.quantity == Decimal("10") and pre.price == Decimal("100")
+    assert db.query(Position).filter_by(company_id=c.id).one().quantity == Decimal("15")
+
+
+def test_closed_position_reverse_split_rejects_quantization_oversell(db):
+    import pytest
+
+    from app.models.entities import CorporateAction, Transaction
+    c = _company(db)
+    _buy(db, c, "10", "10", date(2025, 1, 10))
+    _buy(db, c, "10", "10", date(2025, 1, 11))
+    _sell(db, c, "20", "10", date(2025, 2, 1))
+    db.commit()
+    assert db.query(Position).filter_by(company_id=c.id).count() == 0
+    with pytest.raises(ValueError, match="oversell"):
+        CorporateActionService().create_action(
+            db, ticker=c.ticker, action_type="reverse_split",
+            effective_date=date(2025, 6, 1), ratio=Decimal(1) / Decimal(3))
+    assert db.query(CorporateAction).count() == 0
+    qtys = sorted(t.quantity for t in db.query(Transaction).filter_by(company_id=c.id))
+    assert qtys == [Decimal("10"), Decimal("10"), Decimal("20")]
+
+
+def test_closed_position_split_rescales_legs_and_rebuild_still_works(db):
+    from app.models.entities import Transaction
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    _sell(db, c, "10", "120", date(2025, 2, 1))
+    db.commit()
+    CorporateActionService().create_action(
+        db, ticker=c.ticker, action_type="split", effective_date=date(2025, 6, 1),
+        ratio=Decimal("2"))
+    qtys = sorted(t.quantity for t in db.query(Transaction).filter_by(company_id=c.id))
+    assert qtys == [Decimal("20"), Decimal("20")]
+    assert PortfolioLedgerService().rebuild_position(db, c.id) is None
+
+
+def test_closed_position_with_mixed_currencies_rejected_without_writes(db):
+    import pytest
+
+    from app.models.entities import CorporateAction, Transaction
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    _sell(db, c, "10", "100", date(2025, 2, 1))
+    db.add(Transaction(
+        company_id=c.id, trade_date=date(2025, 3, 1), action="buy", quantity=Decimal("1"),
+        price=Decimal("1"), fees=Decimal("0"), currency="EUR"))
+    db.add(Transaction(
+        company_id=c.id, trade_date=date(2025, 3, 2), action="sell", quantity=Decimal("1"),
+        price=Decimal("1"), fees=Decimal("0"), currency="EUR"))
+    db.commit()
+    with pytest.raises(ValueError, match="mixes currencies"):
+        CorporateActionService().create_action(
+            db, ticker=c.ticker, action_type="split", effective_date=date(2025, 6, 1),
+            ratio=Decimal("2"))
+    assert db.query(CorporateAction).count() == 0
+    first = db.query(Transaction).filter_by(company_id=c.id, currency="USD", action="buy").one()
+    assert first.quantity == Decimal("10")
+
+
+def test_ledger_split_rescales_buy_and_sell_legs_but_not_cash_or_post_legs(db):
+    from app.models.entities import Transaction
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2026, 1, 10))
+    _sell(db, c, "4", "150", date(2026, 2, 10))
+    db.add(Transaction(
+        company_id=c.id, trade_date=date(2026, 3, 1), action="dividend",
+        quantity=Decimal("1"), price=Decimal("25"), fees=Decimal("0"), currency="USD"))
+    _buy(db, c, "2", "40", date(2026, 7, 1))
+    db.commit()
+    _apply(db, c, "4", date(2026, 6, 1), price="40", as_of=date(2026, 7, 2))
+    rows = {(t.action, t.trade_date): t for t in db.query(Transaction).filter_by(company_id=c.id)}
+    buy = rows[("buy", date(2026, 1, 10))]
+    sell = rows[("sell", date(2026, 2, 10))]
+    assert (buy.quantity, buy.price) == (Decimal("40"), Decimal("25"))
+    assert (sell.quantity, sell.price) == (Decimal("16"), Decimal("37.5"))
+    assert rows[("dividend", date(2026, 3, 1))].price == Decimal("25")
+    post = rows[("buy", date(2026, 7, 1))]
+    assert (post.quantity, post.price) == (Decimal("2"), Decimal("40"))
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.quantity == Decimal("26")

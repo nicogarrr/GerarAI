@@ -100,6 +100,8 @@ class CorporateActionService:
         ratio: Decimal,
         description: str = "",
         apply_now: bool = True,
+        post_split_price: Decimal | None = None,
+        post_split_price_as_of=None,
     ) -> CorporateAction:
         company = resolve_company(db, ticker)
         if company is None:
@@ -123,7 +125,11 @@ class CorporateActionService:
         # accion pendiente residual; se revierte accion y cambios juntos.
         try:
             db.flush()
-            self._apply_in_txn(db, action)
+            self._apply_in_txn(
+                db, action,
+                post_split_price=post_split_price,
+                post_split_price_as_of=post_split_price_as_of,
+            )
             db.commit()
         except Exception:
             db.rollback()
@@ -144,14 +150,21 @@ class CorporateActionService:
         db.commit()
         return True
 
-    def apply_action(self, db: Session, action_id: int) -> CorporateAction:
+    def apply_action(
+        self, db: Session, action_id: int, *, post_split_price: Decimal | None = None,
+        post_split_price_as_of=None,
+    ) -> CorporateAction:
         action = db.get(CorporateAction, action_id)
         if action is None:
             raise ValueError("Corporate action not found")
         if action.applied:
             return action
         try:
-            self._apply_in_txn(db, action)
+            self._apply_in_txn(
+                db, action,
+                post_split_price=post_split_price,
+                post_split_price_as_of=post_split_price_as_of,
+            )
             db.commit()
         except Exception:
             db.rollback()
@@ -159,7 +172,10 @@ class CorporateActionService:
         db.refresh(action)
         return action
 
-    def _apply_in_txn(self, db: Session, action: CorporateAction) -> None:
+    def _apply_in_txn(
+        self, db: Session, action: CorporateAction, *,
+        post_split_price: Decimal | None = None, post_split_price_as_of=None,
+    ) -> None:
         """Aplica sin commit: el llamador confirma o revierte todo junto."""
         ratio = action.ratio
         if ratio <= 0:
@@ -173,7 +189,7 @@ class CorporateActionService:
             )
             # Split historico (anterior a la primera operacion): ya reflejado,
             # se marca aplicado sin reescalar la posicion actual.
-            if position is not None and not self.is_historical(action, first):
+            if not self.is_historical(action, first):
                 # Replay del libro con las patas ANTERIORES a la fecha efectiva
                 # ajustadas (cantidad*ratio, precio/ratio, comisiones sin
                 # tocar) y las posteriores tal cual (ya estan en terminos
@@ -198,24 +214,41 @@ class CorporateActionService:
                     ),
                     Decimal("0"),
                 )
-                # Solo posiciones derivadas del libro (source postgres_ledger) y
-                # con libro coherente: manual/Flex/sin patas no demuestran
-                # unidades ni precio correctos, se rechaza antes de escribir.
-                if position.source != "postgres_ledger":
+                if len({(leg.currency or "").upper() for leg in legs}) > 1:
                     raise ValueError(
-                        "Split rejected: position source "
-                        f"{position.source!r} is not the ledger; review the position"
+                        "Split rejected: the ledger mixes currencies; "
+                        "split the instrument or normalize it first"
                     )
-                if not legs:
-                    raise ValueError(
-                        "Split rejected: no buy/sell legs on the ledger; review the position"
-                    )
-                if ledger_net != position.quantity:
-                    raise ValueError(
-                        "Split rejected: position quantity "
-                        f"{position.quantity} does not match the ledger "
-                        f"({ledger_net}); review the position before applying"
-                    )
+                if position is not None:
+                    # Solo posiciones derivadas del libro (source postgres_ledger) y
+                    # con libro coherente: manual/Flex/sin patas no demuestran
+                    # unidades ni precio correctos, se rechaza antes de escribir.
+                    if position.source != "postgres_ledger":
+                        raise ValueError(
+                            "Split rejected: position source "
+                            f"{position.source!r} is not the ledger; review the position"
+                        )
+                    if (
+                        post_split_price is None
+                        or post_split_price <= 0
+                        or post_split_price_as_of is None
+                    ):
+                        raise ValueError(
+                            "Split rejected: the stored market price has no "
+                            "provenance (it cannot be told whether it is pre- or "
+                            "post-split). Supply a verified post-split price and "
+                            "its date; nothing was changed"
+                        )
+                    if not legs:
+                        raise ValueError(
+                            "Split rejected: no buy/sell legs on the ledger; review the position"
+                        )
+                    if ledger_net != position.quantity:
+                        raise ValueError(
+                            "Split rejected: position quantity "
+                            f"{position.quantity} does not match the ledger "
+                            f"({ledger_net}); review the position before applying"
+                        )
                 qty = Decimal("0")
                 cost = Decimal("0")
                 realized = Decimal("0")
@@ -240,17 +273,25 @@ class CorporateActionService:
                         realized += (leg_price - avg) * leg_qty - fees
                         cost -= avg * leg_qty
                         qty -= leg_qty
-                if qty <= 0:
+                if position is None:
+                    # Posicion ya cerrada: solo se valida el replay ajustado
+                    # (sin oversell por redondeo) y se reescalan las patas.
+                    if qty > 0:
+                        raise ValueError(
+                            "Split rejected: the ledger is open but there is "
+                            "no position row; review the position"
+                        )
+                elif qty <= 0:
                     raise ValueError("Split rejected: adjusted ledger is empty")
                 # Cantidad, coste, realizado y columnas base/FX/no realizado las
                 # recalcula rebuild_position sobre las patas ya ajustadas (una
-                # sola fuente de verdad); aqui solo se divide la cotizacion
-                # guardada. La procedencia del precio sigue SIN resolver.
-                if position.market_price is not None:
-                    position.market_price = (position.market_price / ratio).quantize(
-                        Decimal("0.000001")
-                    )
-                rebuild_company_id = action.company_id
+                # sola fuente de verdad). El precio de mercado post-split y su
+                # fecha los aporta quien aplica (verificados); jamas se deduce
+                # del precio guardado, que no tiene proveniencia.
+                if position is not None:
+                    position.market_price = post_split_price
+                    position.as_of = post_split_price_as_of
+                    rebuild_company_id = action.company_id
 
             # Share-denominated legs only. Cash rows keep their amount in
             # `price` (quantity 0 or 1 is legitimate for cash, see
