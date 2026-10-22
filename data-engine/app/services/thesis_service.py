@@ -71,6 +71,49 @@ logger = logging.getLogger(__name__)
 
 PROMPT_VERSION = "thesis-render-v5-number-formats"
 
+# Keys de missing_inputs (literales en long_term_model_service) CUBIERTAS por
+# un input presente-excluido. La métrica excluida y la key de missing viven en
+# espacios de nombres distintos (metric «revenue» vs key «no_revenue_reported»)
+# y la resta literal nunca las empareja: la tarjeta pediría como ausente un
+# dato presente-no-utilizable (contradicción 0presente→faltante). Solo se
+# cubre «no_revenue_reported»: revenue excluido implica ingresos REPORTADOS
+# no utilizables (0/no positivos/no finitos en el ancla), que es exactamente
+# esa key. «annual_revenue_missing» (solo trimestrales) y
+# «revenue_history_two_periods» son ausencias reales distintas y se siguen
+# pidiendo. Guarda de sincronía en tests: si el literal se renombra, falla.
+_EXCLUDED_COVERS_MISSING: dict[str, frozenset[str]] = {
+    "revenue": frozenset({"no_revenue_reported"}),
+}
+
+
+def _split_missing_ask(missing: list, excluded_items: list | None) -> tuple[list, list]:
+    """(ausentes reales, presentes-no-utilizables) desde missing + excluidos.
+
+    Empareja la métrica excluida literal Y las keys de missing que cubre
+    (_EXCLUDED_COVERS_MISSING). Las presentes se deduplican por métrica."""
+    excl = {
+        str(e.get("metric")): e
+        for e in (excluded_items or [])
+        if isinstance(e, dict) and e.get("metric")
+    }
+    covered: dict[str, str] = {}
+    for metric in excl:
+        for key in _EXCLUDED_COVERS_MISSING.get(metric, frozenset()):
+            covered[key] = metric
+    ausentes: list = []
+    presentes: list = []
+    seen_metrics: set[str] = set()
+    for key in missing:
+        ks = str(key)
+        owner = ks if ks in excl else covered.get(ks)
+        if owner is None:
+            ausentes.append(key)
+        elif owner not in seen_metrics:
+            seen_metrics.add(owner)
+            presentes.append(excl[owner])
+    return ausentes, presentes
+
+
 
 def latest_missing_inputs(db: Session, company_id: int) -> list[str] | None:
     """Inputs pendientes del modelo fundamental persistido mas reciente.
@@ -90,12 +133,19 @@ def latest_missing_inputs(db: Session, company_id: int) -> list[str] | None:
     if model is None:
         return None
     snapshot = model.model_snapshot or {}
-    return sorted(
+    # Mismo criterio que en generación (_pendings_markdown/_card_summary):
+    # un input presente-excluido persistido (p. ej. ingresos reportados 0)
+    # no se pide como ausente en la tarjeta. Snapshots antiguos sin
+    # valuation.excluded_inputs comportan igual que antes (set vacío).
+    valuation = snapshot.get("valuation") or {}
+    missing = sorted(
         set(
             (snapshot.get("missing_inputs") or [])
             + (snapshot.get("missing_mandatory_drivers") or [])
         )
     )
+    ausentes, _presentes = _split_missing_ask(missing, valuation.get("excluded_inputs"))
+    return sorted(str(k) for k in ausentes)
 
 
 def resolve_fact_sources(
@@ -1227,7 +1277,6 @@ class ThesisService:
             for item in (valuation.get("excluded_inputs") or [])
             if isinstance(item, dict) and item.get("metric")
         ]
-        excluded_keys = {str(item.get("metric")) for item in excluded_items}
         excluded_note = ""
         if excluded_items:
             excluded_note = (
@@ -1247,7 +1296,7 @@ class ThesisService:
             for key in (long_term_model.get("missing_inputs") or []):
                 if key not in missing_all:
                     missing_all.append(key)
-        ask = [k for k in missing_all if k not in excluded_keys]
+        ask, _pres = _split_missing_ask(missing_all, excluded_items)
         if valuation.get("status") == "insufficient_data":
             if ask:
                 missing = ", ".join(term_es(k) for k in ask)
@@ -1486,13 +1535,13 @@ class ThesisService:
         """Ausentes reales vs presentes-no-utilizables (p. ej. ingresos
         reportados 0): listar los segundos como «Faltan» contradice el
         compendio. Devuelve (bloque_faltan, bloque_presentes)."""
-        excl = {str(e.get("metric")): e for e in (excluded_present or [])}
-        ausentes = [k for k in (valuation.get("missing_inputs") or []) if str(k) not in excl]
+        ausentes, presentes_items = _split_missing_ask(
+            list(valuation.get("missing_inputs") or []), excluded_present
+        )
         faltan = "\n".join(f"- {term_es(item)}" for item in ausentes)
         presentes = "\n".join(
-            f"- {e.get('detail') or term_es(k)} (presente, no utilizable: no es un dato ausente)"
-            for k in (valuation.get("missing_inputs") or [])
-            if (e := excl.get(str(k))) is not None
+            f"- {e.get('detail') or term_es(e.get('metric'))} (presente, no utilizable: no es un dato ausente)"
+            for e in presentes_items
         )
         return faltan, presentes
 
@@ -1777,23 +1826,25 @@ class ThesisService:
         sources: dict,
         fact_sources: dict[int, dict] | None = None,
     ) -> str:
-        excluded_keys = {
-            str(item.get("metric"))
+        excluded_items = [
+            item
             for item in (valuation.get("excluded_inputs") or [])
             if isinstance(item, dict) and item.get("metric")
-        }
+        ]
         # Presente-excluido (tenemos el dato, fuera de periodo del ancla) NO
         # se lista como ausente: pedirlo al usuario seria falso. Sigue
         # bloqueando la valoracion internamente; aqui solo se explica aparte.
         missing = sorted(
-            {
-                key
-                for key in set(
-                    (valuation.get("missing_inputs") or [])
-                    + (long_term_model.get("missing_inputs") or [])
-                )
-                if key not in excluded_keys
-            }
+            str(k)
+            for k in _split_missing_ask(
+                sorted(
+                    set(
+                        (valuation.get("missing_inputs") or [])
+                        + (long_term_model.get("missing_inputs") or [])
+                    )
+                ),
+                list(excluded_items),
+            )[0]
         )
         lines: list[str] = []
         if missing:
