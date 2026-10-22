@@ -79,3 +79,11 @@ def test_sources_with_urls_exposed_from_registry_only():
     assert rx["format"] == "html" and rx["url"].startswith("https://www.recursion.com/")
     assert row["UBER"]["press_release_sources"][0]["url"].startswith("https://www.sec.gov/")
     assert row["AAPL"]["transcript_sources"] == [] and row["AAPL"]["press_release_sources"] == []
+
+
+def test_rxrx_call_date_provenance_is_press_release_not_document():
+    from app.services.commitment_coverage import coverage_with_checks
+    src = coverage_with_checks({}, ("RXRX",))[0]["transcript_sources"][0]
+    assert src["call_date_source"].startswith("https://ir.recursion.com/news-releases/")
+    assert coverage_with_checks({}, ("KKR",))[0]["transcript_sources"][0][
+        "call_date_source"] == "documento"

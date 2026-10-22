@@ -43,6 +43,9 @@ class VerifiedAsset:
     # Formato del documento: "pdf" (por defecto) o "html" (transcripcion publicada como pagina web
     # del propio emisor; se lee con el mismo hijo acotado, sin ejecutar JS).
     format: str = "pdf"
+    # Donde se leyo call_date: "documento" (en la propia transcripcion) o el URL del comunicado/pagina
+    # oficial que anuncia la llamada. Nunca se afirma "leida en el documento" si no lo es.
+    call_date_source: str = "documento"
 
     def __post_init__(self) -> None:
         if self.format not in ("pdf", "html"):
@@ -175,11 +178,13 @@ _ENTRIES = (
                 "2026-08-05",
                 origin="url_dominio_oficial_por_busqueda",
                 format="html",
+                call_date_source="https://ir.recursion.com/news-releases/news-release-details/recursion-reports-second-quarter-financial-results-genentech/",
             ),
         ),
         "Pagina HTML del propio emisor (recursion.com/news, publicada 'August 10, 2026'); el texto "
-        "dice 'On August 5, 2026, Recursion reported ... In a related Earnings Call ... Below, the "
-        "full transcript'. La pagina IR leida (presentations) NO la enlaza; URL hallada por busqueda. "
+        "dice 'On August 5, 2026, Recursion reported ... In a related Earnings Call ...' (5-ago son los "
+        "resultados); la fecha/hora de la llamada (5-ago-2026 8:00 am ET) se leyo en el comunicado oficial "
+        "del IR (call_date_source), NO en esta pagina. La pagina IR leida (presentations) NO la enlaza; URL hallada por busqueda. "
         "HTML 63930 bytes, sha256 2415b3a0..., ~5400 palabras. Transcripcion escrita por el emisor: "
         "no es un PDF de proveedor ni se verifica palabra por palabra contra el audio.",
     ),

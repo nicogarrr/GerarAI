@@ -107,7 +107,7 @@ def check_transcripts(
             out.append(SourceCheckRecord(**base, outcome="error", reason=type(exc).__name__))
             continue
         facts = ({"pages": doc.text.count("\f") + 1, "bytes": doc.byte_size,
-                  "extractor": doc.extractor, "cache_hit": meta["cache_hit"],
+                  "extractor": doc.extractor, "text_sha256": doc.text_sha256, "cache_hit": meta["cache_hit"],
                   "bytes_changed": meta["bytes_changed"]},)
         out.append(SourceCheckRecord(**base, outcome="extraido", reason="texto_obtenido",
                                      content_sha256=doc.bytes_sha256, facts=facts))
