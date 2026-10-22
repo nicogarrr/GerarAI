@@ -40,8 +40,13 @@ class VerifiedAsset:
     # "url_dominio_oficial_por_busqueda" (hallado por busqueda, NO enlazado en la pagina IR leida;
     # verificado por descarga directa: dominio oficial, emisor, periodo y fecha en el documento).
     origin: str = "href_ir_leido"
+    # Formato del documento: "pdf" (por defecto) o "html" (transcripcion publicada como pagina web
+    # del propio emisor; se lee con el mismo hijo acotado, sin ejecutar JS).
+    format: str = "pdf"
 
     def __post_init__(self) -> None:
+        if self.format not in ("pdf", "html"):
+            raise ValueError("formato de activo desconocido")
         if self.origin not in ("href_ir_leido", "url_dominio_oficial_por_busqueda"):
             raise ValueError("origen de activo desconocido")
         if self.kind != "transcript":
@@ -156,6 +161,27 @@ _ENTRIES = (
         "Enlace leido en la pagina IR del evento; PDF 17 pags, sha256 3ebdb6b3dda8..., 'Formatted "
         "Report' de FactSet CallStreet alojado en el q4cdn del IR, cabecera 'Chubb Ltd. (CB) Q3 "
         "2026 Earnings Call 21-Oct-2026'.",
+    ),
+    SourceEntry(
+        "RXRX",
+        OFFICIAL_TRANSCRIPT_PDF,
+        "https://ir.recursion.com/news-events/presentations/",
+        _CHECKED,
+        (
+            VerifiedAsset(
+                "https://www.recursion.com/news/full-transcript-of-recursions-second-quarter-2026-earnings-call",
+                "Full Transcript of Recursion's Second Quarter 2026 Earnings Call",
+                "Q2 2026",
+                "2026-08-05",
+                origin="url_dominio_oficial_por_busqueda",
+                format="html",
+            ),
+        ),
+        "Pagina HTML del propio emisor (recursion.com/news, publicada 'August 10, 2026'); el texto "
+        "dice 'On August 5, 2026, Recursion reported ... In a related Earnings Call ... Below, the "
+        "full transcript'. La pagina IR leida (presentations) NO la enlaza; URL hallada por busqueda. "
+        "HTML 63930 bytes, sha256 2415b3a0..., ~5400 palabras. Transcripcion escrita por el emisor: "
+        "no es un PDF de proveedor ni se verifica palabra por palabra contra el audio.",
     ),
     SourceEntry(
         "ASTS",

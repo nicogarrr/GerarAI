@@ -11,9 +11,11 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
+from html.parser import HTMLParser
 from io import BytesIO
 
 from app.services.followup_primary_evidence_adapter import (
@@ -218,6 +220,9 @@ def fetch_registered_document_isolated(
     asset = asset_from_registry(get_entry(ticker), source_url=url)
     if asset is None:
         raise PrimarySourceError("Activo registrado sin fecha de llamada leida")
+    if any(a.url == url and a.format == "html" for a in get_entry(ticker).assets):
+        return _fetch_html_transcript(ticker, url, asset, today=today, deadline=deadline,
+                                      runner=runner)
     now = time.monotonic()
     with _LOCK:
         hit = _CACHE.get(url)
@@ -268,12 +273,18 @@ def fetch_registered_html_isolated(
 ) -> bytes:
     """HTML de un activo FINANCIERO exacto registrado, en el mismo hijo acotado que el PDF
     (CPU/memoria/deadline total de reloj, salida acotada). Sin reescribir la politica SSRF."""
-    import base64
-
     from app.services.commitment_financial_release import FINANCIAL_ASSETS
 
     if not any(a.url == url for a in FINANCIAL_ASSETS):
         raise PrimarySourceError("URL no registrada como documento financiero exacto")
+    return _run_html_child(url, deadline=deadline, runner=runner)
+
+
+def _run_html_child(
+    url: str, *, deadline: float, runner: Callable[..., dict] = run_child,
+) -> bytes:
+    import base64
+
     if not _SLOTS.acquire(blocking=False):
         raise PrimarySourceError("Demasiadas descargas en curso; reintentar mas tarde")
     try:
@@ -295,3 +306,63 @@ def fetch_registered_html_isolated(
             or len(content) > 4_000_000):
         raise PrimarySourceError("Respuesta del extractor inconsistente")
     return content
+
+
+class _TextExtractor(HTMLParser):
+    """Texto visible con la libreria estandar: sin scripts/estilos/nav/cabecera/pie (no ejecuta JS)."""
+
+    _SKIP = {"script", "style", "nav", "header", "footer", "noscript", "template", "svg"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag, attrs):  # noqa: ARG002
+        if tag in self._SKIP:
+            self._skip_depth += 1
+        elif tag in ("p", "br", "div", "li", "h1", "h2", "h3", "h4"):
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in self._SKIP and self._skip_depth:
+            self._skip_depth -= 1
+
+    def handle_data(self, data):
+        if not self._skip_depth:
+            self.parts.append(data)
+
+
+def html_visible_text(content: bytes) -> str:
+    parser = _TextExtractor()
+    parser.feed(content.decode("utf-8", "replace"))
+    return re.sub(r"[ \t\r\f\v]+", " ", "".join(parser.parts)).replace(" \n", "\n").strip()
+
+
+def _fetch_html_transcript(
+    ticker: str, url: str, asset, *, today: date, deadline: float, runner: Callable[..., dict],
+) -> tuple[RegisteredDocument, dict]:
+    now = time.monotonic()
+    with _LOCK:
+        hit = _CACHE.get(url)
+        if hit and now - hit[0] < CACHE_TTL_SECONDS:
+            _CACHE.move_to_end(url)
+            return hit[1], {"cache_hit": True, "previous_bytes_sha256": None, "bytes_changed": None}
+    content = _run_html_child(url, deadline=deadline, runner=runner)
+    text = html_visible_text(content)
+    if len(text.split()) < 200:
+        raise PrimarySourceError("Texto extraido insuficiente (pagina vacia o requiere JS)")
+    sha = hashlib.sha256(content).hexdigest()
+    doc = RegisteredDocument(
+        asset=asset, url=url, bytes_sha256=sha, byte_size=len(content),
+        text=text, text_sha256=hashlib.sha256(text.encode()).hexdigest(),
+        extractor="html-stdlib", fetched_on=today,
+    )
+    with _LOCK:
+        previous = _SEEN_BYTES.get(url)
+        _SEEN_BYTES[url] = sha
+        _CACHE[url] = (now, doc)
+        while len(_CACHE) > CACHE_MAX_ENTRIES:
+            _CACHE.popitem(last=False)
+    return doc, {"cache_hit": False, "previous_bytes_sha256": previous,
+                 "bytes_changed": None if previous is None else previous != sha}
