@@ -309,6 +309,11 @@ class ManagementCandidateExtract(BaseModel):
     source_url: str = Field(max_length=1000, pattern=r"^https?://")
 
 
+class ManagementCandidateFromUrl(BaseModel):
+    call_date: date
+    source_url: str = Field(max_length=1000, pattern=r"^https://")
+
+
 class ManagementPromiseCreate(BaseModel):
     promise: str = Field(min_length=3, max_length=5000)
     promise_date: date
@@ -908,13 +913,47 @@ def extract_management_candidates(
     company = resolve_company(db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    rows = ManagementCredibilityService().register_extracted_candidates(
-        db,
-        company,
-        transcript_text=payload.transcript_text,
-        call_date=payload.call_date,
-        source_url=payload.source_url,
+    try:
+        rows = ManagementCredibilityService().register_extracted_candidates(
+            db,
+            company,
+            transcript_text=payload.transcript_text,
+            call_date=payload.call_date,
+            source_url=payload.source_url,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return [ManagementCredibilityService.payload(row) for row in rows]
+
+
+@router.post("/{ticker}/management-credibility/extract-candidates-from-url", status_code=201)
+def extract_management_candidates_from_url(
+    ticker: str,
+    payload: ManagementCandidateFromUrl,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    from app.services.transcript_source_service import (
+        TranscriptSourceError,
+        fetch_transcript_text,
     )
+
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    try:
+        text = fetch_transcript_text(payload.source_url)
+    except TranscriptSourceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        rows = ManagementCredibilityService().register_extracted_candidates(
+            db,
+            company,
+            transcript_text=text,
+            call_date=payload.call_date,
+            source_url=payload.source_url,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return [ManagementCredibilityService.payload(row) for row in rows]
 
 

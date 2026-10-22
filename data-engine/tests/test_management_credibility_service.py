@@ -287,3 +287,48 @@ def test_legacy_heuristic_promises_are_excluded_from_score(db):
     assert dash["score"] is None and dash["grade"] == "insufficient_history"
     assert dash["legacy_excluded_from_score"] == 1
     assert dash["promises"][0]["legacy_heuristic_target"] is True
+
+
+def test_same_quote_in_other_call_is_not_a_duplicate_and_cap_applies(db, monkeypatch):
+    from app.services import management_credibility_service as mod
+
+    company = _company(db)
+    service = ManagementCredibilityService()
+    a = service.register_extracted_candidates(
+        db, company, transcript_text=SYNTH_CALL, call_date=date(2030, 7, 1),
+        source_url="https://example.invalid/a",
+    )
+    b = service.register_extracted_candidates(
+        db, company, transcript_text=SYNTH_CALL, call_date=date(2030, 10, 1),
+        source_url="https://example.invalid/b",
+    )
+    assert len(a) == 1 and len(b) == 1
+    dash = service.dashboard(db, company)
+    assert dash["counts"]["total"] == 2 and dash["counts"]["registered"] == 0
+    monkeypatch.setattr(mod, "MAX_CANDIDATES_PER_COMPANY", 2)
+    with pytest.raises(ValueError, match="Limite"):
+        service.register_extracted_candidates(
+            db, company, transcript_text=SYNTH_CALL, call_date=date(2031, 1, 1),
+            source_url="https://example.invalid/c",
+        )
+
+
+def test_candidates_are_tenant_scoped():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as a:
+        a.info["tenant_id"] = 1
+        company = _company(a)
+        ManagementCredibilityService().register_extracted_candidates(
+            a, company, transcript_text=SYNTH_CALL, call_date=date(2030, 7, 1),
+            source_url="https://example.invalid/a",
+        )
+        cid = company.id
+    with Session(engine) as b:
+        b.info["tenant_id"] = 2
+        from sqlalchemy import select
+
+        from app.models.entities import ManagementPromise
+
+        rows = b.scalars(select(ManagementPromise).where(ManagementPromise.company_id == cid)).all()
+        assert rows == []

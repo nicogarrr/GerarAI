@@ -1079,6 +1079,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/management-credibility/extract-candidates-from-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Extract Management Candidates From Url */
+        post: operations["extract_management_candidates_from_url_api_companies__ticker__management_credibility_extract_candidates_from_url_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/management-credibility/import-call-claims": {
         parameters: {
             query?: never;
@@ -6765,6 +6782,16 @@ export interface components {
             /** Transcript Text */
             transcript_text: string;
         };
+        /** ManagementCandidateFromUrl */
+        ManagementCandidateFromUrl: {
+            /**
+             * Call Date
+             * Format: date
+             */
+            call_date: string;
+            /** Source Url */
+            source_url: string;
+        };
         /** ManagementExplanationUpdate */
         ManagementExplanationUpdate: {
             /** Explanation */
@@ -10868,6 +10895,52 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ManagementCandidateExtract"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extract_management_candidates_from_url_api_companies__ticker__management_credibility_extract_candidates_from_url_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManagementCandidateFromUrl"];
             };
         };
         responses: {

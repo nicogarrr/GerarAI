@@ -237,7 +237,7 @@ export type ManagementCredibility = {
   ticker: string;
   score: number | null;
   grade: string;
-  counts: { total: number; open: number; candidate?: number; met: number; partial: number; missed: number };
+  counts: { total: number; registered?: number; open: number; candidate?: number; met: number; partial: number; missed: number };
   method: string;
   legacy_excluded_from_score?: number;
   promises: Array<{
