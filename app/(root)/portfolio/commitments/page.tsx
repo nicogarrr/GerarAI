@@ -37,14 +37,21 @@ export default async function PortfolioCommitmentsPage() {
         description="Frases de la directiva en llamadas, con cita literal, fuente y fecha. Un candidato sugerido no es una promesa confirmada: nada se marca cumplido o fallido sin evidencia, y un plazo vencido sin prueba queda como no verificado."
       />
       <p className="text-xs text-gray-500">
-        {data.held_count} empresa(s) en cartera · {withItems.length} con compromisos o candidatos registrados. Las empresas sin transcripción cargada no tienen datos: no significa que la directiva no haya prometido nada.
+        {data.held_count} en cartera · {data.watchlist_count} en watchlist · {withItems.length} con compromisos o candidatos registrados. Las empresas sin datos no tienen conclusión: no significa que la directiva no haya prometido nada.
       </p>
       <SourceCoverage />
-      {!withItems.length ? <EmptyState title="Aún no hay compromisos ni candidatos para las empresas de tu cartera." /> : null}
+      {!withItems.length ? <EmptyState title="Aún no hay compromisos ni candidatos para las empresas de tu cartera ni de tu watchlist." /> : null}
+      {data.companies.length - withItems.length > 0 ? (
+        <p className="text-xs text-gray-500">
+          {data.companies.length - withItems.length} empresa(s) del seguimiento sin compromisos registrados todavía: no significa que no existan, solo que no hay datos.
+        </p>
+      ) : null}
       {withItems.map((company) => (
         <section className="rounded-xl border border-gray-800 bg-surface-1 p-5" key={company.ticker}>
-          <div className="flex items-center gap-3">
-            <h2 className="font-semibold text-gray-100">{company.ticker} · {company.name}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-semibold text-gray-100">{company.ticker}{company.name ? ` · ${company.name}` : ''}</h2>
+            {company.in_portfolio ? <span className="rounded border border-gray-700 px-1.5 text-xs text-gray-400">Cartera</span> : null}
+            {company.in_watchlist ? <span className="rounded border border-gray-700 px-1.5 text-xs text-gray-400">Watchlist</span> : null}
             <span className="text-xs text-gray-500">{company.counts.registered} registrados · {company.counts.candidate} sugeridos sin verificar</span>
             <Link className="ml-auto text-xs underline" href={`/research/${company.ticker}/management-credibility`}>Detalle</Link>
           </div>

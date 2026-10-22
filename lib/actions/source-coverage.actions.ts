@@ -96,7 +96,8 @@ export type SourceCoverageReport = {
     universe_source: string;
     universe_size: number;
     note: string;
-    store: SourceCoverageStore;
+    /** Puede faltar en backends antiguos: la UI lo declara, no lo tumba. */
+    store: SourceCoverageStore | null;
     /** null = nunca ejecutado o ilegible (NO garantiza 'nunca'); ok=false = fallo del chequeo programado. */
     job_last_run: SourceCoverageJobRun | null;
     companies: SourceCoverageCompany[];
@@ -118,7 +119,19 @@ export async function getSourceCoverage(): Promise<SourceCoverageResult> {
             headers: identity,
         });
         if (!response.ok) return { status: 'unavailable' };
-        return { status: 'ok', report: (await response.json()) as SourceCoverageReport };
+        const data = (await response.json()) as SourceCoverageReport;
+        if (!data || !Array.isArray(data.companies) || !Array.isArray(data.history)) {
+            return { status: 'unavailable' };
+        }
+        // Normalización defensiva: campos lista ausentes nunca tumban la página.
+        for (const c of data.companies) {
+            c.pending ??= [];
+            c.outcomes ??= [];
+            c.transcript_origins ??= [];
+            c.transcript_sources ??= [];
+            c.press_release_sources ??= [];
+        }
+        return { status: 'ok', report: data };
     } catch {
         return { status: 'unavailable' };
     }

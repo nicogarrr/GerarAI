@@ -15,6 +15,12 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const source = (rel: string) => readFileSync(join(here, '..', rel), 'utf8');
 
+void test('los estados del contrato tienen etiqueta y tono en español, con fallback para desconocidos', () => {
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(view.includes("STATE_LABEL[c.state] ?? 'Estado desconocido'"), 'fallback de estado (compat backend)');
+    assert.ok(view.includes("STATE_GROUP[c.state] ??"), 'fallback de contador');
+})
+
 void test('los 7 estados del contrato tienen etiqueta y tono en español', () => {
     const view = source('components/portfolio/SourceCoverage.tsx');
     for (const state of [
@@ -98,6 +104,30 @@ void test('las fuentes por empresa son enlaces validados http(s) con etiqueta le
     const view = source('components/portfolio/SourceCoverage.tsx');
     assert.ok(view.includes('safeUrl'), 'validación http(s) centralizada');
     assert.ok(view.includes("src.label || 'Transcripción'"), 'etiqueta legible del registro');
+});
+
+void test('abstención significa fuente NO obtenida/verificada, nunca «sin datos nuevos»', () => {
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(view.includes('No se pudo obtener la fuente'), 'estado abstención honesto');
+    assert.ok(view.includes('fuente no obtenida'), 'outcome abstención honesto');
+    assert.ok(!view.includes('Sin datos nuevos'), 'la etiqueta ambigua quedó fuera');
+});
+
+void test('la respuesta se valida y una respuesta incompleta no tumba la página', () => {
+    const actions = source('lib/actions/source-coverage.actions.ts');
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(actions.includes('Array.isArray(data.companies)'), 'validación mínima de shape');
+    assert.ok(view.includes('no incluyó el estado del registro'), 'store ausente declarado, no crash');
+});
+
+void test('la página cubre la unión cartera+watchlist con badges y cero conclusión sin datos', () => {
+    const page = source('app/(root)/portfolio/commitments/page.tsx');
+    assert.ok(page.includes('title="Compromisos de tu cartera y watchlist"'), 'unión declarada');
+    assert.ok(page.includes('company.in_watchlist'), 'badge watchlist');
+    assert.ok(page.includes('company.in_portfolio'), 'badge cartera');
+    assert.ok(page.includes('watchlist_count'), 'contador watchlist honesto');
+    assert.ok(page.includes('no significa que no existan'), '0 filas NO es «sin compromisos»');
+    assert.ok(page.includes("company.name ? `"), 'nombre nulo (sin Company en BD) no rompe la cabecera');
 });
 
 void test('la acción usa firma de identidad y no-store como el resto del cliente research', () => {

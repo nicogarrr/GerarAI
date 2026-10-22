@@ -14,7 +14,7 @@ const JOB_RUN_NOTE = 'Es la última ejecución programada; no indica la salud ac
 
 const STATE_LABEL: Record<SourceCoverageState, string> = {
     fuente_obtenida: 'Fuente obtenida',
-    abstencion_en_chequeo: 'Sin datos nuevos',
+    abstencion_en_chequeo: 'No se pudo obtener la fuente',
     ultimo_chequeo_con_error: 'Último chequeo con error',
     nunca_chequeado: 'Nunca chequeado',
     sin_chequeo_posible: 'Sin chequeo posible',
@@ -43,7 +43,7 @@ const PENDING_LABEL: Record<string, string> = {
 
 const OUTCOME_LABEL: Record<string, string> = {
     extraido: 'fuente obtenida',
-    abstencion: 'sin datos nuevos',
+    abstencion: 'fuente no obtenida',
     error: 'error',
 };
 
@@ -59,7 +59,7 @@ const KIND_LABEL: Record<string, string> = {
 
 const STATE_GROUP: Record<SourceCoverageState, { label: string; order: number }> = {
     fuente_obtenida: { label: 'con fuente obtenida', order: 0 },
-    abstencion_en_chequeo: { label: 'sin datos nuevos', order: 1 },
+    abstencion_en_chequeo: { label: 'sin fuente obtenida en el último chequeo', order: 1 },
     ultimo_chequeo_con_error: { label: 'con error en el último chequeo', order: 2 },
     nunca_chequeado: { label: 'nunca chequeadas', order: 3 },
     sin_chequeo_posible: { label: 'sin chequeo posible', order: 4 },
@@ -73,7 +73,7 @@ function CoverageSummary({ companies }: { companies: SourceCoverageCompany[] }) 
     const counts = new Map<string, { label: string; order: number; n: number }>();
     let pendingCount = 0;
     for (const c of companies) {
-        const g = STATE_GROUP[c.state];
+        const g = STATE_GROUP[c.state] ?? { label: 'de estado desconocido', order: 6 };
         const cur = counts.get(g.label) ?? { ...g, n: 0 };
         cur.n += 1;
         counts.set(g.label, cur);
@@ -121,14 +121,15 @@ function CompanyRow({ company }: { company: SourceCoverageCompany }) {
     const c = company;
     // Fuera de retención (evicción): el backend marca estado_fuera_retencion
     // porque pudo haberse chequeado; NUNCA afirmar "nunca" en ese caso.
-    const stateLabel = STATE_LABEL[c.state];
+    const stateLabel = STATE_LABEL[c.state] ?? 'Estado desconocido';
+    const stateTone = STATE_TONE[c.state] ?? 'text-gray-500';
     return (
         <li className="rounded-lg border border-gray-800 p-3 text-sm">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="font-semibold text-gray-100">{c.ticker}</span>
                 {c.in_portfolio ? <span className="rounded border border-gray-700 px-1.5 text-xs text-gray-400">Cartera</span> : null}
                 {c.in_watchlist ? <span className="rounded border border-gray-700 px-1.5 text-xs text-gray-400">Watchlist</span> : null}
-                <span className={`text-xs font-medium ${STATE_TONE[c.state]}`}>{stateLabel}</span>
+                <span className={`text-xs font-medium ${stateTone}`}>{stateLabel}</span>
             </div>
             <p className="mt-1 text-xs text-gray-400">
                 {c.last_checked_on
@@ -195,7 +196,16 @@ function HistoryList({ history }: { history: SourceCoverageHistoryItem[] }) {
 }
 
 function StoreAlerts({ report }: { report: SourceCoverageReport }) {
-    const { store, job_last_run: job } = report;
+    const store = report.store;
+    const job = report.job_last_run;
+    if (!store) {
+        // Backend antiguo o respuesta incompleta: no se afirma cobertura.
+        return (
+            <p role="alert" className="rounded-lg border border-red-900 bg-red-950/40 p-3 text-xs text-red-300">
+                La respuesta no incluyó el estado del registro de chequeos; las fechas mostradas pueden no estar completas.
+            </p>
+        );
+    }
     return (
         <>
             {store.latest === 'corrupto' || store.latest === 'ilegible' ? (
@@ -218,7 +228,9 @@ function StoreAlerts({ report }: { report: SourceCoverageReport }) {
 }
 
 function OperationalDetails({ report }: { report: SourceCoverageReport }) {
-    const { store, job_last_run: job } = report;
+    const store = report.store;
+    const job = report.job_last_run;
+    if (!store) return null;
     return (
         <>
             {store.incident?.status === 'historico_sanado' ? (

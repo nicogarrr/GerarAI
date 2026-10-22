@@ -895,9 +895,15 @@ export async function updateManagementExplanation(ticker: string, promiseId: num
 
 export type PortfolioCommitments = {
   held_count: number;
+  watchlist_count: number;
+  universe_count: number;
+  universe_source: string;
   companies: Array<{
     ticker: string;
-    name: string;
+    name: string | null;
+    in_portfolio: boolean;
+    in_watchlist: boolean;
+    company_in_db: boolean;
     counts: { total: number; candidate: number; registered: number };
     items: ManagementCredibility['promises'];
   }>;
