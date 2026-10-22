@@ -121,6 +121,7 @@ def test_cross_currency_missing_rate_keeps_totals_unknown(db):
     assert metrics["expected_contributions_converted_base"] == pytest.approx(400)
     assert len(metrics["expected_missing_fx"]) == 1
     assert metrics["expected_missing_fx"][0]["period"] == 1
+    assert metrics["expected_missing_fx"][0]["reason"] == "no_rate_on_or_before_due_date"
     assert metrics["gap_base"] is None
     assert metrics["on_track"] is None
 
@@ -172,3 +173,27 @@ def test_drift_exposes_next_contribution_currency(db):
     if drift.get("plan_exists"):
         assert drift["next_contribution"] == 500.0
         assert drift["next_contribution_currency"] == "USD"
+
+
+def test_not_yet_due_quota_is_pending_not_missing_and_not_converted(db):
+    service = InvestmentPlanService()
+    today = date.today()
+    start = InvestmentPlanService._add_months_clamped(date(today.year, today.month, 1), -1)
+    # months_elapsed=1 pero aniversario = dia 1 del mes actual <= hoy: forzamos futuro
+    day = min(today.day + 1, 28)
+    start = InvestmentPlanService._add_months_clamped(date(today.year, today.month, day), -1)
+    if InvestmentPlanService._add_months_clamped(start, 1) <= today:
+        pytest.skip("hoy es dia 28+, no hay aniversario futuro en este mes")
+    _plan(service, db, start_date=start, monthly_contribution_currency="USD")
+    db.add(FXRate(base_currency="EUR", quote_currency="USD",
+                  rate=Decimal("0.9"), rate_date=today, source="test"))
+    db.commit()
+    metrics = service.plan_metrics(db)
+    assert metrics["months_elapsed"] == 1
+    assert metrics["expected_contributions_base"] is None
+    assert metrics["expected_conversion_complete"] is False
+    assert metrics["expected_missing_fx"] == []  # no es «falta tasa»
+    period = metrics["expected_periods"][0]
+    assert period["status"] == "pending_due_date"
+    assert period["rate"] is None and period["rate_date"] is None and period["source"] is None
+    assert metrics["gap_base"] is None and metrics["on_track"] is None

@@ -188,7 +188,7 @@ class InvestmentPlanService:
         complete = not missing_fx
         months_elapsed = self._months_between(plan.start_date, date.today())
         plan_currency = (plan.monthly_contribution_currency or "").upper() or None
-        expected, expected_partial, expected_missing_fx = self._expected_base(
+        expected, expected_partial, expected_missing_fx, expected_periods = self._expected_base(
             db,
             plan=plan,
             plan_currency=plan_currency,
@@ -213,6 +213,8 @@ class InvestmentPlanService:
                 float(expected_partial) if expected_partial is not None else None
             ),
             "expected_missing_fx": expected_missing_fx,
+            "expected_periods": expected_periods,
+            "expected_conversion_complete": expected is not None,
             "actual_contributions_base": float(total_actual) if complete else None,
             "actual_contributions_converted_base": float(total_actual),
             "contributions_complete": complete,
@@ -234,7 +236,7 @@ class InvestmentPlanService:
         plan_currency: str | None,
         base_currency: str | None,
         months_elapsed: int,
-    ) -> tuple[Decimal | None, Decimal | None, list[dict]]:
+    ) -> tuple[Decimal | None, Decimal | None, list[dict], list[dict]]:
         """Cuotas previstas en divisa base, con tri-estado honesto.
 
         - Sin divisa registrada (legacy): (None, None, []). El total no se
@@ -246,36 +248,77 @@ class InvestmentPlanService:
           declara en expected_missing_fx; el total queda None (nunca un
           parcial disfrazado de completo, espejo de las aportaciones).
         """
+        periods: list[dict] = []
         if plan_currency is None or base_currency is None:
-            return None, None, []
+            return None, None, [], periods
         if plan_currency == base_currency:
+            # Compat: monthly x meses de CALENDARIO (months_elapsed), igual
+            # que siempre; no depende del dia de vencimiento.
             total = plan.monthly_contribution * Decimal(months_elapsed)
-            return total, total, []
+            return total, total, [], periods
         today = date.today()
         total = Decimal("0")
         missing: list[dict] = []
+        pending = False
         for period in range(1, months_elapsed + 1):
-            quota_date = min(self._add_months_clamped(plan.start_date, period), today)
+            due_date = self._add_months_clamped(plan.start_date, period)
+            if due_date > today:
+                # Cuota contada por el calendario pero aun no vencida: no se
+                # convierte (ni FX futura ni la tasa de hoy atribuida a una
+                # fecha futura). Estado propio, distinto de «falta tasa».
+                pending = True
+                periods.append(
+                    {
+                        "period": period,
+                        "due_date": due_date.isoformat(),
+                        "status": "pending_due_date",
+                        "rate_date": None,
+                        "rate": None,
+                        "source": None,
+                    }
+                )
+                continue
             rate = self.fx.rate(
                 db,
                 quote_currency=plan_currency,
                 base_currency=base_currency,
-                as_of=quota_date,
+                as_of=due_date,
             )
             if rate is None:
                 missing.append(
                     {
                         "period": period,
-                        "as_of": quota_date.isoformat(),
+                        "due_date": due_date.isoformat(),
+                        "reason": "no_rate_on_or_before_due_date",
                         "quote_currency": plan_currency,
                         "base_currency": base_currency,
                     }
                 )
+                periods.append(
+                    {
+                        "period": period,
+                        "due_date": due_date.isoformat(),
+                        "status": "missing_rate",
+                        "rate_date": None,
+                        "rate": None,
+                        "source": None,
+                    }
+                )
                 continue
             total += plan.monthly_contribution * rate
-        if missing:
-            return None, total, missing
-        return total, total, []
+            periods.append(
+                {
+                    "period": period,
+                    "due_date": due_date.isoformat(),
+                    "status": "converted",
+                    "rate_date": None,  # procedencia: pendiente del helper FX
+                    "rate": float(rate),
+                    "source": None,
+                }
+            )
+        if missing or pending:
+            return None, total, missing, periods
+        return total, total, [], periods
 
     @staticmethod
     def _add_months_clamped(anchor: date, months: int) -> date:
