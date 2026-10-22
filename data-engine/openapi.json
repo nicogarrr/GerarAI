@@ -4926,11 +4926,47 @@
       },
       "ManagementPromiseCreate": {
         "properties": {
+          "call_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Date"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
           "expected_period": {
             "maxLength": 80,
             "minLength": 1,
             "title": "Expected Period",
             "type": "string"
+          },
+          "fulfillment_criteria": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fulfillment Criteria"
           },
           "metric": {
             "anyOf": [
@@ -4973,6 +5009,30 @@
             "title": "Promise Date",
             "type": "string"
           },
+          "quote_literal": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Literal"
+          },
+          "quote_translation_es": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Translation Es"
+          },
           "source_document_id": {
             "anyOf": [
               {
@@ -4983,6 +5043,43 @@
               }
             ],
             "title": "Source Document Id"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "pattern": "^https?://",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "speaker": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker"
+          },
+          "speaker_role": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker Role"
           },
           "target_value": {
             "anyOf": [
@@ -4997,6 +5094,18 @@
               }
             ],
             "title": "Target Value"
+          },
+          "transcript_locator": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript Locator"
           },
           "unit": {
             "anyOf": [

@@ -6743,8 +6743,14 @@ export interface components {
         };
         /** ManagementPromiseCreate */
         ManagementPromiseCreate: {
+            /** Call Date */
+            call_date?: string | null;
+            /** Due Date */
+            due_date?: string | null;
             /** Expected Period */
             expected_period: string;
+            /** Fulfillment Criteria */
+            fulfillment_criteria?: string | null;
             /** Metric */
             metric?: string | null;
             /** Operator */
@@ -6756,10 +6762,22 @@ export interface components {
              * Format: date
              */
             promise_date: string;
+            /** Quote Literal */
+            quote_literal?: string | null;
+            /** Quote Translation Es */
+            quote_translation_es?: string | null;
             /** Source Document Id */
             source_document_id?: number | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Speaker */
+            speaker?: string | null;
+            /** Speaker Role */
+            speaker_role?: string | null;
             /** Target Value */
             target_value?: number | string | null;
+            /** Transcript Locator */
+            transcript_locator?: string | null;
             /** Unit */
             unit?: string | null;
         };
