@@ -37,7 +37,7 @@ export default async function PortfolioCommitmentsPage() {
       <PageHeader
         kicker="Seguimiento de la directiva"
         title="Compromisos de tu cartera y watchlist"
-        description="Frases de la directiva en llamadas, con cita literal, fuente y fecha. Un candidato sugerido no es una promesa confirmada: nada se marca cumplido o fallido sin evidencia, y un plazo vencido sin prueba queda como no verificado."
+        description="Llamadas y compromisos de las empresas de tu cartera y watchlist, con fuentes y fechas. Un candidato sugerido no es una promesa confirmada: nada se marca cumplido o fallido sin evidencia."
       />
       <p className="text-xs text-gray-500">
         {data.held_count} en cartera · {data.watchlist_count} en watchlist · {withItems.length} con compromisos o candidatos registrados. Las empresas sin datos no tienen conclusión: no significa que la directiva no haya prometido nada.
