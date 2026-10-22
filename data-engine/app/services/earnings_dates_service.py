@@ -31,6 +31,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, EarningsDate, Position, WatchItem
+from app.services.async_bridge import run_from_any_context
 from app.services.connectors.earnings_calendar import BROWSER_HEADERS, EARNINGS_URL
 from app.services.market_refresh_service import _us_listed
 from app.services.propicks_price_service import yahoo_symbol
@@ -170,7 +171,7 @@ async def _nasdaq_scan(tickers: set[str], today: date) -> dict[str, dict[str, An
 def fetch_nasdaq_dates(tickers: set[str], today: date) -> dict[str, dict[str, Any]]:
     if not tickers:
         return {}
-    return asyncio.run(_nasdaq_scan(tickers, today))
+    return run_from_any_context(_nasdaq_scan(tickers, today))
 
 
 def merge_candidate(yahoo: dict | None, nasdaq: dict | None) -> dict[str, Any] | None:
