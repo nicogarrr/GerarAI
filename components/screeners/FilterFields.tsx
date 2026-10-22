@@ -74,6 +74,9 @@ function MetricPicker({ id, name, value, onChange, options, placeholder, require
           <CommandInput placeholder="Buscar métrica" />
           <CommandList className="max-h-72" id={`${id}-list`}>
             <CommandEmpty>Sin resultados</CommandEmpty>
+            {options.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-gray-400">No hay métricas disponibles. Puedes crear una fórmula.</p>
+            ) : null}
             {groups.map(([title, items]) => <CommandGroup heading={title} key={title}>
               {items.map((option) => <CommandItem key={option.key} onSelect={() => { onChange(option.key); setOpen(false); }} value={`${option.label} ${option.key}`}>
                 <Check aria-hidden="true" className={cn('mr-2 h-4 w-4', selected?.key === option.key ? 'opacity-100' : 'opacity-0')} />
