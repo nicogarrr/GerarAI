@@ -109,6 +109,16 @@ def check_transcripts(
         facts = ({"pages": doc.text.count("\f") + 1, "bytes": doc.byte_size,
                   "extractor": doc.extractor, "text_sha256": doc.text_sha256, "cache_hit": meta["cache_hit"],
                   "bytes_changed": meta["bytes_changed"]},)
+        if getattr(asset, "body_start", None):
+            from app.services.commitment_body_provenance import extract_body
+
+            try:
+                b = extract_body(doc, asset)
+                facts = (*facts, {"body_sha256": b.body_sha256, "body_words": b.words,
+                                  "body_span": [b.start, b.end], "body_qa_hints": list(b.qa_hints),
+                                  "body_extraction": "ok"})
+            except PrimarySourceError as exc:
+                facts = (*facts, {"body_extraction": "abstencion", "body_reason": str(exc)[:100]})
         out.append(SourceCheckRecord(**base, outcome="extraido", reason="texto_obtenido",
                                      content_sha256=doc.bytes_sha256, facts=facts))
     return out

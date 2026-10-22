@@ -46,8 +46,16 @@ class VerifiedAsset:
     # Donde se leyo call_date: "documento" (en la propia transcripcion) o el URL del comunicado/pagina
     # oficial que anuncia la llamada. Nunca se afirma "leida en el documento" si no lo es.
     call_date_source: str = "documento"
+    # Marcadores EXACTOS (texto literal) que delimitan el cuerpo de la llamada dentro del texto
+    # visible de una pagina HTML. Ambos o ninguno. start debe aparecer UNA vez.
+    body_start: str | None = None
+    body_end: str | None = None
 
     def __post_init__(self) -> None:
+        if (self.body_start is None) != (self.body_end is None):
+            raise ValueError("body_start y body_end van juntos")
+        if self.body_start is not None and self.format != "html":
+            raise ValueError("marcadores de cuerpo solo para activos html")
         if self.format not in ("pdf", "html"):
             raise ValueError("formato de activo desconocido")
         if self.origin not in ("href_ir_leido", "url_dominio_oficial_por_busqueda"):
@@ -179,6 +187,8 @@ _ENTRIES = (
                 origin="url_dominio_oficial_por_busqueda",
                 format="html",
                 call_date_source="https://ir.recursion.com/news-releases/news-release-details/recursion-reports-second-quarter-financial-results-genentech/",
+                body_start="Below, the full transcript from the Earnings Call.",
+                body_end="Decoding biology to radically improve lives.\u00ae",
             ),
         ),
         "Pagina HTML del propio emisor (recursion.com/news, publicada 'August 10, 2026'); el texto "
