@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { extractOutcomeMessage } from './extract-outcome-message.runner.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source = (rel: string) => readFileSync(join(here, '..', rel), 'utf8');
@@ -94,24 +95,40 @@ void test('fuentes nulas o malformadas se filtran con aviso de lista parcial, nu
 });
 
 void test('extracción sin candidatos nuevos no celebra: el mensaje sigue el outcome real', () => {
-    const actions = source('lib/actions/research-tools.actions.ts');
-    assert.ok(actions.includes('No se han añadido candidatos nuevos'), 'mensaje explícito de cero añadidos');
-    assert.ok(actions.includes('sin_cambios_hash'), 'distingue fuente sin cambios');
-    assert.ok(actions.includes('sin_candidatos_detectados'), 'distingue sin candidatos detectados');
-    assert.ok(actions.includes('Esto no significa que no haya compromisos'), 'sin detectados NUNCA se expresa como ausencia de compromisos');
-    assert.ok(actions.includes("typeof result?.created === 'number'"), 'el mensaje depende del resultado real, no es fijo');
-    assert.ok(!actions.includes('No hay compromisos'), 'cero añadidos NUNCA se expresa como ausencia de compromisos');
+    const mapper = source('lib/actions/extract-outcome-message.ts');
+    assert.ok(mapper.includes('No se han añadido candidatos nuevos'), 'mensaje explícito de cero añadidos');
+    assert.ok(mapper.includes('sin_cambios_hash'), 'distingue fuente sin cambios');
+    assert.ok(mapper.includes('sin_candidatos_detectados'), 'distingue sin candidatos detectados');
+    assert.ok(mapper.includes('Esto no significa que no haya compromisos'), 'sin detectados NUNCA se expresa como ausencia de compromisos');
+    assert.ok(mapper.includes("typeof result?.created === 'number'"), 'el mensaje depende del resultado real, no es fijo');
+    assert.ok(!mapper.includes('No hay compromisos'), 'cero añadidos NUNCA se expresa como ausencia de compromisos');
 });
 
 void test('cero candidatos nuevos no brinda con toast de éxito: tono neutral', () => {
     const actions = source('lib/actions/research-tools.actions.ts');
     const form = source('components/forms/MutationForm.tsx');
-    assert.ok(actions.includes("return n > 0 ? { message } : { message, tone: 'neutral' }"), '0-nuevos devuelve tone neutral');
+    assert.ok(actions.includes('return extractOutcomeMessage(result)'), 'la acción delega en el mapeador puro');
     assert.ok(form.includes("if (tone === 'neutral') toast(message); else toast.success(message);"), 'MutationForm honra tone neutral');
 });
 
-void test('abstención sin contexto de tenant se explica, no se oculta', () => {
-    const actions = source('lib/actions/research-tools.actions.ts');
-    assert.ok(actions.includes('sin_contexto_tenant'), 'detecta la razón real del backend');
-    assert.ok(actions.includes('No se pudo identificar tu sesión; vuelve a entrar.'), 'mensaje accionable en español');
+void test('el mapeador se ejecuta contra result reales: outcome exacto del backend, no grep', () => {
+    // Contrato backend 55f91627: outcome='sin_contexto_de_tenant' llega en un 200, no como error.
+    const sesion = extractOutcomeMessage({ outcome: 'sin_contexto_de_tenant', created: 0, candidates: [] });
+    assert.equal(sesion.message, 'No se pudo identificar tu sesión; vuelve a entrar.');
+    assert.equal(sesion.tone, 'neutral');
+    const sinCambios = extractOutcomeMessage({ outcome: 'sin_cambios_hash', created: 0, candidates: [] });
+    assert.ok(sinCambios.message.includes('la fuente no ha cambiado desde la última extracción'));
+    assert.equal(sinCambios.tone, 'neutral');
+    const sinDetectados = extractOutcomeMessage({ outcome: 'sin_candidatos_detectados', created: 0, candidates: [] });
+    assert.ok(sinDetectados.message.includes('Esto no significa que no haya compromisos'));
+    assert.equal(sinDetectados.tone, 'neutral');
+    const creados = extractOutcomeMessage({ outcome: 'candidatos_creados', created: 3, candidates: [{}, {}, {}] });
+    assert.equal(creados.message, '3 candidatos nuevos extraídos (sin revisar).');
+    assert.equal(creados.tone, undefined);
+    const uno = extractOutcomeMessage({ outcome: 'candidatos_creados', created: 1, candidates: [{}] });
+    assert.equal(uno.message, '1 candidato nuevo extraído (sin revisar).');
+    // Respuesta malformada: cero declarado sin outcome no se celebra ni afirma ausencia.
+    const raro = extractOutcomeMessage(null);
+    assert.equal(raro.message, 'No se han añadido candidatos nuevos.');
+    assert.equal(raro.tone, 'neutral');
 });

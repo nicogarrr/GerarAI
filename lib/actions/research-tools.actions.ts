@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { commitmentsUiEnabled } from '@/lib/commitments-flag';
 
 import { normalizeResearchBody, researchIdentityHeaders } from '@/lib/auth/research-identity';
+import { extractOutcomeMessage, type ExtractFromRegistryResult } from '@/lib/actions/extract-outcome-message';
 import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
 import { AppError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
@@ -854,39 +855,16 @@ export async function extractManagementCandidatesFromUrl(ticker: string, formDat
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
 }
 
-type ExtractFromRegistryResult = { outcome?: string; created?: number; candidates?: unknown[] };
-
 export async function extractManagementCandidatesFromRegistry(ticker: string, formData: FormData) {
   assertCommitmentsUi();
-  let result: ExtractFromRegistryResult;
-  try {
-    result = await requestJson<ExtractFromRegistryResult>(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-registry`, {
-      method: 'POST',
-      body: JSON.stringify({
-        source_url: required(formData, 'source_url', 'Source URL'),
-      }),
-    });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes('sin_contexto_tenant')) {
-      throw new Error('No se pudo identificar tu sesión; vuelve a entrar.');
-    }
-    throw err;
-  }
+  const result = await requestJson<ExtractFromRegistryResult>(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-registry`, {
+    method: 'POST',
+    body: JSON.stringify({
+      source_url: required(formData, 'source_url', 'Source URL'),
+    }),
+  });
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
-  // Contrato backend: 0 creados NUNCA se celebra; el outcome dice la razón real.
-  const n = typeof result?.created === 'number' ? result.created : (Array.isArray(result?.candidates) ? result.candidates.length : 0);
-  const outcome = typeof result?.outcome === 'string' ? result.outcome : '';
-  let message: string;
-  if (n > 0) {
-    message = `${n} ${n === 1 ? 'candidato nuevo extraído' : 'candidatos nuevos extraídos'} (sin revisar).`;
-  } else if (outcome === 'sin_cambios_hash') {
-    message = 'No se han añadido candidatos nuevos: la fuente no ha cambiado desde la última extracción.';
-  } else if (outcome === 'sin_candidatos_detectados') {
-    message = 'No se detectaron candidatos en esta fuente. Esto no significa que no haya compromisos.';
-  } else {
-    message = 'No se han añadido candidatos nuevos.';
-  }
-  return n > 0 ? { message } : { message, tone: 'neutral' };
+  return extractOutcomeMessage(result);
 }
 
 export async function reviewManagementCandidate(ticker: string, promiseId: number, formData: FormData) {
