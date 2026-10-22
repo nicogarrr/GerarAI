@@ -168,6 +168,7 @@ class ManagementCredibilityService:
         call_date: date,
         source_url: str,
         source_check: str = "not_checked",
+        date_basis: str = "user_entered",
     ) -> list[ManagementPromise]:
         """Guarda candidatos extraidos (status="candidate", source_status="suggested").
 
@@ -194,7 +195,7 @@ class ManagementCredibilityService:
             if row.quote_literal
         }
         created: list[ManagementPromise] = []
-        for cand in extract_candidates(transcript_text):
+        for cand in extract_candidates(transcript_text, call_date=call_date):
             if (cand.quote_literal, call_date, source_url) in existing:
                 continue
             row = ManagementPromise(
@@ -215,6 +216,8 @@ class ManagementCredibilityService:
                     "locator_normalization": cand.normalization,
                     "context_before": cand.context_before,
                     "context_after": cand.context_after,
+                    "support_quote": cand.support_quote,
+                    "parser": cand.parser,
                 },
                 quote_literal=cand.quote_literal,
                 speaker=cand.speaker,
@@ -224,7 +227,7 @@ class ManagementCredibilityService:
                 transcript_locator=locator_for(cand),
                 due_date=cand.due_date_hint,
                 status_reason="Candidato extraido por reglas; sin revisar contra la fuente.",
-                date_basis="user_entered",
+                date_basis=date_basis,
             )
             db.add(row)
             created.append(row)
@@ -507,6 +510,9 @@ class ManagementCredibilityService:
             "source_status": (row.metadata_ or {}).get("source_status"),
             "flags": (row.metadata_ or {}).get("flags") or [],
             "source_check": (row.metadata_ or {}).get("source_check"),
+            "support_quote": (row.metadata_ or {}).get("support_quote") or None,
+            "due_basis": (row.metadata_ or {}).get("due_basis"),
+            "extraction_parser": (row.metadata_ or {}).get("parser"),
             "reviewed_by_user_id": (row.metadata_ or {}).get("reviewed_by_user_id"),
             "reviewed_at": (row.metadata_ or {}).get("reviewed_at"),
             "legacy_heuristic_target": ManagementCredibilityService._is_legacy_heuristic(row),

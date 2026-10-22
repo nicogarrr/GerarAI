@@ -985,6 +985,53 @@ def extract_management_candidates_from_url(
     return [ManagementCredibilityService.payload(row) for row in rows]
 
 
+class ManagementCandidateFromRegistry(BaseModel):
+    # Solo un URL YA registrado como transcripcion oficial exacta; la fecha sale del registro.
+    source_url: str = Field(max_length=1000, pattern=r"^https://")
+
+
+@router.post("/{ticker}/management-credibility/extract-candidates-from-registry", status_code=201)
+def extract_management_candidates_from_registry(
+    ticker: str,
+    payload: ManagementCandidateFromRegistry,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> list[dict]:
+    """Extrae CANDIDATOS (sin revisar) de una transcripcion oficial registrada. No decide nada."""
+    from datetime import date as _date
+
+    from app.services.commitment_primary_pipeline import (
+        PrimarySourceError,
+        fetch_registered_document_isolated,
+    )
+    from app.services.transcript_source_service import throttle
+
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    if not throttle(company.id):
+        raise HTTPException(status_code=429, detail="Espera unos segundos entre descargas")
+    try:
+        doc, _meta = fetch_registered_document_isolated(
+            company.ticker, payload.source_url, today=_date.today()
+        )
+    except PrimarySourceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        rows = ManagementCredibilityService().register_extracted_candidates(
+            db,
+            company,
+            transcript_text=doc.text,
+            call_date=doc.asset.published_on,
+            source_url=doc.url,
+            source_check="registro_oficial_exacto",
+            date_basis="call_date",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return [ManagementCredibilityService.payload(row) for row in rows]
+
+
 def _principal_user(principal) -> str:
     return principal.user_id if principal else "local-dev"
 
