@@ -303,6 +303,12 @@ class DecisionLessonAction(BaseModel):
     action: Literal["approve", "reject"]
 
 
+class ManagementCandidateExtract(BaseModel):
+    transcript_text: str = Field(min_length=50, max_length=400_000)
+    call_date: date
+    source_url: str = Field(max_length=1000, pattern=r"^https?://")
+
+
 class ManagementPromiseCreate(BaseModel):
     promise: str = Field(min_length=3, max_length=5000)
     promise_date: date
@@ -891,6 +897,25 @@ def import_management_call_claims(
         ManagementCredibilityService.payload(row)
         for row in ManagementCredibilityService().import_call_claims(db, company)
     ]
+
+
+@router.post("/{ticker}/management-credibility/extract-candidates", status_code=201)
+def extract_management_candidates(
+    ticker: str,
+    payload: ManagementCandidateExtract,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    rows = ManagementCredibilityService().register_extracted_candidates(
+        db,
+        company,
+        transcript_text=payload.transcript_text,
+        call_date=payload.call_date,
+        source_url=payload.source_url,
+    )
+    return [ManagementCredibilityService.payload(row) for row in rows]
 
 
 @router.post("/{ticker}/management-credibility/reconcile")

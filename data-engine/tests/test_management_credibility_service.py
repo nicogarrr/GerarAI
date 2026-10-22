@@ -234,3 +234,39 @@ def test_register_records_provenance_and_date_basis(db):
         metric=None, operator=None, target_value=None, unit=None,
     )
     assert other.date_basis == "user_entered" and other.quote_literal is None
+
+
+SYNTH_CALL = """Acme Corp (ACME)
+Second Quarter 2030 Results Conference Call
+
+Ana Perez, CEO
+
+We expect to launch 12 units by the end of 2031. We love our customers.
+"""
+
+
+def test_extracted_candidates_are_suggested_never_reconciled_and_deduped(db):
+    company = _company(db)
+    service = ManagementCredibilityService()
+    rows = service.register_extracted_candidates(
+        db, company, transcript_text=SYNTH_CALL, call_date=date(2030, 7, 1),
+        source_url="https://example.invalid/synthetic",
+    )
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.status == "candidate" and row.operator is None and row.target_value is None
+    assert row.metadata_["source_status"] == "suggested"
+    assert row.transcript_locator.startswith("ws_collapse_v1:")
+    assert row.due_date == date(2031, 12, 31) and row.date_basis == "user_entered"
+    assert len(row.metadata_["context_before"]) <= 80 and len(row.metadata_["context_after"]) <= 80
+    assert "Second Quarter 2030 Results Conference Call" not in row.promise
+    service.reconcile(db, company)
+    db.refresh(row)
+    assert row.status == "candidate"
+    again = service.register_extracted_candidates(
+        db, company, transcript_text=SYNTH_CALL, call_date=date(2030, 7, 1),
+        source_url="https://example.invalid/synthetic",
+    )
+    assert again == []
+    dash = service.dashboard(db, company)
+    assert dash["counts"]["candidate"] == 1 and dash["score"] is None
