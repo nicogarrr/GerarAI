@@ -48,4 +48,10 @@ describe('visualizacion del importe', () => {
         assert.doesNotMatch(f[0], /base_currency/);
         assert.match(view, /next_contribution: planNext/);
     });
+    it('cuotas pendientes de vencimiento se informan, no se tratan como error', () => {
+        const f = view.match(/const planExpectedPeriods[\s\S]*?\n};/);
+        assert.ok(f);
+        assert.match(f[0], /pendientes de vencimiento/);
+        assert.match(view, /expected_periods: planExpectedPeriods/);
+    });
 });

@@ -136,7 +136,16 @@ const planNext = (value: unknown, record: DataRecord) =>
     typeof record.next_contribution_currency === 'string' && record.next_contribution_currency
         ? formatMoney(value as number | string | null, record.next_contribution_currency)
         : typeof value === 'number' ? `${formatNumber(value)} (divisa no registrada)` : NA;
-const PLAN_FORMAT = {start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, next_contribution: planNext, ...Object.fromEntries(['expected_contributions_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
+/** Resumen de cuotas previstas: «pendiente de vencimiento» no es un error ni un FX faltante. */
+const planExpectedPeriods = (value: unknown) => {
+    if (!Array.isArray(value)) return NA;
+    const count = (status: string) => value.filter((p) => p && typeof p === 'object' && (p as Record<string, unknown>).status === status).length;
+    const parts = [`${count('converted')} convertidas`, `${count('pending_due_date')} pendientes de vencimiento`];
+    const missing = count('missing_rate');
+    if (missing > 0) parts.push(`${missing} sin tipo de cambio`);
+    return parts.join(', ');
+};
+const PLAN_FORMAT = {start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, next_contribution: planNext, expected_periods: planExpectedPeriods, ...Object.fromEntries(['expected_contributions_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
 const DETAIL_FORMAT = Object.fromEntries(['target_allocations', 'current_weights', 'deviations', 'suggestions', 'missing_fx', 'status'].map(key => [key, (value: unknown, record: DataRecord) => planValue(value, typeof record.base_currency === 'string' ? record.base_currency : undefined, key === 'current_weights')]));
 
 /** Extrae tickers del drift (current_weights "ticker:XXX", deviations kind ticker) y del plan (targets kind ticker) */
@@ -180,7 +189,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 record={initialPlan}
                 fetchRecord={getPlan}
                 columnLabels={PLAN_LABELS}
-                hiddenKeys={['id', 'currency_contract_enabled', 'monthly_currency_recorded', 'monthly_contribution_currency', 'expected_basis', 'expected_periods', 'expected_conversion_complete']}
+                hiddenKeys={['id', 'currency_contract_enabled', 'monthly_currency_recorded', 'monthly_contribution_currency', 'expected_basis', 'expected_conversion_complete']}
                 formatColumns={{...PLAN_FORMAT, ...DETAIL_FORMAT}}
                 maxKeys={20}
                 emptyMessage={t('plan.empty')}
