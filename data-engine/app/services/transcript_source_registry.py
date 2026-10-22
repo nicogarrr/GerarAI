@@ -277,10 +277,10 @@ _ENTRIES = (
     ),
     SourceEntry(
         "ASTS",
-        NOT_LISTED_ON_IR_PAGE,
-        "https://investors.ast-science.com/eventsPastEvents",
+        WEBCAST_ONLY,
+        "https://investors.ast-science.com/events",
         _CHECKED,
-        note="La pagina de eventos pasados no menciona transcripcion (0 apariciones); hay webcast/presentacion, que no son transcripcion. No prueba que no exista.",
+        note="Releida 2026-10-22 22:04 en navegador publico: /events enlaza webcasts (Chorus Call, YouTube) y 0 menciones de 'transcript'; la URL anterior /eventsPastEvents devuelve 404. No prueba que no exista una transcripcion en otra seccion.",
     ),
     SourceEntry(
         "RKLB",
@@ -294,7 +294,7 @@ _ENTRIES = (
         PAGE_MENTIONS_TRANSCRIPT,
         "https://www.alibabagroup.com/ir-financial-reports-quarterly-results",
         _CHECKED,
-        note="La pagina muestra dos etiquetas 'Transcript' sin href legible; URL del documento sin verificar.",
+        note="Releida 2026-10-22 22:02 en navegador publico: las dos etiquetas 'Transcript' (June Quarter 2026 y March Quarter 2026) son <a> SIN atributo href en el DOM (Press Releases si lo tiene); no hay URL resoluble, no se promueve a fuente.",
     ),
     SourceEntry(
         "ONDS",
