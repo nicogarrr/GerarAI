@@ -904,6 +904,8 @@ export type PortfolioCommitments = {
     in_portfolio: boolean;
     in_watchlist: boolean;
     company_in_db: boolean;
+    /** true = identidad Company normalizada ambigua: items[] vacío por identidad, NO por ausencia. */
+    company_identity_ambiguous: boolean;
     counts: { total: number; candidate: number; registered: number };
     items: ManagementCredibility['promises'];
   }>;

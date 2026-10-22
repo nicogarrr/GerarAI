@@ -29,6 +29,9 @@ export default async function PortfolioCommitmentsPage() {
   }
   const data = await getPortfolioCommitments();
   const withItems = data.companies.filter((c) => c.counts.total > 0);
+  const ambiguous = data.companies.filter((c) => c.company_identity_ambiguous);
+  // Sin datos por ausencia REAL: ni compromisos ni identidad ambigua.
+  const withoutData = data.companies.length - withItems.length - ambiguous.length;
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
       <PageHeader
@@ -41,9 +44,14 @@ export default async function PortfolioCommitmentsPage() {
       </p>
       <SourceCoverage />
       {!withItems.length ? <EmptyState title="Aún no hay compromisos ni candidatos para las empresas de tu cartera ni de tu watchlist." /> : null}
-      {data.companies.length - withItems.length > 0 ? (
+      {ambiguous.length ? (
+        <p className="text-xs text-amber-300">
+          {ambiguous.map((c) => c.ticker).join(', ')}: identidad ambigua, pendiente de revisar. No se muestran compromisos porque la empresa no está resuelta, no porque falten.
+        </p>
+      ) : null}
+      {withoutData > 0 ? (
         <p className="text-xs text-gray-500">
-          {data.companies.length - withItems.length} empresa(s) del seguimiento sin compromisos registrados todavía: no significa que no existan, solo que no hay datos.
+          {withoutData} empresa(s) del seguimiento sin compromisos registrados todavía: no significa que no existan, solo que no hay datos.
         </p>
       ) : null}
       {withItems.map((company) => (

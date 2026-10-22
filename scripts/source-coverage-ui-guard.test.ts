@@ -128,6 +128,9 @@ void test('la página cubre la unión cartera+watchlist con badges y cero conclu
     assert.ok(page.includes('watchlist_count'), 'contador watchlist honesto');
     assert.ok(page.includes('no significa que no existan'), '0 filas NO es «sin compromisos»');
     assert.ok(page.includes("company.name ? `"), 'nombre nulo (sin Company en BD) no rompe la cabecera');
+    assert.ok(page.includes('identidad ambigua, pendiente de revisar'), 'ambigüedad declarada, no «sin compromisos»');
+    assert.ok(page.includes('company_identity_ambiguous'), 'usa la señal del contrato 7236e06e');
+    assert.ok(!page.includes('data.companies.length - withItems.length > 0'), 'las ambiguas no cuentan como ausencia de datos');
 });
 
 void test('la acción usa firma de identidad y no-store como el resto del cliente research', () => {
