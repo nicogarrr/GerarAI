@@ -97,34 +97,39 @@ def coverage_with_checks(
 
 
 def dynamic_universe(db) -> tuple[tuple[str, ...], dict[str, tuple[bool, bool]]]:
-    """Universo DESDE LA BD del tenant (posiciones netas != 0 + watchlist), no la foto estatica."""
+    """Universo DESDE LA BD del tenant (posiciones netas != 0 + watchlist), normalizado."""
     from sqlalchemy import func, select
 
     from app.models.entities import Company, Position, WatchItem
 
     net = (select(Position.company_id).group_by(Position.company_id)
            .having(func.sum(Position.quantity) != 0).subquery())
-    held = {t for (t,) in db.execute(
-        select(Company.ticker).join(net, net.c.company_id == Company.id))}
-    watched = {s.upper() for (s,) in db.execute(select(WatchItem.symbol))}
+    held = {t.strip().upper() for (t,) in db.execute(
+        select(Company.ticker).join(net, net.c.company_id == Company.id)) if t and t.strip()}
+    watched = {s.strip().upper() for (s,) in db.execute(select(WatchItem.symbol))
+               if s and s.strip()}
     universe = tuple(sorted(held | watched))
-    flags = {t: (t in held, t in watched) for t in universe}
-    return universe, flags
+    return universe, {t: (t in held, t in watched) for t in universe}
 
 
 def coverage_report(db, store) -> dict:
-    """Cobertura dinamica + ultimo chequeo real del job + historial reciente (solo lectura)."""
+    """Cobertura dinamica + ultimo chequeo real + historial del universo (SOLO LECTURA, sin 500)."""
     universe, flags = dynamic_universe(db)
-    latest = store.load()
+    latest, status = store.read_snapshot()
     rows = coverage_with_checks(latest, universe)
+    degraded = status["latest"] != "ok"
     for r in rows:
         r["in_portfolio"], r["in_watchlist"] = flags[r["ticker"]]
         r["universe_static_snapshot"] = False
+        if degraded and r["state"] == "nunca_chequeado":
+            r["state"] = "estado_del_almacen_no_fiable"  # no se afirma "nunca chequeado"
+    wanted = set(universe)
+    history = [h for h in store.read_history(limit=500) if h.get("ticker") in wanted][:50]
     return {
         "universe_source": "bd_tenant",
         "universe_size": len(universe),
-        "store_corrupt_quarantined": store.corrupt_quarantined,
+        "store": status,
         "note": "fuente_obtenida no equivale a seguimiento completo de compromisos",
         "companies": rows,
-        "history": store.read_history(limit=50),
+        "history": history,
     }

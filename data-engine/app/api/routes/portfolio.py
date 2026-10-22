@@ -402,12 +402,12 @@ def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
 def source_coverage(db: Session = Depends(get_db)) -> dict:
     """Cobertura de fuentes de llamadas por empresa de cartera+watchlist del tenant (solo lectura).
 
-    Sin posiciones/watchlist devuelve universo vacio. No ejecuta el job ni escribe nada.
+    Sin posiciones/watchlist devuelve universo vacio. No ejecuta el job ni escribe nada (ni cuarentena).
     """
     from app.services.commitment_coverage import coverage_report
-    from app.services.commitment_source_check_job import JsonSourceCheckStore
+    from app.services.commitment_source_check_job import JsonSourceCheckStore, resolve_store_dir
 
-    return coverage_report(db, JsonSourceCheckStore(get_settings().source_check_store_dir))
+    return coverage_report(db, JsonSourceCheckStore(resolve_store_dir(get_settings().source_check_store_dir)))
 
 
 @router.get("/management-commitments")

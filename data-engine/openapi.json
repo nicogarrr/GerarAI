@@ -47456,7 +47456,7 @@
     },
     "/api/portfolio/source-coverage": {
       "get": {
-        "description": "Cobertura de fuentes de llamadas por empresa de cartera+watchlist del tenant (solo lectura).\n\nSin posiciones/watchlist devuelve universo vacio. No ejecuta el job ni escribe nada.",
+        "description": "Cobertura de fuentes de llamadas por empresa de cartera+watchlist del tenant (solo lectura).\n\nSin posiciones/watchlist devuelve universo vacio. No ejecuta el job ni escribe nada (ni cuarentena).",
         "operationId": "source_coverage_api_portfolio_source_coverage_get",
         "parameters": [
           {

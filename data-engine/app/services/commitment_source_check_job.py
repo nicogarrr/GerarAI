@@ -169,6 +169,55 @@ class JsonSourceCheckStore:
             return {}
         return data
 
+    def read_snapshot(self) -> tuple[dict[str, dict], dict]:
+        """Lectura SOLO LECTURA (no cuarentena, no escribe, no lanza).
+
+        Devuelve (latest, estado). Si latest.json falta o esta corrupto/ilegible, se reconstruye el
+        ultimo evento por URL desde history.jsonl y se indica en el estado; nunca se hace pasar por
+        "nunca chequeado". `incident` es el ultimo evento de cuarentena del historial (persistente).
+        """
+        status: dict = {"latest": "ok", "recovered_from_history": False, "incident": None,
+                        "history_readable": True}
+        data: dict[str, dict] | None = None
+        try:
+            raw = self.latest.read_text()
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict) and all(isinstance(v, dict) for v in parsed.values()):
+                data = parsed
+            else:
+                status["latest"] = "corrupto"
+        except FileNotFoundError:
+            status["latest"] = "ausente"
+        except ValueError:
+            status["latest"] = "corrupto"
+        except OSError:
+            status["latest"] = "ilegible"
+        try:
+            lines = self.history.read_text().splitlines()
+        except FileNotFoundError:
+            lines = []
+        except OSError:
+            lines = []
+            status["history_readable"] = False
+        events = []
+        for line in lines:
+            try:
+                item = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(item, dict):
+                events.append(item)
+        for item in events:
+            if item.get("event") == "store_corrupt_quarantined":
+                status["incident"] = {"file": item.get("file")}
+        if data is None:
+            data = {}
+            for item in events:
+                if item.get("url") and item.get("ticker"):
+                    data[item["url"]] = item
+            status["recovered_from_history"] = bool(data)
+        return data, status
+
     def read_history(self, url: str | None = None, limit: int = 100) -> list[dict]:
         try:
             lines = self.history.read_text().splitlines()
@@ -276,3 +325,9 @@ def run_job(store: JsonSourceCheckStore, *, today: date, **kwargs) -> list[Sourc
             reason=f"almacen_corrupto_en_cuarentena:{store.corrupt_quarantined}"))
     store.save(records)
     return records
+
+
+def resolve_store_dir(path: Path | str) -> Path:
+    """Ruta ABSOLUTA estable: una ruta relativa se ancla a la raiz de data-engine, no al cwd."""
+    p = Path(path)
+    return p if p.is_absolute() else (Path(__file__).resolve().parents[2] / p).resolve()
