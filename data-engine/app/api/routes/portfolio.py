@@ -614,7 +614,9 @@ def update_transaction(
     transaction.quantity = payload.quantity
     transaction.price = payload.price
     transaction.trade_date = payload.trade_date
-    transaction.fees = payload.fees
+    # Omitir `fees` conserva la comision registrada (el default 0 del modelo no es un dato).
+    if "fees" in payload.model_fields_set:
+        transaction.fees = payload.fees
     transaction.currency = payload.currency.upper()
     transaction.raw_payload = {"notes": payload.notes} if payload.notes else {}
     try:

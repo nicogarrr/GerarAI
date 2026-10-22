@@ -308,7 +308,6 @@ export async function updateTransaction(
                 trade_date: date.toISOString().slice(0, 10),
                 notes: notes || null,
                 currency: currency.toUpperCase(),
-                fees: 0,
             }),
         },
     );
