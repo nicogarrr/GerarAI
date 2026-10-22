@@ -8,7 +8,9 @@ fuentes; nada se declara cumplido sin fuente. Ausencia en el registro significa
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
+from app.services.commitment_calendar import next_calls
 from app.services.commitment_financial_release import FINANCIAL_ASSETS
 from app.services.commitment_source_check_job import job_target_tickers, read_job_run
 from app.services.transcript_source_registry import all_entries
@@ -82,7 +84,7 @@ def universe_coverage(universe: tuple[str, ...] | None = None) -> list[TickerCov
 
 
 def coverage_with_checks(
-    latest: dict[str, dict], universe: tuple[str, ...] | None = None,
+    latest: dict[str, dict], universe: tuple[str, ...] | None = None, today: date | None = None,
 ) -> list[dict]:
     """Cobertura + ultimo chequeo REAL del job (latest.json). Sin chequeo => nunca_chequeado."""
     targets = job_target_tickers()
@@ -102,6 +104,7 @@ def coverage_with_checks(
         else:
             state = "abstencion_en_chequeo"
         rows.append({**c.__dict__, "pending": list(c.pending), "transcript_origins": list(c.transcript_origins),
+                     "next_calls": next_calls(c.ticker, today or date.today()),
                      "transcript_sources": list(c.transcript_sources),
                      "press_release_sources": list(c.press_release_sources), "state": state,
                      "last_checked_on": last, "outcomes": outcomes,
