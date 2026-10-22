@@ -274,7 +274,7 @@ _ENTRIES = (
         "/content/dam/UHG/PDF/investors/2026/unh-q3-2026-remarks.pdf presente en el HTML de "
         "financial-reports leido por curl el 2026-10-22. Q2 (16-jul-2026): historico, hallado por "
         "busqueda en el dominio del emisor y YA NO enlazado en esa pagina. Ambos documentos anuncian "
-        "una sesion de preguntas y respuestas posterior que NO esta incluida (Q3 solo trae el cierre \"Post Q&A\" de la direccion). Extractor: 0 turnos de directiva reconocidos en ambos (formato de nombre inline sin dos puntos): limitacion de formato, NO \"sin compromisos\"."
+        "una sesion de preguntas y respuestas posterior que NO esta incluida (Q3 solo trae el cierre \"Post Q&A\" de la direccion). Extractor (v4): hablantes reconocidos por nombre solo en linea (formato nombre_solo_comentarios_preparados), cargo NO indicado en el documento; candidatos solo propuestos, sin revisar."
     ),
     SourceEntry(
         "AAPL",

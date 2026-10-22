@@ -53,7 +53,7 @@ _ORD = {"first": 1, "second": 2, "third": 3, "fourth": 4}
 NORMALIZATION_ID = "ws_collapse_v1"
 # Subir al cambiar reglas del extractor: el job re-extrae activos con hash igual pero version distinta
 # (solo ANADE candidatos nuevos; nunca toca filas ya revisadas por una persona).
-EXTRACTOR_VERSION = "2026-10-22.v3"
+EXTRACTOR_VERSION = "2026-10-22.v4"
 
 
 @dataclass
@@ -176,6 +176,44 @@ def _turns_blocks(text: str) -> tuple[list[tuple[str, str, str]], dict[str, str]
     return [(w, r, " ".join(p)) for w, r, p in turns], roster
 
 
+_PREPARED_HEADER = re.compile(r"prepared\s+remarks", re.I)
+_NAME_ONLY = re.compile(r"^[A-Z][a-z][\w.'’-]*(?: [A-Z]\.?)?(?: [A-Z][a-z][\w'’-]*){1,2}$")
+_NAME_ONLY_STOP = re.compile(
+    r"\b(?:Remarks|Results|Quarter|Conference|Call|Teleconference|Moderator|Operator|Group|Company|Corporation|"
+    r"Earnings|Presentation|Statement|Statements|Outlook|Guidance)\b"
+)
+ROLE_NOT_IN_DOCUMENT = "cargo no indicado en el documento (comentarios preparados de la compañía)"
+
+
+def _turns_name_only(text: str) -> tuple[list[tuple[str, str, str]], dict[str, str]]:
+    """Comentarios preparados cuyo hablante va solo, en su propia linea (sin cargo ni dos puntos).
+
+    Solo si la cabecera del documento dice "prepared remarks" (no hay analistas). El cargo no se
+    inventa: queda "no indicado". "Post Q&A" corta el turno: es un cierre posterior al Q&A, no
+    atribuible al hablante anterior. Sin Moderator/Operator.
+    """
+    lines = [ln.strip() for ln in text.replace("\f", "\n").splitlines()]
+    if not _PREPARED_HEADER.search(" ".join(lines[:40])):
+        return [], {}
+    turns: list[tuple[str, str, list[str]]] = []
+    roster: dict[str, str] = {}
+    cur: int | None = None
+    for ln in lines:
+        if not ln or ln.isdigit():
+            continue
+        if re.match(r"^(?:Moderator|Operator)\b", ln) or re.match(r"^Post Q&A\b", ln):
+            cur = None
+            continue
+        if len(ln) <= 40 and _NAME_ONLY.match(ln) and not _NAME_ONLY_STOP.search(ln) and not ln.endswith(":"):
+            roster.setdefault(ln, ROLE_NOT_IN_DOCUMENT)
+            turns.append((ln, ROLE_NOT_IN_DOCUMENT, []))
+            cur = len(turns) - 1
+            continue
+        if cur is not None:
+            turns[cur][2].append(ln)
+    return [(w, r, " ".join(p)) for w, r, p in turns if p], roster
+
+
 _ABBREV = re.compile(
     r"(?:\b(?:U\.S|U\.K|E\.U|Inc|Corp|Co|Ltd|Mr|Ms|Mrs|Dr|vs|e\.g|i\.e|approx|No|St|Jr|Sr)|\b[A-Z])\.$"
 )
@@ -185,8 +223,14 @@ def _split_sentences(text: str) -> list[str]:
     """Parte en frases sin cortar tras abreviaturas (U.S., Inc., Mr., inicial suelta)."""
     out: list[str] = []
     start = 0
-    for m in re.finditer(r"[.!?]\s+(?=[A-Z“\"])", text):
+    for m in re.finditer(r"[.!?]\s+(?=[A-Z“\"])|\s*•\s*", text):
         head = text[start : m.start() + 1]
+        if m.group(0).strip() == "•":  # viñeta: cada punto es una frase propia
+            seg = text[start : m.start()].strip().rstrip(";").strip()
+            if seg:
+                out.append(seg)
+            start = m.end()
+            continue
         if _ABBREV.search(head):
             continue
         out.append(text[start : m.start() + 1].strip())
@@ -237,6 +281,10 @@ def extract_with_diagnostics(
         block_turns, roster = _turns_blocks(transcript_text)
         turns = [(w, b) for w, _r, b in block_turns]
         parser = "bloques_pdf"
+        if not turns:
+            name_turns, roster = _turns_name_only(transcript_text)
+            turns = [(w, b) for w, _r, b in name_turns]
+            parser = "nombre_solo_comentarios_preparados" if turns else "bloques_pdf"
     diag = {"parser": parser, "management_turns": len(turns)}
     out: list[Candidate] = []
     seen: set[str] = set()
