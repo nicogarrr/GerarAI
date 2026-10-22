@@ -13,6 +13,7 @@ constante) se etiquetan como tales y no se mezclan con las reportadas.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import date
@@ -111,34 +112,129 @@ def check_transcripts(
     return out
 
 
-class JsonSourceCheckStore:
-    """Ultimo chequeo por URL en un JSON acotado (sin BD ni migracion; fichero explicito)."""
+class StoreCorruptError(RuntimeError):
+    pass
 
-    def __init__(self, path: Path) -> None:
-        self.path = Path(path)
+
+class JsonSourceCheckStore:
+    """Ultimo chequeo por URL (latest.json) + HISTORIAL append-only (history.jsonl) en un directorio.
+
+    - Escritura atomica (tmp + fsync + replace) bajo flock exclusivo; directorio 0700, ficheros 0600.
+    - Un latest.json corrupto NO se descarta en silencio: se mueve a *.corrupt-<n> (cuarentena,
+      se conserva), se anota un evento en el historial y load() lo senala (corrupt_quarantined).
+      Nunca se reescribe como "sin actividad".
+    - El historial se recorta a MAX_HISTORY lineas (las mas antiguas salen, no se pierde el latest).
+    """
+
+    MAX_HISTORY = 2000
+
+    def __init__(self, directory: Path) -> None:
+        self.dir = Path(directory)
+        self.latest = self.dir / "latest.json"
+        self.history = self.dir / "history.jsonl"
+        self.lock = self.dir / ".lock"
+        self.corrupt_quarantined: str | None = None
+
+    def _ensure(self) -> None:
+        self.dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    def _quarantine(self) -> str:
+        n = 0
+        while (target := self.latest.with_name(f"latest.json.corrupt-{n}")).exists():
+            n += 1
+        self.latest.replace(target)
+        os.chmod(target, 0o600)
+        return target.name
 
     def load(self) -> dict[str, dict]:
         try:
-            data = json.loads(self.path.read_text())
-        except (OSError, ValueError):
+            raw = self.latest.read_text()
+        except FileNotFoundError:
             return {}
-        return data if isinstance(data, dict) else {}
+        except OSError as exc:
+            raise StoreCorruptError("no se puede leer el almacen de chequeos") from exc
+        try:
+            data = json.loads(raw)
+            if not isinstance(data, dict) or not all(isinstance(v, dict) for v in data.values()):
+                raise ValueError
+        except ValueError:
+            self._ensure()
+            with self._locked():
+                if self.latest.exists():
+                    self.corrupt_quarantined = self._quarantine()
+                    self._append_history([{"event": "store_corrupt_quarantined",
+                                           "file": self.corrupt_quarantined}])
+            return {}
+        return data
+
+    def read_history(self, url: str | None = None, limit: int = 100) -> list[dict]:
+        try:
+            lines = self.history.read_text().splitlines()
+        except OSError:
+            return []
+        out = []
+        for line in reversed(lines):
+            try:
+                item = json.loads(line)
+            except ValueError:
+                continue
+            if url is None or item.get("url") == url:
+                out.append(item)
+            if len(out) >= limit:
+                break
+        return out
+
+    def _locked(self):
+        import contextlib
+        import fcntl
+
+        @contextlib.contextmanager
+        def cm():
+            fd = os.open(self.lock, os.O_CREAT | os.O_RDWR, 0o600)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                yield
+            finally:
+                os.close(fd)
+
+        return cm()
+
+    def _atomic_write(self, path: Path, text: str) -> None:
+        tmp = path.with_name(path.name + ".tmp")
+        fd = os.open(tmp, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        tmp.replace(path)
+
+    def _append_history(self, items: list[dict]) -> None:
+        try:
+            lines = self.history.read_text().splitlines()
+        except OSError:
+            lines = []
+        lines += [json.dumps(i, ensure_ascii=False, sort_keys=True) for i in items]
+        self._atomic_write(self.history, "\n".join(lines[-self.MAX_HISTORY:]) + "\n")
 
     def save(self, records: list[SourceCheckRecord]) -> dict[str, dict]:
+        self._ensure()
         data = self.load()
-        for rec in records:
-            previous = data.get(rec.url)
-            item = asdict(rec)
-            item["previous_content_sha256"] = previous.get("content_sha256") if previous else None
-            item["content_changed"] = (
-                None if not previous or not rec.content_sha256 or not previous.get("content_sha256")
-                else previous["content_sha256"] != rec.content_sha256)
-            data[rec.url] = item
-        while len(data) > MAX_RECORDS:
-            data.pop(next(iter(data)))
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True))
-        tmp.replace(self.path)
+        with self._locked():
+            data = self.load() if self.latest.exists() else data
+            events = []
+            for rec in records:
+                previous = data.get(rec.url)
+                item = asdict(rec)
+                item["previous_content_sha256"] = previous.get("content_sha256") if previous else None
+                item["content_changed"] = (
+                    None if not previous or not rec.content_sha256 or not previous.get("content_sha256")
+                    else previous["content_sha256"] != rec.content_sha256)
+                data[rec.url] = item
+                events.append(item)
+            while len(data) > MAX_RECORDS:
+                data.pop(next(iter(data)))
+            self._atomic_write(self.latest, json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True))
+            self._append_history(events)
         return data
 
 
