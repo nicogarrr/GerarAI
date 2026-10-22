@@ -9,6 +9,7 @@ export interface ChatSource {
     id: number | string | null;
     title: string;
     document_id?: number | null;
+    knowledge_document_id?: number | null;
     document_chunk_id?: number | null;
     page_number?: number | null;
     chunk_index?: number | null;
@@ -77,9 +78,19 @@ export function toPortfolioChatCitations(sources: ChatSource[] | undefined | nul
         // El mismo documento citado por varios fragmentos no se repite en
         // «Fuentes»: una entrada por documento y página.
         if (['document_chunk', 'rag_chunk', 'claim_evidence', 'knowledge_chunk'].includes(String(source.type))) {
-            const title = typeof source.title === 'string' ? source.title : '';
             const page = typeof source.page_number === 'number' ? source.page_number : null;
-            const docKey = `${String(source.type)}:${title}:${String(page)}`;
+            // Los títulos no identifican documentos: dos informes pueden
+            // llamarse igual y citar la misma página. Priorizar el ID del
+            // documento (con su namespace), o la URL si el backend no lo da.
+            // Sin ambos no podemos afirmar que dos fragmentos sean del mismo documento.
+            const identity = source.knowledge_document_id != null
+                ? ['knowledge_document', source.knowledge_document_id]
+                : source.document_id != null
+                    ? ['document', source.document_id]
+                    : typeof source.url === 'string' && source.url.trim()
+                        ? ['url', source.url.trim()]
+                        : ['chunk', source.id];
+            const docKey = JSON.stringify([source.type, identity, page]);
             if (seenDocuments.has(docKey)) return false;
             seenDocuments.add(docKey);
         }

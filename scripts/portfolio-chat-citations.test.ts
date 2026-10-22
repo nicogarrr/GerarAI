@@ -62,10 +62,39 @@ test('Cerebro no repite la misma fuente ni la etiqueta de tipo si el título ya 
 
 test('B5: el mismo documento citado por varios fragmentos no se repite en Fuentes', () => {
     const result = toPortfolioChatCitations([
-        { type: 'knowledge_chunk', id: 31, title: 'Numantia Patrimonio - Carta 2021', page_number: 4 },
-        { type: 'knowledge_chunk', id: 32, title: 'Numantia Patrimonio - Carta 2021', page_number: 4 },
-        { type: 'knowledge_chunk', id: 33, title: 'Numantia Patrimonio - Carta 2021', page_number: 9 },
+        { type: 'knowledge_chunk', id: 31, knowledge_document_id: 7, title: 'Numantia Patrimonio - Carta 2021', page_number: 4 },
+        { type: 'knowledge_chunk', id: 32, knowledge_document_id: 7, title: 'Numantia Patrimonio - Carta 2021', page_number: 4 },
+        { type: 'knowledge_chunk', id: 33, knowledge_document_id: 7, title: 'Numantia Patrimonio - Carta 2021', page_number: 9 },
     ]);
     assert.equal(result.length, 2);
     assert.deepEqual(result.map((c) => c.page), [4, 9]);
+});
+
+test('Fuentes conserva documentos distintos con el mismo título y página', () => {
+    const result = toPortfolioChatCitations([
+        { type: 'document_chunk', id: 101, document_id: 10, title: 'Informe anual', page_number: 4 },
+        { type: 'document_chunk', id: 102, document_id: 20, title: 'Informe anual', page_number: 4 },
+        { type: 'document_chunk', id: 103, document_id: 10, title: 'Informe anual', page_number: 4 },
+    ]);
+    assert.deepEqual(result.map((c) => c.locator), ['document_chunk:101', 'document_chunk:102']);
+});
+
+test('Fuentes distingue documentos de biblioteca y URLs cuando no hay ID documental', () => {
+    const result = toPortfolioChatCitations([
+        { type: 'rag_chunk', id: 'a', knowledge_document_id: 10, title: 'Carta', page_number: 1 },
+        { type: 'rag_chunk', id: 'b', knowledge_document_id: 20, title: 'Carta', page_number: 1 },
+        { type: 'rag_chunk', id: 'c', knowledge_document_id: 10, title: 'Carta', page_number: 1 },
+        { type: 'knowledge_chunk', id: 1, title: 'Carta', page_number: 1, url: 'https://example.org/2024.pdf' },
+        { type: 'knowledge_chunk', id: 2, title: 'Carta', page_number: 1, url: 'https://example.org/2025.pdf' },
+        { type: 'knowledge_chunk', id: 3, title: 'Carta', page_number: 1, url: 'https://example.org/2024.pdf' },
+    ]);
+    assert.deepEqual(result.map((c) => c.locator), ['rag_chunk:a', 'rag_chunk:b', 'knowledge_chunk:1', 'knowledge_chunk:2']);
+});
+
+ test('Fuentes sin ID documental ni URL no deduce equivalencia por el título', () => {
+    const result = toPortfolioChatCitations([
+        { type: 'document_chunk', id: 401, title: 'Informe anual', page_number: 4 },
+        { type: 'document_chunk', id: 402, title: 'Informe anual', page_number: 4 },
+    ]);
+    assert.equal(result.length, 2);
 });
