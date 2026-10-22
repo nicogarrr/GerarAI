@@ -155,6 +155,74 @@ class ManagementCredibilityService:
             db.refresh(row)
         return created
 
+    def register_extracted_candidates(
+        self,
+        db: Session,
+        company: Company,
+        *,
+        transcript_text: str,
+        call_date: date,
+        source_url: str,
+    ) -> list[ManagementPromise]:
+        """Guarda candidatos extraidos (status="candidate", source_status="suggested").
+
+        No guarda el texto de la transcripcion: solo la cita corta, localizador
+        versionado, contexto de 80 caracteres y flags. Sin operador/objetivo,
+        asi reconcile() nunca los resuelve. Dedup por (empresa, cita literal).
+        call_date y source_url los aporta quien llama; no se verifican aqui.
+        """
+        from app.services.commitment_extraction_service import (
+            extract_candidates,
+            locator_for,
+        )
+
+        existing = {
+            row.quote_literal
+            for row in db.scalars(
+                select(ManagementPromise).where(ManagementPromise.company_id == company.id)
+            ).all()
+            if row.quote_literal
+        }
+        created: list[ManagementPromise] = []
+        for cand in extract_candidates(transcript_text):
+            if cand.quote_literal in existing:
+                continue
+            row = ManagementPromise(
+                company_id=company.id,
+                promise=cand.quote_literal,
+                promise_date=call_date,
+                expected_period=(
+                    str(cand.due_date_hint.year) if cand.due_date_hint else "unknown"
+                ),
+                status="candidate",
+                evidence=[],
+                metadata_={
+                    "source": "extraction_candidate",
+                    "source_status": "suggested",
+                    "flags": cand.flags,
+                    "due_basis": cand.due_basis,
+                    "locator_normalization": cand.normalization,
+                    "context_before": cand.context_before,
+                    "context_after": cand.context_after,
+                },
+                quote_literal=cand.quote_literal,
+                speaker=cand.speaker,
+                speaker_role=cand.speaker_role,
+                call_date=call_date,
+                source_url=source_url,
+                transcript_locator=locator_for(cand),
+                due_date=cand.due_date_hint,
+                status_reason="Candidato extraido por reglas; sin revisar contra la fuente.",
+                date_basis="user_entered",
+            )
+            db.add(row)
+            created.append(row)
+            existing.add(cand.quote_literal)
+        db.commit()
+        for row in created:
+            db.refresh(row)
+        return created
+
     def reconcile(
         self, db: Session, company: Company
     ) -> list[ManagementPromise]:
@@ -272,6 +340,7 @@ class ManagementCredibilityService:
             "counts": {
                 "total": len(promises),
                 "open": sum(row.status == "open" for row in promises),
+                "candidate": sum(row.status == "candidate" for row in promises),
                 "met": sum(row.status == "met" for row in promises),
                 "partial": sum(row.status == "partial" for row in promises),
                 "missed": sum(row.status == "missed" for row in promises),
