@@ -8,6 +8,8 @@ type OverflowScrollRegionProps = {
     className?: string;
     /** Clases extra de la region scrollable (p.ej. overscroll-x-contain). */
     regionClassName?: string;
+    /** Texto de la pista; por defecto habla de columnas (tablas). */
+    hint?: string;
     children: ReactNode;
 };
 
@@ -20,7 +22,7 @@ type OverflowScrollRegionProps = {
  *  - desaparece al llegar al final (nunca anuncia scroll que no existe),
  *  - se enlaza con aria-describedby para lectores de pantalla.
  */
-export function OverflowScrollRegion({ label, className, regionClassName, children }: OverflowScrollRegionProps) {
+export function OverflowScrollRegion({ label, className, regionClassName, hint = 'Desliza para ver más columnas', children }: OverflowScrollRegionProps) {
     const ref = useRef<HTMLDivElement>(null);
     const hintId = useId();
     const [moreRight, setMoreRight] = useState(false);
@@ -51,7 +53,7 @@ export function OverflowScrollRegion({ label, className, regionClassName, childr
         <div className={className}>
             {moreRight ? (
                 <p className="mb-2 text-xs text-gray-500" id={hintId}>
-                    Desliza para ver más columnas <span aria-hidden="true">→</span>
+                    {hint} <span aria-hidden="true">→</span>
                 </p>
             ) : null}
             <div
