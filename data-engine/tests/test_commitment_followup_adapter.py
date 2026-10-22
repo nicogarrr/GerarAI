@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 os.environ['APP_ENV'] = 'test'
-os.environ['DATABASE_URL'] = 'sqlite://'
 
 from sqlalchemy import create_engine, select  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
