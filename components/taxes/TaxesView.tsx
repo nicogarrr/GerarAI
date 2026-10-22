@@ -214,13 +214,28 @@ function csvFullValue(value: unknown, depth = 8): string {
         .join(' · ');
 }
 
+/** Neutraliza fórmulas de hoja de cálculo (convención `_csv_cell` del
+ *  backend, export.py): si el valor ORIGINAL es texto y empieza por
+ *  = + - @ | %, la celda lleva prefijo '. Un número negativo (-10) queda
+ *  intacto: las hojas ya lo parsean como número; una cadena '-10' sí se
+ *  neutraliza, igual que el backend (isinstance str). Las comillas de
+ *  csvCell solo protegen la estructura del CSV, no la interpretación
+ *  como fórmula. */
+function csvExportCell(value: unknown): string {
+    const text = csvFullValue(value);
+    if (typeof value === 'string' && /^[=+\-@|%]/.test(text)) {
+        return csvCell(`'${text}`);
+    }
+    return csvCell(text);
+}
+
 /** Descarga un resumen fiscal (reporte + posiciones) como CSV generado en cliente */
 function downloadTaxSummary(holdings: DataRecord[], report: DataRecord | null, year: number) {
     const lines: string[] = [`reporte_fiscal,${year}`, ''];
     lines.push('seccion,clave,valor');
     if (report) {
         for (const [key, value] of Object.entries(report)) {
-            lines.push(`reporte,${csvCell(key)},${csvCell(csvFullValue(value))}`);
+            lines.push(`reporte,${csvExportCell(key)},${csvExportCell(value)}`);
         }
     } else {
         lines.push('reporte,sin_reporte,Sin reporte fiscal disponible');
@@ -230,10 +245,10 @@ function downloadTaxSummary(holdings: DataRecord[], report: DataRecord | null, y
         const headers = Array.from(
             new Set(holdings.flatMap((holding) => Object.keys(holding))),
         ).slice(0, 12);
-        lines.push(headers.map(csvCell).join(','));
+        lines.push(headers.map(csvExportCell).join(','));
         for (const holding of holdings) {
             lines.push(
-                headers.map((header) => csvCell(csvFullValue(holding[header]))).join(','),
+                headers.map((header) => csvExportCell(holding[header])).join(','),
             );
         }
     }
