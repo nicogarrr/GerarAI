@@ -432,9 +432,30 @@ def management_commitments(db: Session = Depends(get_db)) -> dict:
             select(Company).where(func.upper(func.trim(Company.ticker)).in_(universe))
         ).scalars():
             candidates.setdefault(c.ticker.strip().upper(), []).append(c)
+    # 1) Empresas POSEIDAS: la identidad real es Position.company_id (posicion neta != 0), no el
+    #    nombre canonico. Si varias Company poseidas comparten ticker normalizado => ambigua.
+    held_net = (
+        select(Position.company_id)
+        .group_by(Position.company_id)
+        .having(func.sum(Position.quantity) != 0)
+        .subquery()
+    )
+    held_by_ticker: dict[str, list] = {}
+    for c in db.execute(
+        select(Company).join(held_net, held_net.c.company_id == Company.id)
+    ).scalars():
+        held_by_ticker.setdefault(c.ticker.strip().upper(), []).append(c)
     by_ticker = {}
     ambiguous: set[str] = set()
+    for tk, cs in held_by_ticker.items():
+        if len(cs) == 1:
+            by_ticker[tk] = cs[0]
+        else:
+            ambiguous.add(tk)
+    # 2) Watch-only: coincidencia exacta canonica; si no, unica normalizada; varias => ambigua.
     for tk, cs in candidates.items():
+        if tk in by_ticker or tk in ambiguous or tk in held_by_ticker:
+            continue
         exact = [c for c in cs if c.ticker == tk]
         if len(exact) == 1:
             by_ticker[tk] = exact[0]

@@ -252,3 +252,31 @@ def test_company_identity_is_deterministic_trimmed_and_ambiguity_not_guessed(db)
     assert rows["UBER"]["company_in_db"] and not rows["UBER"]["company_identity_ambiguous"]
     assert rows["KKR"]["company_in_db"] and rows["KKR"]["name"] == " kkr "
     assert rows["ABC"]["company_in_db"] is False and rows["ABC"]["company_identity_ambiguous"]
+
+
+def test_held_company_identity_is_position_company_id_not_canonical_name(db):
+    from app.api.routes.portfolio import management_commitments
+    from app.models.entities import ManagementPromise
+
+    owned = _co(db, " uber ")   # la que tiene la posicion real
+    canon = _co(db, "UBER")     # canonica ajena, no poseida
+    db.add(Position(company_id=owned.id, quantity=Decimal("2"), as_of=date(2030, 1, 1)))
+    db.commit()
+    for comp, text in ((owned, "promesa de la poseida"), (canon, "promesa ajena")):
+        db.add(ManagementPromise(company_id=comp.id, promise=text, status="candidate",
+                                 promise_date=date(2030, 1, 1), expected_period="FY2030"))
+    db.commit()
+    row = management_commitments(db)["companies"][0]
+    assert row["ticker"] == "UBER" and row["name"] == " uber "
+    assert [i["promise"] for i in row["items"]] == ["promesa de la poseida"]
+
+
+def test_two_held_companies_same_normalized_ticker_is_ambiguous(db):
+    from app.api.routes.portfolio import management_commitments
+
+    a, b = _co(db, "kkr"), _co(db, "KKR ")
+    db.add_all([Position(company_id=a.id, quantity=Decimal("1"), as_of=date(2030, 1, 1)),
+                Position(company_id=b.id, quantity=Decimal("1"), as_of=date(2030, 1, 1))])
+    db.commit()
+    row = management_commitments(db)["companies"][0]
+    assert row["company_identity_ambiguous"] and not row["company_in_db"] and row["items"] == []
