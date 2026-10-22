@@ -514,6 +514,7 @@ function orderDocFor(parsed: ParsedOrder, userId: string): DocBuilder {
         fee: status === 'filled' ? parsed.fee : 0,
         fillSource: 'manual-simulado',
         executedAt: status === 'filled' ? new Date(parsed.executedAt) : null,
+        requestPayload: status === 'rejected' ? orderSnapshotFor(parsed) : null,
         rejectReason: reason,
     });
 }
@@ -537,6 +538,7 @@ function fxDocFor(parsed: ParsedFx, userId: string): DocBuilder {
         fee: 0,
         fillSource: 'manual-simulado',
         executedAt: status === 'filled' ? new Date(parsed.executedAt) : null,
+        requestPayload: status === 'rejected' ? fxSnapshotFor(parsed) : null,
         rejectReason: reason,
     });
 }
@@ -566,6 +568,82 @@ function toRow(doc: ManualDemoTradeDoc): ManualDemoOrderRow {
  * orderDocFor), así que esos campos solo se comparan cuando la fila original
  * es un fill. La identidad del instrumento, lado, fase, cantidad y divisa
  * siempre se comparan. */
+/* ----- snapshot del payload pedido (fix-2): rechazos comparables ----- */
+
+type OrderSnapshot = {
+    v: 1;
+    kind: 'accion' | 'opcion';
+    symbol: string | null;
+    contractKey: string | null;
+    side: 'buy' | 'sell';
+    openClose: 'open' | 'close';
+    quantity: number;
+    currency: Currency;
+    price: number;
+    fee: number;
+    executedAtMs: number;
+};
+
+type FxSnapshot = { v: 1; kind: 'fx'; from: Currency; to: Currency; amount: number; rate: number; executedAtMs: number };
+
+function orderSnapshotFor(p: ParsedOrder): OrderSnapshot {
+    return {
+        v: 1,
+        kind: p.instrument.kind,
+        symbol: p.instrument.kind === 'accion' ? p.instrument.symbol : null,
+        contractKey: p.instrument.kind === 'opcion' ? instrumentKey(p.instrument) : null,
+        side: p.side,
+        openClose: p.openClose,
+        quantity: p.quantity,
+        currency: p.currency,
+        price: p.price,
+        fee: p.fee,
+        executedAtMs: p.executedAt,
+    };
+}
+
+function fxSnapshotFor(p: ParsedFx): FxSnapshot {
+    return { v: 1, kind: 'fx', from: p.from, to: p.to, amount: p.amount, rate: p.rate, executedAtMs: p.executedAt };
+}
+
+/** Shape del Mixed persistido: cualquier cosa inesperada = desconocido (null), NUNCA excepción. */
+function asOrderSnapshot(raw: unknown): OrderSnapshot | null {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const s = raw as Record<string, unknown>;
+    if (s.v !== 1) return null;
+    if (s.kind !== 'accion' && s.kind !== 'opcion') return null;
+    if (s.side !== 'buy' && s.side !== 'sell') return null;
+    if (s.openClose !== 'open' && s.openClose !== 'close') return null;
+    if (s.currency !== 'EUR' && s.currency !== 'USD') return null;
+    if (s.kind === 'accion' && typeof s.symbol !== 'string') return null;
+    if (s.kind === 'opcion' && typeof s.contractKey !== 'string') return null;
+    for (const k of ['quantity', 'price', 'fee', 'executedAtMs'] as const) {
+        if (typeof s[k] !== 'number' || !Number.isFinite(s[k])) return null;
+    }
+    return s as unknown as OrderSnapshot;
+}
+
+function asFxSnapshot(raw: unknown): FxSnapshot | null {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const s = raw as Record<string, unknown>;
+    if (s.v !== 1 || s.kind !== 'fx') return null;
+    if ((s.from !== 'EUR' && s.from !== 'USD') || (s.to !== 'EUR' && s.to !== 'USD')) return null;
+    for (const k of ['amount', 'rate', 'executedAtMs'] as const) {
+        if (typeof s[k] !== 'number' || !Number.isFinite(s[k])) return null;
+    }
+    return s as unknown as FxSnapshot;
+}
+
+function sameOrderSnapshot(a: OrderSnapshot, b: OrderSnapshot): boolean {
+    return a.kind === b.kind && a.symbol === b.symbol && a.contractKey === b.contractKey
+        && a.side === b.side && a.openClose === b.openClose && a.quantity === b.quantity
+        && a.currency === b.currency && a.price === b.price && a.fee === b.fee && a.executedAtMs === b.executedAtMs;
+}
+
+function sameFxSnapshot(a: FxSnapshot, b: FxSnapshot): boolean {
+    return a.from === b.from && a.to === b.to && a.amount === b.amount && a.rate === b.rate && a.executedAtMs === b.executedAtMs;
+}
+
 function sameOrderPayload(stored: ManualDemoTradeDoc, p: ParsedOrder): boolean {
     if (stored.kind !== p.instrument.kind) return false;
     if (stored.side !== p.side || stored.openClose !== p.openClose) return false;
@@ -578,19 +656,32 @@ function sameOrderPayload(stored: ManualDemoTradeDoc, p: ParsedOrder): boolean {
             : null;
         if (key !== instrumentKey(p.instrument)) return false;
     }
-    if (stored.status !== 'filled') return true;
-    if (stored.fillPrice !== p.price || stored.fee !== p.fee) return false;
-    const t = stored.executedAt ? stored.executedAt.getTime() : null;
-    return t === p.executedAt;
+    if (stored.status === 'filled') {
+        if (stored.fillPrice !== p.price || stored.fee !== p.fee) return false;
+        const t = stored.executedAt ? stored.executedAt.getTime() : null;
+        return t === p.executedAt;
+    }
+    // Rechazada con snapshot válido (fix-2): comparación completa del payload pedido.
+    const snap = asOrderSnapshot(stored.requestPayload);
+    if (snap) return sameOrderSnapshot(snap, orderSnapshotFor(p));
+    // LEGACY (sin snapshot válido): la igualdad completa es desconocida; solo el
+    // subconjunto persistido arriba prueba igualdad. Precio/fee/fecha NO se afirman.
+    return true;
 }
 
 function sameFxPayload(stored: ManualDemoTradeDoc, p: ParsedFx): boolean {
     if (stored.kind !== 'fx' || stored.fxFrom !== p.from || stored.fxTo !== p.to) return false;
     if (stored.quantity !== p.amount) return false;
-    if (stored.status !== 'filled') return true;
-    if (stored.fillPrice !== p.rate) return false;
-    const t = stored.executedAt ? stored.executedAt.getTime() : null;
-    return t === p.executedAt;
+    if (stored.status === 'filled') {
+        if (stored.fillPrice !== p.rate) return false;
+        const t = stored.executedAt ? stored.executedAt.getTime() : null;
+        return t === p.executedAt;
+    }
+    // Rechazada con snapshot válido (fix-2): comparación completa del payload pedido.
+    const snap = asFxSnapshot(stored.requestPayload);
+    if (snap) return sameFxSnapshot(snap, fxSnapshotFor(p));
+    // LEGACY: igualdad completa desconocida; solo el subconjunto persistido prueba igualdad.
+    return true;
 }
 
 async function duplicateResult(
