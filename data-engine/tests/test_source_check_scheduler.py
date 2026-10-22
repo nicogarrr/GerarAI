@@ -44,3 +44,42 @@ def test_failed_scheduled_run_is_persisted_and_exposed(monkeypatch, tmp_path):
     run = mod.read_job_run(mod.JsonSourceCheckStore(tmp_path / "s"))
     assert run["finished"] is False and run["error"] == "StoreCorruptError"
     monkeypatch.undo()
+
+
+def test_e2e_dev_scheduler_to_store_to_api(monkeypatch, tmp_path):
+    """Ciclo DEV sin red: run_source_check_job -> store en disco -> funcion de la ruta GET.
+    Fixtures SINTETICAS (registros falsos con URL .invalid); no prueba HTTP/auth reales."""
+    from decimal import Decimal
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.api.routes.portfolio import source_coverage
+    from app.models.entities import Base, Company, Position
+    from app.services import commitment_source_check_job as mod
+    from app.workers import scheduler as sch
+
+    monkeypatch.setattr(get_settings(), "source_check_store_dir", tmp_path / "s")
+    fake = [mod.SourceCheckRecord(ticker="UBER", url="https://x.invalid/u", kind="transcript",
+                                  period="Q2 2026", checked_on="2026-10-22", outcome="error",
+                                  reason="TimeoutError")]
+    monkeypatch.setattr(mod, "check_financial_assets", lambda **k: fake)
+    monkeypatch.setattr(mod, "check_transcripts", lambda **k: [])
+    out = sch.run_source_check_job()
+    assert out["outcomes"] == {"error": 1}
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.info["tenant_id"] = "t"
+        c = Company(ticker="UBER", name="U", exchange="NYSE", currency="USD", sector="S",
+                    industry="I", company_type="holding", valuation_model="unassigned",
+                    special_sources=[], special_risks=[], factor_tags=[])
+        db.add(c)
+        db.commit()
+        db.add(Position(company_id=c.id, quantity=Decimal("1"), as_of=__import__("datetime").date(2030, 1, 1)))
+        db.commit()
+        rep = source_coverage(db)
+    row = rep["companies"][0]
+    assert row["ticker"] == "UBER" and row["state"] == "ultimo_chequeo_con_error"
+    assert rep["job_last_run"]["finished"] is True and rep["job_last_run"]["had_errors"] is True
+    assert rep["store"]["latest"] == "ok"
