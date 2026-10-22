@@ -53,6 +53,15 @@ class FollowupEvidence:
     quote_verified: bool
     checked_at: date
     kind: Literal['financial_fact'] = 'financial_fact'
+    # document_quote: cita literal de un activo oficial (tuberia primaria). Los campos de
+    # trazabilidad son obligatorios en ese modo; en modo normalized_row no se usan.
+    quote_kind: Literal['normalized_row', 'document_quote'] = 'normalized_row'
+    page: int | None = None
+    char_start: int | None = None
+    char_end: int | None = None
+    text_sha256: str | None = None
+    bytes_sha256: str | None = None
+    extractor: str | None = None
 
     @property
     def quote(self) -> str:
@@ -104,6 +113,28 @@ def _literal_row(evidence: FollowupEvidence) -> bool:
     return False
 
 
+_SHA256 = re.compile(r'[0-9a-f]{64}')
+
+
+def _traceable_document_quote(evidence: FollowupEvidence) -> bool:
+    """Cita literal con rastro recuperable y el valor del hecho presente como numero entero.
+
+    No reinterpreta prosa: el adaptador primario ya acoto la gramatica. Aqui solo se exige
+    que el rastro (pagina, span del texto, hash de texto y de bytes, extractor) este completo
+    y coherente con la cita, y que el valor aparezca literal en ella.
+    """
+    if (evidence.page is None or evidence.page < 1 or evidence.char_start is None
+            or evidence.char_end is None or evidence.char_start < 0
+            or evidence.char_end - evidence.char_start != len(evidence.excerpt)):
+        return False
+    if not (evidence.text_sha256 and _SHA256.fullmatch(evidence.text_sha256)
+            and evidence.bytes_sha256 and _SHA256.fullmatch(evidence.bytes_sha256)
+            and evidence.extractor):
+        return False
+    token = format(evidence.value.normalize(), 'f')
+    return re.search(rf'(?<![\d.]){re.escape(token)}(?![\d.])', evidence.excerpt) is not None
+
+
 def evaluate_followup(
     criterion: FollowupCriterion, evidence: tuple[FollowupEvidence, ...], *, today: date,
 ) -> FollowupResult:
@@ -116,8 +147,12 @@ def evaluate_followup(
     independently authenticate documents. Untrusted payloads need the adapter.
     """
     def result(status, reason, items=()):
-        return FollowupResult(criterion.promise_id, status,
-                              'automatic_financial_fact' if items else 'none',
+        basis = 'none'
+        if items:
+            basis = ('automatic_document_quote'
+                     if all(i.quote_kind == 'document_quote' for i in items)
+                     else 'automatic_financial_fact')
+        return FollowupResult(criterion.promise_id, status, basis,
                               tuple(items), reason)
 
     if (type(criterion.tenant_id) is not int or criterion.tenant_id < 1
@@ -153,7 +188,9 @@ def evaluate_followup(
                   and criterion.promised_on <= item.published_on
                   and item.published_on <= item.checked_at <= today):
             rejected.add('future_source')
-        elif not item.quote_verified or not 1 <= len(item.excerpt) <= 300 or not _literal_row(item):
+        elif not item.quote_verified or not 1 <= len(item.excerpt) <= 300 or not (
+                _traceable_document_quote(item) if item.quote_kind == 'document_quote'
+                else _literal_row(item)):
             rejected.add('invalid_quote')
         else:
             accepted.append(item)
