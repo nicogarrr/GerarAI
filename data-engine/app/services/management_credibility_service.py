@@ -166,6 +166,7 @@ class ManagementCredibilityService:
         transcript_text: str,
         call_date: date,
         source_url: str,
+        source_check: str = "not_checked",
     ) -> list[ManagementPromise]:
         """Guarda candidatos extraidos (status="candidate", source_status="suggested").
 
@@ -207,6 +208,7 @@ class ManagementCredibilityService:
                 metadata_={
                     "source": "extraction_candidate",
                     "source_status": "suggested",
+                    "source_check": source_check,
                     "flags": cand.flags,
                     "due_basis": cand.due_basis,
                     "locator_normalization": cand.normalization,
@@ -409,6 +411,7 @@ class ManagementCredibilityService:
             "date_basis": row.date_basis,
             "source_status": (row.metadata_ or {}).get("source_status"),
             "flags": (row.metadata_ or {}).get("flags") or [],
+            "source_check": (row.metadata_ or {}).get("source_check"),
             "legacy_heuristic_target": ManagementCredibilityService._is_legacy_heuristic(row),
         }
 
