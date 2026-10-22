@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import {
     RecordDetail,
     RecordList,
-    formatRecordValue,
     researchHrefFor,
     type DataRecord,
 } from '@/components/data/RecordViews';
@@ -192,13 +191,36 @@ function csvCell(value: string): string {
     return `"${value.replaceAll('"', '""')}"`;
 }
 
+/** Serialización COMPLETA para la exportación. Los formateadores de pantalla
+ *  (describeValue/formatRecordValue) truncan entradas («+N más») y caracteres
+ *  («…» a los 400) para caber en una celda con clamp: un resumen fiscal
+ *  descargable no puede perder datos (perdía 16 de 22 campos del summary y
+ *  la sección loss_compensation entera). Mismo formato «clave: valor · …». */
+function csvFullValue(value: unknown, depth = 8): string {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'string') return value;
+    if (value instanceof Date) return value.toISOString();
+    if (depth <= 0) return JSON.stringify(value);
+    if (Array.isArray(value)) {
+        if (value.length === 0) return '—';
+        return value.map((item) => csvFullValue(item, depth - 1)).join(' · ');
+    }
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return '—';
+    return entries
+        .map(([key, item]) => `${humanizeKey(key)}: ${csvFullValue(item, depth - 1)}`)
+        .join(' · ');
+}
+
 /** Descarga un resumen fiscal (reporte + posiciones) como CSV generado en cliente */
 function downloadTaxSummary(holdings: DataRecord[], report: DataRecord | null, year: number) {
     const lines: string[] = [`reporte_fiscal,${year}`, ''];
     lines.push('seccion,clave,valor');
     if (report) {
         for (const [key, value] of Object.entries(report)) {
-            lines.push(`reporte,${csvCell(key)},${csvCell(formatRecordValue(value))}`);
+            lines.push(`reporte,${csvCell(key)},${csvCell(csvFullValue(value))}`);
         }
     } else {
         lines.push('reporte,sin_reporte,Sin reporte fiscal disponible');
@@ -211,7 +233,7 @@ function downloadTaxSummary(holdings: DataRecord[], report: DataRecord | null, y
         lines.push(headers.map(csvCell).join(','));
         for (const holding of holdings) {
             lines.push(
-                headers.map((header) => csvCell(formatRecordValue(holding[header]))).join(','),
+                headers.map((header) => csvCell(csvFullValue(holding[header]))).join(','),
             );
         }
     }
