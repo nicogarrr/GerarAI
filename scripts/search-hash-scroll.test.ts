@@ -138,7 +138,10 @@ describe('la paleta desplaza al ancla tras router.push', () => {
         const source = readFileSync('components/SearchCommand.tsx', 'utf8');
         assert.ok(source.includes('import { hashFromHref, scrollToHashAnchor } from "@/lib/search/scroll-to-hash"'));
         const goBody = source.slice(source.indexOf('const go = useCallback'));
-        assert.ok(goBody.indexOf('router.push(href)') < goBody.indexOf('scrollToHashAnchor(hash)'));
+        assert.ok(goBody.indexOf('router.push(href,') < goBody.indexOf('scrollToHashAnchor(hash)'));
+        // scroll:false SOLO para ancla en la misma ruta (flicker 22-oct-2026):
+        // sin ancla o con cambio de ruta manda el scroll por defecto.
+        assert.ok(goBody.includes('hash && samePath ? { scroll: false } : undefined'));
         assert.ok(goBody.includes('hashFromHref(href)'));
     });
 });

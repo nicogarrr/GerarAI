@@ -237,11 +237,17 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
     const go = useCallback((href: string) => {
         closeSearchCommand();
         setSearchTerm("");
-        router.push(href);
+        // Navegación a la MISMA ruta con ancla: scroll:false evita el salto
+        // intermedio al TOPE del App Router (en prod la vista saltaba a
+        // scrollY=0 durante 100-600 ms antes del scroll al ancla, medido
+        // 22-oct-2026). Sin ancla o con cambio de ruta se conserva el scroll
+        // por defecto (página nueva o misma ficha re-elegida empieza arriba).
+        const hash = hashFromHref(href);
+        const samePath = new URL(href, window.location.origin).pathname === window.location.pathname;
+        router.push(href, hash && samePath ? { scroll: false } : undefined);
         // El App Router no desplaza al ancla en navegaciones a la MISMA ruta
         // (bug 22-oct-2026: «MSFT GP» fijaba #grafico sin mover la vista);
         // scroll propio con reintentos cortos (lib/search/scroll-to-hash).
-        const hash = hashFromHref(href);
         if (hash) scrollToHashAnchor(hash);
     }, [router]);
 
