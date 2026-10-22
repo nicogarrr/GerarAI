@@ -2,6 +2,7 @@
 
 import IntentLink from '@/components/layout/IntentLink'
 import {usePathname} from 'next/navigation'
+import {useVisibleSections} from '@/lib/nav/nav-flags'
 import {isNavItemActive, NAV_SECTIONS, showsNavSectionTitle, type NavItem} from '@/lib/constants'
 
 /**
@@ -11,10 +12,11 @@ import {isNavItemActive, NAV_SECTIONS, showsNavSectionTitle, type NavItem} from 
  */
 const NavItems = () => {
     const pathname = usePathname()
+    const navSections = useVisibleSections(NAV_SECTIONS)
 
     return (
         <ul className="flex max-w-full flex-col p-2 text-sm font-medium">
-            {NAV_SECTIONS.map((section) => (
+            {navSections.map((section) => (
                 <li key={section.title}>
                     {showsNavSectionTitle(section) && (
                         <p className="px-1 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">

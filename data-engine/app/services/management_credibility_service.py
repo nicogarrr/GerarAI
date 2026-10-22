@@ -27,6 +27,9 @@ OPERATORS = {
 }
 
 
+MAX_CANDIDATES_PER_COMPANY = 400
+
+
 class ManagementCredibilityService:
     def register(
         self,
@@ -42,6 +45,15 @@ class ManagementCredibilityService:
         unit: str | None,
         source_document_id: int | None = None,
         call_claim_id: int | None = None,
+        quote_literal: str | None = None,
+        quote_translation_es: str | None = None,
+        speaker: str | None = None,
+        speaker_role: str | None = None,
+        call_date: date | None = None,
+        source_url: str | None = None,
+        transcript_locator: str | None = None,
+        due_date: date | None = None,
+        fulfillment_criteria: str | None = None,
     ) -> ManagementPromise:
         if target_value is not None and operator not in OPERATORS:
             raise ValueError("A numeric promise requires a supported operator")
@@ -59,6 +71,18 @@ class ManagementCredibilityService:
             status="open",
             evidence=[],
             metadata_={"source": "manual" if call_claim_id is None else "call_claim"},
+            quote_literal=quote_literal,
+            quote_translation_es=quote_translation_es,
+            speaker=speaker,
+            speaker_role=speaker_role,
+            call_date=call_date,
+            source_url=source_url,
+            transcript_locator=transcript_locator,
+            due_date=due_date,
+            fulfillment_criteria=fulfillment_criteria,
+            # promise_date la da quien registra; si coincide con call_date es la
+            # fecha real de la llamada, si no, es la que el usuario introdujo.
+            date_basis="call_date" if call_date == promise_date else "user_entered",
         )
         db.add(row)
         db.commit()
@@ -89,7 +113,11 @@ class ManagementCredibilityService:
             if existing:
                 created.append(existing)
                 continue
-            operator, target = self._target(claim.claim)
+            # El objetivo numerico NO se autodeduce del texto: la heuristica
+            # tomaba el primer numero (p. ej. el ano) como objetivo. Se guarda
+            # solo como sugerencia en metadata, sin efecto en la conciliacion.
+            suggested_operator, suggested_target = self._target(claim.claim)
+            operator, target = None, None
             row = ManagementPromise(
                 company_id=company.id,
                 call_claim_id=claim.id,
@@ -108,10 +136,98 @@ class ManagementCredibilityService:
                         "speaker": claim.speaker,
                     }
                 ],
-                metadata_={"source": "call_claim", "speaker_role": claim.speaker_role},
+                metadata_={
+                    "source": "call_claim",
+                    "speaker_role": claim.speaker_role,
+                    "suggested_target_unverified": (
+                        {"operator": suggested_operator, "value": str(suggested_target)}
+                        if suggested_target is not None
+                        else None
+                    ),
+                },
+                quote_literal=claim.claim,
+                speaker=claim.speaker,
+                speaker_role=claim.speaker_role,
+                # created_at es el alta en BD, no la fecha de la llamada.
+                date_basis="registered_at",
             )
             db.add(row)
             created.append(row)
+        db.commit()
+        for row in created:
+            db.refresh(row)
+        return created
+
+    def register_extracted_candidates(
+        self,
+        db: Session,
+        company: Company,
+        *,
+        transcript_text: str,
+        call_date: date,
+        source_url: str,
+        source_check: str = "not_checked",
+    ) -> list[ManagementPromise]:
+        """Guarda candidatos extraidos (status="candidate", source_status="suggested").
+
+        No guarda el texto de la transcripcion: solo la cita corta, localizador
+        versionado, contexto de 80 caracteres y flags. Sin operador/objetivo,
+        asi reconcile() nunca los resuelve. Dedup por (empresa, cita literal).
+        call_date y source_url los aporta quien llama; no se verifican aqui.
+        """
+        from app.services.commitment_extraction_service import (
+            extract_candidates,
+            locator_for,
+        )
+
+        # Identidad = (cita, fecha de llamada, fuente): la misma frase en otra
+        # llamada o fuente es otro compromiso, no un duplicado.
+        existing_rows = db.scalars(
+            select(ManagementPromise).where(ManagementPromise.company_id == company.id)
+        ).all()
+        if sum(row.status == "candidate" for row in existing_rows) >= MAX_CANDIDATES_PER_COMPANY:
+            raise ValueError("Limite de candidatos sugeridos alcanzado; revisa o descarta los existentes")
+        existing = {
+            (row.quote_literal, row.call_date, row.source_url)
+            for row in existing_rows
+            if row.quote_literal
+        }
+        created: list[ManagementPromise] = []
+        for cand in extract_candidates(transcript_text):
+            if (cand.quote_literal, call_date, source_url) in existing:
+                continue
+            row = ManagementPromise(
+                company_id=company.id,
+                promise=cand.quote_literal,
+                promise_date=call_date,
+                expected_period=(
+                    str(cand.due_date_hint.year) if cand.due_date_hint else "unknown"
+                ),
+                status="candidate",
+                evidence=[],
+                metadata_={
+                    "source": "extraction_candidate",
+                    "source_status": "suggested",
+                    "source_check": source_check,
+                    "flags": cand.flags,
+                    "due_basis": cand.due_basis,
+                    "locator_normalization": cand.normalization,
+                    "context_before": cand.context_before,
+                    "context_after": cand.context_after,
+                },
+                quote_literal=cand.quote_literal,
+                speaker=cand.speaker,
+                speaker_role=cand.speaker_role,
+                call_date=call_date,
+                source_url=source_url,
+                transcript_locator=locator_for(cand),
+                due_date=cand.due_date_hint,
+                status_reason="Candidato extraido por reglas; sin revisar contra la fuente.",
+                date_basis="user_entered",
+            )
+            db.add(row)
+            created.append(row)
+            existing.add((cand.quote_literal, call_date, source_url))
         db.commit()
         for row in created:
             db.refresh(row)
@@ -216,7 +332,16 @@ class ManagementCredibilityService:
                 .order_by(desc(ManagementPromise.promise_date))
             ).all()
         )
-        resolved = [row for row in promises if row.status in {"met", "partial", "missed"}]
+        # Promesas importadas ANTES de 0078 desde call claims llevan objetivo
+        # deducido por heuristica (primer numero) sin procedencia: no entran en
+        # la puntuacion para no mostrar credibilidad numerica no fiable.
+        legacy = [row for row in promises if self._is_legacy_heuristic(row)]
+        legacy_ids = {row.id for row in legacy}
+        resolved = [
+            row
+            for row in promises
+            if row.status in {"met", "partial", "missed"} and row.id not in legacy_ids
+        ]
         score = (
             sum(1 if row.status == "met" else 0.5 if row.status == "partial" else 0 for row in resolved)
             / len(resolved)
@@ -233,14 +358,50 @@ class ManagementCredibilityService:
             ),
             "counts": {
                 "total": len(promises),
+                "registered": sum(row.status != "candidate" for row in promises),
                 "open": sum(row.status == "open" for row in promises),
+                "candidate": sum(row.status == "candidate" for row in promises),
                 "met": sum(row.status == "met" for row in promises),
                 "partial": sum(row.status == "partial" for row in promises),
                 "missed": sum(row.status == "missed" for row in promises),
             },
-            "promises": [self.payload(row) for row in promises],
+            "legacy_excluded_from_score": len(legacy),
+            "promises": self._with_tracking(db, promises),
             "method": "resolved promises: met=1, partial=0.5, missed=0",
         }
+
+    def _with_tracking(self, db: Session, promises: list[ManagementPromise]) -> list[dict[str, Any]]:
+        from datetime import date as _date
+
+        from app.models.entities import ManagementPromiseCheck
+        from app.services.commitment_tracking_service import CommitmentTrackingService, due_state
+
+        ids = [row.id for row in promises]
+        by_promise: dict[int, list] = {}
+        if ids:
+            for check in db.scalars(
+                select(ManagementPromiseCheck)
+                .where(ManagementPromiseCheck.promise_id.in_(ids))
+                .order_by(desc(ManagementPromiseCheck.checked_on), desc(ManagementPromiseCheck.id))
+            ).all():
+                by_promise.setdefault(check.promise_id, []).append(check)
+        today = _date.today()
+        out = []
+        for row in promises:
+            checks = by_promise.get(row.id, [])
+            item = self.payload(row)
+            item["due_state"] = due_state(row, checks, today)
+            item["checks"] = [CommitmentTrackingService.check_payload(c) for c in checks]
+            out.append(item)
+        return out
+
+    @staticmethod
+    def _is_legacy_heuristic(row: ManagementPromise) -> bool:
+        return (
+            (row.metadata_ or {}).get("source") == "call_claim"
+            and row.date_basis is None
+            and row.target_value is not None
+        )
 
     @staticmethod
     def payload(row: ManagementPromise) -> dict[str, Any]:
@@ -262,6 +423,23 @@ class ManagementCredibilityService:
             "management_explanation": row.management_explanation,
             "verified_at": row.verified_at,
             "evidence": row.evidence,
+            "quote_literal": row.quote_literal,
+            "quote_translation_es": row.quote_translation_es,
+            "speaker": row.speaker,
+            "speaker_role": row.speaker_role,
+            "call_date": row.call_date,
+            "source_url": row.source_url,
+            "transcript_locator": row.transcript_locator,
+            "due_date": row.due_date,
+            "fulfillment_criteria": row.fulfillment_criteria,
+            "status_reason": row.status_reason,
+            "date_basis": row.date_basis,
+            "source_status": (row.metadata_ or {}).get("source_status"),
+            "flags": (row.metadata_ or {}).get("flags") or [],
+            "source_check": (row.metadata_ or {}).get("source_check"),
+            "reviewed_by_user_id": (row.metadata_ or {}).get("reviewed_by_user_id"),
+            "reviewed_at": (row.metadata_ or {}).get("reviewed_at"),
+            "legacy_heuristic_target": ManagementCredibilityService._is_legacy_heuristic(row),
         }
 
     @staticmethod

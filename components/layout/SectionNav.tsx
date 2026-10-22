@@ -5,6 +5,7 @@ import {usePathname} from 'next/navigation';
 import {useEffect, useState} from 'react';
 import {flattenNavItems, sectionForRoute} from '@/lib/constants';
 import {OverflowScrollRegion} from '@/components/ui/overflow-scroll-region';
+import {useHiddenHrefs} from '@/lib/nav/nav-flags';
 
 /**
  * Subnav contextual del hub actual. En móvil va PLEGADO en una línea: la
@@ -25,6 +26,7 @@ import {OverflowScrollRegion} from '@/components/ui/overflow-scroll-region';
  *   pertenece al hub Biblioteca.
  */
 export default function SectionNav(){
+ const hiddenHrefs=useHiddenHrefs();
  const pathname=usePathname();
  const [open,setOpen]=useState(false);
  useEffect(()=>{
@@ -45,7 +47,7 @@ export default function SectionNav(){
  if((pathname==='/inversores'||pathname.startsWith('/inversores/'))&&!pathname.startsWith('/inversores/canales'))return null;
  const section=sectionForRoute(pathname);
  if(!section)return null;
- const items=flattenNavItems().filter((item)=>item.hub===section&&!(item.href===pathname&&item.subnavHideSelf));
+ const items=flattenNavItems().filter((item)=>item.hub===section&&!hiddenHrefs.includes(item.href)&&!(item.href===pathname&&item.subnavHideSelf));
  if(items.length<2)return null;
  // Activo = la ruta mas especifica que contiene la pagina actual (una ficha /research/AAPL cuelga de Empresas).
  const current=items.filter((item)=>pathname===item.href||pathname.startsWith(`${item.href}/`)).sort((a,b)=>b.href.length-a.href.length)[0]?.href;

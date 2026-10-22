@@ -9,6 +9,7 @@ import { searchStocksWithStatus, getPopularStocks } from "@/lib/actions/finnhub.
 import { loadPopularStocks } from "@/lib/popular-stocks-loader";
 import { isNextRedirectError } from "@/lib/types/errors";
 import { flattenNavItems, ROUTE_CATALOG } from "@/lib/constants";
+import { useVisibleSections } from "@/lib/nav/nav-flags";
 import { navItemMatchesSearch, navSectionMatchesSearch } from "@/lib/search/nav-search";
 import {
     subscribeSearchCommand,
@@ -23,6 +24,7 @@ import { hashFromHref, scrollToHashAnchor } from "@/lib/search/scroll-to-hash";
 import { etiquetaTipoInstrumento } from "@/lib/labels";
 
 export default function SearchCommand({ renderAs = 'button', label = 'Añadir acción', initialStocks }: SearchCommandProps) {
+    const visibleCatalog = useVisibleSections(ROUTE_CATALOG);
     const router = useRouter()
     const [searchTerm, setSearchTerm] = useState("")
     const [loading, setLoading] = useState(false)
@@ -428,7 +430,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                                 antes desaparecian con el primer caracter y cmdk no
                                 podia filtrarlas, asi que "ir a Temas" por teclado
                                 era imposible. */}
-                            {ROUTE_CATALOG.filter((section) => section.items.length > 1 && (!isSearchMode || navSectionMatchesSearch(section, searchTerm, flattenNavItems))).map((section) => (
+                            {visibleCatalog.filter((section) => section.items.length > 1 && (!isSearchMode || navSectionMatchesSearch(section, searchTerm, flattenNavItems))).map((section) => (
                                 <CommandGroup
                                     key={section.title}
                                     heading={section.title}

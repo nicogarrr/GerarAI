@@ -398,6 +398,48 @@ def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
     return TearsheetService().build(db)
 
 
+@router.get("/management-commitments")
+def management_commitments(db: Session = Depends(get_db)) -> dict:
+    """Compromisos de la directiva SOLO de empresas con posicion real (tenant del principal).
+
+    Los tickers salen de Position en BD, no de una lista aportada por el llamante.
+    """
+    from app.models.entities import ManagementPromise
+    from app.services.management_credibility_service import ManagementCredibilityService
+
+    # Posicion NETA por empresa: puede haber varias filas (carteras/lotes) del mismo
+    # ticker; se agregan y se incluye toda posicion neta != 0 (largos y cortos).
+    net = (
+        select(Position.company_id)
+        .group_by(Position.company_id)
+        .having(func.sum(Position.quantity) != 0)
+        .subquery()
+    )
+    held = db.execute(
+        select(Company).join(net, net.c.company_id == Company.id).order_by(Company.ticker)
+    ).scalars().all()
+    companies = []
+    for company in held:
+        rows = db.scalars(
+            select(ManagementPromise)
+            .where(ManagementPromise.company_id == company.id)
+            .order_by(desc(ManagementPromise.call_date), desc(ManagementPromise.id))
+        ).all()
+        companies.append(
+            {
+                "ticker": company.ticker,
+                "name": company.name,
+                "counts": {
+                    "total": len(rows),
+                    "candidate": sum(r.status == "candidate" for r in rows),
+                    "registered": sum(r.status != "candidate" for r in rows),
+                },
+                "items": [ManagementCredibilityService.payload(r) for r in rows],
+            }
+        )
+    return {"companies": companies, "held_count": len(held)}
+
+
 @router.get("/positions")
 def positions(
     limit: Annotated[int, Query(ge=1, le=2000)] = 500,

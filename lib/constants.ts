@@ -27,6 +27,7 @@ import {
   Landmark,
     Users,
     UsersRound,
+  ListChecks,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -150,6 +151,7 @@ export const ROUTE_CATALOG: NavSection[] = [
       { href: '/corporate-actions', label: 'Acciones corp.', icon: Building2, hub: '/portfolio' },
       { href: '/calendar', label: 'Calendario', icon: CalendarDays, hub: '/portfolio' },
       { href: '/portfolio/stress', label: 'Estrés histórico', icon: LineChart, hub: '/portfolio' },
+      { href: '/portfolio/commitments', label: 'Compromisos', icon: ListChecks, hub: '/portfolio' },
       { href: '/paper-trading', label: 'Cuenta demo manual', icon: FlaskConical, hub: '/portfolio' },
     ],
   },

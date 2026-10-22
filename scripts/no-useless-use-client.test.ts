@@ -228,6 +228,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/work-products/WorkProductButton.tsx': 'useState, jsx-onOpenChange, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/label.tsx, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/select.tsx',
   'hooks/useOnlineStatus.ts': 'useSyncExternalStore, browser:window, browser:navigator',
   'lib/utils/scroll-anchor.ts': 'browser:window, browser:cancelAnimationFrame, browser:requestAnimationFrame, browser:document',
+  'lib/nav/nav-flags.tsx': 'createContext, useContext, useMemo (contexto cliente alimentado por el layout servidor)',
 };
 
 const audit = auditRepo(root, ['components', 'app', 'hooks', 'lib']);

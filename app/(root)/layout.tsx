@@ -1,4 +1,6 @@
 import SectionNav from "@/components/layout/SectionNav";
+import { NavFlagsProvider } from "@/lib/nav/nav-flags";
+import { commitmentsUiEnabled } from "@/lib/commitments-flag";
 import { ScrollPreserver } from "@/components/layout/ScrollPreserver";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import Header from "@/components/Header";
@@ -44,7 +46,10 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
         (jar) => jar.get(SIDEBAR_COLLAPSED_COOKIE)?.value !== '0',
     );
 
+    const hiddenHrefs = commitmentsUiEnabled() ? [] : ['/portfolio/commitments'];
+
     return (
+        <NavFlagsProvider hiddenHrefs={hiddenHrefs}>
         <div className="flex min-h-dvh flex-col text-gray-300">
             <a href="#content" className="skip-link">Saltar al contenido</a>
 
@@ -73,6 +78,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                 contexto de página explícito. Solo lectura. */}
             <GlobalBrain userId={user.id} />
         </div>
+        </NavFlagsProvider>
     );
 };
 

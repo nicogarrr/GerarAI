@@ -1062,6 +1062,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/management-credibility/extract-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Extract Management Candidates */
+        post: operations["extract_management_candidates_api_companies__ticker__management_credibility_extract_candidates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{ticker}/management-credibility/extract-candidates-from-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Extract Management Candidates From Url */
+        post: operations["extract_management_candidates_from_url_api_companies__ticker__management_credibility_extract_candidates_from_url_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/management-credibility/import-call-claims": {
         parameters: {
             query?: never;
@@ -1073,6 +1107,26 @@ export interface paths {
         put?: never;
         /** Import Management Call Claims */
         post: operations["import_management_call_claims_api_companies__ticker__management_credibility_import_call_claims_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{ticker}/management-credibility/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Company Promise Notes
+         * @description Notas privadas del usuario agrupadas por promesa, en una sola consulta (max 500).
+         */
+        get: operations["list_company_promise_notes_api_companies__ticker__management_credibility_notes_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1096,6 +1150,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/management-credibility/promises/{promise_id}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Promise Checks */
+        get: operations["list_promise_checks_api_companies__ticker__management_credibility_promises__promise_id__checks_get"];
+        put?: never;
+        /** Add Promise Check */
+        post: operations["add_promise_check_api_companies__ticker__management_credibility_promises__promise_id__checks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/management-credibility/promises/{promise_id}/explanation": {
         parameters: {
             query?: never;
@@ -1107,6 +1179,41 @@ export interface paths {
         /** Update Management Explanation */
         put: operations["update_management_explanation_api_companies__ticker__management_credibility_promises__promise_id__explanation_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{ticker}/management-credibility/promises/{promise_id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Promise Notes */
+        get: operations["list_promise_notes_api_companies__ticker__management_credibility_promises__promise_id__notes_get"];
+        put?: never;
+        /** Add Promise Note */
+        post: operations["add_promise_note_api_companies__ticker__management_credibility_promises__promise_id__notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{ticker}/management-credibility/promises/{promise_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Promise Candidate */
+        post: operations["review_promise_candidate_api_companies__ticker__management_credibility_promises__promise_id__review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3427,6 +3534,28 @@ export interface paths {
         };
         /** Portfolio Intelligence */
         get: operations["portfolio_intelligence_api_portfolio_intelligence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/management-commitments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Management Commitments
+         * @description Compromisos de la directiva SOLO de empresas con posicion real (tenant del principal).
+         *
+         *     Los tickers salen de Position en BD, no de una lista aportada por el llamante.
+         */
+        get: operations["management_commitments_api_portfolio_management_commitments_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6736,6 +6865,28 @@ export interface components {
             /** Confirmed */
             confirmed: boolean;
         };
+        /** ManagementCandidateExtract */
+        ManagementCandidateExtract: {
+            /**
+             * Call Date
+             * Format: date
+             */
+            call_date: string;
+            /** Source Url */
+            source_url: string;
+            /** Transcript Text */
+            transcript_text: string;
+        };
+        /** ManagementCandidateFromUrl */
+        ManagementCandidateFromUrl: {
+            /**
+             * Call Date
+             * Format: date
+             */
+            call_date: string;
+            /** Source Url */
+            source_url: string;
+        };
         /** ManagementExplanationUpdate */
         ManagementExplanationUpdate: {
             /** Explanation */
@@ -6743,8 +6894,14 @@ export interface components {
         };
         /** ManagementPromiseCreate */
         ManagementPromiseCreate: {
+            /** Call Date */
+            call_date?: string | null;
+            /** Due Date */
+            due_date?: string | null;
             /** Expected Period */
             expected_period: string;
+            /** Fulfillment Criteria */
+            fulfillment_criteria?: string | null;
             /** Metric */
             metric?: string | null;
             /** Operator */
@@ -6756,10 +6913,22 @@ export interface components {
              * Format: date
              */
             promise_date: string;
+            /** Quote Literal */
+            quote_literal?: string | null;
+            /** Quote Translation Es */
+            quote_translation_es?: string | null;
             /** Source Document Id */
             source_document_id?: number | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Speaker */
+            speaker?: string | null;
+            /** Speaker Role */
+            speaker_role?: string | null;
             /** Target Value */
             target_value?: number | string | null;
+            /** Transcript Locator */
+            transcript_locator?: string | null;
             /** Unit */
             unit?: string | null;
         };
@@ -7239,6 +7408,44 @@ export interface components {
             top_n: number;
             /** Universe Size */
             universe_size: number;
+        };
+        /** PromiseCheckCreate */
+        PromiseCheckCreate: {
+            /**
+             * Checked On
+             * Format: date
+             */
+            checked_on: string;
+            /** Evidence Date */
+            evidence_date?: string | null;
+            /** Evidence Excerpt */
+            evidence_excerpt?: string | null;
+            /** Evidence Url */
+            evidence_url?: string | null;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "unknown" | "not_verifiable" | "insufficient_evidence" | "met" | "partially_met" | "not_met";
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+        };
+        /** PromiseNoteCreate */
+        PromiseNoteCreate: {
+            /** Body */
+            body: string;
+        };
+        /** PromiseReview */
+        PromiseReview: {
+            /** Confirmed Source Checked */
+            confirmed_source_checked: boolean;
+            /** Due Date */
+            due_date?: string | null;
+            /** Fulfillment Criteria */
+            fulfillment_criteria: string;
         };
         /** QueryRequest */
         QueryRequest: {
@@ -10800,6 +11007,98 @@ export interface operations {
             };
         };
     };
+    extract_management_candidates_api_companies__ticker__management_credibility_extract_candidates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManagementCandidateExtract"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extract_management_candidates_from_url_api_companies__ticker__management_credibility_extract_candidates_from_url_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManagementCandidateFromUrl"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     import_management_call_claims_api_companies__ticker__management_credibility_import_call_claims_post: {
         parameters: {
             query?: never;
@@ -10829,6 +11128,48 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_company_promise_notes_api_companies__ticker__management_credibility_notes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -10888,6 +11229,96 @@ export interface operations {
             };
         };
     };
+    list_promise_checks_api_companies__ticker__management_credibility_promises__promise_id__checks_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+                promise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_promise_check_api_companies__ticker__management_credibility_promises__promise_id__checks_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+                promise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromiseCheckCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_management_explanation_api_companies__ticker__management_credibility_promises__promise_id__explanation_put: {
         parameters: {
             query?: never;
@@ -10910,6 +11341,143 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ManagementExplanationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_promise_notes_api_companies__ticker__management_credibility_promises__promise_id__notes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+                promise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_promise_note_api_companies__ticker__management_credibility_promises__promise_id__notes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+                promise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromiseNoteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_promise_candidate_api_companies__ticker__management_credibility_promises__promise_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+                promise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromiseReview"];
             };
         };
         responses: {
@@ -16613,6 +17181,46 @@ export interface operations {
             query?: {
                 years?: number;
             };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    management_commitments_api_portfolio_management_commitments_get: {
+        parameters: {
+            query?: never;
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { commitmentsUiEnabled } from '@/lib/commitments-flag';
+
 import { normalizeResearchBody, researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
 import { AppError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
@@ -237,8 +239,9 @@ export type ManagementCredibility = {
   ticker: string;
   score: number | null;
   grade: string;
-  counts: { total: number; open: number; met: number; partial: number; missed: number };
+  counts: { total: number; registered?: number; open: number; candidate?: number; met: number; partial: number; missed: number };
   method: string;
+  legacy_excluded_from_score?: number;
   promises: Array<{
     id: number;
     promise: string;
@@ -253,6 +256,25 @@ export type ManagementCredibility = {
     management_explanation: string | null;
     verified_at: string | null;
     evidence: Array<Record<string, unknown>>;
+    quote_literal?: string | null;
+    quote_translation_es?: string | null;
+    speaker?: string | null;
+    speaker_role?: string | null;
+    call_date?: string | null;
+    source_url?: string | null;
+    transcript_locator?: string | null;
+    due_date?: string | null;
+    fulfillment_criteria?: string | null;
+    status_reason?: string | null;
+    date_basis?: string | null;
+    source_status?: string | null;
+    flags?: string[];
+    source_check?: string | null;
+    legacy_heuristic_target?: boolean;
+    due_state?: string;
+    reviewed_by_user_id?: string | null;
+    reviewed_at?: string | null;
+    checks?: Array<{ id: number; checked_on: string; outcome: string; summary: string; evidence_url: string | null; evidence_date: string | null; evidence_excerpt: string | null; declared_by_user_id?: string | null; declared_at?: string | null }>;
   }>;
 };
 
@@ -759,6 +781,27 @@ export async function getManagementCredibility(ticker: string): Promise<Manageme
   return requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility`);
 }
 
+function assertCommitmentsUi() {
+  if (!commitmentsUiEnabled()) throw new ValidationError('El seguimiento de compromisos esta desactivado en este entorno.', 'commitments');
+}
+
+export type ManagementPromiseNote = { id: number; promise_id: number; body: string; created_at: string | null };
+
+export async function getManagementNotesByPromise(ticker: string): Promise<{ notes: Record<string, ManagementPromiseNote[]>; truncated: boolean }> {
+  assertCommitmentsUi();
+  const data = await requestJson<{ notes_by_promise: Record<string, ManagementPromiseNote[]>; truncated?: boolean }>(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/notes`);
+  return { notes: data.notes_by_promise ?? {}, truncated: Boolean(data.truncated) };
+}
+
+export async function addManagementPromiseNote(ticker: string, promiseId: number, formData: FormData) {
+  assertCommitmentsUi();
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ body: required(formData, 'body', 'Nota') }),
+  });
+  revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+}
+
 export async function createManagementPromise(ticker: string, formData: FormData) {
   const target = String(formData.get('target_value') ?? '').trim();
   const sourceDocument = String(formData.get('source_document_id') ?? '').trim();
@@ -783,6 +826,60 @@ export async function importManagementCallClaims(ticker: string) {
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
 }
 
+export async function extractManagementCandidates(ticker: string, formData: FormData) {
+  assertCommitmentsUi();
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates`, {
+    method: 'POST',
+    body: JSON.stringify({
+      transcript_text: required(formData, 'transcript_text', 'Transcript text'),
+      call_date: required(formData, 'call_date', 'Call date'),
+      source_url: required(formData, 'source_url', 'Source URL'),
+    }),
+  });
+  revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+}
+
+export async function extractManagementCandidatesFromUrl(ticker: string, formData: FormData) {
+  assertCommitmentsUi();
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-url`, {
+    method: 'POST',
+    body: JSON.stringify({
+      call_date: required(formData, 'call_date', 'Call date'),
+      source_url: required(formData, 'source_url', 'Source URL'),
+    }),
+  });
+  revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+}
+
+export async function reviewManagementCandidate(ticker: string, promiseId: number, formData: FormData) {
+  assertCommitmentsUi();
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/review`, {
+    method: 'POST',
+    body: JSON.stringify({
+      fulfillment_criteria: required(formData, 'fulfillment_criteria', 'Criterio'),
+      due_date: String(formData.get('due_date') ?? '').trim() || null,
+      confirmed_source_checked: formData.get('confirmed_source_checked') === 'on',
+    }),
+  });
+  revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+}
+
+export async function addManagementPromiseCheck(ticker: string, promiseId: number, formData: FormData) {
+  assertCommitmentsUi();
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/checks`, {
+    method: 'POST',
+    body: JSON.stringify({
+      outcome: required(formData, 'outcome', 'Outcome'),
+      checked_on: required(formData, 'checked_on', 'Checked on'),
+      summary: String(formData.get('summary') ?? '').trim(),
+      evidence_url: String(formData.get('evidence_url') ?? '').trim() || null,
+      evidence_date: String(formData.get('evidence_date') ?? '').trim() || null,
+      evidence_excerpt: String(formData.get('evidence_excerpt') ?? '').trim() || null,
+    }),
+  });
+  revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+}
+
 export async function reconcileManagementCredibility(ticker: string) {
   await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/reconcile`, { method: 'POST' });
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
@@ -794,6 +891,21 @@ export async function updateManagementExplanation(ticker: string, promiseId: num
     body: JSON.stringify({ explanation: required(formData, 'explanation', 'Explanation') }),
   });
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+}
+
+export type PortfolioCommitments = {
+  held_count: number;
+  companies: Array<{
+    ticker: string;
+    name: string;
+    counts: { total: number; candidate: number; registered: number };
+    items: ManagementCredibility['promises'];
+  }>;
+};
+
+export async function getPortfolioCommitments(): Promise<PortfolioCommitments> {
+  assertCommitmentsUi();
+  return requestJson('/api/portfolio/management-commitments');
 }
 
 export async function getPortfolioIntelligence(years = 5): Promise<PortfolioIntelligence> {

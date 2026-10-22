@@ -1,0 +1,148 @@
+"""Obtencion reproducible de texto de transcripciones desde fuentes IR oficiales.
+
+- Solo https y solo hosts de IR en lista blanca (ampliable por entorno
+  COMMITMENT_TRANSCRIPT_HOSTS, separada por comas). Aplica tambien a redirects.
+- SSRF/IP privadas/limite de bytes: los resuelve public_fetch (IP fijada).
+- Solo PDF (magic %PDF), tope de paginas y de bytes. Texto extraido con pypdf.
+- El texto se devuelve al llamador para extraer citas cortas; NO se persiste.
+- No establece licencia de redistribucion: no republicar el texto.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from datetime import date
+from io import BytesIO
+from urllib.parse import urlparse
+
+from app.services.public_fetch import fetch_public_url
+
+DEFAULT_HOSTS = frozenset(
+    {"s21.q4cdn.com", "investor.atmeta.com", "bn.brookfield.com"}
+)
+MAX_BYTES = 8 * 1024 * 1024
+MAX_PAGES = 80
+TIMEOUT_SECONDS = 25.0
+
+
+class TranscriptSourceError(ValueError):
+    pass
+
+
+def allowed_hosts() -> set[str]:
+    extra = {
+        h.strip().lower()
+        for h in os.environ.get("COMMITMENT_TRANSCRIPT_HOSTS", "").split(",")
+        if h.strip()
+    }
+    return set(DEFAULT_HOSTS) | extra
+
+
+def is_allowed_source(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme == "https" and (parsed.hostname or "").lower() in allowed_hosts()
+
+
+MAX_TEXT_CHARS = 1_500_000
+_TZ_TOKENS = frozenset({"ET", "PT", "CT", "MT", "EST", "EDT", "PST", "PDT", "CST", "CDT", "UTC", "GMT", "CET", "CEST", "BST"})
+_MONTHS = {m: i for i, m in enumerate(
+    ["january","february","march","april","may","june","july","august","september","october","november","december"], 1)}
+
+
+_NOT_TICKERS = frozenset({"CEO", "CFO", "COO", "CTO", "IR", "US", "USA", "EU", "AI", "UK", "Q1", "Q2", "Q3", "Q4", "FY", "INC", "CORP", "LLC", "LTD", "PLC", "NYSE", "NASDAQ"}) | _TZ_TOKENS
+
+
+def observe_header(text: str) -> dict:
+    """Lee SOLO la cabecera: tickers candidatos y fechas candidatas. Observado, no verificado."""
+    head = " ".join(text[:1500].split())
+    tickers = {
+        m.group(1)
+        for m in re.finditer(r"\(([A-Z][A-Z0-9.\-]{0,9})\)|\b(?:NYSE|NASDAQ|TSX|LSE)\s*:\s*([A-Z][A-Z0-9.\-]{0,9})", head)
+        for m in [type("M", (), {"group": lambda self, i, m=m: m.group(1) or m.group(2)})()]
+        if m.group(1) not in _NOT_TICKERS
+    }
+    dates: set[date] = set()
+    for m in re.finditer(
+        r"\b(January|February|March|April|May|June|July|August|September|October|November|December)"
+        r"\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(20\d{2})\b",
+        head,
+        re.I,
+    ):
+        try:
+            dates.add(date(int(m.group(3)), _MONTHS[m.group(1).lower()], int(m.group(2))))
+        except ValueError:
+            continue
+    return {"tickers": sorted(tickers), "dates": sorted(dates)}
+
+
+def check_source(text: str, *, ticker: str, call_date: date) -> str:
+    """Resultado conservador, nunca "verificado":
+    header_matches (ticker y fecha esperados aparecen en la cabecera),
+    header_date_differs (ticker ok/ilegible pero la fecha esperada no aparece: aviso, no rechazo),
+    header_unreadable (ambiguo o ilegible).
+    Solo se RECHAZA si hay exactamente un ticker candidato y no es el pedido."""
+    seen = observe_header(text)
+    expected = ticker.upper()
+    tickers = [t.upper() for t in seen["tickers"]]
+    if len(tickers) == 1 and tickers[0] != expected and expected not in tickers:
+        raise TranscriptSourceError(f"La cabecera del documento identifica {tickers[0]}, no {expected}")
+    ticker_ok = expected in tickers
+    date_ok = call_date in seen["dates"]
+    if ticker_ok and date_ok:
+        return "header_matches"
+    if seen["dates"] and not date_ok:
+        return "header_date_differs"
+    return "header_unreadable"
+
+
+def fetch_transcript_text(url: str) -> str:
+    if not is_allowed_source(url):
+        raise TranscriptSourceError("Fuente no permitida: solo https y hosts IR autorizados")
+    try:
+        content, _ctype, _final = fetch_public_url(
+            url, max_bytes=MAX_BYTES, timeout=TIMEOUT_SECONDS, allowed_url=is_allowed_source
+        )
+    except ValueError as exc:
+        raise TranscriptSourceError(str(exc)) from exc
+    except Exception as exc:  # red/HTTP: error acotado, sin detalle interno
+        raise TranscriptSourceError("No se pudo descargar la fuente oficial") from exc
+    if not content.startswith(b"%PDF"):
+        raise TranscriptSourceError("La fuente no es un PDF (HTML aun no soportado)")
+    from pypdf import PdfReader
+
+    try:
+        reader = PdfReader(BytesIO(content))
+        if len(reader.pages) > MAX_PAGES:
+            raise TranscriptSourceError(f"PDF con mas de {MAX_PAGES} paginas")
+        chunks: list[str] = []
+        total = 0
+        for page in reader.pages:
+            piece = page.extract_text() or ""
+            total += len(piece)
+            if total > MAX_TEXT_CHARS:
+                raise TranscriptSourceError("Texto extraido demasiado grande")
+            chunks.append(piece)
+        text = "\n".join(chunks)
+    except TranscriptSourceError:
+        raise
+    except Exception as exc:
+        raise TranscriptSourceError("No se pudo extraer texto del PDF") from exc
+    if len(text.split()) < 200:
+        raise TranscriptSourceError("Texto extraido insuficiente (PDF escaneado o vacio)")
+    return text
+
+
+_LAST_CALL: dict[int, float] = {}
+THROTTLE_SECONDS = 20.0
+
+
+def throttle(key: int) -> bool:
+    """Una descarga cada THROTTLE_SECONDS por empresa y proceso (acota CPU/red; no es limite global)."""
+    import time
+
+    now = time.monotonic()
+    if now - _LAST_CALL.get(key, -1e9) < THROTTLE_SECONDS:
+        return False
+    _LAST_CALL[key] = now
+    return True

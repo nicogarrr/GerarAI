@@ -10,6 +10,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 from starlette.concurrency import run_in_threadpool
 
+from app.core.auth import get_research_principal
 from app.core.database import get_db
 from app.core.errors import safe_detail
 from app.models import (
@@ -303,6 +304,38 @@ class DecisionLessonAction(BaseModel):
     action: Literal["approve", "reject"]
 
 
+class ManagementCandidateExtract(BaseModel):
+    transcript_text: str = Field(min_length=50, max_length=400_000)
+    call_date: date
+    source_url: str = Field(max_length=1000, pattern=r"^https?://")
+
+
+class ManagementCandidateFromUrl(BaseModel):
+    call_date: date
+    source_url: str = Field(max_length=1000, pattern=r"^https://")
+
+
+class PromiseCheckCreate(BaseModel):
+    outcome: Literal[
+        "unknown", "not_verifiable", "insufficient_evidence", "met", "partially_met", "not_met"
+    ]
+    checked_on: date
+    summary: str = Field(default="", max_length=2000)
+    evidence_url: str | None = Field(default=None, max_length=1000, pattern=r"^https://")
+    evidence_date: date | None = None
+    evidence_excerpt: str | None = Field(default=None, max_length=2000)
+
+
+class PromiseReview(BaseModel):
+    fulfillment_criteria: str = Field(min_length=10, max_length=2000)
+    due_date: date | None = None
+    confirmed_source_checked: bool
+
+
+class PromiseNoteCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=5000)
+
+
 class ManagementPromiseCreate(BaseModel):
     promise: str = Field(min_length=3, max_length=5000)
     promise_date: date
@@ -312,6 +345,15 @@ class ManagementPromiseCreate(BaseModel):
     target_value: Decimal | None = None
     unit: str | None = Field(default=None, max_length=40)
     source_document_id: int | None = None
+    quote_literal: str | None = Field(default=None, max_length=5000)
+    quote_translation_es: str | None = Field(default=None, max_length=5000)
+    speaker: str | None = Field(default=None, max_length=160)
+    speaker_role: str | None = Field(default=None, max_length=120)
+    call_date: date | None = None
+    source_url: str | None = Field(default=None, max_length=1000, pattern=r"^https?://")
+    transcript_locator: str | None = Field(default=None, max_length=200)
+    due_date: date | None = None
+    fulfillment_criteria: str | None = Field(default=None, max_length=2000)
 
 
 class ManagementExplanationUpdate(BaseModel):
@@ -882,6 +924,198 @@ def import_management_call_claims(
         ManagementCredibilityService.payload(row)
         for row in ManagementCredibilityService().import_call_claims(db, company)
     ]
+
+
+@router.post("/{ticker}/management-credibility/extract-candidates", status_code=201)
+def extract_management_candidates(
+    ticker: str,
+    payload: ManagementCandidateExtract,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    try:
+        rows = ManagementCredibilityService().register_extracted_candidates(
+            db,
+            company,
+            transcript_text=payload.transcript_text,
+            call_date=payload.call_date,
+            source_url=payload.source_url,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return [ManagementCredibilityService.payload(row) for row in rows]
+
+
+@router.post("/{ticker}/management-credibility/extract-candidates-from-url", status_code=201)
+def extract_management_candidates_from_url(
+    ticker: str,
+    payload: ManagementCandidateFromUrl,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    from app.services.transcript_source_service import (
+        TranscriptSourceError,
+        check_source,
+        fetch_transcript_text,
+        throttle,
+    )
+
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    if not throttle(company.id):
+        raise HTTPException(status_code=429, detail="Espera unos segundos entre descargas")
+    try:
+        text = fetch_transcript_text(payload.source_url)
+        source_check = check_source(text, ticker=company.ticker, call_date=payload.call_date)
+    except TranscriptSourceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        rows = ManagementCredibilityService().register_extracted_candidates(
+            db,
+            company,
+            transcript_text=text,
+            call_date=payload.call_date,
+            source_url=payload.source_url,
+            source_check=source_check,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return [ManagementCredibilityService.payload(row) for row in rows]
+
+
+def _principal_user(principal) -> str:
+    return principal.user_id if principal else "local-dev"
+
+
+def _promise_or_404(db: Session, ticker: str, promise_id: int):
+    company = resolve_company(db, ticker)
+    promise = db.get(ManagementPromise, promise_id)
+    if not company or not promise or promise.company_id != company.id:
+        raise HTTPException(status_code=404, detail="Management promise not found")
+    return promise
+
+
+@router.post("/{ticker}/management-credibility/promises/{promise_id}/review")
+def review_promise_candidate(
+    ticker: str,
+    promise_id: int,
+    payload: PromiseReview,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> dict:
+    from app.services.commitment_tracking_service import (
+        CommitmentTrackingError,
+        CommitmentTrackingService,
+    )
+
+    promise = _promise_or_404(db, ticker, promise_id)
+    try:
+        row = CommitmentTrackingService().review_candidate(
+            db, promise, user_id=_principal_user(principal), **payload.model_dump()
+        )
+    except CommitmentTrackingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ManagementCredibilityService.payload(row)
+
+
+@router.post("/{ticker}/management-credibility/promises/{promise_id}/checks", status_code=201)
+def add_promise_check(
+    ticker: str,
+    promise_id: int,
+    payload: PromiseCheckCreate,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> dict:
+    from app.services.commitment_tracking_service import (
+        CommitmentTrackingError,
+        CommitmentTrackingService,
+    )
+
+    promise = _promise_or_404(db, ticker, promise_id)
+    try:
+        row = CommitmentTrackingService().add_check(
+            db, promise, user_id=_principal_user(principal), **payload.model_dump()
+        )
+    except CommitmentTrackingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return CommitmentTrackingService.check_payload(row)
+
+
+@router.get("/{ticker}/management-credibility/promises/{promise_id}/checks")
+def list_promise_checks(
+    ticker: str, promise_id: int, db: Session = Depends(get_db)
+) -> list[dict]:
+    from app.services.commitment_tracking_service import CommitmentTrackingService
+
+    promise = _promise_or_404(db, ticker, promise_id)
+    service = CommitmentTrackingService()
+    return [service.check_payload(r) for r in service.checks(db, promise)]
+
+
+@router.post("/{ticker}/management-credibility/promises/{promise_id}/notes", status_code=201)
+def add_promise_note(
+    ticker: str,
+    promise_id: int,
+    payload: PromiseNoteCreate,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> dict:
+    from app.services.commitment_tracking_service import (
+        CommitmentTrackingError,
+        CommitmentTrackingService,
+    )
+
+    promise = _promise_or_404(db, ticker, promise_id)
+    try:
+        row = CommitmentTrackingService().add_note(
+            db, promise, user_id=_principal_user(principal), body=payload.body
+        )
+    except CommitmentTrackingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return CommitmentTrackingService.note_payload(row)
+
+
+@router.get("/{ticker}/management-credibility/promises/{promise_id}/notes")
+def list_promise_notes(
+    ticker: str,
+    promise_id: int,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> list[dict]:
+    from app.services.commitment_tracking_service import CommitmentTrackingService
+
+    promise = _promise_or_404(db, ticker, promise_id)
+    service = CommitmentTrackingService()
+    return [
+        service.note_payload(r)
+        for r in service.notes(db, promise, user_id=_principal_user(principal))
+    ]
+
+
+@router.get("/{ticker}/management-credibility/notes")
+def list_company_promise_notes(
+    ticker: str,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> dict:
+    """Notas privadas del usuario agrupadas por promesa, en una sola consulta (max 500)."""
+    from app.services.commitment_tracking_service import CommitmentTrackingService
+
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    service = CommitmentTrackingService()
+    grouped: dict[str, list[dict]] = {}
+    limit = 500
+    rows = service.notes_for_company(db, company.id, user_id=_principal_user(principal), limit=limit + 1)
+    truncated = len(rows) > limit
+    for row in rows[:limit]:
+        grouped.setdefault(str(row.promise_id), []).append(service.note_payload(row))
+    # Orden estable: id descendente (mas recientes primero). Si hay mas de `limit`,
+    # las mas antiguas quedan fuera y `truncated` lo dice; no equivale a "sin notas".
+    return {"notes_by_promise": grouped, "truncated": truncated, "limit": limit}
 
 
 @router.post("/{ticker}/management-credibility/reconcile")
