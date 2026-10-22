@@ -55,3 +55,45 @@ def test_registry_is_exact_url_and_not_a_transcript():
     assert get_financial_asset("UBER", ASSET.url + "?x=1") is None
     assert get_financial_asset("RKLB", ASSET.url) is None
     assert ASSET.kind == "press_release"
+
+
+def _run(rows):
+    return extract_gross_bookings(asset=ASSET, html=_html(rows=rows), today=TODAY)
+
+
+def test_inverted_reported_and_constant_currency_headers_are_rejected_not_remapped():
+    inverted = HEADER_ROW.replace(
+        "<td>% Change</td><td>% Change(Constant Currency (1))</td>",
+        "<td>% Change(Constant Currency (1))</td><td>% Change</td>")
+    facts, why = _run(inverted + ROW)
+    assert facts == [] and "cabecera" in why
+
+
+def test_units_must_be_millions_not_thousands():
+    thousands = HEADER_ROW.replace("In millions", "In thousands")
+    facts, why = _run(thousands + ROW)
+    assert facts == [] and why == "unidad_no_millones"
+    assert _run(HEADER_ROW.replace("In millions, ", "") + ROW)[0] == []
+
+
+def test_reported_growth_must_match_amounts_at_published_rounding_only():
+    wrong = ROW.replace("<td>24</td>", "<td>10</td>")
+    facts, why = _run(HEADER_ROW + wrong)
+    assert facts == [] and why == "crecimiento_reportado_incoherente_con_importes"
+    # 58022/46756 = 24.09%: 24 (entero) pasa; 25 y 24.5 no (sin tolerancia propia)
+    for bad in ("25", "24.5"):
+        assert _run(HEADER_ROW + ROW.replace("<td>24</td>", f"<td>{bad}</td>"))[0] == []
+    one_decimal = ROW.replace("<td>24</td>", "<td>24.1</td>")
+    assert len(_run(HEADER_ROW + one_decimal)[0]) == 3
+
+
+def test_second_ambiguous_change_header_invalidates_the_mapping():
+    other = ("<tr><td>(In millions)</td><td>2025</td><td>2026</td><td>% Change</td>"
+             "<td>% Change(Constant Currency)</td><td>extra</td></tr>")
+    facts, why = _run(HEADER_ROW + other + ROW)
+    assert facts == [] and "cabecera" in why
+
+
+def test_header_years_must_match_asset_period():
+    wrong_years = HEADER_ROW.replace("<td>2025</td>", "<td>2024</td>")
+    assert _run(wrong_years + ROW)[0] == []

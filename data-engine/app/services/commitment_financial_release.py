@@ -15,7 +15,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from html.parser import HTMLParser
 
 ISSUER_REPORTED = "emisor_reportado"  # no es evidencia externa independiente
@@ -113,25 +113,43 @@ def extract_gross_bookings(
         return [], "titulo_no_coincide"
     parser = _Rows()
     parser.feed(text)
-    header_ok = False
-    found: list[list[str]] = []
+    year = int(asset.period.split()[-1])
+    header: list[str] | None = None
+    found: list[tuple[list[str], list[str]]] = []
     for row in parser.rows:
-        joined = " ".join(row).lower()
-        if ("% change" in joined and "constant currency" in joined
-                and "2025" in row and "2026" in row and row.index("2025") < row.index("2026")):
-            header_ok = True
-        if row and row[0] == "Gross Bookings" and header_ok:
-            found.append(row)
+        # Cabecera de columnas: etiqueta + año previo + año actual + "% Change" + "% Change(Constant Currency...)"
+        if (len(row) == 5 and row[1:3] == [str(year - 1), str(year)]
+                and row[3].lower() == "% change"
+                and row[4].lower().startswith("% change") and "constant currency" in row[4].lower()):
+            header = row
+        elif any("% change" in c.lower() for c in row):
+            # otra cabecera con orden/forma distinta: invalida la anterior (no se mapea a ciegas)
+            header = None
+        if row and row[0] == "Gross Bookings" and header is not None:
+            found.append((header, row))
     if len(found) != 1:
-        return [], "fila_gross_bookings_no_unica_o_sin_cabecera"
-    row = found[0]
+        return [], "fila_gross_bookings_no_unica_o_sin_cabecera_verificada"
+    header, row = found[0]
+    label = header[0].lower()
+    if "in millions" not in label or "thousand" in label:
+        return [], "unidad_no_millones"
     if row.count("%") != 2 or row.count("$") != 2:
         return [], "columnas_inesperadas"
     cells = [c for c in row[1:] if c not in {"$", "%"}]
     if len(cells) != 4 or not all(_NUM.fullmatch(c.replace(",", "")) for c in cells):
         return [], "valores_no_numericos"
-    cur = cells[1].replace(",", "")
+    prev, cur = Decimal(cells[0].replace(",", "")), Decimal(cells[1].replace(",", ""))
     pct = cells[2:]
+    if prev <= 0 or cur <= 0:
+        return [], "importes_no_validos"
+    # Coherencia aritmetica SOLO a la precision del redondeo publicado (sin tolerancia propia):
+    # el % reportado debe ser el crecimiento calculado redondeado a sus decimales publicados.
+    # La columna de moneda constante no se puede comprobar sin tipos de cambio: no se verifica.
+    places = len(pct[0].split(".")[1]) if "." in pct[0] else 0
+    computed = ((cur / prev) - 1) * 100
+    if computed.quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP) != Decimal(pct[0]):
+        return [], "crecimiento_reportado_incoherente_con_importes"
+    cur = cells[1].replace(",", "")
     digest = hashlib.sha256(html).hexdigest()
     base = dict(
         period=asset.period, period_end=asset.period_end, provenance=ISSUER_REPORTED,
