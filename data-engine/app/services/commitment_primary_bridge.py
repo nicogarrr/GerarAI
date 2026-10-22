@@ -1,21 +1,39 @@
 """Puente PipelineResult -> FollowupEvidence (puro, sin I/O).
 
-El periodo/fecha de corte NO salen del texto: los aporta quien llama desde el criterio
-declarado y se exige que el periodo coincida con el del activo registrado. El motor sigue
+El corte del periodo NO sale del texto ni del criterio: se toma del `period` del
+FinancialFact reportado ('YYYY-MM-DD[:Qn|:FY]'); sin fecha de corte autentica -> None
+(se rechaza antes de canonizar estado). Solo acepta PipelineResult emitido por la tuberia. El motor sigue
 siendo suggestion_only; aqui no hay veredictos.
 """
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from app.services.commitment_followup_service import FollowupEvidence
-from app.services.commitment_primary_pipeline import PipelineResult
+from app.services.commitment_primary_pipeline import PipelineResult, is_issued_by_pipeline
+
+
+def period_end_from_fact_period(fact_period: str | None) -> date | None:
+    m = re.match(r'(\d{4})-(\d{2})-(\d{2})(?::|$)', fact_period or '')
+    if not m:
+        return None
+    try:
+        return date(int(m[1]), int(m[2]), int(m[3]))
+    except ValueError:
+        return None
 
 
 def evidence_from_pipeline(
-    out: PipelineResult, *, document_id: int, chunk_id: int, period_end: date, adjusted: bool = False,
+    out: PipelineResult, *, document_id: int, chunk_id: int, fact_period: str | None,
+    adjusted: bool = False,
 ) -> FollowupEvidence | None:
+    if not is_issued_by_pipeline(out):
+        return None
+    period_end = period_end_from_fact_period(fact_period)
+    if period_end is None:
+        return None
     quote = out.result.evidence
     if quote is None or quote.kind != 'document_quote' or quote.period != out.document.asset.period:
         return None

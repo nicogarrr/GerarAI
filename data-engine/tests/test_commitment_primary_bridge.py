@@ -28,7 +28,7 @@ def _evidence(value="22"):
     fact = ReportedObservation(1, 1, 7, "gross_bookings_growth_yoy", Decimal(value), "%", URL,
                                doc.asset.period, True, False)
     out = quote_for_fact(tenant_id=1, company_id=1, document=doc, fact=fact, today=TODAY)
-    return evidence_from_pipeline(out, document_id=3, chunk_id=0, period_end=PERIOD_END)
+    return evidence_from_pipeline(out, document_id=3, chunk_id=0, fact_period="2026-06-30:Q2")
 
 
 def test_document_quote_is_consumed_with_visible_traceability():
@@ -69,4 +69,18 @@ def test_bridge_refuses_without_evidence():
     fact = ReportedObservation(1, 1, 7, "gross_bookings_growth_yoy", Decimal("99"), "%", URL,
                                doc.asset.period, True, False)
     out = quote_for_fact(tenant_id=1, company_id=1, document=doc, fact=fact, today=TODAY)
-    assert evidence_from_pipeline(out, document_id=3, chunk_id=0, period_end=PERIOD_END) is None
+    assert evidence_from_pipeline(out, document_id=3, chunk_id=0, fact_period="2026-06-30:Q2") is None
+
+
+def test_bridge_rejects_hand_built_result_and_missing_fact_cutoff():
+    from app.services.commitment_primary_pipeline import PipelineResult
+
+    doc = _doc()
+    fact = ReportedObservation(1, 1, 7, "gross_bookings_growth_yoy", Decimal("22"), "%", URL,
+                               doc.asset.period, True, False)
+    out = quote_for_fact(tenant_id=1, company_id=1, document=doc, fact=fact, today=TODAY)
+    forged = PipelineResult(result=out.result, document=out.document)
+    assert evidence_from_pipeline(forged, document_id=3, chunk_id=0,
+                                  fact_period="2026-06-30:Q2") is None
+    for bad in (None, "Q2 2026", "2026-13-40"):
+        assert evidence_from_pipeline(out, document_id=3, chunk_id=0, fact_period=bad) is None

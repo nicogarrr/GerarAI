@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from io import BytesIO
 
@@ -52,6 +52,15 @@ class RegisteredDocument:
 class PipelineResult:
     result: PrimaryEvidenceResult
     document: RegisteredDocument
+    # Sello privado: solo quote_for_fact lo pone; el puente rechaza resultados sin el.
+    _seal: object = field(default=None, repr=False, compare=False)
+
+
+_SEAL = object()
+
+
+def is_issued_by_pipeline(out: object) -> bool:
+    return isinstance(out, PipelineResult) and out._seal is _SEAL
 
 
 def _extractor_id() -> str:
@@ -97,7 +106,7 @@ def fetch_registered_document(
     if asset is None:
         raise PrimarySourceError("Activo registrado sin fecha de llamada leida")
     try:
-        content, _ctype, final_url = fetcher(
+        content, ctype, final_url = fetcher(
             url,
             max_bytes=MAX_BYTES,
             timeout=TIMEOUT_SECONDS,
@@ -109,6 +118,8 @@ def fetch_registered_document(
         raise PrimarySourceError("No se pudo descargar la fuente oficial") from exc
     if final_url != url:
         raise PrimarySourceError("La descarga termino en una URL distinta de la registrada")
+    if (ctype or "").split(";")[0].strip().lower() != "application/pdf":
+        raise PrimarySourceError("Content-Type no es application/pdf")
     if not content.startswith(b"%PDF"):
         raise PrimarySourceError("La fuente no es un PDF")
     pages = page_extractor(content)
@@ -145,4 +156,4 @@ def quote_for_fact(
         fact=fact,
         today=today,
     )
-    return PipelineResult(result=result, document=document)
+    return PipelineResult(result=result, document=document, _seal=_SEAL)

@@ -100,3 +100,12 @@ def test_wrong_value_gives_no_evidence():
     )
     out = quote_for_fact(tenant_id=1, company_id=1, document=doc, fact=fact, today=TODAY)
     assert out.result.evidence is None
+
+
+def test_wrong_content_type_is_rejected():
+    def fetch(url, **kw):
+        return BYTES, "text/html", URL
+
+    with pytest.raises(PrimarySourceError):
+        fetch_registered_document("UBER", URL, today=TODAY, fetcher=fetch,
+                                  page_extractor=lambda b: PAGES)
