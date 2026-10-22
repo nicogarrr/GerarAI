@@ -110,3 +110,62 @@ def test_dashboard_exposes_due_state_and_checks():
     dash = ManagementCredibilityService().dashboard(db, company)
     item = dash["promises"][0]
     assert item["due_state"] == "overdue_unverified" and item["checks"] == []
+
+
+def test_candidate_review_flow_enables_verdicts_only_after_explicit_declaration():
+    from app.services.management_credibility_service import ManagementCredibilityService as S
+
+    db = _session(_engine(), 1)
+    company = Company(
+        ticker="ACME", name="ACME", exchange="NYSE", currency="USD", sector="S", industry="I",
+        company_type="holding", valuation_model="unassigned",
+        special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    text = "Ana Perez, CEO\n\nWe expect to launch 12 units by the end of 2030.\n"
+    cand = S().register_extracted_candidates(
+        db, company, transcript_text=text, call_date=date(2030, 7, 1), source_url="https://x.invalid/a"
+    )[0]
+    svc = CommitmentTrackingService()
+    with pytest.raises(CommitmentTrackingError, match="Revisa primero"):  # candidato sin revisar
+        svc.add_check(db, cand, outcome="met", checked_on=date(2031, 1, 5),
+                      evidence_url="https://x.invalid/e", evidence_excerpt="12 delivered")
+    with pytest.raises(CommitmentTrackingError, match="Confirma"):
+        svc.review_candidate(db, cand, fulfillment_criteria="12 unidades entregadas",
+                             due_date=None, confirmed_source_checked=False, user_id="u1")
+    with pytest.raises(CommitmentTrackingError, match="concreto"):
+        svc.review_candidate(db, cand, fulfillment_criteria="ok", due_date=None,
+                             confirmed_source_checked=True, user_id="u1")
+    row = svc.review_candidate(db, cand, fulfillment_criteria="12 unidades entregadas a fin de 2030",
+                               due_date=date(2030, 12, 31), confirmed_source_checked=True, user_id="u1")
+    assert row.status == "open" and row.metadata_["review_kind"] == "user_declared"
+    assert row.metadata_["reviewed_by_user_id"] == "u1" and row.due_date == date(2030, 12, 31)
+    assert row.quote_literal and row.metadata_["source_status"] == "suggested"
+    check = svc.add_check(db, row, outcome="met", checked_on=date(2031, 1, 5),
+                          evidence_url="https://x.invalid/e", evidence_excerpt="12 delivered", user_id="u1")
+    assert CommitmentTrackingService.check_payload(check)["verification"] == "user_declared_not_independently_verified"
+    with pytest.raises(CommitmentTrackingError, match="Solo se revisan"):
+        svc.review_candidate(db, row, fulfillment_criteria="12 unidades entregadas a fin de 2030",
+                             due_date=None, confirmed_source_checked=True, user_id="u1")
+
+
+def test_candidates_cannot_receive_checks_before_review():
+    from app.services.management_credibility_service import ManagementCredibilityService as S
+
+    db = _session(_engine(), 1)
+    company = Company(
+        ticker="ACME", name="ACME", exchange="NYSE", currency="USD", sector="S", industry="I",
+        company_type="holding", valuation_model="unassigned",
+        special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    text = "Ana Perez, CEO\n\nWe expect to launch 12 units by the end of 2030.\n"
+    cand = S().register_extracted_candidates(
+        db, company, transcript_text=text, call_date=date(2030, 7, 1), source_url="https://x.invalid/a"
+    )[0]
+    with pytest.raises(CommitmentTrackingError, match="Revisa primero"):
+        CommitmentTrackingService().add_check(
+            db, cand, outcome="unknown", checked_on=date(2031, 1, 5), summary="x"
+        )

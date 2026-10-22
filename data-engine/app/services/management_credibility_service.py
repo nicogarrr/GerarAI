@@ -437,6 +437,8 @@ class ManagementCredibilityService:
             "source_status": (row.metadata_ or {}).get("source_status"),
             "flags": (row.metadata_ or {}).get("flags") or [],
             "source_check": (row.metadata_ or {}).get("source_check"),
+            "reviewed_by_user_id": (row.metadata_ or {}).get("reviewed_by_user_id"),
+            "reviewed_at": (row.metadata_ or {}).get("reviewed_at"),
             "legacy_heuristic_target": ManagementCredibilityService._is_legacy_heuristic(row),
         }
 

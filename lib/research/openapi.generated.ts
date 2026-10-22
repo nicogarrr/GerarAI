@@ -1183,6 +1183,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/management-credibility/promises/{promise_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Promise Candidate */
+        post: operations["review_promise_candidate_api_companies__ticker__management_credibility_promises__promise_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/management-credibility/reconcile": {
         parameters: {
             query?: never;
@@ -7401,6 +7418,15 @@ export interface components {
             /** Body */
             body: string;
         };
+        /** PromiseReview */
+        PromiseReview: {
+            /** Confirmed Source Checked */
+            confirmed_source_checked: boolean;
+            /** Due Date */
+            due_date?: string | null;
+            /** Fulfillment Criteria */
+            fulfillment_criteria: string;
+        };
         /** QueryRequest */
         QueryRequest: {
             /** As Of From */
@@ -11348,6 +11374,53 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_promise_candidate_api_companies__ticker__management_credibility_promises__promise_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+                promise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromiseReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
