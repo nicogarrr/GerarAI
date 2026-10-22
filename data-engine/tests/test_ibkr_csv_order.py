@@ -62,3 +62,16 @@ def test_reimport_in_other_order_is_idempotent():
     assert second["trades_imported"] == 0
     assert second["duplicate_trades"] == 2
     assert _actions(db) == ["buy", "sell"]
+
+
+def test_genuine_oversell_is_still_reported():
+    db = _session()
+    csv_text = (
+        "symbol,action,quantity,price,date,fees,currency\n"
+        "ZZOVER,buy,2,5,2026-01-02,0,USD\n"
+        "ZZOVER,sell,5,7,2026-01-05,0,USD\n"
+    )
+    result = IBKRImportService().import_ibkr_csv(db, csv_text)
+    assert result["rows_skipped"] == 1
+    assert any("ZZOVER" in e and "Cannot sell" in e for e in result["row_errors"])
+    assert _actions(db) == ["buy"]
