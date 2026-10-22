@@ -18,7 +18,7 @@ by the user because it depends on deal terms.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -28,6 +28,31 @@ from app.models import Company, CorporateAction, Position, Transaction
 from app.services.company_resolver import resolve_company
 
 SPLIT_TYPES = {"split", "reverse_split"}
+
+
+def _today() -> date:
+    return datetime.now(UTC).date()
+
+
+def _validate_verified_price(price, as_of, effective_date) -> None:
+    """Entradas explicitas del llamador: se comprueban antes de escribir.
+
+    No acreditan procedencia por si solas (no hay fuente autenticada): solo
+    descartan basura (float, NaN/Inf, <=0, datetime, fecha anterior al
+    efectivo o futura).
+    """
+    if price is None and as_of is None:
+        return
+    if type(price) is not Decimal or not price.is_finite() or price <= 0:
+        raise ValueError("Split rejected: post_split_price must be a finite Decimal > 0")
+    if type(as_of) is not date:
+        raise ValueError("Split rejected: post_split_price_as_of must be a date")
+    if as_of < effective_date:
+        raise ValueError(
+            "Split rejected: post_split_price_as_of is before the effective date"
+        )
+    if as_of > _today():
+        raise ValueError("Split rejected: post_split_price_as_of is in the future")
 
 
 class CorporateActionService:
@@ -103,6 +128,11 @@ class CorporateActionService:
         post_split_price: Decimal | None = None,
         post_split_price_as_of=None,
     ) -> CorporateAction:
+        """Crea la accion y, con apply_now, la aplica en UNA unidad de trabajo.
+
+        Si aplicar falla se hace rollback de TODA la sesion (tambien de los
+        cambios pendientes sin commit del llamador) y se relanza el error.
+        """
         company = resolve_company(db, ticker)
         if company is None:
             raise ValueError(f"Company {ticker} does not exist; import transactions or create it first")
@@ -183,6 +213,9 @@ class CorporateActionService:
         rebuild_company_id: int | None = None
 
         if action.action_type in {"split", "reverse_split"}:
+            _validate_verified_price(
+                post_split_price, post_split_price_as_of, action.effective_date
+            )
             first = self.first_trade_dates(db, {action.company_id}).get(action.company_id)
             position = db.scalar(
                 select(Position).where(Position.company_id == action.company_id)
@@ -228,11 +261,7 @@ class CorporateActionService:
                             "Split rejected: position source "
                             f"{position.source!r} is not the ledger; review the position"
                         )
-                    if (
-                        post_split_price is None
-                        or post_split_price <= 0
-                        or post_split_price_as_of is None
-                    ):
+                    if post_split_price is None:
                         raise ValueError(
                             "Split rejected: the stored market price has no "
                             "provenance (it cannot be told whether it is pre- or "

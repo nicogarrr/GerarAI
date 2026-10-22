@@ -174,7 +174,7 @@ def test_split_without_verified_price_rejects_before_any_write(db):
     pos.as_of = date(2025, 5, 1)
     db.commit()
     with pytest.raises(ValueError, match="no provenance"):
-        _apply(db, c, "4", date(2025, 6, 1), price=None)
+        _apply(db, c, "4", date(2025, 6, 1), price=None, as_of=None)
     assert db.query(CorporateAction).count() == 0
     tx = db.query(Transaction).filter_by(company_id=c.id).one()
     assert tx.quantity == Decimal("10") and tx.price == Decimal("100")
@@ -387,3 +387,89 @@ def test_ledger_split_rescales_buy_and_sell_legs_but_not_cash_or_post_legs(db):
     assert (post.quantity, post.price) == (Decimal("2"), Decimal("40"))
     pos = db.query(Position).filter_by(company_id=c.id).one()
     assert pos.quantity == Decimal("26")
+
+
+def _bad_price_case(db, price, as_of):
+    import pytest
+
+    from app.models.entities import Company, CorporateAction, Transaction
+    c = db.query(Company).first() or _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.commit()
+    with pytest.raises(ValueError, match="Split rejected"):
+        CorporateActionService().create_action(
+            db, ticker=c.ticker, action_type="split", effective_date=date(2025, 6, 1),
+            ratio=Decimal("2"), post_split_price=price, post_split_price_as_of=as_of)
+    assert db.query(CorporateAction).count() == 0
+    tx = db.query(Transaction).filter_by(company_id=c.id).one()
+    assert tx.quantity == Decimal("10") and tx.price == Decimal("100")
+    assert db.query(Position).filter_by(company_id=c.id).one().quantity == Decimal("10")
+
+
+def test_split_rejects_invalid_verified_price_inputs_before_writes(db):
+    from datetime import datetime
+    good = date(2025, 12, 31)
+    for price, as_of in [
+        (25.0, good),                      # float
+        (25, good),                        # int
+        (Decimal("NaN"), good),
+        (Decimal("Infinity"), good),
+        (Decimal("0"), good),
+        (Decimal("-1"), good),
+        (Decimal("25"), None),             # sin fecha
+        (Decimal("25"), datetime(2025, 12, 31)),   # datetime, no date
+        (Decimal("25"), "2025-12-31"),
+        (Decimal("25"), date(2025, 5, 31)),        # anterior al efectivo
+    ]:
+        _bad_price_case(db, price, as_of)
+        db.rollback()
+        db.query(Position).delete()
+        from app.models.entities import Transaction
+        db.query(Transaction).delete()
+        db.commit()
+
+
+def test_split_rejects_future_verified_price_date_with_fixed_clock(db, monkeypatch):
+    import app.services.corporate_actions_service as mod
+    monkeypatch.setattr(mod, "_today", lambda: date(2025, 12, 1))
+    _bad_price_case(db, Decimal("25"), date(2025, 12, 2))
+    monkeypatch.setattr(mod, "_today", lambda: date(2025, 12, 2))
+    db.rollback()
+    c = db.query(__import__("app.models.entities", fromlist=["Company"]).Company).one()
+    CorporateActionService().create_action(
+        db, ticker=c.ticker, action_type="split", effective_date=date(2025, 6, 1),
+        ratio=Decimal("2"), post_split_price=Decimal("25"),
+        post_split_price_as_of=date(2025, 12, 2))
+    assert db.query(Position).filter_by(company_id=c.id).one().quantity == Decimal("20")
+
+
+def test_http_route_ignores_post_split_fields_and_does_not_enable_bypass(db):
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.routes.corporate_actions import (
+        CorporateActionInput,
+        apply_action,
+        create_action,
+    )
+    from app.models.entities import CorporateAction, Transaction
+
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.commit()
+    body = {
+        "ticker": c.ticker, "action_type": "split", "effective_date": "2025-06-01",
+        "ratio": 2, "post_split_price": "25", "post_split_price_as_of": "2025-12-01",
+    }
+    # El modelo del endpoint no declara esos campos: se descartan, no habilitan nada.
+    assert "post_split_price" not in CorporateActionInput.model_fields
+    with pytest.raises(HTTPException) as exc:
+        create_action(CorporateActionInput(**body), db)
+    assert exc.value.status_code == 400 and "no provenance" in exc.value.detail
+    assert db.query(CorporateAction).count() == 0
+    assert db.query(Transaction).filter_by(company_id=c.id).one().quantity == Decimal("10")
+    created = create_action(CorporateActionInput(**{**body, "apply_now": False}), db)
+    with pytest.raises(HTTPException) as exc:
+        apply_action(created["id"], db)
+    assert exc.value.status_code == 400
+    assert db.query(Transaction).filter_by(company_id=c.id).one().quantity == Decimal("10")
