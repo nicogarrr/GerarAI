@@ -366,9 +366,34 @@ class ManagementCredibilityService:
                 "missed": sum(row.status == "missed" for row in promises),
             },
             "legacy_excluded_from_score": len(legacy),
-            "promises": [self.payload(row) for row in promises],
+            "promises": self._with_tracking(db, promises),
             "method": "resolved promises: met=1, partial=0.5, missed=0",
         }
+
+    def _with_tracking(self, db: Session, promises: list[ManagementPromise]) -> list[dict[str, Any]]:
+        from datetime import date as _date
+
+        from app.models.entities import ManagementPromiseCheck
+        from app.services.commitment_tracking_service import CommitmentTrackingService, due_state
+
+        ids = [row.id for row in promises]
+        by_promise: dict[int, list] = {}
+        if ids:
+            for check in db.scalars(
+                select(ManagementPromiseCheck)
+                .where(ManagementPromiseCheck.promise_id.in_(ids))
+                .order_by(desc(ManagementPromiseCheck.checked_on), desc(ManagementPromiseCheck.id))
+            ).all():
+                by_promise.setdefault(check.promise_id, []).append(check)
+        today = _date.today()
+        out = []
+        for row in promises:
+            checks = by_promise.get(row.id, [])
+            item = self.payload(row)
+            item["due_state"] = due_state(row, checks, today)
+            item["checks"] = [CommitmentTrackingService.check_payload(c) for c in checks]
+            out.append(item)
+        return out
 
     @staticmethod
     def _is_legacy_heuristic(row: ManagementPromise) -> bool:

@@ -10,6 +10,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 from starlette.concurrency import run_in_threadpool
 
+from app.core.auth import get_research_principal
 from app.core.database import get_db
 from app.core.errors import safe_detail
 from app.models import (
@@ -312,6 +313,21 @@ class ManagementCandidateExtract(BaseModel):
 class ManagementCandidateFromUrl(BaseModel):
     call_date: date
     source_url: str = Field(max_length=1000, pattern=r"^https://")
+
+
+class PromiseCheckCreate(BaseModel):
+    outcome: Literal[
+        "unknown", "not_verifiable", "insufficient_evidence", "met", "partially_met", "not_met"
+    ]
+    checked_on: date
+    summary: str = Field(default="", max_length=2000)
+    evidence_url: str | None = Field(default=None, max_length=1000, pattern=r"^https://")
+    evidence_date: date | None = None
+    evidence_excerpt: str | None = Field(default=None, max_length=2000)
+
+
+class PromiseNoteCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=5000)
 
 
 class ManagementPromiseCreate(BaseModel):
@@ -961,6 +977,92 @@ def extract_management_candidates_from_url(
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return [ManagementCredibilityService.payload(row) for row in rows]
+
+
+def _principal_user(principal) -> str:
+    return principal.user_id if principal else "local-dev"
+
+
+def _promise_or_404(db: Session, ticker: str, promise_id: int):
+    company = resolve_company(db, ticker)
+    promise = db.get(ManagementPromise, promise_id)
+    if not company or not promise or promise.company_id != company.id:
+        raise HTTPException(status_code=404, detail="Management promise not found")
+    return promise
+
+
+@router.post("/{ticker}/management-credibility/promises/{promise_id}/checks", status_code=201)
+def add_promise_check(
+    ticker: str,
+    promise_id: int,
+    payload: PromiseCheckCreate,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> dict:
+    from app.services.commitment_tracking_service import (
+        CommitmentTrackingError,
+        CommitmentTrackingService,
+    )
+
+    promise = _promise_or_404(db, ticker, promise_id)
+    try:
+        row = CommitmentTrackingService().add_check(
+            db, promise, user_id=_principal_user(principal), **payload.model_dump()
+        )
+    except CommitmentTrackingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return CommitmentTrackingService.check_payload(row)
+
+
+@router.get("/{ticker}/management-credibility/promises/{promise_id}/checks")
+def list_promise_checks(
+    ticker: str, promise_id: int, db: Session = Depends(get_db)
+) -> list[dict]:
+    from app.services.commitment_tracking_service import CommitmentTrackingService
+
+    promise = _promise_or_404(db, ticker, promise_id)
+    service = CommitmentTrackingService()
+    return [service.check_payload(r) for r in service.checks(db, promise)]
+
+
+@router.post("/{ticker}/management-credibility/promises/{promise_id}/notes", status_code=201)
+def add_promise_note(
+    ticker: str,
+    promise_id: int,
+    payload: PromiseNoteCreate,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> dict:
+    from app.services.commitment_tracking_service import (
+        CommitmentTrackingError,
+        CommitmentTrackingService,
+    )
+
+    promise = _promise_or_404(db, ticker, promise_id)
+    try:
+        row = CommitmentTrackingService().add_note(
+            db, promise, user_id=_principal_user(principal), body=payload.body
+        )
+    except CommitmentTrackingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return CommitmentTrackingService.note_payload(row)
+
+
+@router.get("/{ticker}/management-credibility/promises/{promise_id}/notes")
+def list_promise_notes(
+    ticker: str,
+    promise_id: int,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> list[dict]:
+    from app.services.commitment_tracking_service import CommitmentTrackingService
+
+    promise = _promise_or_404(db, ticker, promise_id)
+    service = CommitmentTrackingService()
+    return [
+        service.note_payload(r)
+        for r in service.notes(db, promise, user_id=_principal_user(principal))
+    ]
 
 
 @router.post("/{ticker}/management-credibility/reconcile")

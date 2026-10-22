@@ -269,6 +269,8 @@ export type ManagementCredibility = {
     flags?: string[];
     source_check?: string | null;
     legacy_heuristic_target?: boolean;
+    due_state?: string;
+    checks?: Array<{ id: number; checked_on: string; outcome: string; summary: string; evidence_url: string | null; evidence_date: string | null; evidence_excerpt: string | null }>;
   }>;
 };
 
@@ -817,6 +819,21 @@ export async function extractManagementCandidatesFromUrl(ticker: string, formDat
     body: JSON.stringify({
       call_date: required(formData, 'call_date', 'Call date'),
       source_url: required(formData, 'source_url', 'Source URL'),
+    }),
+  });
+  revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+}
+
+export async function addManagementPromiseCheck(ticker: string, promiseId: number, formData: FormData) {
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/checks`, {
+    method: 'POST',
+    body: JSON.stringify({
+      outcome: required(formData, 'outcome', 'Outcome'),
+      checked_on: required(formData, 'checked_on', 'Checked on'),
+      summary: String(formData.get('summary') ?? '').trim(),
+      evidence_url: String(formData.get('evidence_url') ?? '').trim() || null,
+      evidence_date: String(formData.get('evidence_date') ?? '').trim() || null,
+      evidence_excerpt: String(formData.get('evidence_excerpt') ?? '').trim() || null,
     }),
   });
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
