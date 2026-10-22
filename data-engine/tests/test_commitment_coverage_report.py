@@ -187,3 +187,23 @@ def test_eviction_is_retention_not_recovery_and_does_not_flag_incident(db, tmp_p
     assert rep["store"]["incident"] is None
     assert rep["companies"][0]["state"] == "fuente_obtenida"
     assert rep["companies"][0]["last_checked_on"] == "2026-10-22"
+
+
+def test_evicted_ticker_is_out_of_retention_not_never_checked(db, tmp_path):
+    from app.services import commitment_source_check_job as mod
+
+    _co(db, "BN")
+    db.add(WatchItem(symbol="BN"))
+    db.commit()
+    store = JsonSourceCheckStore(tmp_path / "s")
+    old = SourceCheckRecord(ticker="BN", url="https://x.invalid/z", kind="transcript",
+                            period="Q2 2026", checked_on="2025-01-01", outcome="extraido",
+                            reason="texto_obtenido", content_sha256="e" * 64)
+    fill = [SourceCheckRecord(ticker=f"T{i}", url=f"https://x.invalid/{i}", kind="transcript",
+                              period="Q2 2026", checked_on="2026-10-22", outcome="extraido",
+                              reason="texto_obtenido", content_sha256="e" * 64)
+            for i in range(mod.MAX_RECORDS)]
+    store.save([old, *fill])
+    rep = coverage_report(db, JsonSourceCheckStore(tmp_path / "s"))
+    assert rep["companies"][0]["state"] == "estado_fuera_retencion"
+    assert "BN" in rep["store"]["evicted_tickers"] and rep["store"]["at_retention_cap"]

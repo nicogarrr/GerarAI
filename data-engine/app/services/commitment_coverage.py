@@ -125,7 +125,9 @@ def coverage_report(db, store) -> dict:
         r["in_portfolio"], r["in_watchlist"] = flags[r["ticker"]]
         r["universe_static_snapshot"] = False
         if r["state"] == "nunca_chequeado":
-            if status.get("first_run"):
+            if r["ticker"] in status.get("evicted_tickers", []) or status.get("at_retention_cap"):
+                r["state"] = "estado_fuera_retencion"  # puede haberse chequeado: desconocido
+            elif status.get("first_run"):
                 r["state"] = "sin_ejecuciones_aun"  # arranque normal, no averia
             elif degraded:
                 r["state"] = "estado_del_almacen_no_fiable"  # no se afirma "nunca chequeado"

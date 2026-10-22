@@ -42,5 +42,5 @@ def test_failed_scheduled_run_is_persisted_and_exposed(monkeypatch, tmp_path):
     with pytest.raises(mod.StoreCorruptError):
         sch.run_source_check_job()
     run = mod.read_job_run(mod.JsonSourceCheckStore(tmp_path / "s"))
-    assert run["ok"] is False and run["error"] == "StoreCorruptError"
+    assert run["finished"] is False and run["error"] == "StoreCorruptError"
     monkeypatch.undo()

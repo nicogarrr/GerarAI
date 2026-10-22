@@ -215,9 +215,12 @@ class JsonSourceCheckStore:
         # ultimo evento por URL del historial (conserva su resultado real, incluso error/abstencion,
         # y su last_good_*): se usa para reconstruir y para completar un latest parcial.
         by_url: dict[str, dict] = {}
+        evicted_tickers: set[str] = set()
         for item in events:
             if item.get("event") == "evicted" and item.get("url"):
                 by_url.pop(item["url"], None)  # retencion, NO recuperacion: no se resucita
+                if item.get("ticker_evicted"):
+                    evicted_tickers.add(item["ticker_evicted"])
             elif item.get("url") and item.get("ticker"):
                 by_url[item["url"]] = item
         recovered = []
@@ -227,6 +230,8 @@ class JsonSourceCheckStore:
             if url not in data:
                 data[url] = {**item, "_source": "historial"}
                 recovered.append(url)
+        status["evicted_tickers"] = sorted(evicted_tickers)
+        status["at_retention_cap"] = len(data) - len(recovered) >= MAX_RECORDS
         status["recovered_from_history"] = bool(recovered)
         status["recovered_urls"] = len(recovered)
         status["first_run"] = (status["latest"] == "ausente" and not events
@@ -325,8 +330,10 @@ class JsonSourceCheckStore:
                 # evicta por fecha de chequeo mas antigua (determinista; desempate por URL)
                 for url in sorted(data, key=lambda u: (data[u].get("checked_on", ""), u))[
                         : len(data) - MAX_RECORDS]:
+                    data_ticker = {url: data[url].get("ticker")}
                     data.pop(url)
-                    events.append({"event": "evicted", "url": url})
+                    events.append({"event": "evicted", "url": url,
+                                   "ticker_evicted": data_ticker.get(url)})
             # Diario primero, estado despues: si cae entre ambos, el historial tiene el chequeo y
             # latest queda en el estado anterior (el siguiente chequeo lo reescribe); nunca al reves.
             self._append_history(events)
@@ -364,7 +371,9 @@ def record_job_run(store: JsonSourceCheckStore, *, ok: bool, day: str,
         store._ensure()
         with store._locked():
             store._atomic_write(store.dir / "last_run.json", json.dumps(
-                {"day": day, "ok": ok, "error": error, "outcomes": outcomes or {}}))
+                {"day": day, "finished": ok, "error": error, "outcomes": outcomes or {},
+                 "had_errors": bool((outcomes or {}).get("error")),
+                 "note": "ultima ejecucion programada; no es salud actual ni exito de fuentes"}))
     except OSError:
         pass  # el propio almacen puede estar roto; el log del scheduler ya lleva el fallo
 
