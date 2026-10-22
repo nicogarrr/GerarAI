@@ -856,13 +856,19 @@ export async function extractManagementCandidatesFromUrl(ticker: string, formDat
 
 export async function extractManagementCandidatesFromRegistry(ticker: string, formData: FormData) {
   assertCommitmentsUi();
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-registry`, {
+  const created = await requestJson<unknown[]>(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-registry`, {
     method: 'POST',
     body: JSON.stringify({
       source_url: required(formData, 'source_url', 'Source URL'),
     }),
   });
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+  const n = Array.isArray(created) ? created.length : 0;
+  return {
+    message: n === 0
+      ? 'No se han añadido candidatos nuevos: la fuente ya se había procesado o no se detectaron candidatos nuevos.'
+      : `${n} ${n === 1 ? 'candidato nuevo extraído' : 'candidatos nuevos extraídos'} (sin revisar).`,
+  };
 }
 
 export async function reviewManagementCandidate(ticker: string, promiseId: number, formData: FormData) {
