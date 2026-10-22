@@ -376,3 +376,20 @@ def test_manual_promise_with_user_target_is_not_excluded_from_score(db):
     assert dash["legacy_excluded_from_score"] == 0
     assert dash["promises"][0]["legacy_heuristic_target"] is False
     assert dash["score"] == 1
+
+
+def test_portfolio_commitments_aggregates_net_position_without_duplicates(db):
+    from app.api.routes.portfolio import management_commitments
+    from app.models.entities import Position
+
+    held = _company(db)
+    db.add_all([
+        Position(company_id=held.id, quantity=Decimal("3"), as_of=date(2030, 1, 1)),
+        Position(company_id=held.id, quantity=Decimal("2"), as_of=date(2030, 1, 1)),
+    ])
+    db.commit()
+    data = management_commitments(db)
+    assert data["held_count"] == 1 and [c["ticker"] for c in data["companies"]] == ["MCO"]
+    db.add(Position(company_id=held.id, quantity=Decimal("-5"), as_of=date(2030, 1, 1)))
+    db.commit()
+    assert management_commitments(db)["held_count"] == 0  # neta 0: no en cartera

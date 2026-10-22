@@ -407,8 +407,16 @@ def management_commitments(db: Session = Depends(get_db)) -> dict:
     from app.models.entities import ManagementPromise
     from app.services.management_credibility_service import ManagementCredibilityService
 
+    # Posicion NETA por empresa: puede haber varias filas (carteras/lotes) del mismo
+    # ticker; se agregan y se incluye toda posicion neta != 0 (largos y cortos).
+    net = (
+        select(Position.company_id)
+        .group_by(Position.company_id)
+        .having(func.sum(Position.quantity) != 0)
+        .subquery()
+    )
     held = db.execute(
-        select(Company).join(Position, Position.company_id == Company.id).where(Position.quantity > 0).order_by(Company.ticker)
+        select(Company).join(net, net.c.company_id == Company.id).order_by(Company.ticker)
     ).scalars().all()
     companies = []
     for company in held:

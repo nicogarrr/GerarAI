@@ -2724,3 +2724,49 @@ class EtfHolding(Base):
     weight_pct: Mapped[Decimal] = mapped_column(Numeric(9, 4))
     as_of: Mapped[_DateT] = mapped_column(Date)
     source_url: Mapped[str] = mapped_column(Text)
+
+
+CHECK_OUTCOMES = (
+    "unknown",
+    "not_verifiable",
+    "insufficient_evidence",
+    "met",
+    "partially_met",
+    "not_met",
+)
+
+
+class ManagementPromiseCheck(TenantOwnedMixin, Base, TimestampMixin):
+    """Comprobacion fechada de un compromiso, con su fuente. Visible para el tenant.
+
+    met / partially_met / not_met exigen evidence_url y evidence_excerpt: un
+    enlace sin contenido que pruebe el criterio no es cumplimiento. Que pase el
+    vencimiento sin comprobacion NO crea una fila ni un "no cumplido".
+    """
+
+    __tablename__ = "management_promise_checks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    promise_id: Mapped[int] = mapped_column(
+        ForeignKey("management_promises.id", ondelete="CASCADE"), index=True
+    )
+    checked_on: Mapped[date] = mapped_column(Date)
+    outcome: Mapped[str] = mapped_column(String(30))
+    summary: Mapped[str] = mapped_column(Text, default="")
+    evidence_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    evidence_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    evidence_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_user_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+
+
+class ManagementPromiseNote(TenantOwnedMixin, Base, TimestampMixin):
+    """Nota PRIVADA: solo la lee y escribe su autor (owner_user_id) dentro de su tenant."""
+
+    __tablename__ = "management_promise_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    promise_id: Mapped[int] = mapped_column(
+        ForeignKey("management_promises.id", ondelete="CASCADE"), index=True
+    )
+    owner_user_id: Mapped[str] = mapped_column(String(160), index=True)
+    body: Mapped[str] = mapped_column(Text)
