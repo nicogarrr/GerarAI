@@ -779,6 +779,20 @@ export async function getManagementCredibility(ticker: string): Promise<Manageme
   return requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility`);
 }
 
+export type ManagementPromiseNote = { id: number; promise_id: number; body: string; created_at: string | null };
+
+export async function getManagementPromiseNotes(ticker: string, promiseId: number): Promise<ManagementPromiseNote[]> {
+  return requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/notes`);
+}
+
+export async function addManagementPromiseNote(ticker: string, promiseId: number, formData: FormData) {
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ body: required(formData, 'body', 'Nota') }),
+  });
+  revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+}
+
 export async function createManagementPromise(ticker: string, formData: FormData) {
   const target = String(formData.get('target_value') ?? '').trim();
   const sourceDocument = String(formData.get('source_document_id') ?? '').trim();
