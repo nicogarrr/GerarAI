@@ -153,9 +153,37 @@ class CorporateActionService:
             # Split historico (anterior a la primera operacion): ya reflejado,
             # se marca aplicado sin reescalar la posicion actual.
             if position is not None and not self.is_historical(action, first):
-                position.quantity = (position.quantity * ratio).quantize(Decimal("0.000001"))
-                if position.average_cost is not None:
-                    position.average_cost = (position.average_cost / ratio).quantize(
+                # Las operaciones desde la fecha efectiva ya se registraron en
+                # terminos post-split y no se reescalan; solo se reescala el
+                # resto de la posicion. Sin operaciones posteriores el
+                # resultado es el escalado completo de siempre. El coste
+                # total se conserva.
+                post_legs = db.execute(
+                    select(Transaction.action, Transaction.quantity).where(
+                        Transaction.company_id == action.company_id,
+                        Transaction.trade_date >= action.effective_date,
+                        Transaction.action.in_(("buy", "sell")),
+                    )
+                ).all()
+                post_net = sum(
+                    (
+                        (quantity or Decimal("0")) * (1 if leg_action == "buy" else -1)
+                        for leg_action, quantity in post_legs
+                    ),
+                    Decimal("0"),
+                )
+                post_net = max(Decimal("0"), min(post_net, position.quantity))
+                old_quantity = position.quantity
+                old_cost = (
+                    old_quantity * position.average_cost
+                    if position.average_cost is not None
+                    else None
+                )
+                position.quantity = ((old_quantity - post_net) * ratio + post_net).quantize(
+                    Decimal("0.000001")
+                )
+                if old_cost is not None and position.quantity > 0:
+                    position.average_cost = (old_cost / position.quantity).quantize(
                         Decimal("0.000001")
                     )
                 if position.market_price is not None:
