@@ -23,3 +23,15 @@ test('convierte lo que ve la persona al valor del backend y de vuelta', () => {
   assert.equal(fromBackendValue('0.15', 'ratio'), '15');
   assert.equal(fromBackendValue('abc', 'ratio'), '');
 });
+
+
+test('cobertura conocida vacía no equivale a proveedor desconocido', () => {
+  assert.deepEqual(buildMetricOptions([]), []);
+  assert.ok(buildMetricOptions(undefined).length > 20);
+});
+
+test('cobertura vacía conserva métricas personalizadas sin cambiar su escala', () => {
+  const options = buildMetricOptions([], [{ metric_key: 'roic_spread', name: 'Diferencial ROIC', unit: 'percent' }]);
+  assert.deepEqual(options.map((option: { key: string }) => option.key), ['roic_spread']);
+  assert.equal(options[0].unit, 'number');
+});

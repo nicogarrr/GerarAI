@@ -39,7 +39,7 @@ export function buildMetricOptions(
   custom: readonly { metric_key: string; name: string; unit: string }[] = [],
   metricLabel: (key: string) => string = (key) => key.replaceAll('_', ' '),
 ): MetricOption[] {
-  const have = available && available.length > 0 ? new Set(available) : null;
+  const have = available === undefined ? null : new Set(available);
   const out: MetricOption[] = [];
   const seen = new Set<string>();
   for (const g of GROUPS) {
