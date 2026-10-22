@@ -36,7 +36,7 @@ import {
 } from '@/database/models/manual-demo.model';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { sanitizeFinnhubQuote } from '@/lib/market/quote-freshness';
-import { createQuoteCache, type CachedQuote, type QuoteFetchAttempt } from '@/lib/market/quote-cache';
+import { combineAbortSignals, createQuoteCache, type CachedQuote, type QuoteFetchAttempt } from '@/lib/market/quote-cache';
 import { parseListingCurrencies, symbolFromKey, valuePositions, type DemoValuation, type ValuationQuote } from '@/lib/market/demo-valuation';
 import { computeManualDemoAccount } from '@/lib/paper-trading/accounting';
 import { docsToLedger } from '@/lib/paper-trading/ledger-adapter';
@@ -775,49 +775,6 @@ const MAX_VALUATION_SYMBOLS = 25;
 // enriquecido (fetchedAt/saturated) que devuelve la caché.
 type QuoteAttempt = QuoteFetchAttempt;
 
-/**
- * Combina la señal del llamador (la caché aborta en su timeout) con el tope
- * propio del fetch respetando AMBOS límites: AbortSignal.any si el runtime
- * la tiene; si no, controlador manual que aborta de verdad desde cualquiera
- * de las dos fuentes (mismo patrón que requestSignal de lib/research/client.ts;
- * package.json no fija engines y el Node de prod no está confirmado en repo).
- * Una señal ya abortada produce una señal abortada al instante. Al abortar se
- * retiran los listeners de AMBAS fuentes: la cadena no queda retenida aunque
- * la petición se repita muchas veces. Exportada para las guardas.
- */
-export function combineQuoteSignals(external: AbortSignal, timeoutMs: number): AbortSignal {
-    const timeoutSignal = AbortSignal.timeout(timeoutMs);
-    if (typeof AbortSignal.any === 'function') {
-        return AbortSignal.any([external, timeoutSignal]);
-    }
-    if (external.aborted) return AbortSignal.abort(external.reason);
-    if (timeoutSignal.aborted) return AbortSignal.abort(timeoutSignal.reason);
-    const controller = new AbortController();
-    let onExternal: (() => void) | null = null;
-    let onTimeout: (() => void) | null = null;
-    const cleanup = () => {
-        if (onExternal) {
-            external.removeEventListener('abort', onExternal);
-            onExternal = null;
-        }
-        if (onTimeout) {
-            timeoutSignal.removeEventListener('abort', onTimeout);
-            onTimeout = null;
-        }
-    };
-    onExternal = () => {
-        cleanup();
-        controller.abort(external.reason);
-    };
-    onTimeout = () => {
-        cleanup();
-        controller.abort(timeoutSignal.reason);
-    };
-    external.addEventListener('abort', onExternal, { once: true });
-    timeoutSignal.addEventListener('abort', onTimeout, { once: true });
-    return controller.signal;
-}
-
 async function finnhubOnlyQuote(symbol: string, signal?: AbortSignal): Promise<QuoteAttempt> {
     const token = process.env.FINNHUB_API_KEY;
     if (!token) return { quote: null, fetchFailed: true, retryAfterSeconds: null };
@@ -827,7 +784,7 @@ async function finnhubOnlyQuote(symbol: string, signal?: AbortSignal): Promise<Q
             cache: 'no-store',
             // El timeout de la caché ABORTA de verdad (su señal llega hasta
             // este fetch); el tope propio de 8 s se mantiene en paralelo.
-            signal: signal ? combineQuoteSignals(signal, 8_000) : AbortSignal.timeout(8_000),
+            signal: signal ? combineAbortSignals(signal, 8_000) : AbortSignal.timeout(8_000),
         });
         if (!response.ok) {
             const retryAfter = Number.parseInt(response.headers.get('retry-after') ?? '', 10);

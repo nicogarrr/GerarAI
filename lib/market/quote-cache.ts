@@ -84,6 +84,49 @@ export type QuoteCacheOptions = {
     now?: () => number;
 };
 
+/**
+ * Combina la señal del llamador (esta caché aborta en su timeout) con el tope
+ * propio del fetch respetando AMBOS límites: AbortSignal.any si el runtime
+ * la tiene; si no, controlador manual que aborta de verdad desde cualquiera
+ * de las dos fuentes (mismo patrón que requestSignal de lib/research/client.ts;
+ * package.json no fija engines y el Node de prod no está confirmado en repo).
+ * Una señal ya abortada produce una señal abortada al instante. Al abortar se
+ * retiran los listeners de AMBAS fuentes: la cadena no queda retenida aunque
+ * la petición se repita muchas veces.
+ */
+export function combineAbortSignals(external: AbortSignal, timeoutMs: number): AbortSignal {
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    if (typeof AbortSignal.any === 'function') {
+        return AbortSignal.any([external, timeoutSignal]);
+    }
+    if (external.aborted) return AbortSignal.abort(external.reason);
+    if (timeoutSignal.aborted) return AbortSignal.abort(timeoutSignal.reason);
+    const controller = new AbortController();
+    let onExternal: (() => void) | null = null;
+    let onTimeout: (() => void) | null = null;
+    const cleanup = () => {
+        if (onExternal) {
+            external.removeEventListener('abort', onExternal);
+            onExternal = null;
+        }
+        if (onTimeout) {
+            timeoutSignal.removeEventListener('abort', onTimeout);
+            onTimeout = null;
+        }
+    };
+    onExternal = () => {
+        cleanup();
+        controller.abort(external.reason);
+    };
+    onTimeout = () => {
+        cleanup();
+        controller.abort(timeoutSignal.reason);
+    };
+    external.addEventListener('abort', onExternal, { once: true });
+    timeoutSignal.addEventListener('abort', onTimeout, { once: true });
+    return controller.signal;
+}
+
 type Entry = { quote: SanitizedQuote; fetchedAt: number };
 type FailureMark = { notBefore: number; failures: number };
 

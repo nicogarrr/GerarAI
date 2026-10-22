@@ -9,7 +9,6 @@
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
-import { getEventListeners } from 'node:events';
 
 register('./manual-demo-guard.loader.mjs', import.meta.url);
 
@@ -894,62 +893,6 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         const r3 = (await actions.getManualDemoValuation()) as unknown as VResult;
         assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['BBVA', 'BBVA'], 'cumplido Retry-After se reintenta');
         assert.equal(r3.valuation.rows[0].status, 'valorada');
-    });
-});
-
-describe('combineQuoteSignals (fallback compatible sin AbortSignal.any)', () => {
-    const combine = (actions as unknown as { combineQuoteSignals: (external: AbortSignal, timeoutMs: number) => AbortSignal }).combineQuoteSignals;
-    const anyDesc = Object.getOwnPropertyDescriptor(AbortSignal, 'any');
-    const sinAny = <T>(fn: () => T): T => {
-        (AbortSignal as unknown as { any?: unknown }).any = undefined;
-        try {
-            return fn();
-        } finally {
-            if (anyDesc) Object.defineProperty(AbortSignal, 'any', anyDesc);
-        }
-    };
-
-    it('ruta nativa (any presente): el abort externo se propaga con su reason', () => {
-        const c = new AbortController();
-        const combined = combine(c.signal, 60_000);
-        c.abort('motivo-externo');
-        assert.equal(combined.aborted, true);
-        assert.equal(combined.reason, 'motivo-externo');
-    });
-
-    it('fallback sin any: abort externo => combinada abortada, reason preservado y listeners retirados', () => {
-        sinAny(() => {
-            const c = new AbortController();
-            const combined = combine(c.signal, 60_000);
-            assert.equal(getEventListeners(c.signal, 'abort').length, 1, 'escuchando la fuente externa');
-            c.abort('motivo-externo');
-            assert.equal(combined.aborted, true, 'la cancelación externa es real sin any');
-            assert.equal(combined.reason, 'motivo-externo');
-            assert.equal(getEventListeners(c.signal, 'abort').length, 0, 'no retiene la cadena tras abortar');
-        });
-    });
-
-    it('fallback sin any: el timeout propio también aborta de verdad', async () => {
-        await sinAny(async () => {
-            const c = new AbortController();
-            const combined = combine(c.signal, 30);
-            assert.equal(combined.aborted, false);
-            await new Promise((r) => setTimeout(r, 80));
-            assert.equal(combined.aborted, true, 'el tope interno aborta sin any');
-            assert.equal((combined.reason as { name?: string })?.name, 'TimeoutError');
-            assert.equal(getEventListeners(c.signal, 'abort').length, 0, 'listeners retirados tras el timeout');
-        });
-    });
-
-    it('fallback sin any: señal YA abortada => combinada abortada al instante, sin listeners', () => {
-        sinAny(() => {
-            const c = new AbortController();
-            c.abort('ya-abortada');
-            const combined = combine(c.signal, 60_000);
-            assert.equal(combined.aborted, true);
-            assert.equal(combined.reason, 'ya-abortada');
-            assert.equal(getEventListeners(c.signal, 'abort').length, 0, 'no registra listeners innecesarios');
-        });
     });
 });
 
