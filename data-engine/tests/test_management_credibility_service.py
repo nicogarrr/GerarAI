@@ -70,7 +70,23 @@ def _fact(db, company, value, year=2025, quarter="FY", metric="revenue", with_so
     return fact
 
 
-def _promise(db, company, *, period="FY2025", operator=">=", target="100"):
+def _mark_reviewed(db, promise):
+    """Criterio estructurado revisado por una persona (provenance user_declared)."""
+    promise.metadata_ = {
+        **(promise.metadata_ or {}),
+        "reviewed_at": "2026-10-22T12:00:00+00:00",
+        "review_kind": "user_declared",
+    }
+    db.commit()
+    return promise
+
+
+def _promise(db, company, *, period="FY2025", operator=">=", target="100", reviewed=True):
+    promise = _promise_raw(db, company, period=period, operator=operator, target=target)
+    return _mark_reviewed(db, promise) if reviewed else promise
+
+
+def _promise_raw(db, company, *, period="FY2025", operator=">=", target="100"):
     return ManagementCredibilityService().register(
         db, company,
         promise=f"Revenue {operator} {target} in {period}",
@@ -188,8 +204,10 @@ def test_promise_without_target_records_outcome(db):
         metric="revenue", operator=None, target_value=None, unit=None,
     )
     [p] = ManagementCredibilityService().reconcile(db, c)
-    assert p.status == "outcome_recorded"
+    # sin criterio estructurado no hay veredicto; el hecho queda solo como contexto
+    assert p.status == "open"
     assert p.actual_value == Decimal("110")
+    assert p.evidence[-1]["context_only"] is True
 
 
 # --- Procedencia verificable (0078) -----------------------------------------
@@ -389,11 +407,12 @@ def test_manual_promise_with_user_target_is_not_excluded_from_score(db):
     company = _company(db)
     service = ManagementCredibilityService()
     _fact(db, company, 120, year=2030)
-    service.register(
+    promise = service.register(
         db, company, promise="Revenue above 100", promise_date=date(2029, 1, 1),
         expected_period="FY2030", metric="revenue", operator=">=",
         target_value=Decimal("100"), unit="USD",
     )
+    _mark_reviewed(db, promise)
     service.reconcile(db, company)
     dash = service.dashboard(db, company)
     assert dash["legacy_excluded_from_score"] == 0
@@ -451,3 +470,31 @@ def test_fact_without_traceable_source_document_is_ignored(db):
     [p] = ManagementCredibilityService().reconcile(db, c)
     assert p.status == "open"
     assert p.actual_fact_id is None
+
+
+def test_unreviewed_promise_gets_context_but_no_verdict_and_keeps_prior_status(db):
+    c = _company(db)
+    _fact(db, c, 120)
+    p = _promise(db, c, reviewed=False)
+    ManagementCredibilityService().reconcile(db, c)
+    db.refresh(p)
+    assert p.status == "open"
+    assert p.actual_value == Decimal("120")
+    assert p.evidence[-1]["context_only"] is True
+    # un juicio previo no se sobrescribe sin criterio revisado
+    p.status = "partial"
+    db.commit()
+    ManagementCredibilityService().reconcile(db, c)
+    db.refresh(p)
+    assert p.status == "partial"
+
+
+def test_reviewed_promise_gets_exact_verdict_with_source(db):
+    c = _company(db)
+    fact = _fact(db, c, 120)
+    p = _promise(db, c)
+    ManagementCredibilityService().reconcile(db, c)
+    db.refresh(p)
+    assert p.status == "met"
+    assert p.evidence[-1]["context_only"] is False
+    assert p.evidence[-1]["source_document_id"] == fact.source_id
