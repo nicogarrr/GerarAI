@@ -27,10 +27,12 @@ _BOILERPLATE = re.compile(
     r"press release|non[- ‐]GAAP|reconciliation",
     re.I,
 )
+# Solo intencion en PRIMERA PERSONA (la direccion habla de si misma). "es esperado que"/"will be" sobre
+# mercados o terceros NO cuentan: se marcan aparte y no entran como candidatos.
 _FORWARD = re.compile(
     r"\b(we expect|we anticipate|we plan to|we intend to|we will|we are going to|we aim to|"
-    r"we target|on track to|we remain committed to|we are committed to|we continue to expect|"
-    r"we expect to|is expected to|are expected to|will be|we'll be|we're on track|on track to be)\b",
+    r"we target|we remain committed to|we are committed to|we continue to expect|"
+    r"we expect to|we'll be|we're on track|we are on track)\b",
     re.I,
 )
 _CHECKABLE = re.compile(
@@ -40,6 +42,10 @@ _CHECKABLE = re.compile(
 )
 _CONDITIONAL = re.compile(r"\b(if|unless|subject to|depending on|assuming|absent|provided that)\b", re.I)
 _NEGATION = re.compile(r"\b(not|no longer|do not|don't|aren't|won't|cannot|isn't)\b", re.I)
+_THIRD_PARTY = re.compile(
+    r"\b(?:is|are|was|were)\s+expected\s+to\b|\b(?:market|industry|Department|Government|Commission|Agency|"
+    r"regulator\w*)\b"
+)
 _QUARTER_END = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
 _ORD = {"first": 1, "second": 2, "third": 3, "fourth": 4}
 
@@ -211,6 +217,14 @@ def _due_hint(sentence: str, call_date: date | None = None) -> tuple[date | None
 def extract_candidates(
     transcript_text: str, *, max_candidates: int = 40, call_date: date | None = None
 ) -> list[Candidate]:
+    return extract_with_diagnostics(transcript_text, max_candidates=max_candidates, call_date=call_date)[0]
+
+
+def extract_with_diagnostics(
+    transcript_text: str, *, max_candidates: int = 40, call_date: date | None = None
+) -> tuple[list[Candidate], dict]:
+    """(candidatos, {parser, management_turns}). management_turns == 0 => formato NO soportado
+    (no se reconocen hablantes directivos): NO equivale a "sin compromisos"."""
     lines = transcript_text.splitlines()
     roster = _roster(lines)
     haystack = _normalize(transcript_text.replace("\f", "\n"))
@@ -220,6 +234,7 @@ def extract_candidates(
         block_turns, roster = _turns_blocks(transcript_text)
         turns = [(w, b) for w, _r, b in block_turns]
         parser = "bloques_pdf"
+    diag = {"parser": parser, "management_turns": len(turns)}
     out: list[Candidate] = []
     seen: set[str] = set()
     for speaker, body in turns:
@@ -241,6 +256,8 @@ def extract_candidates(
                 flags.append("conditional")
             if _NEGATION.search(sentence):
                 flags.append("negation_present")
+            if _THIRD_PARTY.search(sentence):
+                flags.append("mercado_o_tercero_mencionado")
             if basis == "year_end_inferred_from_call_year":
                 flags.append("due_year_inferred")
             out.append(
@@ -260,5 +277,5 @@ def extract_candidates(
                 )
             )
             if len(out) >= max_candidates:
-                return out
-    return out
+                return out, diag
+    return out, diag

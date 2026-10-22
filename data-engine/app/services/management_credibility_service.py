@@ -226,7 +226,7 @@ class ManagementCredibilityService:
                 source_url=source_url,
                 transcript_locator=locator_for(cand),
                 due_date=cand.due_date_hint,
-                status_reason="Candidato extraido por reglas; sin revisar contra la fuente.",
+                status_reason="Frase candidata extraida por reglas (no es una promesa confirmada); sin revisar contra la fuente.",
                 date_basis=date_basis,
             )
             db.add(row)

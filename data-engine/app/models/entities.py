@@ -2759,6 +2759,36 @@ class ManagementPromiseCheck(TenantOwnedMixin, Base, TimestampMixin):
     created_by_user_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
 
 
+class CommitmentExtractionAttempt(TenantOwnedMixin, Base, TimestampMixin):
+    """Registro por (tenant, empresa, transcripcion registrada) de intentos de extraccion de candidatos.
+
+    La restriccion UNIQUE hace de cerrojo de idempotencia: dos procesos no extraen el mismo activo a la
+    vez. Guarda hash/fecha/resultado para no re-descargar a ciegas ni quemar el presupuesto con fallos.
+    """
+
+    __tablename__ = "commitment_extraction_attempts"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "company_id", "source_url", name="uq_commitment_extraction_attempt"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    source_url: Mapped[str] = mapped_column(String(1000))
+    call_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="running")  # running | done | failed
+    outcome: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+    last_attempt_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    next_attempt_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    bytes_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    text_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    management_turns: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    candidates_created: Mapped[int] = mapped_column(Integer, default=0)
+    detail: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
 class ManagementPromiseNote(TenantOwnedMixin, Base, TimestampMixin):
     """Nota PRIVADA: solo la lee y escribe su autor (owner_user_id) dentro de su tenant."""
 

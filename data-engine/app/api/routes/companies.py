@@ -1000,36 +1000,33 @@ def extract_management_candidates_from_registry(
     """Extrae CANDIDATOS (sin revisar) de una transcripcion oficial registrada. No decide nada."""
     from datetime import date as _date
 
-    from app.services.commitment_primary_pipeline import (
-        PrimarySourceError,
-        fetch_registered_document_isolated,
-    )
+    from app.services.commitment_candidate_job import process_asset
+    from app.services.commitment_primary_pipeline import fetch_registered_document_isolated
+    from app.services.transcript_source_registry import get_entry
     from app.services.transcript_source_service import throttle
 
     company = resolve_company(db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
+    entry = get_entry(company.ticker)
+    asset = next((a for a in (entry.assets if entry else ()) if a.url == payload.source_url), None)
+    if asset is None or not asset.call_date:
+        raise HTTPException(status_code=422, detail="URL no registrada como transcripcion oficial exacta")
     if not throttle(company.id):
         raise HTTPException(status_code=429, detail="Espera unos segundos entre descargas")
-    try:
-        doc, _meta = fetch_registered_document_isolated(
-            company.ticker, payload.source_url, today=_date.today()
-        )
-    except PrimarySourceError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    try:
-        rows = ManagementCredibilityService().register_extracted_candidates(
-            db,
-            company,
-            transcript_text=doc.text,
-            call_date=doc.asset.published_on,
-            source_url=doc.url,
-            source_check="registro_oficial_exacto",
-            date_basis="call_date",
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return [ManagementCredibilityService.payload(row) for row in rows]
+    before = {r.id for r in db.scalars(select(ManagementPromise).where(ManagementPromise.company_id == company.id))}
+    item = process_asset(db, company, company.ticker, asset, today=_date.today(), fetch=fetch_registered_document_isolated)
+    if item["outcome"] in ("en_curso_otro_proceso",):
+        raise HTTPException(status_code=409, detail=item["outcome"])
+    if item["outcome"] == "formato_sin_hablantes_reconocidos":
+        raise HTTPException(status_code=422, detail="formato_sin_hablantes_reconocidos: no es 'sin compromisos'")
+    if item["outcome"].startswith(("fallo_", "error_")):
+        raise HTTPException(status_code=422, detail=item["outcome"] + (": " + item["detail"] if item.get("detail") else ""))
+    return [
+        ManagementCredibilityService.payload(r)
+        for r in db.scalars(select(ManagementPromise).where(ManagementPromise.company_id == company.id))
+        if r.id not in before
+    ]
 
 
 def _principal_user(principal) -> str:

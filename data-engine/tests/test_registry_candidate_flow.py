@@ -44,7 +44,7 @@ def _db():
     Base.metadata.create_all(eng)
     db = Session(eng)
     db.info["tenant_id"] = None
-    co = Company(ticker="ACME", name="ACME", exchange="NYSE", currency="USD", sector="S", industry="I",
+    co = Company(ticker="UBER", name="Uber", exchange="NYSE", currency="USD", sector="S", industry="I",
                  company_type="holding", valuation_model="unassigned",
                  special_sources=[], special_risks=[], factor_tags=[])
     db.add(co)
@@ -56,14 +56,14 @@ def test_registry_route_creates_unreviewed_candidates_then_human_review(monkeypa
     from app.api.routes import companies as routes
 
     db, co = _db()
-    doc = SimpleNamespace(text=SYN, url="https://x.invalid/t.pdf",
+    doc = SimpleNamespace(text=SYN, bytes_sha256="b" * 64, text_sha256="t" * 64, url="https://s23.q4cdn.com/407969754/files/doc_events/2026/Aug/05/Uber-Q2-26-Earnings-Call-Transcript.pdf",
                           asset=SimpleNamespace(published_on=date(2026, 8, 5)))
     monkeypatch.setattr("app.services.commitment_primary_pipeline.fetch_registered_document_isolated",
                         lambda t, u, today: (doc, {}))
     monkeypatch.setattr("app.services.transcript_source_service.throttle", lambda k: True)
     monkeypatch.setattr(routes, "resolve_company", lambda db_, t: co)
     out = routes.extract_management_candidates_from_registry(
-        "ACME", routes.ManagementCandidateFromRegistry(source_url="https://x.invalid/t.pdf"), db=db, principal=None)
+        "UBER", routes.ManagementCandidateFromRegistry(source_url="https://s23.q4cdn.com/407969754/files/doc_events/2026/Aug/05/Uber-Q2-26-Earnings-Call-Transcript.pdf"), db=db, principal=None)
     first = out[0]
     assert first["status"] == "candidate" and first["source_check"] == "registro_oficial_exacto"
     assert first["due_basis"] == "year_end_inferred_from_call_year" and first["support_quote"]
@@ -88,6 +88,22 @@ def test_registry_route_rejects_unregistered_url(monkeypatch):
     monkeypatch.setattr(routes, "resolve_company", lambda db_, t: co)
     with pytest.raises(HTTPException) as e:
         routes.extract_management_candidates_from_registry(
-            "ACME", routes.ManagementCandidateFromRegistry(source_url="https://evil.invalid/t.pdf"),
+            "UBER", routes.ManagementCandidateFromRegistry(source_url="https://evil.invalid/t.pdf"),
             db=db, principal=None)
     assert e.value.status_code == 422
+
+
+def test_third_party_or_market_sentences_are_labeled_and_non_first_person_is_excluded():
+    txt = ("Jane Roe \nChief Executive Officer, Acme Corp. \n"
+           "The market is expected to generate 300 billion in 2026 and we expect to grow 10 percent. "
+           "The sector will be 5 times bigger in 2030. \n")
+    cs = extract_candidates(txt)
+    assert len(cs) == 1 and "mercado_o_tercero_mencionado" in cs[0].flags
+    assert "sector will be" not in cs[0].quote_literal
+
+
+def test_unrecognised_format_reports_zero_management_turns_not_no_commitments():
+    from app.services.commitment_extraction_service import extract_with_diagnostics
+
+    cs, diag = extract_with_diagnostics("Just a page of prepared remarks without speaker headers. We will grow 10% in 2027.")
+    assert cs == [] and diag["management_turns"] == 0
