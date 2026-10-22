@@ -217,3 +217,23 @@ def test_record_carries_origin_and_format(tmp_path):
                                   origin="url_dominio_oficial_por_busqueda", format="pdf")])
     item = store.read_history(limit=1)[0]
     assert item["origin"] == "url_dominio_oficial_por_busqueda" and item["format"] == "pdf"
+
+
+def test_management_commitments_covers_union_without_amounts(db):
+    from app.api.routes.portfolio import management_commitments
+
+    held, only_watch, closed = _co(db, "UBER"), _co(db, "KKR"), _co(db, "OLD")
+    db.add_all([Position(company_id=held.id, quantity=Decimal("5"), as_of=date(2030, 1, 1)),
+                Position(company_id=closed.id, quantity=Decimal("0"), as_of=date(2030, 1, 1))])
+    db.add_all([WatchItem(symbol="kkr"), WatchItem(symbol="NOCO"), WatchItem(symbol="UBER")])
+    db.commit()
+    assert only_watch.id
+    data = management_commitments(db)
+    rows = {c["ticker"]: c for c in data["companies"]}
+    assert set(rows) == {"UBER", "KKR", "NOCO"}  # OLD (posicion cerrada) fuera
+    assert rows["UBER"]["in_portfolio"] and rows["UBER"]["in_watchlist"]
+    assert rows["KKR"]["in_watchlist"] and not rows["KKR"]["in_portfolio"]
+    assert rows["NOCO"]["company_in_db"] is False and rows["NOCO"]["counts"]["total"] == 0
+    assert data["universe_count"] == 3 and data["held_count"] == 1 and data["watchlist_count"] == 3
+    blob = str(data)
+    assert "quantity" not in blob and "5" not in {k for c in data["companies"] for k in c}

@@ -46212,7 +46212,7 @@
     },
     "/api/portfolio/management-commitments": {
       "get": {
-        "description": "Compromisos de la directiva SOLO de empresas con posicion real (tenant del principal).\n\nLos tickers salen de Position en BD, no de una lista aportada por el llamante.",
+        "description": "Compromisos de la directiva de TODA la union cartera + watchlist del tenant.\n\nEl universo sale de BD (posiciones netas != 0 y WatchItem del tenant de la sesion), no de una\nlista aportada por el llamante. Una empresa de la watchlist sin fila Company (o sin\ncompromisos) aparece igualmente, con `company_in_db`/contadores a 0: ausencia de datos NO es\n\"sin compromisos\". No devuelve cantidades, precios ni importes de la cartera.",
         "operationId": "management_commitments_api_portfolio_management_commitments_get",
         "parameters": [
           {

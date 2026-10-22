@@ -412,35 +412,44 @@ def source_coverage(db: Session = Depends(get_db)) -> dict:
 
 @router.get("/management-commitments")
 def management_commitments(db: Session = Depends(get_db)) -> dict:
-    """Compromisos de la directiva SOLO de empresas con posicion real (tenant del principal).
+    """Compromisos de la directiva de TODA la union cartera + watchlist del tenant.
 
-    Los tickers salen de Position en BD, no de una lista aportada por el llamante.
+    El universo sale de BD (posiciones netas != 0 y WatchItem del tenant de la sesion), no de una
+    lista aportada por el llamante. Una empresa de la watchlist sin fila Company (o sin
+    compromisos) aparece igualmente, con `company_in_db`/contadores a 0: ausencia de datos NO es
+    "sin compromisos". No devuelve cantidades, precios ni importes de la cartera.
     """
     from app.models.entities import ManagementPromise
+    from app.services.commitment_coverage import dynamic_universe
     from app.services.management_credibility_service import ManagementCredibilityService
 
-    # Posicion NETA por empresa: puede haber varias filas (carteras/lotes) del mismo
-    # ticker; se agregan y se incluye toda posicion neta != 0 (largos y cortos).
-    net = (
-        select(Position.company_id)
-        .group_by(Position.company_id)
-        .having(func.sum(Position.quantity) != 0)
-        .subquery()
-    )
-    held = db.execute(
-        select(Company).join(net, net.c.company_id == Company.id).order_by(Company.ticker)
-    ).scalars().all()
+    universe, flags = dynamic_universe(db)
+    by_ticker = {}
+    if universe:
+        by_ticker = {
+            c.ticker.strip().upper(): c
+            for c in db.execute(
+                select(Company).where(func.upper(Company.ticker).in_(universe))
+            ).scalars()
+        }
     companies = []
-    for company in held:
-        rows = db.scalars(
-            select(ManagementPromise)
-            .where(ManagementPromise.company_id == company.id)
-            .order_by(desc(ManagementPromise.call_date), desc(ManagementPromise.id))
-        ).all()
+    for ticker in universe:
+        company = by_ticker.get(ticker)
+        rows = []
+        if company is not None:
+            rows = db.scalars(
+                select(ManagementPromise)
+                .where(ManagementPromise.company_id == company.id)
+                .order_by(desc(ManagementPromise.call_date), desc(ManagementPromise.id))
+            ).all()
+        in_portfolio, in_watchlist = flags[ticker]
         companies.append(
             {
-                "ticker": company.ticker,
-                "name": company.name,
+                "ticker": ticker,
+                "name": company.name if company is not None else None,
+                "in_portfolio": in_portfolio,
+                "in_watchlist": in_watchlist,
+                "company_in_db": company is not None,
                 "counts": {
                     "total": len(rows),
                     "candidate": sum(r.status == "candidate" for r in rows),
@@ -449,7 +458,13 @@ def management_commitments(db: Session = Depends(get_db)) -> dict:
                 "items": [ManagementCredibilityService.payload(r) for r in rows],
             }
         )
-    return {"companies": companies, "held_count": len(held)}
+    return {
+        "companies": companies,
+        "held_count": sum(1 for v in flags.values() if v[0]),
+        "watchlist_count": sum(1 for v in flags.values() if v[1]),
+        "universe_count": len(universe),
+        "universe_source": "bd_tenant",
+    }
 
 
 @router.get("/positions")
