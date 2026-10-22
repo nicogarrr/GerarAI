@@ -123,6 +123,9 @@ export async function getSourceCoverage(): Promise<SourceCoverageResult> {
         if (!data || !Array.isArray(data.companies) || !Array.isArray(data.history)) {
             return { status: 'unavailable' };
         }
+        // Filas malformadas (null, sin ticker) se descartan: nunca se inventan datos ni se rinde un crash.
+        data.companies = data.companies.filter((c) => c && typeof c === 'object' && typeof c.ticker === 'string');
+        data.history = data.history.filter((h) => h && typeof h === 'object' && typeof h.ticker === 'string' && typeof h.url === 'string');
         // Normalización defensiva: campos lista ausentes nunca tumban la página.
         for (const c of data.companies) {
             c.pending ??= [];

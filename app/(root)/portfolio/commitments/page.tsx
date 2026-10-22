@@ -36,10 +36,12 @@ export default async function PortfolioCommitmentsPage() {
       </main>
     );
   }
-  const withItems = data.companies.filter((c) => c.counts.total > 0);
-  const ambiguous = data.companies.filter((c) => c.company_identity_ambiguous);
+  // Filas malformadas (sin counts.numérico) se descartan: no cuentan como 0 ni tumban la página.
+  const valid = data.companies.filter((c) => c && typeof c === 'object' && typeof c.ticker === 'string' && c.counts && typeof c.counts.total === 'number');
+  const withItems = valid.filter((c) => c.counts.total > 0);
+  const ambiguous = valid.filter((c) => c.company_identity_ambiguous);
   // Sin datos por ausencia REAL: ni compromisos ni identidad ambigua.
-  const withoutData = data.companies.length - withItems.length - ambiguous.length;
+  const withoutData = valid.length - withItems.length - ambiguous.length;
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
       <PageHeader

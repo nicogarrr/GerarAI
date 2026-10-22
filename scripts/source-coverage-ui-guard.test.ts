@@ -150,6 +150,16 @@ void test('management-commitments sin companies[] degrada y watchlist_count ause
     assert.ok(page.includes("typeof data.watchlist_count === 'number'"), 'watchlist_count ausente no se imprime como 0');
 });
 
+void test('filas malformadas se filtran sin inventar datos ni tumbar la página', () => {
+    const actions = source('lib/actions/source-coverage.actions.ts');
+    const page = source('app/(root)/portfolio/commitments/page.tsx');
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(actions.includes("typeof c.ticker === 'string'"), 'coverage: company malformada fuera');
+    assert.ok(actions.includes("typeof h.url === 'string'"), 'coverage: history null fuera');
+    assert.ok(page.includes("typeof c.counts.total === 'number'"), 'commitments: sin counts.total no se lee');
+    assert.ok(view.includes('.filter((h) => h &&'), 'historial no rinde null');
+});
+
 void test('la acción usa firma de identidad y no-store como el resto del cliente research', () => {
     const actions = source('lib/actions/source-coverage.actions.ts');
     assert.ok(actions.includes('researchIdentityHeaders'), 'firma de identidad');

@@ -77,7 +77,7 @@ function CoverageSummary({ companies }: { companies: SourceCoverageCompany[] }) 
         const cur = counts.get(g.label) ?? { ...g, n: 0 };
         cur.n += 1;
         counts.set(g.label, cur);
-        if (c.pending.length) pendingCount += 1;
+        if ((c.pending ?? []).length) pendingCount += 1;
     }
     const parts = [...counts.values()].sort((a, b) => a.order - b.order).map((g) => `${g.n} ${g.label}`);
     return (
@@ -124,6 +124,11 @@ function outcomesSummary(outcomes: Record<string, number>): string {
 
 function CompanyRow({ company }: { company: SourceCoverageCompany }) {
     const c = company;
+    // Fila parcial (p.ej. solo ticker): nunca crash; se muestra lo que llegó, sin inventar.
+    const sources = c.transcript_sources ?? [];
+    const pressSources = c.press_release_sources ?? [];
+    const origins = c.transcript_origins ?? [];
+    const pending = c.pending ?? [];
     // Fuera de retención (evicción): el backend marca estado_fuera_retencion
     // porque pudo haberse chequeado; NUNCA afirmar "nunca" en ese caso.
     const stateLabel = STATE_LABEL[c.state] ?? 'Estado desconocido';
@@ -149,12 +154,12 @@ function CompanyRow({ company }: { company: SourceCoverageCompany }) {
                     Documentos: {c.transcript_assets} ({c.transcript_assets_with_call_date} con fecha de llamada)
                 </p>
             ) : null}
-            {c.transcript_sources.length + c.press_release_sources.length > 0 ? (
+            {sources.length + pressSources.length > 0 ? (
                 <details className="mt-1">
-                    <summary className="cursor-pointer text-xs text-gray-500 underline">Fuentes ({c.transcript_sources.length + c.press_release_sources.length})</summary>
+                    <summary className="cursor-pointer text-xs text-gray-500 underline">Fuentes ({sources.length + pressSources.length})</summary>
                     <ul className="mt-1 grid gap-1">
-                        {c.transcript_sources.map((src) => <TranscriptSourceLine key={src.url} source={src} />)}
-                        {c.press_release_sources.map((prs) => (
+                        {sources.map((src) => <TranscriptSourceLine key={src.url} source={src} />)}
+                        {pressSources.map((prs) => (
                             <li className="text-xs text-gray-400" key={prs.url}>
                                 {safeUrl(prs.url)
                                     ? <a className="underline" href={safeUrl(prs.url) ?? undefined} rel="noopener noreferrer" target="_blank">Comunicado financiero</a>
@@ -165,14 +170,14 @@ function CompanyRow({ company }: { company: SourceCoverageCompany }) {
                     </ul>
                 </details>
             ) : null}
-            {c.transcript_origins.length ? (
+            {origins.length ? (
                 <p className="mt-1 text-xs text-gray-500">
-                    Fuente de la transcripción: {c.transcript_origins.map((o) => ORIGIN_LABEL[o] ?? 'origen registrado').join(' · ')}
+                    Fuente de la transcripción: {origins.map((o) => ORIGIN_LABEL[o] ?? 'origen registrado').join(' · ')}
                 </p>
             ) : null}
-            {c.pending.length ? (
+            {pending.length ? (
                 <p className="mt-1 text-xs text-gray-500">
-                    Pendiente: {c.pending.map((p) => PENDING_LABEL[p] ?? p).join(' · ')}
+                    Pendiente: {pending.map((p) => PENDING_LABEL[p] ?? p).join(' · ')}
                 </p>
             ) : null}
         </li>
@@ -180,10 +185,12 @@ function CompanyRow({ company }: { company: SourceCoverageCompany }) {
 }
 
 function HistoryList({ history }: { history: SourceCoverageHistoryItem[] }) {
-    if (!history.length) return <p className="text-xs text-gray-500">Sin chequeos registrados todavía.</p>;
+    // Defensa extra: la acción ya filtra malformados; aquí nunca rinde un null.
+    const rows = (history ?? []).filter((h) => h && typeof h === 'object' && typeof h.ticker === 'string');
+    if (!rows.length) return <p className="text-xs text-gray-500">Sin chequeos registrados todavía.</p>;
     return (
         <ul className="grid gap-2">
-            {history.map((h, i) => (
+            {rows.map((h, i) => (
                 <li className="text-xs text-gray-400" key={`${h.url}-${h.checked_on}-${i}`}>
                     <span className="font-medium text-gray-300">{h.ticker}</span>
                     {' · '}{KIND_LABEL[h.kind] ?? h.kind}
@@ -262,6 +269,9 @@ function OperationalDetails({ report }: { report: SourceCoverageReport }) {
 }
 
 export function SourceCoverageView({ report }: { report: SourceCoverageReport }) {
+    // Defensa a nivel componente (la acción ya filtra): null/malformados nunca rinden ni tumban.
+    const companies = (report.companies ?? []).filter((c) => c && typeof c === 'object' && typeof c.ticker === 'string');
+    const historyRows = (report.history ?? []).filter((h) => h && typeof h === 'object' && typeof h.ticker === 'string');
     return (
         <section aria-labelledby="source-coverage-title" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
             <h2 className="font-semibold text-gray-100" id="source-coverage-title">Cobertura de fuentes</h2>
@@ -272,22 +282,22 @@ export function SourceCoverageView({ report }: { report: SourceCoverageReport })
             <div className="mt-3 grid gap-2">
                 <StoreAlerts report={report} />
             </div>
-            <CoverageSummary companies={report.companies} />
-            {report.companies.length ? (
+            <CoverageSummary companies={companies} />
+            {companies.length ? (
                 <details className="mt-3">
-                    <summary className="cursor-pointer text-xs text-gray-400 underline">Cobertura por empresa ({report.companies.length})</summary>
+                    <summary className="cursor-pointer text-xs text-gray-400 underline">Cobertura por empresa ({companies.length})</summary>
                     <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-                        {report.companies.map((c) => <CompanyRow company={c} key={c.ticker} />)}
+                        {companies.map((c) => <CompanyRow company={c} key={c.ticker} />)}
                     </ul>
                 </details>
             ) : (
                 <p className="mt-3 text-xs text-gray-500">No hay empresas en el universo todavía.</p>
             )}
             <details className="mt-4">
-                <summary className="cursor-pointer text-xs text-gray-400 underline">Detalle operativo y chequeos recientes ({report.history.length})</summary>
+                <summary className="cursor-pointer text-xs text-gray-400 underline">Detalle operativo y chequeos recientes ({historyRows.length})</summary>
                 <div className="mt-2 grid gap-2">
                     <OperationalDetails report={report} />
-                    <HistoryList history={report.history} />
+                    <HistoryList history={historyRows} />
                 </div>
             </details>
         </section>
