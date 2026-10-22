@@ -934,14 +934,19 @@ def extract_management_candidates_from_url(
 ) -> list[dict]:
     from app.services.transcript_source_service import (
         TranscriptSourceError,
+        check_source,
         fetch_transcript_text,
+        throttle,
     )
 
     company = resolve_company(db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
+    if not throttle(company.id):
+        raise HTTPException(status_code=429, detail="Espera unos segundos entre descargas")
     try:
         text = fetch_transcript_text(payload.source_url)
+        source_check = check_source(text, ticker=company.ticker, call_date=payload.call_date)
     except TranscriptSourceError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
@@ -951,6 +956,7 @@ def extract_management_candidates_from_url(
             transcript_text=text,
             call_date=payload.call_date,
             source_url=payload.source_url,
+            source_check=source_check,
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc

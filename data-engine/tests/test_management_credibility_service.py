@@ -360,3 +360,19 @@ def test_portfolio_commitments_only_for_held_companies(db):
     assert [c["ticker"] for c in data["companies"]] == ["MCO"]
     assert data["companies"][0]["counts"] == {"total": 1, "candidate": 1, "registered": 0}
     assert data["companies"][0]["items"][0]["source_status"] == "suggested"
+
+
+def test_manual_promise_with_user_target_is_not_excluded_from_score(db):
+    company = _company(db)
+    service = ManagementCredibilityService()
+    _fact(db, company, 120, year=2030)
+    service.register(
+        db, company, promise="Revenue above 100", promise_date=date(2029, 1, 1),
+        expected_period="FY2030", metric="revenue", operator=">=",
+        target_value=Decimal("100"), unit="USD",
+    )
+    service.reconcile(db, company)
+    dash = service.dashboard(db, company)
+    assert dash["legacy_excluded_from_score"] == 0
+    assert dash["promises"][0]["legacy_heuristic_target"] is False
+    assert dash["score"] == 1
