@@ -53,6 +53,11 @@ def test_thesis_debate_sync_work_off_the_event_loop(monkeypatch):
     monkeypatch.setattr(
         "app.services.thesis_debate_service.debate_thesis", fake_debate
     )
+    # The route constructs its provider before calling the doubled debate.
+    # Do not require real credentials just to test the threadpool boundary.
+    monkeypatch.setattr(
+        "app.llm.free_interactive.create_free_interactive_provider", lambda: object()
+    )
     response = client.post("/api/thesis/PROBE/debate")
     assert response.status_code == 200, response.text
     assert response.json()["verdict"] == "hold"
@@ -138,3 +143,31 @@ def test_extract_document_kpis_off_the_event_loop(monkeypatch):
     response = client.post(f"/api/sources/documents/{document_id}/extract-kpis")
     assert response.status_code == 200, response.text
     assert calls and all(calls)
+
+
+def test_thesis_debate_without_free_provider_returns_honest_503(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.llm.free_interactive import FreeLLMUnavailable
+
+    init_db()
+    monkeypatch.setattr(
+        "app.api.routes.thesis.ThesisService.latest",
+        lambda self, db, ticker: SimpleNamespace(id=None, thesis_markdown="# test", executive_summary=""),
+    )
+    monkeypatch.setattr(
+        "app.api.routes.thesis.resolve_company",
+        lambda db, ticker: SimpleNamespace(id=None, ticker=ticker),
+    )
+
+    def no_provider():
+        raise FreeLLMUnavailable()
+
+    async def unexpected_debate(*args, **kwargs):
+        raise AssertionError("A missing provider must not call the debate")
+
+    monkeypatch.setattr("app.llm.free_interactive.create_free_interactive_provider", no_provider)
+    monkeypatch.setattr("app.services.thesis_debate_service.debate_thesis", unexpected_debate)
+    response = client.post("/api/thesis/PROBE/debate")
+    assert response.status_code == 503
+    assert response.json() == {"detail": "LLM gratuito no disponible, vuelve más tarde"}

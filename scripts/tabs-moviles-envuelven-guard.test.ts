@@ -16,8 +16,10 @@ test('las tres tiras envuelven en móvil', () => {
     assert.ok(SECTION.includes("localStorage.getItem('subnav-seccion')"), 'SectionNav: recuerda plegado/desplegado');
     assert.ok(SECTION.includes('aria-expanded={open}'), 'SectionNav: botón con aria-expanded');
     assert.ok(SECTION.includes('scroll={false}'), 'SectionNav: los enlaces conservan el scroll');
-    assert.ok(SECTION.includes('flex-nowrap gap-1.5 overflow-x-auto'), 'SectionNav: lista desplegada en una fila con scroll');
-    assert.ok(SECTION.includes('sm:flex-wrap'), 'SectionNav: wrap solo desde sm');
+    // La fila con scroll vive en OverflowScrollRegion (pista de overflow);
+    // la lista interna mantiene una fila en movil y wrap solo desde sm.
+    assert.ok(SECTION.includes('flex flex-nowrap gap-1.5 sm:flex-wrap'), 'SectionNav: lista desplegada en una fila, wrap solo desde sm');
+    assert.ok(SECTION.includes('<OverflowScrollRegion'), 'SectionNav: el scroll lo da la region con pista');
     assert.ok(PROPICKS.includes('flex-wrap justify-start gap-1'), 'TabsList ProPicks sin wrap');
     assert.ok(!PROPICKS.includes('snap-x'), 'TabsList ProPicks sigue con snap scroll');
     assert.ok(RESEARCH.includes('flex-wrap gap-x-6 gap-y-2'), 'nav de etapas sin wrap');

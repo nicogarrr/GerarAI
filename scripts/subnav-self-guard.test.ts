@@ -22,3 +22,17 @@ test('/portfolio y /knowledge ocultan su self-link; /research conserva el suyo',
     const research = catalog.slice(catalog.indexOf("href: '/research',"), catalog.indexOf("href: '/research',") + 400);
     assert.doesNotMatch(research, /subnavHideSelf/);
 });
+
+test('la subnav anuncia el overflow horizontal con la pista del patron y conserva accesibilidad', () => {
+    assert.match(nav, /OverflowScrollRegion/, 'reutiliza la region con pista');
+    assert.match(nav, /hint="Desliza para ver más secciones"/, 'pista con texto de secciones');
+    assert.match(nav, /aria-controls="subnav-seccion-lista"/, 'toggle sigue controlando la lista');
+    assert.match(nav, /aria-expanded=\{open\}/, 'toggle sigue exponiendo estado');
+    assert.match(nav, /sm:flex-wrap/, 'en escritorio la lista sigue envolviendo (sin scroll)');
+});
+
+test('la pista del componente es parametrizable sin romper el texto de tablas', () => {
+    const region = readFileSync('components/ui/overflow-scroll-region.tsx', 'utf8');
+    assert.match(region, /hint\?: string/, 'prop hint opcional');
+    assert.match(region, /hint = 'Desliza para ver más columnas'/, 'default intacto para tablas');
+});
