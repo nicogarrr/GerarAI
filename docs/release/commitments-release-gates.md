@@ -27,14 +27,18 @@ autorizacion. Lo que no consta como verificado se marca "no verificado".
 - Review/checks con un criterio humano real; privacidad entre dos cuentas en la UI; tablet y otros navegadores.
 - Compatibilidad de imagenes de worker/web con las migraciones.
 - Reextraccion v4 sobre filas revisadas reales; el overlay "Insight" de `next dev` es de desarrollo, no se probo en build de produccion.
-- Criterios de cumplimiento autenticos: ninguno recuperado; los declara Nico, no se inventan.
+- Criterios de cumplimiento autenticos: ninguno recuperado en el historial/BD consultados (no es prueba de que no existan); los declara Nico, no se inventan.
 
 ## Puertas (todas necesarias, en este orden)
-1. FAV del auditor sobre el SHA40 exacto de cada PR a mergear; merge commit; nunca un head distinto al FAV.
+1. Revision del arbol exacto y FAV del auditor sobre el SHA40 de cada PR; nunca mergear un head distinto al FAV. Cada merge a main puede
+   desplegar Vercel: por eso el orden es compatibilidad de backend y flag primero, y la UI no se publica antes de que el backend
+   sea compatible (puerta 3). Un merge no es un paso neutro: solo se hace con esa compatibilidad ya demostrada.
 2. Backup verificado de la base de produccion y restore probado en una copia antes de tocar nada.
 3. Compatibilidad: la imagen backend nueva arranca con el esquema viejo (flags OFF) y la UI nueva no llama a rutas inexistentes
    (`COMMITMENTS_UI_ENABLED` OFF por defecto). Vercel no debe publicar el frontend antes que el backend sea compatible.
-4. Migraciones 0078 -> 0079 -> 0080 en copia de produccion (cronometradas, con bajada probada); luego produccion solo con permiso expreso.
+4. Migraciones 0078 -> 0079 -> 0080 en copia de produccion (cronometradas); luego produccion solo con permiso expreso. No se exige
+   una bajada de produccion: se documenta que revertir 0080 pierde `commitment_extraction_attempts` (datos regenerables) y que
+   promesas, checks y notas se conservan. La via de vuelta de produccion es el restore de la puerta 2, no un downgrade destructivo.
 5. Worker/scheduler/Redis: reclamo unico (UNIQUE tenant/empresa/url + UPDATE condicional) probado con Redis real; cron 07:50 UTC
    y `candidate_extraction_job_enabled` OFF hasta el permiso.
 6. QA final con identidades de prueba (nunca la cuenta de Nico ni su tenant): recorrido representativo completo y capturas.
