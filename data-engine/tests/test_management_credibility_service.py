@@ -332,3 +332,31 @@ def test_candidates_are_tenant_scoped():
 
         rows = b.scalars(select(ManagementPromise).where(ManagementPromise.company_id == cid)).all()
         assert rows == []
+
+
+
+def test_portfolio_commitments_only_for_held_companies(db):
+    from app.api.routes.portfolio import management_commitments
+    from app.models.entities import Position
+
+    held = _company(db)
+    other = Company(
+        ticker="OTH", name="OTH", exchange="NYSE", currency="USD",
+        sector="S", industry="I", company_type="holding",
+        valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(other)
+    db.commit()
+    db.add(Position(company_id=held.id, quantity=Decimal("3"), as_of=date(2030, 1, 1)))
+    db.commit()
+    service = ManagementCredibilityService()
+    for company in (held, other):
+        service.register_extracted_candidates(
+            db, company, transcript_text=SYNTH_CALL, call_date=date(2030, 7, 1),
+            source_url="https://example.invalid/a",
+        )
+    data = management_commitments(db)
+    assert data["held_count"] == 1
+    assert [c["ticker"] for c in data["companies"]] == ["MCO"]
+    assert data["companies"][0]["counts"] == {"total": 1, "candidate": 1, "registered": 0}
+    assert data["companies"][0]["items"][0]["source_status"] == "suggested"

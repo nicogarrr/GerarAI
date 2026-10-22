@@ -823,6 +823,20 @@ export async function updateManagementExplanation(ticker: string, promiseId: num
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
 }
 
+export type PortfolioCommitments = {
+  held_count: number;
+  companies: Array<{
+    ticker: string;
+    name: string;
+    counts: { total: number; candidate: number; registered: number };
+    items: ManagementCredibility['promises'];
+  }>;
+};
+
+export async function getPortfolioCommitments(): Promise<PortfolioCommitments> {
+  return requestJson('/api/portfolio/management-commitments');
+}
+
 export async function getPortfolioIntelligence(years = 5): Promise<PortfolioIntelligence> {
   return requestJson(`/api/portfolio/intelligence?years=${Math.max(1, Math.min(20, years))}`);
 }
