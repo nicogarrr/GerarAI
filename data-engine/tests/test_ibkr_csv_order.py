@@ -46,3 +46,19 @@ def test_same_day_round_trip_with_sell_first_in_file():
     result = IBKRImportService().import_ibkr_csv(db, SAME_DAY_SELL_FIRST)
     assert result["rows_skipped"] == 0, result["row_errors"]
     assert _actions(db) == ["buy", "sell"]
+
+
+OLDEST_FIRST = """symbol,action,quantity,price,date,fees,currency
+ZZTEST,buy,10,5,2026-01-02,0,USD
+ZZTEST,sell,6,7,2026-01-05,0,USD
+"""
+
+
+def test_reimport_in_other_order_is_idempotent():
+    db = _session()
+    first = IBKRImportService().import_ibkr_csv(db, NEWEST_FIRST)
+    assert first["trades_imported"] == 2
+    second = IBKRImportService().import_ibkr_csv(db, OLDEST_FIRST)
+    assert second["trades_imported"] == 0
+    assert second["duplicate_trades"] == 2
+    assert _actions(db) == ["buy", "sell"]
