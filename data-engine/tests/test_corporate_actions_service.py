@@ -61,22 +61,18 @@ def _tx(db, company, day, action, qty, price):
     return tx
 
 
-def test_split_preserves_position_economic_value(db):
+def test_split_rejects_manual_position_without_ledger(db):
+    # Posicion manual sin patas: no hay libro que demuestre unidades/precio.
     company = _company(db)
-    position = _position(db, company, qty=10, cost=100, price=150)
-    service = CorporateActionService()
-    action = service.create_action(
-        db, ticker="AAA", action_type="split",
-        effective_date=date(2026, 6, 1), ratio=Decimal("4"),
-    )
-    db.refresh(position)
-    # 4:1 split: 40 shares at a quarter of the price - same money.
-    assert position.quantity == Decimal("40.000000")
-    assert position.average_cost == Decimal("25.000000")
-    assert position.market_price == Decimal("37.500000")
-    assert position.market_value == position.quantity * position.market_price
-    assert position.cost_basis_native == position.quantity * position.average_cost
-    assert action.applied is True and action.applied_at is not None
+    _position(db, company, qty=10, cost=100, price=150)
+    with pytest.raises(ValueError, match="Split rejected"):
+        CorporateActionService().create_action(
+            db, ticker="AAA", action_type="split",
+            effective_date=date(2026, 6, 1), ratio=Decimal("4"),
+        )
+    db.rollback()
+    position = db.query(Position).filter_by(company_id=company.id).one()
+    assert position.quantity == Decimal("10")
 
 
 def test_split_rescales_only_pre_effective_transactions(db):
@@ -100,35 +96,32 @@ def test_split_rescales_only_pre_effective_transactions(db):
     assert after.quantity == Decimal("2") and after.price == Decimal("38")
 
 
-def test_reverse_split(db):
+def test_reverse_split_rejects_manual_position_without_ledger(db):
     company = _company(db)
-    position = _position(db, company, qty=100, cost=2, price=3)
-    CorporateActionService().create_action(
-        db, ticker="AAA", action_type="reverse_split",
-        effective_date=date(2026, 6, 1), ratio=Decimal("0.1"),
-    )
-    db.refresh(position)
-    assert position.quantity == Decimal("10.000000")
-    assert position.average_cost == Decimal("20.000000")
-    assert position.cost_basis_native == Decimal("200.000000")
+    _position(db, company, qty=100, cost=2, price=3)
+    with pytest.raises(ValueError, match="Split rejected"):
+        CorporateActionService().create_action(
+            db, ticker="AAA", action_type="reverse_split",
+            effective_date=date(2026, 6, 1), ratio=Decimal("0.1"),
+        )
+    db.rollback()
+    position = db.query(Position).filter_by(company_id=company.id).one()
+    assert position.quantity == Decimal("100")
 
 
-def test_apply_is_idempotent_and_delete_blocked_after_apply(db):
+def test_split_rejects_manual_source_even_if_quantity_matches_ledger(db):
+    # qty coincide con el libro pero source manual: no habilita el replay.
     company = _company(db)
     _position(db, company, qty=10, cost=100, price=150)
     tx = _tx(db, company, date(2026, 1, 10), "buy", 10, 100)
-    service = CorporateActionService()
-    action = service.create_action(
-        db, ticker="AAA", action_type="split",
-        effective_date=date(2026, 6, 1), ratio=Decimal("2"),
-    )
-    service.apply_action(db, action.id)
+    with pytest.raises(ValueError, match="not the ledger"):
+        CorporateActionService().create_action(
+            db, ticker="AAA", action_type="split",
+            effective_date=date(2026, 6, 1), ratio=Decimal("2"),
+        )
+    db.rollback()
     db.refresh(tx)
-    # Second apply is a no-op: quantity stays 20, not 40.
-    assert tx.quantity == Decimal("20.000000")
-    with pytest.raises(ValueError, match="immutable"):
-        service.delete_action(db, action.id)
-
+    assert tx.quantity == Decimal("10")
 
 def test_unapplied_action_can_be_deleted(db):
     _company(db)

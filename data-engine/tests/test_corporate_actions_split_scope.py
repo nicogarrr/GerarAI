@@ -105,33 +105,24 @@ def test_split_still_rescales_buy_and_sell_legs(db: Session):
     assert after.quantity == Decimal("2") and after.price == Decimal("40")
 
 
-def test_split_keeps_position_money_columns_invariant(db: Session):
-    """quantity x price and cost basis are preserved, so the base-currency
-    columns a rebuild would write are already correct: they are left as they
-    are on purpose (and the position is not replayed from the ledger)."""
+def test_split_rejects_manual_position_money_columns_untouched(db: Session):
+    """Posicion manual sin libro: se rechaza y no se escribe nada."""
     company = _company(db)
     position = Position(
         company_id=company.id, quantity=Decimal("10"), average_cost=Decimal("100"),
         market_price=Decimal("150"), market_value=Decimal("1500"),
-        currency="USD", base_currency="USD", market_value_native=Decimal("1500"),
-        market_value_base=Decimal("1500"), cost_basis_native=Decimal("1000"),
-        cost_basis_base=Decimal("1000"), unrealized_pnl_base=Decimal("500"),
-        as_of=date(2026, 5, 1), fx_rate=Decimal("1"),
+        currency="USD", base_currency="USD", cost_basis_native=Decimal("1000"),
+        as_of=date(2026, 5, 1),
     )
     db.add(position)
     db.commit()
-
-    CorporateActionService().create_action(
-        db, ticker="SPL", action_type="split",
-        effective_date=EFFECTIVE, ratio=RATIO,
-    )
-
+    with pytest.raises(ValueError, match="Split rejected"):
+        CorporateActionService().create_action(
+            db, ticker="SPL", action_type="split",
+            effective_date=EFFECTIVE, ratio=RATIO,
+        )
+    db.rollback()
     db.refresh(position)
-    assert position.quantity == Decimal("40.000000")
-    assert position.average_cost == Decimal("25.000000")
+    assert position.quantity == Decimal("10")
     assert position.market_value == Decimal("1500")
-    assert position.cost_basis_native == Decimal("1000")
-    assert position.market_value_base == Decimal("1500")
-    assert position.cost_basis_base == Decimal("1000")
-    assert position.unrealized_pnl_base == Decimal("500")
     assert position.as_of == date(2026, 5, 1)
