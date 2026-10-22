@@ -72,7 +72,8 @@ def coverage_for(ticker: str) -> TickerCoverage:
         transcript_sources=tuple(
             {"url": a.url, "period": a.period, "call_date": a.call_date, "origin": a.origin,
              "format": a.format, "label": a.label,
-             "call_date_source": a.call_date_source} for a in assets),
+             "call_date_source": a.call_date_source,
+             "completeness": a.completeness} for a in assets),
         press_release_sources=tuple(
             {"url": a.url, "period": a.period, "kind": a.kind}
             for a in FINANCIAL_ASSETS if a.ticker == ticker),

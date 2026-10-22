@@ -115,7 +115,7 @@ def check_transcripts(
             try:
                 b = extract_body(doc, asset)
                 facts = (*facts, {"body_sha256": b.body_sha256, "body_words": b.words,
-                                  "body_span": [b.start, b.end], "body_qa_hints": list(b.qa_hints),
+                                  "body_span_text_chars": [b.start, b.end], "completeness": asset.completeness, "body_qa_hints": list(b.qa_hints),
                                   "body_extraction": "ok"})
             except PrimarySourceError as exc:
                 facts = (*facts, {"body_extraction": "abstencion", "body_reason": str(exc)[:100]})

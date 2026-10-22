@@ -308,6 +308,9 @@ def _run_html_child(
     return content
 
 
+HTML_TRANSCRIPT_MAX_BYTES = 1_500_000
+
+
 class _TextExtractor(HTMLParser):
     """Texto visible con la libreria estandar: sin scripts/estilos/nav/cabecera/pie (no ejecuta JS)."""
 
@@ -349,6 +352,9 @@ def _fetch_html_transcript(
             _CACHE.move_to_end(url)
             return hit[1], {"cache_hit": True, "previous_bytes_sha256": None, "bytes_changed": None}
     content = _run_html_child(url, deadline=deadline, runner=runner)
+    if len(content) > HTML_TRANSCRIPT_MAX_BYTES:
+        raise PrimarySourceError("HTML de transcripcion demasiado grande para el parseo en proceso")
+    # OJO: la DESCARGA va en el hijo acotado; este PARSEO corre en el proceso padre.
     text = html_visible_text(content)
     if len(text.split()) < 200:
         raise PrimarySourceError("Texto extraido insuficiente (pagina vacia o requiere JS)")

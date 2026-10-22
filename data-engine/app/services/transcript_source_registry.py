@@ -50,8 +50,18 @@ class VerifiedAsset:
     # visible de una pagina HTML. Ambos o ninguno. start debe aparecer UNA vez.
     body_start: str | None = None
     body_end: str | None = None
+    # Contexto exigido tras body_end (debe aparecer a <=300 caracteres): evita cortar en una
+    # aparicion legitima del marcador dentro de la llamada; si no coincide, se abstiene.
+    body_end_context: str | None = None
+    # Completitud del documento: "no_evaluada" (por defecto), "comentarios_preparados_sin_qa"
+    # (el documento NO incluye preguntas y respuestas aunque el emisor lo titule "full transcript").
+    completeness: str = "no_evaluada"
 
     def __post_init__(self) -> None:
+        if self.completeness not in ("no_evaluada", "comentarios_preparados_sin_qa", "completa_con_qa"):
+            raise ValueError("completitud desconocida")
+        if self.body_end_context is not None and self.body_end is None:
+            raise ValueError("body_end_context exige body_end")
         if (self.body_start is None) != (self.body_end is None):
             raise ValueError("body_start y body_end van juntos")
         if self.body_start is not None and self.format != "html":
@@ -189,6 +199,8 @@ _ENTRIES = (
                 call_date_source="https://ir.recursion.com/news-releases/news-release-details/recursion-reports-second-quarter-financial-results-genentech/",
                 body_start="Below, the full transcript from the Earnings Call.",
                 body_end="Decoding biology to radically improve lives.\u00ae",
+                body_end_context="Get In Touch",
+                completeness="comentarios_preparados_sin_qa",
             ),
         ),
         "Pagina HTML del propio emisor (recursion.com/news, publicada 'August 10, 2026'); el texto "
@@ -196,7 +208,9 @@ _ENTRIES = (
         "resultados); la fecha/hora de la llamada (5-ago-2026 8:00 am ET) se leyo en el comunicado oficial "
         "del IR (call_date_source), NO en esta pagina. La pagina IR leida (presentations) NO la enlaza; URL hallada por busqueda. "
         "HTML 63930 bytes, sha256 2415b3a0..., ~5400 palabras. Transcripcion escrita por el emisor: "
-        "no es un PDF de proveedor ni se verifica palabra por palabra contra el audio.",
+        "no se verifica palabra por palabra contra el audio. Lectura manual del auditor: SOLO comentarios "
+        "preparados, sin preguntas y respuestas de analistas (termina 'happy to take your questions'), "
+        "aunque la pagina se titule 'Full Transcript'.",
     ),
     SourceEntry(
         "CPT",

@@ -57,3 +57,19 @@ def test_asset_without_markers_has_no_body_and_markers_only_for_html():
 def test_qa_hints_are_informational():
     b = extract_body(*_asset_doc(_page().replace("Najat:", "Operator: hola\nNajat:")))
     assert "Operator:" in b.qa_hints
+
+
+def test_end_context_mismatch_abstains_not_truncates():
+    page = (f"{REAL.body_start}\nNajat: {BODYTXT} {REAL.body_end} sigue la llamada {BODYTXT}\n"
+            f"{REAL.body_end}\nGet In Touch")
+    with pytest.raises(PrimarySourceError):
+        extract_body(*_asset_doc(page))  # 1.a aparicion sin 'Get In Touch' cerca: no se corta
+
+
+def test_completeness_label_propagates_and_is_not_full():
+    from app.services.commitment_coverage import coverage_for
+    assert coverage_for("RXRX").transcript_sources[0]["completeness"] == (
+        "comentarios_preparados_sin_qa")
+    assert coverage_for("KKR").transcript_sources[0]["completeness"] == "no_evaluada"
+    with pytest.raises(ValueError):
+        VerifiedAsset("https://x.invalid/a", "t", "Q1", completeness="full")

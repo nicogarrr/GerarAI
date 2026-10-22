@@ -19,7 +19,7 @@ _QA_HINTS = ("Operator:", "Q&A", "Question:", "Analyst")
 @dataclass(frozen=True)
 class BodyProvenance:
     text: str
-    start: int
+    start: int  # offsets en CARACTERES del texto visible extraido (no bytes del HTML)
     end: int
     body_sha256: str
     start_marker: str
@@ -42,6 +42,11 @@ def extract_body(doc: RegisteredDocument, asset=None) -> BodyProvenance:
     end = text.find(end_marker, start)
     if end == -1:
         raise PrimarySourceError("Marcador de fin ausente tras el inicio")
+    ctx = getattr(a, "body_end_context", None)
+    if ctx is not None:
+        after = text[end + len(end_marker): end + len(end_marker) + 300]
+        if ctx not in after:
+            raise PrimarySourceError("Contexto de fin no coincide: posible corte dentro de la llamada")
     body = text[start:end].strip()
     if len(body.split()) < 200:
         raise PrimarySourceError("Cuerpo extraido insuficiente")
