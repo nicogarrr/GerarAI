@@ -40,6 +40,7 @@ const PLAN_LABELS: Record<string, string> = {
     currency_contract_enabled: 'Contrato de divisa activo',
     expected_basis: 'Base del cálculo previsto',
     expected_periods: 'Cuotas previstas',
+    expected_contributions_converted_base: 'Aportaciones previstas convertidas',
     expected_missing_fx: 'Cuotas sin tipo de cambio',
     expected_conversion_complete: 'Conversión prevista completa',
 };
@@ -145,7 +146,7 @@ const planExpectedPeriods = (value: unknown) => {
     if (missing > 0) parts.push(`${missing} sin tipo de cambio`);
     return parts.join(', ');
 };
-const PLAN_FORMAT = {start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, next_contribution: planNext, expected_periods: planExpectedPeriods, ...Object.fromEntries(['expected_contributions_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
+const PLAN_FORMAT = {start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, next_contribution: planNext, expected_periods: planExpectedPeriods, ...Object.fromEntries(['expected_contributions_base', 'expected_contributions_converted_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
 const DETAIL_FORMAT = Object.fromEntries(['target_allocations', 'current_weights', 'deviations', 'suggestions', 'missing_fx', 'status'].map(key => [key, (value: unknown, record: DataRecord) => planValue(value, typeof record.base_currency === 'string' ? record.base_currency : undefined, key === 'current_weights')]));
 
 /** Extrae tickers del drift (current_weights "ticker:XXX", deviations kind ticker) y del plan (targets kind ticker) */
