@@ -36,6 +36,7 @@ import {
 } from '@/database/models/manual-demo.model';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { sanitizeFinnhubQuote } from '@/lib/market/quote-freshness';
+import { combineAbortSignals, createQuoteCache, type CachedQuote, type QuoteFetchAttempt } from '@/lib/market/quote-cache';
 import { parseListingCurrencies, symbolFromKey, valuePositions, type DemoValuation, type ValuationQuote } from '@/lib/market/demo-valuation';
 import { computeManualDemoAccount } from '@/lib/paper-trading/accounting';
 import { docsToLedger } from '@/lib/paper-trading/ledger-adapter';
@@ -769,16 +770,21 @@ const MAX_VALUATION_SYMBOLS = 25;
  * cliente. retryAfterSeconds recoge el Retry-After cuando el proveedor lo
  * expone en un no-OK (cabecera estándar de throttle, en segundos).
  */
-type QuoteAttempt = { quote: ValuationQuote | null; fetchFailed: boolean; retryAfterSeconds: number | null };
+// Misma forma que QuoteFetchAttempt del quote-cache (quote saneado | null,
+// fetchFailed, retryAfterSeconds): la valoración trabaja con el intento
+// enriquecido (fetchedAt/saturated) que devuelve la caché.
+type QuoteAttempt = QuoteFetchAttempt;
 
-async function finnhubOnlyQuote(symbol: string): Promise<QuoteAttempt> {
+async function finnhubOnlyQuote(symbol: string, signal?: AbortSignal): Promise<QuoteAttempt> {
     const token = process.env.FINNHUB_API_KEY;
     if (!token) return { quote: null, fetchFailed: true, retryAfterSeconds: null };
     try {
         const base = process.env.FINNHUB_BASE_URL || 'https://finnhub.io/api/v1';
         const response = await fetch(`${base}/quote?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(token)}`, {
             cache: 'no-store',
-            signal: AbortSignal.timeout(8_000),
+            // El timeout de la caché ABORTA de verdad (su señal llega hasta
+            // este fetch); el tope propio de 8 s se mantiene en paralelo.
+            signal: signal ? combineAbortSignals(signal, 8_000) : AbortSignal.timeout(8_000),
         });
         if (!response.ok) {
             const retryAfter = Number.parseInt(response.headers.get('retry-after') ?? '', 10);
@@ -789,6 +795,17 @@ async function finnhubOnlyQuote(symbol: string): Promise<QuoteAttempt> {
         return { quote: null, fetchFailed: true, retryAfterSeconds: null };
     }
 }
+
+/**
+ * Caché dedupe de cotizaciones PÚBLICAS (lib/market/quote-cache.ts), una
+ * instancia por proceso: mismo símbolo en ráfaga (renders concurrentes,
+ * re-polls dentro del TTL de 20 s) => UN fetch; backoff/Retry-After
+ * compartido tras fallos (un 429 frena también la siguiente valoración).
+ * SOLO cotizaciones: el libro se relee en CADA llamada (readLedger abajo),
+ * así que cash/posiciones nunca salen de caché. No es protección global de
+ * cuota: cada instancia serverless lleva la suya.
+ */
+const valuationQuoteCache = createQuoteCache();
 
 const LISTING_TTL_MS = 6 * 3_600_000;
 let usListing: { at: number; map: Map<string, string> } | null = null;
@@ -830,8 +847,15 @@ function getUsListing(): Promise<Map<string, string> | null> {
 /**
  * Valoración BAJO DEMANDA de las posiciones abiertas con cotizaciones reales
  * (Finnhub /quote directo, validada por frescura; sin fallback a Yahoo ni a
- * getStockQuote). No hay auto-refresco ni caché propia: cada llamada vuelve a
- * pedir a Finnhub (la hora de cada fila es la del proveedor). Sin cotización => N/D por posición; nunca se usa el precio de
+ * getStockQuote). Las cotizaciones pasan por valuationQuoteCache (dedupe por
+ * símbolo, TTL 20 s, revalidación de frescura al servir, backoff compartido
+ * tras fallos): una ráfaga de valoraciones en la misma ventana comparte los
+ * fetches; la hora de cada fila sigue siendo la del proveedor (quote.t).
+ * asOf = min(fetchedAt) de las cotizaciones usadas (la más vieja servida;
+ * Date.now() si no hubo ninguna) para que la UI no maquille datos de caché
+ * como recién pedidos. El libro NO se cachea: posiciones y cash se releen
+ * del ledger en cada llamada y un fill se refleja al instante.
+ * Sin cotización => N/D por posición; nunca se usa el precio de
  * un fill como precio de mercado. Más de 25 símbolos distintos: los
  * sobrantes salen "No consultada: límite de 25 símbolos por consulta".
  * Estrictamente de solo lectura: ni siquiera crea la cuenta vacía (a
@@ -867,15 +891,20 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
         // cotizaciones (serian inutiles: sin divisa verificada la fila es N/D).
         const listing = symbols.length > 0 ? await getUsListing() : null;
         const verifiable = listing ? symbols.filter((s) => listing.has(s)) : [];
-        const settled = await Promise.allSettled(verifiable.map((symbol) => finnhubOnlyQuote(symbol)));
+        const settled = await Promise.allSettled(verifiable.map((symbol) => valuationQuoteCache.getQuote(symbol, finnhubOnlyQuote)));
         for (const symbol of symbols) quotes[symbol] = null;
         const currencyUnverified = new Set(symbols.filter((s) => !verifiable.includes(s)));
         let fetchFailures = 0;
         let retryAfterSeconds: number | null = null;
+        let oldestQuoteAt: number | null = null;
         verifiable.forEach((symbol, i) => {
             const r = settled[i];
-            const attempt: QuoteAttempt = r.status === 'fulfilled' ? r.value : { quote: null, fetchFailed: true, retryAfterSeconds: null };
+            const attempt: CachedQuote =
+                r.status === 'fulfilled'
+                    ? r.value
+                    : { quote: null, fetchFailed: true, retryAfterSeconds: null, fetchedAt: null, saturated: false };
             quotes[symbol] = attempt.quote ? { ...attempt.quote, currency: listing?.get(symbol) ?? null } : null;
+            if (attempt.quote && attempt.fetchedAt !== null) oldestQuoteAt = Math.min(oldestQuoteAt ?? Infinity, attempt.fetchedAt);
             if (attempt.fetchFailed) {
                 fetchFailures += 1;
                 if (attempt.retryAfterSeconds !== null) retryAfterSeconds = Math.max(retryAfterSeconds ?? 0, attempt.retryAfterSeconds);
@@ -884,7 +913,9 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
         return {
             ok: true,
             valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified }),
-            asOf: Date.now(),
+            // min(fetchedAt): la cotización más vieja servida manda (cambio
+            // de semántica documentado arriba: antes era Date.now() siempre).
+            asOf: oldestQuoteAt ?? Date.now(),
             listingUnavailable: symbols.length > 0 && listing === null,
             quoteFetchFailed: verifiable.length > 0 && fetchFailures === verifiable.length,
             retryAfterSeconds,
