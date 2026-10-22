@@ -42,9 +42,9 @@ def test_private_notes_isolated_over_signed_http(monkeypatch):
                  {"body": "nota privada A"})
     assert note.status_code == 201, note.text
 
-    from app.core.database import engine as _engine
-
     import os
+
+    from app.core.database import engine as _engine
 
     expected = "postgresql" if os.environ.get("DATABASE_URL", "").startswith("postgres") else "sqlite"
     assert _engine.dialect.name == expected
