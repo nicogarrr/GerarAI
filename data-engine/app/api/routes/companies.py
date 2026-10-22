@@ -326,6 +326,12 @@ class PromiseCheckCreate(BaseModel):
     evidence_excerpt: str | None = Field(default=None, max_length=2000)
 
 
+class PromiseReview(BaseModel):
+    fulfillment_criteria: str = Field(min_length=10, max_length=2000)
+    due_date: date | None = None
+    confirmed_source_checked: bool
+
+
 class PromiseNoteCreate(BaseModel):
     body: str = Field(min_length=1, max_length=5000)
 
@@ -989,6 +995,29 @@ def _promise_or_404(db: Session, ticker: str, promise_id: int):
     if not company or not promise or promise.company_id != company.id:
         raise HTTPException(status_code=404, detail="Management promise not found")
     return promise
+
+
+@router.post("/{ticker}/management-credibility/promises/{promise_id}/review")
+def review_promise_candidate(
+    ticker: str,
+    promise_id: int,
+    payload: PromiseReview,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> dict:
+    from app.services.commitment_tracking_service import (
+        CommitmentTrackingError,
+        CommitmentTrackingService,
+    )
+
+    promise = _promise_or_404(db, ticker, promise_id)
+    try:
+        row = CommitmentTrackingService().review_candidate(
+            db, promise, user_id=_principal_user(principal), **payload.model_dump()
+        )
+    except CommitmentTrackingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ManagementCredibilityService.payload(row)
 
 
 @router.post("/{ticker}/management-credibility/promises/{promise_id}/checks", status_code=201)

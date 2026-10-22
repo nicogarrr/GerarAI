@@ -56,6 +56,10 @@ class CommitmentTrackingService:
     ) -> ManagementPromiseCheck:
         if outcome not in CHECK_OUTCOMES:
             raise CommitmentTrackingError("Resultado no valido")
+        if promise.status == "candidate":
+            raise CommitmentTrackingError(
+                "Revisa primero el candidato (cita, contexto, fecha, fuente) y pasalo a seguimiento"
+            )
         url = (evidence_url or "").strip() or None
         excerpt = (evidence_excerpt or "").strip() or None
         if url and not url.startswith("https://"):
@@ -84,6 +88,50 @@ class CommitmentTrackingService:
         db.commit()
         db.refresh(row)
         return row
+
+    def review_candidate(
+        self,
+        db: Session,
+        promise: ManagementPromise,
+        *,
+        fulfillment_criteria: str,
+        due_date: date | None,
+        confirmed_source_checked: bool,
+        user_id: str | None,
+    ) -> ManagementPromise:
+        """candidate -> open por declaracion EXPLICITA de la persona que reviso cita/contexto/fuente.
+
+        No verifica nada por si mismo: deja constancia de quien declaro y cuando.
+        """
+        if promise.status != "candidate":
+            raise CommitmentTrackingError("Solo se revisan candidatos sugeridos")
+        if not confirmed_source_checked:
+            raise CommitmentTrackingError(
+                "Confirma que has revisado cita, contexto, fecha y fuente en el documento original"
+            )
+        criteria = fulfillment_criteria.strip()
+        if len(criteria) < 10:
+            raise CommitmentTrackingError("Define un criterio de cumplimiento concreto")
+        from datetime import UTC, datetime
+
+        promise.fulfillment_criteria = criteria
+        if due_date is not None:
+            promise.due_date = due_date
+            meta_due = "declared_by_user"
+        else:
+            meta_due = (promise.metadata_ or {}).get("due_basis", "none")
+        promise.status = "open"
+        promise.status_reason = "Revisado por una persona: criterio declarado por el usuario, sin verificacion automatica."
+        promise.metadata_ = {
+            **(promise.metadata_ or {}),
+            "reviewed_by_user_id": user_id,
+            "reviewed_at": datetime.now(UTC).isoformat(),
+            "review_kind": "user_declared",
+            "due_basis": meta_due,
+        }
+        db.commit()
+        db.refresh(promise)
+        return promise
 
     def checks(self, db: Session, promise: ManagementPromise) -> list[ManagementPromiseCheck]:
         return list(
@@ -129,6 +177,9 @@ class CommitmentTrackingService:
             "evidence_url": row.evidence_url,
             "evidence_date": row.evidence_date,
             "evidence_excerpt": row.evidence_excerpt,
+            "declared_by_user_id": row.created_by_user_id,
+            "declared_at": row.created_at,
+            "verification": "user_declared_not_independently_verified",
         }
 
     @staticmethod

@@ -8,6 +8,8 @@ import { getPortfolioCommitments } from '@/lib/actions/research-tools.actions';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const FLAGS: Record<string, string> = { conditional: 'condicional', negation_present: 'contiene negación' };
+
 const DATE_BASIS: Record<string, string> = {
   call_date: 'fecha de llamada indicada al registrar',
   user_entered: 'fecha introducida, no verificada',
@@ -40,7 +42,7 @@ export default async function PortfolioCommitmentsPage() {
               <li className="rounded-lg border border-gray-800 p-3 text-sm" key={item.id}>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{item.status === 'candidate' ? 'sugerido, sin verificar' : item.legacy_heuristic_target ? 'veredicto no verificado' : item.status}</Badge>
-                  {item.flags?.length ? <span className="text-xs text-amber-300">{item.flags.join(', ')}</span> : null}
+                  {item.flags?.length ? <span className="text-xs text-amber-300">{item.flags.map((f) => FLAGS[f] ?? f).join(', ')}</span> : null}
                 </div>
                 <p className="mt-2 text-gray-100">{item.quote_literal ? `“${item.quote_literal}”` : item.promise}</p>
                 <p className="mt-1 text-xs text-gray-400">

@@ -6664,6 +6664,38 @@
         "title": "PromiseNoteCreate",
         "type": "object"
       },
+      "PromiseReview": {
+        "properties": {
+          "confirmed_source_checked": {
+            "title": "Confirmed Source Checked",
+            "type": "boolean"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "fulfillment_criteria": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Fulfillment Criteria",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fulfillment_criteria",
+          "confirmed_source_checked"
+        ],
+        "title": "PromiseReview",
+        "type": "object"
+      },
       "QueryRequest": {
         "properties": {
           "as_of_from": {
@@ -21878,6 +21910,197 @@
           }
         },
         "summary": "Add Promise Note",
+        "tags": [
+          "companies"
+        ]
+      }
+    },
+    "/api/companies/{ticker}/management-credibility/promises/{promise_id}/review": {
+      "post": {
+        "operationId": "review_promise_candidate_api_companies__ticker__management_credibility_promises__promise_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "promise_id",
+            "required": true,
+            "schema": {
+              "title": "Promise Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromiseReview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Review Promise Candidate Api Companies  Ticker  Management Credibility Promises  Promise Id  Review Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Promise Candidate",
         "tags": [
           "companies"
         ]
