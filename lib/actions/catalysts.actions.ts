@@ -56,6 +56,8 @@ export type FollowedEarningsCalendar = {
     count: number;
     days: { date: string; events: FollowedEarningsEvent[] }[];
     without_date_in_range: string[];
+    /** Subconjunto con fecha futura caducada (sin renovar): no equivale a "sin publicar". */
+    stale_date_in_range?: string[];
 };
 
 /** GET /api/calendar/followed — resultados de cartera + watchlist agrupados por día (60 días). */

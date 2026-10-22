@@ -41,6 +41,8 @@ export default async function FollowedEarningsPage() {
     const materialsPromise: Promise<Record<string, EventMaterials>> = getEarningsMaterials();
     const upcoming = calendar.days.filter((day) => day.date >= today);
     const recent = calendar.days.filter((day) => day.date < today).reverse();
+    const staleDates = calendar.stale_date_in_range ?? [];
+    const withoutDate = calendar.without_date_in_range.filter((t) => !staleDates.includes(t));
     const renderDay = (day: FollowedEarningsCalendar['days'][number]) => (
         <section key={day.date} aria-labelledby={`d-${day.date}`}>
             <h2 id={`d-${day.date}`} className="mb-2 text-lg font-semibold text-gray-100 first-letter:uppercase">
@@ -78,7 +80,7 @@ export default async function FollowedEarningsPage() {
                 </p>
             ) : calendar.days.length === 0 ? (
                 <p className="rounded-2xl border border-gray-800 p-4 text-sm text-gray-400">
-                    Ninguna de tus empresas tiene fecha de resultados en los próximos 60 días.
+                    No hay fechas de resultados vigentes en el calendario para tus empresas en los próximos 60 días.
                 </p>
             ) : (
                 <div className="flex flex-col gap-6">
@@ -95,9 +97,12 @@ export default async function FollowedEarningsPage() {
             )}
 
             {calendar.without_date_in_range.length > 0 && calendar.days.length > 0 ? (
-                <p className="text-sm text-gray-500">
-                    Próxima fecha aún sin publicar: {calendar.without_date_in_range.join(', ')}
-                </p>
+                <div className="flex flex-col gap-1 text-sm text-gray-400">
+                    {withoutDate.length > 0 ? <p>Sin fecha vigente en el calendario: {withoutDate.join(', ')}</p> : null}
+                    {staleDates.length > 0 ? (
+                        <p>Fecha pendiente de actualizar (el dato lleva días sin renovarse): {staleDates.join(', ')}</p>
+                    ) : null}
+                </div>
             ) : null}
         </main>
     );

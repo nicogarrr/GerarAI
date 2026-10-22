@@ -39,12 +39,14 @@ test('registro IR: pagina de evento solo con fecha exacta; si no, seccion genera
     }
 });
 
-test('calendario: el historial dice "Resultados recientes" y el pie habla de la proxima fecha', () => {
+test('calendario: el historial dice "Resultados recientes" y el pie no afirma que la fecha no este publicada', () => {
     const page = readFileSync('app/(root)/calendar/resultados/page.tsx', 'utf8');
     assert.ok(page.includes('Resultados recientes (últimos {HISTORY_DAYS} días)'));
-    assert.ok(page.includes('Próxima fecha aún sin publicar:'));
+    assert.ok(page.includes('Sin fecha vigente en el calendario:'));
+    assert.ok(page.includes('Fecha pendiente de actualizar'));
     assert.ok(!page.includes('Publicados en los últimos'));
     assert.ok(!page.includes('Sin fecha publicada'));
+    assert.ok(!page.includes('aún sin publicar'));
 });
 
 test('registro IR: BN T2 enlaza grabacion y transcripcion solo con fecha exacta', () => {
