@@ -9,8 +9,11 @@ def test_uber_checkable_and_unresolved_abstain():
     u = coverage_for("UBER")
     assert u.checkable_by_job and u.press_release_registered and u.transcript_assets_with_call_date == 1
     a = coverage_for("AAPL")
-    assert not a.checkable_by_job and a.transcript_status == "sin_fuente_resuelta"
-    assert "resolver_fuente_oficial_de_transcripcion" in a.pending
+    assert not a.checkable_by_job and a.transcript_status == "no_listada_en_pagina_ir"
+    assert "sin_activo_de_transcripcion_verificado" in a.pending
+    z = coverage_for("NOEXISTE")
+    assert z.transcript_status == "sin_fuente_resuelta"
+    assert "resolver_fuente_oficial_de_transcripcion" in z.pending
 
 
 def test_bn_date_read_from_document_is_checkable():
@@ -87,3 +90,9 @@ def test_rxrx_call_date_provenance_is_press_release_not_document():
     assert src["call_date_source"].startswith("https://ir.recursion.com/news-releases/")
     assert coverage_with_checks({}, ("KKR",))[0]["transcript_sources"][0][
         "call_date_source"] == "documento"
+
+
+def test_consulted_pages_are_not_listed_not_unresolved():
+    for t in ("CPT", "AAPL", "IBRX", "CGEO.L"):
+        c = coverage_for(t)
+        assert c.transcript_status == "no_listada_en_pagina_ir" and not c.checkable_by_job
