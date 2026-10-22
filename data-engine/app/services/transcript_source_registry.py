@@ -17,8 +17,11 @@ from urllib.parse import urlparse
 OFFICIAL_TRANSCRIPT_PDF = "transcripcion_oficial_pdf"
 WEBCAST_ONLY = "solo_webcast"
 PAGE_MENTIONS_TRANSCRIPT = "pagina_ir_menciona_transcripcion"
+NOT_LISTED_ON_IR_PAGE = "no_listada_en_pagina_ir"
 UNCHECKED = "sin_comprobar"
-STATUSES = frozenset({OFFICIAL_TRANSCRIPT_PDF, WEBCAST_ONLY, PAGE_MENTIONS_TRANSCRIPT, UNCHECKED})
+STATUSES = frozenset(
+    {OFFICIAL_TRANSCRIPT_PDF, WEBCAST_ONLY, PAGE_MENTIONS_TRANSCRIPT, NOT_LISTED_ON_IR_PAGE, UNCHECKED}
+)
 
 
 @dataclass(frozen=True)
@@ -51,7 +54,8 @@ _ENTRIES = (
         _CHECKED,
         (("s21.q4cdn.com", "/399680738/"),),
         "https://s21.q4cdn.com/399680738/files/doc_financials/2026/q1/META-Q1-2026-Earnings-Call-Transcript.pdf",
-        "PDF leido y extraido en pruebas previas.",
+        "PDF leido y extraido en pruebas previas. Enlace 'Earnings Call Transcript (pdf)' leido (href) en la pagina IR el 2026-10-22.",
+        True,
     ),
     SourceEntry(
         "BN",
@@ -60,7 +64,8 @@ _ENTRIES = (
         _CHECKED,
         (("bn.brookfield.com", "/sites/brookfield-bn-v2/files/"),),
         "https://bn.brookfield.com/sites/brookfield-bn-v2/files/Brookfield-BN-IR-V2/2026/Q2/BN%20Q2-2026-transcript.pdf",
-        "PDF leido y extraido en pruebas previas.",
+        "PDF leido y extraido en pruebas previas. Enlace 'Transcript' leido (href) en la pagina del evento IR el 2026-10-22.",
+        True,
     ),
     SourceEntry(
         "UBER",
@@ -74,10 +79,10 @@ _ENTRIES = (
     ),
     SourceEntry(
         "ASTS",
-        WEBCAST_ONLY,
+        NOT_LISTED_ON_IR_PAGE,
         "https://investors.ast-science.com/eventsPastEvents",
         _CHECKED,
-        note="Sin enlaces a transcripcion en la pagina; webcast/presentacion no son transcripcion.",
+        note="La pagina de eventos pasados no menciona transcripcion (0 apariciones leidas el 2026-10-22); hay webcast/presentacion, que no son transcripcion. No prueba que no exista.",
     ),
     SourceEntry(
         "RKLB",
@@ -95,24 +100,24 @@ _ENTRIES = (
     ),
     SourceEntry(
         "ONDS",
-        UNCHECKED,
+        WEBCAST_ONLY,
         "https://ir.ondas.com/ir-calendar/detail/4834/second-quarter-2026-earnings-conference-call",
         _CHECKED,
-        note="Sin transcripcion visible en la pagina del evento; solo terceros en busqueda.",
+        note="La pagina del evento enlaza webcast/audio y presentacion PDF, sin transcripcion (leido 2026-10-22). No prueba que no exista.",
     ),
     SourceEntry(
         "KRKNF",
-        UNCHECKED,
+        NOT_LISTED_ON_IR_PAGE,
         "https://www.krakenrobotics.com/investors/financial-reports/",
         _CHECKED,
-        note="Cotiza tambien en TSX como PNG; sin transcripcion vista en la pagina.",
+        note="Cotiza tambien en TSX como PNG. La pagina lista estados, MD&A y presentacion; 0 menciones de transcripcion (2026-10-22).",
     ),
     SourceEntry(
         "HYMC",
-        UNCHECKED,
+        NOT_LISTED_ON_IR_PAGE,
         "https://hycroftmining.com/investors/financials-and-reports/",
         _CHECKED,
-        note="Sin transcripcion vista en la pagina.",
+        note="La pagina de informes financieros lista 10-K/10-Q; 0 menciones de transcripcion (2026-10-22). No prueba que no exista.",
     ),
 )
 
