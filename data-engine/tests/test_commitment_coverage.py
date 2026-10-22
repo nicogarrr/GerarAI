@@ -30,7 +30,7 @@ def test_meta_assets_without_date_not_checkable():
 def test_every_ticker_reports_honest_pending():
     rows = universe_coverage()
     assert all(r.pending or r.checkable_by_job for r in rows)
-    assert sum(r.checkable_by_job for r in rows) == 5
+    assert sum(r.checkable_by_job for r in rows) == 6
 
 
 def test_checkable_flag_matches_real_job_targets():

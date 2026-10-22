@@ -249,10 +249,24 @@ _ENTRIES = (
     ),
     SourceEntry(
         "UNH",
-        NOT_LISTED_ON_IR_PAGE,
+        OFFICIAL_TRANSCRIPT_PDF,
         "https://www.unitedhealthgroup.com/investors/financial-reports.html",
         _CHECKED,
-        note="Leida en navegador publico el 2026-10-22 (financial-reports): 0 enlaces con 'transcript'. No prueba que no exista en otra seccion.",
+        (
+            VerifiedAsset(
+                "https://www.unitedhealthgroup.com/content/dam/UHG/PDF/investors/2026/unh-q2-2026-remarks.pdf",
+                "Second Quarter 2026 Results Teleconference Prepared Remarks",
+                "Q2 2026",
+                "2026-07-16",
+                origin="url_dominio_oficial_por_busqueda",
+                completeness="comentarios_preparados_sin_qa",
+            ),
+        ),
+        "COMENTARIOS PREPARADOS (no transcripcion con preguntas y respuestas). URL hallada por busqueda "
+        "en unitedhealthgroup.com (dominio del emisor, ruta /investors/2026/); NO enlazada en la pagina IR "
+        "financial-reports leida el 2026-10-22 (0 enlaces 'transcript'). Cabecera del documento: "
+        "'Second Quarter 2026 Results Teleconference Prepared Remarks July 16, 2026'; el documento "
+        "anuncia una sesion de preguntas y respuestas posterior que NO esta incluida.",
     ),
     SourceEntry(
         "AAPL",
