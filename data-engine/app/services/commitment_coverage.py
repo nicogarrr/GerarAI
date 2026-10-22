@@ -37,6 +37,8 @@ class TickerCoverage:
     press_release_registered: bool
     checkable_by_job: bool  # el job puede chequear (activo con call_date o comunicado)
     pending: tuple[str, ...]
+    transcript_sources: tuple[dict, ...] = ()
+    press_release_sources: tuple[dict, ...] = ()
 
 
 def coverage_for(ticker: str) -> TickerCoverage:
@@ -65,6 +67,12 @@ def coverage_for(ticker: str) -> TickerCoverage:
         press_release_registered=pr,
         checkable_by_job=bool(dated or pr),
         pending=tuple(pending),
+        transcript_sources=tuple(
+            {"url": a.url, "period": a.period, "call_date": a.call_date, "origin": a.origin,
+             "format": a.format, "label": a.label} for a in assets),
+        press_release_sources=tuple(
+            {"url": a.url, "period": a.period, "kind": a.kind}
+            for a in FINANCIAL_ASSETS if a.ticker == ticker),
     )
 
 
@@ -92,7 +100,9 @@ def coverage_with_checks(
             state = "fuente_obtenida"  # NO equivale a seguimiento de compromisos completo
         else:
             state = "abstencion_en_chequeo"
-        rows.append({**c.__dict__, "pending": list(c.pending), "transcript_origins": list(c.transcript_origins), "state": state,
+        rows.append({**c.__dict__, "pending": list(c.pending), "transcript_origins": list(c.transcript_origins),
+                     "transcript_sources": list(c.transcript_sources),
+                     "press_release_sources": list(c.press_release_sources), "state": state,
                      "last_checked_on": last, "outcomes": outcomes,
                      "from_history": any(r.get("_source") == "historial" for r in mine),
                      "last_good_checked_on": max(

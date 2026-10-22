@@ -207,3 +207,13 @@ def test_evicted_ticker_is_out_of_retention_not_never_checked(db, tmp_path):
     rep = coverage_report(db, JsonSourceCheckStore(tmp_path / "s"))
     assert rep["companies"][0]["state"] == "estado_fuera_retencion"
     assert "BN" in rep["store"]["evicted_tickers"] and rep["store"]["at_retention_cap"]
+
+
+def test_record_carries_origin_and_format(tmp_path):
+    store = JsonSourceCheckStore(tmp_path / "s")
+    store.save([SourceCheckRecord(ticker="KKR", url="https://x.invalid/k", kind="transcript",
+                                  period="Q2 2026", checked_on="2026-10-22", outcome="extraido",
+                                  reason="texto_obtenido", content_sha256="f" * 64,
+                                  origin="url_dominio_oficial_por_busqueda", format="pdf")])
+    item = store.read_history(limit=1)[0]
+    assert item["origin"] == "url_dominio_oficial_por_busqueda" and item["format"] == "pdf"

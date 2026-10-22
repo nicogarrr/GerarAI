@@ -47,6 +47,8 @@ class SourceCheckRecord:
     provenance: str = ISSUER_REPORTED
     independent: bool = False
     note: str = field(default="contraste_documental_mismo_emisor_no_verificacion_independiente")
+    origin: str | None = None  # procedencia del URL registrado (transcripciones); None = n/d
+    format: str | None = None  # pdf | html (transcripciones); None = n/d
 
 
 def _fetch_html(url: str) -> bytes:
@@ -95,7 +97,7 @@ def check_transcripts(
     out: list[SourceCheckRecord] = []
     for ticker, asset in transcript_targets():
         base = dict(ticker=ticker, url=asset.url, kind="transcript", period=asset.period,
-                    checked_on=today.isoformat())
+                    checked_on=today.isoformat(), origin=asset.origin, format=asset.format)
         try:
             doc, meta = fetch(ticker, asset.url, today=today)
         except PrimarySourceError as exc:

@@ -70,3 +70,12 @@ def test_origins_reach_coverage_and_cb_is_ir_href():
     from app.services.commitment_coverage import coverage_with_checks
     assert coverage_with_checks({}, ("KKR",))[0]["transcript_origins"] == [
         "url_dominio_oficial_por_busqueda"]
+
+
+def test_sources_with_urls_exposed_from_registry_only():
+    from app.services.commitment_coverage import coverage_with_checks
+    row = {r["ticker"]: r for r in coverage_with_checks({}, ("RXRX", "UBER", "AAPL"))}
+    rx = row["RXRX"]["transcript_sources"][0]
+    assert rx["format"] == "html" and rx["url"].startswith("https://www.recursion.com/")
+    assert row["UBER"]["press_release_sources"][0]["url"].startswith("https://www.sec.gov/")
+    assert row["AAPL"]["transcript_sources"] == [] and row["AAPL"]["press_release_sources"] == []
