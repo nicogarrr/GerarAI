@@ -52,7 +52,10 @@ def get_plan(db: Session = Depends(get_db)) -> dict:
     service = InvestmentPlanService()
     plan = service.get_plan(db)
     if plan is None:
-        return {"plan_exists": False}
+        return {
+            "plan_exists": False,
+            "currency_contract_enabled": plan_currency_enforced(),
+        }
     metrics = service.plan_metrics(db)
     metrics["id"] = plan.id
     return metrics

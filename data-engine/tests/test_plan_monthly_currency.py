@@ -309,3 +309,10 @@ def test_drift_off_registered_not_base_blocks_next_contribution(db, monkeypatch)
     assert drift["next_contribution"] is None
     assert drift["next_contribution_basis"] == "blocked_contract_disabled"
     assert drift["next_contribution_currency"] == "USD"
+
+
+def test_get_plan_without_plan_exposes_capability(db, monkeypatch):
+    from app.api.routes.plan import get_plan
+    assert get_plan(db) == {"plan_exists": False, "currency_contract_enabled": True}
+    monkeypatch.delenv("PLAN_CURRENCY_ENFORCED")
+    assert get_plan(db)["currency_contract_enabled"] is False
