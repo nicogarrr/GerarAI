@@ -101,7 +101,17 @@ function planValue(value: unknown, currency?: string, weights = false): string {
 }
 const planMoney = (value: unknown, record: DataRecord) =>
     typeof record.base_currency === 'string' ? formatMoney(value as number | string | null, record.base_currency) : NA;
-const PLAN_FORMAT = {start_date: (value: unknown) => formatMarketDate(value as string), ...Object.fromEntries(['monthly_contribution', 'expected_contributions_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'next_contribution', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
+/** monthly_contribution es INPUT crudo del usuario (el diálogo lo captura en €,
+ *  PlanSetupDialog), no un importe convertido a divisa base: sin cartera no hay
+ *  base_currency y planMoney lo pintaba N/D escondiendo el dato. Sin cartera se
+ *  muestra en EUR, la divisa en la que el usuario lo introdujo; con cartera se
+ *  mantiene la divisa base como antes. Los campos *_base sí necesitan FX y su
+ *  N/D sin cartera es honesto. */
+const planMonthly = (value: unknown, record: DataRecord) =>
+    typeof record.base_currency === 'string'
+        ? formatMoney(value as number | string | null, record.base_currency)
+        : formatMoney(value as number | string | null, 'EUR');
+const PLAN_FORMAT = {start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, ...Object.fromEntries(['expected_contributions_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'next_contribution', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
 const DETAIL_FORMAT = Object.fromEntries(['target_allocations', 'current_weights', 'deviations', 'suggestions', 'missing_fx', 'status'].map(key => [key, (value: unknown, record: DataRecord) => planValue(value, typeof record.base_currency === 'string' ? record.base_currency : undefined, key === 'current_weights')]));
 
 /** Extrae tickers del drift (current_weights "ticker:XXX", deviations kind ticker) y del plan (targets kind ticker) */
