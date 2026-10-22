@@ -1984,6 +1984,28 @@ def refresh_earnings_calendar(
         db.close()
 
 
+@dramatiq.actor(max_retries=0, time_limit=900_000)
+def extract_commitment_candidates(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Candidatos SIN REVISAR desde transcripciones oficiales registradas (cartera + watchlist)."""
+    from datetime import date as _date
+
+    from app.services.commitment_candidate_job import extract_registry_candidates
+
+    db = _session(tenant_id, user_id)
+    try:
+        res = extract_registry_candidates(db, today=_date.today())
+        created = sum(i.get("created", 0) for rows in res.values() for i in rows)
+        return {"actor": "extract_commitment_candidates", "created": created, "companies": res}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("extract_commitment_candidates", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
 def backfill_company_price_history(
     company_id: int,

@@ -17,6 +17,7 @@ from app.workers.dramatiq_app import (
     dispatch_insider_alerts,
     dispatch_tracked_news_alerts,
     evaluate_alert_rules,
+    extract_commitment_candidates,
     freeze_propicks_snapshot,
     ingest_ca_insider_yahoo,
     ingest_class_shares_outstanding,
@@ -544,6 +545,9 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     if get_settings().source_check_job_enabled:
         _register(scheduler, run_source_check_job, "cron", job_id="source_check_job",
                   hour=7, minute=35)
+    if get_settings().candidate_extraction_job_enabled:
+        _register(scheduler, partial(enqueue_for_all_tenants, extract_commitment_candidates), "cron",
+                  job_id="commitment_candidates", hour=7, minute=50)
     return scheduler
 
 

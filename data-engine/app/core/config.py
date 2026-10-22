@@ -178,6 +178,9 @@ class Settings(BaseSettings):
     # defecto: no se registra en el scheduler hasta que se active explicitamente. Env:
     # SOURCE_CHECK_JOB_ENABLED.
     source_check_job_enabled: bool = False
+    # Candidatos de compromisos desde transcripciones registradas (sin revisar). APAGADO por defecto.
+    # Env: CANDIDATE_EXTRACTION_JOB_ENABLED.
+    candidate_extraction_job_enabled: bool = False
     knowledge_rag_max_file_mb: int = Field(default=60, ge=1, le=500)
     # Guarda de disco: el VM va justo. Ingesta rechazada si queda menos libre.
     knowledge_rag_min_free_gb: float = Field(default=3.0, ge=0.0, le=1000.0)
