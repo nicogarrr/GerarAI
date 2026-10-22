@@ -6,6 +6,7 @@ import { commitmentsUiEnabled } from '@/lib/commitments-flag';
 
 import { normalizeResearchBody, researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { extractOutcomeMessage, type ExtractFromRegistryResult } from '@/lib/actions/extract-outcome-message';
+import { commitmentErrorMessage } from '@/lib/actions/commitment-error-message';
 import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
 import { AppError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
@@ -869,30 +870,42 @@ export async function extractManagementCandidatesFromRegistry(ticker: string, fo
 
 export async function reviewManagementCandidate(ticker: string, promiseId: number, formData: FormData) {
   assertCommitmentsUi();
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/review`, {
-    method: 'POST',
-    body: JSON.stringify({
-      fulfillment_criteria: required(formData, 'fulfillment_criteria', 'Criterio'),
-      due_date: String(formData.get('due_date') ?? '').trim() || null,
-      confirmed_source_checked: formData.get('confirmed_source_checked') === 'on',
-    }),
-  });
+  try {
+    await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/review`, {
+      method: 'POST',
+      body: JSON.stringify({
+        fulfillment_criteria: required(formData, 'fulfillment_criteria', 'Criterio'),
+        due_date: String(formData.get('due_date') ?? '').trim() || null,
+        confirmed_source_checked: formData.get('confirmed_source_checked') === 'on',
+      }),
+    });
+  } catch (err) {
+    const translated = commitmentErrorMessage(err);
+    if (translated) throw new Error(translated);
+    throw err;
+  }
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
 }
 
 export async function addManagementPromiseCheck(ticker: string, promiseId: number, formData: FormData) {
   assertCommitmentsUi();
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/checks`, {
-    method: 'POST',
-    body: JSON.stringify({
-      outcome: required(formData, 'outcome', 'Outcome'),
-      checked_on: required(formData, 'checked_on', 'Checked on'),
-      summary: String(formData.get('summary') ?? '').trim(),
-      evidence_url: String(formData.get('evidence_url') ?? '').trim() || null,
-      evidence_date: String(formData.get('evidence_date') ?? '').trim() || null,
-      evidence_excerpt: String(formData.get('evidence_excerpt') ?? '').trim() || null,
-    }),
-  });
+  try {
+    await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/checks`, {
+      method: 'POST',
+      body: JSON.stringify({
+        outcome: required(formData, 'outcome', 'Outcome'),
+        checked_on: required(formData, 'checked_on', 'Checked on'),
+        summary: String(formData.get('summary') ?? '').trim(),
+        evidence_url: String(formData.get('evidence_url') ?? '').trim() || null,
+        evidence_date: String(formData.get('evidence_date') ?? '').trim() || null,
+        evidence_excerpt: String(formData.get('evidence_excerpt') ?? '').trim() || null,
+      }),
+    });
+  } catch (err) {
+    const translated = commitmentErrorMessage(err);
+    if (translated) throw new Error(translated);
+    throw err;
+  }
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
 }
 

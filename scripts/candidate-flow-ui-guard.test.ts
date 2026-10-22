@@ -143,3 +143,31 @@ void test('todo flag que emite el extractor backend tiene etiqueta fiel en ambas
     }
     assert.ok(portfolio.includes('menciona mercado o terceros; revisar que el compromiso sea de la directiva'), 'traducción fiel sin conclusión');
 });
+
+void test('los 422 conocidos de checks/review se explican en español, nunca con reintento ciego', async () => {
+    const { commitmentErrorMessage } = await import('./commitment-error-message.runner.mjs');
+    // Literales exactos del contrato backend (commitment_tracking_service.py).
+    const casos: Array<[string, string]> = [
+        ['Cumplido, parcial o no cumplido exigen URL de evidencia y extracto que pruebe el criterio', 'Completa esos campos y vuelve a registrar la comprobación.'],
+        ['La evidencia debe ser una URL https', 'La evidencia debe ser una URL https completa.'],
+        ['Define primero el criterio de cumplimiento del compromiso', 'la revisión debe fijarlo antes de registrar un veredicto'],
+        ['Revisa primero el candidato (cita, contexto, fecha, fuente) y pasalo a seguimiento', 'primero revisa cita, contexto, fecha y fuente'],
+        ['Indica por que no se puede concluir (resumen)', 'indica por qué no se puede concluir'],
+        ['Solo se revisan candidatos sugeridos', 'ya está en seguimiento'],
+        ['Confirma que has revisado cita, contexto, fecha y fuente en el documento original', 'marca que has revisado cita, contexto, fecha y fuente'],
+        ['Define un criterio de cumplimiento concreto', 'describe qué hecho concreto y fecha lo probaría'],
+    ];
+    for (const [detalle, esperado] of casos) {
+        const traducido = commitmentErrorMessage(new Error(detalle));
+        assert.ok(traducido !== null, `sin traducción para: ${detalle}`);
+        assert.ok(traducido.includes(esperado), `traducción sin «${esperado}» para: ${detalle}`);
+        assert.ok(!traducido.includes('Inténtalo de nuevo'), 'nunca sustituido por reintento ciego');
+    }
+    // Error desconocido: null y sigue el camino genérico, no se inventa instrucción.
+    assert.equal(commitmentErrorMessage(new Error('Connection reset by peer')), null);
+    assert.equal(commitmentErrorMessage('no es error'), null);
+    // Ambas acciones pasan por el mapeador.
+    const actions = source('lib/actions/research-tools.actions.ts');
+    assert.ok(actions.includes("import { commitmentErrorMessage } from '@/lib/actions/commitment-error-message'"), 'mapper importado');
+    assert.equal((actions.match(/commitmentErrorMessage\(err\)/g) ?? []).length, 2, 'checks y review usan el mapper');
+});
