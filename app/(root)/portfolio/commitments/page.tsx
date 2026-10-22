@@ -10,7 +10,7 @@ import SourceCoverage from '@/components/portfolio/SourceCoverage';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const FLAGS: Record<string, string> = { conditional: 'condicional', negation_present: 'contiene negación', due_year_inferred: 'año del plazo inferido de la fecha de la llamada; no es fecha expresa' };
+const FLAGS: Record<string, string> = { conditional: 'condicional', negation_present: 'contiene negación', mercado_o_tercero_mencionado: 'menciona mercado o terceros; revisar que el compromiso sea de la directiva', due_year_inferred: 'año del plazo inferido de la fecha de la llamada; no es fecha expresa' };
 
 const DATE_BASIS: Record<string, string> = {
   call_date: 'fecha de llamada indicada al registrar',

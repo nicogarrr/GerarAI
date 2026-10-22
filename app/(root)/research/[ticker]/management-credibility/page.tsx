@@ -41,6 +41,7 @@ const STATUS_LABELS: Record<string, string> = {
 const FLAG_LABELS: Record<string, string> = {
   conditional: 'condicional',
   negation_present: 'contiene negación',
+  mercado_o_tercero_mencionado: 'menciona mercado o terceros; revisar que el compromiso sea de la directiva',
   due_year_inferred: 'año del plazo inferido de la fecha de la llamada, no dicho por la directiva',
 };
 

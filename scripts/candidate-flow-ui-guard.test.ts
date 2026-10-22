@@ -132,3 +132,14 @@ void test('el mapeador se ejecuta contra result reales: outcome exacto del backe
     assert.equal(raro.message, 'No se han añadido candidatos nuevos.');
     assert.equal(raro.tone, 'neutral');
 });
+
+void test('todo flag que emite el extractor backend tiene etiqueta fiel en ambas páginas', () => {
+    const portfolio = source('app/(root)/portfolio/commitments/page.tsx');
+    const credibilidad = source('app/(root)/research/[ticker]/management-credibility/page.tsx');
+    // Lista leída de data-engine/app/services/commitment_extraction_service.py (flags.append).
+    for (const flag of ['conditional', 'negation_present', 'mercado_o_tercero_mencionado', 'due_year_inferred']) {
+        assert.ok(portfolio.includes(flag), `portfolio sin ${flag}`);
+        assert.ok(credibilidad.includes(flag), `credibilidad sin ${flag}`);
+    }
+    assert.ok(portfolio.includes('menciona mercado o terceros; revisar que el compromiso sea de la directiva'), 'traducción fiel sin conclusión');
+});
