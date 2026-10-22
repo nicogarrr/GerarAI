@@ -35,7 +35,7 @@ function DayCard({ isoDate, todayIso, events }: { isoDate: string; todayIso: str
             </span>
             <span className="text-xs text-gray-400 first-letter:uppercase">{dayLabel(isoDate, todayIso)}</span>
             {events.length === 0 ? (
-                <span className="mt-1 text-xs text-gray-600">Sin eventos</span>
+                <span className="mt-1 text-xs text-gray-400">Sin eventos</span>
             ) : (
                 <>
                     <span className="rounded-md bg-gray-800 px-1.5 py-0.5 text-xs font-medium text-gray-200">
