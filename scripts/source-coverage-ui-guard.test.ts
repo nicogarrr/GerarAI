@@ -34,10 +34,12 @@ void test('un fallo de lectura (404/red) no se presenta como ausencia de fuentes
     assert.ok(!view.includes('sin fuentes registradas'), 'no inventa ausencia');
 });
 
-void test('la nota del contrato se muestra y no se convierte en «compromiso cumplido»', () => {
+void test('la nota de usuario es español claro, nunca jerga técnica del backend', () => {
     const view = source('components/portfolio/SourceCoverage.tsx');
-    assert.ok(view.includes('report.note'), 'la nota del backend se renderiza tal cual');
-    assert.ok(!view.includes('compromiso cumplido"'), 'la UI no marca cumplidos');
+    assert.ok(view.includes('Tener la transcripción no significa que el compromiso se haya cumplido.'), 'nota ES visible');
+    assert.ok(!view.includes('{report.note}'), 'la nota técnica del backend no se muestra tal cual');
+    assert.ok(!view.includes('{job.note}'), 'la nota técnica del job no se muestra tal cual');
+    assert.ok(view.includes('JOB_RUN_NOTE'), 'nota del job sustituida por texto ES');
 });
 
 void test('fuera de retención nunca se afirma como «nunca chequeado»', () => {
@@ -57,6 +59,13 @@ void test('la última fecha de chequeo se muestra explícita por empresa', () =>
     const view = source('components/portfolio/SourceCoverage.tsx');
     assert.ok(view.includes('Último chequeo:'), 'fecha visible');
     assert.ok(view.includes('Último chequeo bueno:'), 'último bueno cuando el último es error');
+});
+
+void test('el origen de la transcripción se muestra en español, sin literales enum', () => {
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(view.includes('enlace leído de la página de relación con inversores'), 'origen IR en ES');
+    assert.ok(view.includes('dominio oficial localizado por búsqueda'), 'origen búsqueda en ES');
+    assert.ok(!view.includes("href_ir_leido'</"), 'literal enum no visible');
 });
 
 void test('la acción usa firma de identidad y no-store como el resto del cliente research', () => {

@@ -6,6 +6,11 @@ import {
     type SourceCoverageState,
 } from '@/lib/actions/source-coverage.actions';
 
+/** Nota de usuario en español (la del backend es técnica: no se muestra tal cual). */
+const COVERAGE_NOTE = 'Tener la transcripción no significa que el compromiso se haya cumplido.';
+/** Sustituye a job.note del backend (técnica y sin acentos). */
+const JOB_RUN_NOTE = 'Es la última ejecución programada; no indica la salud actual del chequeo.';
+
 const STATE_LABEL: Record<SourceCoverageState, string> = {
     fuente_obtenida: 'Fuente obtenida',
     abstencion_en_chequeo: 'Sin datos nuevos',
@@ -39,6 +44,11 @@ const OUTCOME_LABEL: Record<string, string> = {
     extraido: 'fuente obtenida',
     abstencion: 'sin datos nuevos',
     error: 'error',
+};
+
+const ORIGIN_LABEL: Record<string, string> = {
+    href_ir_leido: 'enlace leído de la página de relación con inversores',
+    url_dominio_oficial_por_busqueda: 'dominio oficial localizado por búsqueda',
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -78,6 +88,11 @@ function CompanyRow({ company }: { company: SourceCoverageCompany }) {
                     Documentos: {c.transcript_assets} ({c.transcript_assets_with_call_date} con fecha de llamada)
                 </p>
             ) : null}
+            {c.transcript_origins.length ? (
+                <p className="mt-1 text-xs text-gray-500">
+                    Fuente de la transcripción: {c.transcript_origins.map((o) => ORIGIN_LABEL[o] ?? 'origen registrado').join(' · ')}
+                </p>
+            ) : null}
             {c.pending.length ? (
                 <p className="mt-1 text-xs text-gray-500">
                     Pendiente: {c.pending.map((p) => PENDING_LABEL[p] ?? p).join(' · ')}
@@ -105,7 +120,7 @@ function HistoryList({ history }: { history: SourceCoverageHistoryItem[] }) {
     );
 }
 
-function StoreBanners({ report }: { report: SourceCoverageReport }) {
+function StoreAlerts({ report }: { report: SourceCoverageReport }) {
     const { store, job_last_run: job } = report;
     return (
         <>
@@ -119,29 +134,38 @@ function StoreBanners({ report }: { report: SourceCoverageReport }) {
                     Hay una incidencia activa en el registro de chequeos ({store.incident.file}).
                 </p>
             ) : null}
+            {job !== null && !job.finished ? (
+                <p role="alert" className="rounded-lg border border-amber-800 bg-amber-950/40 p-3 text-xs text-amber-300">
+                    La última ejecución programada ({job.day}) no terminó{job.error ? `: ${job.error}` : ''}.
+                </p>
+            ) : null}
+        </>
+    );
+}
+
+function OperationalDetails({ report }: { report: SourceCoverageReport }) {
+    const { store, job_last_run: job } = report;
+    return (
+        <>
             {store.incident?.status === 'historico_sanado' ? (
                 <p className="text-xs text-gray-500">Incidencia histórica del registro, ya resuelta.</p>
             ) : null}
             {store.at_retention_cap ? (
                 <p className="text-xs text-gray-500">
-                    El registro alcanzó su límite de retención: algunos estados aparecen como desconocidos aunque pudieron chequearse.
+                    El registro alcanzó su límite de conservación: algunos estados aparecen como desconocidos aunque pudieron chequearse.
                 </p>
             ) : null}
             {job === null ? (
                 <p className="text-xs text-gray-500">
-                    No hay una ejecución del chequeo programado legible todavía (arranque normal o registro no legible).
+                    No hay una ejecución del chequeo automático legible todavía (arranque normal o registro no legible).
                 </p>
-            ) : !job.finished ? (
-                <p role="alert" className="rounded-lg border border-amber-800 bg-amber-950/40 p-3 text-xs text-amber-300">
-                    La última ejecución programada ({job.day}) no terminó{job.error ? `: ${job.error}` : ''}.
-                </p>
-            ) : (
+            ) : job.finished ? (
                 <p className="text-xs text-gray-500">
                     Última ejecución programada: {job.day}
                     {Object.keys(job.outcomes).length ? ` (${outcomesSummary(job.outcomes)})` : ''}
-                    {job.had_errors ? ' · con errores' : ''}. {job.note}
+                    {job.had_errors ? ' · con errores' : ''}. {JOB_RUN_NOTE}
                 </p>
-            )}
+            ) : null}
         </>
     );
 }
@@ -153,9 +177,9 @@ export function SourceCoverageView({ report }: { report: SourceCoverageReport })
             <p className="mt-1 text-xs text-gray-500">
                 Universo: tu cartera + tu watchlist ({report.universe_size} empresas), leído de tu cuenta.
             </p>
-            <p className="mt-1 text-xs text-gray-400">{report.note}</p>
+            <p className="mt-1 text-xs text-gray-400">{COVERAGE_NOTE}</p>
             <div className="mt-3 grid gap-2">
-                <StoreBanners report={report} />
+                <StoreAlerts report={report} />
             </div>
             {report.companies.length ? (
                 <ul className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -165,8 +189,11 @@ export function SourceCoverageView({ report }: { report: SourceCoverageReport })
                 <p className="mt-3 text-xs text-gray-500">No hay empresas en el universo todavía.</p>
             )}
             <details className="mt-4">
-                <summary className="cursor-pointer text-xs text-gray-400 underline">Chequeos recientes ({report.history.length})</summary>
-                <div className="mt-2"><HistoryList history={report.history} /></div>
+                <summary className="cursor-pointer text-xs text-gray-400 underline">Detalle operativo y chequeos recientes ({report.history.length})</summary>
+                <div className="mt-2 grid gap-2">
+                    <OperationalDetails report={report} />
+                    <HistoryList history={report.history} />
+                </div>
             </details>
         </section>
     );

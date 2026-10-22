@@ -22,7 +22,7 @@ export default async function PortfolioCommitmentsPage() {
   if (!commitmentsUiEnabled()) {
     return (
       <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
-        <PageHeader kicker="Seguimiento de la directiva" title="Compromisos de tu cartera" description="Esta función está desactivada en este entorno todavía." />
+        <PageHeader kicker="Seguimiento de la directiva" title="Compromisos de tu cartera y watchlist" description="Esta función está desactivada en este entorno todavía." />
         <EmptyState title="Seguimiento de compromisos no disponible" />
       </main>
     );
@@ -33,7 +33,7 @@ export default async function PortfolioCommitmentsPage() {
     <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
       <PageHeader
         kicker="Seguimiento de la directiva"
-        title="Compromisos de tu cartera"
+        title="Compromisos de tu cartera y watchlist"
         description="Frases de la directiva en llamadas, con cita literal, fuente y fecha. Un candidato sugerido no es una promesa confirmada: nada se marca cumplido o fallido sin evidencia, y un plazo vencido sin prueba queda como no verificado."
       />
       <p className="text-xs text-gray-500">

@@ -23,6 +23,8 @@ export type SourceCoverageCompany = {
     transcript_status: string;
     transcript_assets: number;
     transcript_assets_with_call_date: number;
+    /** Origen de cada transcripción: href_ir_leido | url_dominio_oficial_por_busqueda. */
+    transcript_origins: string[];
     press_release_registered: boolean;
     checkable_by_job: boolean;
     pending: string[];
