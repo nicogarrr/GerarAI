@@ -28,12 +28,9 @@ from app.services.commitment_primary_pipeline import (
     PrimarySourceError,
     fetch_registered_document_isolated,
 )
-from app.services.public_fetch import fetch_public_url
 from app.services.transcript_source_registry import all_entries
 
 MAX_RECORDS = 200
-HTML_MAX_BYTES = 4_000_000
-HTML_TIMEOUT = 25.0
 
 
 @dataclass(frozen=True)
@@ -53,12 +50,9 @@ class SourceCheckRecord:
 
 
 def _fetch_html(url: str) -> bytes:
-    content, ctype, final_url = fetch_public_url(
-        url, max_bytes=HTML_MAX_BYTES, timeout=HTML_TIMEOUT, allowed_url=lambda u: u == url
-    )
-    if final_url != url or (ctype or "").split(";")[0].strip().lower() != "text/html":
-        raise PrimarySourceError("Respuesta distinta de la registrada (URL o tipo)")
-    return content
+    from app.services.commitment_primary_pipeline import fetch_registered_html_isolated
+
+    return fetch_registered_html_isolated(url)
 
 
 def check_financial_assets(
@@ -123,7 +117,9 @@ class JsonSourceCheckStore:
     - Un latest.json corrupto NO se descarta en silencio: se mueve a *.corrupt-<n> (cuarentena,
       se conserva), se anota un evento en el historial y load() lo senala (corrupt_quarantined).
       Nunca se reescribe como "sin actividad".
-    - El historial se recorta a MAX_HISTORY lineas (las mas antiguas salen, no se pierde el latest).
+    - El historial es RETENCION ACOTADA (MAX_HISTORY lineas, las mas antiguas salen): no es un
+      registro de auditoria inmutable ni infalsificable (un proceso con acceso al directorio puede
+      editarlo). latest.json es derivable del ultimo evento por URL del historial.
     """
 
     MAX_HISTORY = 2000
@@ -200,13 +196,24 @@ class JsonSourceCheckStore:
         return cm()
 
     def _atomic_write(self, path: Path, text: str) -> None:
-        tmp = path.with_name(path.name + ".tmp")
-        fd = os.open(tmp, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as fh:
-            fh.write(text)
-            fh.flush()
-            os.fsync(fh.fileno())
-        tmp.replace(path)
+        import tempfile
+
+        fd, tmp_name = tempfile.mkstemp(dir=self.dir, prefix=path.name + ".", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(text)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.chmod(tmp_name, 0o600)
+            os.replace(tmp_name, path)
+        except BaseException:
+            Path(tmp_name).unlink(missing_ok=True)
+            raise
+        dfd = os.open(self.dir, os.O_RDONLY)
+        try:
+            os.fsync(dfd)
+        finally:
+            os.close(dfd)
 
     def _append_history(self, items: list[dict]) -> None:
         try:
@@ -225,21 +232,41 @@ class JsonSourceCheckStore:
             for rec in records:
                 previous = data.get(rec.url)
                 item = asdict(rec)
-                item["previous_content_sha256"] = previous.get("content_sha256") if previous else None
+                prev_good = previous.get("last_good_sha256") if previous else None
+                item["previous_content_sha256"] = prev_good
                 item["content_changed"] = (
-                    None if not previous or not rec.content_sha256 or not previous.get("content_sha256")
-                    else previous["content_sha256"] != rec.content_sha256)
+                    None if not prev_good or not rec.content_sha256
+                    else prev_good != rec.content_sha256)
+                # un error/abstencion NO borra el ultimo hash bueno conocido
+                if rec.content_sha256:
+                    item["last_good_sha256"] = rec.content_sha256
+                    item["last_good_checked_on"] = rec.checked_on
+                else:
+                    item["last_good_sha256"] = prev_good
+                    item["last_good_checked_on"] = previous.get("last_good_checked_on") if previous else None
                 data[rec.url] = item
                 events.append(item)
-            while len(data) > MAX_RECORDS:
-                data.pop(next(iter(data)))
-            self._atomic_write(self.latest, json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True))
+            if len(data) > MAX_RECORDS:
+                # evicta por fecha de chequeo mas antigua (determinista; desempate por URL)
+                for url in sorted(data, key=lambda u: (data[u].get("checked_on", ""), u))[
+                        : len(data) - MAX_RECORDS]:
+                    data.pop(url)
+            # Diario primero, estado despues: si cae entre ambos, el historial tiene el chequeo y
+            # latest queda en el estado anterior (el siguiente chequeo lo reescribe); nunca al reves.
             self._append_history(events)
+            self._atomic_write(self.latest, json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True))
         return data
 
 
 def run_job(store: JsonSourceCheckStore, *, today: date, **kwargs) -> list[SourceCheckRecord]:
+    store.load()  # si el almacen esta corrupto lo pone en cuarentena ANTES de escribir nada
     records = check_financial_assets(today=today, **{k: v for k, v in kwargs.items() if k == "fetch_html"})
     records += check_transcripts(today=today, **{k: v for k, v in kwargs.items() if k == "fetch"})
+    if store.corrupt_quarantined:
+        # error VISIBLE en la salida del job (no un descarte silencioso del estado previo)
+        records.append(SourceCheckRecord(
+            ticker="-", url="store://latest.json", kind="store", period="-",
+            checked_on=today.isoformat(), outcome="error",
+            reason=f"almacen_corrupto_en_cuarentena:{store.corrupt_quarantined}"))
     store.save(records)
     return records

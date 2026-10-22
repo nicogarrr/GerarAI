@@ -13,7 +13,7 @@ import resource
 import sys
 
 
-def main(url: str) -> int:
+def main(url: str, mode: str = "pdf") -> int:
     from app.services.commitment_primary_pipeline import (
         MAX_BYTES,
         TIMEOUT_SECONDS,
@@ -28,8 +28,17 @@ def main(url: str) -> int:
         )
         if final_url != url:
             raise PrimarySourceError("La descarga termino en una URL distinta de la registrada")
-        if (ctype or "").split(";")[0].strip().lower() != "application/pdf":
-            raise PrimarySourceError("Content-Type no es application/pdf")
+        want = "text/html" if mode == "html" else "application/pdf"
+        if (ctype or "").split(";")[0].strip().lower() != want:
+            raise PrimarySourceError(f"Content-Type no es {want}")
+        if mode == "html":
+            import base64
+
+            sys.stdout.write(json.dumps({
+                "bytes_sha256": hashlib.sha256(content).hexdigest(), "byte_size": len(content),
+                "content_type": want, "final_url": final_url,
+                "html_b64": base64.b64encode(content).decode()}))
+            return 0
         if not content.startswith(b"%PDF"):
             raise PrimarySourceError("La fuente no es un PDF")
         pages = _pdf_pages(content)
@@ -58,4 +67,4 @@ if __name__ == "__main__":
     mem = int(sys.argv[3]) if len(sys.argv) > 3 else 1_000_000_000
     resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
     resource.setrlimit(resource.RLIMIT_AS, (mem, mem))
-    sys.exit(main(sys.argv[1]))
+    sys.exit(main(sys.argv[1], sys.argv[4] if len(sys.argv) > 4 else "pdf"))

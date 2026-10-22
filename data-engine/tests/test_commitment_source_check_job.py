@@ -114,3 +114,59 @@ def test_store_is_bounded(tmp_path):
                               "2026-10-22", "abstencion", "r") for i in range(MAX_RECORDS + 20)]
     assert len(store.save(recs)) == MAX_RECORDS
     _ = (OK, URL)
+
+
+def _rec(url, outcome, sha, day="2026-10-22"):
+    from app.services.commitment_source_check_job import SourceCheckRecord
+
+    return SourceCheckRecord("T", url, "press_release", "Q1 2026", day, outcome, "r", content_sha256=sha)
+
+
+def test_error_between_good_checks_does_not_erase_last_good_hash(tmp_path):
+    store = JsonSourceCheckStore(tmp_path / "s")
+    u = "https://x.example/a"
+    store.save([_rec(u, "extraido", "a" * 64, "2026-10-21")])
+    store.save([_rec(u, "error", None, "2026-10-22")])
+    mid = store.load()[u]
+    assert mid["last_good_sha256"] == "a" * 64 and mid["last_good_checked_on"] == "2026-10-21"
+    store.save([_rec(u, "extraido", "b" * 64, "2026-10-23")])
+    last = store.load()[u]
+    assert last["content_changed"] is True and last["previous_content_sha256"] == "a" * 64
+
+
+def test_multi_process_concurrent_saves_lose_nothing(tmp_path):
+    import subprocess
+    import sys
+
+    code = (
+        "import sys;from pathlib import Path;"
+        "from app.services.commitment_source_check_job import *;"
+        "st=JsonSourceCheckStore(Path(sys.argv[1]));i=sys.argv[2]\n"
+        "for k in range(10):\n"
+        " st.save([SourceCheckRecord('T',f'https://x.example/{i}-{k}','press_release','Q1 2026','2026-10-22','abstencion','r')])"
+    )
+    procs = [subprocess.Popen([sys.executable, "-c", code, str(tmp_path / "s"), str(i)]) for i in range(4)]
+    assert all(p.wait(timeout=60) == 0 for p in procs)
+    store = JsonSourceCheckStore(tmp_path / "s")
+    assert len(store.load()) == 40 and len(store.read_history(limit=100)) == 40
+
+
+def test_eviction_drops_oldest_checked_not_alphabetical(tmp_path):
+    from app.services.commitment_source_check_job import MAX_RECORDS
+
+    store = JsonSourceCheckStore(tmp_path / "s")
+    recs = [_rec(f"https://x.example/{i:04d}", "abstencion", None, "2026-10-22") for i in range(MAX_RECORDS)]
+    recs.append(_rec("https://x.example/AAAA-old", "abstencion", None, "2026-01-01"))
+    data = store.save(recs)
+    assert "https://x.example/AAAA-old" not in data and len(data) == MAX_RECORDS
+    assert "https://x.example/0000" in data
+
+
+def test_job_output_shows_corrupt_store_as_error_record(tmp_path):
+    store = JsonSourceCheckStore(tmp_path / "s")
+    store._ensure()
+    store.latest.write_text("{trunc")
+    recs = run_job(store, today=TODAY, fetch_html=lambda u: _html(), fetch=_fake_transcripts)
+    err = [r for r in recs if r.kind == "store"]
+    assert err and err[0].outcome == "error" and "latest.json.corrupt-0" in err[0].reason
+    assert (store.dir / "latest.json.corrupt-0").read_text() == "{trunc"

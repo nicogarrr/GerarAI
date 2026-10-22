@@ -95,3 +95,29 @@ def test_unregistered_url_never_spawns_a_child():
     with pytest.raises(pp.PrimarySourceError):
         pp.fetch_registered_document_isolated(
             "UBER", URL.replace("Transcript", "Presentation"), today=TODAY, runner=boom)
+
+
+def test_html_fetch_goes_through_isolated_worker_and_checks_integrity():
+    import base64
+    import hashlib
+
+    from app.services.commitment_financial_release import FINANCIAL_ASSETS
+
+    url = FINANCIAL_ASSETS[0].url
+    html = b"<html>x</html>"
+    good = {"bytes_sha256": hashlib.sha256(html).hexdigest(), "byte_size": len(html),
+            "content_type": "text/html", "final_url": url, "html_b64": base64.b64encode(html).decode()}
+    seen = []
+
+    def runner(argv, deadline):
+        seen.append((argv, deadline))
+        return dict(good)
+
+    assert pp.fetch_registered_html_isolated(url, runner=runner) == html
+    assert seen[0][0][-1] == "html" and seen[0][1] == pp.TOTAL_DEADLINE_SECONDS
+    for bad in (dict(good, final_url="https://evil.example/"), dict(good, bytes_sha256="0" * 64),
+                dict(good, content_type="application/pdf"), {"error": "x"}):
+        with pytest.raises(pp.PrimarySourceError):
+            pp.fetch_registered_html_isolated(url, runner=lambda a, deadline, b=bad: b)
+    with pytest.raises(pp.PrimarySourceError):
+        pp.fetch_registered_html_isolated(url + "?x=1", runner=runner)

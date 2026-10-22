@@ -261,3 +261,37 @@ def fetch_registered_document_isolated(
         "previous_bytes_sha256": previous,
         "bytes_changed": None if previous is None else previous != sha,
     }
+
+
+def fetch_registered_html_isolated(
+    url: str, *, deadline: float = TOTAL_DEADLINE_SECONDS, runner: Callable[..., dict] = run_child,
+) -> bytes:
+    """HTML de un activo FINANCIERO exacto registrado, en el mismo hijo acotado que el PDF
+    (CPU/memoria/deadline total de reloj, salida acotada). Sin reescribir la politica SSRF."""
+    import base64
+
+    from app.services.commitment_financial_release import FINANCIAL_ASSETS
+
+    if not any(a.url == url for a in FINANCIAL_ASSETS):
+        raise PrimarySourceError("URL no registrada como documento financiero exacto")
+    if not _SLOTS.acquire(blocking=False):
+        raise PrimarySourceError("Demasiadas descargas en curso; reintentar mas tarde")
+    try:
+        data = runner(
+            [sys.executable, "-m", "app.services.commitment_primary_worker", url,
+             str(CHILD_CPU_SECONDS), str(CHILD_MEMORY_BYTES), "html"],
+            deadline=deadline,
+        )
+    finally:
+        _SLOTS.release()
+    if "error" in data:
+        raise PrimarySourceError(str(data["error"])[:200])
+    try:
+        content = base64.b64decode(data["html_b64"], validate=True)
+    except (KeyError, ValueError, TypeError) as exc:
+        raise PrimarySourceError("Respuesta del extractor inconsistente") from exc
+    if (data.get("final_url") != url or data.get("content_type") != "text/html"
+            or hashlib.sha256(content).hexdigest() != data.get("bytes_sha256")
+            or len(content) > 4_000_000):
+        raise PrimarySourceError("Respuesta del extractor inconsistente")
+    return content
