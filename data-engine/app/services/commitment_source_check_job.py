@@ -80,29 +80,35 @@ def check_financial_assets(
     return out
 
 
+def transcript_targets() -> list[tuple[str, object]]:
+    """(ticker, activo) que el job chequea: SOLO activos con call_date leida. Unica fuente de verdad."""
+    return [(e.ticker, a) for e in all_entries() for a in e.assets if a.call_date]
+
+
+def job_target_tickers() -> set[str]:
+    return {a.ticker for a in FINANCIAL_ASSETS} | {t for t, _ in transcript_targets()}
+
+
 def check_transcripts(
     *, today: date, fetch=fetch_registered_document_isolated,
 ) -> list[SourceCheckRecord]:
     out: list[SourceCheckRecord] = []
-    for entry in all_entries():
-        for asset in entry.assets:
-            if not asset.call_date:
-                continue
-            base = dict(ticker=entry.ticker, url=asset.url, kind="transcript", period=asset.period,
-                        checked_on=today.isoformat())
-            try:
-                doc, meta = fetch(entry.ticker, asset.url, today=today)
-            except PrimarySourceError as exc:
-                out.append(SourceCheckRecord(**base, outcome="abstencion", reason=str(exc)[:120]))
-                continue
-            except Exception as exc:
-                out.append(SourceCheckRecord(**base, outcome="error", reason=type(exc).__name__))
-                continue
-            facts = ({"pages": doc.text.count("\f") + 1, "bytes": doc.byte_size,
-                      "extractor": doc.extractor, "cache_hit": meta["cache_hit"],
-                      "bytes_changed": meta["bytes_changed"]},)
-            out.append(SourceCheckRecord(**base, outcome="extraido", reason="texto_obtenido",
-                                         content_sha256=doc.bytes_sha256, facts=facts))
+    for ticker, asset in transcript_targets():
+        base = dict(ticker=ticker, url=asset.url, kind="transcript", period=asset.period,
+                    checked_on=today.isoformat())
+        try:
+            doc, meta = fetch(ticker, asset.url, today=today)
+        except PrimarySourceError as exc:
+            out.append(SourceCheckRecord(**base, outcome="abstencion", reason=str(exc)[:120]))
+            continue
+        except Exception as exc:
+            out.append(SourceCheckRecord(**base, outcome="error", reason=type(exc).__name__))
+            continue
+        facts = ({"pages": doc.text.count("\f") + 1, "bytes": doc.byte_size,
+                  "extractor": doc.extractor, "cache_hit": meta["cache_hit"],
+                  "bytes_changed": meta["bytes_changed"]},)
+        out.append(SourceCheckRecord(**base, outcome="extraido", reason="texto_obtenido",
+                                     content_sha256=doc.bytes_sha256, facts=facts))
     return out
 
 

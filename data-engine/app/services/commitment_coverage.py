@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.services.commitment_financial_release import FINANCIAL_ASSETS
+from app.services.commitment_source_check_job import job_target_tickers
 from app.services.transcript_source_registry import all_entries
 
 UNIVERSE_READ_ON = "2026-10-22"
@@ -66,16 +67,7 @@ def coverage_for(ticker: str) -> TickerCoverage:
 
 
 def universe_coverage(universe: tuple[str, ...] | None = None) -> list[TickerCoverage]:
-    return [coverage_for(t) for t in (universe or UNIVERSE)]
-
-
-def job_target_tickers() -> set[str]:
-    """Tickers que el job REALMENTE chequea (misma regla que check_transcripts/financial)."""
-    out = {a.ticker for a in FINANCIAL_ASSETS}
-    for e in all_entries():
-        if any(a.call_date for a in e.assets):
-            out.add(e.ticker)
-    return out
+    return [coverage_for(t) for t in (UNIVERSE if universe is None else universe)]
 
 
 def coverage_with_checks(

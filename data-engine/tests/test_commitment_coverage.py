@@ -31,7 +31,7 @@ def test_every_ticker_reports_honest_pending():
 
 
 def test_checkable_flag_matches_real_job_targets():
-    from app.services.commitment_coverage import job_target_tickers
+    from app.services.commitment_source_check_job import job_target_tickers
     assert {r.ticker for r in universe_coverage() if r.checkable_by_job} == (
         job_target_tickers() & set(UNIVERSE))
 
@@ -48,3 +48,8 @@ def test_coverage_with_checks_states_and_static_flag():
     ok = coverage_with_checks({"u": {"ticker": "UBER", "outcome": "extraido",
                                      "checked_on": "2026-10-22"}})
     assert {r["ticker"]: r["state"] for r in ok}["UBER"] == "fuente_obtenida"
+
+
+def test_explicit_empty_universe_stays_empty():
+    from app.services.commitment_coverage import coverage_with_checks
+    assert universe_coverage(()) == [] and coverage_with_checks({}, ()) == []
