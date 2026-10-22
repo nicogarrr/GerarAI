@@ -2,7 +2,8 @@
 
 A credibility score is only meaningful if promise matching is strict: an
 annual promise must never be reconciled against a quarterly observation,
-"partial" means genuinely close (within 5%), and unmatched promises stay
+there is no invented tolerance (a miss is "missed", never "partial"), a fact
+without a traceable source document is ignored, and unmatched promises stay
 honestly open.
 """
 
@@ -13,7 +14,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.entities import Base, Company, FinancialFact
+from app.models.entities import Base, Company, Document, FinancialFact
 from app.services.management_credibility_service import ManagementCredibilityService
 
 
@@ -37,8 +38,28 @@ def _company(db: Session) -> Company:
     return company
 
 
-def _fact(db, company, value, year=2025, quarter="FY", metric="revenue"):
+def _doc(db, company):
+    doc = Document(
+        company_id=company.id, title="10-Q", source_type="filing",
+        source_url="https://www.sec.gov/Archives/example-10q",
+    )
+    db.add(doc)
+    db.flush()
+    return doc.id
+
+
+def _fact(db, company, value, year=2025, quarter="FY", metric="revenue", with_source=True):
+    doc_id = None
+    if with_source:
+        doc = Document(
+            company_id=company.id, title="10-K", source_type="filing",
+            source_url="https://www.sec.gov/Archives/example",
+        )
+        db.add(doc)
+        db.flush()
+        doc_id = doc.id
     fact = FinancialFact(
+        source_id=doc_id,
         company_id=company.id, metric=metric, value=Decimal(str(value)),
         unit="USD", period=f"{quarter} {year}" if quarter != "FY" else f"FY{year}",
         fiscal_year=year, fiscal_quarter=None if quarter == "FY" else quarter,
@@ -76,15 +97,15 @@ def test_missed_when_clearly_below_target(db):
     assert p.status == "missed"
 
 
-def test_partial_within_five_percent_only(db):
+def test_no_invented_tolerance_close_miss_is_missed_not_partial(db):
     c = _company(db)
-    _fact(db, c, 97)  # 3% below target
+    _fact(db, c, 97)  # 3% below target: no tolerance rule, exact comparison only
     _promise(db, c)
     [p] = ManagementCredibilityService().reconcile(db, c)
-    assert p.status == "partial"
+    assert p.status == "missed"
 
 
-def test_just_outside_five_percent_is_missed(db):
+def test_clear_miss_is_missed(db):
     c = _company(db)
     _fact(db, c, 94)  # 6% below target
     _promise(db, c)
@@ -113,6 +134,7 @@ def test_quarterly_promise_matches_ten_q_fact_with_null_fiscal_year(db):
     """Hechos de la ingesta 10-Q: fiscal_year NULL, period '<end>:Qn'."""
     c = _company(db)
     fact = FinancialFact(
+        source_id=_doc(db, c),
         company_id=c.id, metric="revenue", value=Decimal("130"),
         unit="USD", period="2025-06-30:Q2",
         fiscal_year=None, fiscal_quarter="Q2",
@@ -129,6 +151,7 @@ def test_quarterly_promise_matches_ten_q_fact_with_null_fiscal_year(db):
 def test_quarterly_promise_ignores_null_fiscal_year_fact_from_other_year(db):
     c = _company(db)
     fact = FinancialFact(
+        source_id=_doc(db, c),
         company_id=c.id, metric="revenue", value=Decimal("130"),
         unit="USD", period="2024-06-30:Q2",
         fiscal_year=None, fiscal_quarter="Q2",
@@ -393,3 +416,38 @@ def test_portfolio_commitments_aggregates_net_position_without_duplicates(db):
     db.add(Position(company_id=held.id, quantity=Decimal("-5"), as_of=date(2030, 1, 1)))
     db.commit()
     assert management_commitments(db)["held_count"] == 0  # neta 0: no en cartera
+
+
+def test_reconcile_ignores_unreported_and_other_unit_facts(db):
+    c = _company(db)
+    estimated = _fact(db, c, 500)
+    estimated.is_reported = False
+    other_unit = _fact(db, c, 900)
+    other_unit.unit = "EUR"
+    db.commit()
+    _promise(db, c)
+    [p] = ManagementCredibilityService().reconcile(db, c)
+    assert p.status == "open"
+    assert p.actual_fact_id is None
+
+
+def test_reconcile_uses_reported_fact_with_same_unit_case_insensitive(db):
+    c = _company(db)
+    ignored = _fact(db, c, 500)
+    ignored.is_reported = False
+    ok = _fact(db, c, 120, year=2025)
+    ok.unit = "usd"
+    db.commit()
+    _promise(db, c)
+    [p] = ManagementCredibilityService().reconcile(db, c)
+    assert p.status == "met"
+    assert p.actual_fact_id == ok.id
+
+
+def test_fact_without_traceable_source_document_is_ignored(db):
+    c = _company(db)
+    _fact(db, c, 500, with_source=False)
+    _promise(db, c)
+    [p] = ManagementCredibilityService().reconcile(db, c)
+    assert p.status == "open"
+    assert p.actual_fact_id is None

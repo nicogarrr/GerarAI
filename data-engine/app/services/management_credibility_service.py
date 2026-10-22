@@ -7,12 +7,13 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import desc, or_, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import (
     CallClaim,
     Company,
+    Document,
     FinancialFact,
     ManagementPromise,
     Transcript,
@@ -246,10 +247,24 @@ class ManagementCredibilityService:
         for promise in promises:
             if not promise.metric:
                 continue
-            statement = select(FinancialFact).where(
-                FinancialFact.company_id == company.id,
-                FinancialFact.metric == promise.metric,
+            # Solo hechos REPORTADOS y en la misma unidad que la promesa: comparar
+            # cifras estimadas/derivadas o en otra unidad produciria met/missed falsos.
+            # Ademas el hecho debe poder trazarse a un documento con URL: un
+            # FinancialFact sin documento fuente no basta para dar un veredicto.
+            statement = (
+                select(FinancialFact)
+                .join(Document, Document.id == FinancialFact.source_id)
+                .where(
+                    FinancialFact.company_id == company.id,
+                    FinancialFact.metric == promise.metric,
+                    FinancialFact.is_reported.is_(True),
+                    Document.source_url.is_not(None),
+                )
             )
+            if promise.unit:
+                statement = statement.where(
+                    func.lower(FinancialFact.unit) == promise.unit.strip().lower()
+                )
             year_match = re.search(r"(?:19|20)\d{2}", promise.expected_period)
             if year_match:
                 year = int(year_match.group(0))
@@ -295,13 +310,10 @@ class ManagementCredibilityService:
             if promise.target_value is None or promise.operator not in OPERATORS:
                 promise.status = "outcome_recorded"
             else:
+                # Comparacion exacta segun operador/objetivo; sin tolerancia inventada:
+                # un "casi cumplido" ("partial") no se infiere, solo lo declara una persona.
                 met = OPERATORS[promise.operator](actual.value, promise.target_value)
-                if met:
-                    promise.status = "met"
-                else:
-                    distance = abs(actual.value - promise.target_value)
-                    tolerance = abs(promise.target_value) * Decimal("0.05")
-                    promise.status = "partial" if distance <= tolerance else "missed"
+                promise.status = "met" if met else "missed"
             promise.evidence = [
                 *(promise.evidence or []),
                 {
@@ -309,6 +321,7 @@ class ManagementCredibilityService:
                     "period": actual.period,
                     "source_type": actual.source_type,
                     "actual_value": str(actual.value),
+                    "source_document_id": actual.source_id,
                 },
             ]
         db.commit()
