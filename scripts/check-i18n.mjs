@@ -132,7 +132,12 @@ const englishHits = [];
 for (const file of files) {
   const rel = file.slice(ROOT.length + 1).replace(/\\/g, "/");
   if (ALLOW.some((prefix) => rel === prefix || rel.startsWith(prefix))) continue;
-  const source = readFileSync(file, "utf8");
+  // The public ICS feed uses a uniform machine 404 body, not UI copy.
+  // Exempt only that exact response expression, never the whole route.
+  const rawSource = readFileSync(file, "utf8");
+  const source = rel === "app/api/calendar-feed/[token]/route.ts"
+    ? rawSource.replace(/new NextResponse\('Not found', \{ status: 404 \}\)/g, "new NextResponse('feed_not_found', { status: 404 })")
+    : rawSource;
   for (const chunk of visibleChunks(source)) {
     const trimmed = chunk.trim();
     const line = source.slice(0, source.indexOf(chunk)).split("\n").length;

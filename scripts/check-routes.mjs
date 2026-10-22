@@ -102,7 +102,9 @@ for (const [file, content] of sources) {
   for (const match of content.matchAll(apiHrefPattern)) {
     // '/api/thesis/${encoded}/epub' -> '/api/thesis/*/epub': dynamic parts
     // match any [param] segment of the proxy route.
-    const normalized = match[1].split('${').join('*').split('}').join('');
+    // Query strings and fragments are not pathname segments.
+    const pathname = match[1].split(/[?#]/, 1)[0];
+    const normalized = pathname.replace(/\$\{[^}]*\}/g, '*');
     apiHrefCount += 1;
     const segments = normalized.split('/').filter(Boolean);
     const matches = apiPatterns.some((pattern) => {
