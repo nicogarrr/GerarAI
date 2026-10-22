@@ -36,8 +36,14 @@ class VerifiedAsset:
     period: str  # p.ej. 'Q2 2026'
     call_date: str | None = None  # AAAA-MM-DD solo si se leyo en el documento
     kind: str = "transcript"
+    # Procedencia del URL: "href_ir_leido" (enlace leido en la pagina IR) o
+    # "url_dominio_oficial_por_busqueda" (hallado por busqueda, NO enlazado en la pagina IR leida;
+    # verificado por descarga directa: dominio oficial, emisor, periodo y fecha en el documento).
+    origin: str = "href_ir_leido"
 
     def __post_init__(self) -> None:
+        if self.origin not in ("href_ir_leido", "url_dominio_oficial_por_busqueda"):
+            raise ValueError("origen de activo desconocido")
         if self.kind != "transcript":
             raise ValueError("solo se registran activos de tipo transcript")
         if not self.url.startswith("https://"):
@@ -113,6 +119,26 @@ _ENTRIES = (
             ),
         ),
         "PDF 200 application/pdf; cabecera 'Corrected Transcript 05-Aug-2026'. La misma pagina enlaza 'Prepared Remarks' (otro PDF, NO es la transcripcion).",
+    ),
+    SourceEntry(
+        "KKR",
+        OFFICIAL_TRANSCRIPT_PDF,
+        "https://ir.kkr.com/events-presentations",
+        _CHECKED,
+        (
+            VerifiedAsset(
+                "https://ir.kkr.com/media/document/f00cf12c-3dfa-4eda-80fc-c25f5552e5b2/assets/KKR_Q226_Earnings_Transcript.pdf?disposition=inline",
+                "KKR Q2'26 Earnings Transcript (titulo del resultado de busqueda)",
+                "Q2 2026",
+                "2026-07-30",
+                origin="url_dominio_oficial_por_busqueda",
+            ),
+        ),
+        "URL hallada por busqueda en ir.kkr.com; NO la enlazan las paginas IR leidas (inicio y "
+        "events-presentations, que solo enlaza el transcript del Investor Day 2024). Descargada: "
+        "PDF 21 pags, sha256 ab2dd1a9e43c..., cabecera 'KKR & Co. Inc. Second Quarter 2026 "
+        "Earnings Conference Call July 30, 2026' (InComm Conferencing); fecha coincide con la "
+        "llamada anunciada en la pagina IR.",
     ),
     SourceEntry(
         "ASTS",
