@@ -6,8 +6,6 @@ por los que el refresco deja de escribir filas para TODOS los tickers.
 """
 from datetime import UTC, date, datetime
 
-import pytest
-
 from app.core.database import SessionLocal, init_db
 from app.models import EarningsDate
 from app.services.earnings_dates_service import followed_calendar, refresh_earnings_dates
