@@ -169,3 +169,15 @@ def test_candidates_cannot_receive_checks_before_review():
         CommitmentTrackingService().add_check(
             db, cand, outcome="unknown", checked_on=date(2031, 1, 5), summary="x"
         )
+
+
+def test_company_notes_batch_is_private_and_single_query():
+    engine = _engine()
+    a = _session(engine, 1)
+    company, promise = _setup(a)
+    svc = CommitmentTrackingService()
+    svc.add_note(a, promise, user_id="user-a", body="a1")
+    svc.add_note(a, promise, user_id="user-b", body="b1")
+    assert [n.body for n in svc.notes_for_company(a, company.id, user_id="user-a")] == ["a1"]
+    assert [n.body for n in svc.notes_for_company(a, company.id, user_id="user-b")] == ["b1"]
+    assert svc.notes_for_company(_session(engine, 2), company.id, user_id="user-a") == []

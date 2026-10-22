@@ -787,9 +787,10 @@ function assertCommitmentsUi() {
 
 export type ManagementPromiseNote = { id: number; promise_id: number; body: string; created_at: string | null };
 
-export async function getManagementPromiseNotes(ticker: string, promiseId: number): Promise<ManagementPromiseNote[]> {
+export async function getManagementNotesByPromise(ticker: string): Promise<Record<string, ManagementPromiseNote[]>> {
   assertCommitmentsUi();
-  return requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/notes`);
+  const data = await requestJson<{ notes_by_promise: Record<string, ManagementPromiseNote[]> }>(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/notes`);
+  return data.notes_by_promise ?? {};
 }
 
 export async function addManagementPromiseNote(ticker: string, promiseId: number, formData: FormData) {

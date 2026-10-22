@@ -166,6 +166,23 @@ class CommitmentTrackingService:
             ).all()
         )
 
+    def notes_for_company(
+        self, db: Session, company_id: int, *, user_id: str, limit: int = 500
+    ) -> list[ManagementPromiseNote]:
+        """Notas privadas del usuario en las promesas de una empresa (1 consulta, acotada)."""
+        return list(
+            db.scalars(
+                select(ManagementPromiseNote)
+                .join(ManagementPromise, ManagementPromise.id == ManagementPromiseNote.promise_id)
+                .where(
+                    ManagementPromise.company_id == company_id,
+                    ManagementPromiseNote.owner_user_id == user_id,
+                )
+                .order_by(desc(ManagementPromiseNote.id))
+                .limit(limit)
+            ).all()
+        )
+
     @staticmethod
     def check_payload(row: ManagementPromiseCheck) -> dict[str, Any]:
         return {
