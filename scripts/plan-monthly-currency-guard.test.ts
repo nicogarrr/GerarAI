@@ -27,10 +27,12 @@ describe('aportación mensual visible sin cartera', () => {
         assert.match(view, /monthly_contribution: planMonthly/);
     });
     it('sin cartera muestra el importe en la divisa del input (EUR), nunca N/D con dato presente', () => {
-        const formatter = view.match(/const planMonthly[\s\S]*?;/);
+        const formatter = view.match(/const planMonthly[\s\S]*?\n};/);
         assert.ok(formatter, 'planMonthly no encontrado');
         assert.match(formatter[0], /formatMoney\([^)]*'EUR'\)/);
-        assert.doesNotMatch(formatter[0], /\bNA\b/);
+        // El tramo sin divisa registrada ni contrato (cartera ausente) nunca da N/D.
+        const fallback = formatter[0].slice(formatter[0].lastIndexOf('return typeof record.base_currency'));
+        assert.doesNotMatch(fallback, /\bNA\b/);
     });
     it('los importes convertidos *_base mantienen planMoney (N/D honesto sin FX)', () => {
         const group = view.match(/Object\.fromEntries\(\[([^\]]*)\]\.map\(key => \[key, planMoney\]\)/);
