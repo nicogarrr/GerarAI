@@ -115,10 +115,20 @@ class CorporateActionService:
             applied=False,
         )
         db.add(action)
-        db.commit()
+        if not apply_now:
+            db.commit()
+            db.refresh(action)
+            return action
+        # Atomico: si aplicar falla (libro ambiguo, oversell...) no queda una
+        # accion pendiente residual; se revierte accion y cambios juntos.
+        try:
+            db.flush()
+            self._apply_in_txn(db, action)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
         db.refresh(action)
-        if apply_now:
-            self.apply_action(db, action.id)
         return action
 
     def delete_action(self, db: Session, action_id: int) -> bool:
@@ -140,10 +150,21 @@ class CorporateActionService:
             raise ValueError("Corporate action not found")
         if action.applied:
             return action
+        try:
+            self._apply_in_txn(db, action)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        db.refresh(action)
+        return action
 
+    def _apply_in_txn(self, db: Session, action: CorporateAction) -> None:
+        """Aplica sin commit: el llamador confirma o revierte todo junto."""
         ratio = action.ratio
         if ratio <= 0:
             raise ValueError("Ratio must be positive")
+        rebuild_company_id: int | None = None
 
         if action.action_type in {"split", "reverse_split"}:
             first = self.first_trade_dates(db, {action.company_id}).get(action.company_id)
@@ -203,8 +224,9 @@ class CorporateActionService:
                     leg_price = leg.price or Decimal("0")
                     fees = leg.fees or Decimal("0")
                     if leg.trade_date < action.effective_date:
-                        leg_qty = leg_qty * ratio
-                        leg_price = leg_price / ratio
+                        # Mismo redondeo que se persiste mas abajo.
+                        leg_qty = (leg_qty * ratio).quantize(Decimal("0.000001"))
+                        leg_price = (leg_price / ratio).quantize(Decimal("0.000001"))
                     if leg.action == "buy":
                         qty += leg_qty
                         cost += leg_qty * leg_price + fees
@@ -220,28 +242,15 @@ class CorporateActionService:
                         qty -= leg_qty
                 if qty <= 0:
                     raise ValueError("Split rejected: adjusted ledger is empty")
-                position.quantity = qty.quantize(Decimal("0.000001"))
-                position.average_cost = (cost / qty).quantize(Decimal("0.000001"))
-                position.realized_pnl = realized
+                # Cantidad, coste, realizado y columnas base/FX/no realizado las
+                # recalcula rebuild_position sobre las patas ya ajustadas (una
+                # sola fuente de verdad); aqui solo se divide la cotizacion
+                # guardada. La procedencia del precio sigue SIN resolver.
                 if position.market_price is not None:
                     position.market_price = (position.market_price / ratio).quantize(
                         Decimal("0.000001")
                     )
-                if position.market_price is not None:
-                    position.market_value = position.quantity * position.market_price
-                if position.average_cost is not None:
-                    position.cost_basis_native = position.quantity * position.average_cost
-                # The base-currency columns are left untouched ON PURPOSE: a
-                # split preserves money (quantity x price and cost basis are
-                # unchanged), so market_value_base, cost_basis_base,
-                # unrealized_pnl_base, realized_pnl_base and fx_rate already
-                # hold exactly the values a rebuild would write. A
-                # PortfolioLedgerService.rebuild_position replay is therefore
-                # not run here: it would re-derive the holding from EVERY
-                # buy/sell leg (including legs already quoted post-split)
-                # instead of rescaling the open position, and it would rewind
-                # position.as_of to the last leg's trade date, making a
-                # freshly priced position look stale.
+                rebuild_company_id = action.company_id
 
             # Share-denominated legs only. Cash rows keep their amount in
             # `price` (quantity 0 or 1 is legitimate for cash, see
@@ -273,8 +282,10 @@ class CorporateActionService:
 
         # mergers / spin-offs: deal terms are user-specific; only flag as applied
         # after the user confirms the compensating transactions exist.
+        if rebuild_company_id is not None:
+            from app.services.portfolio_ledger_service import PortfolioLedgerService
+
+            db.flush()
+            PortfolioLedgerService().rebuild_position(db, rebuild_company_id)
         action.applied = True
         action.applied_at = datetime.now(UTC)
-        db.commit()
-        db.refresh(action)
-        return action

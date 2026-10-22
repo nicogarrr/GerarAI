@@ -79,8 +79,7 @@ def test_split_consistent_fixture_110_gives_410_cost_5600(db):
     _apply(db, c, "4", date(2025, 6, 1))
     pos = db.query(Position).filter_by(company_id=c.id).one()
     assert pos.quantity == Decimal("410")
-    assert pos.cost_basis_native == pos.quantity * pos.average_cost
-    assert abs(pos.quantity * pos.average_cost - Decimal("5600")) < Decimal("0.01")
+    assert pos.cost_basis_native == Decimal("5600")
     assert abs(pos.average_cost - Decimal("13.658537")) < Decimal("0.000001")
 
 
@@ -117,3 +116,113 @@ def test_ledger_split_with_no_post_legs_scales_whole_position(db):
     assert pos.quantity == Decimal("40")
     assert pos.average_cost == Decimal("25")
     assert pos.cost_basis_native == Decimal("1000")
+
+
+def _snapshot(pos):
+    from sqlalchemy.orm import object_session
+    object_session(pos).expire_all()
+    return {
+        k: getattr(pos, k)
+        for k in (
+            "quantity", "average_cost", "market_price", "market_value", "unrealized_pnl",
+            "realized_pnl", "cost_basis_native", "cost_basis_base", "realized_pnl_base",
+            "unrealized_pnl_base", "market_value_base", "fx_rate", "as_of",
+        )
+    }
+
+
+def test_post_split_sell_updates_base_fx_and_unrealized_like_rebuild(db):
+    from app.models.entities import FXRate
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    c = _company(db)
+    base = PortfolioFXService().ensure_portfolio(db).base_currency.upper()
+    if base != "USD":
+        db.add(FXRate(base_currency=base, quote_currency="USD", rate=Decimal("0.9"),
+                      rate_date=date(2024, 1, 1), source="test"))
+    db.commit()
+    rate = Decimal("1") if base == "USD" else Decimal("0.9")
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    _sell(db, c, "5", "50", date(2025, 7, 10))
+    db.commit()
+    _apply(db, c, "2", date(2025, 6, 1))
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.cost_basis_native == Decimal("750")
+    assert pos.realized_pnl == Decimal("0")
+    assert pos.cost_basis_base == Decimal("750") * rate
+    assert pos.realized_pnl_base == Decimal("0")
+    assert pos.unrealized_pnl == pos.market_value - pos.cost_basis_native
+    before = _snapshot(pos)
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+    PortfolioLedgerService().rebuild_position(db, c.id)
+    after = _snapshot(db.query(Position).filter_by(company_id=c.id).one())
+    assert after == before
+
+
+def test_split_preserves_as_of_and_divides_stored_price(db):
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    pos.market_price = Decimal("120")
+    pos.as_of = date(2025, 5, 1)
+    db.commit()
+    _apply(db, c, "4", date(2025, 6, 1))
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.as_of == date(2025, 5, 1)
+    assert pos.market_price == Decimal("30")
+    assert pos.market_value == Decimal("1200")
+
+
+def test_failed_apply_now_leaves_no_residual_action(db):
+    import pytest
+
+    from app.models.entities import CorporateAction
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    pos.quantity = Decimal("11")
+    db.commit()
+    with pytest.raises(ValueError):
+        _apply(db, c, "2", date(2025, 6, 1))
+    assert db.query(CorporateAction).count() == 0
+    CorporateActionService().create_action(
+        db, ticker=c.ticker, action_type="split", effective_date=date(2025, 6, 1),
+        ratio=Decimal("2"), apply_now=False)
+    row = db.query(CorporateAction).one()
+    assert row.applied is False
+
+
+def test_ledger_apply_is_idempotent_and_delete_blocked_after_apply(db):
+    import pytest
+
+    from app.models.entities import Transaction
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.commit()
+    service = CorporateActionService()
+    action = _apply(db, c, "2", date(2025, 6, 1))
+    service.apply_action(db, action.id)
+    tx = db.query(Transaction).filter_by(company_id=c.id).one()
+    assert tx.quantity == Decimal("20.000000")
+    assert db.query(Position).filter_by(company_id=c.id).one().quantity == Decimal("20")
+    with pytest.raises(ValueError, match="immutable"):
+        service.delete_action(db, action.id)
+
+
+def test_ratio_3_with_fees_and_pre_post_sells_matches_rebuild(db):
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+    c = _company(db)
+    svc = PortfolioLedgerService()
+    svc.create_transaction(db, ticker=c.ticker, action="buy", quantity=Decimal("9"),
+                           price=Decimal("90"), fees=Decimal("3"),
+                           trade_date=date(2025, 1, 10), currency="USD")
+    _sell(db, c, "3", "100", date(2025, 2, 10))
+    _buy(db, c, "30", "35", date(2025, 7, 1))
+    _sell(db, c, "6", "40", date(2025, 8, 1))
+    db.commit()
+    _apply(db, c, "3", date(2025, 6, 1))
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.quantity == Decimal("18") + Decimal("30") + Decimal("0") - Decimal("6")
+    before = _snapshot(pos)
+    svc.rebuild_position(db, c.id)
+    assert _snapshot(db.query(Position).filter_by(company_id=c.id).one()) == before
