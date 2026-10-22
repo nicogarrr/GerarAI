@@ -4,6 +4,7 @@ import { useState } from 'react';
 import IntentLink from '@/components/layout/IntentLink';
 import { usePathname } from 'next/navigation';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { useVisibleSections } from '@/lib/nav/nav-flags';
 import { isNavItemActive, NAV_SECTIONS, showsNavSectionTitle, type NavItem } from '@/lib/constants';
 
 import { SIDEBAR_COLLAPSED_COOKIE } from '@/lib/ui/sidebar-preference';
@@ -20,6 +21,7 @@ import { SIDEBAR_COLLAPSED_COOKIE } from '@/lib/ui/sidebar-preference';
  * mismo vale cuando el aviso de "sin conexion" aniade su propia altura.
  */
 export default function Sidebar({ collapsed: initiallyCollapsed }: { collapsed: boolean }) {
+    const navSections = useVisibleSections(NAV_SECTIONS);
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(initiallyCollapsed);
 
@@ -51,7 +53,7 @@ export default function Sidebar({ collapsed: initiallyCollapsed }: { collapsed: 
                 aria-label="Navegación principal"
             >
                 <ul className="flex flex-col">
-                    {NAV_SECTIONS.map((section) => {
+                    {navSections.map((section) => {
                         const showTitle = showsNavSectionTitle(section);
                         return (
                             <li key={section.title}>

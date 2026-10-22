@@ -1094,6 +1094,30 @@ def list_promise_notes(
     ]
 
 
+@router.get("/{ticker}/management-credibility/notes")
+def list_company_promise_notes(
+    ticker: str,
+    db: Session = Depends(get_db),
+    principal=Depends(get_research_principal),
+) -> dict:
+    """Notas privadas del usuario agrupadas por promesa, en una sola consulta (max 500)."""
+    from app.services.commitment_tracking_service import CommitmentTrackingService
+
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    service = CommitmentTrackingService()
+    grouped: dict[str, list[dict]] = {}
+    limit = 500
+    rows = service.notes_for_company(db, company.id, user_id=_principal_user(principal), limit=limit + 1)
+    truncated = len(rows) > limit
+    for row in rows[:limit]:
+        grouped.setdefault(str(row.promise_id), []).append(service.note_payload(row))
+    # Orden estable: id descendente (mas recientes primero). Si hay mas de `limit`,
+    # las mas antiguas quedan fuera y `truncated` lo dice; no equivale a "sin notas".
+    return {"notes_by_promise": grouped, "truncated": truncated, "limit": limit}
+
+
 @router.post("/{ticker}/management-credibility/reconcile")
 def reconcile_management_promises(
     ticker: str, db: Session = Depends(get_db)

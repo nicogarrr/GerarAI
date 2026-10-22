@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { commitmentsUiEnabled } from '@/lib/commitments-flag';
+
 import { normalizeResearchBody, researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
 import { AppError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
@@ -779,13 +781,20 @@ export async function getManagementCredibility(ticker: string): Promise<Manageme
   return requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility`);
 }
 
+function assertCommitmentsUi() {
+  if (!commitmentsUiEnabled()) throw new ValidationError('El seguimiento de compromisos esta desactivado en este entorno.', 'commitments');
+}
+
 export type ManagementPromiseNote = { id: number; promise_id: number; body: string; created_at: string | null };
 
-export async function getManagementPromiseNotes(ticker: string, promiseId: number): Promise<ManagementPromiseNote[]> {
-  return requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/notes`);
+export async function getManagementNotesByPromise(ticker: string): Promise<{ notes: Record<string, ManagementPromiseNote[]>; truncated: boolean }> {
+  assertCommitmentsUi();
+  const data = await requestJson<{ notes_by_promise: Record<string, ManagementPromiseNote[]>; truncated?: boolean }>(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/notes`);
+  return { notes: data.notes_by_promise ?? {}, truncated: Boolean(data.truncated) };
 }
 
 export async function addManagementPromiseNote(ticker: string, promiseId: number, formData: FormData) {
+  assertCommitmentsUi();
   await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/notes`, {
     method: 'POST',
     body: JSON.stringify({ body: required(formData, 'body', 'Nota') }),
@@ -818,6 +827,7 @@ export async function importManagementCallClaims(ticker: string) {
 }
 
 export async function extractManagementCandidates(ticker: string, formData: FormData) {
+  assertCommitmentsUi();
   await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates`, {
     method: 'POST',
     body: JSON.stringify({
@@ -830,6 +840,7 @@ export async function extractManagementCandidates(ticker: string, formData: Form
 }
 
 export async function extractManagementCandidatesFromUrl(ticker: string, formData: FormData) {
+  assertCommitmentsUi();
   await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-url`, {
     method: 'POST',
     body: JSON.stringify({
@@ -841,6 +852,7 @@ export async function extractManagementCandidatesFromUrl(ticker: string, formDat
 }
 
 export async function reviewManagementCandidate(ticker: string, promiseId: number, formData: FormData) {
+  assertCommitmentsUi();
   await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/review`, {
     method: 'POST',
     body: JSON.stringify({
@@ -853,6 +865,7 @@ export async function reviewManagementCandidate(ticker: string, promiseId: numbe
 }
 
 export async function addManagementPromiseCheck(ticker: string, promiseId: number, formData: FormData) {
+  assertCommitmentsUi();
   await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/checks`, {
     method: 'POST',
     body: JSON.stringify({
@@ -891,6 +904,7 @@ export type PortfolioCommitments = {
 };
 
 export async function getPortfolioCommitments(): Promise<PortfolioCommitments> {
+  assertCommitmentsUi();
   return requestJson('/api/portfolio/management-commitments');
 }
 

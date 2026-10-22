@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
+import { commitmentsUiEnabled } from '@/lib/commitments-flag';
 import { getPortfolioCommitments } from '@/lib/actions/research-tools.actions';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,14 @@ const DATE_BASIS: Record<string, string> = {
 };
 
 export default async function PortfolioCommitmentsPage() {
+  if (!commitmentsUiEnabled()) {
+    return (
+      <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
+        <PageHeader kicker="Seguimiento de la directiva" title="Compromisos de tu cartera" description="Esta función está desactivada en este entorno todavía." />
+        <EmptyState title="Seguimiento de compromisos no disponible" />
+      </main>
+    );
+  }
   const data = await getPortfolioCommitments();
   const withItems = data.companies.filter((c) => c.counts.total > 0);
   return (
