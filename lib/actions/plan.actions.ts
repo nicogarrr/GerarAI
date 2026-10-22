@@ -41,6 +41,8 @@ export type PlanTargetInput = {
 
 export type PlanUpsertPayload = {
     monthly_contribution: number;
+    /** Solo con la capability currency_contract_enabled; omitirlo conserva la divisa registrada. */
+    monthly_contribution_currency?: string;
     start_date: string;
     horizon_years: number;
     target_allocations: PlanTargetInput[];
@@ -48,11 +50,27 @@ export type PlanUpsertPayload = {
 
 /** PUT /api/plan — crea o actualiza el plan de inversión (B12: antes no
  *  existía ninguna vía de alta desde la UI). */
-export async function upsertPlan(payload: PlanUpsertPayload): Promise<void> {
+/** Rechazos 409 del contrato de divisa: se devuelven como resultado (un Server
+ *  Action en produccion oculta el mensaje de las excepciones). */
+export type PlanUpsertResult =
+    | { ok: true }
+    | { ok: false; code: 'plan_currency_required_for_amount_change' | 'plan_currency_contract_disabled' };
+
+const PLAN_CURRENCY_REJECTIONS = ['plan_currency_required_for_amount_change', 'plan_currency_contract_disabled'] as const;
+
+export async function upsertPlan(payload: PlanUpsertPayload): Promise<PlanUpsertResult> {
     await requireAuthenticatedUser();
-    await researchRequest('/api/plan', {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-    });
+    try {
+        await researchRequest('/api/plan', {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        const code = PLAN_CURRENCY_REJECTIONS.find((c) => message.includes(c));
+        if (code) return { ok: false, code };
+        throw error;
+    }
     revalidatePath('/plan');
+    return { ok: true };
 }
