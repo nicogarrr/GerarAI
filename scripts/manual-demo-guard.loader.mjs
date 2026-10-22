@@ -20,6 +20,7 @@ const REAL = {
     '@/lib/paper-trading/ledger-adapter': '../lib/paper-trading/ledger-adapter.ts',
     '@/lib/market/demo-valuation': '../lib/market/demo-valuation.ts',
     '@/lib/market/quote-freshness': '../lib/market/quote-freshness.ts',
+    '@/lib/market/quote-cache': '../lib/market/quote-cache.ts',
 };
 
 export async function resolve(specifier, context, nextResolve) {

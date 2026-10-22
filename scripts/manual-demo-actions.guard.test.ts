@@ -832,6 +832,9 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         assert.equal(r.quoteFetchFailed, true, 'todas las cotizaciones verificables fallaron');
         assert.equal(r.retryAfterSeconds, 120, 'Retry-After del proveedor propagado');
         assert.equal(r.valuation.coverage.valued, 0);
+        // El quote-cache anota el fallo (Retry-After 120 s / backoff 1 s): hay
+        // que dejar pasar esa ventana para que la siguiente fase re-consulte.
+        skewMs += 130_000;
         // Dato genuinamente ausente o viejo (respuesta OK saneada a null): NO es fallo de fetch.
         g.__GUARD_QUOTES__ = { BBVA: finnhub(5, { t: 1_000_000_000 }) }; // vieja; T00 sin entrada => { c: 0 }
         r = (await actions.getManualDemoValuation()) as unknown as VResult;
@@ -847,6 +850,49 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         r = (await actions.getManualDemoValuation()) as unknown as VResult;
         assert.equal(r.quoteFetchFailed, false, 'sin verificables no aplica');
         assert.equal(r.listingUnavailable, false, 'el listado respondió');
+    });
+
+    it('ahorro medido: misma ventana => 1 fetch por símbolo, libro releído fresco y asOf honesto', async () => {
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'BBVA', name: 'BBVA' }, currency: 'EUR', quantity: 10, price: 10 }));
+        listing = [{ symbol: 'BBVA', currency: 'EUR' }];
+        g.__GUARD_QUOTES__ = { BBVA: finnhub(10) };
+        const r1 = (await actions.getManualDemoValuation()) as unknown as VResult & { asOf: number };
+        assert.equal(r1.valuation.rows[0].marketValue, 100, '10 x 10 con la primera cotización');
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['BBVA'], 'primer fetch real a Finnhub');
+        // Nuevo fill DENTRO de la ventana de 20 s: el precio se mueve a 20
+        // pero la caché sirve el de hace <20 s; el libro NO se cachea.
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'BBVA', name: 'BBVA' }, currency: 'EUR', quantity: 10, price: 10 }));
+        g.__GUARD_QUOTES__ = { BBVA: finnhub(20) };
+        const r2 = (await actions.getManualDemoValuation()) as unknown as VResult & { asOf: number };
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['BBVA'], 'ahorro medido: cero fetches nuevos dentro del TTL');
+        assert.equal(r2.valuation.rows[0].marketValue, 200, '20 acciones x 10 (cotización cacheada): el fill nuevo SÍ se refleja');
+        assert.equal(r2.asOf, r1.asOf, 'asOf = min(fetchedAt): la UI ve que el dato no es recién pedido');
+        // Expirada la ventana se reconsulta y se usa el precio nuevo.
+        skewMs += 21_000;
+        const r3 = (await actions.getManualDemoValuation()) as unknown as VResult & { asOf: number };
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['BBVA', 'BBVA'], 'expirado el TTL vuelve a pedir');
+        assert.equal(r3.valuation.rows[0].marketValue, 400, '20 acciones x 20 con la cotización fresca');
+        assert.ok(r3.asOf > r1.asOf, 'asOf avanza con el fetch nuevo');
+    });
+
+    it('429 frena la siguiente valoración (backoff compartido, medido): cero fetches durante Retry-After', async () => {
+        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'BBVA', name: 'BBVA' }, currency: 'EUR', quantity: 1, price: 1 }));
+        listing = [{ symbol: 'BBVA', currency: 'EUR' }];
+        g.__GUARD_QUOTES__ = { BBVA: new Response('throttled', { status: 429, headers: { 'retry-after': '120' } }) };
+        const r1 = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r1.quoteFetchFailed, true);
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['BBVA']);
+        // Re-valoración inmediata (p. ej. siguiente render): NO martillea al proveedor.
+        g.__GUARD_QUOTES__ = { BBVA: finnhub(10) };
+        const r2 = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['BBVA'], 'ahorro medido: Retry-After frena el reintento');
+        assert.equal(r2.quoteFetchFailed, true);
+        assert.equal(r2.retryAfterSeconds, 120, 'la espera restante se sigue propagando');
+        // Cumplida la espera, reintenta y valora.
+        skewMs += 121_000;
+        const r3 = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['BBVA', 'BBVA'], 'cumplido Retry-After se reintenta');
+        assert.equal(r3.valuation.rows[0].status, 'valorada');
     });
 });
 
