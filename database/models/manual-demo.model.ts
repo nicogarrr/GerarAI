@@ -85,6 +85,7 @@ export interface ManualDemoTradeDoc extends Document {
     /** Cuándo se ejecutó de verdad; el FIFO ordena por esto. */
     executedAt: Date | null;
     rejectReason: string | null;
+    createdAt: Date;
     /** Snapshot normalizado del payload pedido (fix-2); SOLO en filas rejected nuevas. Legacy: null. Nunca sale al cliente. */
     requestPayload: Record<string, unknown> | null;
     updatedAt: Date;
