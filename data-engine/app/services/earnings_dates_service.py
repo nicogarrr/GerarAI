@@ -227,8 +227,16 @@ def refresh_earnings_dates(
             skipped.append(ticker)
         if _us_listed(company):
             us.add(ticker)
-    yahoo = yahoo_fetcher(yahoo_symbols) if yahoo_symbols else {}
-    nasdaq = nasdaq_fetcher(us, today) if us else {}
+    try:
+        yahoo = yahoo_fetcher(yahoo_symbols) if yahoo_symbols else {}
+    except Exception as exc:  # noqa: BLE001 - una fuente caida nunca tira la otra
+        logger.warning("earnings_dates: yahoo fallo por completo: %s", exc)
+        yahoo = {}
+    try:
+        nasdaq = nasdaq_fetcher(us, today) if us else {}
+    except Exception as exc:  # noqa: BLE001 - idem NASDAQ
+        logger.warning("earnings_dates: nasdaq fallo por completo: %s", exc)
+        nasdaq = {}
     written, missing, disagree = 0, [], 0
     for ticker in followed:
         manual = db.scalar(
@@ -243,6 +251,44 @@ def refresh_earnings_dates(
         if candidate is None:
             if not manual:
                 missing.append(ticker)
+            continue
+        if candidate["date"] < today:
+            # El proveedor aun ensena la fecha ya celebrada (ventana tipica
+            # tras publicar, hasta que programa la siguiente). No es la
+            # proxima: NUNCA se borran las filas futuras vigentes ni se
+            # inserta un duplicado. Antes de este guard el insert chocaba con
+            # uq_earnings_date_ticker_day_source, el commit de TODA la corrida
+            # reventaba y ningun ticker se renovaba (repro 22 oct 2026:
+            # tests/test_earnings_dates_refresh_repro.py).
+            future_row = db.scalar(
+                select(EarningsDate.id).where(
+                    EarningsDate.ticker == ticker, EarningsDate.source != "manual",
+                    EarningsDate.event_date >= today,
+                )
+            )
+            if future_row is None and not manual:
+                missing.append(ticker)
+            existing = db.scalar(
+                select(EarningsDate).where(
+                    EarningsDate.ticker == ticker,
+                    EarningsDate.event_date == candidate["date"],
+                    EarningsDate.source == candidate["source"],
+                )
+            )
+            if existing is not None:
+                # El proveedor confirma que sigue mostrando esa fecha: se
+                # renueva fetched_at (is_fresh la usa en la watchlist).
+                existing.fetched_at = datetime.now(UTC)
+            else:
+                db.add(
+                    EarningsDate(
+                        ticker=ticker, event_date=candidate["date"], session=candidate["session"],
+                        fiscal_label=candidate["fiscal"], confirmed=candidate["confirmed"],
+                        source=candidate["source"], source_label=candidate["label"],
+                        fetched_at=datetime.now(UTC),
+                    )
+                )
+                written += 1
             continue
         db.execute(
             delete(EarningsDate).where(
