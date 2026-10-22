@@ -7,7 +7,7 @@ without a traceable source document is ignored, and unmatched promises stay
 honestly open.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -42,18 +42,23 @@ def _doc(db, company):
     doc = Document(
         company_id=company.id, title="10-Q", source_type="filing",
         source_url="https://www.sec.gov/Archives/example-10q",
+        published_at=datetime(2026, 3, 1, tzinfo=UTC),
     )
     db.add(doc)
     db.flush()
     return doc.id
 
 
-def _fact(db, company, value, year=2025, quarter="FY", metric="revenue", with_source=True):
+def _fact(
+    db, company, value, year=2025, quarter="FY", metric="revenue", with_source=True,
+    published=datetime(2026, 3, 1, tzinfo=UTC), adjusted=False,
+):
     doc_id = None
     if with_source:
         doc = Document(
             company_id=company.id, title="10-K", source_type="filing",
             source_url="https://www.sec.gov/Archives/example",
+            published_at=published,
         )
         db.add(doc)
         db.flush()
@@ -63,7 +68,7 @@ def _fact(db, company, value, year=2025, quarter="FY", metric="revenue", with_so
         company_id=company.id, metric=metric, value=Decimal(str(value)),
         unit="USD", period=f"{quarter} {year}" if quarter != "FY" else f"FY{year}",
         fiscal_year=year, fiscal_quarter=None if quarter == "FY" else quarter,
-        source_type="filing",
+        source_type="filing", is_adjusted=adjusted,
     )
     db.add(fact)
     db.commit()
@@ -406,10 +411,10 @@ def test_portfolio_commitments_only_for_held_companies(db):
 def test_manual_promise_with_user_target_is_not_excluded_from_score(db):
     company = _company(db)
     service = ManagementCredibilityService()
-    _fact(db, company, 120, year=2030)
+    _fact(db, company, 120, year=2025)
     promise = service.register(
-        db, company, promise="Revenue above 100", promise_date=date(2029, 1, 1),
-        expected_period="FY2030", metric="revenue", operator=">=",
+        db, company, promise="Revenue above 100", promise_date=date(2024, 1, 1),
+        expected_period="FY2025", metric="revenue", operator=">=",
         target_value=Decimal("100"), unit="USD",
     )
     _mark_reviewed(db, promise)
@@ -498,3 +503,62 @@ def test_reviewed_promise_gets_exact_verdict_with_source(db):
     assert p.status == "met"
     assert p.evidence[-1]["context_only"] is False
     assert p.evidence[-1]["source_document_id"] == fact.source_id
+
+
+def _reconciled(db, c, p):
+    ManagementCredibilityService().reconcile(db, c)
+    db.refresh(p)
+    return p
+
+
+def test_year_only_or_half_year_period_never_matches_a_quarter_fact(db):
+    c = _company(db)
+    _fact(db, c, 90, year=2026, quarter="Q2")
+    for period in ("2026", "H1 2026", "primer semestre 2026"):
+        p = _promise(db, c, period=period)
+        assert _reconciled(db, c, p).status == "open"
+        assert p.actual_value is None
+        assert not p.evidence
+
+
+def test_adjusted_fact_is_not_used(db):
+    c = _company(db)
+    _fact(db, c, 120, adjusted=True)
+    p = _promise(db, c)
+    assert _reconciled(db, c, p).status == "open"
+    assert p.actual_value is None
+
+
+def test_open_period_gives_context_not_verdict(db):
+    c = _company(db)
+    _fact(db, c, 120, year=2026, quarter="Q4", published=datetime(2026, 3, 1, tzinfo=UTC))
+    p = _promise(db, c, period="Q4 2026")
+    assert _reconciled(db, c, p).status == "open"
+    assert p.evidence[-1]["context_only"] is True
+
+
+def test_document_not_after_promise_gives_context_not_verdict(db):
+    c = _company(db)
+    _fact(db, c, 120, published=datetime(2024, 1, 1, tzinfo=UTC))
+    p = _promise(db, c)
+    assert _reconciled(db, c, p).status == "open"
+    assert p.evidence[-1]["context_only"] is True
+
+
+def test_conflicting_values_for_same_period_abstain(db):
+    c = _company(db)
+    _fact(db, c, 120)
+    _fact(db, c, 80)
+    p = _promise(db, c)
+    assert _reconciled(db, c, p).status == "open"
+    assert p.actual_value is None
+
+
+def test_reconcile_is_idempotent_and_evidence_dedups(db):
+    c = _company(db)
+    _fact(db, c, 120)
+    p = _promise(db, c)
+    for _ in range(5):
+        _reconciled(db, c, p)
+    assert len(p.evidence) == 1
+    assert p.status == "met"

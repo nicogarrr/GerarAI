@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import create_engine
@@ -53,6 +53,7 @@ def test_financial_terminal_portfolio_intelligence_and_management_scorecard():
             title="FY2025 filing",
             source_type="sec_filing",
             source_url="https://sec.gov/example",
+            published_at=datetime(2026, 3, 1, tzinfo=UTC),
             metadata_={"segment": "Cloud"},
         )
         db.add(filing)
