@@ -74,7 +74,7 @@ def test_financial_terminal_portfolio_intelligence_and_management_scorecard():
                         metric=metric,
                         value=Decimal(value),
                         unit=unit,
-                        period=f"FY{year}",
+                        period=f"{year}-12-31:FY",
                         fiscal_year=year,
                         fiscal_quarter="FY",
                         source_id=filing.id,

@@ -272,24 +272,18 @@ class ManagementCredibilityService:
                     func.lower(FinancialFact.unit) == promise.unit.strip().lower()
                 )
             kind, year, quarter = period
+            # Año fiscal explicito y coherente; sin inferir año fiscal desde el calendario.
+            statement = statement.where(FinancialFact.fiscal_year == year)
             if kind == "Q":
-                # Hechos trimestrales ingeridos desde 10-Q llevan fiscal_year NULL y el
-                # año solo en period '<end>:Qn'.
-                statement = statement.where(
-                    FinancialFact.fiscal_quarter == quarter,
-                    or_(
-                        FinancialFact.fiscal_year == year,
-                        FinancialFact.period.like(f"{year}-%"),
-                    ),
-                )
+                statement = statement.where(FinancialFact.fiscal_quarter == quarter)
             else:
-                # Promesa anual: nunca contra una observacion trimestral del mismo año.
+                # Anual: marcador FY explicito (no vale un trimestre ni un corte sin marcar).
                 statement = statement.where(
-                    FinancialFact.fiscal_year == year,
                     or_(
                         FinancialFact.fiscal_quarter == "FY",
-                        FinancialFact.fiscal_quarter.is_(None),
-                    ),
+                        FinancialFact.period.like("%:FY"),
+                        FinancialFact.period.like("FY%"),
+                    )
                 )
             matches = list(db.scalars(statement.order_by(desc(FinancialFact.created_at))).all())
             if not matches:
@@ -301,12 +295,14 @@ class ManagementCredibilityService:
             actual = matches[0]
             doc = db.get(Document, actual.source_id)
             published = doc.published_at.date() if doc and doc.published_at else None
-            period_end = self._period_end(kind, year, quarter)
+            period_end = self._fact_period_end(actual.period)
             verdict_ok = (
                 self._has_reviewed_structured_criterion(promise)
                 and not self._is_legacy_heuristic(promise)
                 and promise.operator in OPERATORS
                 # periodo ya cerrado y documento publicado DESPUES de la promesa
+                # cierre segun la fecha de corte propia del hecho (no calendario)
+                and period_end is not None
                 and period_end <= today
                 and published is not None
                 and promise.promise_date < published <= today
@@ -446,12 +442,15 @@ class ManagementCredibilityService:
         return None
 
     @staticmethod
-    def _period_end(kind: str, year: int, quarter: str | None) -> date:
-        if kind == "FY":
-            return date(year, 12, 31)
-        month = int(quarter[1]) * 3  # type: ignore[index]
-        day = 30 if month in (6, 9) else 31
-        return date(year, month, day)
+    def _fact_period_end(period: str | None) -> date | None:
+        """Fecha de corte autentica del hecho ('YYYY-MM-DD[:Qn|:FY]'); None si no consta."""
+        match = re.match(r"(\d{4})-(\d{2})-(\d{2})(?::|$)", period or "")
+        if not match:
+            return None
+        try:
+            return date(int(match[1]), int(match[2]), int(match[3]))
+        except ValueError:
+            return None
 
     @staticmethod
     def _has_reviewed_structured_criterion(row: ManagementPromise) -> bool:
