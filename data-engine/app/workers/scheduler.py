@@ -147,6 +147,26 @@ def enqueue_for_all_tenants(actor, **kwargs) -> dict:
     return {"actor": actor.actor_name, "queued": queued}
 
 
+def run_source_check_job() -> dict:
+    """Corre el job en este proceso (los PDF/HTML se extraen en hijos acotados). Sin tenant/BD."""
+    from datetime import date as _date
+
+    from app.core.config import get_settings
+    from app.services.commitment_source_check_job import (
+        JsonSourceCheckStore,
+        resolve_store_dir,
+        run_job,
+    )
+
+    store = JsonSourceCheckStore(resolve_store_dir(get_settings().source_check_store_dir))
+    records = run_job(store, today=_date.today())
+    outcomes: dict[str, int] = {}
+    for r in records:
+        outcomes[r.outcome] = outcomes.get(r.outcome, 0) + 1
+    return {"checked": len(records), "outcomes": outcomes,
+            "store_quarantined": store.corrupt_quarantined}
+
+
 def build_scheduler(*, background: bool = False) -> BlockingScheduler | BackgroundScheduler:
     scheduler_cls = BackgroundScheduler if background else BlockingScheduler
     scheduler = scheduler_cls(timezone="UTC")
@@ -509,6 +529,12 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         hour="4,16",
         minute=20,
     )
+    # Chequeo de fuentes oficiales de llamadas: SOLO si source_check_job_enabled (OFF por defecto).
+    from app.core.config import get_settings
+
+    if get_settings().source_check_job_enabled:
+        _register(scheduler, run_source_check_job, "cron", job_id="source_check_job",
+                  hour=7, minute=35)
     return scheduler
 
 

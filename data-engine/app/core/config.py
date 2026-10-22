@@ -174,6 +174,10 @@ class Settings(BaseSettings):
     # acepta rutas absolutas ni sube bytes: solo nombres relativos a este dir.
     knowledge_rag_inbox_dir: Path = Path("./storage/knowledge_inbox")
     source_check_store_dir: Path = Path("./storage/source_checks")
+    # Job de chequeo de fuentes oficiales de llamadas (transcripcion/comunicado). APAGADO por
+    # defecto: no se registra en el scheduler hasta que se active explicitamente. Env:
+    # SOURCE_CHECK_JOB_ENABLED.
+    source_check_job_enabled: bool = False
     knowledge_rag_max_file_mb: int = Field(default=60, ge=1, le=500)
     # Guarda de disco: el VM va justo. Ingesta rechazada si queda menos libre.
     knowledge_rag_min_free_gb: float = Field(default=3.0, ge=0.0, le=1000.0)
