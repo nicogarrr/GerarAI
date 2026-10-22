@@ -31,6 +31,8 @@ class SourceEntry:
     pdf_prefixes: tuple[tuple[str, str], ...] = ()
     example_pdf: str | None = None
     note: str = ""
+    # True solo si el enlace al PDF se leyo (href) en la pagina IR, no por busqueda
+    link_verified_on_ir_page: bool = False
 
     def __post_init__(self) -> None:
         if self.status not in STATUSES:
@@ -67,7 +69,8 @@ _ENTRIES = (
         _CHECKED,
         (("s23.q4cdn.com", "/407969754/"),),
         "https://s23.q4cdn.com/407969754/files/doc_events/2026/Aug/05/Uber-Q2-26-Earnings-Call-Transcript.pdf",
-        "PDF 200 application/pdf; cabecera 'Corrected Transcript 05-Aug-2026 Uber Q2 2026 Earnings Call'. La pagina IR lista el PDF; URL del PDF hallada por busqueda, no por enlace extraido.",
+        "PDF 200 application/pdf; cabecera 'Corrected Transcript 05-Aug-2026 Uber Q2 2026 Earnings Call'. Enlace 'Transcript' leido (href) en la pagina IR el 2026-10-22.",
+        True,
     ),
     SourceEntry(
         "ASTS",
