@@ -1,5 +1,6 @@
 """Pipeline de evidencia primaria sin red: fetcher y extractor inyectados, SINTETICO."""
 import hashlib
+import re
 from datetime import date
 from decimal import Decimal
 
@@ -20,8 +21,19 @@ TODAY = date(2026, 10, 22)
 PAGES = [
     "Uber Technologies (UBER) Q2 2026 Earnings Call 05-Aug-2026 " + "filler " * 120,
     "intro " * 100,
-    "Q2 was another outstanding quarter. Gross bookings grew 22% year-on-year to more than $58 billion. " + "x " * 100,
+    "Q2 was another outstanding quarter. Synthetic growth was 22% year-on-year reported in U.S. dollars. " + "x " * 100,
 ]
+
+@pytest.fixture(autouse=True)
+def _synthetic_reported_rule(monkeypatch):
+    """Regla SINTETICA de mecanica (base explicita 'reported in U.S. dollars'). No existe para
+    UBER real: la frase real no declara base, y cc es ajustada (ver adaptador)."""
+    from app.services import followup_primary_evidence_adapter as adapter
+
+    monkeypatch.setitem(adapter._RULES, "synthetic_reported_growth", re.compile(
+        r"\bSynthetic growth was (?P<value>\d+(?:\.\d+)?)% year-on-year reported in U\.S\. dollars\b"))
+
+
 BYTES = b"%PDF-1.7 synthetic"
 
 
@@ -82,7 +94,7 @@ def test_redirect_to_other_url_and_non_pdf_are_rejected():
 def test_quote_comes_from_adapter_with_page_three_and_span():
     doc = _doc()
     fact = ReportedObservation(
-        1, 1, 7, "gross_bookings_growth_yoy", Decimal("22"), "%", URL,
+        1, 1, 7, "synthetic_reported_growth", Decimal("22"), "%", URL,
         doc.asset.period, True, False,
     )
     out = quote_for_fact(tenant_id=1, company_id=1, document=doc, fact=fact, today=TODAY)
@@ -95,7 +107,7 @@ def test_quote_comes_from_adapter_with_page_three_and_span():
 def test_wrong_value_gives_no_evidence():
     doc = _doc()
     fact = ReportedObservation(
-        1, 1, 7, "gross_bookings_growth_yoy", Decimal("25"), "%", URL,
+        1, 1, 7, "synthetic_reported_growth", Decimal("25"), "%", URL,
         doc.asset.period, True, False,
     )
     out = quote_for_fact(tenant_id=1, company_id=1, document=doc, fact=fact, today=TODAY)

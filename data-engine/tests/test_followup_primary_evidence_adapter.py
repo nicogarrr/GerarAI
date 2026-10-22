@@ -1,8 +1,10 @@
-"""Original quote roundtrip, including a short excerpt from official UBER PDF.
+"""Original quote roundtrip mechanics. TEXTO SINTETICO derivado de la forma del PDF oficial de UBER.
 
 Source read 2026-10-22:
 https://s23.q4cdn.com/407969754/files/doc_events/2026/Aug/05/Uber-Q2-26-Earnings-Call-Transcript.pdf
-PDF p3. This fixture is a small original excerpt, not live holdings evidence.
+REAL_PHRASE abajo SI es literal del PDF p3; QUOTE anade 'on a constant currency basis' (sintetico)
+para probar la regla de base explicita. En el PDF real esa base NO figura en la frase.
+No es evidencia de cartera real.
 """
 import hashlib
 import unittest
@@ -19,9 +21,10 @@ from app.services.followup_primary_evidence_adapter import (
 
 URL = 'https://s23.q4cdn.com/407969754/files/doc_events/2026/Aug/05/Uber-Q2-26-Earnings-Call-Transcript.pdf'
 ASSET = PrimaryAsset('UBER', URL, 'Q2 2026', date(2026, 8, 5), 'transcript')
-FACT = ReportedObservation(1, 8, 42, 'gross_bookings_growth_yoy', Decimal('22'), '%', URL, 'Q2 2026', True, False)
+FACT = ReportedObservation(1, 8, 42, 'gross_bookings_growth_yoy_constant_currency', Decimal('22'), '%', URL, 'Q2 2026', True, True)
 HEADER = 'Uber Technologies, Inc. (UBER)\nQ2 2026 Earnings Call\n05-Aug-2026\n\n'
-QUOTE = ('Gross bookings grew 22% year-on-year to more than\n'
+REAL_PHRASE = 'Gross bookings grew 22% year-on-year to more than\n$58 billion, above the high end of our guidance'
+QUOTE = ('Gross bookings grew 22% year-on-year on a constant currency basis to more than\n'
          '$58 billion, above the high end of our guidance and marking our fourth consecutive quarter above 20% growth.')
 PREAMBLE = 'So, Q2 was another outstanding quarter for Uber with record cash generation. '
 TEXT = HEADER + '\f' + HEADER + '\f' + HEADER + PREAMBLE + QUOTE
@@ -47,16 +50,25 @@ class PrimaryEvidenceTests(unittest.TestCase):
         self.assertEqual(evidence.kind, 'document_quote')
         self.assertNotIn('|', evidence.quote)  # no synthetic normalized row
 
+    def test_real_transcript_phrase_22_is_never_a_reported_fact_even_if_numbers_match(self):
+        # El comunicado SEC de UBER da 24% reportado y 22% moneda constante. La frase de la
+        # transcripcion no declara base: ni reportado ni moneda constante pueden deducirse.
+        text = HEADER + PREAMBLE + REAL_PHRASE + '.'
+        reported = replace(FACT, metric='gross_bookings_growth_yoy', adjusted=False)
+        self.assertEqual(self.extract(text=text, fact=reported).reason_code, 'metric_basis_unstated')
+        self.assertIsNone(self.extract(text=text).evidence)  # cc declarado: la frase no lo dice
+        self.assertIsNone(self.extract(text=text, fact=replace(reported, value=Decimal('24'))).evidence)
+
     def test_guidance_not_actual_even_when_target_number_matches(self):
-        for phrase in ['We expect Gross bookings grew 22% year-on-year.',
-                       'Our forecast: Gross bookings grew 22% year-on-year.',
-                       'We aim for Gross bookings grew 22% year-on-year.']:
+        for phrase in ['We expect Gross bookings grew 22% year-on-year on a constant currency basis.',
+                       'Our forecast: Gross bookings grew 22% year-on-year on a constant currency basis.',
+                       'We aim for Gross bookings grew 22% year-on-year on a constant currency basis.']:
             self.assertIsNone(self.extract(text=HEADER + PREAMBLE + phrase).evidence)
 
     def test_more_than_dollars_and_ttm_are_not_exact_growth_or_amount(self):
         for metric, unit, value in [('gross_bookings', 'USD', '58000000000'),
                                     ('free_cash_flow', 'USD', '10000000000')]:
-            result = self.extract(fact=replace(FACT, metric=metric, unit=unit, value=Decimal(value)))
+            result = self.extract(fact=replace(FACT, metric=metric, unit=unit, value=Decimal(value), adjusted=False))
             self.assertEqual(result.reason_code, 'unsupported_metric_rule')
 
     def test_arbitrary_qa_reference_without_current_quarter_context_abstains(self):
@@ -79,9 +91,9 @@ class PrimaryEvidenceTests(unittest.TestCase):
         self.assertEqual(self.extract(fact=replace(FACT, period='Q1 2026')).reason_code, 'period_mismatch')
 
     def test_unreported_adjusted_wrong_unit_future_and_conflicts_abstain(self):
-        for changes in [{'reported': False}, {'adjusted': True}, {'unit': 'USD'}, {'value': Decimal('NaN')}]:
+        for changes in [{'reported': False}, {'adjusted': False}, {'unit': 'USD'}, {'value': Decimal('NaN')}]:
             self.assertIsNone(self.extract(fact=replace(FACT, **changes)).evidence)
-        text = HEADER + PREAMBLE + 'Gross bookings grew 22% year-on-year.\n\n' + PREAMBLE + 'Gross bookings grew 19% year-on-year.'
+        text = HEADER + PREAMBLE + 'Gross bookings grew 22% year-on-year on a constant currency basis.\n\n' + PREAMBLE + 'Gross bookings grew 19% year-on-year on a constant currency basis.'
         self.assertEqual(self.extract(text=text).reason_code, 'conflicting_source_values')
         self.assertIsNone(self.extract(asset=replace(ASSET, published_on=date(2027, 8, 5))).evidence)
 

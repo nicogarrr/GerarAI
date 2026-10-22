@@ -72,9 +72,15 @@ class PrimaryEvidenceResult:
 # Explicit canonical metric contracts, not a fuzzy mapping/extractor guess.
 # Percent means growth, NOT gross bookings amount or percent-point change.
 _RULES = {
-    'gross_bookings_growth_yoy': re.compile(
-        r'\bGross bookings grew (?P<value>\d+(?:\.\d+)?)% year-on-year\b'),
+    # Base EXPLICITA en la frase: moneda constante es una medida ajustada, NO crecimiento
+    # reportado en USD (el comunicado de UBER Q2-26 da 24% reportado y 22% moneda constante).
+    'gross_bookings_growth_yoy_constant_currency': re.compile(
+        r'\bGross bookings grew (?P<value>\d+(?:\.\d+)?)% year-on-year on a constant currency basis\b'),
 }
+# Metrica -> el hecho debe declararse ajustado (basis explicita en la regla).
+_ADJUSTED_METRICS = frozenset({'gross_bookings_growth_yoy_constant_currency'})
+# Sin base declarada: NUNCA se deduce "reportado" por ausencia de "constant currency".
+_BASIS_UNSTATED = frozenset({'gross_bookings_growth_yoy'})
 _FUTURE = re.compile(r'\b(expect\w*|anticipat\w*|guidance|forecast\w*|will|would|aim\w*|target\w*|could|should|project\w*)\b', re.I)
 
 
@@ -104,7 +110,9 @@ def extract_primary_evidence(
         valid_url = False
     if not valid_url or not (asset.published_on <= today):
         return rejected('future_or_invalid_source')
-    if not fact.reported or fact.adjusted or not fact.value.is_finite():
+    if fact.metric in _BASIS_UNSTATED:
+        return rejected('metric_basis_unstated')
+    if not fact.reported or fact.adjusted != (fact.metric in _ADJUSTED_METRICS) or not fact.value.is_finite():
         return rejected('no_reported_fact')
     if not original_text or len(original_text) > 1_500_000:
         return rejected('invalid_text_size')

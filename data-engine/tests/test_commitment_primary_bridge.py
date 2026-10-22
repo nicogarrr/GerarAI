@@ -7,7 +7,12 @@ from app.services.commitment_followup_service import FollowupCriterion, Followup
 from app.services.commitment_primary_bridge import evidence_from_pipeline
 from app.services.commitment_primary_pipeline import PipelineResult, quote_for_fact
 from app.services.followup_primary_evidence_adapter import ReportedObservation
-from tests.test_commitment_primary_pipeline import TODAY, URL, _doc
+from tests.test_commitment_primary_pipeline import (
+    TODAY,
+    URL,
+    _doc,
+    _synthetic_reported_rule,  # noqa: F401
+)
 
 PERIOD_END = date(2026, 6, 30)
 
@@ -15,7 +20,7 @@ PERIOD_END = date(2026, 6, 30)
 @dataclass
 class Fact:
     id: int = 7
-    metric: str = "gross_bookings_growth_yoy"
+    metric: str = "synthetic_reported_growth"
     value: Decimal = Decimal("22")
     unit: str = "%"
     period: str = "2026-06-30:Q2"
@@ -33,7 +38,7 @@ class Doc:
 
 def _criterion(operator=">=", target="20", **kw):
     base = dict(
-        tenant_id=1, company_id=1, promise_id=5, metric="gross_bookings_growth_yoy",
+        tenant_id=1, company_id=1, promise_id=5, metric="synthetic_reported_growth",
         operator=operator, target=Decimal(target), unit="%", period="Q2 2026",
         period_end=PERIOD_END, promised_on=date(2026, 2, 1), due_on=date(2026, 7, 31),
         basis="declared_structured",
@@ -68,10 +73,10 @@ def test_real_quote_passes_with_traceability():
 def test_engine_rejects_hand_built_document_quote_even_with_flags_hashes_and_numeric_match():
     """Repros del auditor: guidance y cifra suelta con rastro y flags a mano -> sin veredicto."""
     for text in ("We expect growth of 22% next year.", "Our 22 offices grew.",
-                 "Gross bookings grew 22% year-on-year."):
+                 "Synthetic growth was 22% year-on-year reported in U.S. dollars."):
         forged = FollowupEvidence(
             tenant_id=1, company_id=1, fact_id=7, document_id=3, chunk_id=0,
-            metric="gross_bookings_growth_yoy", value=Decimal("22"), unit="%", period="Q2 2026",
+            metric="synthetic_reported_growth", value=Decimal("22"), unit="%", period="Q2 2026",
             period_end=PERIOD_END, published_on=date(2026, 8, 5), source_url=URL, excerpt=text,
             reported=True, adjusted=False, primary_source_verified=True, quote_verified=True,
             checked_at=TODAY, quote_kind="document_quote", page=3, char_start=0,
