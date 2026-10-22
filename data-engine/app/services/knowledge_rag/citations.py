@@ -75,7 +75,18 @@ def verify_citation(
     """
     failures: list[str] = []
     checks: list[str] = []
-    if parent_text[char_start:char_end] != quote:
+    # Python normaliza índices negativos y finales fuera del texto, y acepta
+    # bool como int. Eso puede validar una ubicación inexistente o vacía.
+    valid_span = (
+        type(char_start) is int
+        and type(char_end) is int
+        and 0 <= char_start < char_end <= len(parent_text)
+    )
+    if not quote.strip():
+        failures.append("empty_quote")
+    if not valid_span:
+        failures.append("invalid_quote_span")
+    elif parent_text[char_start:char_end] != quote:
         failures.append("quote_not_in_parent_span")
     else:
         checks.append("quote_matches_parent_span")
