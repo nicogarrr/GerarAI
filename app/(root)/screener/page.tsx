@@ -1,6 +1,6 @@
 import { quoteObserved } from '@/lib/market/quote-observed';
 import type { Metadata } from 'next';
-import { getMarketIndicesResult, getMarketMovers } from '@/lib/actions/market.actions';
+import { getMarketIndicesResult, getMarketMoversResult } from '@/lib/actions/market.actions';
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { MoversTable } from '@/components/market/MoversTable';
 import BackendOffline from '@/components/system/BackendOffline';
@@ -87,15 +87,17 @@ function VistaTabs({ vista }: { vista: Vista }) {
 }
 
 async function MoversVista({ vista }: { vista: Exclude<Vista, 'empresas'> }) {
-  let movers, tickerContext;
+  let moversResult, tickerContext;
   try {
-    [movers, tickerContext] = await Promise.all([getMarketMovers(25), getTickerContext()]);
+    [moversResult, tickerContext] = await Promise.all([getMarketMoversResult(25), getTickerContext()]);
+    if (!moversResult.data) throw moversResult.error;
   } catch (error) {
     if (isBackendUnavailableError(error)) {
       return <BackendOffline feature="Mercado" retryHref={`/screener?vista=${vista}`} />;
     }
     throw error;
   }
+  const movers = moversResult.data;
   const tickerSets = {
     portfolioTickers: new Set(tickerContext.portfolioTickers),
     watchlistTickers: new Set(tickerContext.watchlistTickers),
