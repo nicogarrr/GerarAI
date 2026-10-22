@@ -8,7 +8,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0080_commitment_extraction_attempts"
+revision = "0080_extraction_attempts"
 down_revision = "0079_commitment_checks_notes"
 branch_labels = None
 depends_on = None
