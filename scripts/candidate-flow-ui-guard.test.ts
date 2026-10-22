@@ -47,7 +47,9 @@ void test('solo URLs https verificables ofrecen extracción', () => {
 void test('el plazo inferido y el contexto se declaran como inferencia, no como dicho de la directiva', () => {
     const page = source('app/(root)/research/[ticker]/management-credibility/page.tsx');
     assert.ok(page.includes("year_end_inferred_from_call_year"), 'clave due_basis del backend');
-    assert.ok(page.includes('inferido; la directiva no dijo la fecha'), 'inferencia explícita');
+    assert.ok(page.includes('inferido; la directiva no dijo la fecha'), 'inferencia explícita (año de la llamada)');
+    assert.ok(page.includes("year_end_hint: 'fin del año citado en la frase; el día exacto es orientativo'"), 'year_end_hint usa el año de la frase, NO el de la llamada');
+    assert.ok(page.includes("quarter_end_hint: 'fin del trimestre citado en la frase; el día exacto es orientativo'"), 'quarter_end_hint usa la frase');
     assert.ok(page.includes("due_year_inferred: 'año del plazo inferido de la fecha de la llamada, no dicho por la directiva'"), 'flag con etiqueta honesta');
     assert.ok(page.includes('frase anterior, NO es el compromiso'), 'support_quote declarado como contexto');
     assert.ok(page.includes('promise.support_quote'), 'render del support_quote');
@@ -57,7 +59,8 @@ void test('el plazo inferido y el contexto se declaran como inferencia, no como 
 void test('la página monta el componente y pasa el registro con degradación nula', () => {
     const page = source('app/(root)/research/[ticker]/management-credibility/page.tsx');
     assert.ok(page.includes('<ExtractFromRegistry sources={registrySources} ticker={ticker} />'), 'componente montado');
-    assert.ok(page.includes("coverage.status !== 'ok' ? null"), 'fallo de lectura → null, no lista vacía');
+    assert.ok(page.includes("coverage.status !== 'ok' || coverageCompany === undefined ? null"), 'fallo de lectura o fuera de universo → null, no lista vacía');
+    assert.ok(page.includes('outOfUniverse={outOfUniverse}'), 'estado fuera de universo explícito');
     assert.ok(page.includes("from '@/lib/actions/source-coverage.actions'"), 'reutiliza la acción de cobertura existente');
     assert.ok(page.includes('uiOn ? <ExtractFromRegistry'), 'detrás del flag compromisos');
 });
@@ -75,4 +78,17 @@ void test('la revisión exige criterio escrito por una persona y checkbox de fue
     assert.ok(!/fulfillment_criteria[^}]*defaultValue/.test(page), 'el criterio NO se prellena: lo declara una persona');
     assert.ok(page.includes("name=\"confirmed_source_checked\" required type=\"checkbox\""), 'checkbox de fuente revisada obligatorio');
     assert.ok(page.includes('no se verifica de forma automática'), 'revisión declarada, no automática');
+});
+
+void test('fuera del universo cartera+watchlist no afirma ausencia de registro', () => {
+    const view = source('components/research/ExtractFromRegistry.tsx');
+    assert.ok(view.includes('fuera de la cartera y de la lista de seguimiento'), 'distingue fuera de universo');
+    assert.ok(view.includes('no se consulta su registro'), 'registro no consultado, no vacío');
+});
+
+void test('fuentes nulas o malformadas se filtran con aviso de lista parcial, nunca en silencio', () => {
+    const view = source('components/research/ExtractFromRegistry.tsx');
+    assert.ok(view.includes("sources.filter((src) => src && typeof src.url === 'string')"), 'filtra nulas/malformadas');
+    assert.ok(view.includes('Lista parcial:'), 'avisa de fuentes descartadas');
+    assert.ok(view.includes('no se'), 'declara que no se muestran');
 });
