@@ -25,6 +25,8 @@ export type SourceCoverageTranscriptSource = {
     label: string | null;
     /** 'documento' (por defecto) o URL del comunicado IR que anuncia la llamada. */
     call_date_source: string;
+    /** Completitud verificada del documento; por defecto no evaluada. HTML/emisor NO implica completa. */
+    completeness?: 'no_evaluada' | 'comentarios_preparados_sin_qa' | 'completa_con_qa' | string;
 };
 
 export type SourceCoveragePressSource = {

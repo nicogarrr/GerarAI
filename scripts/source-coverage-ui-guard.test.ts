@@ -169,6 +169,13 @@ void test('las filas descartadas se cuentan y se avisan: el filtrado nunca apare
     assert.ok(page.includes('no se pudieron leer y no se muestran'), 'aviso de respuesta parcial en compromisos');
 });
 
+void test('la completitud se declara según el registro; el formato nunca implica «completa»', () => {
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(view.includes('Comentarios preparados; no incluye preguntas de analistas'), 'RXRX honesto');
+    assert.ok(view.includes('Completitud no evaluada'), 'default honesto');
+    assert.ok(!view.includes("'completa'"), 'ninguna etiqueta «completa» automática');
+});
+
 void test('la acción usa firma de identidad y no-store como el resto del cliente research', () => {
     const actions = source('lib/actions/source-coverage.actions.ts');
     assert.ok(actions.includes('researchIdentityHeaders'), 'firma de identidad');

@@ -52,6 +52,12 @@ const ORIGIN_LABEL: Record<string, string> = {
     url_dominio_oficial_por_busqueda: 'URL en dominio oficial hallada por búsqueda; no enlazada en la página IR consultada',
 };
 
+const COMPLETENESS_LABEL: Record<string, string> = {
+    comentarios_preparados_sin_qa: 'Comentarios preparados; no incluye preguntas de analistas',
+    completa_con_qa: 'Transcripción completa, con preguntas de analistas',
+    no_evaluada: 'Completitud no evaluada',
+};
+
 const KIND_LABEL: Record<string, string> = {
     transcript: 'transcripción',
     press_release: 'comunicado',
@@ -106,6 +112,7 @@ function TranscriptSourceLine({ source: src }: { source: SourceCoverageTranscrip
             {url ? <a className="underline" href={url} rel="noopener noreferrer" target="_blank">{src.label || 'Transcripción'}</a> : <span>{src.label || 'Transcripción'}</span>}
             {src.period ? ` (${src.period})` : ''}
             {' · '}{src.format === 'html' ? 'página del emisor' : 'PDF'}
+            {' · '}{COMPLETENESS_LABEL[src.completeness ?? 'no_evaluada'] ?? 'Completitud no evaluada'}
             {' · '}{ORIGIN_LABEL[src.origin] ?? 'origen registrado'}
             {src.call_date
                 ? dateSourceUrl
