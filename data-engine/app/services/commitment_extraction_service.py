@@ -185,12 +185,35 @@ _NAME_ONLY_STOP = re.compile(
 ROLE_NOT_IN_DOCUMENT = "cargo no indicado en el documento (comentarios preparados de la compañía)"
 
 
+_QA_MARK = re.compile(r"^(?:Post[\s-]*Q\s*&\s*A|Q\s*&\s*A|Questions?[\s-]+and[\s-]+Answers?)\b", re.I)
+
+
+def _corroboration(name: str, before: str) -> tuple[bool, str | None]:
+    """Evidencia de identidad en el propio documento, ANTES del turno: presentacion con cargo
+    ("...over to the chief ... officer of X, Nombre Apellido") o traspaso explicito por nombre/nombre de pila
+    ("turn it over to Nombre", "Thanks, Nombre"). Un titulo cualquiera con forma de nombre NO basta."""
+    full = re.escape(name)
+    first = re.escape(name.split()[0])
+    m = re.search(
+        rf"(?:over to|introduce|joined by|hand(?:ing)? (?:it )?(?:over )?to)\s+(?:the\s+)?"
+        rf"(?P<role>[^,.;:]{{5,140}}?),\s+{full}\b",
+        before,
+        re.I,
+    )
+    if m and re.search(r"chief|officer|president|chair|ceo|cfo|coo|head|director|founder|treasurer", m.group("role"), re.I):
+        return True, m.group("role").strip()
+    handoff = rf"(?:(?:turn|hand|pass)(?:ing)? (?:it|the (?:call|conference|floor|discussion)) (?:back )?(?:over )?to|(?:Thanks|Thank you),)\s+(?:{full}|{first})\b"
+    if re.search(handoff, before, re.I):
+        return True, None
+    return False, None
+
+
 def _turns_name_only(text: str) -> tuple[list[tuple[str, str, str]], dict[str, str]]:
     """Comentarios preparados cuyo hablante va solo, en su propia linea (sin cargo ni dos puntos).
 
-    Solo si la cabecera del documento dice "prepared remarks" (no hay analistas). El cargo no se
-    inventa: queda "no indicado". "Post Q&A" corta el turno: es un cierre posterior al Q&A, no
-    atribuible al hablante anterior. Sin Moderator/Operator.
+    Solo si la cabecera dice "prepared remarks". Una linea con forma de nombre es hablante SOLO si el
+    documento lo corrobora antes (presentacion con cargo o traspaso por nombre); si no, es texto. El cargo
+    sale de esa presentacion; si no hay, queda "no indicado". Moderator/Operator y marcas Q&A cortan el turno.
     """
     lines = [ln.strip() for ln in text.replace("\f", "\n").splitlines()]
     if not _PREPARED_HEADER.search(" ".join(lines[:40])):
@@ -198,19 +221,65 @@ def _turns_name_only(text: str) -> tuple[list[tuple[str, str, str]], dict[str, s
     turns: list[tuple[str, str, list[str]]] = []
     roster: dict[str, str] = {}
     cur: int | None = None
+    seen: list[str] = []
     for ln in lines:
         if not ln or ln.isdigit():
             continue
-        if re.match(r"^(?:Moderator|Operator)\b", ln) or re.match(r"^Post Q&A\b", ln):
+        if re.match(r"^(?:Moderator|Operator)\b", ln) or _QA_MARK.match(ln):
             cur = None
+            seen.append(ln)
             continue
         if len(ln) <= 40 and _NAME_ONLY.match(ln) and not _NAME_ONLY_STOP.search(ln) and not ln.endswith(":"):
-            roster.setdefault(ln, ROLE_NOT_IN_DOCUMENT)
-            turns.append((ln, ROLE_NOT_IN_DOCUMENT, []))
-            cur = len(turns) - 1
-            continue
+            ok, role = _corroboration(ln, " ".join(seen))
+            if ok:
+                role = role or ROLE_NOT_IN_DOCUMENT
+                roster.setdefault(ln, role)
+                turns.append((ln, role, []))
+                cur = len(turns) - 1
+                seen.append(ln)
+                continue
         if cur is not None:
             turns[cur][2].append(ln)
+        seen.append(ln)
+    return [(w, r, " ".join(p)) for w, r, p in turns if p], roster
+
+
+_INLINE_HEADER = re.compile(
+    r"(?:(?<=^)|(?<=[.!?] ))"
+    r"(?P<name>[A-Z][\w.'’-]+(?: [A-Z][\w.'’-]*\.?){1,3}(?:, (?:PhD|MD|Ph\.D\.|M\.D\.|CFA|CPA))?), "
+    r"(?P<role>(?:Chief|CEO|CFO|COO|CTO|President|Chair\w*|Head|Vice|VP|Executive|Founder|General Counsel|Treasurer|Co-|Analyst|Senior Analyst|Research|Equity Research)"
+    r"[^:\n]{0,110}):"
+)
+
+
+def _turns_inline_header(text: str) -> tuple[list[tuple[str, str, str]], dict[str, str]]:
+    """HTML/texto con "Nombre, Cargo de Empresa:" (con o sin texto detras en la misma linea).
+
+    Solo cargos directivos; analistas y operador cortan el turno. El cargo sale literal del encabezado.
+    """
+    turns: list[tuple[str, str, list[str]]] = []
+    roster: dict[str, str] = {}
+    cur: int | None = None
+    for raw in text.replace("\f", "\n").splitlines():
+        line = raw.replace("\u200d", "").strip()
+        if not line or line.isdigit():
+            continue
+        pos = 0
+        for m in _INLINE_HEADER.finditer(line):
+            before = line[pos : m.start()].strip()
+            if before and cur is not None:
+                turns[cur][2].append(before)
+            name, role = m.group("name"), m.group("role").strip()
+            if _ANALYST_ROLE.search(role):
+                cur = None
+            else:
+                roster.setdefault(name, role)
+                turns.append((name, role, []))
+                cur = len(turns) - 1
+            pos = m.end()
+        rest = line[pos:].strip()
+        if rest and cur is not None:
+            turns[cur][2].append(rest)
     return [(w, r, " ".join(p)) for w, r, p in turns if p], roster
 
 
@@ -285,6 +354,10 @@ def extract_with_diagnostics(
             name_turns, roster = _turns_name_only(transcript_text)
             turns = [(w, b) for w, _r, b in name_turns]
             parser = "nombre_solo_comentarios_preparados" if turns else "bloques_pdf"
+            if not turns:
+                inl, roster = _turns_inline_header(transcript_text)
+                turns = [(w, b) for w, _r, b in inl]
+                parser = "encabezado_nombre_cargo_inline" if turns else "bloques_pdf"
     diag = {"parser": parser, "management_turns": len(turns)}
     out: list[Candidate] = []
     seen: set[str] = set()
