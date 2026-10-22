@@ -64,7 +64,7 @@ void test('la última fecha de chequeo se muestra explícita por empresa', () =>
 void test('el origen de la transcripción se muestra en español, sin literales enum', () => {
     const view = source('components/portfolio/SourceCoverage.tsx');
     assert.ok(view.includes('enlace leído de la página de relación con inversores'), 'origen IR en ES');
-    assert.ok(view.includes('dominio oficial localizado por búsqueda'), 'origen búsqueda en ES');
+    assert.ok(view.includes('URL en dominio oficial hallada por búsqueda; no enlazada en la página IR consultada'), 'origen búsqueda en ES con matiz honesto');
     assert.ok(!view.includes("href_ir_leido'</"), 'literal enum no visible');
 });
 
@@ -79,6 +79,25 @@ void test('los enlaces de historial solo se renderizan con URL http(s) devuelta 
     const view = source('components/portfolio/SourceCoverage.tsx');
     assert.ok(view.includes('/^https?:'), 'validación de esquema antes de enlazar');
     assert.ok(!view.includes('new URL(h.url)'), 'no se reconstruyen URLs');
+});
+
+void test('call_date nunca se afirma «leída en la transcripción» de forma universal', () => {
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(view.includes('(según el documento)'), 'atribución documento explícita');
+    assert.ok(view.includes('Fecha según comunicado del IR'), 'atribución comunicado IR con enlace');
+    assert.ok(view.includes('call_date_source'), 'usa la señal de procedencia del contrato');
+});
+
+void test('un cambio de hash es «cambió el documento/página», nunca «cambió compromiso»', () => {
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(view.includes('cambió el documento/página'), 'etiqueta honesta de hash');
+    assert.ok(!view.includes('cambió el compromiso'), 'no se infla un cambio de menú/pie');
+});
+
+void test('las fuentes por empresa son enlaces validados http(s) con etiqueta legible', () => {
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(view.includes('safeUrl'), 'validación http(s) centralizada');
+    assert.ok(view.includes("src.label || 'Transcripción'"), 'etiqueta legible del registro');
 });
 
 void test('la acción usa firma de identidad y no-store como el resto del cliente research', () => {

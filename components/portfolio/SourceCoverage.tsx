@@ -4,6 +4,7 @@ import {
     type SourceCoverageHistoryItem,
     type SourceCoverageReport,
     type SourceCoverageState,
+    type SourceCoverageTranscriptSource,
 } from '@/lib/actions/source-coverage.actions';
 
 /** Nota de usuario en español (la del backend es técnica: no se muestra tal cual). */
@@ -48,7 +49,7 @@ const OUTCOME_LABEL: Record<string, string> = {
 
 const ORIGIN_LABEL: Record<string, string> = {
     href_ir_leido: 'enlace leído de la página de relación con inversores',
-    url_dominio_oficial_por_busqueda: 'dominio oficial localizado por búsqueda',
+    url_dominio_oficial_por_busqueda: 'URL en dominio oficial hallada por búsqueda; no enlazada en la página IR consultada',
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -87,6 +88,29 @@ function CoverageSummary({ companies }: { companies: SourceCoverageCompany[] }) 
     );
 }
 
+function safeUrl(url: string | null | undefined): string | null {
+    // Solo URLs http(s) devueltas por el backend; nunca reconstruidas.
+    return url && /^https?:\/\//.test(url) ? url : null;
+}
+
+function TranscriptSourceLine({ source: src }: { source: SourceCoverageTranscriptSource }) {
+    const url = safeUrl(src.url);
+    const dateSourceUrl = safeUrl(src.call_date_source !== 'documento' ? src.call_date_source : null);
+    return (
+        <li className="text-xs text-gray-400">
+            {url ? <a className="underline" href={url} rel="noopener noreferrer" target="_blank">{src.label || 'Transcripción'}</a> : <span>{src.label || 'Transcripción'}</span>}
+            {src.period ? ` (${src.period})` : ''}
+            {' · '}{src.format === 'html' ? 'página del emisor' : 'PDF'}
+            {' · '}{ORIGIN_LABEL[src.origin] ?? 'origen registrado'}
+            {src.call_date
+                ? dateSourceUrl
+                    ? <> · <a className="underline" href={dateSourceUrl} rel="noopener noreferrer" target="_blank">Fecha según comunicado del IR</a>: {src.call_date}</>
+                    : <> · Fecha de llamada: {src.call_date} (según el documento)</>
+                : null}
+        </li>
+    );
+}
+
 function outcomesSummary(outcomes: Record<string, number>): string {
     return Object.entries(outcomes)
         .map(([k, n]) => `${n} ${OUTCOME_LABEL[k] ?? k}`)
@@ -119,6 +143,22 @@ function CompanyRow({ company }: { company: SourceCoverageCompany }) {
                     Documentos: {c.transcript_assets} ({c.transcript_assets_with_call_date} con fecha de llamada)
                 </p>
             ) : null}
+            {c.transcript_sources.length + c.press_release_sources.length > 0 ? (
+                <details className="mt-1">
+                    <summary className="cursor-pointer text-xs text-gray-500 underline">Fuentes ({c.transcript_sources.length + c.press_release_sources.length})</summary>
+                    <ul className="mt-1 grid gap-1">
+                        {c.transcript_sources.map((src) => <TranscriptSourceLine key={src.url} source={src} />)}
+                        {c.press_release_sources.map((prs) => (
+                            <li className="text-xs text-gray-400" key={prs.url}>
+                                {safeUrl(prs.url)
+                                    ? <a className="underline" href={safeUrl(prs.url) ?? undefined} rel="noopener noreferrer" target="_blank">Comunicado financiero</a>
+                                    : <span>Comunicado financiero</span>}
+                                {prs.period ? ` (${prs.period})` : ''}
+                            </li>
+                        ))}
+                    </ul>
+                </details>
+            ) : null}
             {c.transcript_origins.length ? (
                 <p className="mt-1 text-xs text-gray-500">
                     Fuente de la transcripción: {c.transcript_origins.map((o) => ORIGIN_LABEL[o] ?? 'origen registrado').join(' · ')}
@@ -144,10 +184,10 @@ function HistoryList({ history }: { history: SourceCoverageHistoryItem[] }) {
                     {h.period ? ` (${h.period})` : ''}
                     {' · '}<span className={h.outcome === 'error' ? 'text-red-400' : ''}>{OUTCOME_LABEL[h.outcome] ?? h.outcome}</span>
                     {' · '}{h.checked_on}
-                    {/^https?:\/\//.test(h.url)
-                        ? <> · <a className="underline" href={h.url} rel="noopener noreferrer" target="_blank">fuente</a></>
+                    {safeUrl(h.url)
+                        ? <> · <a className="underline" href={safeUrl(h.url) ?? undefined} rel="noopener noreferrer" target="_blank">fuente</a></>
                         : null}
-                    {h.content_changed ? ' · contenido cambiado' : ''}
+                    {h.content_changed ? ' · cambió el documento/página' : ''}
                 </li>
             ))}
         </ul>

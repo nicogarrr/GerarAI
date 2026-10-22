@@ -16,6 +16,23 @@ export type SourceCoverageState =
     | 'estado_del_almacen_no_fiable'
     | 'estado_fuera_retencion';
 
+export type SourceCoverageTranscriptSource = {
+    url: string;
+    period: string | null;
+    call_date: string | null;
+    origin: string;
+    format: 'pdf' | 'html' | string;
+    label: string | null;
+    /** 'documento' (por defecto) o URL del comunicado IR que anuncia la llamada. */
+    call_date_source: string;
+};
+
+export type SourceCoveragePressSource = {
+    url: string;
+    period: string | null;
+    kind: string;
+};
+
 export type SourceCoverageCompany = {
     ticker: string;
     in_portfolio: boolean;
@@ -25,6 +42,8 @@ export type SourceCoverageCompany = {
     transcript_assets_with_call_date: number;
     /** Origen de cada transcripción: href_ir_leido | url_dominio_oficial_por_busqueda. */
     transcript_origins: string[];
+    transcript_sources: SourceCoverageTranscriptSource[];
+    press_release_sources: SourceCoveragePressSource[];
     press_release_registered: boolean;
     checkable_by_job: boolean;
     pending: string[];
@@ -45,6 +64,8 @@ export type SourceCoverageHistoryItem = {
     outcome: 'extraido' | 'abstencion' | 'error' | string;
     reason: string | null;
     content_sha256: string | null;
+    origin?: string | null;
+    format?: string | null;
     provenance: unknown;
     independent: boolean;
     content_changed: boolean;
