@@ -8,8 +8,11 @@ suggestions to stay inside the bands.
 
 from __future__ import annotations
 
+import os
+from calendar import monthrange
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -24,6 +27,24 @@ from app.models import (
 from app.services.portfolio_fx_service import PortfolioFXService
 
 DEFAULT_BAND = Decimal("0.05")  # ±5 percentage points
+
+# Omiso != None: un cliente viejo que OMITE la divisa no debe borrar la ya
+# registrada al actualizar; un None EXPLICITO si la desregistra (queda como
+# legacy «divisa no registrada»).
+PLAN_CURRENCY_UNSET: Any = object()
+
+
+def plan_currency_enforced() -> bool:
+    """Capability «contrato de divisa del plan» (default OFF, solo dev).
+
+    ON: la divisa de la cuota se registra y los totales previstos se
+    convierten por cuota. OFF: contrato anterior (cuota == divisa base) SOLO
+    donde es seguro: plan sin divisa registrada o con divisa == base. Un plan
+    con divisa registrada distinta de la base NUNCA se reinterpreta como base:
+    sus totales quedan null con expected_basis=blocked_contract_disabled. Las
+    escrituras con divisa explicita se rechazan (409) en vez de ignorarse.
+    """
+    return os.getenv("PLAN_CURRENCY_ENFORCED") == "1"
 
 
 class InvestmentPlanService:
@@ -45,6 +66,7 @@ class InvestmentPlanService:
         start_date: date,
         horizon_years: int,
         target_allocations: list[dict],
+        monthly_contribution_currency: Any = PLAN_CURRENCY_UNSET,
     ) -> InvestmentPlan:
         portfolio = self.fx.ensure_portfolio(db)
         plan = self.get_plan(db)
@@ -52,6 +74,13 @@ class InvestmentPlanService:
             plan = InvestmentPlan(
                 portfolio_id=portfolio.id,
                 monthly_contribution=monthly_contribution,
+                # Plan nuevo via cliente viejo (omiso) o null explicito:
+                # NULL = «divisa no registrada», nunca se inventa una.
+                monthly_contribution_currency=(
+                    None
+                    if monthly_contribution_currency is PLAN_CURRENCY_UNSET
+                    else monthly_contribution_currency
+                ),
                 start_date=start_date,
                 horizon_years=horizon_years,
                 target_allocations=target_allocations,
@@ -63,6 +92,8 @@ class InvestmentPlanService:
             plan.start_date = start_date
             plan.horizon_years = horizon_years
             plan.target_allocations = target_allocations
+            if monthly_contribution_currency is not PLAN_CURRENCY_UNSET:
+                plan.monthly_contribution_currency = monthly_contribution_currency
             plan.status = "active"
         db.commit()
         db.refresh(plan)
@@ -124,7 +155,7 @@ class InvestmentPlanService:
         db.commit()
         return True
 
-    def plan_metrics(self, db: Session) -> dict:
+    def plan_metrics(self, db: Session, *, today: date | None = None) -> dict:
         """Expected contributions vs actual, from plan start to today."""
         plan = self.get_plan(db)
         if plan is None:
@@ -169,24 +200,175 @@ class InvestmentPlanService:
                 continue
             total_actual += contribution.amount * rate
         complete = not missing_fx
-        months_elapsed = self._months_between(plan.start_date, date.today())
-        total_expected = plan.monthly_contribution * Decimal(months_elapsed)
+        today = today or date.today()
+        months_elapsed = self._months_between(plan.start_date, today)
+        plan_currency = (plan.monthly_contribution_currency or "").upper() or None
+        enforced = plan_currency_enforced()
+        if enforced:
+            expected, expected_partial, expected_missing_fx, expected_periods = (
+                self._expected_base(
+                    db,
+                    plan=plan,
+                    plan_currency=plan_currency,
+                    base_currency=base_currency,
+                    months_elapsed=months_elapsed,
+                    today=today,
+                )
+            )
+            expected_basis = "plan_currency" if plan_currency else "unknown_currency"
+        elif plan_currency is not None and plan_currency != base_currency:
+            # Capability OFF con divisa registrada distinta de la base: el
+            # contrato anterior no puede representarla. Bloqueo honesto.
+            expected, expected_partial, expected_missing_fx, expected_periods = (
+                None, None, [], [],
+            )
+            expected_basis = "blocked_contract_disabled"
+        else:
+            # Contrato anterior, seguro aqui: sin divisa registrada o == base.
+            legacy_total = plan.monthly_contribution * Decimal(months_elapsed)
+            expected, expected_partial = legacy_total, legacy_total
+            expected_missing_fx, expected_periods = [], []
+            expected_basis = "legacy_monthly_as_base"
+        totals_known = expected is not None
         return {
             "plan_exists": True,
             "base_currency": base_currency,
             "monthly_contribution": float(plan.monthly_contribution),
+            "monthly_contribution_currency": plan_currency,
+            # False = plan legacy o dado de alta por API vieja: la divisa es
+            # DESCONOCIDA y los totales quedan sin inventar hasta que el
+            # usuario la fije conscientemente.
+            "monthly_currency_recorded": plan_currency is not None,
+            "currency_contract_enabled": enforced,
+            "expected_basis": expected_basis,
             "start_date": plan.start_date.isoformat(),
             "horizon_years": plan.horizon_years,
             "months_elapsed": months_elapsed,
-            "expected_contributions_base": float(total_expected),
+            "expected_contributions_base": float(expected) if totals_known else None,
+            "expected_contributions_converted_base": (
+                float(expected_partial) if expected_partial is not None else None
+            ),
+            "expected_missing_fx": expected_missing_fx,
+            "expected_periods": expected_periods,
+            "expected_conversion_complete": expected is not None,
             "actual_contributions_base": float(total_actual) if complete else None,
             "actual_contributions_converted_base": float(total_actual),
             "contributions_complete": complete,
             "contributions_missing_fx": missing_fx,
-            "gap_base": float(total_expected - total_actual) if complete else None,
-            "on_track": (total_actual >= total_expected) if complete else None,
+            "gap_base": (
+                float(expected - total_actual) if totals_known and complete else None
+            ),
+            "on_track": (
+                (total_actual >= expected) if totals_known and complete else None
+            ),
             "target_allocations": plan.target_allocations,
         }
+
+    def _expected_base(
+        self,
+        db: Session,
+        *,
+        plan: InvestmentPlan,
+        plan_currency: str | None,
+        base_currency: str | None,
+        months_elapsed: int,
+        today: date,
+    ) -> tuple[Decimal | None, Decimal | None, list[dict], list[dict]]:
+        """Cuotas previstas en divisa base, con tri-estado honesto.
+
+        - Sin divisa registrada (legacy): (None, None, []). El total no se
+          inventa.
+        - Divisa del plan == base: la multiplicacion de siempre, sin FX.
+        - Divisa distinta: conversion POR PERIODO en el aniversario mensual
+          de start_date (clamp a fin de mes; la fecha se acota a hoy para no
+          leer tasas con lookahead). Un periodo sin tasa no suma y se
+          declara en expected_missing_fx; el total queda None (nunca un
+          parcial disfrazado de completo, espejo de las aportaciones).
+        """
+        periods: list[dict] = []
+        if plan_currency is None or base_currency is None:
+            return None, None, [], periods
+        if plan_currency == base_currency:
+            # Compat: monthly x meses de CALENDARIO (months_elapsed), igual
+            # que siempre; no depende del dia de vencimiento.
+            total = plan.monthly_contribution * Decimal(months_elapsed)
+            return total, total, [], periods
+        total = Decimal("0")
+        missing: list[dict] = []
+        pending = False
+        for period in range(1, months_elapsed + 1):
+            due_date = self._add_months_clamped(plan.start_date, period)
+            if due_date > today:
+                # Cuota contada por el calendario pero aun no vencida: no se
+                # convierte (ni FX futura ni la tasa de hoy atribuida a una
+                # fecha futura). Estado propio, distinto de «falta tasa».
+                pending = True
+                periods.append(
+                    {
+                        "period": period,
+                        "due_date": due_date.isoformat(),
+                        "status": "pending_due_date",
+                        "rate_date": None,
+                        "rate": None,
+                        "source": None,
+                    }
+                )
+                continue
+            found = self.fx.rate_with_provenance(
+                db,
+                quote_currency=plan_currency,
+                base_currency=base_currency,
+                as_of=due_date,
+            )
+            rate = found["rate"] if found else None
+            if rate is None:
+                missing.append(
+                    {
+                        "period": period,
+                        "due_date": due_date.isoformat(),
+                        "reason": "no_rate_on_or_before_due_date",
+                        "quote_currency": plan_currency,
+                        "base_currency": base_currency,
+                    }
+                )
+                periods.append(
+                    {
+                        "period": period,
+                        "due_date": due_date.isoformat(),
+                        "status": "missing_rate",
+                        "rate_date": None,
+                        "rate": None,
+                        "source": None,
+                    }
+                )
+                continue
+            total += plan.monthly_contribution * rate
+            periods.append(
+                {
+                    "period": period,
+                    "due_date": due_date.isoformat(),
+                    "status": "converted",
+                    "rate_date": (
+                        found["rate_date"].isoformat() if found["rate_date"] else None
+                    ),
+                    "rate": float(rate),
+                    "source": found["source"],
+                    "direction": found["direction"],
+                }
+            )
+        if missing or pending:
+            return None, total, missing, periods
+        return total, total, [], periods
+
+    @staticmethod
+    def _add_months_clamped(anchor: date, months: int) -> date:
+        """Aniversario mensual de ``anchor``: mismo dia, clamp a fin de mes
+        (31 de enero a 28/29 de febrero)."""
+        month_index = anchor.month - 1 + months
+        year = anchor.year + month_index // 12
+        month = month_index % 12 + 1
+        last_day = monthrange(year, month)[1]
+        return date(year, month, min(anchor.day, last_day))
 
     def drift_analysis(self, db: Session) -> dict:
         """Current weights vs targets with rebalancing suggestions."""
@@ -332,6 +514,14 @@ class InvestmentPlanService:
             # Con cobertura parcial los pesos y el total no son los de la cartera
             # real: no se publican importes de compra/venta calculados sobre ellos.
             suggestions = []
+        registered_currency = (plan.monthly_contribution_currency or "").upper() or None
+        # Capability OFF con divisa registrada distinta de la base: el valor
+        # crudo no se presenta como importe en divisa base.
+        next_blocked = (
+            not plan_currency_enforced()
+            and registered_currency is not None
+            and registered_currency != portfolio.base_currency.upper()
+        )
         return {
             "plan_exists": True,
             "status": "incomplete_fx" if missing_fx else "ok",
@@ -343,7 +533,17 @@ class InvestmentPlanService:
             "current_weights": current_weights,
             "deviations": deviations,
             "suggestions": suggestions,
-            "next_contribution": float(plan.monthly_contribution),
+            "next_contribution": (
+                None if next_blocked else float(plan.monthly_contribution)
+            ),
+            "next_contribution_basis": (
+                "blocked_contract_disabled" if next_blocked else "plan_value"
+            ),
+            # La cuota es en la divisa DEL PLAN (o desconocida si legacy):
+            # nunca se presenta como divisa base.
+            "next_contribution_currency": (
+                (plan.monthly_contribution_currency or "").upper() or None
+            ),
         }
 
     @staticmethod

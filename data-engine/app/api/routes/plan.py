@@ -11,7 +11,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.services.investment_plan_service import InvestmentPlanService
+from app.services.investment_plan_service import (
+    PLAN_CURRENCY_UNSET,
+    InvestmentPlanService,
+    plan_currency_enforced,
+)
 
 router = APIRouter()
 
@@ -25,6 +29,11 @@ class PlanTarget(BaseModel):
 
 class PlanUpsertInput(BaseModel):
     monthly_contribution: float = Field(gt=0, le=1_000_000)
+    # Divisa de la cuota. OMISO (cliente viejo): se preserva la registrada;
+    # null EXPLICITO: queda «divisa no registrada»; valor ISO: se fija.
+    monthly_contribution_currency: str | None = Field(
+        default=None, min_length=3, max_length=10, pattern=r"^[A-Za-z]{3}$"
+    )
     start_date: date
     horizon_years: int = Field(default=30, ge=1, le=80)
     target_allocations: list[PlanTarget] = Field(default_factory=list)
@@ -43,7 +52,10 @@ def get_plan(db: Session = Depends(get_db)) -> dict:
     service = InvestmentPlanService()
     plan = service.get_plan(db)
     if plan is None:
-        return {"plan_exists": False}
+        return {
+            "plan_exists": False,
+            "currency_contract_enabled": plan_currency_enforced(),
+        }
     metrics = service.plan_metrics(db)
     metrics["id"] = plan.id
     return metrics
@@ -52,16 +64,55 @@ def get_plan(db: Session = Depends(get_db)) -> dict:
 @router.put("")
 def upsert_plan(payload: PlanUpsertInput, db: Session = Depends(get_db)) -> dict:
     service = InvestmentPlanService()
+    if (
+        "monthly_contribution_currency" in payload.model_fields_set
+        and not plan_currency_enforced()
+    ):
+        # Capability apagada: ignorar la divisa en silencio guardaria un
+        # plan que el cliente cree en esa divisa y se calcularia como base.
+        raise HTTPException(
+            status_code=409,
+            detail="plan_currency_contract_disabled",
+        )
+    if "monthly_contribution_currency" not in payload.model_fields_set:
+        # Cliente viejo: su formulario entiende el importe como EUR. Si el plan
+        # tiene registrada otra divisa, cambiar el importe sin divisa
+        # guardaria «300» creyendo euros bajo la etiqueta USD: se rechaza.
+        existing = service.get_plan(db)
+        registered = (
+            (existing.monthly_contribution_currency or "").upper() if existing else ""
+        )
+        if (
+            registered
+            and registered != "EUR"
+            and Decimal(str(payload.monthly_contribution)) != existing.monthly_contribution
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="plan_currency_required_for_amount_change",
+            )
+    if "monthly_contribution_currency" in payload.model_fields_set:
+        currency = (
+            payload.monthly_contribution_currency.upper()
+            if payload.monthly_contribution_currency is not None
+            else None
+        )
+    else:
+        currency = PLAN_CURRENCY_UNSET
     plan = service.upsert_plan(
         db,
         monthly_contribution=Decimal(str(payload.monthly_contribution)),
         start_date=payload.start_date,
         horizon_years=payload.horizon_years,
         target_allocations=[t.model_dump() for t in payload.target_allocations],
+        monthly_contribution_currency=currency,
     )
     return {
         "id": plan.id,
         "monthly_contribution": float(plan.monthly_contribution),
+        "monthly_contribution_currency": (
+            (plan.monthly_contribution_currency or "").upper() or None
+        ),
         "start_date": plan.start_date.isoformat(),
         "horizon_years": plan.horizon_years,
         "status": plan.status,

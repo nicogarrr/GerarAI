@@ -28,6 +28,9 @@ def db():
 def _plan(service, db, **overrides):
     args = {
         "monthly_contribution": Decimal("300"),
+        # Divisa registrada explicitamente: sin ella el plan es legacy
+        # «divisa no registrada» y los totales quedan en estado desconocido.
+        "monthly_contribution_currency": "EUR",
         "start_date": date(2026, 1, 1),
         "horizon_years": 30,
         "target_allocations": [],

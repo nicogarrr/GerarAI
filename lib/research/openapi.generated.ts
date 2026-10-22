@@ -480,6 +480,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/calendar/followed/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Followed Materials
+         * @description Material oficial (SEC) de resultados ya publicados de las empresas seguidas.
+         *
+         *     Hoy y ultimos 7 dias, solo eventos con fecha confirmada. Usa SECClient (identidad,
+         *     ritmo y cache ya configurados); un fallo de la SEC devuelve ``no_disponible`` por
+         *     evento y nunca rompe el calendario. Clave: ``TICKER|YYYY-MM-DD``.
+         */
+        get: operations["followed_materials_api_calendar_followed_materials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat": {
         parameters: {
             query?: never;
@@ -7036,6 +7060,8 @@ export interface components {
             horizon_years: number;
             /** Monthly Contribution */
             monthly_contribution: number;
+            /** Monthly Contribution Currency */
+            monthly_contribution_currency?: string | null;
             /**
              * Start Date
              * Format: date
@@ -9288,6 +9314,46 @@ export interface operations {
                 desde?: string | null;
                 hasta?: string | null;
             };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    followed_materials_api_calendar_followed_materials_get: {
+        parameters: {
+            query?: never;
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;

@@ -49,10 +49,36 @@ class PortfolioFXService:
         base_currency: str,
         as_of: date,
     ) -> Decimal | None:
+        found = self.rate_with_provenance(
+            db,
+            quote_currency=quote_currency,
+            base_currency=base_currency,
+            as_of=as_of,
+        )
+        return found["rate"] if found else None
+
+    def rate_with_provenance(
+        self,
+        db: Session,
+        *,
+        quote_currency: str,
+        base_currency: str,
+        as_of: date,
+    ) -> dict | None:
+        """Misma seleccion que ``rate`` (unica implementacion): ultima tasa
+        con rate_date <= as_of, directa antes que inversa, desempate por
+        rate_date desc y created_at desc. Devuelve la tasa efectiva y su
+        procedencia: rate_date y source de la fila usada y direction
+        ("same", "direct" o "inverse"; en inversa rate = 1 / fila.rate)."""
         quote = quote_currency.upper()
         base = base_currency.upper()
         if quote == base:
-            return Decimal("1")
+            return {
+                "rate": Decimal("1"),
+                "rate_date": None,
+                "source": None,
+                "direction": "same",
+            }
         direct = db.scalar(
             select(FXRate)
             .where(
@@ -64,7 +90,12 @@ class PortfolioFXService:
             .limit(1)
         )
         if direct:
-            return direct.rate
+            return {
+                "rate": direct.rate,
+                "rate_date": direct.rate_date,
+                "source": direct.source,
+                "direction": "direct",
+            }
         inverse = db.scalar(
             select(FXRate)
             .where(
@@ -76,7 +107,12 @@ class PortfolioFXService:
             .limit(1)
         )
         if inverse and inverse.rate:
-            return Decimal("1") / inverse.rate
+            return {
+                "rate": Decimal("1") / inverse.rate,
+                "rate_date": inverse.rate_date,
+                "source": inverse.source,
+                "direction": "inverse",
+            }
         return None
 
     def fx_table(
