@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { commitmentsUiEnabled } from '@/lib/commitments-flag';
 import { addManagementPromiseNote, getManagementNotesByPromise, addManagementPromiseCheck, reviewManagementCandidate, createManagementPromise, extractManagementCandidates, extractManagementCandidatesFromUrl, getManagementCredibility, importManagementCallClaims, reconcileManagementCredibility, updateManagementExplanation } from '@/lib/actions/research-tools.actions';
 
-function PromiseNotes({ ticker, promiseId, notes }: { ticker: string; promiseId: number; notes: { id: number; body: string; created_at: string | null }[] | null; truncated?: boolean }) {
+function PromiseNotes({ ticker, promiseId, notes, truncated }: { ticker: string; promiseId: number; notes: { id: number; body: string; created_at: string | null }[] | null; truncated?: boolean }) {
   return (
     <div className="mt-4 rounded-lg border border-gray-800 p-3 text-sm">
       <div className="text-xs uppercase text-gray-500">Notas privadas (solo tú las ves)</div>
