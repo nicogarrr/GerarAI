@@ -71,6 +71,23 @@ def upsert_plan(payload: PlanUpsertInput, db: Session = Depends(get_db)) -> dict
             status_code=409,
             detail="plan_currency_contract_disabled",
         )
+    if "monthly_contribution_currency" not in payload.model_fields_set:
+        # Cliente viejo: su formulario entiende el importe como EUR. Si el plan
+        # tiene registrada otra divisa, cambiar el importe sin divisa
+        # guardaria «300» creyendo euros bajo la etiqueta USD: se rechaza.
+        existing = service.get_plan(db)
+        registered = (
+            (existing.monthly_contribution_currency or "").upper() if existing else ""
+        )
+        if (
+            registered
+            and registered != "EUR"
+            and Decimal(str(payload.monthly_contribution)) != existing.monthly_contribution
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="plan_currency_required_for_amount_change",
+            )
     if "monthly_contribution_currency" in payload.model_fields_set:
         currency = (
             payload.monthly_contribution_currency.upper()

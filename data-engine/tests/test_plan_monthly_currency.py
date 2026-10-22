@@ -281,3 +281,31 @@ def test_on_put_explicit_registers_and_omitted_preserves(db):
     assert _put(db, monthly_contribution_currency="usd")["monthly_contribution_currency"] == "USD"
     assert _put(db)["monthly_contribution_currency"] == "USD"  # omitido preserva
     assert _put(db, monthly_contribution_currency=None)["monthly_contribution_currency"] is None
+
+
+def test_old_client_amount_change_on_non_eur_registered_plan_is_rejected(db):
+    from fastapi import HTTPException
+    _put(db, monthly_contribution_currency="USD")
+    with pytest.raises(HTTPException) as err:
+        from app.api.routes.plan import PlanUpsertInput, upsert_plan
+        upsert_plan(PlanUpsertInput(monthly_contribution=300, start_date=date(2026, 1, 15)), db)
+    assert err.value.status_code == 409
+    assert err.value.detail == "plan_currency_required_for_amount_change"
+    assert InvestmentPlanService().get_plan(db).monthly_contribution == Decimal("500")
+
+
+def test_old_client_same_amount_on_registered_plan_preserves_currency(db):
+    _put(db, monthly_contribution_currency="USD")
+    out = _put(db)  # mismo importe 500, solo otros campos
+    assert out["monthly_contribution_currency"] == "USD"
+
+
+def test_drift_off_registered_not_base_blocks_next_contribution(db, monkeypatch):
+    service = InvestmentPlanService()
+    _plan(service, db, monthly_contribution_currency="USD")
+    monkeypatch.delenv("PLAN_CURRENCY_ENFORCED")
+    drift = service.drift_analysis(db)
+    assert drift["plan_exists"] is True
+    assert drift["next_contribution"] is None
+    assert drift["next_contribution_basis"] == "blocked_contract_disabled"
+    assert drift["next_contribution_currency"] == "USD"

@@ -514,6 +514,14 @@ class InvestmentPlanService:
             # Con cobertura parcial los pesos y el total no son los de la cartera
             # real: no se publican importes de compra/venta calculados sobre ellos.
             suggestions = []
+        registered_currency = (plan.monthly_contribution_currency or "").upper() or None
+        # Capability OFF con divisa registrada distinta de la base: el valor
+        # crudo no se presenta como importe en divisa base.
+        next_blocked = (
+            not plan_currency_enforced()
+            and registered_currency is not None
+            and registered_currency != portfolio.base_currency.upper()
+        )
         return {
             "plan_exists": True,
             "status": "incomplete_fx" if missing_fx else "ok",
@@ -525,7 +533,12 @@ class InvestmentPlanService:
             "current_weights": current_weights,
             "deviations": deviations,
             "suggestions": suggestions,
-            "next_contribution": float(plan.monthly_contribution),
+            "next_contribution": (
+                None if next_blocked else float(plan.monthly_contribution)
+            ),
+            "next_contribution_basis": (
+                "blocked_contract_disabled" if next_blocked else "plan_value"
+            ),
             # La cuota es en la divisa DEL PLAN (o desconocida si legacy):
             # nunca se presenta como divisa base.
             "next_contribution_currency": (
