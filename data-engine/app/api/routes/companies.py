@@ -312,6 +312,15 @@ class ManagementPromiseCreate(BaseModel):
     target_value: Decimal | None = None
     unit: str | None = Field(default=None, max_length=40)
     source_document_id: int | None = None
+    quote_literal: str | None = Field(default=None, max_length=5000)
+    quote_translation_es: str | None = Field(default=None, max_length=5000)
+    speaker: str | None = Field(default=None, max_length=160)
+    speaker_role: str | None = Field(default=None, max_length=120)
+    call_date: date | None = None
+    source_url: str | None = Field(default=None, max_length=1000, pattern=r"^https?://")
+    transcript_locator: str | None = Field(default=None, max_length=200)
+    due_date: date | None = None
+    fulfillment_criteria: str | None = Field(default=None, max_length=2000)
 
 
 class ManagementExplanationUpdate(BaseModel):

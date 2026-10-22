@@ -42,6 +42,15 @@ class ManagementCredibilityService:
         unit: str | None,
         source_document_id: int | None = None,
         call_claim_id: int | None = None,
+        quote_literal: str | None = None,
+        quote_translation_es: str | None = None,
+        speaker: str | None = None,
+        speaker_role: str | None = None,
+        call_date: date | None = None,
+        source_url: str | None = None,
+        transcript_locator: str | None = None,
+        due_date: date | None = None,
+        fulfillment_criteria: str | None = None,
     ) -> ManagementPromise:
         if target_value is not None and operator not in OPERATORS:
             raise ValueError("A numeric promise requires a supported operator")
@@ -59,6 +68,18 @@ class ManagementCredibilityService:
             status="open",
             evidence=[],
             metadata_={"source": "manual" if call_claim_id is None else "call_claim"},
+            quote_literal=quote_literal,
+            quote_translation_es=quote_translation_es,
+            speaker=speaker,
+            speaker_role=speaker_role,
+            call_date=call_date,
+            source_url=source_url,
+            transcript_locator=transcript_locator,
+            due_date=due_date,
+            fulfillment_criteria=fulfillment_criteria,
+            # promise_date la da quien registra; si coincide con call_date es la
+            # fecha real de la llamada, si no, es la que el usuario introdujo.
+            date_basis="call_date" if call_date == promise_date else "user_entered",
         )
         db.add(row)
         db.commit()
@@ -89,7 +110,11 @@ class ManagementCredibilityService:
             if existing:
                 created.append(existing)
                 continue
-            operator, target = self._target(claim.claim)
+            # El objetivo numerico NO se autodeduce del texto: la heuristica
+            # tomaba el primer numero (p. ej. el ano) como objetivo. Se guarda
+            # solo como sugerencia en metadata, sin efecto en la conciliacion.
+            suggested_operator, suggested_target = self._target(claim.claim)
+            operator, target = None, None
             row = ManagementPromise(
                 company_id=company.id,
                 call_claim_id=claim.id,
@@ -108,7 +133,20 @@ class ManagementCredibilityService:
                         "speaker": claim.speaker,
                     }
                 ],
-                metadata_={"source": "call_claim", "speaker_role": claim.speaker_role},
+                metadata_={
+                    "source": "call_claim",
+                    "speaker_role": claim.speaker_role,
+                    "suggested_target_unverified": (
+                        {"operator": suggested_operator, "value": str(suggested_target)}
+                        if suggested_target is not None
+                        else None
+                    ),
+                },
+                quote_literal=claim.claim,
+                speaker=claim.speaker,
+                speaker_role=claim.speaker_role,
+                # created_at es el alta en BD, no la fecha de la llamada.
+                date_basis="registered_at",
             )
             db.add(row)
             created.append(row)
@@ -262,6 +300,17 @@ class ManagementCredibilityService:
             "management_explanation": row.management_explanation,
             "verified_at": row.verified_at,
             "evidence": row.evidence,
+            "quote_literal": row.quote_literal,
+            "quote_translation_es": row.quote_translation_es,
+            "speaker": row.speaker,
+            "speaker_role": row.speaker_role,
+            "call_date": row.call_date,
+            "source_url": row.source_url,
+            "transcript_locator": row.transcript_locator,
+            "due_date": row.due_date,
+            "fulfillment_criteria": row.fulfillment_criteria,
+            "status_reason": row.status_reason,
+            "date_basis": row.date_basis,
         }
 
     @staticmethod

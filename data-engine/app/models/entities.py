@@ -2261,6 +2261,23 @@ class ManagementPromise(TenantOwnedMixin, Base, TimestampMixin):
     )
     evidence: Mapped[list[dict]] = mapped_column(JSON, default=list)
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    # Procedencia verificable (0078, todo NULL = «no registrado», sin backfill).
+    # quote_literal es texto copiado de la fuente; quote_translation_es es una
+    # traduccion y se muestra como tal; fulfillment_criteria lo declara quien
+    # registra, nunca se infiere.
+    quote_literal: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quote_translation_es: Mapped[str | None] = mapped_column(Text, nullable=True)
+    speaker: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    speaker_role: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    call_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    transcript_locator: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    fulfillment_criteria: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # De donde sale promise_date: «call_date» (fecha real de la llamada),
+    # «user_entered» o «registered_at» (fecha de alta en BD, NO la de la llamada).
+    date_basis: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 class TaxReport(TenantOwnedMixin, Base, TimestampMixin):
     """Persisted fiscal-year tax snapshot (IRPF-style) for the private portfolio."""

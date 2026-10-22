@@ -167,3 +167,70 @@ def test_promise_without_target_records_outcome(db):
     [p] = ManagementCredibilityService().reconcile(db, c)
     assert p.status == "outcome_recorded"
     assert p.actual_value == Decimal("110")
+
+
+# --- Procedencia verificable (0078) -----------------------------------------
+
+
+def _claim(db, company, text):
+    from app.models.entities import CallClaim, Transcript
+
+    transcript = Transcript(
+        company_id=company.id, title="Q4 call (sintetico)", period="Q4 2025",
+        transcript_text=text,
+    )
+    db.add(transcript)
+    db.commit()
+    claim = CallClaim(
+        transcript_id=transcript.id, speaker="Persona Sintetica", speaker_role="CFO",
+        claim=text, claim_type="commitment", period="FY2025",
+    )
+    db.add(claim)
+    db.commit()
+    return claim
+
+
+def test_import_does_not_turn_a_year_into_a_numeric_target(db):
+    """«25 satelites en 2025»: la heuristica tomaba un numero del texto como
+    objetivo y la conciliacion lo daba por promesa numerica autenticada."""
+    company = _company(db)
+    _claim(db, company, "In 2025 we will have 25 satellites in orbit")
+    rows = ManagementCredibilityService().import_call_claims(db, company)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.operator is None and row.target_value is None
+    assert row.metadata_["suggested_target_unverified"] is not None  # sugerencia, no dato
+    assert row.status == "open"
+
+
+def test_import_marks_date_basis_registered_not_call_date(db):
+    company = _company(db)
+    _claim(db, company, "We expect to launch the new product by year end")
+    row = ManagementCredibilityService().import_call_claims(db, company)[0]
+    assert row.date_basis == "registered_at"
+    assert row.call_date is None
+    assert row.quote_literal == "We expect to launch the new product by year end"
+    assert row.speaker == "Persona Sintetica" and row.speaker_role == "CFO"
+
+
+def test_register_records_provenance_and_date_basis(db):
+    company = _company(db)
+    svc = ManagementCredibilityService()
+    row = svc.register(
+        db, company, promise="Ampliar la oferta antes de fin de ano",
+        promise_date=date(2026, 5, 11), expected_period="FY2026", metric=None,
+        operator=None, target_value=None, unit=None,
+        quote_literal="[...] into more complex offerings", speaker="X", speaker_role="CFO",
+        call_date=date(2026, 5, 11), source_url="https://example.invalid/t.pdf",
+        transcript_locator="27:04", due_date=date(2026, 12, 31),
+        fulfillment_criteria="Oferta disponible al publico",
+    )
+    payload = ManagementCredibilityService.payload(row)
+    assert payload["date_basis"] == "call_date"
+    assert payload["due_date"] == date(2026, 12, 31)
+    assert payload["fulfillment_criteria"] == "Oferta disponible al publico"
+    other = svc.register(
+        db, company, promise="Otra", promise_date=date(2026, 5, 12), expected_period="FY2026",
+        metric=None, operator=None, target_value=None, unit=None,
+    )
+    assert other.date_basis == "user_entered" and other.quote_literal is None
