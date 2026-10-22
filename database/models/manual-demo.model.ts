@@ -85,7 +85,8 @@ export interface ManualDemoTradeDoc extends Document {
     /** Cuándo se ejecutó de verdad; el FIFO ordena por esto. */
     executedAt: Date | null;
     rejectReason: string | null;
-    createdAt: Date;
+    /** Snapshot normalizado del payload pedido (fix-2); SOLO en filas rejected nuevas. Legacy: null. Nunca sale al cliente. */
+    requestPayload: Record<string, unknown> | null;
     updatedAt: Date;
 }
 
@@ -123,6 +124,7 @@ const ManualDemoTradeSchema = new Schema<ManualDemoTradeDoc>(
         fillSource: { type: String, enum: ['manual-simulado'], required: true },
         executedAt: { type: Date, default: null },
         rejectReason: { type: String, default: null },
+        requestPayload: { type: Schema.Types.Mixed, default: null },
     },
     { timestamps: true }
 );

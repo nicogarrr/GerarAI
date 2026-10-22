@@ -5,9 +5,10 @@
  * explícito que no graba nada. El reintento legítimo (mismo id, mismo
  * payload) sigue devolviendo duplicate sin grabar otra orden.
  *
- * Residual documentado: las filas RECHAZADAS no persisten precio/comisión/
- * fecha (orderDocFor los deja null/0), así que contra una fila rechazada solo
- * se comparan instrumento, lado, fase, cantidad y divisa.
+ * Rechazadas (fix-2): las filas nuevas persisten un snapshot normalizado del
+ * payload pedido (requestPayload) y la comparación es completa. Las filas
+ * LEGACY sin snapshot comparan solo el subconjunto persistido; ver
+ * scripts/manual-demo-reject-payload-guard.test.ts.
  *
  * Ejecución: node --experimental-strip-types --test scripts/manual-demo-duplicate-payload-guard.test.ts
  */
@@ -172,11 +173,14 @@ describe('huella de idempotencia: un clientOrderId = un payload', () => {
         assert.equal(modelStub.__counts().trades, 1);
     });
 
-    it('residual documentado: contra fila RECHAZADA no se persiste el precio pedido; mismo id con otro precio sigue duplicate', async () => {
+    it('fix-2: la rechazada persiste snapshot; mismo id con OTRO precio es conflicto explícito', async () => {
         await actions.placeManualOrder(accion({ clientOrderId: 'dup-rej-02', quantity: 100_000, price: 999_999 }));
         const r2 = await actions.placeManualOrder(accion({ clientOrderId: 'dup-rej-02', quantity: 100_000, price: 888_888 }));
-        assert.ok(r2.ok);
-        if (r2.ok) assert.equal(r2.outcome, 'duplicate');
+        assert.equal(r2.ok, false);
+        if (!r2.ok) {
+            assert.equal(r2.field, 'clientOrderId');
+            assert.match(r2.message, /operación distinta/);
+        }
         assert.equal(modelStub.__counts().trades, 1);
     });
 
