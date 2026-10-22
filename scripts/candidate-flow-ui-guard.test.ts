@@ -93,9 +93,12 @@ void test('fuentes nulas o malformadas se filtran con aviso de lista parcial, nu
     assert.ok(view.includes('no se'), 'declara que no se muestran');
 });
 
-void test('extracción sin candidatos nuevos no celebra: mensaje honesto de cero añadidos', () => {
+void test('extracción sin candidatos nuevos no celebra: el mensaje sigue el outcome real', () => {
     const actions = source('lib/actions/research-tools.actions.ts');
     assert.ok(actions.includes('No se han añadido candidatos nuevos'), 'mensaje explícito de cero añadidos');
+    assert.ok(actions.includes('sin_cambios_hash'), 'distingue fuente sin cambios');
+    assert.ok(actions.includes('sin_candidatos_detectados'), 'distingue sin candidatos detectados');
+    assert.ok(actions.includes('Esto no significa que no haya compromisos'), 'sin detectados NUNCA se expresa como ausencia de compromisos');
+    assert.ok(actions.includes("typeof result?.created === 'number'"), 'el mensaje depende del resultado real, no es fijo');
     assert.ok(!actions.includes('No hay compromisos'), 'cero añadidos NUNCA se expresa como ausencia de compromisos');
-    assert.ok(actions.includes('created.length'), 'el mensaje depende del resultado real, no es fijo');
 });

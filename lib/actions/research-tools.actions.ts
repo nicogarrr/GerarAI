@@ -854,21 +854,31 @@ export async function extractManagementCandidatesFromUrl(ticker: string, formDat
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
 }
 
+type ExtractFromRegistryResult = { outcome?: string; created?: number; candidates?: unknown[] };
+
 export async function extractManagementCandidatesFromRegistry(ticker: string, formData: FormData) {
   assertCommitmentsUi();
-  const created = await requestJson<unknown[]>(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-registry`, {
+  const result = await requestJson<ExtractFromRegistryResult>(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-registry`, {
     method: 'POST',
     body: JSON.stringify({
       source_url: required(formData, 'source_url', 'Source URL'),
     }),
   });
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
-  const n = Array.isArray(created) ? created.length : 0;
-  return {
-    message: n === 0
-      ? 'No se han añadido candidatos nuevos: la fuente ya se había procesado o no se detectaron candidatos nuevos.'
-      : `${n} ${n === 1 ? 'candidato nuevo extraído' : 'candidatos nuevos extraídos'} (sin revisar).`,
-  };
+  // Contrato backend: 0 creados NUNCA se celebra; el outcome dice la razón real.
+  const n = typeof result?.created === 'number' ? result.created : (Array.isArray(result?.candidates) ? result.candidates.length : 0);
+  const outcome = typeof result?.outcome === 'string' ? result.outcome : '';
+  let message: string;
+  if (n > 0) {
+    message = `${n} ${n === 1 ? 'candidato nuevo extraído' : 'candidatos nuevos extraídos'} (sin revisar).`;
+  } else if (outcome === 'sin_cambios_hash') {
+    message = 'No se han añadido candidatos nuevos: la fuente no ha cambiado desde la última extracción.';
+  } else if (outcome === 'sin_candidatos_detectados') {
+    message = 'No se detectaron candidatos en esta fuente. Esto no significa que no haya compromisos.';
+  } else {
+    message = 'No se han añadido candidatos nuevos.';
+  }
+  return { message };
 }
 
 export async function reviewManagementCandidate(ticker: string, promiseId: number, formData: FormData) {
