@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useMemo, useState } from 'react';
+import { useCommandState } from 'cmdk';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,15 @@ const OPERATORS: { value: ScreenCriterion['operator']; symbol: string; label: st
   { value: '==', symbol: '=', label: 'Igual a' },
   { value: '!=', symbol: '≠', label: 'Distinto de' },
 ];
+
+/** Nota de cobertura vacia conocida: solo sin busqueda activa, para no
+ *  acumularse con el «Sin resultados» del filtro. Lee el valor real de
+ *  cmdk (sin estado paralelo que se desincronice). */
+function EmptyCoverageNote() {
+  const search = useCommandState((state) => state.search);
+  if (search.trim() !== '') return null;
+  return <p className="px-3 py-2 text-sm text-gray-400">No hay métricas disponibles. Puedes crear una fórmula.</p>;
+}
 
 const selectClasses = 'min-h-11 w-full min-w-0 rounded-md border border-gray-700 bg-black px-3 text-sm text-gray-200';
 const fieldLabel = 'mb-1.5 block text-sm font-medium text-gray-200';
@@ -74,9 +84,7 @@ function MetricPicker({ id, name, value, onChange, options, placeholder, require
           <CommandInput placeholder="Buscar métrica" />
           <CommandList className="max-h-72" id={`${id}-list`}>
             <CommandEmpty>Sin resultados</CommandEmpty>
-            {options.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-gray-400">No hay métricas disponibles. Puedes crear una fórmula.</p>
-            ) : null}
+            {options.length === 0 ? <EmptyCoverageNote /> : null}
             {groups.map(([title, items]) => <CommandGroup heading={title} key={title}>
               {items.map((option) => <CommandItem key={option.key} onSelect={() => { onChange(option.key); setOpen(false); }} value={`${option.label} ${option.key}`}>
                 <Check aria-hidden="true" className={cn('mr-2 h-4 w-4', selected?.key === option.key ? 'opacity-100' : 'opacity-0')} />
