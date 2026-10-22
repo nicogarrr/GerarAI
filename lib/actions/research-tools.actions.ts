@@ -881,7 +881,10 @@ export async function reviewManagementCandidate(ticker: string, promiseId: numbe
     });
   } catch (err) {
     const translated = commitmentErrorMessage(err);
-    if (translated) throw new Error(translated);
+    // Error esperado del contrato (422 conocido): resultado tipado, no throw.
+    // En producción Next oculta el message de errores lanzados en server
+    // actions; el objeto devuelto sí llega íntegro al cliente.
+    if (translated) return { ok: false as const, message: translated };
     throw err;
   }
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
@@ -903,7 +906,7 @@ export async function addManagementPromiseCheck(ticker: string, promiseId: numbe
     });
   } catch (err) {
     const translated = commitmentErrorMessage(err);
-    if (translated) throw new Error(translated);
+    if (translated) return { ok: false as const, message: translated };
     throw err;
   }
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);

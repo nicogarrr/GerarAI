@@ -10,6 +10,9 @@ type MutationFormProps = Omit<ComponentPropsWithoutRef<'form'>, 'action'> & {
   successMessage?: string;
   resetOnSuccess?: boolean;
   showSuccessInline?: boolean;
+  /** Tras un error, restaura los valores escritos (React resetea los campos
+   *  no controlados al completar la acción). Opt-in: no cambia otros forms. */
+  preserveOnError?: boolean;
 };
 
 export function MutationForm({
@@ -18,6 +21,7 @@ export function MutationForm({
   successMessage = 'Operación completada',
   resetOnSuccess = false,
   showSuccessInline = false,
+  preserveOnError = false,
   ...props
 }: MutationFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -32,8 +36,34 @@ export function MutationForm({
     setError(null);
     setSuccess(null);
     setIsPending(true);
+    // Restaura los valores escritos tras un fallo (React resetea los campos
+    // no controlados al completar la acción; el timeout queda después).
+    const restoreInputs = () => {
+      if (!preserveOnError) return;
+      const form = formRef.current;
+      const data = lastFormData.current;
+      if (!form || !data) return;
+      // Doble rAF: queda DESPUÉS del commit de React que resetea el form.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        for (const [name, value] of data.entries()) {
+          const field = form.elements.namedItem(name);
+          if (field instanceof HTMLInputElement && field.type === 'checkbox') {
+            field.checked = value === 'on';
+          } else if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
+            if (typeof value === 'string') field.value = value;
+          }
+        }
+      }));
+    };
     try {
       const result = await action(formData);
+      // Resultado tipado de error esperado (p. ej. 422 del contrato): inline,
+      // con los datos conservados. No es un éxito ni un fallo inesperado.
+      if (result && typeof result === 'object' && (result as { ok?: unknown }).ok === false && typeof (result as { message?: unknown }).message === 'string') {
+        restoreInputs();
+        setError((result as { message: string }).message);
+        return;
+      }
       const message = result && typeof result === 'object' && 'message' in result && typeof result.message === 'string' ? result.message : successMessage;
       const tone = result && typeof result === 'object' && 'tone' in result ? (result as { tone?: string }).tone : undefined;
       if (resetOnSuccess) formRef.current?.reset();
@@ -42,6 +72,7 @@ export function MutationForm({
     } catch (err) {
       // Los redirects de Next forman parte de la navegación: re-lanzarlos.
       if (isNextRedirectError(err)) throw err;
+      restoreInputs();
       // Error inline siempre visible: ningún submit falla en silencio.
       setError(getFriendlyErrorMessage(err));
       // Toast SOLO cuando aporta una acción (B7): motor caído -> "Reintentar"

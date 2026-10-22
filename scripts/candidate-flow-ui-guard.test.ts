@@ -170,4 +170,21 @@ void test('los 422 conocidos de checks/review se explican en español, nunca con
     const actions = source('lib/actions/research-tools.actions.ts');
     assert.ok(actions.includes("import { commitmentErrorMessage } from '@/lib/actions/commitment-error-message'"), 'mapper importado');
     assert.equal((actions.match(/commitmentErrorMessage\(err\)/g) ?? []).length, 2, 'checks y review usan el mapper');
+    // Los 422 esperados vuelven como resultado tipado (prod oculta el message de throws en server actions); los desconocidos siguen lanzando.
+    assert.equal((actions.match(/return \{ ok: false as const, message: translated \}/g) ?? []).length, 2, 'checks y review devuelven {ok:false,message}');
+    assert.ok(!actions.includes('throw new Error(translated)'), 'el error esperado NO se lanza como throw');
+    const mf = source('components/forms/MutationForm.tsx');
+    assert.ok(mf.includes('.ok === false'), 'MutationForm detecta el resultado tipado de error');
+});
+
+void test('los forms del flujo conservan lo escrito tras un 422 (opt-in acotado)', () => {
+    const form = source('components/forms/MutationForm.tsx');
+    assert.ok(form.includes('preserveOnError = false'), 'opt-in: por defecto NO cambia ningún form');
+    assert.ok(form.includes('requestAnimationFrame('), 'restaura tras el commit de React');
+    assert.ok(form.includes("field.type === 'checkbox'"), 'restaura también casillas');
+    const page = source('app/(root)/research/[ticker]/management-credibility/page.tsx');
+    for (const action of ['reviewManagementCandidate', 'addManagementPromiseCheck', 'addManagementPromiseNote']) {
+        const key = action === 'addManagementPromiseNote' ? 'promiseId)}' : 'promise.id)}';
+        assert.ok(page.includes(`<MutationForm action={${action}.bind(null, ticker, ${key} preserveOnError`), `${action} con preserveOnError`);
+    }
 });
