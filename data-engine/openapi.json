@@ -5853,6 +5853,20 @@
             "title": "Monthly Contribution",
             "type": "number"
           },
+          "monthly_contribution_currency": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "minLength": 3,
+                "pattern": "^[A-Za-z]{3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Contribution Currency"
+          },
           "start_date": {
             "format": "date",
             "title": "Start Date",

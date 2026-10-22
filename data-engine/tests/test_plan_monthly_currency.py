@@ -9,7 +9,7 @@ monthly_contribution_currency es aditiva y NULL en planes legacy:
   tasa deja el total en None y se declara, nunca parcial como completo.
 """
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -18,7 +18,6 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import Base, FXRate
 from app.services.investment_plan_service import (
-    PLAN_CURRENCY_UNSET,
     InvestmentPlanService,
 )
 
