@@ -47,6 +47,16 @@ const STATUS_LABELS: Record<string, string> = {
   changes_requested: 'cambios solicitados',
 };
 
+/** Franjas horarias conocidas del calendario de resultados (misma convencion
+ *  que catalyst_calendar_service.py). Los codigos sin etiqueta, como
+ *  "time-not-supplied", o desconocidos no se muestran en crudo. */
+const CATALYST_TIME_LABELS: Record<string, string> = {
+  'time-pre-market': 'antes de la apertura',
+  'time-after-hours': 'tras el cierre',
+  'before-market': 'antes de la apertura',
+  'after-market': 'tras el cierre',
+};
+
 function enumLabel(map: Record<string, string>, value: string | null | undefined): string {
   if (value === null || value === undefined || value === '') return NA;
   return map[value] ?? value.replaceAll('_', ' ');
@@ -385,7 +395,7 @@ export default function ThesisMemo({
                   {catalyst.date ? (
                     <span className="text-gray-400">
                       · {catalyst.date}
-                      {catalyst.time ? ` ${catalyst.time}` : ''}
+                      {catalyst.time && CATALYST_TIME_LABELS[catalyst.time] ? ` ${CATALYST_TIME_LABELS[catalyst.time]}` : ''}
                     </span>
                   ) : null}
                   {catalyst.eps_forecast !== undefined ? (
