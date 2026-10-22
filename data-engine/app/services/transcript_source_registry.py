@@ -214,24 +214,24 @@ _ENTRIES = (
     ),
     SourceEntry(
         "CPT",
-        NOT_LISTED_ON_IR_PAGE,
+        WEBCAST_ONLY,
         "https://investors.camdenliving.com/investors/news-events-presentations/events-and-presentations/default.aspx",
         _CHECKED,
-        note="Leida en navegador publico el 2026-10-22 (events-and-presentations): 0 enlaces con 'transcript'. No prueba que no exista en otra seccion.",
+        note="Releida 2026-10-22 con navegador publico (events-and-presentations y detalle 2Q26): enlaza webcasts (Chorus Call) y 0 enlaces a transcripcion. No prueba que no exista transcripcion en otra seccion.",
     ),
     SourceEntry(
         "ABCL",
-        NOT_LISTED_ON_IR_PAGE,
+        WEBCAST_ONLY,
         "https://investors.abcellera.com/events/default.aspx",
         _CHECKED,
-        note="Leida en navegador publico el 2026-10-22 (events y detalle del evento Q3 2026): 0 enlaces con 'transcript'. No prueba que no exista en otra seccion.",
+        note="Releida 2026-10-22 con navegador publico (events): enlaza webcasts (Q4 events, Q2 2026 incluido) y 0 enlaces a transcripcion. No prueba que no exista en otra seccion.",
     ),
     SourceEntry(
         "NAUT",
-        NOT_LISTED_ON_IR_PAGE,
+        WEBCAST_ONLY,
         "https://investors.nautilus.bio/news-events/events",
         _CHECKED,
-        note="Leida en navegador publico el 2026-10-22 (events y detalle del evento Q3 2026): 0 enlaces con 'transcript'. No prueba que no exista en otra seccion.",
+        note="Releida 2026-10-22 con navegador publico (events y detalle Q2 2026): enlaza webcasts (media-server) y 0 enlaces a transcripcion. No prueba que no exista en otra seccion.",
     ),
     SourceEntry(
         "POOL",
@@ -242,10 +242,10 @@ _ENTRIES = (
     ),
     SourceEntry(
         "HIMS",
-        NOT_LISTED_ON_IR_PAGE,
+        WEBCAST_ONLY,
         "https://investors.hims.com/events-and-presentations/default.aspx",
         _CHECKED,
-        note="Leida en navegador publico el 2026-10-22 (events-and-presentations): 0 enlaces con 'transcript'. No prueba que no exista en otra seccion.",
+        note="Releida 2026-10-22 con navegador publico (events-and-presentations y detalle Q2 2026): enlaza webcasts (Q4 events) y 0 enlaces a transcripcion. No prueba que no exista en otra seccion.",
     ),
     SourceEntry(
         "UNH",

@@ -93,9 +93,13 @@ def test_rxrx_call_date_provenance_is_press_release_not_document():
 
 
 def test_consulted_pages_are_not_listed_not_unresolved():
-    for t in ("CPT", "AAPL", "IBRX", "CGEO.L"):
+    for t in ("AAPL", "IBRX", "CGEO.L"):
         c = coverage_for(t)
         assert c.transcript_status == "no_listada_en_pagina_ir" and not c.checkable_by_job
+    # releidas el 2026-10-22: enlazan webcasts y ninguna transcripcion (no es "sin fuente" ni "no existe")
+    for t in ("CPT", "HIMS", "NAUT", "ABCL"):
+        c = coverage_for(t)
+        assert c.transcript_status == "solo_webcast" and not c.checkable_by_job
 
 
 def test_labels_are_user_friendly_origin_stays_in_metadata():
