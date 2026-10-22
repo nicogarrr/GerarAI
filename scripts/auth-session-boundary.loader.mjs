@@ -9,7 +9,7 @@ export async function resolve(specifier, context, nextResolve) {
 }
 export async function load(url, context, nextLoad) {
     const sources = {
-        'auth-boundary:endpoint': `export async function callAuthEndpoint(path, body) { const names = { '/sign-in/email': 'signInEmail', '/sign-up/email': 'signUpEmail', '/two-factor/verify-totp': 'verifyTOTP' }; return globalThis.__authBoundaryTestAuth.api[names[path]]({ body }); }`,
+        'auth-boundary:endpoint': `export async function callAuthEndpoint(path, body) { const names = { '/sign-in/email': 'signInEmail', '/sign-up/email': 'signUpEmail', '/two-factor/verify-totp': 'verifyTOTP' }; if (globalThis.__authBoundaryEndpointError) throw globalThis.__authBoundaryEndpointError; return globalThis.__authBoundaryTestAuth.api[names[path]]({ body }); }`,
         'auth-boundary:auth': 'export async function getAuth() { return globalThis.__authBoundaryTestAuth; }',
         'auth-boundary:headers': 'export async function headers() { return new Headers(); }',
         'auth-boundary:constants': 'export const ERROR_MESSAGES = { AUTH_UNAVAILABLE: "No disponible", AUTH_FAILED: "No autenticado" };',

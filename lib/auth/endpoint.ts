@@ -20,7 +20,7 @@ export async function callAuthEndpoint(path: AuthEndpoint, body: unknown): Promi
     // Keep Origin as supplied so the official CSRF check can reject it. The
     // configured baseURL, never inbound Host/X-Forwarded-Host, sets the target.
     const ipHeaders = (context.options as BetterAuthOptions).advanced?.ipAddress?.ipAddressHeaders ?? ['x-forwarded-for'];
-    for (const name of ['cookie', 'origin', 'referer', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest', ...ipHeaders]) {
+    for (const name of ['cookie', 'origin', 'referer', 'user-agent', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest', ...ipHeaders]) {
         const value = incoming.get(name);
         if (value !== null) forwarded.set(name, value);
     }
@@ -43,6 +43,21 @@ export async function callAuthEndpoint(path: AuthEndpoint, body: unknown): Promi
         }
     }
     if (!response.ok) {
+        // Only documented codes select copy. Never expose upstream message,
+        // stack or arbitrary fields, and never equate every 422 with duplicate.
+        const detail: unknown = await response.json().catch(() => null);
+        const code = detail && typeof detail === 'object' && 'code' in detail && typeof detail.code === 'string'
+            ? detail.code : '';
+        const signupMessages: Record<string, string> = {
+            USER_ALREADY_EXISTS: 'Este email ya está registrado. Inicia sesión.',
+            USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: 'Este email ya está registrado. Inicia sesión.',
+            PASSWORD_TOO_SHORT: 'La contraseña debe tener al menos 8 caracteres.',
+            PASSWORD_TOO_LONG: 'La contraseña no puede superar los 128 caracteres.',
+            INVALID_EMAIL: 'Introduce un email válido.',
+        };
+        const signupMessage = path === '/sign-up/email' && (response.status === 400 || response.status === 422)
+            ? signupMessages[code] : undefined;
+        if (signupMessage) throw new AppError(signupMessage, `AUTH_ENDPOINT_${code}`, response.status);
         const message = response.status === 429
             ? 'Demasiados intentos. Espera un momento antes de volver a intentarlo.'
             : response.status === 401

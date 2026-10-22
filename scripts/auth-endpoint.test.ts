@@ -88,3 +88,26 @@ test('rate-limit store failure fails closed with sanitized 503 and no cookies', 
     });
     assert.deepEqual(state.__endpointCookies, []);
 });
+
+
+test('real signup errors use documented codes, not raw detail or universal 422 copy', async () => {
+    configure({ enabled: false });
+    await callAuthEndpoint('/sign-up/email', credentials);
+    await assert.rejects(() => callAuthEndpoint('/sign-up/email', credentials), { statusCode: 422, code: 'AUTH_ENDPOINT_USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', message: 'Este email ya está registrado. Inicia sesión.' });
+    await assert.rejects(() => callAuthEndpoint('/sign-up/email', { ...credentials, email: 'short@example.com', password: 'short' }), { statusCode: 400, code: 'AUTH_ENDPOINT_PASSWORD_TOO_SHORT', message: 'La contraseña debe tener al menos 8 caracteres.' });
+    state.__endpointAuth = { $context: Promise.resolve({ baseURL: 'http://localhost:3000/api/auth', options: {} }), handler: async () => Response.json({ code: 'OTHER_422', message: 'synthetic-private-detail' }, { status: 422 }) };
+    await assert.rejects(() => callAuthEndpoint('/sign-up/email', credentials), { statusCode: 422, code: 'AUTH_ENDPOINT_ERROR', message: 'No se pudo completar el acceso. Inténtalo de nuevo.' });
+});
+
+test('user-agent passes unchanged, without changing target or trusting proxy host', async () => {
+    configure({ enabled: false });
+    state.__endpointHeaders.set('user-agent', 'Synthetic QA Browser/1.0');
+    state.__endpointHeaders.set('x-forwarded-host', 'untrusted.invalid');
+    state.__endpointAuth = { $context: Promise.resolve({ baseURL: 'http://localhost:3000/api/auth', options: {} }), handler: async (request: Request) => {
+        assert.equal(request.headers.get('user-agent'), 'Synthetic QA Browser/1.0');
+        assert.equal(request.headers.get('x-forwarded-host'), null);
+        assert.equal(new URL(request.url).host, 'localhost:3000');
+        return Response.json({ token: 'synthetic-private-token' });
+    } };
+    assert.deepEqual(await callAuthEndpoint('/sign-in/email', credentials), { twoFactorRedirect: false });
+});

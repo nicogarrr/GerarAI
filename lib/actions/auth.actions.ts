@@ -22,6 +22,12 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
         return { success: true };
     } catch (error: unknown) {
         const appError = toAppError(error);
+        // The endpoint maps documented status/code pairs to safe Spanish copy.
+        // Do not reinterpret that structured result by English substrings.
+        if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
+            return { success: false, error: getSafeErrorMessage(appError) };
+        }
+
 
         // Mensajes de error más específicos
         let errorMessage: string = ERROR_MESSAGES.AUTH_FAILED;
@@ -63,6 +69,12 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
         return { success: true };
     } catch (error: unknown) {
         const appError = toAppError(error);
+        // The endpoint maps documented status/code pairs to safe Spanish copy.
+        // Do not reinterpret that structured result by English substrings.
+        if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
+            return { success: false, error: getSafeErrorMessage(appError) };
+        }
+
 
         // better-auth blocks sign-in with HTTP 403 when the account has 2FA
         // enabled. Surface a dedicated signal so the UI can show the TOTP step.
