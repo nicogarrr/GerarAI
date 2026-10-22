@@ -66,7 +66,10 @@ function listedColumns(view: string): string[][] {
 
 /** Claves del dict que devuelve una función del data-engine (su último return). */
 function returnedKeys(file: string, from: string, to: string): string[] {
-  const block = file.slice(file.indexOf(from), file.indexOf(to));
+  const begin = file.indexOf(from);
+  // `to` se busca DESPUES de `from`: helpers/@staticmethod pueden estar antes.
+  const end = file.indexOf(to, begin + from.length);
+  const block = begin >= 0 && end > begin ? file.slice(begin, end) : '';
   assert.ok(block.length > 0, `no se encontró ${from} en la fuente del backend`);
   // El ÚLTIMO return es el que responde la consulta; los anteriores son
   // salidas tempranas (p. ej. `{"plan_exists": False}`).

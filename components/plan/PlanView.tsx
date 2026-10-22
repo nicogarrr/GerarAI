@@ -35,6 +35,14 @@ const PLAN_LABELS: Record<string, string> = {
     gap_base: 'Desviación',
     on_track: 'En camino',
     target_allocations: 'Asignación objetivo',
+    monthly_contribution_currency: 'Divisa de la aportación',
+    monthly_currency_recorded: 'Divisa registrada',
+    currency_contract_enabled: 'Contrato de divisa activo',
+    expected_basis: 'Base del cálculo previsto',
+    expected_periods: 'Cuotas previstas',
+    expected_contributions_converted_base: 'Aportaciones previstas convertidas',
+    expected_missing_fx: 'Cuotas sin tipo de cambio',
+    expected_conversion_complete: 'Conversión prevista completa',
 };
 
 /** Claves de GET /api/plan/drift (investment_plan_service.drift_analysis). */
@@ -49,6 +57,8 @@ const DRIFT_LABELS: Record<string, string> = {
     deviations: 'Desviaciones',
     suggestions: 'Sugerencias',
     next_contribution: 'Próxima aportación',
+    next_contribution_currency: 'Divisa de la próxima aportación',
+    next_contribution_basis: 'Base de la próxima aportación',
 };
 
 /** Etiquetas de GET /api/plan/contributions. `external_id` no se declara en la
