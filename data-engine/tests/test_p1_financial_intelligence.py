@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import create_engine
@@ -53,6 +53,7 @@ def test_financial_terminal_portfolio_intelligence_and_management_scorecard():
             title="FY2025 filing",
             source_type="sec_filing",
             source_url="https://sec.gov/example",
+            published_at=datetime(2026, 3, 1, tzinfo=UTC),
             metadata_={"segment": "Cloud"},
         )
         db.add(filing)
@@ -73,7 +74,7 @@ def test_financial_terminal_portfolio_intelligence_and_management_scorecard():
                         metric=metric,
                         value=Decimal(value),
                         unit=unit,
-                        period=f"FY{year}",
+                        period=f"{year}-12-31:FY",
                         fiscal_year=year,
                         fiscal_quarter="FY",
                         source_id=filing.id,
@@ -222,6 +223,12 @@ def test_financial_terminal_portfolio_intelligence_and_management_scorecard():
         ManagementCredibilityService().set_explanation(
             db, promise, "Cloud demand exceeded the original plan."
         )
+        promise.metadata_ = {
+            **(promise.metadata_ or {}),
+            "reviewed_at": "2026-10-22T12:00:00+00:00",
+            "review_kind": "user_declared",
+        }
+        db.commit()
         ManagementCredibilityService().reconcile(db, company)
         dashboard = ManagementCredibilityService().dashboard(db, company)
         assert dashboard["score"] == 1

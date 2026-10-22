@@ -2,18 +2,19 @@
 
 A credibility score is only meaningful if promise matching is strict: an
 annual promise must never be reconciled against a quarterly observation,
-"partial" means genuinely close (within 5%), and unmatched promises stay
+there is no invented tolerance (a miss is "missed", never "partial"), a fact
+without a traceable source document is ignored, and unmatched promises stay
 honestly open.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.entities import Base, Company, FinancialFact
+from app.models.entities import Base, Company, Document, FinancialFact
 from app.services.management_credibility_service import ManagementCredibilityService
 
 
@@ -37,19 +38,65 @@ def _company(db: Session) -> Company:
     return company
 
 
-def _fact(db, company, value, year=2025, quarter="FY", metric="revenue"):
+def _doc(db, company):
+    doc = Document(
+        company_id=company.id, title="10-Q", source_type="filing",
+        source_url="https://www.sec.gov/Archives/example-10q",
+        published_at=datetime(2026, 3, 1, tzinfo=UTC),
+    )
+    db.add(doc)
+    db.flush()
+    return doc.id
+
+
+def _period(year, quarter):
+    ends = {"Q1": "03-31", "Q2": "06-30", "Q3": "09-30", "Q4": "12-31", "FY": "12-31"}
+    return f"{year}-{ends[quarter]}:{quarter}"
+
+
+def _fact(
+    db, company, value, year=2025, quarter="FY", metric="revenue", with_source=True,
+    published=datetime(2026, 3, 1, tzinfo=UTC), adjusted=False,
+):
+    doc_id = None
+    if with_source:
+        doc = Document(
+            company_id=company.id, title="10-K", source_type="filing",
+            source_url="https://www.sec.gov/Archives/example",
+            published_at=published,
+        )
+        db.add(doc)
+        db.flush()
+        doc_id = doc.id
     fact = FinancialFact(
+        source_id=doc_id,
         company_id=company.id, metric=metric, value=Decimal(str(value)),
-        unit="USD", period=f"{quarter} {year}" if quarter != "FY" else f"FY{year}",
+        unit="USD", period=_period(year, quarter),
         fiscal_year=year, fiscal_quarter=None if quarter == "FY" else quarter,
-        source_type="filing",
+        source_type="filing", is_adjusted=adjusted,
     )
     db.add(fact)
     db.commit()
     return fact
 
 
-def _promise(db, company, *, period="FY2025", operator=">=", target="100"):
+def _mark_reviewed(db, promise):
+    """Criterio estructurado revisado por una persona (provenance user_declared)."""
+    promise.metadata_ = {
+        **(promise.metadata_ or {}),
+        "reviewed_at": "2026-10-22T12:00:00+00:00",
+        "review_kind": "user_declared",
+    }
+    db.commit()
+    return promise
+
+
+def _promise(db, company, *, period="FY2025", operator=">=", target="100", reviewed=True):
+    promise = _promise_raw(db, company, period=period, operator=operator, target=target)
+    return _mark_reviewed(db, promise) if reviewed else promise
+
+
+def _promise_raw(db, company, *, period="FY2025", operator=">=", target="100"):
     return ManagementCredibilityService().register(
         db, company,
         promise=f"Revenue {operator} {target} in {period}",
@@ -76,15 +123,15 @@ def test_missed_when_clearly_below_target(db):
     assert p.status == "missed"
 
 
-def test_partial_within_five_percent_only(db):
+def test_no_invented_tolerance_close_miss_is_missed_not_partial(db):
     c = _company(db)
-    _fact(db, c, 97)  # 3% below target
+    _fact(db, c, 97)  # 3% below target: no tolerance rule, exact comparison only
     _promise(db, c)
     [p] = ManagementCredibilityService().reconcile(db, c)
-    assert p.status == "partial"
+    assert p.status == "missed"
 
 
-def test_just_outside_five_percent_is_missed(db):
+def test_clear_miss_is_missed(db):
     c = _company(db)
     _fact(db, c, 94)  # 6% below target
     _promise(db, c)
@@ -109,10 +156,11 @@ def test_quarterly_promise_matches_quarterly_fact(db):
     assert p.status == "met"
 
 
-def test_quarterly_promise_matches_ten_q_fact_with_null_fiscal_year(db):
+def test_quarterly_promise_does_not_infer_fiscal_year_from_calendar_for_null_fiscal_year(db):
     """Hechos de la ingesta 10-Q: fiscal_year NULL, period '<end>:Qn'."""
     c = _company(db)
     fact = FinancialFact(
+        source_id=_doc(db, c),
         company_id=c.id, metric="revenue", value=Decimal("130"),
         unit="USD", period="2025-06-30:Q2",
         fiscal_year=None, fiscal_quarter="Q2",
@@ -122,13 +170,15 @@ def test_quarterly_promise_matches_ten_q_fact_with_null_fiscal_year(db):
     db.commit()
     _promise(db, c, period="2025 Q2")
     [p] = ManagementCredibilityService().reconcile(db, c)
-    assert p.status == "met"
-    assert p.actual_fact_id == fact.id
+    # año fiscal no explicito: no se infiere desde el calendario -> sin hecho ni veredicto
+    assert p.status == "open"
+    assert p.actual_fact_id is None
 
 
 def test_quarterly_promise_ignores_null_fiscal_year_fact_from_other_year(db):
     c = _company(db)
     fact = FinancialFact(
+        source_id=_doc(db, c),
         company_id=c.id, metric="revenue", value=Decimal("130"),
         unit="USD", period="2024-06-30:Q2",
         fiscal_year=None, fiscal_quarter="Q2",
@@ -165,8 +215,10 @@ def test_promise_without_target_records_outcome(db):
         metric="revenue", operator=None, target_value=None, unit=None,
     )
     [p] = ManagementCredibilityService().reconcile(db, c)
-    assert p.status == "outcome_recorded"
+    # sin criterio estructurado no hay veredicto; el hecho queda solo como contexto
+    assert p.status == "open"
     assert p.actual_value == Decimal("110")
+    assert p.evidence[-1]["context_only"] is True
 
 
 # --- Procedencia verificable (0078) -----------------------------------------
@@ -365,12 +417,13 @@ def test_portfolio_commitments_only_for_held_companies(db):
 def test_manual_promise_with_user_target_is_not_excluded_from_score(db):
     company = _company(db)
     service = ManagementCredibilityService()
-    _fact(db, company, 120, year=2030)
-    service.register(
-        db, company, promise="Revenue above 100", promise_date=date(2029, 1, 1),
-        expected_period="FY2030", metric="revenue", operator=">=",
+    _fact(db, company, 120, year=2025)
+    promise = service.register(
+        db, company, promise="Revenue above 100", promise_date=date(2024, 1, 1),
+        expected_period="FY2025", metric="revenue", operator=">=",
         target_value=Decimal("100"), unit="USD",
     )
+    _mark_reviewed(db, promise)
     service.reconcile(db, company)
     dash = service.dashboard(db, company)
     assert dash["legacy_excluded_from_score"] == 0
@@ -393,3 +446,156 @@ def test_portfolio_commitments_aggregates_net_position_without_duplicates(db):
     db.add(Position(company_id=held.id, quantity=Decimal("-5"), as_of=date(2030, 1, 1)))
     db.commit()
     assert management_commitments(db)["held_count"] == 0  # neta 0: no en cartera
+
+
+def test_reconcile_ignores_unreported_and_other_unit_facts(db):
+    c = _company(db)
+    estimated = _fact(db, c, 500)
+    estimated.is_reported = False
+    other_unit = _fact(db, c, 900)
+    other_unit.unit = "EUR"
+    db.commit()
+    _promise(db, c)
+    [p] = ManagementCredibilityService().reconcile(db, c)
+    assert p.status == "open"
+    assert p.actual_fact_id is None
+
+
+def test_reconcile_uses_reported_fact_with_same_unit_case_insensitive(db):
+    c = _company(db)
+    ignored = _fact(db, c, 500)
+    ignored.is_reported = False
+    ok = _fact(db, c, 120, year=2025)
+    ok.unit = "usd"
+    db.commit()
+    _promise(db, c)
+    [p] = ManagementCredibilityService().reconcile(db, c)
+    assert p.status == "met"
+    assert p.actual_fact_id == ok.id
+
+
+def test_fact_without_traceable_source_document_is_ignored(db):
+    c = _company(db)
+    _fact(db, c, 500, with_source=False)
+    _promise(db, c)
+    [p] = ManagementCredibilityService().reconcile(db, c)
+    assert p.status == "open"
+    assert p.actual_fact_id is None
+
+
+def test_unreviewed_promise_gets_context_but_no_verdict_and_keeps_prior_status(db):
+    c = _company(db)
+    _fact(db, c, 120)
+    p = _promise(db, c, reviewed=False)
+    ManagementCredibilityService().reconcile(db, c)
+    db.refresh(p)
+    assert p.status == "open"
+    assert p.actual_value == Decimal("120")
+    assert p.evidence[-1]["context_only"] is True
+    # un juicio previo no se sobrescribe sin criterio revisado
+    p.status = "partial"
+    db.commit()
+    ManagementCredibilityService().reconcile(db, c)
+    db.refresh(p)
+    assert p.status == "partial"
+
+
+def test_reviewed_promise_gets_exact_verdict_with_source(db):
+    c = _company(db)
+    fact = _fact(db, c, 120)
+    p = _promise(db, c)
+    ManagementCredibilityService().reconcile(db, c)
+    db.refresh(p)
+    assert p.status == "met"
+    assert p.evidence[-1]["context_only"] is False
+    assert p.evidence[-1]["source_document_id"] == fact.source_id
+
+
+def _reconciled(db, c, p):
+    ManagementCredibilityService().reconcile(db, c)
+    db.refresh(p)
+    return p
+
+
+def test_year_only_or_half_year_period_never_matches_a_quarter_fact(db):
+    c = _company(db)
+    _fact(db, c, 90, year=2026, quarter="Q2")
+    for period in ("2026", "H1 2026", "primer semestre 2026"):
+        p = _promise(db, c, period=period)
+        assert _reconciled(db, c, p).status == "open"
+        assert p.actual_value is None
+        assert not p.evidence
+
+
+def test_adjusted_fact_is_not_used(db):
+    c = _company(db)
+    _fact(db, c, 120, adjusted=True)
+    p = _promise(db, c)
+    assert _reconciled(db, c, p).status == "open"
+    assert p.actual_value is None
+
+
+def test_open_period_gives_context_not_verdict(db):
+    c = _company(db)
+    _fact(db, c, 120, year=2026, quarter="Q4", published=datetime(2026, 3, 1, tzinfo=UTC))
+    p = _promise(db, c, period="Q4 2026")
+    assert _reconciled(db, c, p).status == "open"
+    assert p.evidence[-1]["context_only"] is True
+
+
+def test_document_not_after_promise_gives_context_not_verdict(db):
+    c = _company(db)
+    _fact(db, c, 120, published=datetime(2024, 1, 1, tzinfo=UTC))
+    p = _promise(db, c)
+    assert _reconciled(db, c, p).status == "open"
+    assert p.evidence[-1]["context_only"] is True
+
+
+def test_conflicting_values_for_same_period_abstain(db):
+    c = _company(db)
+    _fact(db, c, 120)
+    _fact(db, c, 80)
+    p = _promise(db, c)
+    assert _reconciled(db, c, p).status == "open"
+    assert p.actual_value is None
+
+
+def test_reconcile_is_idempotent_and_evidence_dedups(db):
+    c = _company(db)
+    _fact(db, c, 120)
+    p = _promise(db, c)
+    for _ in range(5):
+        _reconciled(db, c, p)
+    assert len(p.evidence) == 1
+    assert p.status == "met"
+
+
+def test_fy_promise_ignores_unmarked_non_annual_cutoff(db):
+    c = _company(db)
+    f = _fact(db, c, 90)
+    f.period = "2025-09-30"
+    f.fiscal_quarter = None
+    db.commit()
+    p = _promise(db, c)
+    assert _reconciled(db, c, p).status == "open"
+    assert p.actual_value is None
+
+
+def test_fiscal_quarter_not_matched_by_calendar_year(db):
+    c = _company(db)
+    f = _fact(db, c, 90, year=2026, quarter="Q1")  # Q1 del año fiscal 2026
+    f.period = "2025-12-31:Q1"
+    db.commit()
+    p = _promise(db, c, period="Q1 2025")
+    assert _reconciled(db, c, p).status == "open"
+    assert p.actual_value is None
+
+
+def test_fact_without_authentic_cutoff_date_gives_context_only(db):
+    c = _company(db)
+    f = _fact(db, c, 120)
+    f.period = "FY2025"
+    db.commit()
+    p = _promise(db, c)
+    assert _reconciled(db, c, p).status == "open"
+    assert p.evidence[-1]["context_only"] is True
