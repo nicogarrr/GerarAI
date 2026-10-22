@@ -129,7 +129,7 @@ void test('el estado de una acción corporativa viene de applied / applied_at', 
 
 void test('el plan etiqueta todas las claves que devuelve el backend', () => {
   const labels = labelMapKeys(plan);
-  const metrics = returnedKeys(planService, 'def plan_metrics', 'def drift_analysis');
+  const metrics = returnedKeys(planService, 'def plan_metrics', 'def _expected_base');
   const drift = returnedKeys(planService, 'def drift_analysis', '@staticmethod');
   const contributions = returnedKeys(planRoute, 'def list_contributions', '@router.post("/contributions"');
   for (const key of [...metrics, ...drift, ...contributions]) {
