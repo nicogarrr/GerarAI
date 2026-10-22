@@ -40,7 +40,7 @@ const PLAN_LABELS: Record<string, string> = {
     currency_contract_enabled: 'Contrato de divisa activo',
     expected_basis: 'Base del cálculo previsto',
     expected_periods: 'Cuotas previstas',
-    expected_contributions_converted_base: 'Aportaciones previstas convertidas',
+    expected_contributions_converted_base: 'Aportaciones previstas convertidas (parcial si faltan tipos de cambio)',
     expected_missing_fx: 'Cuotas sin tipo de cambio',
     expected_conversion_complete: 'Conversión prevista completa',
 };
@@ -150,7 +150,18 @@ const planExpectedPeriods = (value: unknown, record: DataRecord) => {
     if (missing > 0) parts.push(`${missing} sin tipo de cambio`);
     return parts.join(', ');
 };
-const PLAN_FORMAT = {start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, next_contribution: planNext, expected_periods: planExpectedPeriods, ...Object.fromEntries(['expected_contributions_base', 'expected_contributions_converted_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
+/** Cuotas vencidas sin tipo de cambio en o antes de su fecha: resumen legible, no claves crudas. */
+const planExpectedMissingFx = (value: unknown) => {
+    if (!Array.isArray(value) || value.length === 0) return '—';
+    const rows = value.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object');
+    const first = rows[0] ?? {};
+    const last = rows[rows.length - 1] ?? {};
+    const pair = typeof first.quote_currency === 'string' && typeof first.base_currency === 'string' ? ` ${first.quote_currency}→${first.base_currency}` : '';
+    const range = typeof first.due_date === 'string' && typeof last.due_date === 'string'
+        ? ` (vencidas del ${formatMarketDate(first.due_date)} al ${formatMarketDate(last.due_date)})` : '';
+    return `${rows.length} ${rows.length === 1 ? 'cuota' : 'cuotas'} sin tipo de cambio${pair} en o antes del vencimiento${range}`;
+};
+const PLAN_FORMAT = {start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, next_contribution: planNext, expected_periods: planExpectedPeriods, expected_missing_fx: planExpectedMissingFx, ...Object.fromEntries(['expected_contributions_base', 'expected_contributions_converted_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
 const DETAIL_FORMAT = Object.fromEntries(['target_allocations', 'current_weights', 'deviations', 'suggestions', 'missing_fx', 'status'].map(key => [key, (value: unknown, record: DataRecord) => planValue(value, typeof record.base_currency === 'string' ? record.base_currency : undefined, key === 'current_weights')]));
 
 /** Extrae tickers del drift (current_weights "ticker:XXX", deviations kind ticker) y del plan (targets kind ticker) */

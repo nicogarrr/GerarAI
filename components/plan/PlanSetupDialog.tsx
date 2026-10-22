@@ -37,6 +37,8 @@ type PlanInitial = {
     currency_contract_enabled?: unknown;
 };
 
+// Sin `required` nativo: el aviso propio (role=alert) es el que se ve y se anuncia.
+const CURRENCY_REQUIRED_ERROR = 'Elige la divisa de la aportación mensual.';
 const CURRENCY_OPTIONS = ['EUR', 'USD', 'GBP', 'CHF', 'JPY'];
 
 function asText(value: unknown): string {
@@ -95,7 +97,7 @@ export default function PlanSetupDialog({
             return;
         }
         if (currencyEnabled && !currency) {
-            setError('Elige la divisa de la aportación mensual.');
+            setError(CURRENCY_REQUIRED_ERROR);
             return;
         }
         // parseInt truncaba "30,5" a 30 en silencio: solo se aceptan enteros exactos (F388).
@@ -135,13 +137,22 @@ export default function PlanSetupDialog({
 
         setPending(true);
         try {
-            await upsertPlan({
+            const result = await upsertPlan({
                 monthly_contribution: monthlyContribution,
                 ...(currencyEnabled ? { monthly_contribution_currency: currency } : {}),
                 start_date: startDate,
                 horizon_years: horizonYears,
                 target_allocations: allocations,
             });
+            if (!result.ok) {
+                // Rechazo del contrato de divisa: nada se guardo; aviso inline y diálogo abierto.
+                setError(
+                    result.code === 'plan_currency_required_for_amount_change'
+                        ? 'Este plan tiene la divisa registrada. Para cambiar el importe hay que actualizar la aplicación y elegir la divisa: no se ha guardado nada.'
+                        : 'La divisa de la aportación todavía no está disponible en el servidor: no se ha guardado nada.',
+                );
+                return;
+            }
             toast.success('Plan de inversión guardado');
             setOpen(false);
             router.refresh();
@@ -219,7 +230,7 @@ export default function PlanSetupDialog({
                                 id="plan-currency"
                                 value={currency}
                                 onChange={(e) => setCurrency(e.target.value)}
-                                required
+                                aria-invalid={error === CURRENCY_REQUIRED_ERROR}
                                 className="h-9 w-full rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100"
                             >
                                 <option value="" disabled>Elige una divisa</option>

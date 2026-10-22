@@ -42,7 +42,7 @@ describe('visualizacion del importe', () => {
         assert.match(f[0], /currency_contract_enabled === true/);
     });
     it('la proxima aportacion usa su propia divisa, nunca la base', () => {
-        const f = view.match(/const planNext[\s\S]*?const PLAN_FORMAT/);
+        const f = view.match(/const planNext[\s\S]*?(?=\/\*\* Resumen de cuotas previstas)/);
         assert.ok(f);
         assert.match(f[0], /next_contribution_currency/);
         assert.doesNotMatch(f[0], /base_currency/);
@@ -59,5 +59,17 @@ describe('visualizacion del importe', () => {
         assert.ok(f);
         assert.match(f[0], /No calculables: divisa no registrada/);
         assert.match(f[0], /monthly_currency_recorded !== true/);
+    });
+    it('las cuotas sin tipo de cambio se resumen en espanol, no como claves crudas', () => {
+        const f = view.match(/const planExpectedMissingFx[\s\S]*?\n};/);
+        assert.ok(f);
+        assert.match(f[0], /sin tipo de cambio/);
+        assert.match(view, /expected_missing_fx: planExpectedMissingFx/);
+    });
+    it('el 409 del contrato se devuelve como resultado y se muestra inline, sin guardar', () => {
+        assert.match(actions, /plan_currency_required_for_amount_change/);
+        assert.match(actions, /if \(code\) return \{ ok: false, code \}/);
+        assert.match(dialog, /if \(!result\.ok\)/);
+        assert.match(dialog, /no se ha guardado nada/);
     });
 });
