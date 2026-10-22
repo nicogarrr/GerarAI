@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { commitmentsUiEnabled } from '@/lib/commitments-flag';
 import { getPortfolioCommitments } from '@/lib/actions/research-tools.actions';
+import SourceCoverage from '@/components/portfolio/SourceCoverage';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -38,6 +39,7 @@ export default async function PortfolioCommitmentsPage() {
       <p className="text-xs text-gray-500">
         {data.held_count} empresa(s) en cartera · {withItems.length} con compromisos o candidatos registrados. Las empresas sin transcripción cargada no tienen datos: no significa que la directiva no haya prometido nada.
       </p>
+      <SourceCoverage />
       {!withItems.length ? <EmptyState title="Aún no hay compromisos ni candidatos para las empresas de tu cartera." /> : null}
       {withItems.map((company) => (
         <section className="rounded-xl border border-gray-800 bg-surface-1 p-5" key={company.ticker}>
