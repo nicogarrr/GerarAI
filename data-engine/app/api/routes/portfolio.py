@@ -636,11 +636,22 @@ def delete_transaction(transaction_id: int, db: Session = Depends(get_db)) -> No
     if not transaction or transaction.action not in {"buy", "sell"}:
         raise HTTPException(status_code=404, detail="Transaction not found")
     company_id = transaction.company_id
-    db.delete(transaction)
-    db.flush()
-    if company_id is not None:
-        PortfolioLedgerService().rebuild_position(db, company_id)
-    db.commit()
+    try:
+        db.delete(transaction)
+        db.flush()
+        if company_id is not None:
+            PortfolioLedgerService().rebuild_position(db, company_id)
+        db.commit()
+    except PortfolioOversellError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="Insufficient shares for sale"
+        ) from exc
+    except PortfolioMixedCurrencyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=422, detail="Position cannot mix transaction currencies"
+        ) from exc
 
 
 @router.delete("/holdings/{ticker}", status_code=204)
