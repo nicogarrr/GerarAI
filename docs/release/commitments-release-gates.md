@@ -21,6 +21,12 @@ autorizacion. Lo que no consta como verificado se marca "no verificado".
 - Cobertura real de fuentes oficiales: 6 de 20 tickers (UBER, BN, KKR, CB, RXRX, UNH). RXRX y UNH solo comentarios
   preparados, sin Q&A. 14 sin fuente resuelta: NO es evidencia de ausencia.
 
+- Auditor (su entorno, UI c5274f6a55e129603bbd0b0549af21fd8d73ae5f): tsc 0 errores y bundle de guards completo 2245 pass / 0 fail.
+  Esto NO borra los 27 nombres que fallaron en un entorno anterior sobre 55f916 y 372e2b33 (causa no verificada, no atribuir).
+- Prueba UI local con datos SINTETICOS (no es cumplimiento real): candidato -> "Pasar a seguimiento" con criterio marcado de prueba -> persiste
+  tras recarga; check "desconocido" con resumen persiste (CUMPLIDAS/FALLIDAS siguen 0); nota privada persiste; check "cumplido" sin
+  evidencia se rechaza (la UI mostraba un mensaje generico: fix asignado al designer). No probado: met/not_met con evidencia en UI.
+
 ## Que NO esta probado
 - Postgres de produccion/copia real, Redis real, actor `extract_commitment_candidates` y scheduler en entorno real.
 - Suite completa del repo; 27 tests de guards fallan igual en 55f916 y 372e2b33 (causa no verificada).
