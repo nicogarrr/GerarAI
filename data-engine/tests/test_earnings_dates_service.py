@@ -91,6 +91,7 @@ def test_refresh_writes_rows_keeps_manual_and_reports_missing():
         assert by[n["ZQA"]]["confirmed"] is True and by[n["ZQA"]]["session"] is None
         assert by[n["ZQC.L"]]["source_url"] == "https://example.test/rns"
         assert cal["without_date_in_range"] == [n["ZQB"]]
+        assert cal["stale_date_in_range"] == []
     finally:
         db.rollback()
         db.close()
@@ -130,6 +131,8 @@ def test_stale_automatic_dates_are_omitted_but_manual_stays():
         tickers = {e["ticker"] for d in cal["days"] for e in d["events"]}
         assert n["ZSA"] not in tickers and n["ZSA"] in cal["without_date_in_range"]
         assert n["ZSB"] in tickers
+        # Caducada no es lo mismo que sin fecha: se marca aparte para no decir "sin publicar".
+        assert cal["stale_date_in_range"] == [n["ZSA"]]
     finally:
         db.rollback()
         db.close()
