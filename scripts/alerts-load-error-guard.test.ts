@@ -4,8 +4,11 @@ import test from 'node:test';
 
 /**
  * /alerts: el fallo de CARGA se comunica una sola vez (estado inline con
- * Reintentar); los fallos de MUTACIÓN conservan su toast porque no tienen
- * otra superficie de feedback.
+ * Reintentar). El fallo de ALTA con el motor caído (offline) también usa
+ * superficie inline DENTRO del diálogo: el toast con acción quedaba
+ * inutilizable bajo el modal (el click cerraba el diálogo vía overlay y Tab
+ * no alcanzaba el botón dentro del focus-trap de Radix). Borrar y revisar
+ * conservan su toast con reintento (no hay modal abierto en esos flujos).
  */
 const source = readFileSync('components/alerts/AlertsManager.tsx', 'utf8');
 
@@ -16,9 +19,26 @@ test('la carga fallida no dispara toast además del estado inline', () => {
     assert.doesNotMatch(loadBlock[0], /showErrorToast/);
 });
 
-test('crear, borrar y revisar conservan showErrorToast con reintento', () => {
-    const mutations = source.match(/showErrorToast\(error, \{[\s\S]*?\}\);/g) ?? [];
-    assert.ok(mutations.length >= 3, `esperados >=3 toasts de mutación, hay ${mutations.length}`);
+test('el alta offline se reintenta inline dentro del diálogo, sin toast accionable', () => {
+    // El catch del alta clasifica: offline -> estado inline; resto -> toast
+    // informativo sin acción (duplicados, validación de servidor...).
+    assert.match(source, /classifyError\(error\) === 'offline'/);
+    assert.match(source, /setCreateError\(getFriendlyErrorMessage\(error\)\)/);
+    // La región inline es un role=alert enfocable con su propio Reintentar
+    // que relanza el alta; se limpia al reintentar y al cerrar el diálogo.
+    assert.match(source, /role="alert"/);
+    assert.match(source, /createErrorRef/);
+    assert.match(source, /if \(!next\) setCreateError\(null\);/);
+    // El alta ya no pasa onRetry al toast: esa acción bajo el modal no era
+    // usable (overlay interceptaba el click, focus-trap bloqueaba el Tab).
+    const createCatch = source.match(/const handleCreateAlert = async \(\) => \{[\s\S]*?\n    \};/);
+    assert.ok(createCatch, 'handleCreateAlert no encontrado');
+    assert.doesNotMatch(createCatch[0], /onRetry/);
+});
+
+test('borrar y revisar conservan showErrorToast con reintento', () => {
+    assert.match(source, /onRetry: \(\) => handleDeleteAlert\(alertId\)/);
+    assert.match(source, /onRetry: \(\) => handleReview\(alert\)/);
     assert.match(source, /duplicateMessage: 'Ya tienes esta alerta configurada.'/);
 });
 
