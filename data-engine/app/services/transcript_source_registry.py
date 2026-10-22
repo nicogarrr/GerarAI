@@ -254,6 +254,14 @@ _ENTRIES = (
         _CHECKED,
         (
             VerifiedAsset(
+                "https://www.unitedhealthgroup.com/content/dam/UHG/PDF/investors/2026/unh-q3-2026-remarks.pdf",
+                "Third Quarter 2026 Results Teleconference Prepared Remarks",
+                "Q3 2026",
+                "2026-10-13",
+                origin="href_ir_leido",
+                completeness="comentarios_preparados_sin_qa",
+            ),
+            VerifiedAsset(
                 "https://www.unitedhealthgroup.com/content/dam/UHG/PDF/investors/2026/unh-q2-2026-remarks.pdf",
                 "Second Quarter 2026 Results Teleconference Prepared Remarks",
                 "Q2 2026",
@@ -262,11 +270,11 @@ _ENTRIES = (
                 completeness="comentarios_preparados_sin_qa",
             ),
         ),
-        "COMENTARIOS PREPARADOS (no transcripcion con preguntas y respuestas). URL hallada por busqueda "
-        "en unitedhealthgroup.com (dominio del emisor, ruta /investors/2026/); NO enlazada en la pagina IR "
-        "financial-reports leida el 2026-10-22 (0 enlaces 'transcript'). Cabecera del documento: "
-        "'Second Quarter 2026 Results Teleconference Prepared Remarks July 16, 2026'; el documento "
-        "anuncia una sesion de preguntas y respuestas posterior que NO esta incluida.",
+        "COMENTARIOS PREPARADOS (no transcripcion con preguntas y respuestas). Q3 (13-oct-2026): href "
+        "/content/dam/UHG/PDF/investors/2026/unh-q3-2026-remarks.pdf presente en el HTML de "
+        "financial-reports leido por curl el 2026-10-22. Q2 (16-jul-2026): historico, hallado por "
+        "busqueda en el dominio del emisor y YA NO enlazado en esa pagina. Ambos documentos anuncian "
+        "una sesion de preguntas y respuestas posterior que NO esta incluida (Q3 solo trae el cierre \"Post Q&A\" de la direccion). Extractor: 0 turnos de directiva reconocidos en ambos (formato de nombre inline sin dos puntos): limitacion de formato, NO \"sin compromisos\"."
     ),
     SourceEntry(
         "AAPL",
