@@ -72,4 +72,7 @@ describe('visualizacion del importe', () => {
         assert.match(dialog, /if \(!result\.ok\)/);
         assert.match(dialog, /no se ha guardado nada/);
     });
+    it('una divisa registrada fuera de la lista se muestra y se conserva (no se enmascara con otra)', () => {
+        assert.match(dialog, /currency && !CURRENCY_OPTIONS\.includes\(currency\) \? \[currency, \.\.\.CURRENCY_OPTIONS\]/);
+    });
 });

@@ -234,7 +234,8 @@ export default function PlanSetupDialog({
                                 className="h-9 w-full rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100"
                             >
                                 <option value="" disabled>Elige una divisa</option>
-                                {CURRENCY_OPTIONS.map((code) => (
+                                {/* Una divisa registrada fuera de la lista se conserva como opción: nunca se muestra otra. */}
+                                {(currency && !CURRENCY_OPTIONS.includes(currency) ? [currency, ...CURRENCY_OPTIONS] : CURRENCY_OPTIONS).map((code) => (
                                     <option key={code} value={code}>{code}</option>
                                 ))}
                             </select>
