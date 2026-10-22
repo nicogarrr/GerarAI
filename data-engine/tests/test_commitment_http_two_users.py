@@ -42,17 +42,27 @@ def test_private_notes_isolated_over_signed_http(monkeypatch):
                  {"body": "nota privada A"})
     assert note.status_code == 201, note.text
 
+    from app.core.database import engine as _engine
+
+    import os
+
+    expected = "postgresql" if os.environ.get("DATABASE_URL", "").startswith("postgres") else "sqlite"
+    assert _engine.dialect.name == expected
     own = _call(client, "GET", f"{base}/promises/{pid}/notes", "tenant-a", "user-a")
     assert own.status_code == 200 and "nota privada A" in own.text
     batch_own = _call(client, "GET", f"{base}/notes", "tenant-a", "user-a")
     assert "nota privada A" in batch_own.text
 
     other_user = _call(client, "GET", f"{base}/promises/{pid}/notes", "tenant-a", "user-b")
-    assert "nota privada A" not in other_user.text
+    assert other_user.status_code == 200, other_user.text
+    assert other_user.json() == [] and "nota privada A" not in other_user.text
     batch_other_user = _call(client, "GET", f"{base}/notes", "tenant-a", "user-b")
+    assert batch_other_user.status_code == 200, batch_other_user.text
     assert "nota privada A" not in batch_other_user.text
 
     other_tenant = _call(client, "GET", f"{base}/promises/{pid}/notes", "tenant-b", "user-a")
+    assert other_tenant.status_code == 404, other_tenant.text
     assert "nota privada A" not in other_tenant.text
     batch_other_tenant = _call(client, "GET", f"{base}/notes", "tenant-b", "user-a")
+    assert batch_other_tenant.status_code == 200, batch_other_tenant.text
     assert "nota privada A" not in batch_other_tenant.text
