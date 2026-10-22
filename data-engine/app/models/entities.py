@@ -2293,6 +2293,12 @@ class InvestmentPlan(TenantOwnedMixin, Base, TimestampMixin):
         ForeignKey("portfolios.id"), nullable=True, index=True
     )
     monthly_contribution: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    # Divisa de la aportacion mensual. NULL = «divisa no registrada» (planes
+    # legacy): NUNCA se reinterpreta como divisa base — los totales quedan en
+    # estado desconocido explicito hasta que el usuario fija una divisa.
+    monthly_contribution_currency: Mapped[str | None] = mapped_column(
+        String(10), nullable=True
+    )
     start_date: Mapped[date] = mapped_column(Date)
     horizon_years: Mapped[int] = mapped_column(Integer, default=30)
     target_allocations: Mapped[list[dict]] = mapped_column(JSON, default=list)
