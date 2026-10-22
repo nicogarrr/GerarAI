@@ -244,13 +244,18 @@ class ManagementCredibilityService:
                 .order_by(ManagementPromise.promise_date, ManagementPromise.id)
             ).all()
         )
+        today = self._today()
         for promise in promises:
             if not promise.metric:
                 continue
-            # Solo hechos REPORTADOS y en la misma unidad que la promesa: comparar
-            # cifras estimadas/derivadas o en otra unidad produciria met/missed falsos.
-            # Ademas el hecho debe poder trazarse a un documento con URL: un
-            # FinancialFact sin documento fuente no basta para dar un veredicto.
+            period = self._comparable_period(promise.expected_period)
+            if period is None:
+                # "2026", "H1 2026", "mediados de ano"...: periodo ambiguo, no se compara
+                # contra ningun hecho (ni siquiera como contexto).
+                continue
+            # Solo hechos REPORTADOS, NO ajustados y en la misma unidad que la promesa:
+            # comparar cifras estimadas/ajustadas/en otra unidad produciria veredictos falsos.
+            # Ademas el hecho debe poder trazarse a un documento con URL.
             statement = (
                 select(FinancialFact)
                 .join(Document, Document.id == FinancialFact.source_id)
@@ -258,6 +263,7 @@ class ManagementCredibilityService:
                     FinancialFact.company_id == company.id,
                     FinancialFact.metric == promise.metric,
                     FinancialFact.is_reported.is_(True),
+                    FinancialFact.is_adjusted.is_(False),
                     Document.source_url.is_not(None),
                 )
             )
@@ -265,74 +271,76 @@ class ManagementCredibilityService:
                 statement = statement.where(
                     func.lower(FinancialFact.unit) == promise.unit.strip().lower()
                 )
-            year_match = re.search(r"(?:19|20)\d{2}", promise.expected_period)
-            if year_match:
-                year = int(year_match.group(0))
-                normalized_period = re.sub(
-                    r"[^A-Z0-9]", "", promise.expected_period.upper()
-                )
-                quarter_match = re.search(r"Q[1-4]", normalized_period)
-                if quarter_match:
-                    # Hechos trimestrales ingeridos desde 10-Q llevan
-                    # fiscal_year NULL y el año solo en period '<end>:Qn';
-                    # exigir fiscal_year == año los dejaria irreconciliables.
-                    statement = statement.where(
-                        FinancialFact.fiscal_quarter == quarter_match.group(0),
-                        or_(
-                            FinancialFact.fiscal_year == year,
-                            FinancialFact.period.like(f"{year}-%"),
-                        ),
-                    )
-                elif "FY" in normalized_period:
-                    statement = statement.where(
-                        FinancialFact.fiscal_year == year
-                    )
-                    # An annual promise must not be reconciled against a later
-                    # quarterly observation from the same fiscal year.
-                    statement = statement.where(
-                        or_(
-                            FinancialFact.fiscal_quarter == "FY",
-                            FinancialFact.fiscal_quarter.is_(None),
-                        )
-                    )
-            else:
+            kind, year, quarter = period
+            if kind == "Q":
+                # Hechos trimestrales ingeridos desde 10-Q llevan fiscal_year NULL y el
+                # año solo en period '<end>:Qn'.
                 statement = statement.where(
-                    FinancialFact.period == promise.expected_period
+                    FinancialFact.fiscal_quarter == quarter,
+                    or_(
+                        FinancialFact.fiscal_year == year,
+                        FinancialFact.period.like(f"{year}-%"),
+                    ),
                 )
-            actual = db.scalar(
-                statement.order_by(desc(FinancialFact.created_at)).limit(1)
-            )
-            if actual is None:
+            else:
+                # Promesa anual: nunca contra una observacion trimestral del mismo año.
+                statement = statement.where(
+                    FinancialFact.fiscal_year == year,
+                    or_(
+                        FinancialFact.fiscal_quarter == "FY",
+                        FinancialFact.fiscal_quarter.is_(None),
+                    ),
+                )
+            matches = list(db.scalars(statement.order_by(desc(FinancialFact.created_at))).all())
+            if not matches:
                 continue
+            if len({m.value for m in matches}) > 1:
+                # Valores distintos para el mismo periodo: sin criterio de reexpresion
+                # no se elige "el mas reciente"; se abstiene.
+                continue
+            actual = matches[0]
+            doc = db.get(Document, actual.source_id)
+            published = doc.published_at.date() if doc and doc.published_at else None
+            period_end = self._period_end(kind, year, quarter)
+            verdict_ok = (
+                self._has_reviewed_structured_criterion(promise)
+                and not self._is_legacy_heuristic(promise)
+                and promise.operator in OPERATORS
+                # periodo ya cerrado y documento publicado DESPUES de la promesa
+                and period_end <= today
+                and published is not None
+                and promise.promise_date < published <= today
+            )
             # Contexto comparable y con fuente valida: siempre se registra el hecho.
             promise.actual_fact_id = actual.id
             promise.actual_value = actual.value
             promise.verified_at = datetime.now(UTC)
-            verdict = False
-            if (
-                self._has_reviewed_structured_criterion(promise)
-                and not self._is_legacy_heuristic(promise)
-                and promise.operator in OPERATORS
-            ):
+            if verdict_ok:
                 # Comparacion exacta segun operador/objetivo; sin tolerancia inventada:
                 # un "casi cumplido" ("partial") no se infiere, solo lo declara una persona.
                 met = OPERATORS[promise.operator](actual.value, promise.target_value)
                 promise.status = "met" if met else "missed"
-                verdict = True
-            # Sin criterio revisado por una persona (o target legado inferido) NO se emite
-            # met/missed ni se sobrescribe un juicio previo: el estado y su provenance se
-            # conservan, el hecho queda solo como contexto.
-            promise.evidence = [
-                *(promise.evidence or []),
-                {
-                    "financial_fact_id": actual.id,
-                    "period": actual.period,
-                    "source_type": actual.source_type,
-                    "actual_value": str(actual.value),
-                    "source_document_id": actual.source_id,
-                    "context_only": not verdict,
-                },
+            # Sin criterio revisado, periodo abierto o documento no posterior NO se emite
+            # met/missed ni se sobrescribe un juicio previo: el hecho queda como contexto.
+            entry = {
+                "financial_fact_id": actual.id,
+                "period": actual.period,
+                "source_type": actual.source_type,
+                "actual_value": str(actual.value),
+                "source_document_id": actual.source_id,
+                "context_only": not verdict_ok,
+            }
+            history = [e for e in (promise.evidence or []) if isinstance(e, dict)]
+            # idempotente: una entrada por (hecho, valor, modo); la ultima reemplaza
+            history = [
+                e
+                for e in history
+                if not (
+                    e.get("financial_fact_id") == actual.id
+                    and e.get("actual_value") == entry["actual_value"]
+                )
             ]
+            promise.evidence = [*history, entry][-20:]
         db.commit()
         for promise in promises:
             db.refresh(promise)
@@ -416,6 +424,34 @@ class ManagementCredibilityService:
             item["checks"] = [CommitmentTrackingService.check_payload(c) for c in checks]
             out.append(item)
         return out
+
+    @staticmethod
+    def _today() -> date:
+        return datetime.now(UTC).date()
+
+    @staticmethod
+    def _comparable_period(expected: str | None) -> tuple[str, int, str | None] | None:
+        """Solo periodos exactos: trimestre ('Q2 2025'/'2025 Q2') o año fiscal ('FY2025').
+        Un año suelto, semestres u otras expresiones son ambiguos -> None."""
+        text = re.sub(r"[^A-Z0-9]", "", (expected or "").upper())
+        years = re.findall(r"(?:19|20)\d{2}", text)
+        if len(years) != 1:
+            return None
+        year = int(years[0])
+        rest = text.replace(years[0], "")
+        if re.fullmatch(r"Q[1-4]", rest):
+            return ("Q", year, rest)
+        if rest == "FY":
+            return ("FY", year, None)
+        return None
+
+    @staticmethod
+    def _period_end(kind: str, year: int, quarter: str | None) -> date:
+        if kind == "FY":
+            return date(year, 12, 31)
+        month = int(quarter[1]) * 3  # type: ignore[index]
+        day = 30 if month in (6, 9) else 31
+        return date(year, month, day)
 
     @staticmethod
     def _has_reviewed_structured_criterion(row: ManagementPromise) -> bool:
