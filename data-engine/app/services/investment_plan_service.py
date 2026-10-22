@@ -141,7 +141,7 @@ class InvestmentPlanService:
         db.commit()
         return True
 
-    def plan_metrics(self, db: Session) -> dict:
+    def plan_metrics(self, db: Session, *, today: date | None = None) -> dict:
         """Expected contributions vs actual, from plan start to today."""
         plan = self.get_plan(db)
         if plan is None:
@@ -186,7 +186,8 @@ class InvestmentPlanService:
                 continue
             total_actual += contribution.amount * rate
         complete = not missing_fx
-        months_elapsed = self._months_between(plan.start_date, date.today())
+        today = today or date.today()
+        months_elapsed = self._months_between(plan.start_date, today)
         plan_currency = (plan.monthly_contribution_currency or "").upper() or None
         expected, expected_partial, expected_missing_fx, expected_periods = self._expected_base(
             db,
@@ -194,6 +195,7 @@ class InvestmentPlanService:
             plan_currency=plan_currency,
             base_currency=base_currency,
             months_elapsed=months_elapsed,
+            today=today,
         )
         totals_known = expected is not None
         return {
@@ -236,6 +238,7 @@ class InvestmentPlanService:
         plan_currency: str | None,
         base_currency: str | None,
         months_elapsed: int,
+        today: date,
     ) -> tuple[Decimal | None, Decimal | None, list[dict], list[dict]]:
         """Cuotas previstas en divisa base, con tri-estado honesto.
 
@@ -256,7 +259,6 @@ class InvestmentPlanService:
             # que siempre; no depende del dia de vencimiento.
             total = plan.monthly_contribution * Decimal(months_elapsed)
             return total, total, [], periods
-        today = date.today()
         total = Decimal("0")
         missing: list[dict] = []
         pending = False

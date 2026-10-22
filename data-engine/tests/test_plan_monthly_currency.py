@@ -74,96 +74,99 @@ def test_update_explicit_null_unregisters_currency(db):
 def test_same_currency_math_unchanged(db):
     service = InvestmentPlanService()
     _plan(service, db, monthly_contribution_currency="EUR")  # cartera EUR
-    metrics = service.plan_metrics(db)
+    metrics = service.plan_metrics(db, today=date(2026, 4, 20))
     months = metrics["months_elapsed"]
+    assert months == 3
     assert metrics["expected_contributions_base"] == pytest.approx(500 * months)
     assert metrics["expected_missing_fx"] == []
 
 
-def _two_month_start() -> tuple[date, date, date]:
-    """start con months_elapsed=2 y aniversarios <= hoy."""
-    today = date.today()
-    start = date(today.year, today.month, 1)
-    start = InvestmentPlanService._add_months_clamped(start, -2)
-    first = InvestmentPlanService._add_months_clamped(start, 1)
-    second = InvestmentPlanService._add_months_clamped(start, 2)
-    assert second <= today
-    return start, first, second
+TODAY = date(2026, 3, 20)  # reloj fijo: ningun test depende del dia actual
+
+
+def _usd_plan(service, db, start):
+    _plan(service, db, start_date=start, monthly_contribution_currency="USD")
+
+
+def _rate(db, rate, on, source="test"):
+    db.add(FXRate(base_currency="EUR", quote_currency="USD",
+                  rate=Decimal(rate), rate_date=on, source=source))
+    db.commit()
 
 
 def test_cross_currency_converts_per_period_with_dated_rates(db):
     service = InvestmentPlanService()
-    start, first, second = _two_month_start()
-    _plan(service, db, start_date=start, monthly_contribution_currency="USD")
-    db.add(FXRate(base_currency="EUR", quote_currency="USD",
-                  rate=Decimal("0.9"), rate_date=first, source="test"))
-    db.add(FXRate(base_currency="EUR", quote_currency="USD",
-                  rate=Decimal("0.8"), rate_date=second, source="test"))
-    db.commit()
-    metrics = service.plan_metrics(db)
-    assert metrics["months_elapsed"] == 2
-    assert metrics["expected_contributions_base"] == pytest.approx(500 * 0.9 + 500 * 0.8)
-    assert metrics["expected_missing_fx"] == []
+    _usd_plan(service, db, date(2026, 1, 15))  # vencen 15-feb y 15-mar
+    _rate(db, "0.9", date(2026, 2, 15))
+    _rate(db, "0.8", date(2026, 3, 15))
+    m = service.plan_metrics(db, today=TODAY)
+    assert m["months_elapsed"] == 2
+    assert m["expected_contributions_base"] == pytest.approx(500 * 0.9 + 500 * 0.8)
+    assert m["expected_conversion_complete"] is True
+    assert m["expected_missing_fx"] == []
 
 
-def test_cross_currency_missing_rate_keeps_totals_unknown(db):
-    """Politica FX existente: ultima tasa <= fecha (carry-forward). Un periodo
-    solo queda sin tasa si NO hay ninguna anterior: aqui la unica tasa es la
-    del periodo 2, asi que el periodo 1 se declara y el total sigue None."""
+def test_missing_rate_on_due_period_keeps_totals_unknown(db):
     service = InvestmentPlanService()
-    start, _first, second = _two_month_start()
-    _plan(service, db, start_date=start, monthly_contribution_currency="USD")
-    db.add(FXRate(base_currency="EUR", quote_currency="USD",
-                  rate=Decimal("0.8"), rate_date=second, source="test"))
-    db.commit()
-    metrics = service.plan_metrics(db)
-    assert metrics["expected_contributions_base"] is None
-    assert metrics["expected_contributions_converted_base"] == pytest.approx(400)
-    assert len(metrics["expected_missing_fx"]) == 1
-    assert metrics["expected_missing_fx"][0]["period"] == 1
-    assert metrics["expected_missing_fx"][0]["reason"] == "no_rate_on_or_before_due_date"
-    assert metrics["gap_base"] is None
-    assert metrics["on_track"] is None
+    _usd_plan(service, db, date(2026, 1, 15))
+    _rate(db, "0.8", date(2026, 3, 15))  # nada <= 15-feb
+    m = service.plan_metrics(db, today=TODAY)
+    assert m["expected_contributions_base"] is None
+    assert m["expected_contributions_converted_base"] == pytest.approx(400)
+    assert [x["period"] for x in m["expected_missing_fx"]] == [1]
+    assert m["expected_missing_fx"][0]["reason"] == "no_rate_on_or_before_due_date"
+    assert m["gap_base"] is None and m["on_track"] is None
 
 
-def test_cross_currency_rate_carries_forward_from_earlier_date(db):
+def test_rate_carries_forward_from_earlier_date(db):
     service = InvestmentPlanService()
-    start, first, _second = _two_month_start()
-    _plan(service, db, start_date=start, monthly_contribution_currency="USD")
-    db.add(FXRate(base_currency="EUR", quote_currency="USD",
-                  rate=Decimal("0.9"), rate_date=first, source="test"))
-    db.commit()
-    metrics = service.plan_metrics(db)
-    assert metrics["expected_missing_fx"] == []
-    assert metrics["expected_contributions_base"] == pytest.approx(900)
+    _usd_plan(service, db, date(2026, 1, 15))
+    _rate(db, "0.9", date(2026, 2, 1))
+    m = service.plan_metrics(db, today=TODAY)
+    assert m["expected_missing_fx"] == []
+    assert m["expected_contributions_base"] == pytest.approx(900)
+
+
+def test_partial_month_future_anniversary_is_pending_not_converted(db):
+    service = InvestmentPlanService()
+    _usd_plan(service, db, date(2026, 1, 25))  # 25-feb vencida, 25-mar FUTURA
+    _rate(db, "0.9", date(2026, 2, 1))
+    _rate(db, "9.9", date(2026, 3, 20))  # tasa de hoy: no debe atribuirse al 25-mar
+    m = service.plan_metrics(db, today=TODAY)
+    assert m["months_elapsed"] == 2
+    statuses = [p["status"] for p in m["expected_periods"]]
+    assert statuses == ["converted", "pending_due_date"]
+    pending = m["expected_periods"][1]
+    assert pending["due_date"] == "2026-03-25"
+    assert pending["rate"] is None and pending["rate_date"] is None and pending["source"] is None
+    assert m["expected_conversion_complete"] is False
+    assert m["expected_contributions_base"] is None
+    assert m["expected_missing_fx"] == []
+
+
+def test_leap_day_and_month_end_anniversaries_are_deterministic(db):
+    service = InvestmentPlanService()
+    _usd_plan(service, db, date(2024, 1, 31))
+    _rate(db, "0.9", date(2024, 1, 1))
+    m = service.plan_metrics(db, today=date(2024, 3, 31))
+    due = [p["due_date"] for p in m["expected_periods"]]
+    assert due == ["2024-02-29", "2024-03-31"]
+    assert m["expected_conversion_complete"] is True
 
 
 def test_monthly_anniversary_clamps_to_month_end():
     clamp = InvestmentPlanService._add_months_clamped
     assert clamp(date(2026, 1, 31), 1) == date(2026, 2, 28)
-    assert clamp(date(2024, 1, 31), 1) == date(2024, 2, 29)  # bisiesto
+    assert clamp(date(2024, 1, 31), 1) == date(2024, 2, 29)
     assert clamp(date(2026, 1, 15), 1) == date(2026, 2, 15)
 
 
-def test_quota_dates_never_use_future_rates(db):
-    """Un aniversario aun no alcanzado se acota a hoy: una tasa fechada en
-    el futuro (despues del aniversario real, antes de hoy no aplica) no se
-    lee con lookahead."""
+def test_same_currency_uses_calendar_month_count_even_if_not_due(db):
     service = InvestmentPlanService()
-    today = date.today()
-    future_day = min(today.day + 1, 28)
-    start = InvestmentPlanService._add_months_clamped(
-        date(today.year, today.month, future_day), -1
-    )
-    _plan(service, db, start_date=start, monthly_contribution_currency="USD")
-    # Tasa futura respecto al aniversario real (dia future_day de este mes):
-    db.add(FXRate(base_currency="EUR", quote_currency="USD",
-                  rate=Decimal("9.9"), rate_date=today + timedelta(days=10),
-                  source="test"))
-    db.commit()
-    metrics = service.plan_metrics(db)
-    # Sin tasa valida <= hoy: total desconocido, no inventado con la futura.
-    assert metrics["expected_contributions_base"] is None
+    _plan(service, db, start_date=date(2026, 1, 25), monthly_contribution_currency="EUR")
+    m = service.plan_metrics(db, today=TODAY)  # 25-mar aun no vencida
+    assert m["months_elapsed"] == 2
+    assert m["expected_contributions_base"] == pytest.approx(1000)  # compat
 
 
 def test_drift_exposes_next_contribution_currency(db):
@@ -173,27 +176,3 @@ def test_drift_exposes_next_contribution_currency(db):
     if drift.get("plan_exists"):
         assert drift["next_contribution"] == 500.0
         assert drift["next_contribution_currency"] == "USD"
-
-
-def test_not_yet_due_quota_is_pending_not_missing_and_not_converted(db):
-    service = InvestmentPlanService()
-    today = date.today()
-    start = InvestmentPlanService._add_months_clamped(date(today.year, today.month, 1), -1)
-    # months_elapsed=1 pero aniversario = dia 1 del mes actual <= hoy: forzamos futuro
-    day = min(today.day + 1, 28)
-    start = InvestmentPlanService._add_months_clamped(date(today.year, today.month, day), -1)
-    if InvestmentPlanService._add_months_clamped(start, 1) <= today:
-        pytest.skip("hoy es dia 28+, no hay aniversario futuro en este mes")
-    _plan(service, db, start_date=start, monthly_contribution_currency="USD")
-    db.add(FXRate(base_currency="EUR", quote_currency="USD",
-                  rate=Decimal("0.9"), rate_date=today, source="test"))
-    db.commit()
-    metrics = service.plan_metrics(db)
-    assert metrics["months_elapsed"] == 1
-    assert metrics["expected_contributions_base"] is None
-    assert metrics["expected_conversion_complete"] is False
-    assert metrics["expected_missing_fx"] == []  # no es «falta tasa»
-    period = metrics["expected_periods"][0]
-    assert period["status"] == "pending_due_date"
-    assert period["rate"] is None and period["rate_date"] is None and period["source"] is None
-    assert metrics["gap_base"] is None and metrics["on_track"] is None
