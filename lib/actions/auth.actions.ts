@@ -2,6 +2,7 @@
 
 import { getAuth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
+import { callAuthEndpoint } from "@/lib/auth/endpoint";
 import { AuthenticationError, toAppError, getSafeErrorMessage } from "@/lib/types/errors";
 import { ERROR_MESSAGES } from "@/lib/constants";
 
@@ -14,13 +15,19 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
 
         // El perfil inversor viaja en el propio sign-up (additionalFields de
         // better-auth, sin migraciones SQL) en vez de perderse en el destructuring.
-        await auth.api.signUpEmail({ body: { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry } });
+        await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry });
 
-        // nextCookies() delivers the session in HttpOnly cookies. Never serialize
+        // The auth endpoint delivers the session in HttpOnly cookies. Never serialize
         // Better Auth's response: it also contains the raw bearer session token.
         return { success: true };
     } catch (error: unknown) {
         const appError = toAppError(error);
+        // The endpoint maps documented status/code pairs to safe Spanish copy.
+        // Do not reinterpret that structured result by English substrings.
+        if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
+            return { success: false, error: getSafeErrorMessage(appError) };
+        }
+
 
         // Mensajes de error más específicos
         let errorMessage: string = ERROR_MESSAGES.AUTH_FAILED;
@@ -47,7 +54,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
             throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
         }
 
-        const response = await auth.api.signInEmail({ body: { email, password } });
+        const response = await callAuthEndpoint('/sign-in/email', { email, password });
 
         // better-auth (plugin twoFactor) NO lanza con 2FA activo: responde 200 con
         // `twoFactorRedirect: true`, sin sesion, solo con la cookie pendiente de
@@ -57,11 +64,17 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
             return { success: false, twoFactorRequired: true };
         }
 
-        // nextCookies() delivers the session in HttpOnly cookies. Never serialize
+        // The auth endpoint delivers the session in HttpOnly cookies. Never serialize
         // Better Auth's response: it also contains the raw bearer session token.
         return { success: true };
     } catch (error: unknown) {
         const appError = toAppError(error);
+        // The endpoint maps documented status/code pairs to safe Spanish copy.
+        // Do not reinterpret that structured result by English substrings.
+        if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
+            return { success: false, error: getSafeErrorMessage(appError) };
+        }
+
 
         // better-auth blocks sign-in with HTTP 403 when the account has 2FA
         // enabled. Surface a dedicated signal so the UI can show the TOTP step.
@@ -95,18 +108,17 @@ export const verifyTwoFactorTotp = async ({ email, password, totpCode }: { email
             throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
         }
 
-        await auth.api.verifyTOTP({
-            body: { code: totpCode },
-            headers: await headers(),
-        });
+        await callAuthEndpoint('/two-factor/verify-totp', { code: totpCode });
 
-        // nextCookies() delivers the session in HttpOnly cookies. Never serialize
+        // The auth endpoint delivers the session in HttpOnly cookies. Never serialize
         // Better Auth's response: it also contains the raw bearer session token.
         return { success: true };
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('2FA verification failed:', appError);
-        return { success: false, error: 'Código de autenticación no válido. Inténtalo de nuevo.' };
+        return { success: false, error: appError.statusCode === 429 || appError.statusCode === 503
+            ? getSafeErrorMessage(appError)
+            : 'Código de autenticación no válido. Inténtalo de nuevo.' };
     }
 }
 

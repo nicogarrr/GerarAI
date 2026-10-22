@@ -33,3 +33,20 @@ test('pending two-factor sign-in is not converted to a successful session', asyn
     authGlobal.__authBoundaryTestAuth = { api: { signInEmail: async () => ({ twoFactorRedirect: true, ...privateResponse }) } };
     assert.deepEqual(await signInWithEmail(credentials), { success: false, twoFactorRequired: true });
 });
+
+// @ts-expect-error TS5097: source extension for node strip-types.
+const { AppError } = await import('../lib/types/errors.ts');
+test('actions preserve structured endpoint copy instead of guessing from substrings', async () => {
+    const errorState = globalThis as typeof globalThis & { __authBoundaryEndpointError?: Error };
+    for (const [code, message, status] of [
+        ['AUTH_ENDPOINT_USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', 'Este email ya está registrado. Inicia sesión.', 422],
+        ['AUTH_ENDPOINT_PASSWORD_TOO_SHORT', 'La contraseña debe tener al menos 8 caracteres.', 400],
+        ['AUTH_ENDPOINT_ERROR', 'Demasiados intentos. Espera un momento antes de volver a intentarlo.', 429],
+        ['AUTH_UNAVAILABLE', 'El servicio de acceso no está disponible. Inténtalo más tarde.', 503],
+    ] as const) {
+        errorState.__authBoundaryEndpointError = new AppError(message, code, status);
+        assert.deepEqual(await signInWithEmail(credentials), { success: false, error: message });
+        assert.deepEqual(await signUpWithEmail({ ...credentials, fullName: 'Synthetic', country: 'ES', investmentGoals: 'Growth', riskTolerance: 'Medium', preferredIndustry: 'Technology' }), { success: false, error: message });
+    }
+    delete errorState.__authBoundaryEndpointError;
+});
