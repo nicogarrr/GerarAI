@@ -270,6 +270,9 @@ export type ManagementCredibility = {
     source_status?: string | null;
     flags?: string[];
     source_check?: string | null;
+    support_quote?: string | null;
+    due_basis?: string | null;
+    extraction_parser?: string | null;
     legacy_heuristic_target?: boolean;
     due_state?: string;
     reviewed_by_user_id?: string | null;
@@ -845,6 +848,17 @@ export async function extractManagementCandidatesFromUrl(ticker: string, formDat
     method: 'POST',
     body: JSON.stringify({
       call_date: required(formData, 'call_date', 'Call date'),
+      source_url: required(formData, 'source_url', 'Source URL'),
+    }),
+  });
+  revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+}
+
+export async function extractManagementCandidatesFromRegistry(ticker: string, formData: FormData) {
+  assertCommitmentsUi();
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates-from-registry`, {
+    method: 'POST',
+    body: JSON.stringify({
       source_url: required(formData, 'source_url', 'Source URL'),
     }),
   });
