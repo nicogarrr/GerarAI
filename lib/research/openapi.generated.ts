@@ -3677,7 +3677,7 @@ export interface paths {
          * Source Coverage
          * @description Cobertura de fuentes de llamadas por empresa de cartera+watchlist del tenant (solo lectura).
          *
-         *     Sin posiciones/watchlist devuelve universo vacio. No ejecuta el job ni escribe nada.
+         *     Sin posiciones/watchlist devuelve universo vacio. No ejecuta el job ni escribe nada (ni cuarentena).
          */
         get: operations["source_coverage_api_portfolio_source_coverage_get"];
         put?: never;
