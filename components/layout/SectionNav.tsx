@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {useEffect, useState} from 'react';
 import {flattenNavItems, sectionForRoute} from '@/lib/constants';
+import {OverflowScrollRegion} from '@/components/ui/overflow-scroll-region';
 
 /**
  * Subnav contextual del hub actual. En móvil va PLEGADO en una línea: la
@@ -54,9 +55,9 @@ export default function SectionNav(){
    {currentItem?(currentItem.subnavLabel??currentItem.label):'Secciones'}
    {open?<ChevronUp aria-hidden size={16}/>:<ChevronDown aria-hidden size={16}/>}
   </button>
-  <nav aria-label="Herramientas de la sección" className={`${open?'flex':'hidden'} flex-nowrap gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:border-b sm:border-gray-800 sm:pb-3 [&::-webkit-scrollbar]:hidden`} id="subnav-seccion-lista">{items.map((item)=>{
+  <nav aria-label="Herramientas de la sección" className={`${open?'block':'hidden'} sm:border-b sm:border-gray-800 sm:pb-3`} id="subnav-seccion-lista"><OverflowScrollRegion hint="Desliza para ver más secciones" label="Herramientas de la sección" regionClassName="[-ms-overflow-style:none] [scrollbar-width:none] sm:overflow-visible [&::-webkit-scrollbar]:hidden"><div className="flex flex-nowrap gap-1.5 sm:flex-wrap">{items.map((item)=>{
    const active=item.href===current;
    return <Link key={item.href} href={item.href} scroll={false} aria-current={active?'page':undefined} className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors ${active?'bg-teal-400/10 text-teal-300':'text-gray-400 hover:bg-gray-800 hover:text-gray-100'}`}>{item.subnavLabel??item.label}</Link>;
-  })}</nav>
+  })}</div></OverflowScrollRegion></nav>
  </div>;
 }
