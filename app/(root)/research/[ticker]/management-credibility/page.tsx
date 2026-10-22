@@ -32,6 +32,7 @@ const FLAG_LABELS: Record<string, string> = {
 
 const SOURCE_CHECK_LABELS: Record<string, string> = {
   header_matches: 'la cabecera del documento coincide con empresa y fecha indicadas',
+  header_date_differs: 'AVISO: la fecha indicada no aparece en la cabecera del documento; revisa que sea la llamada correcta',
   header_unreadable: 'cabecera ilegible: empresa y fecha sin comprobar contra el documento',
   not_checked: 'documento no comprobado (texto aportado a mano)',
 };

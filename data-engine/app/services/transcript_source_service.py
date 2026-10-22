@@ -50,43 +50,49 @@ _MONTHS = {m: i for i, m in enumerate(
     ["january","february","march","april","may","june","july","august","september","october","november","december"], 1)}
 
 
+_NOT_TICKERS = frozenset({"CEO", "CFO", "COO", "CTO", "IR", "US", "USA", "EU", "AI", "UK", "Q1", "Q2", "Q3", "Q4", "FY", "INC", "CORP", "LLC", "LTD", "PLC", "NYSE", "NASDAQ"}) | _TZ_TOKENS
+
+
 def observe_header(text: str) -> dict:
-    """Lee SOLO la cabecera del texto: ticker entre parentesis y fecha. Observado, no verificado."""
-    head = " ".join(text[:1200].split())
-    ticker = next(
-        (
-            m
-            for m in re.finditer(r"\(([A-Z][A-Z0-9.\-]{0,9})\)", head)
-            if m.group(1) not in _TZ_TOKENS
-        ),
-        None,
-    )
-    date_m = re.search(
+    """Lee SOLO la cabecera: tickers candidatos y fechas candidatas. Observado, no verificado."""
+    head = " ".join(text[:1500].split())
+    tickers = {
+        m.group(1)
+        for m in re.finditer(r"\(([A-Z][A-Z0-9.\-]{0,9})\)|\b(?:NYSE|NASDAQ|TSX|LSE)\s*:\s*([A-Z][A-Z0-9.\-]{0,9})", head)
+        for m in [type("M", (), {"group": lambda self, i, m=m: m.group(1) or m.group(2)})()]
+        if m.group(1) not in _NOT_TICKERS
+    }
+    dates: set[date] = set()
+    for m in re.finditer(
         r"\b(January|February|March|April|May|June|July|August|September|October|November|December)"
         r"\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(20\d{2})\b",
         head,
         re.I,
-    )
-    observed_date = None
-    if date_m:
+    ):
         try:
-            observed_date = date(int(date_m.group(3)), _MONTHS[date_m.group(1).lower()], int(date_m.group(2)))
+            dates.add(date(int(m.group(3)), _MONTHS[m.group(1).lower()], int(m.group(2))))
         except ValueError:
-            observed_date = None
-    return {"ticker": ticker.group(1) if ticker else None, "call_date": observed_date}
+            continue
+    return {"tickers": sorted(tickers), "dates": sorted(dates)}
 
 
 def check_source(text: str, *, ticker: str, call_date: date) -> str:
-    """header_matches | header_unreadable. Lanza si la cabecera CONTRADICE ticker o fecha."""
+    """Resultado conservador, nunca "verificado":
+    header_matches (ticker y fecha esperados aparecen en la cabecera),
+    header_date_differs (ticker ok/ilegible pero la fecha esperada no aparece: aviso, no rechazo),
+    header_unreadable (ambiguo o ilegible).
+    Solo se RECHAZA si hay exactamente un ticker candidato y no es el pedido."""
     seen = observe_header(text)
-    if seen["ticker"] and seen["ticker"].upper() != ticker.upper():
-        raise TranscriptSourceError(f"La cabecera del documento indica {seen['ticker']}, no {ticker.upper()}")
-    if seen["call_date"] and seen["call_date"] != call_date:
-        raise TranscriptSourceError(
-            f"La cabecera indica fecha {seen['call_date'].isoformat()}, no {call_date.isoformat()}"
-        )
-    if seen["ticker"] and seen["call_date"]:
+    expected = ticker.upper()
+    tickers = [t.upper() for t in seen["tickers"]]
+    if len(tickers) == 1 and tickers[0] != expected and expected not in tickers:
+        raise TranscriptSourceError(f"La cabecera del documento identifica {tickers[0]}, no {expected}")
+    ticker_ok = expected in tickers
+    date_ok = call_date in seen["dates"]
+    if ticker_ok and date_ok:
         return "header_matches"
+    if seen["dates"] and not date_ok:
+        return "header_date_differs"
     return "header_unreadable"
 
 
