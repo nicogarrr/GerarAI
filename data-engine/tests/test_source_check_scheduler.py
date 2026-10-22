@@ -83,3 +83,33 @@ def test_e2e_dev_scheduler_to_store_to_api(monkeypatch, tmp_path):
     assert row["ticker"] == "UBER" and row["state"] == "ultimo_chequeo_con_error"
     assert rep["job_last_run"]["finished"] is True and rep["job_last_run"]["had_errors"] is True
     assert rep["store"]["latest"] == "ok"
+
+
+def test_real_apscheduler_executes_job_function_and_persists_state(monkeypatch, tmp_path):
+    """APScheduler REAL (BackgroundScheduler, disparo inmediato) -> run_source_check_job -> store.
+    Sin red: los chequeos estan sustituidos por fixtures sinteticos. No es el cron 07:35 real."""
+    import time
+    from datetime import UTC, datetime, timedelta
+
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    from app.services import commitment_source_check_job as mod
+    from app.workers import scheduler as sch
+
+    monkeypatch.setattr(get_settings(), "source_check_store_dir", tmp_path / "s")
+    monkeypatch.setattr(mod, "check_financial_assets", lambda **k: [])
+    monkeypatch.setattr(mod, "check_transcripts", lambda **k: [])
+    s = BackgroundScheduler(timezone="UTC")
+    s.add_job(sch.run_source_check_job, "date", run_date=datetime.now(UTC) + timedelta(seconds=1),
+              id="e2e", max_instances=1)
+    s.start()
+    try:
+        store = mod.JsonSourceCheckStore(tmp_path / "s")
+        for _ in range(60):
+            if mod.read_job_run(store):
+                break
+            time.sleep(0.2)
+    finally:
+        s.shutdown(wait=True)
+    run = mod.read_job_run(store)
+    assert run and run["finished"] is True and run["had_errors"] is False
