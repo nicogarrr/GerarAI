@@ -237,3 +237,18 @@ def test_management_commitments_covers_union_without_amounts(db):
     assert data["universe_count"] == 3 and data["held_count"] == 1 and data["watchlist_count"] == 3
     blob = str(data)
     assert "quantity" not in blob and "5" not in {k for c in data["companies"] for k in c}
+
+
+def test_company_identity_is_deterministic_trimmed_and_ambiguity_not_guessed(db):
+    from app.api.routes.portfolio import management_commitments
+
+    _co(db, "UBER")
+    _co(db, " kkr ")        # unica coincidencia normalizada: se usa
+    _co(db, "abc")          # dos candidatas no canonicas: ambigua
+    _co(db, "ABC ")
+    db.add_all([WatchItem(symbol=" uber "), WatchItem(symbol="KKR"), WatchItem(symbol="ABC")])
+    db.commit()
+    rows = {c["ticker"]: c for c in management_commitments(db)["companies"]}
+    assert rows["UBER"]["company_in_db"] and not rows["UBER"]["company_identity_ambiguous"]
+    assert rows["KKR"]["company_in_db"] and rows["KKR"]["name"] == " kkr "
+    assert rows["ABC"]["company_in_db"] is False and rows["ABC"]["company_identity_ambiguous"]

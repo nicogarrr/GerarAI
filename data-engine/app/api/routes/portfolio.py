@@ -424,14 +424,24 @@ def management_commitments(db: Session = Depends(get_db)) -> dict:
     from app.services.management_credibility_service import ManagementCredibilityService
 
     universe, flags = dynamic_universe(db)
-    by_ticker = {}
+    # Identidad determinista: coincidencia exacta del ticker canonico; si no, una unica coincidencia
+    # normalizada (trim+upper); si hay varias candidatas NO se elige ninguna ("ambigua").
+    candidates: dict[str, list] = {}
     if universe:
-        by_ticker = {
-            c.ticker.strip().upper(): c
-            for c in db.execute(
-                select(Company).where(func.upper(Company.ticker).in_(universe))
-            ).scalars()
-        }
+        for c in db.execute(
+            select(Company).where(func.upper(func.trim(Company.ticker)).in_(universe))
+        ).scalars():
+            candidates.setdefault(c.ticker.strip().upper(), []).append(c)
+    by_ticker = {}
+    ambiguous: set[str] = set()
+    for tk, cs in candidates.items():
+        exact = [c for c in cs if c.ticker == tk]
+        if len(exact) == 1:
+            by_ticker[tk] = exact[0]
+        elif len(cs) == 1:
+            by_ticker[tk] = cs[0]
+        else:
+            ambiguous.add(tk)
     companies = []
     for ticker in universe:
         company = by_ticker.get(ticker)
@@ -450,6 +460,7 @@ def management_commitments(db: Session = Depends(get_db)) -> dict:
                 "in_portfolio": in_portfolio,
                 "in_watchlist": in_watchlist,
                 "company_in_db": company is not None,
+                "company_identity_ambiguous": ticker in ambiguous,
                 "counts": {
                     "total": len(rows),
                     "candidate": sum(r.status == "candidate" for r in rows),
