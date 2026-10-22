@@ -8,7 +8,7 @@ format; a headline, forecast or bare URL cannot establish an outcome.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from typing import Literal
@@ -62,6 +62,9 @@ class FollowupEvidence:
     text_sha256: str | None = None
     bytes_sha256: str | None = None
     extractor: str | None = None
+    # Sello de revalidacion contra el texto original; solo lo pone la frontera confiable
+    # (commitment_primary_bridge). Un FollowupEvidence document_quote sin el NO decide nada.
+    _proof: object = field(default=None, repr=False, compare=False)
 
     @property
     def quote(self) -> str:
@@ -114,6 +117,7 @@ def _literal_row(evidence: FollowupEvidence) -> bool:
 
 
 _SHA256 = re.compile(r'[0-9a-f]{64}')
+_PROOF = object()
 
 
 def _traceable_document_quote(evidence: FollowupEvidence) -> bool:
@@ -123,6 +127,8 @@ def _traceable_document_quote(evidence: FollowupEvidence) -> bool:
     que el rastro (pagina, span del texto, hash de texto y de bytes, extractor) este completo
     y coherente con la cita, y que el valor aparezca literal en ella.
     """
+    if evidence._proof is not _PROOF:
+        return False
     if (evidence.page is None or evidence.page < 1 or evidence.char_start is None
             or evidence.char_end is None or evidence.char_start < 0
             or evidence.char_end - evidence.char_start != len(evidence.excerpt)):

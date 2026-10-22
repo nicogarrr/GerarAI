@@ -157,3 +157,107 @@ def quote_for_fact(
         today=today,
     )
     return PipelineResult(result=result, document=document, _seal=_SEAL)
+
+
+# --- Ejecucion acotada (job/HTTP): hijo aislado, deadline total, concurrencia y cache ---
+
+import json  # noqa: E402
+import subprocess  # noqa: E402
+import sys  # noqa: E402
+import threading  # noqa: E402
+import time  # noqa: E402
+from collections import OrderedDict  # noqa: E402
+
+TOTAL_DEADLINE_SECONDS = 45.0
+CHILD_CPU_SECONDS = 20
+CHILD_MEMORY_BYTES = 1_000_000_000
+MAX_CHILD_OUTPUT_BYTES = 4 * MAX_TEXT_CHARS
+MAX_CONCURRENT = 2
+CACHE_TTL_SECONDS = 900.0
+CACHE_MAX_ENTRIES = 8
+
+_SLOTS = threading.BoundedSemaphore(MAX_CONCURRENT)
+_CACHE: OrderedDict[str, tuple[float, RegisteredDocument]] = OrderedDict()
+_SEEN_BYTES: dict[str, str] = {}  # url -> sha256 de la ultima descarga observada EN ESTE PROCESO
+_LOCK = threading.Lock()
+
+
+def run_child(argv: list[str], *, deadline: float = TOTAL_DEADLINE_SECONDS) -> dict:
+    """Ejecuta un hijo con deadline TOTAL de reloj; mata el proceso al vencer. Salida acotada."""
+    try:
+        proc = subprocess.run(  # noqa: S603
+            argv, capture_output=True, timeout=deadline, check=False
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise PrimarySourceError("Tiempo total excedido al obtener la fuente") from exc
+    if len(proc.stdout) > MAX_CHILD_OUTPUT_BYTES:
+        raise PrimarySourceError("Salida del extractor demasiado grande")
+    if proc.returncode != 0:
+        raise PrimarySourceError("El extractor aislado fallo (limite de CPU/memoria o error)")
+    try:
+        data = json.loads(proc.stdout.decode())
+    except ValueError as exc:
+        raise PrimarySourceError("Respuesta del extractor no valida") from exc
+    if not isinstance(data, dict):
+        raise PrimarySourceError("Respuesta del extractor no valida")
+    return data
+
+
+def fetch_registered_document_isolated(
+    ticker: str, url: str, *, today: date, deadline: float = TOTAL_DEADLINE_SECONDS,
+    runner: Callable[..., dict] = run_child,
+) -> tuple[RegisteredDocument, dict]:
+    """Registro exacto + descarga/extraccion en hijo con limites + dedup por URL.
+
+    Devuelve (documento, meta) con meta = {cache_hit, previous_bytes_sha256, bytes_changed}.
+    `bytes_changed` solo compara contra la ultima descarga vista EN ESTE PROCESO; None si no
+    hay observacion previa (no es un historial persistente).
+    """
+    if not is_official_transcript_url(ticker, url):
+        raise PrimarySourceError("URL no registrada como transcripcion oficial exacta")
+    asset = asset_from_registry(get_entry(ticker), source_url=url)
+    if asset is None:
+        raise PrimarySourceError("Activo registrado sin fecha de llamada leida")
+    now = time.monotonic()
+    with _LOCK:
+        hit = _CACHE.get(url)
+        if hit and now - hit[0] < CACHE_TTL_SECONDS:
+            _CACHE.move_to_end(url)
+            return hit[1], {"cache_hit": True, "previous_bytes_sha256": None, "bytes_changed": None}
+    if not _SLOTS.acquire(blocking=False):
+        raise PrimarySourceError("Demasiadas descargas en curso; reintentar mas tarde")
+    try:
+        data = runner(
+            [sys.executable, "-m", "app.services.commitment_primary_worker", url,
+             str(CHILD_CPU_SECONDS), str(CHILD_MEMORY_BYTES)],
+            deadline=deadline,
+        )
+    finally:
+        _SLOTS.release()
+    if "error" in data:
+        raise PrimarySourceError(str(data["error"])[:200])
+    pages = data.get("pages")
+    sha = data.get("bytes_sha256")
+    if (data.get("final_url") != url or data.get("content_type") != "application/pdf"
+            or not isinstance(pages, list) or not all(isinstance(p, str) for p in pages)
+            or not isinstance(sha, str) or len(sha) != 64):
+        raise PrimarySourceError("Respuesta del extractor inconsistente")
+    text = "\f".join(pages)
+    if len(text.split()) < 200:
+        raise PrimarySourceError("Texto extraido insuficiente (PDF escaneado o vacio)")
+    doc = RegisteredDocument(
+        asset=asset, url=url, bytes_sha256=sha, byte_size=int(data.get("byte_size", 0)),
+        text=text, text_sha256=hashlib.sha256(text.encode()).hexdigest(),
+        extractor=_extractor_id(), fetched_on=today,
+    )
+    with _LOCK:
+        previous = _SEEN_BYTES.get(url)
+        _SEEN_BYTES[url] = sha
+        _CACHE[url] = (now, doc)
+        while len(_CACHE) > CACHE_MAX_ENTRIES:
+            _CACHE.popitem(last=False)
+    return doc, {
+        "cache_hit": False,
+        "previous_bytes_sha256": previous,
+        "bytes_changed": None if previous is None else previous != sha,
+    }
