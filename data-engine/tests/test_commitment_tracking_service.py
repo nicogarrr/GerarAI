@@ -181,3 +181,14 @@ def test_company_notes_batch_is_private_and_single_query():
     assert [n.body for n in svc.notes_for_company(a, company.id, user_id="user-a")] == ["a1"]
     assert [n.body for n in svc.notes_for_company(a, company.id, user_id="user-b")] == ["b1"]
     assert svc.notes_for_company(_session(engine, 2), company.id, user_id="user-a") == []
+
+
+def test_company_notes_limit_is_visible_not_silent():
+    engine = _engine()
+    a = _session(engine, 1)
+    company, promise = _setup(a)
+    svc = CommitmentTrackingService()
+    for i in range(4):
+        svc.add_note(a, promise, user_id="user-a", body=f"n{i}")
+    rows = svc.notes_for_company(a, company.id, user_id="user-a", limit=3)
+    assert [n.body for n in rows] == ["n3", "n2", "n1"]  # mas recientes primero, orden estable
