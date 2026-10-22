@@ -3666,6 +3666,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio/source-coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Source Coverage
+         * @description Cobertura de fuentes de llamadas por empresa de cartera+watchlist del tenant (solo lectura).
+         *
+         *     Sin posiciones/watchlist devuelve universo vacio. No ejecuta el job ni escribe nada.
+         */
+        get: operations["source_coverage_api_portfolio_source_coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portfolio/summary": {
         parameters: {
             query?: never;
@@ -17475,6 +17497,46 @@ export interface operations {
             query?: {
                 as_of?: string | null;
             };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    source_coverage_api_portfolio_source_coverage_get: {
+        parameters: {
+            query?: never;
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;

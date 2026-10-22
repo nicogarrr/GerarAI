@@ -398,6 +398,18 @@ def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
     return TearsheetService().build(db)
 
 
+@router.get("/source-coverage")
+def source_coverage(db: Session = Depends(get_db)) -> dict:
+    """Cobertura de fuentes de llamadas por empresa de cartera+watchlist del tenant (solo lectura).
+
+    Sin posiciones/watchlist devuelve universo vacio. No ejecuta el job ni escribe nada.
+    """
+    from app.services.commitment_coverage import coverage_report
+    from app.services.commitment_source_check_job import JsonSourceCheckStore
+
+    return coverage_report(db, JsonSourceCheckStore(get_settings().source_check_store_dir))
+
+
 @router.get("/management-commitments")
 def management_commitments(db: Session = Depends(get_db)) -> dict:
     """Compromisos de la directiva SOLO de empresas con posicion real (tenant del principal).

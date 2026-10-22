@@ -173,6 +173,7 @@ class Settings(BaseSettings):
     # Directorio (montado) del que el actor puede leer ficheros. La API NUNCA
     # acepta rutas absolutas ni sube bytes: solo nombres relativos a este dir.
     knowledge_rag_inbox_dir: Path = Path("./storage/knowledge_inbox")
+    source_check_store_dir: Path = Path("./storage/source_checks")
     knowledge_rag_max_file_mb: int = Field(default=60, ge=1, le=500)
     # Guarda de disco: el VM va justo. Ingesta rechazada si queda menos libre.
     knowledge_rag_min_free_gb: float = Field(default=3.0, ge=0.0, le=1000.0)

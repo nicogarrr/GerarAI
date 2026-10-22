@@ -94,3 +94,37 @@ def coverage_with_checks(
                      "last_checked_on": last, "outcomes": outcomes,
                      "universe_static_snapshot": UNIVERSE_IS_STATIC_SNAPSHOT})
     return rows
+
+
+def dynamic_universe(db) -> tuple[tuple[str, ...], dict[str, tuple[bool, bool]]]:
+    """Universo DESDE LA BD del tenant (posiciones netas != 0 + watchlist), no la foto estatica."""
+    from sqlalchemy import func, select
+
+    from app.models.entities import Company, Position, WatchItem
+
+    net = (select(Position.company_id).group_by(Position.company_id)
+           .having(func.sum(Position.quantity) != 0).subquery())
+    held = {t for (t,) in db.execute(
+        select(Company.ticker).join(net, net.c.company_id == Company.id))}
+    watched = {s.upper() for (s,) in db.execute(select(WatchItem.symbol))}
+    universe = tuple(sorted(held | watched))
+    flags = {t: (t in held, t in watched) for t in universe}
+    return universe, flags
+
+
+def coverage_report(db, store) -> dict:
+    """Cobertura dinamica + ultimo chequeo real del job + historial reciente (solo lectura)."""
+    universe, flags = dynamic_universe(db)
+    latest = store.load()
+    rows = coverage_with_checks(latest, universe)
+    for r in rows:
+        r["in_portfolio"], r["in_watchlist"] = flags[r["ticker"]]
+        r["universe_static_snapshot"] = False
+    return {
+        "universe_source": "bd_tenant",
+        "universe_size": len(universe),
+        "store_corrupt_quarantined": store.corrupt_quarantined,
+        "note": "fuente_obtenida no equivale a seguimiento completo de compromisos",
+        "companies": rows,
+        "history": store.read_history(limit=50),
+    }
