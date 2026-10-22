@@ -280,12 +280,13 @@ class InvestmentPlanService:
                     }
                 )
                 continue
-            rate = self.fx.rate(
+            found = self.fx.rate_with_provenance(
                 db,
                 quote_currency=plan_currency,
                 base_currency=base_currency,
                 as_of=due_date,
             )
+            rate = found["rate"] if found else None
             if rate is None:
                 missing.append(
                     {
@@ -313,9 +314,12 @@ class InvestmentPlanService:
                     "period": period,
                     "due_date": due_date.isoformat(),
                     "status": "converted",
-                    "rate_date": None,  # procedencia: pendiente del helper FX
+                    "rate_date": (
+                        found["rate_date"].isoformat() if found["rate_date"] else None
+                    ),
                     "rate": float(rate),
-                    "source": None,
+                    "source": found["source"],
+                    "direction": found["direction"],
                 }
             )
         if missing or pending:

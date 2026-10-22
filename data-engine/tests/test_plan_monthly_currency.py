@@ -176,3 +176,27 @@ def test_drift_exposes_next_contribution_currency(db):
     if drift.get("plan_exists"):
         assert drift["next_contribution"] == 500.0
         assert drift["next_contribution_currency"] == "USD"
+
+
+def test_periods_expose_rate_date_source_and_direction(db):
+    service = InvestmentPlanService()
+    _usd_plan(service, db, date(2026, 1, 15))
+    _rate(db, "0.9", date(2026, 2, 1), source="ecb")
+    _rate(db, "0.8", date(2026, 3, 15), source="manual")
+    first, second = service.plan_metrics(db, today=TODAY)["expected_periods"]
+    assert (first["rate_date"], first["rate"], first["source"], first["direction"]) == (
+        "2026-02-01", 0.9, "ecb", "direct")
+    assert (second["rate_date"], second["source"]) == ("2026-03-15", "manual")
+
+
+def test_inverse_rate_reports_inverse_source_and_reciprocal(db):
+    service = InvestmentPlanService()
+    _usd_plan(service, db, date(2026, 1, 15))
+    db.add(FXRate(base_currency="USD", quote_currency="EUR",
+                  rate=Decimal("2"), rate_date=date(2026, 2, 1), source="inv-src"))
+    db.commit()
+    period = service.plan_metrics(db, today=date(2026, 2, 20))["expected_periods"][0]
+    assert period["direction"] == "inverse"
+    assert period["rate"] == pytest.approx(0.5)
+    assert period["source"] == "inv-src"
+    assert period["rate_date"] == "2026-02-01"
