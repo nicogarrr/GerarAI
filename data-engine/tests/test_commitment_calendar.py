@@ -34,3 +34,10 @@ def test_coverage_rows_carry_next_calls():
     row = coverage_with_checks({}, ("CPT", "AAPL"), today=date(2026, 10, 22))
     assert row[0]["next_calls"][0]["source_url"].startswith("https://")
     assert row[1]["next_calls"] == []
+
+
+def test_abcl_time_mismatch_preserved_and_flagged():
+    c = next_calls("ABCL", date(2026, 10, 22))[0]
+    assert c["time_source_inconsistent"] is True
+    assert "3:00 p.m. Pacific Time (5:00 p.m. Eastern Time)" in c["detail"]
+    assert next_calls("CPT", date(2026, 10, 22))[0]["time_source_inconsistent"] is False

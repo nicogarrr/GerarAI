@@ -26,6 +26,7 @@ class UpcomingCall:
     source_url: str | None
     read_on: str = _READ_ON
     detail: str = ""
+    time_source_inconsistent: bool = False
 
     def __post_init__(self) -> None:
         if self.kind not in (ANUNCIO_EMISOR, APP_OBSERVADO):
@@ -47,7 +48,8 @@ CALLS: tuple[UpcomingCall, ...] = (
     UpcomingCall(
         "ABCL", "2026-11-09", ANUNCIO_EMISOR, "Q3 2026 earnings call",
         "https://investors.abcellera.com/news/news-releases/2026/AbCellera-to-Report-Third-Quarter-2026-Financial-Results-on-November-9-2026/default.aspx",
-        detail="Comunicado del IR: llamada lunes 2026-11-09 15:00 PT / 17:00 ET.",
+        detail="Comunicado del IR (literal): 'earnings conference call at 3:00 p.m. Pacific Time (5:00 p.m. Eastern Time) the same day' (lunes 2026-11-09). INCONSISTENCIA DE LA FUENTE: el 9-nov (tras el cambio horario) PT y ET difieren 3 h, no 2; se conserva el texto publicado y NO se corrige. Confirmar hora en el IR antes de usarla.",
+        time_source_inconsistent=True,
     ),
     UpcomingCall(
         "NAUT", "2026-10-27", ANUNCIO_EMISOR, "Q3 2026 earnings conference call",
@@ -67,5 +69,6 @@ def next_calls(ticker: str, today: date) -> list[dict]:
         if c.ticker == ticker and date.fromisoformat(c.date) >= today:
             out.append({"date": c.date, "kind": c.kind, "event": c.event,
                         "source_url": c.source_url, "read_on": c.read_on, "detail": c.detail,
-                        "official_confirmation": c.kind == ANUNCIO_EMISOR})
+                        "official_confirmation": c.kind == ANUNCIO_EMISOR,
+                        "time_source_inconsistent": c.time_source_inconsistent})
     return sorted(out, key=lambda x: x["date"])
