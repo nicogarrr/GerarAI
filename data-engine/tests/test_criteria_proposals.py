@@ -34,6 +34,7 @@ def test_quote_verification_is_literal_single_and_page_checked():
 
 
 def test_engine_has_no_path_from_proposal():
-    import app.services.management_credibility_service as svc
     from pathlib import Path
+
+    import app.services.management_credibility_service as svc
     assert "commitment_criteria_proposals" not in Path(svc.__file__).read_text()
