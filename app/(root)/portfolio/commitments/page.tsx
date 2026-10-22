@@ -28,6 +28,14 @@ export default async function PortfolioCommitmentsPage() {
     );
   }
   const data = await getPortfolioCommitments();
+  if (!data) {
+    return (
+      <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
+        <PageHeader kicker="Seguimiento de la directiva" title="Compromisos de tu cartera y watchlist" description="Llamadas y compromisos de las empresas de tu cartera y watchlist, con fuentes y fechas." />
+        <EmptyState title="No pudimos leer los compromisos ahora mismo. Esto no significa que no existan: la respuesta no fue legible." />
+      </main>
+    );
+  }
   const withItems = data.companies.filter((c) => c.counts.total > 0);
   const ambiguous = data.companies.filter((c) => c.company_identity_ambiguous);
   // Sin datos por ausencia REAL: ni compromisos ni identidad ambigua.
@@ -40,7 +48,7 @@ export default async function PortfolioCommitmentsPage() {
         description="Llamadas y compromisos de las empresas de tu cartera y watchlist, con fuentes y fechas. Un candidato sugerido no es una promesa confirmada: nada se marca cumplido o fallido sin evidencia."
       />
       <p className="text-xs text-gray-500">
-        {data.held_count} en cartera · {data.watchlist_count} en watchlist · {withItems.length} con compromisos o candidatos registrados. Las empresas sin datos no tienen conclusión: no significa que la directiva no haya prometido nada.
+        {data.held_count} en cartera{typeof data.watchlist_count === 'number' ? ` · ${data.watchlist_count} en watchlist` : ''} · {withItems.length} con compromisos o candidatos registrados. Las empresas sin datos no tienen conclusión: no significa que la directiva no haya prometido nada.
       </p>
       <SourceCoverage />
       {!withItems.length ? <EmptyState title="Aún no hay compromisos ni candidatos para las empresas de tu cartera ni de tu watchlist." /> : null}

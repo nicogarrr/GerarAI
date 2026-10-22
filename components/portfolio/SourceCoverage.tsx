@@ -88,6 +88,11 @@ function CoverageSummary({ companies }: { companies: SourceCoverageCompany[] }) 
     );
 }
 
+/** Forma conocida del contrato: boolean presente. La forma antigua {ok} es desconocida, NO un fallo. */
+function isJobRunKnown(job: unknown): job is { day?: string; finished: boolean; error: string | null; outcomes?: Record<string, number>; had_errors?: boolean } {
+    return typeof job === 'object' && job !== null && typeof (job as { finished?: unknown }).finished === 'boolean';
+}
+
 function safeUrl(url: string | null | undefined): string | null {
     // Solo URLs http(s) devueltas por el backend; nunca reconstruidas.
     return url && /^https?:\/\//.test(url) ? url : null;
@@ -218,7 +223,7 @@ function StoreAlerts({ report }: { report: SourceCoverageReport }) {
                     Hay una incidencia activa en el registro de chequeos ({store.incident.file}).
                 </p>
             ) : null}
-            {job !== null && !job.finished ? (
+            {isJobRunKnown(job) && !job.finished ? (
                 <p role="alert" className="rounded-lg border border-amber-800 bg-amber-950/40 p-3 text-xs text-amber-300">
                     La última ejecución programada ({job.day}) no terminó{job.error ? `: ${job.error}` : ''}.
                 </p>
@@ -241,14 +246,14 @@ function OperationalDetails({ report }: { report: SourceCoverageReport }) {
                     El registro alcanzó su límite de conservación: algunos estados aparecen como desconocidos aunque pudieron chequearse.
                 </p>
             ) : null}
-            {job === null ? (
+            {!isJobRunKnown(job) ? (
                 <p className="text-xs text-gray-500">
                     No hay una ejecución del chequeo automático legible todavía (arranque normal o registro no legible).
                 </p>
             ) : job.finished ? (
                 <p className="text-xs text-gray-500">
-                    Última ejecución programada: {job.day}
-                    {Object.keys(job.outcomes).length ? ` (${outcomesSummary(job.outcomes)})` : ''}
+                    Última ejecución programada: {job.day ?? 'fecha no registrada'}
+                    {Object.keys(job.outcomes ?? {}).length ? ` (${outcomesSummary(job.outcomes ?? {})})` : ''}
                     {job.had_errors ? ' · con errores' : ''}. {JOB_RUN_NOTE}
                 </p>
             ) : null}

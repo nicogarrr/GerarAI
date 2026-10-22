@@ -895,9 +895,10 @@ export async function updateManagementExplanation(ticker: string, promiseId: num
 
 export type PortfolioCommitments = {
   held_count: number;
-  watchlist_count: number;
-  universe_count: number;
-  universe_source: string;
+  /** Pueden faltar en backends antiguos: ausente NO es 0. */
+  watchlist_count?: number | null;
+  universe_count?: number | null;
+  universe_source?: string;
   companies: Array<{
     ticker: string;
     name: string | null;
@@ -911,9 +912,12 @@ export type PortfolioCommitments = {
   }>;
 };
 
-export async function getPortfolioCommitments(): Promise<PortfolioCommitments> {
+export async function getPortfolioCommitments(): Promise<PortfolioCommitments | null> {
   assertCommitmentsUi();
-  return requestJson('/api/portfolio/management-commitments');
+  const data = await requestJson<PortfolioCommitments>('/api/portfolio/management-commitments');
+  // Shape mínima: sin companies[] la respuesta no es legible; la página degrada.
+  if (!data || !Array.isArray(data.companies) || typeof data.held_count !== 'number') return null;
+  return data;
 }
 
 export async function getPortfolioIntelligence(years = 5): Promise<PortfolioIntelligence> {

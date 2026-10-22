@@ -133,6 +133,23 @@ void test('la página cubre la unión cartera+watchlist con badges y cero conclu
     assert.ok(!page.includes('data.companies.length - withItems.length > 0'), 'las ambiguas no cuentan como ausencia de datos');
 });
 
+void test('job_last_run de forma antigua o parcial nunca se rotula como fallo', () => {
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(view.includes("typeof (job as { finished?: unknown }).finished === 'boolean'"), 'guardia de forma conocida');
+    assert.ok(view.includes('isJobRunKnown(job) && !job.finished'), 'fallo solo con forma conocida');
+    assert.ok(view.includes('job.outcomes ?? {}'), 'outcomes ausente no tumba');
+    assert.ok(!view.includes('job !== null && !job.finished'), 'la lectura directa quedó fuera');
+});
+
+void test('management-commitments sin companies[] degrada y watchlist_count ausente no se inventa', () => {
+    const actions = source('lib/actions/research-tools.actions.ts');
+    const page = source('app/(root)/portfolio/commitments/page.tsx');
+    assert.ok(actions.includes('Array.isArray(data.companies)'), 'validación shape commitments');
+    assert.ok(actions.includes('PortfolioCommitments | null'), 'null = no legible');
+    assert.ok(page.includes('if (!data)'), 'degradación explícita en página');
+    assert.ok(page.includes("typeof data.watchlist_count === 'number'"), 'watchlist_count ausente no se imprime como 0');
+});
+
 void test('la acción usa firma de identidad y no-store como el resto del cliente research', () => {
     const actions = source('lib/actions/source-coverage.actions.ts');
     assert.ok(actions.includes('researchIdentityHeaders'), 'firma de identidad');
