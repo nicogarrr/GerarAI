@@ -56,6 +56,37 @@ const KIND_LABEL: Record<string, string> = {
     press_release: 'comunicado',
 };
 
+const STATE_GROUP: Record<SourceCoverageState, { label: string; order: number }> = {
+    fuente_obtenida: { label: 'con fuente obtenida', order: 0 },
+    abstencion_en_chequeo: { label: 'sin datos nuevos', order: 1 },
+    ultimo_chequeo_con_error: { label: 'con error en el último chequeo', order: 2 },
+    nunca_chequeado: { label: 'nunca chequeadas', order: 3 },
+    sin_chequeo_posible: { label: 'sin chequeo posible', order: 4 },
+    sin_ejecuciones_aun: { label: 'aún sin chequeos', order: 5 },
+    estado_fuera_retencion: { label: 'de estado desconocido', order: 6 },
+    estado_del_almacen_no_fiable: { label: 'de estado desconocido', order: 6 },
+};
+
+/** Contadores honestos: cada estado cae en su grupo, nada se inventa. */
+function CoverageSummary({ companies }: { companies: SourceCoverageCompany[] }) {
+    const counts = new Map<string, { label: string; order: number; n: number }>();
+    let pendingCount = 0;
+    for (const c of companies) {
+        const g = STATE_GROUP[c.state];
+        const cur = counts.get(g.label) ?? { ...g, n: 0 };
+        cur.n += 1;
+        counts.set(g.label, cur);
+        if (c.pending.length) pendingCount += 1;
+    }
+    const parts = [...counts.values()].sort((a, b) => a.order - b.order).map((g) => `${g.n} ${g.label}`);
+    return (
+        <p className="mt-2 text-xs text-gray-400">
+            {parts.join(' · ')}
+            {pendingCount ? ` · ${pendingCount} con tareas pendientes` : ''}
+        </p>
+    );
+}
+
 function outcomesSummary(outcomes: Record<string, number>): string {
     return Object.entries(outcomes)
         .map(([k, n]) => `${n} ${OUTCOME_LABEL[k] ?? k}`)
@@ -113,6 +144,9 @@ function HistoryList({ history }: { history: SourceCoverageHistoryItem[] }) {
                     {h.period ? ` (${h.period})` : ''}
                     {' · '}<span className={h.outcome === 'error' ? 'text-red-400' : ''}>{OUTCOME_LABEL[h.outcome] ?? h.outcome}</span>
                     {' · '}{h.checked_on}
+                    {/^https?:\/\//.test(h.url)
+                        ? <> · <a className="underline" href={h.url} rel="noopener noreferrer" target="_blank">fuente</a></>
+                        : null}
                     {h.content_changed ? ' · contenido cambiado' : ''}
                 </li>
             ))}
@@ -181,10 +215,14 @@ export function SourceCoverageView({ report }: { report: SourceCoverageReport })
             <div className="mt-3 grid gap-2">
                 <StoreAlerts report={report} />
             </div>
+            <CoverageSummary companies={report.companies} />
             {report.companies.length ? (
-                <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-                    {report.companies.map((c) => <CompanyRow company={c} key={c.ticker} />)}
-                </ul>
+                <details className="mt-3">
+                    <summary className="cursor-pointer text-xs text-gray-400 underline">Cobertura por empresa ({report.companies.length})</summary>
+                    <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+                        {report.companies.map((c) => <CompanyRow company={c} key={c.ticker} />)}
+                    </ul>
+                </details>
             ) : (
                 <p className="mt-3 text-xs text-gray-500">No hay empresas en el universo todavía.</p>
             )}

@@ -68,6 +68,19 @@ void test('el origen de la transcripción se muestra en español, sin literales 
     assert.ok(!view.includes("href_ir_leido'</"), 'literal enum no visible');
 });
 
+void test('la lista de empresas es plegable y el resumen muestra contadores honestos', () => {
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(view.includes('Cobertura por empresa ('), 'lista plegable para no tapar los compromisos');
+    assert.ok(view.includes('CoverageSummary'), 'resumen con contadores');
+    assert.ok(view.includes('con tareas pendientes'), 'pendientes contados en el resumen');
+});
+
+void test('los enlaces de historial solo se renderizan con URL http(s) devuelta por el backend', () => {
+    const view = source('components/portfolio/SourceCoverage.tsx');
+    assert.ok(view.includes('/^https?:'), 'validación de esquema antes de enlazar');
+    assert.ok(!view.includes('new URL(h.url)'), 'no se reconstruyen URLs');
+});
+
 void test('la acción usa firma de identidad y no-store como el resto del cliente research', () => {
     const actions = source('lib/actions/source-coverage.actions.ts');
     assert.ok(actions.includes('researchIdentityHeaders'), 'firma de identidad');
