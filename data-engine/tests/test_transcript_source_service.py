@@ -45,16 +45,28 @@ def test_extracts_text_from_synthetic_pdf(monkeypatch):
         svc.fetch_transcript_text("https://s21.q4cdn.com/x")
 
 
-def test_check_source_matches_mismatches_and_unreadable():
+def test_check_source_conservative_outcomes():
     from datetime import date
 
     head = "Acme Corp (ACME)\nSecond Quarter 2030 Results Conference Call\nJuly 1st, 2030\n"
     assert svc.check_source(head, ticker="acme", call_date=date(2030, 7, 1)) == "header_matches"
-    with pytest.raises(svc.TranscriptSourceError, match="ACME"):
+    with pytest.raises(svc.TranscriptSourceError, match="ACME"):  # unico ticker inequivoco distinto
         svc.check_source(head, ticker="OTHR", call_date=date(2030, 7, 1))
-    with pytest.raises(svc.TranscriptSourceError, match="2030-07-01"):
-        svc.check_source(head, ticker="ACME", call_date=date(2030, 8, 1))
+    assert svc.check_source(head, ticker="ACME", call_date=date(2030, 8, 1)) == "header_date_differs"
     assert svc.check_source("sin cabecera legible", ticker="ACME", call_date=date(2030, 7, 1)) == "header_unreadable"
+
+
+def test_ambiguous_headers_are_not_rejected():
+    from datetime import date
+
+    role_paren = "Acme Corp (CEO) Jane Doe\nTranscript (MCO)\nCall July 1, 2030\n"
+    assert svc.check_source(role_paren, ticker="MCO", call_date=date(2030, 7, 1)) == "header_matches"
+    press = "Press release June 20, 2030 / Conference call July 1, 2030\nAcme (ACME)\n"
+    assert svc.check_source(press, ticker="ACME", call_date=date(2030, 7, 1)) == "header_matches"
+    exch = "Acme Corp (NYSE: MCO) call July 1, 2030"
+    assert svc.check_source(exch, ticker="MCO", call_date=date(2030, 7, 1)) == "header_matches"
+    two = "Acme (ACME) and Beta (BETA) joint call July 1, 2030"
+    assert svc.check_source(two, ticker="OTHR", call_date=date(2030, 7, 1)) == "header_unreadable"
 
 
 def test_throttle_blocks_rapid_repeat():
@@ -66,5 +78,5 @@ def test_timezone_in_parentheses_is_not_a_ticker():
     from datetime import date
 
     head = "BROOKFIELD CORPORATION\nTRANSCRIPT: Q2 2026 CONFERENCE CALL\nAUGUST 13, 2026, at 10:00 a.m. (ET)\n"
-    assert svc.observe_header(head) == {"ticker": None, "call_date": date(2026, 8, 13)}
+    assert svc.observe_header(head) == {"tickers": [], "dates": [date(2026, 8, 13)]}
     assert svc.check_source(head, ticker="BN", call_date=date(2026, 8, 13)) == "header_unreadable"
