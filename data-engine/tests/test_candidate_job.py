@@ -128,6 +128,19 @@ def test_claim_is_exclusive_and_stale_claim_is_recoverable():
     assert job.claim(db, co.id, "https://u/x", None, now + timedelta(minutes=45)) is not None  # caducado
 
 
+def test_held_identity_case_or_space_variants_are_reported_ambiguous_not_guessed():
+    # UNIQUE(companies.ticker) distingue mayusculas/espacios: 'uber' y 'UBER' pueden coexistir.
+    db = _db(tickers=("UBER",), watch=())
+    other = _co("uber ")
+    db.add(other)
+    db.commit()
+    db.add(Position(company_id=other.id, quantity=Decimal("2"), as_of=date(2030, 1, 1)))
+    db.commit()
+    r = job.extract_registry_candidates(db, today=TODAY, fetch=_fetch([]))
+    assert r["UBER"][0]["outcome"] == "company_identity_ambiguous"
+    assert db.scalar(select(ManagementPromise.id).limit(1)) is None
+
+
 def test_scheduler_registration_flag_off_by_default_and_on():
     import pytest
 
