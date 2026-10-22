@@ -49,6 +49,11 @@ def _doc(db, company):
     return doc.id
 
 
+def _period(year, quarter):
+    ends = {"Q1": "03-31", "Q2": "06-30", "Q3": "09-30", "Q4": "12-31", "FY": "12-31"}
+    return f"{year}-{ends[quarter]}:{quarter}"
+
+
 def _fact(
     db, company, value, year=2025, quarter="FY", metric="revenue", with_source=True,
     published=datetime(2026, 3, 1, tzinfo=UTC), adjusted=False,
@@ -66,7 +71,7 @@ def _fact(
     fact = FinancialFact(
         source_id=doc_id,
         company_id=company.id, metric=metric, value=Decimal(str(value)),
-        unit="USD", period=f"{quarter} {year}" if quarter != "FY" else f"FY{year}",
+        unit="USD", period=_period(year, quarter),
         fiscal_year=year, fiscal_quarter=None if quarter == "FY" else quarter,
         source_type="filing", is_adjusted=adjusted,
     )
@@ -151,7 +156,7 @@ def test_quarterly_promise_matches_quarterly_fact(db):
     assert p.status == "met"
 
 
-def test_quarterly_promise_matches_ten_q_fact_with_null_fiscal_year(db):
+def test_quarterly_promise_does_not_infer_fiscal_year_from_calendar_for_null_fiscal_year(db):
     """Hechos de la ingesta 10-Q: fiscal_year NULL, period '<end>:Qn'."""
     c = _company(db)
     fact = FinancialFact(
@@ -165,8 +170,9 @@ def test_quarterly_promise_matches_ten_q_fact_with_null_fiscal_year(db):
     db.commit()
     _promise(db, c, period="2025 Q2")
     [p] = ManagementCredibilityService().reconcile(db, c)
-    assert p.status == "met"
-    assert p.actual_fact_id == fact.id
+    # año fiscal no explicito: no se infiere desde el calendario -> sin hecho ni veredicto
+    assert p.status == "open"
+    assert p.actual_fact_id is None
 
 
 def test_quarterly_promise_ignores_null_fiscal_year_fact_from_other_year(db):
@@ -562,3 +568,34 @@ def test_reconcile_is_idempotent_and_evidence_dedups(db):
         _reconciled(db, c, p)
     assert len(p.evidence) == 1
     assert p.status == "met"
+
+
+def test_fy_promise_ignores_unmarked_non_annual_cutoff(db):
+    c = _company(db)
+    f = _fact(db, c, 90)
+    f.period = "2025-09-30"
+    f.fiscal_quarter = None
+    db.commit()
+    p = _promise(db, c)
+    assert _reconciled(db, c, p).status == "open"
+    assert p.actual_value is None
+
+
+def test_fiscal_quarter_not_matched_by_calendar_year(db):
+    c = _company(db)
+    f = _fact(db, c, 90, year=2026, quarter="Q1")  # Q1 del año fiscal 2026
+    f.period = "2025-12-31:Q1"
+    db.commit()
+    p = _promise(db, c, period="Q1 2025")
+    assert _reconciled(db, c, p).status == "open"
+    assert p.actual_value is None
+
+
+def test_fact_without_authentic_cutoff_date_gives_context_only(db):
+    c = _company(db)
+    f = _fact(db, c, 120)
+    f.period = "FY2025"
+    db.commit()
+    p = _promise(db, c)
+    assert _reconciled(db, c, p).status == "open"
+    assert p.evidence[-1]["context_only"] is True
