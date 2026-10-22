@@ -136,7 +136,7 @@ _ENTRIES = (
         (
             VerifiedAsset(
                 "https://ir.kkr.com/media/document/f00cf12c-3dfa-4eda-80fc-c25f5552e5b2/assets/KKR_Q226_Earnings_Transcript.pdf?disposition=inline",
-                "KKR Q2'26 Earnings Transcript (titulo del resultado de busqueda)",
+                "KKR Q2'26 Earnings Transcript",
                 "Q2 2026",
                 "2026-07-30",
                 origin="url_dominio_oficial_por_busqueda",
