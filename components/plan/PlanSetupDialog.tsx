@@ -33,7 +33,11 @@ type PlanInitial = {
     start_date?: unknown;
     horizon_years?: unknown;
     target_allocations?: unknown;
+    monthly_contribution_currency?: unknown;
+    currency_contract_enabled?: unknown;
 };
+
+const CURRENCY_OPTIONS = ['EUR', 'USD', 'GBP', 'CHF', 'JPY'];
 
 function asText(value: unknown): string {
     return typeof value === 'number' || typeof value === 'string' ? String(value) : '';
@@ -51,6 +55,10 @@ export default function PlanSetupDialog({
     const [open, setOpen] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Capability del backend: sin ella el contrato de divisa no existe (flag OFF).
+    const currencyEnabled = initial?.currency_contract_enabled === true;
+    const [currency, setCurrency] = useState(() => asText(initial?.monthly_contribution_currency).toUpperCase());
+    const legacyWithoutCurrency = Boolean(initial) && !currency;
     const [monthly, setMonthly] = useState(() => asText(initial?.monthly_contribution));
     const [startDate, setStartDate] = useState(
         () => asText(initial?.start_date) || todayLocal(),
@@ -84,6 +92,10 @@ export default function PlanSetupDialog({
         const monthlyContribution = parseLocalizedNumber(monthly);
         if (monthlyContribution === null || monthlyContribution <= 0) {
             setError('La aportación mensual debe ser un número mayor que 0.');
+            return;
+        }
+        if (currencyEnabled && !currency) {
+            setError('Elige la divisa de la aportación mensual.');
             return;
         }
         // parseInt truncaba "30,5" a 30 en silencio: solo se aceptan enteros exactos (F388).
@@ -125,6 +137,7 @@ export default function PlanSetupDialog({
         try {
             await upsertPlan({
                 monthly_contribution: monthlyContribution,
+                ...(currencyEnabled ? { monthly_contribution_currency: currency } : {}),
                 start_date: startDate,
                 horizon_years: horizonYears,
                 target_allocations: allocations,
@@ -164,7 +177,7 @@ export default function PlanSetupDialog({
                 <form id="plan-setup-form" onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-3">
                         <div className="space-y-1.5">
-                            <Label htmlFor="plan-monthly" className="text-gray-300">Aportación mensual (€)</Label>
+                            <Label htmlFor="plan-monthly" className="text-gray-300">{currencyEnabled ? 'Aportación mensual' : 'Aportación mensual (€)'}</Label>
                             <Input
                                 id="plan-monthly"
                                 inputMode="decimal"
@@ -198,6 +211,27 @@ export default function PlanSetupDialog({
                             />
                         </div>
                     </div>
+
+                    {currencyEnabled ? (
+                        <div className="space-y-1.5">
+                            <Label htmlFor="plan-currency" className="text-gray-300">Divisa de la aportación</Label>
+                            <select
+                                id="plan-currency"
+                                value={currency}
+                                onChange={(e) => setCurrency(e.target.value)}
+                                required
+                                className="h-9 w-full rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100"
+                            >
+                                <option value="" disabled>Elige una divisa</option>
+                                {CURRENCY_OPTIONS.map((code) => (
+                                    <option key={code} value={code}>{code}</option>
+                                ))}
+                            </select>
+                            {legacyWithoutCurrency ? (
+                                <p className="text-xs text-amber-300">Divisa no registrada: confirma en qué divisa introdujiste esta aportación.</p>
+                            ) : null}
+                        </div>
+                    ) : null}
 
                     <div className="space-y-2">
                         <p className="text-sm font-medium text-gray-300">Asignación objetivo</p>

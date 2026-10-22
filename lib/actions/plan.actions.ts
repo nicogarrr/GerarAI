@@ -41,6 +41,8 @@ export type PlanTargetInput = {
 
 export type PlanUpsertPayload = {
     monthly_contribution: number;
+    /** Solo con la capability currency_contract_enabled; omitirlo conserva la divisa registrada. */
+    monthly_contribution_currency?: string;
     start_date: string;
     horizon_years: number;
     target_allocations: PlanTargetInput[];
