@@ -24,7 +24,7 @@ describe('signInWithEmail con 2FA', () => {
     it('trata twoFactorRedirect como paso 2FA pendiente, antes de devolver exito', () => {
         const fn = actions.slice(actions.indexOf('export const signInWithEmail'), actions.indexOf('export const verifyTwoFactorTotp'));
         const redirectAt = fn.indexOf('twoFactorRedirect');
-        const successAt = fn.indexOf('return { success: true, data: response }');
+        const successAt = fn.indexOf('return { success: true }');
         assert.ok(redirectAt > -1, 'debe comprobar twoFactorRedirect');
         assert.ok(redirectAt < successAt, 'la comprobación va antes del éxito');
         assert.match(fn, /return \{ success: false, twoFactorRequired: true \}/);
