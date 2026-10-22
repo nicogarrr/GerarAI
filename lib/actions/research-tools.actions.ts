@@ -237,8 +237,9 @@ export type ManagementCredibility = {
   ticker: string;
   score: number | null;
   grade: string;
-  counts: { total: number; open: number; met: number; partial: number; missed: number };
+  counts: { total: number; open: number; candidate?: number; met: number; partial: number; missed: number };
   method: string;
+  legacy_excluded_from_score?: number;
   promises: Array<{
     id: number;
     promise: string;
@@ -253,6 +254,20 @@ export type ManagementCredibility = {
     management_explanation: string | null;
     verified_at: string | null;
     evidence: Array<Record<string, unknown>>;
+    quote_literal?: string | null;
+    quote_translation_es?: string | null;
+    speaker?: string | null;
+    speaker_role?: string | null;
+    call_date?: string | null;
+    source_url?: string | null;
+    transcript_locator?: string | null;
+    due_date?: string | null;
+    fulfillment_criteria?: string | null;
+    status_reason?: string | null;
+    date_basis?: string | null;
+    source_status?: string | null;
+    flags?: string[];
+    legacy_heuristic_target?: boolean;
   }>;
 };
 
@@ -780,6 +795,18 @@ export async function createManagementPromise(ticker: string, formData: FormData
 
 export async function importManagementCallClaims(ticker: string) {
   await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/import-call-claims`, { method: 'POST' });
+  revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
+}
+
+export async function extractManagementCandidates(ticker: string, formData: FormData) {
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/extract-candidates`, {
+    method: 'POST',
+    body: JSON.stringify({
+      transcript_text: required(formData, 'transcript_text', 'Transcript text'),
+      call_date: required(formData, 'call_date', 'Call date'),
+      source_url: required(formData, 'source_url', 'Source URL'),
+    }),
+  });
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
 }
 
