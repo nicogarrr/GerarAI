@@ -27,7 +27,7 @@ def test_meta_assets_without_date_not_checkable():
 def test_every_ticker_reports_honest_pending():
     rows = universe_coverage()
     assert all(r.pending or r.checkable_by_job for r in rows)
-    assert sum(r.checkable_by_job for r in rows) == 3
+    assert sum(r.checkable_by_job for r in rows) == 4
 
 
 def test_checkable_flag_matches_real_job_targets():
@@ -61,3 +61,12 @@ def test_kkr_registered_with_honest_origin_and_checkable():
     assert k.origin == "url_dominio_oficial_por_busqueda" and k.call_date == "2026-07-30"
     c = coverage_for("KKR")
     assert c.checkable_by_job and c.transcript_assets_with_call_date == 1
+
+
+def test_origins_reach_coverage_and_cb_is_ir_href():
+    assert coverage_for("KKR").transcript_origins == ("url_dominio_oficial_por_busqueda",)
+    assert coverage_for("CB").transcript_origins == ("href_ir_leido",)
+    assert coverage_for("CB").checkable_by_job
+    from app.services.commitment_coverage import coverage_with_checks
+    assert coverage_with_checks({}, ("KKR",))[0]["transcript_origins"] == [
+        "url_dominio_oficial_por_busqueda"]

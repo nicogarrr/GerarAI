@@ -141,6 +141,23 @@ _ENTRIES = (
         "llamada anunciada en la pagina IR.",
     ),
     SourceEntry(
+        "CB",
+        OFFICIAL_TRANSCRIPT_PDF,
+        "https://investors.chubb.com/News--Events/news-presentations/events/event-details/2026/3Q-2026-Chubb-Earnings-Conference-Call/default.aspx",
+        _CHECKED,
+        (
+            VerifiedAsset(
+                "https://s201.q4cdn.com/471466897/files/content_files/Chubb-3Q26-Transcript-October-21-2026.pdf",
+                "Transcript (opens in new window)",
+                "Q3 2026",
+                "2026-10-21",
+            ),
+        ),
+        "Enlace leido en la pagina IR del evento; PDF 17 pags, sha256 3ebdb6b3dda8..., 'Formatted "
+        "Report' de FactSet CallStreet alojado en el q4cdn del IR, cabecera 'Chubb Ltd. (CB) Q3 "
+        "2026 Earnings Call 21-Oct-2026'.",
+    ),
+    SourceEntry(
         "ASTS",
         NOT_LISTED_ON_IR_PAGE,
         "https://investors.ast-science.com/eventsPastEvents",
