@@ -66,3 +66,9 @@ void test('Catalizadores muestra el logo de cada empresa en su fila (mismo compo
   assert.match(catalysts, /import \{ CompanyLogo \} from '@\/components\/calendar\/CompanyLogo'/);
   assert.match(catalysts, /<CompanyLogo ticker=\{event\.ticker\} name=\{event\.ticker\}/);
 });
+
+void test('el «Sin eventos» de la tira de Inicio es legible (contraste AA sobre surface-1)', () => {
+  const strip = readFileSync('components/calendar/EarningsDayStrip.tsx', 'utf8');
+  assert.match(strip, /<span className="mt-1 text-xs text-gray-400">Sin eventos<\/span>/, 'estado vacio en gray-400 (7.4:1 sobre surface-1)');
+  assert.doesNotMatch(strip, /Sin eventos<\/span>[\s\S]*?gray-600|gray-600[^>]*>Sin eventos/, 'sin gray-600 (1.8:1) en el estado vacio');
+});
