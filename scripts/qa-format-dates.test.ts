@@ -19,9 +19,10 @@ test('watchlist and movers do not interpolate raw quote dates', () => {
   assert.ok(!movers.includes('{row.date}'));
 });
 
-test('screener: el precio de vela diaria se rotula como cierre con su fecha, no como hora de cotización', () => {
+test('screener: una fecha de barra diaria no certifica cierre ni tiempo real', () => {
   const page = readFileSync('app/(root)/screener/page.tsx', 'utf8');
-  // #1436: quoteObserved recibe ademas el kind para no rotular la apertura de
-  // la vela diaria como hora de cotizacion; el ternario que protege el guard sigue igual.
-  assert.match(page, /r\.priceDate \? `Cierre \$\{formatMarketDate\(r\.priceDate\)\}` : quoteObserved\(r\.priceAsOf, r\.priceTimestampKind\)/);
+  // Las barras diarias también pueden proceder de backfills durante sesión.
+  // La fecha no prueba cierre: no inferirlo del origen ni de la hora local.
+  assert.match(page, /r\.priceDate \? `Dato diario del \$\{formatMarketDate\(r\.priceDate\)\}` : quoteObserved\(r\.priceAsOf, r\.priceTimestampKind\)/);
+  assert.doesNotMatch(page, /`Cierre \$\{formatMarketDate\(r\.priceDate\)\}`/);
 });
