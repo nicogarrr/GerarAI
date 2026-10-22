@@ -31,6 +31,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, EarningsDate, Position, WatchItem
+from app.services.async_bridge import run_from_any_context
 from app.services.connectors.earnings_calendar import BROWSER_HEADERS, EARNINGS_URL
 from app.services.market_refresh_service import _us_listed
 from app.services.propicks_price_service import yahoo_symbol
@@ -170,7 +171,7 @@ async def _nasdaq_scan(tickers: set[str], today: date) -> dict[str, dict[str, An
 def fetch_nasdaq_dates(tickers: set[str], today: date) -> dict[str, dict[str, Any]]:
     if not tickers:
         return {}
-    return asyncio.run(_nasdaq_scan(tickers, today))
+    return run_from_any_context(_nasdaq_scan(tickers, today))
 
 
 def merge_candidate(yahoo: dict | None, nasdaq: dict | None) -> dict[str, Any] | None:
@@ -227,8 +228,16 @@ def refresh_earnings_dates(
             skipped.append(ticker)
         if _us_listed(company):
             us.add(ticker)
-    yahoo = yahoo_fetcher(yahoo_symbols) if yahoo_symbols else {}
-    nasdaq = nasdaq_fetcher(us, today) if us else {}
+    try:
+        yahoo = yahoo_fetcher(yahoo_symbols) if yahoo_symbols else {}
+    except Exception as exc:  # noqa: BLE001 - una fuente caida nunca tira la otra
+        logger.warning("earnings_dates: yahoo fallo por completo: %s", exc)
+        yahoo = {}
+    try:
+        nasdaq = nasdaq_fetcher(us, today) if us else {}
+    except Exception as exc:  # noqa: BLE001 - idem NASDAQ
+        logger.warning("earnings_dates: nasdaq fallo por completo: %s", exc)
+        nasdaq = {}
     written, missing, disagree = 0, [], 0
     for ticker in followed:
         manual = db.scalar(
@@ -243,6 +252,44 @@ def refresh_earnings_dates(
         if candidate is None:
             if not manual:
                 missing.append(ticker)
+            continue
+        if candidate["date"] < today:
+            # El proveedor aun ensena la fecha ya celebrada (ventana tipica
+            # tras publicar, hasta que programa la siguiente). No es la
+            # proxima: NUNCA se borran las filas futuras vigentes ni se
+            # inserta un duplicado. Antes de este guard el insert chocaba con
+            # uq_earnings_date_ticker_day_source, el commit de TODA la corrida
+            # reventaba y ningun ticker se renovaba (repro 22 oct 2026:
+            # tests/test_earnings_dates_refresh_repro.py).
+            future_row = db.scalar(
+                select(EarningsDate.id).where(
+                    EarningsDate.ticker == ticker, EarningsDate.source != "manual",
+                    EarningsDate.event_date >= today,
+                )
+            )
+            if future_row is None and not manual:
+                missing.append(ticker)
+            existing = db.scalar(
+                select(EarningsDate).where(
+                    EarningsDate.ticker == ticker,
+                    EarningsDate.event_date == candidate["date"],
+                    EarningsDate.source == candidate["source"],
+                )
+            )
+            if existing is not None:
+                # El proveedor confirma que sigue mostrando esa fecha: se
+                # renueva fetched_at (is_fresh la usa en la watchlist).
+                existing.fetched_at = datetime.now(UTC)
+            else:
+                db.add(
+                    EarningsDate(
+                        ticker=ticker, event_date=candidate["date"], session=candidate["session"],
+                        fiscal_label=candidate["fiscal"], confirmed=candidate["confirmed"],
+                        source=candidate["source"], source_label=candidate["label"],
+                        fetched_at=datetime.now(UTC),
+                    )
+                )
+                written += 1
             continue
         db.execute(
             delete(EarningsDate).where(
@@ -302,16 +349,18 @@ def followed_calendar(
         followed = {t: v for t, v in followed.items() if v["origin"] == "watchlist"}
     cutoff = (now or datetime.now(UTC)) - STALE_AFTER
     today = (now or datetime.now(UTC)).date()
-    rows = [
-        row
-        for row in db.scalars(
-            select(EarningsDate)
-            .where(EarningsDate.ticker.in_(list(followed) or [""]),
-                   EarningsDate.event_date >= desde, EarningsDate.event_date <= hasta)
-            .order_by(EarningsDate.event_date, EarningsDate.ticker)
-        ).all()
-        if row.source == "manual" or _keep_auto_row(row, today, cutoff)
-    ]
+    all_rows = db.scalars(
+        select(EarningsDate)
+        .where(EarningsDate.ticker.in_(list(followed) or [""]),
+               EarningsDate.event_date >= desde, EarningsDate.event_date <= hasta)
+        .order_by(EarningsDate.event_date, EarningsDate.ticker)
+    ).all()
+    rows = [row for row in all_rows if row.source == "manual" or _keep_auto_row(row, today, cutoff)]
+    # Fechas futuras que existen pero caducaron sin renovarse: no es "sin publicar", es "sin dato reciente".
+    stale_future = {
+        r.ticker for r in all_rows
+        if r.event_date >= today and not (r.source == "manual" or _keep_auto_row(r, today, cutoff))
+    }
     # Si hay fila manual y automatica el mismo ticker, la manual (empresa) gana.
     by_ticker: dict[str, list[EarningsDate]] = {}
     for row in rows:
@@ -354,4 +403,6 @@ def followed_calendar(
         "followed_count": len(followed), "count": len(events),
         "days": [{"date": d, "events": evs} for d, evs in days.items()],
         "without_date_in_range": sorted(set(followed) - covered),
+        # Subconjunto de lo anterior: tenia fecha futura, pero el dato no se renueva desde hace mas de STALE_AFTER.
+        "stale_date_in_range": sorted((set(followed) - covered) & stale_future),
     }
