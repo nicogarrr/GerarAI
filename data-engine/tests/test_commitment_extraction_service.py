@@ -53,3 +53,36 @@ def test_reference_year_does_not_become_due_hint():
     text = "Ana Perez, CEO\n\nWe expect to deliver income this year above 2025 income of $5 billion.\n"
     cands = extract_candidates(text)
     assert cands and cands[0].due_date_hint is None and cands[0].due_basis == "none"
+
+
+def test_analyst_with_head_role_is_not_management():
+    text = (
+        "Ana Perez, CEO\n\nWe expect 5 units in 2030.\n\nOperator:  Go ahead.\n\n"
+        "Cy Rival, Head of Equity Research\n\nWe expect 99 units in 2031.\n"
+    )
+    cands = extract_candidates(text)
+    assert [c.speaker for c in cands] == ["Ana Perez"]
+
+
+def test_analyst_header_before_qa_is_excluded():
+    text = "Cy Rival, Head of Equity Research\n\nWe expect 99 units in 2031.\n"
+    assert extract_candidates(text) == []
+
+
+def test_abbreviations_do_not_truncate_quote():
+    text = "Ana Perez, CEO\n\nWe expect to sign the U.S. Government contract worth $5 billion in 2030. Next topic.\n"
+    cands = extract_candidates(text)
+    assert cands[0].quote_literal.endswith("worth $5 billion in 2030.")
+    assert "U.S. Government" in cands[0].quote_literal
+
+
+def test_locator_declares_normalization_and_context():
+    from app.services.commitment_extraction_service import locator_for, normalize_for_locator
+
+    text = "Ana Perez, CEO\n\nIntro  line.\n\nWe expect\n 5 units in 2030.\n"
+    c = extract_candidates(text)[0]
+    flat = normalize_for_locator(text)
+    assert locator_for(c).startswith("ws_collapse_v1:")
+    assert flat[c.char_start : c.char_end] == c.quote_literal
+    assert text.find(c.quote_literal) == -1  # offsets NO son del original
+    assert c.context_before.rstrip().endswith("Intro line.")

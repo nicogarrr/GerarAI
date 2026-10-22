@@ -44,6 +44,9 @@ _QUARTER_END = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
 _ORD = {"first": 1, "second": 2, "third": 3, "fourth": 4}
 
 
+NORMALIZATION_ID = "ws_collapse_v1"
+
+
 @dataclass
 class Candidate:
     quote_literal: str
@@ -52,20 +55,41 @@ class Candidate:
     due_date_hint: date | None
     due_basis: str  # "year_end_hint" | "quarter_end_hint" | "none"
     flags: list[str] = field(default_factory=list)
-    char_start: int = 0
+    char_start: int = 0  # offsets sobre normalize_for_locator(texto), NO sobre el original
     char_end: int = 0
+    normalization: str = NORMALIZATION_ID
+    context_before: str = ""
+    context_after: str = ""
     source_status: str = "suggested"  # nunca "verified": lo decide una persona con la fuente
 
 
-def _normalize(text: str) -> str:
+def normalize_for_locator(text: str) -> str:
+    """Normalizacion publica ws_collapse_v1: NBSP->espacio, colapsa blancos, strip."""
     return re.sub(r"\s+", " ", text.replace("\u00a0", " ")).strip()
 
 
+_normalize = normalize_for_locator
+
+
+def locator_for(c: Candidate) -> str:
+    """Localizador explicito para transcript_locator: indica la normalizacion usada."""
+    return f"{c.normalization}:{c.char_start}-{c.char_end}"
+
+
+_ANALYST_ROLE = re.compile(
+    r"research|analyst|equity|securities|capital markets|bank|asset management|investment|portfolio|sell[- ]side",
+    re.I,
+)
+
+
 def _roster(lines: list[str]) -> dict[str, str]:
+    """Cargos de la presentacion. Solo ANTES del turno del operador (Q&A) y sin cargos de analista."""
     roster: dict[str, str] = {}
     for line in lines:
+        if line.strip().startswith("Operator:"):
+            break
         m = _ROLE_HEADER.match(line.strip())
-        if m and not line.startswith(" " * 4):
+        if m and not line.startswith(" " * 4) and not _ANALYST_ROLE.search(m.group(2)):
             roster[m.group(1)] = m.group(2).strip()
     return roster
 
@@ -94,8 +118,25 @@ def _turns(text: str, roster: dict[str, str]) -> list[tuple[str, str]]:
     return [(who, " ".join(parts)) for who, parts in turns if who in roster]
 
 
+_ABBREV = re.compile(
+    r"(?:\b(?:U\.S|U\.K|E\.U|Inc|Corp|Co|Ltd|Mr|Ms|Mrs|Dr|vs|e\.g|i\.e|approx|No|St|Jr|Sr)|\b[A-Z])\.$"
+)
+
+
 def _split_sentences(text: str) -> list[str]:
-    return [s.strip() for s in re.split(r"(?<=[.!?])\s+(?=[A-Z“\"])", text) if s.strip()]
+    """Parte en frases sin cortar tras abreviaturas (U.S., Inc., Mr., inicial suelta)."""
+    out: list[str] = []
+    start = 0
+    for m in re.finditer(r"[.!?]\s+(?=[A-Z“\"])", text):
+        head = text[start : m.start() + 1]
+        if _ABBREV.search(head):
+            continue
+        out.append(text[start : m.start() + 1].strip())
+        start = m.end()
+    tail = text[start:].strip()
+    if tail:
+        out.append(tail)
+    return [x for x in out if x]
 
 
 def _due_hint(sentence: str) -> tuple[date | None, str]:
@@ -143,6 +184,8 @@ def extract_candidates(transcript_text: str, *, max_candidates: int = 40) -> lis
                     flags=flags,
                     char_start=start,
                     char_end=start + len(sentence),
+                    context_before=haystack[max(0, start - 80) : start],
+                    context_after=haystack[start + len(sentence) : start + len(sentence) + 80],
                 )
             )
             if len(out) >= max_candidates:
