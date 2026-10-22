@@ -51,6 +51,9 @@ _ORD = {"first": 1, "second": 2, "third": 3, "fourth": 4}
 
 
 NORMALIZATION_ID = "ws_collapse_v1"
+# Subir al cambiar reglas del extractor: el job re-extrae activos con hash igual pero version distinta
+# (solo ANADE candidatos nuevos; nunca toca filas ya revisadas por una persona).
+EXTRACTOR_VERSION = "2026-10-22.v3"
 
 
 @dataclass

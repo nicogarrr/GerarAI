@@ -43,7 +43,7 @@ def _db():
     eng = create_engine("sqlite://")
     Base.metadata.create_all(eng)
     db = Session(eng)
-    db.info["tenant_id"] = None
+    db.info["tenant_id"] = 1
     co = Company(ticker="UBER", name="Uber", exchange="NYSE", currency="USD", sector="S", industry="I",
                  company_type="holding", valuation_model="unassigned",
                  special_sources=[], special_risks=[], factor_tags=[])
@@ -64,7 +64,8 @@ def test_registry_route_creates_unreviewed_candidates_then_human_review(monkeypa
     monkeypatch.setattr(routes, "resolve_company", lambda db_, t: co)
     out = routes.extract_management_candidates_from_registry(
         "UBER", routes.ManagementCandidateFromRegistry(source_url="https://s23.q4cdn.com/407969754/files/doc_events/2026/Aug/05/Uber-Q2-26-Earnings-Call-Transcript.pdf"), db=db, principal=None)
-    first = out[0]
+    assert out["outcome"] == "candidatos_creados" and out["created"] == len(out["candidates"]) >= 1
+    first = out["candidates"][0]
     assert first["status"] == "candidate" and first["source_check"] == "registro_oficial_exacto"
     assert first["due_basis"] == "year_end_inferred_from_call_year" and first["support_quote"]
     assert first["date_basis"] == "call_date" and first["fulfillment_criteria"] is None

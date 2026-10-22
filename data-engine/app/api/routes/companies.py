@@ -990,13 +990,13 @@ class ManagementCandidateFromRegistry(BaseModel):
     source_url: str = Field(max_length=1000, pattern=r"^https://")
 
 
-@router.post("/{ticker}/management-credibility/extract-candidates-from-registry", status_code=201)
+@router.post("/{ticker}/management-credibility/extract-candidates-from-registry")
 def extract_management_candidates_from_registry(
     ticker: str,
     payload: ManagementCandidateFromRegistry,
     db: Session = Depends(get_db),
     principal=Depends(get_research_principal),
-) -> list[dict]:
+) -> dict:
     """Extrae CANDIDATOS (sin revisar) de una transcripcion oficial registrada. No decide nada."""
     from datetime import date as _date
 
@@ -1022,11 +1022,13 @@ def extract_management_candidates_from_registry(
         raise HTTPException(status_code=422, detail="formato_sin_hablantes_reconocidos: no es 'sin compromisos'")
     if item["outcome"].startswith(("fallo_", "error_")):
         raise HTTPException(status_code=422, detail=item["outcome"] + (": " + item["detail"] if item.get("detail") else ""))
-    return [
+    created = [
         ManagementCredibilityService.payload(r)
         for r in db.scalars(select(ManagementPromise).where(ManagementPromise.company_id == company.id))
         if r.id not in before
     ]
+    # Resultado honesto: 0 candidatos NO es "creado"; el outcome dice por que (sin cambios, sin detectados...).
+    return {"outcome": item["outcome"], "created": len(created), "candidates": created}
 
 
 def _principal_user(principal) -> str:

@@ -31,6 +31,7 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("bytes_sha256", sa.String(64), nullable=True),
         sa.Column("text_sha256", sa.String(64), nullable=True),
+        sa.Column("extractor_version", sa.String(40), nullable=True),
         sa.Column("management_turns", sa.Integer(), nullable=True),
         sa.Column("candidates_created", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("detail", sa.String(200), nullable=True),

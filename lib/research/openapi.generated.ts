@@ -11128,14 +11128,14 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    }[];
+                    };
                 };
             };
             /** @description Validation Error */

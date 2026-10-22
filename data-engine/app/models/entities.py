@@ -2784,6 +2784,7 @@ class CommitmentExtractionAttempt(TenantOwnedMixin, Base, TimestampMixin):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     bytes_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     text_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    extractor_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
     management_turns: Mapped[int | None] = mapped_column(Integer, nullable=True)
     candidates_created: Mapped[int] = mapped_column(Integer, default=0)
     detail: Mapped[str | None] = mapped_column(String(200), nullable=True)

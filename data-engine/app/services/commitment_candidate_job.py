@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.models.entities import CommitmentExtractionAttempt as Attempt
 from app.models.entities import Company, Position
 from app.services.commitment_coverage import dynamic_universe
+from app.services.commitment_extraction_service import EXTRACTOR_VERSION
 from app.services.company_resolver import resolve_company
 from app.services.management_credibility_service import ManagementCredibilityService
 from app.services.transcript_source_registry import OFFICIAL_TRANSCRIPT_PDF, get_entry
@@ -96,6 +97,10 @@ def process_asset(db: Session, company: Company, ticker: str, asset, *, today: d
     from app.services.commitment_extraction_service import extract_with_diagnostics
 
     item: dict = {"url": asset.url, "created": 0}
+    if db.info.get("tenant_id") is None:
+        # tenant_id NULL no entra en el UNIQUE de PG: sin contexto de tenant no hay cerrojo fiable.
+        item["outcome"] = "sin_contexto_de_tenant"
+        return item
     row = claim(db, company.id, asset.url, date.fromisoformat(asset.call_date) if asset.call_date else None)
     if row is None:
         item["outcome"] = "en_curso_otro_proceso"
@@ -103,14 +108,16 @@ def process_asset(db: Session, company: Company, ticker: str, asset, *, today: d
     try:
         doc, _meta = fetch(ticker, asset.url, today=today)
         hashes = {"bytes_sha256": getattr(doc, "bytes_sha256", None), "text_sha256": getattr(doc, "text_sha256", None)}
-        if row.outcome in OK_OUTCOMES and row.text_sha256 and row.text_sha256 == hashes["text_sha256"]:
-            _finish(db, row, outcome="sin_cambios_hash", today=today, ok=True, **hashes)
+        if (row.outcome in OK_OUTCOMES and row.text_sha256 and row.text_sha256 == hashes["text_sha256"]
+                and row.extractor_version == EXTRACTOR_VERSION):
+            _finish(db, row, outcome="sin_cambios_hash", today=today, ok=True, extractor_version=EXTRACTOR_VERSION, **hashes)
             item["outcome"] = "sin_cambios_hash"
             return item
         _cands, diag = extract_with_diagnostics(doc.text, call_date=doc.asset.published_on)
         if diag["management_turns"] == 0:
             _finish(db, row, outcome="formato_sin_hablantes_reconocidos", today=today, ok=True,
-                    days=REFRESH_UNSUPPORTED_DAYS, management_turns=0, candidates_created=0, **hashes)
+                    days=REFRESH_UNSUPPORTED_DAYS, management_turns=0, candidates_created=0,
+                    extractor_version=EXTRACTOR_VERSION, **hashes)
             item["outcome"] = "formato_sin_hablantes_reconocidos"
             return item
         new = ManagementCredibilityService().register_extracted_candidates(
@@ -119,7 +126,7 @@ def process_asset(db: Session, company: Company, ticker: str, asset, *, today: d
         )
         outcome = "candidatos_creados" if new else "sin_candidatos_detectados"
         _finish(db, row, outcome=outcome, today=today, ok=True, management_turns=diag["management_turns"],
-                candidates_created=len(new), **hashes)
+                candidates_created=len(new), extractor_version=EXTRACTOR_VERSION, **hashes)
         item.update(outcome=outcome, created=len(new))
     except Exception as exc:  # noqa: BLE001 - aislamiento por activo; el tipo queda persistido, no se traga
         db.rollback()

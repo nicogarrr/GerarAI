@@ -20605,16 +20605,13 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
+                  "additionalProperties": true,
                   "title": "Response Extract Management Candidates From Registry Api Companies  Ticker  Management Credibility Extract Candidates From Registry Post",
-                  "type": "array"
+                  "type": "object"
                 }
               }
             },

@@ -27,7 +27,7 @@ def _db(tickers=("UBER",), watch=("NOSUCH",)):
     eng = create_engine("sqlite://")
     Base.metadata.create_all(eng)
     db = Session(eng)
-    db.info["tenant_id"] = None
+    db.info["tenant_id"] = 1
     for t in tickers:
         c = _co(t)
         db.add(c)
@@ -139,6 +139,33 @@ def test_held_identity_case_or_space_variants_are_reported_ambiguous_not_guessed
     r = job.extract_registry_candidates(db, today=TODAY, fetch=_fetch([]))
     assert r["UBER"][0]["outcome"] == "company_identity_ambiguous"
     assert db.scalar(select(ManagementPromise.id).limit(1)) is None
+
+
+def test_new_extractor_version_reextracts_same_hash_without_touching_reviewed_rows(monkeypatch):
+    db = _db()
+    job.extract_registry_candidates(db, today=TODAY, fetch=_fetch([]))
+    row = db.scalar(select(ManagementPromise))
+    row.status, row.fulfillment_criteria = "open", "criterio declarado por una persona"
+    db.commit()
+    calls: list = []
+    job.extract_registry_candidates(db, today=TODAY + timedelta(days=8), fetch=_fetch(calls))
+    assert db.scalar(select(Attempt)).outcome == "sin_cambios_hash" and len(calls) == 1
+    monkeypatch.setattr(job, "EXTRACTOR_VERSION", "v-nueva")
+    r = job.extract_registry_candidates(db, today=TODAY + timedelta(days=16), fetch=_fetch(calls))
+    assert r["UBER"][0]["outcome"] in ("sin_candidatos_detectados", "candidatos_creados")
+    a = db.scalar(select(Attempt))
+    assert a.extractor_version == "v-nueva"
+    kept = db.get(ManagementPromise, row.id)
+    assert kept.status == "open" and kept.fulfillment_criteria == "criterio declarado por una persona"
+
+
+def test_no_tenant_context_abstains_from_claim():
+    db = _db()
+    db.info["tenant_id"] = None
+    calls: list = []
+    r = job.extract_registry_candidates(db, today=TODAY, fetch=_fetch(calls))
+    assert r["UBER"][0]["outcome"] == "sin_contexto_de_tenant" and calls == []
+    assert db.scalar(select(Attempt.id).limit(1)) is None
 
 
 def test_scheduler_registration_flag_off_by_default_and_on():
