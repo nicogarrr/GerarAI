@@ -27,6 +27,9 @@ OPERATORS = {
 }
 
 
+MAX_CANDIDATES_PER_COMPANY = 400
+
+
 class ManagementCredibilityService:
     def register(
         self,
@@ -176,16 +179,21 @@ class ManagementCredibilityService:
             locator_for,
         )
 
+        # Identidad = (cita, fecha de llamada, fuente): la misma frase en otra
+        # llamada o fuente es otro compromiso, no un duplicado.
+        existing_rows = db.scalars(
+            select(ManagementPromise).where(ManagementPromise.company_id == company.id)
+        ).all()
+        if sum(row.status == "candidate" for row in existing_rows) >= MAX_CANDIDATES_PER_COMPANY:
+            raise ValueError("Limite de candidatos sugeridos alcanzado; revisa o descarta los existentes")
         existing = {
-            row.quote_literal
-            for row in db.scalars(
-                select(ManagementPromise).where(ManagementPromise.company_id == company.id)
-            ).all()
+            (row.quote_literal, row.call_date, row.source_url)
+            for row in existing_rows
             if row.quote_literal
         }
         created: list[ManagementPromise] = []
         for cand in extract_candidates(transcript_text):
-            if cand.quote_literal in existing:
+            if (cand.quote_literal, call_date, source_url) in existing:
                 continue
             row = ManagementPromise(
                 company_id=company.id,
@@ -217,7 +225,7 @@ class ManagementCredibilityService:
             )
             db.add(row)
             created.append(row)
-            existing.add(cand.quote_literal)
+            existing.add((cand.quote_literal, call_date, source_url))
         db.commit()
         for row in created:
             db.refresh(row)
@@ -348,6 +356,7 @@ class ManagementCredibilityService:
             ),
             "counts": {
                 "total": len(promises),
+                "registered": sum(row.status != "candidate" for row in promises),
                 "open": sum(row.status == "open" for row in promises),
                 "candidate": sum(row.status == "candidate" for row in promises),
                 "met": sum(row.status == "met" for row in promises),
