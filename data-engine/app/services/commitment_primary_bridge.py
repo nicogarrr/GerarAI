@@ -14,11 +14,10 @@ Sin corte de periodo autentico -> None (falla cerrado). El motor sigue siendo su
 from __future__ import annotations
 
 import hashlib
-import re
 from dataclasses import replace
-from datetime import date
 
 from app.services import commitment_followup_service as engine
+from app.services.fact_period_guard import anchored_period_end
 from app.services.commitment_followup_service import FollowupEvidence
 from app.services.commitment_primary_pipeline import PipelineResult, is_issued_by_pipeline
 from app.services.followup_primary_evidence_adapter import (
@@ -27,19 +26,10 @@ from app.services.followup_primary_evidence_adapter import (
 )
 
 
-def period_end_from_fact_period(fact_period: str | None) -> date | None:
-    m = re.match(r'(\d{4})-(\d{2})-(\d{2})(?::|$)', fact_period or '')
-    if not m:
-        return None
-    try:
-        return date(int(m[1]), int(m[2]), int(m[3]))
-    except ValueError:
-        return None
-
-
 def evidence_from_pipeline(
     out: PipelineResult, *, tenant_id: int, company_id: int, fact, source_document,
     chunk_id: int = 0,
+    fiscal_end_month: str | None = None,
 ) -> FollowupEvidence | None:
     """`fact` = fila FinancialFact y `source_document` = su Document, leidos de BD por el servicio."""
     if not is_issued_by_pipeline(out) or out.result.evidence is None:
@@ -53,7 +43,9 @@ def evidence_from_pipeline(
             or not getattr(fact, 'is_reported', False) or getattr(fact, 'is_adjusted', True)):
         return None
     period = f'{quarter} {year}'
-    period_end = period_end_from_fact_period(getattr(fact, 'period', None))
+    period_end = anchored_period_end(
+        getattr(fact, 'period', None), quarter, year,
+        accession=getattr(fact, 'accession_number', None), fiscal_end_month=fiscal_end_month)
     if period_end is None or period != doc.asset.period:
         return None
     if source_document is None or source_document.source_url != doc.url:

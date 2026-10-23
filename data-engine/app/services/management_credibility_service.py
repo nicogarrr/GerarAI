@@ -18,6 +18,10 @@ from app.models import (
     ManagementPromise,
     Transcript,
 )
+from app.services.fact_period_guard import (
+    anchored_period_end,
+    fiscal_end_month_from_anchored_fy,
+)
 
 OPERATORS = {
     ">": lambda actual, target: actual > target,
@@ -248,6 +252,15 @@ class ManagementCredibilityService:
             ).all()
         )
         today = self._today()
+        fiscal_end_month = fiscal_end_month_from_anchored_fy(
+            db.scalars(
+                select(FinancialFact).where(
+                    FinancialFact.company_id == company.id,
+                    FinancialFact.fiscal_quarter == "FY",
+                    FinancialFact.source_type == "SEC",
+                )
+            ).all()
+        )
         for promise in promises:
             if not promise.metric:
                 continue
@@ -298,7 +311,10 @@ class ManagementCredibilityService:
             actual = matches[0]
             doc = db.get(Document, actual.source_id)
             published = doc.published_at.date() if doc and doc.published_at else None
-            period_end = self._fact_period_end(actual.period)
+            period_end = anchored_period_end(
+                actual.period, actual.fiscal_quarter or "FY", year,
+                accession=actual.accession_number, fiscal_end_month=fiscal_end_month,
+            )
             verdict_ok = (
                 self._has_reviewed_structured_criterion(promise)
                 and not self._is_legacy_heuristic(promise)
@@ -443,17 +459,6 @@ class ManagementCredibilityService:
         if rest == "FY":
             return ("FY", year, None)
         return None
-
-    @staticmethod
-    def _fact_period_end(period: str | None) -> date | None:
-        """Fecha de corte autentica del hecho ('YYYY-MM-DD[:Qn|:FY]'); None si no consta."""
-        match = re.match(r"(\d{4})-(\d{2})-(\d{2})(?::|$)", period or "")
-        if not match:
-            return None
-        try:
-            return date(int(match[1]), int(match[2]), int(match[3]))
-        except ValueError:
-            return None
 
     @staticmethod
     def _has_reviewed_structured_criterion(row: ManagementPromise) -> bool:

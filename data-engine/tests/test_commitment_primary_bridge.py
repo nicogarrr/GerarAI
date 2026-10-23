@@ -28,6 +28,7 @@ class Fact:
     fiscal_quarter: str | None = "Q2"
     is_reported: bool = True
     is_adjusted: bool = False
+    accession_number: str | None = "0000000000-26-000002"
 
 
 @dataclass
@@ -57,7 +58,7 @@ def _out(fact=None, doc=None):
 def _ev(out=None, fact=None, source=None):
     return evidence_from_pipeline(
         out or _out(fact), tenant_id=1, company_id=1, fact=fact or Fact(),
-        source_document=source or Doc())
+        source_document=source or Doc(), fiscal_end_month="12")
 
 
 def test_real_quote_passes_with_traceability():
@@ -113,3 +114,16 @@ def test_no_evidence_from_pipeline_when_value_not_in_original():
     assert out.result.evidence is None
     assert evidence_from_pipeline(out, tenant_id=1, company_id=1, fact=Fact(value=Decimal("99")),
                                   source_document=Doc()) is None
+
+
+def test_fact_period_must_be_anchored_and_reproduce_quarter():
+    """SINTETICO: corte libre/discordante, sin accession o sin mes fiscal anclado -> sin evidencia."""
+    for bad in ("2020-03-31:Q2", "2026-06-30:Q4", "2026-06-30", "2026-06-30:FY", "2028-06-30:Q2",
+                "2026-12-31:Q2"):  # diciembre con cierre fiscal dic es Q4, no Q2
+        assert _ev(out=_out(Fact()), fact=Fact(period=bad)) is None, bad
+    assert _ev(out=_out(Fact()), fact=Fact(accession_number=None)) is None
+    assert _ev(out=_out(Fact()), fact=Fact(accession_number="x")) is None
+    f = Fact()
+    assert evidence_from_pipeline(
+        _out(f), tenant_id=1, company_id=1, fact=f, source_document=Doc()) is None  # sin mes fiscal
+    assert _ev(out=_out(Fact()), fact=Fact()) is not None
