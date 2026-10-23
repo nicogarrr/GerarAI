@@ -18,6 +18,7 @@ from app.models import (
     ManagementPromise,
     Transcript,
 )
+from app.services.fact_period_guard import fact_period_consistent
 
 OPERATORS = {
     ">": lambda actual, target: actual > target,
@@ -307,6 +308,11 @@ class ManagementCredibilityService:
                 # cierre segun la fecha de corte propia del hecho (no calendario)
                 and period_end is not None
                 and period_end <= today
+                # corte respaldado: sufijo=periodo fiscal explicito, ano +-1 y documento
+                # publicado 0-200 dias despues del corte; si no, solo contexto
+                and fact_period_consistent(
+                    actual.period, actual.fiscal_quarter or "FY", year, period_end, published,
+                )
                 and published is not None
                 and promise.promise_date < published <= today
             )

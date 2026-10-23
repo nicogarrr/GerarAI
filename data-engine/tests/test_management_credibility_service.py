@@ -150,7 +150,8 @@ def test_annual_promise_ignores_quarterly_fact(db):
 
 def test_quarterly_promise_matches_quarterly_fact(db):
     c = _company(db)
-    _fact(db, c, 130, quarter="Q2")
+    # publicado tras el cierre del Q2 (antes 2026-03-01, irreal: >200 dias tras el corte)
+    _fact(db, c, 130, quarter="Q2", published=datetime(2025, 8, 5, tzinfo=UTC))
     _promise(db, c, period="Q2 2025")
     [p] = ManagementCredibilityService().reconcile(db, c)
     assert p.status == "met"
@@ -599,3 +600,22 @@ def test_fact_without_authentic_cutoff_date_gives_context_only(db):
     p = _promise(db, c)
     assert _reconciled(db, c, p).status == "open"
     assert p.evidence[-1]["context_only"] is True
+
+
+@pytest.mark.parametrize("period", [
+    "2020-03-31:Q2",   # corte arbitrario, documento publicado años despues
+    "2025-12-31:Q4",   # sufijo distinto del trimestre fiscal explicito
+    "2025-06-30",      # sin sufijo
+])
+def test_reconcile_unbacked_cutoff_is_context_only(db, period):
+    """SINTETICO: un fact.period libre/discordante no habilita veredicto (solo contexto)."""
+    c = _company(db)
+    db.add(FinancialFact(
+        source_id=_doc(db, c), company_id=c.id, metric="revenue", value=Decimal("130"),
+        unit="USD", period=period, fiscal_year=2025, fiscal_quarter="Q2", source_type="filing",
+    ))
+    db.commit()
+    _promise(db, c, period="2025 Q2")
+    [p] = ManagementCredibilityService().reconcile(db, c)
+    assert p.status == "open"
+    assert p.actual_fact_id is not None
