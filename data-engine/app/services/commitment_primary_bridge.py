@@ -37,6 +37,14 @@ def period_end_from_fact_period(fact_period: str | None) -> date | None:
         return None
 
 
+def fact_period_consistent(fact_period: str | None, quarter: str, year: int, end: date) -> bool:
+    """El corte debe pertenecer al MISMO periodo explicito: sufijo ':Qn' obligatorio e igual al
+    trimestre, y ano del corte a +-1 del ano fiscal (el calendario fiscal no se infiere).
+    Falla cerrado ante un fact.period libre o discordante con fiscal_year/fiscal_quarter."""
+    m = re.match(r'\d{4}-\d{2}-\d{2}:(Q[1-4])$', fact_period or '')
+    return bool(m) and m[1] == quarter and abs(end.year - year) <= 1
+
+
 def evidence_from_pipeline(
     out: PipelineResult, *, tenant_id: int, company_id: int, fact, source_document,
     chunk_id: int = 0,
@@ -54,7 +62,8 @@ def evidence_from_pipeline(
         return None
     period = f'{quarter} {year}'
     period_end = period_end_from_fact_period(getattr(fact, 'period', None))
-    if period_end is None or period != doc.asset.period:
+    if (period_end is None or period != doc.asset.period
+            or not fact_period_consistent(getattr(fact, 'period', None), quarter, year, period_end)):
         return None
     if source_document is None or source_document.source_url != doc.url:
         return None

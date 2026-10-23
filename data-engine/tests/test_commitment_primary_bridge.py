@@ -113,3 +113,11 @@ def test_no_evidence_from_pipeline_when_value_not_in_original():
     assert out.result.evidence is None
     assert evidence_from_pipeline(out, tenant_id=1, company_id=1, fact=Fact(value=Decimal("99")),
                                   source_document=Doc()) is None
+
+
+def test_fact_period_must_match_explicit_quarter_and_year():
+    """SINTETICO: un fact.period libre/discordante no puede fijar el corte (riesgo del auditor)."""
+    for bad in ("2020-03-31:Q2", "2026-06-30:Q4", "2026-06-30", "2026-06-30:FY", "2028-06-30:Q2"):
+        f = Fact(period=bad)
+        assert _ev(out=_out(Fact()), fact=f) is None, bad
+    assert _ev(out=_out(Fact()), fact=Fact(period="2026-06-30:Q2")) is not None
