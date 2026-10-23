@@ -54,10 +54,22 @@ def _period(year, quarter):
     return f"{year}-{ends[quarter]}:{quarter}"
 
 
+def _anchor_fy(db, company):
+    """Hecho FY SEC anclado por accession (como la ingesta real): fija el mes fiscal (dic)."""
+    db.add(FinancialFact(
+        company_id=company.id, metric="anchor_fy", value=Decimal("1"), unit="USD",
+        period="2024-12-31:FY", fiscal_year=2024, fiscal_quarter="FY", source_type="SEC",
+        accession_number="0000000000-25-000001",
+    ))
+    db.commit()
+
+
 def _fact(
     db, company, value, year=2025, quarter="FY", metric="revenue", with_source=True,
-    published=datetime(2026, 3, 1, tzinfo=UTC), adjusted=False,
+    published=datetime(2026, 3, 1, tzinfo=UTC), adjusted=False, anchored=True,
 ):
+    if anchored:
+        _anchor_fy(db, company)
     doc_id = None
     if with_source:
         doc = Document(
@@ -73,7 +85,8 @@ def _fact(
         company_id=company.id, metric=metric, value=Decimal(str(value)),
         unit="USD", period=_period(year, quarter),
         fiscal_year=year, fiscal_quarter=None if quarter == "FY" else quarter,
-        source_type="filing", is_adjusted=adjusted,
+        source_type="SEC" if anchored else "filing", is_adjusted=adjusted,
+        accession_number="0000000000-26-000002" if anchored else None,
     )
     db.add(fact)
     db.commit()
@@ -150,8 +163,7 @@ def test_annual_promise_ignores_quarterly_fact(db):
 
 def test_quarterly_promise_matches_quarterly_fact(db):
     c = _company(db)
-    # publicado tras el cierre del Q2 (antes 2026-03-01, irreal: >200 dias tras el corte)
-    _fact(db, c, 130, quarter="Q2", published=datetime(2025, 8, 5, tzinfo=UTC))
+    _fact(db, c, 130, quarter="Q2")
     _promise(db, c, period="Q2 2025")
     [p] = ManagementCredibilityService().reconcile(db, c)
     assert p.status == "met"
@@ -603,19 +615,39 @@ def test_fact_without_authentic_cutoff_date_gives_context_only(db):
 
 
 @pytest.mark.parametrize("period", [
-    "2020-03-31:Q2",   # corte arbitrario, documento publicado años despues
+    "2020-03-31:Q2",   # corte arbitrario
+    "2025-12-31:Q2",   # diciembre etiquetado Q2: con cierre fiscal dic reproduce Q4
     "2025-12-31:Q4",   # sufijo distinto del trimestre fiscal explicito
     "2025-06-30",      # sin sufijo
 ])
 def test_reconcile_unbacked_cutoff_is_context_only(db, period):
     """SINTETICO: un fact.period libre/discordante no habilita veredicto (solo contexto)."""
     c = _company(db)
+    _anchor_fy(db, c)
     db.add(FinancialFact(
         source_id=_doc(db, c), company_id=c.id, metric="revenue", value=Decimal("130"),
-        unit="USD", period=period, fiscal_year=2025, fiscal_quarter="Q2", source_type="filing",
+        unit="USD", period=period, fiscal_year=2025, fiscal_quarter="Q2", source_type="SEC",
+        accession_number="0000000000-26-000002",
     ))
     db.commit()
     _promise(db, c, period="2025 Q2")
     [p] = ManagementCredibilityService().reconcile(db, c)
     assert p.status == "open"
     assert p.actual_fact_id is not None
+
+
+@pytest.mark.parametrize("anchored_company,anchored_fact", [(True, False), (False, True)])
+def test_reconcile_without_accession_or_anchor_is_context_only(db, anchored_company, anchored_fact):
+    """Caso original (hecho sin accession / compania sin FY anclado): abstencion, no veredicto."""
+    c = _company(db)
+    if anchored_company:
+        _anchor_fy(db, c)
+    db.add(FinancialFact(
+        source_id=_doc(db, c), company_id=c.id, metric="revenue", value=Decimal("130"),
+        unit="USD", period="2025-06-30:Q2", fiscal_year=2025, fiscal_quarter="Q2",
+        source_type="SEC", accession_number="0000000000-26-000002" if anchored_fact else None,
+    ))
+    db.commit()
+    _promise(db, c, period="2025 Q2")
+    [p] = ManagementCredibilityService().reconcile(db, c)
+    assert p.status == "open" and p.actual_fact_id is not None
