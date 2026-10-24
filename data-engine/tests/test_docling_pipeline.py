@@ -367,3 +367,118 @@ def test_lanes_disabled_serve_classic_pypdf(monkeypatch):
         get_settings.cache_clear()
     assert parsed.parser == "pypdf"
     assert {block.metadata["page"] for block in parsed.blocks} == {1, 2}
+
+
+# --- Contencion Pillow en el worker (SINTETICO: imagenes generadas en el test) ---
+
+
+def _png_bytes(w: int, h: int) -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("1", (w, h)).save(buf, "PNG")
+    return buf.getvalue()
+
+
+def test_heavy_context_bounds_and_restores_pillow_pixel_limit(monkeypatch):
+    from PIL import Image
+
+    monkeypatch.setenv("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", "100")
+    before = Image.MAX_IMAGE_PIXELS
+    with pipeline.docling_heavy_context():
+        assert Image.MAX_IMAGE_PIXELS == 100
+    assert before == Image.MAX_IMAGE_PIXELS
+
+
+def test_heavy_context_image_over_limit_fails_instead_of_warning(monkeypatch):
+    import io
+
+    import pytest
+    from PIL import Image
+
+    monkeypatch.setenv("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", "100")
+    with pipeline.docling_heavy_context():
+        # 2x-limit o mas: DecompressionBombError; entre 1x y 2x: el aviso pasa a error.
+        with pytest.raises((Image.DecompressionBombError, Image.DecompressionBombWarning)):
+            Image.open(io.BytesIO(_png_bytes(20, 20)))
+        with pytest.raises((Image.DecompressionBombError, Image.DecompressionBombWarning)):
+            Image.open(io.BytesIO(_png_bytes(12, 12)))
+        Image.open(io.BytesIO(_png_bytes(9, 9)))  # bajo el tope: normal
+    # fuera del contexto el comportamiento previo no cambia
+    Image.open(io.BytesIO(_png_bytes(20, 20)))
+
+
+def test_heavy_context_restores_even_if_body_raises(monkeypatch):
+    import pytest
+    from PIL import Image
+
+    monkeypatch.setenv("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", "100")
+    before = Image.MAX_IMAGE_PIXELS
+    with pytest.raises(RuntimeError), pipeline.docling_heavy_context():
+        raise RuntimeError("boom")
+    assert before == Image.MAX_IMAGE_PIXELS
+    assert pipeline.heavy_lane_allowed() is False
+
+
+def test_overlapping_heavy_contexts_in_threads_restore_pillow_state(monkeypatch):
+    import threading
+
+    from PIL import Image
+
+    monkeypatch.setenv("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", "100")
+    before = Image.MAX_IMAGE_PIXELS
+    filters_before = list(__import__("warnings").filters)
+    a_in, b_in, a_may_exit = threading.Event(), threading.Event(), threading.Event()
+    seen: dict[str, int] = {}
+
+    def worker_a():
+        with pipeline.docling_heavy_context():
+            a_in.set()
+            b_in.wait(5)
+            a_may_exit.wait(5)  # A sale DESPUES de que B ya entro
+            seen["a_inside"] = Image.MAX_IMAGE_PIXELS
+
+    def worker_b():
+        a_in.wait(5)
+        with pipeline.docling_heavy_context():
+            b_in.set()
+            seen["b_inside"] = Image.MAX_IMAGE_PIXELS
+            a_may_exit.set()
+            # B sigue dentro un instante tras la salida de A
+            import time
+
+            time.sleep(0.2)
+            seen["b_after_a_exit"] = Image.MAX_IMAGE_PIXELS
+
+    threads = [threading.Thread(target=worker_a), threading.Thread(target=worker_b)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(10)
+    assert seen == {"a_inside": 100, "b_inside": 100, "b_after_a_exit": 100}
+    assert before == Image.MAX_IMAGE_PIXELS  # sin fuga tras solapes
+    assert list(__import__("warnings").filters) == filters_before
+
+
+def test_pillow_bomb_in_docling_converter_degrades_to_fast_lane(monkeypatch):
+    import io
+
+    from PIL import Image
+
+    _install_fake_markitdown(monkeypatch, TABLE_MD)
+    monkeypatch.setenv("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", "100")
+
+    class BombConverter:
+        def convert(self, _path):
+            Image.open(io.BytesIO(_png_bytes(20, 20)))  # sintetica, sobre el tope
+            raise AssertionError("no debia llegar aqui")
+
+    with pipeline.docling_heavy_context():
+        parsed = parse_pdf_two_lane(
+            b"%PDF-1.4 fake", "filing.pdf", allow_heavy=True, converter=BombConverter()
+        )
+    assert parsed.parser == "markitdown"
+    assert any("Docling fallo" in w and "DecompressionBomb" in w for w in parsed.warnings)
+    assert parsed.blocks

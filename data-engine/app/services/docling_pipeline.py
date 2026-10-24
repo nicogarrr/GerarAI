@@ -56,6 +56,8 @@ from __future__ import annotations
 import contextvars
 import os
 import re
+import threading
+import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -142,6 +144,60 @@ def heavy_lane_allowed() -> bool:
     return bool(_ALLOW_HEAVY.get())
 
 
+def docling_max_image_pixels() -> int:
+    """Tope de pixeles por imagen decodificada por Pillow en el carril docling.
+
+    Un A4 escaneado a 600 dpi son ~35 M px: el default de 50 M los admite. Pillow
+    solo avisa entre 1x y 2x del tope y falla por encima; aqui ambos casos
+    fallan (ver :func:`_bounded_image_pixels`). Es contencion de bombas de
+    descompresion, NO un parche de los fallos de memoria de Pillow.
+    """
+    return _env_int("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", 50_000_000)
+
+
+_PIL_LOCK = threading.Lock()
+_PIL_DEPTH = 0
+_PIL_SAVED: tuple[Any, Any] | None = None  # (MAX_IMAGE_PIXELS previo, filtro de avisos previo)
+
+
+@contextmanager
+def _bounded_image_pixels() -> Iterator[None]:
+    """Acota Pillow mientras haya algun contexto pesado activo en el proceso.
+
+    ``Image.MAX_IMAGE_PIXELS`` y los filtros de ``warnings`` son estado GLOBAL del
+    proceso, y el worker corre varios hilos. Por eso es un contador con lock: el
+    primero que entra guarda el valor previo y el ultimo que sale lo restaura (un
+    save/restore por hilo dejaria el tope puesto para siempre con solapes). Limite
+    conocido: mientras dure un contexto pesado, otros hilos del mismo proceso que
+    usen Pillow tambien ven el tope.
+
+    Sin Pillow importable no hace nada. Una imagen sobre el tope levanta
+    ``DecompressionBombError``/``Warning`` -> el carril lanza ``_LaneFailed`` y el
+    orquestador sirve el carril rapido (pypdf en ultima instancia).
+    """
+    global _PIL_DEPTH, _PIL_SAVED
+    try:
+        from PIL import Image as _PilImage
+    except Exception:  # noqa: BLE001 - Pillow ausente: sin acotar
+        yield
+        return
+    with _PIL_LOCK:
+        if _PIL_DEPTH == 0:
+            _PIL_SAVED = (_PilImage.MAX_IMAGE_PIXELS, list(warnings.filters))
+            _PilImage.MAX_IMAGE_PIXELS = docling_max_image_pixels()
+            warnings.filterwarnings("error", category=_PilImage.DecompressionBombWarning)
+        _PIL_DEPTH += 1
+    try:
+        yield
+    finally:
+        with _PIL_LOCK:
+            _PIL_DEPTH -= 1
+            if _PIL_DEPTH == 0 and _PIL_SAVED is not None:
+                _PilImage.MAX_IMAGE_PIXELS = _PIL_SAVED[0]
+                warnings.filters[:] = _PIL_SAVED[1]  # pyright: ignore[reportIndexIssue]
+                _PIL_SAVED = None
+
+
 @contextmanager
 def docling_heavy_context() -> Iterator[None]:
     """Habilita el conversor Docling en este hilo/contexto (solo worker).
@@ -149,10 +205,11 @@ def docling_heavy_context() -> Iterator[None]:
     Scoped y sin fugas entre mensajes: al salir se restaura el valor previo.
     """
     token = _ALLOW_HEAVY.set(True)
-    try:
-        yield
-    finally:
-        _ALLOW_HEAVY.reset(token)
+    with _bounded_image_pixels():
+        try:
+            yield
+        finally:
+            _ALLOW_HEAVY.reset(token)
 
 
 def resolve_allow_heavy(explicit: bool | None = None) -> bool:
