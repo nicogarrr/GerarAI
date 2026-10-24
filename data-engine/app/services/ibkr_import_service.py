@@ -1011,7 +1011,28 @@ class IBKRImportService:
         occurrences: Counter[str] = Counter()
         has_rows_without_id = False
         rows_skipped = len(bad_lines)
-        for line_number, row in enumerate(data_rows[1:], start=2):
+        # Se reproduce de la fecha mas antigua a la mas nueva: un export con lo
+        # mas reciente primero evaluaria la venta antes de su compra y el libro
+        # la rechazaria. sorted() es estable; con la misma fecha las compras van
+        # antes que las ventas (el CSV no trae hora, y una venta sin compra
+        # previa el libro la rechaza igualmente). `line_number` sigue siendo la
+        # linea ORIGINAL del fichero para row_errors.
+        def _row_sort_key(item: tuple[int, list[str]]) -> tuple[str, int, int]:
+            line_no, raw = item
+            date_pos = mapping.get("date")
+            action_pos = mapping.get("action")
+            try:
+                day = _date(raw[date_pos].strip()).isoformat() if date_pos is not None else "9999-12-31"
+            except Exception:  # noqa: BLE001 - las filas invalidas ya estan en bad_lines
+                day = "9999-12-31"
+            kind = (
+                _csv_trade_action(raw[action_pos])
+                if action_pos is not None and action_pos < len(raw)
+                else None
+            )
+            return (day, 0 if kind == "buy" else 1, line_no)
+
+        for line_number, row in sorted(enumerate(data_rows[1:], start=2), key=_row_sort_key):
             if line_number in bad_lines:
                 continue
             def _cell(name: str) -> str:
