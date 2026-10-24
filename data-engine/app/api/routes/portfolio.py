@@ -955,6 +955,21 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
     valued: list[tuple[Position, Company, float]] = []
     fx_excluded: list[dict] = []
     for position, company in rows:
+        if position.valuation_hold_reason:
+            # Valoracion en suspension (split sin precio post-split verificado): el
+            # market_price de la fila es un centinela 0, nunca un precio. Se declara
+            # con su causa real, no como "conversion N/D".
+            fx_excluded.append(
+                {
+                    "ticker": company.ticker,
+                    "name": company.name,
+                    "weight": None,
+                    "currency": position.currency,
+                    "reason_code": "valuation_hold",
+                    "reason": f"Valoración pendiente: {position.valuation_hold_reason}.",
+                }
+            )
+            continue
         if position.market_value_base is None:
             fx_excluded.append(
                 {
