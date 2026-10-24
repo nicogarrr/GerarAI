@@ -129,7 +129,7 @@ constraint-dependencies = ["torch==2.14.1+cpu"]
 # Pillow 12.x tiene avisos criticos y 13.0.0 es el primer parche; fastembed (uso solo
 # texto/BM25) declara pillow<13. El override es DELIBERADO y esta probado solo en
 # imports/tests locales (ver PR). Las imagenes lo aplican con un pip --no-deps final.
-override-dependencies = ["pillow>=13.0.0,<14"]
+override-dependencies = ["pillow==13.0.0"]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

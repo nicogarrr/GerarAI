@@ -8,7 +8,7 @@ resolution-markers = [
 
 [manifest]
 constraints = [{ name = "torch", specifier = "==2.14.1+cpu", index = "https://download.pytorch.org/whl/cpu" }]
-overrides = [{ name = "pillow", specifier = ">=13.0.0,<14" }]
+overrides = [{ name = "pillow", specifier = "==13.0.0" }]
 
 [[package]]
 name = "accelerate"

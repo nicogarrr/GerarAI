@@ -36,7 +36,7 @@ COPY requirements.txt .
 # data-engine/scripts/sync_requirements.py).
 RUN pip install torch==2.14.1+cpu --index-url https://download.pytorch.org/whl/cpu \
     && pip install -r requirements.txt \
-    && pip install --no-deps "pillow>=13.0.0,<14"
+    && pip install --no-deps "pillow==13.0.0"
 
 # Modelo de embeddings descargado en build en /opt/hf (legible por el usuario
 # no-root). Sin esto el HOME de `cavaai` (--no-create-home) no es escribible,
