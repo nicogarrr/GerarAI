@@ -270,7 +270,10 @@ services:
           memory: 4G
 
   # worker: 3 threads (antes 6). Con 6 el proceso dramatiq llegaba al limite de 3G
-  # (OOM de cgroup 24/10 19:09 y 19:13, jobs SEC): el hijo muere por SIGKILL.
+  # (OOM de cgroup 24/10 19:09 y 19:13): el hijo muere por SIGKILL. Causa medida:
+  # refresh_bottlenecks cargaba todos los chunks del tenant en memoria
+  # (stored_evidence), y la concurrencia/redelivery de esos jobs sumaba memoria.
+  # Bajar hilos mitiga, no corrige la carga; el fix esta en bottleneck_service.
   worker:
     image: cavaai-backend:prod
     container_name: cavaai-worker
