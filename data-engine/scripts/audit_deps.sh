@@ -10,8 +10,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 OVR="$(grep -oE 'pillow==[0-9][0-9.]*' Dockerfile.prod | head -1)"
 [ -n "$OVR" ] || { echo "no se encontro override pillow== en Dockerfile.prod" >&2; exit 2; }
-V="$(mktemp -d)"; trap 'rm -rf "$V"' EXIT
-uv venv --python 3.12 -q "$V/env"
+# AUDIT_VENV=/ruta reutiliza (y NO borra) un venv para reanudar instalaciones largas;
+# sin ella se crea uno temporal y se borra al salir.
+if [ -n "${AUDIT_VENV:-}" ]; then V="$AUDIT_VENV"; mkdir -p "$V"
+else V="$(mktemp -d)"; trap 'rm -rf "$V"' EXIT; fi
+[ -x "$V/env/bin/python" ] || uv venv --python 3.12 -q "$V/env"
 uv pip install --python "$V/env/bin/python" -q pip pip-audit
 "$V/env/bin/python" -m pip install -q -r requirements.txt
 "$V/env/bin/python" -m pip install -q --no-deps "$OVR"
