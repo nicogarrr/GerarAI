@@ -26,12 +26,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt .
 
+# Pillow >=13: las versiones 12.x tienen avisos criticos y fastembed (solo lo usa para
+# texto/BM25, no imagen) declara pillow<13, asi que pip no lo resuelve solo. Se fuerza
+# DESPUES con --no-deps; `pip check` lo marcara y es esperado. Ver LOCKFILE.md.
+
 # 1) torch CPU-only (linux/amd64 y linux/aarch64) antes que el resto.
 # 2) requirements: sentence-transformers vera torch ya satisfecho.
 # Pin sincronizado con requirements.txt (TORCH_CPU_PIN en
 # data-engine/scripts/sync_requirements.py).
 RUN pip install torch==2.14.1+cpu --index-url https://download.pytorch.org/whl/cpu \
-    && pip install -r requirements.txt
+    && pip install -r requirements.txt \
+    && pip install --no-deps "pillow==13.0.0"
 
 # Modelo de embeddings descargado en build en /opt/hf (legible por el usuario
 # no-root). Sin esto el HOME de `cavaai` (--no-create-home) no es escribible,

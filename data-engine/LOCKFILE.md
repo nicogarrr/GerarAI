@@ -259,3 +259,26 @@ rangos sigue siendo válido) o pasar a auditar el lock.
   (3 paquetes) y `dev` (2).
 - En `win32` instala **168**: los 2 que no bajan son `uvloop 0.23.0`
   (`sys_platform != "win32"`, viene de `uvicorn[standard]`) y `httpx2-jsfetch 1.0`.
+## Override de Pillow (2026-10-24)
+
+`pyproject.toml` fija `override-dependencies = ["pillow==13.0.0"]`. Pillow 12.x tiene avisos
+(pip-audit propone 13.0.0) y ni `fastembed` (hasta 0.9.0, `pillow<13`) ni ningun
+resolvedor lo suben solos. fastembed se usa aqui solo para texto/BM25
+(`hybrid_retrieval.py`), no para imagenes. `docling-core`, `docling-ibm-models` y
+`docling-parse` permiten `<14` en las versiones que pip resuelve hoy; el lock puede
+traer versiones mas viejas (p. ej. docling-core 2.99) con otros topes: el override del lock
+es lo que lo permite.
+
+Las imagenes Docker instalan con pip, que no entiende overrides, asi que ambos Dockerfile
+hacen un `pip install --no-deps "pillow==13.0.0"` final (el mismo pin exacto que el lock).
+`pip check` marcara fastembed; es esperado. IMPORTANTE: pip resuelve `requirements.txt`
+a las ultimas versiones permitidas (hoy fastembed 0.9.0, docling-core 2.104.0), no a las
+del lock; el lock y la imagen pueden diferir.
+
+Verificacion hecha (2026-10-24, sin Docker en el entorno): venv Python 3.12 limpio con los
+mismos pasos que el Dockerfile (torch 2.14.1+cpu, `pip install -r requirements.txt`, luego
+pillow==13.0.0 --no-deps): convert_heavy_docling con un PDF sintetico (texto + imagen
+raster) OK, embed_dense y embed_sparse (BM25) de fastembed OK, test_docling_pipeline y
+test_hybrid_retrieval OK. NO verificado: la imagen Docker real (apt, usuario no-root,
+arquitectura), prod, PDFs reales. El job `pip-audit` remoto resuelve `requirements.txt`
+con pip y seguira viendo Pillow 12.x: no demuestra ni desmiente la imagen.

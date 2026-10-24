@@ -20,7 +20,8 @@ COPY requirements.txt .
 # GB inservibles en una maquina CPU-only. Ver --extra-index-url en
 # requirements.txt y data-engine/scripts/sync_requirements.py.
 RUN pip install torch==2.14.1+cpu --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir --no-deps "pillow==13.0.0"
 
 # Copy source (quantstats package is vendored inside data-engine/)
 COPY . .
