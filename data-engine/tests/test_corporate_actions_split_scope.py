@@ -78,60 +78,37 @@ def test_split_leaves_cash_amounts_untouched(db: Session):
         assert Decimal(row.quantity) in (Decimal("0"), Decimal("1")), row.action
 
 
-def test_split_still_rescales_buy_and_sell_legs(db: Session):
+def test_split_rejects_open_ledger_without_position_row(db: Session):
     company = _company(db)
     buy = _tx(db, company, date(2026, 1, 10), "buy", 10, 100)
-    sell = _tx(db, company, date(2026, 2, 10), "sell", 4, 150)
-    dividend = _tx(db, company, date(2026, 3, 1), "dividend", 1, 25)
-    after = _tx(db, company, date(2026, 7, 1), "buy", 2, 40)
-
-    CorporateActionService().create_action(
-        db, ticker="SPL", action_type="split",
-        effective_date=EFFECTIVE, ratio=RATIO,
-    )
-
+    _tx(db, company, date(2026, 2, 10), "sell", 4, 150)
+    with pytest.raises(ValueError, match="no position row"):
+        CorporateActionService().create_action(
+            db, ticker="SPL", action_type="split",
+            effective_date=EFFECTIVE, ratio=RATIO,
+        )
+    db.rollback()
     db.refresh(buy)
-    assert buy.quantity == Decimal("40")
-    assert buy.price == Decimal("25")
-    assert buy.quantity * buy.price == Decimal("1000")
-    db.refresh(sell)
-    assert sell.quantity == Decimal("16")
-    assert sell.price == Decimal("37.50")
-    # Cash leg in the same company, same window: untouched.
-    db.refresh(dividend)
-    assert dividend.price == Decimal("25")
-    # Leg already post-split: untouched.
-    db.refresh(after)
-    assert after.quantity == Decimal("2") and after.price == Decimal("40")
+    assert buy.quantity == Decimal("10") and buy.price == Decimal("100")
 
-
-def test_split_keeps_position_money_columns_invariant(db: Session):
-    """quantity x price and cost basis are preserved, so the base-currency
-    columns a rebuild would write are already correct: they are left as they
-    are on purpose (and the position is not replayed from the ledger)."""
+def test_split_rejects_manual_position_money_columns_untouched(db: Session):
+    """Posicion manual sin libro: se rechaza y no se escribe nada."""
     company = _company(db)
     position = Position(
         company_id=company.id, quantity=Decimal("10"), average_cost=Decimal("100"),
         market_price=Decimal("150"), market_value=Decimal("1500"),
-        currency="USD", base_currency="USD", market_value_native=Decimal("1500"),
-        market_value_base=Decimal("1500"), cost_basis_native=Decimal("1000"),
-        cost_basis_base=Decimal("1000"), unrealized_pnl_base=Decimal("500"),
-        as_of=date(2026, 5, 1), fx_rate=Decimal("1"),
+        currency="USD", base_currency="USD", cost_basis_native=Decimal("1000"),
+        as_of=date(2026, 5, 1),
     )
     db.add(position)
     db.commit()
-
-    CorporateActionService().create_action(
-        db, ticker="SPL", action_type="split",
-        effective_date=EFFECTIVE, ratio=RATIO,
-    )
-
+    with pytest.raises(ValueError, match="Split rejected"):
+        CorporateActionService().create_action(
+            db, ticker="SPL", action_type="split",
+            effective_date=EFFECTIVE, ratio=RATIO,
+        )
+    db.rollback()
     db.refresh(position)
-    assert position.quantity == Decimal("40.000000")
-    assert position.average_cost == Decimal("25.000000")
+    assert position.quantity == Decimal("10")
     assert position.market_value == Decimal("1500")
-    assert position.cost_basis_native == Decimal("1000")
-    assert position.market_value_base == Decimal("1500")
-    assert position.cost_basis_base == Decimal("1000")
-    assert position.unrealized_pnl_base == Decimal("500")
     assert position.as_of == date(2026, 5, 1)

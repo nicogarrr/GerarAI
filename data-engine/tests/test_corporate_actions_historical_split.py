@@ -65,16 +65,20 @@ def test_historical_split_does_not_rescale_current_position(db):
     assert db.get(CorporateAction, old.id).applied is True
 
 
-def test_split_after_first_trade_still_rescales(db):
+def test_split_after_first_trade_rejects_manual_source_position(db):
     company = _setup(db)
     recent = _split(db, company, date(2022, 6, 1), "4")
     service = CorporateActionService()
     first = service.first_trade_dates(db, {company.id})[company.id]
     assert service.is_historical(recent, first) is False
-    service.apply_action(db, recent.id)
+    # Posicion de fixture con source manual: se rechaza sin escribir (el caso
+    # ledger coherente esta en tests/test_split_mixed_legs.py).
+    with pytest.raises(ValueError, match="not the ledger"):
+        service.apply_action(db, recent.id)
+    db.rollback()
     position = db.query(Position).filter_by(company_id=company.id).one()
-    assert position.quantity == Decimal("400.000000")
-    assert position.average_cost == Decimal("12.500000")
+    assert position.quantity == Decimal("100")
+    assert position.average_cost == Decimal("50")
 
 
 def test_no_transactions_is_not_historical(db):
