@@ -21,13 +21,22 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Override Pillow: debe haber exactamente UN valor distinto entre los Dockerfiles.
-OVR="$(grep -hoE 'pillow==[0-9][0-9.]*' Dockerfile Dockerfile.prod | sort -u)"
-N="$(printf '%s\n' "$OVR" | grep -c . || true)"
-if [ "$N" -ne 1 ]; then
-  echo "ERROR: se esperaba un unico pin pillow== en Dockerfile/Dockerfile.prod, hay $N: $OVR" >&2
-  exit 2
+# Override Pillow: cada Dockerfile debe llevar exactamente UN pin pillow== y ambos
+# deben coincidir; ausente en uno, ambiguo o discordante -> exit 2.
+pin_of() {
+  local v n
+  v="$(grep -oE 'pillow==[0-9][0-9.]*' "$1" | sort -u || true)"
+  n="$(printf '%s' "$v" | grep -c . || true)"
+  if [ "$n" -ne 1 ]; then
+    echo "ERROR: $1 debe tener exactamente un pin pillow== (hay $n: $v)" >&2; exit 2
+  fi
+  printf '%s' "$v"
+}
+PIN_A="$(pin_of Dockerfile)"; PIN_B="$(pin_of Dockerfile.prod)"
+if [ "$PIN_A" != "$PIN_B" ]; then
+  echo "ERROR: pines discordantes: Dockerfile=$PIN_A Dockerfile.prod=$PIN_B" >&2; exit 2
 fi
+OVR="$PIN_A"
 
 MARK=".audit_deps_venv"
 if [ -n "${AUDIT_VENV:-}" ]; then
