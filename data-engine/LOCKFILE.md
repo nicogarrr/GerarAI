@@ -259,3 +259,14 @@ rangos sigue siendo válido) o pasar a auditar el lock.
   (3 paquetes) y `dev` (2).
 - En `win32` instala **168**: los 2 que no bajan son `uvloop 0.23.0`
   (`sys_platform != "win32"`, viene de `uvicorn[standard]`) y `httpx2-jsfetch 1.0`.
+## Override de Pillow (2026-10-24)
+
+`pyproject.toml` fija `override-dependencies = ["pillow>=13.0.0,<14"]`. Pillow 12.x tiene
+avisos criticos (pip-audit propone 13.0.0) y `fastembed` (hasta 0.9.0) declara `pillow<13`,
+asi que ningun resolvedor lo sube solo. fastembed se usa aqui solo para texto/BM25
+(`hybrid_retrieval.py`), no para imagenes. Las imagenes Docker instalan con pip, que no
+entiende overrides: ambos Dockerfile hacen un `pip install --no-deps "pillow>=13.0.0,<14"`
+final. `pip check` lo marcara; es esperado. Verificado SOLO con imports y tests locales
+(matplotlib, pdfplumber, python-pptx, rapidocr, docling, fastembed, test_docling_pipeline,
+test_tax_irpf_filing); la imagen Docker no se ha construido ni se ha ejecutado en prod. El
+job `pip-audit` remoto resuelve `requirements.txt` con pip y seguira viendo 12.x.
