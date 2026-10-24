@@ -420,3 +420,65 @@ def test_heavy_context_restores_even_if_body_raises(monkeypatch):
         raise RuntimeError("boom")
     assert before == Image.MAX_IMAGE_PIXELS
     assert pipeline.heavy_lane_allowed() is False
+
+
+def test_overlapping_heavy_contexts_in_threads_restore_pillow_state(monkeypatch):
+    import threading
+
+    from PIL import Image
+
+    monkeypatch.setenv("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", "100")
+    before = Image.MAX_IMAGE_PIXELS
+    filters_before = list(__import__("warnings").filters)
+    a_in, b_in, a_may_exit = threading.Event(), threading.Event(), threading.Event()
+    seen: dict[str, int] = {}
+
+    def worker_a():
+        with pipeline.docling_heavy_context():
+            a_in.set()
+            b_in.wait(5)
+            a_may_exit.wait(5)  # A sale DESPUES de que B ya entro
+            seen["a_inside"] = Image.MAX_IMAGE_PIXELS
+
+    def worker_b():
+        a_in.wait(5)
+        with pipeline.docling_heavy_context():
+            b_in.set()
+            seen["b_inside"] = Image.MAX_IMAGE_PIXELS
+            a_may_exit.set()
+            # B sigue dentro un instante tras la salida de A
+            import time
+
+            time.sleep(0.2)
+            seen["b_after_a_exit"] = Image.MAX_IMAGE_PIXELS
+
+    threads = [threading.Thread(target=worker_a), threading.Thread(target=worker_b)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(10)
+    assert seen == {"a_inside": 100, "b_inside": 100, "b_after_a_exit": 100}
+    assert before == Image.MAX_IMAGE_PIXELS  # sin fuga tras solapes
+    assert list(__import__("warnings").filters) == filters_before
+
+
+def test_pillow_bomb_in_docling_converter_degrades_to_fast_lane(monkeypatch):
+    import io
+
+    from PIL import Image
+
+    _install_fake_markitdown(monkeypatch, TABLE_MD)
+    monkeypatch.setenv("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", "100")
+
+    class BombConverter:
+        def convert(self, _path):
+            Image.open(io.BytesIO(_png_bytes(20, 20)))  # sintetica, sobre el tope
+            raise AssertionError("no debia llegar aqui")
+
+    with pipeline.docling_heavy_context():
+        parsed = parse_pdf_two_lane(
+            b"%PDF-1.4 fake", "filing.pdf", allow_heavy=True, converter=BombConverter()
+        )
+    assert parsed.parser == "markitdown"
+    assert any("Docling fallo" in w and "DecompressionBomb" in w for w in parsed.warnings)
+    assert parsed.blocks

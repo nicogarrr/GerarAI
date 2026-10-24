@@ -56,6 +56,7 @@ from __future__ import annotations
 import contextvars
 import os
 import re
+import threading
 import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -154,27 +155,47 @@ def docling_max_image_pixels() -> int:
     return _env_int("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", 50_000_000)
 
 
+_PIL_LOCK = threading.Lock()
+_PIL_DEPTH = 0
+_PIL_SAVED: tuple[Any, Any] | None = None  # (MAX_IMAGE_PIXELS previo, filtro de avisos previo)
+
+
 @contextmanager
 def _bounded_image_pixels() -> Iterator[None]:
-    """Acota Pillow dentro del contexto del worker y restaura el estado previo.
+    """Acota Pillow mientras haya algun contexto pesado activo en el proceso.
+
+    ``Image.MAX_IMAGE_PIXELS`` y los filtros de ``warnings`` son estado GLOBAL del
+    proceso, y el worker corre varios hilos. Por eso es un contador con lock: el
+    primero que entra guarda el valor previo y el ultimo que sale lo restaura (un
+    save/restore por hilo dejaria el tope puesto para siempre con solapes). Limite
+    conocido: mientras dure un contexto pesado, otros hilos del mismo proceso que
+    usen Pillow tambien ven el tope.
 
     Sin Pillow importable no hace nada. Una imagen sobre el tope levanta
     ``DecompressionBombError``/``Warning`` -> el carril lanza ``_LaneFailed`` y el
-    orquestador degrada a pypdf (comportamiento ya existente ante fallos).
+    orquestador sirve el carril rapido (pypdf en ultima instancia).
     """
+    global _PIL_DEPTH, _PIL_SAVED
     try:
         from PIL import Image as _PilImage
     except Exception:  # noqa: BLE001 - Pillow ausente: sin acotar
         yield
         return
-    previous = _PilImage.MAX_IMAGE_PIXELS
-    _PilImage.MAX_IMAGE_PIXELS = docling_max_image_pixels()
+    with _PIL_LOCK:
+        if _PIL_DEPTH == 0:
+            _PIL_SAVED = (_PilImage.MAX_IMAGE_PIXELS, list(warnings.filters))
+            _PilImage.MAX_IMAGE_PIXELS = docling_max_image_pixels()
+            warnings.filterwarnings("error", category=_PilImage.DecompressionBombWarning)
+        _PIL_DEPTH += 1
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", _PilImage.DecompressionBombWarning)
-            yield
+        yield
     finally:
-        _PilImage.MAX_IMAGE_PIXELS = previous
+        with _PIL_LOCK:
+            _PIL_DEPTH -= 1
+            if _PIL_DEPTH == 0 and _PIL_SAVED is not None:
+                _PilImage.MAX_IMAGE_PIXELS = _PIL_SAVED[0]
+                warnings.filters[:] = _PIL_SAVED[1]  # pyright: ignore[reportIndexIssue]
+                _PIL_SAVED = None
 
 
 @contextmanager
