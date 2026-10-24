@@ -163,9 +163,7 @@ def test_post_split_sell_updates_base_fx_and_unrealized_like_rebuild(db):
     assert after == before
 
 
-def test_split_without_verified_price_rejects_before_any_write(db):
-    import pytest
-
+def test_split_without_verified_price_applies_accounting_and_holds_valuation(db):
     from app.models.entities import CorporateAction, Transaction
     c = _company(db)
     _buy(db, c, "10", "100", date(2025, 1, 10))
@@ -173,14 +171,53 @@ def test_split_without_verified_price_rejects_before_any_write(db):
     pos.market_price = Decimal("120")  # sin proveniencia: pre o post split?
     pos.as_of = date(2025, 5, 1)
     db.commit()
-    with pytest.raises(ValueError, match="no provenance"):
-        _apply(db, c, "4", date(2025, 6, 1), price=None, as_of=None)
-    assert db.query(CorporateAction).count() == 0
+    _apply(db, c, "4", date(2025, 6, 1), price=None, as_of=None)
+    assert db.query(CorporateAction).one().applied
     tx = db.query(Transaction).filter_by(company_id=c.id).one()
-    assert tx.quantity == Decimal("10") and tx.price == Decimal("100")
+    assert tx.quantity == Decimal("40") and tx.price == Decimal("25")
     pos = db.query(Position).filter_by(company_id=c.id).one()
-    assert pos.quantity == Decimal("10")
-    assert pos.market_price == Decimal("120") and pos.as_of == date(2025, 5, 1)
+    assert pos.quantity == Decimal("40") and pos.average_cost == Decimal("25")
+    # Valoracion suspendida de forma persistente: ni el precio guardado (120, pre-split)
+    # ni uno inferido del ratio; valores NULL, as_of sin mover.
+    assert pos.valuation_hold_reason and "sin precio post-split verificado" in pos.valuation_hold_reason
+    assert pos.valuation_hold_effective_date == date(2025, 6, 1)
+    assert pos.market_price == Decimal("0") and pos.market_value == Decimal("0")
+    assert pos.market_value_base is None and pos.market_value_native is None
+    assert pos.unrealized_pnl_base is None
+    assert pos.as_of == date(2025, 5, 1)
+
+
+def test_hold_survives_rebuild_and_market_refresh_and_only_a_verified_price_releases_it(db):
+    import pytest
+
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.commit()
+    _apply(db, c, "2", date(2025, 6, 1), price=None, as_of=None)
+    ledger = PortfolioLedgerService()
+    _buy(db, c, "1", "55", date(2025, 7, 1))  # una operacion posterior reconstruye la posicion
+    db.commit()
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.valuation_hold_reason and pos.market_price == Decimal("0") and pos.market_value_base is None
+    # un refresco con un precio cualquiera (p. ej. cache pre-split) NO levanta ni reescribe
+    ledger.update_market_price(db, company_id=c.id, price=Decimal("120"), as_of=date(2025, 12, 1))
+    db.commit()
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.valuation_hold_reason and pos.market_price == Decimal("0")
+    # liberar exige hold, precio Decimal valido y fecha >= efectiva
+    with pytest.raises(ValueError):
+        ledger.release_valuation_hold(db, company_id=c.id, price=Decimal("60"), as_of=date(2025, 5, 1))
+    with pytest.raises(ValueError):
+        ledger.release_valuation_hold(db, company_id=c.id, price=60.0, as_of=date(2025, 12, 1))
+    db.rollback()
+    ledger.release_valuation_hold(db, company_id=c.id, price=Decimal("60"), as_of=date(2025, 12, 1))
+    db.commit()
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.valuation_hold_reason is None and pos.market_price == Decimal("60")
+    assert pos.market_value == pos.quantity * Decimal("60")
+    with pytest.raises(ValueError):
+        ledger.release_valuation_hold(db, company_id=c.id, price=Decimal("61"), as_of=date(2025, 12, 2))
 
 
 def test_split_uses_exactly_the_supplied_verified_price_and_date(db):
@@ -444,12 +481,8 @@ def test_split_rejects_future_verified_price_date_with_fixed_clock(db, monkeypat
 
 
 def test_http_route_ignores_post_split_fields_and_does_not_enable_bypass(db):
-    import pytest
-    from fastapi import HTTPException
-
     from app.api.routes.corporate_actions import (
         CorporateActionInput,
-        apply_action,
         create_action,
     )
     from app.models.entities import CorporateAction, Transaction
@@ -463,13 +496,44 @@ def test_http_route_ignores_post_split_fields_and_does_not_enable_bypass(db):
     }
     # El modelo del endpoint no declara esos campos: se descartan, no habilitan nada.
     assert "post_split_price" not in CorporateActionInput.model_fields
-    with pytest.raises(HTTPException) as exc:
-        create_action(CorporateActionInput(**body), db)
-    assert exc.value.status_code == 400 and "no provenance" in exc.value.detail
-    assert db.query(CorporateAction).count() == 0
-    assert db.query(Transaction).filter_by(company_id=c.id).one().quantity == Decimal("10")
-    created = create_action(CorporateActionInput(**{**body, "apply_now": False}), db)
-    with pytest.raises(HTTPException) as exc:
-        apply_action(created["id"], db)
-    assert exc.value.status_code == 400
-    assert db.query(Transaction).filter_by(company_id=c.id).one().quantity == Decimal("10")
+    # El precio del cliente se descarta: se aplica la contabilidad y la valoracion
+    # queda en suspenso (25 no se usa como precio de mercado).
+    create_action(CorporateActionInput(**body), db)
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.valuation_hold_reason and pos.market_price != Decimal("25")
+    assert db.query(CorporateAction).count() == 1
+    assert db.query(Transaction).filter_by(company_id=c.id).one().quantity == Decimal("20")
+
+
+def test_hold_consumers_risk_alert_snapshot_and_api_do_not_present_a_zero_quote(db):
+    from app.api.routes.portfolio import positions as list_positions
+    from app.services.risk_service import RiskService
+
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.commit()
+    _apply(db, c, "2", date(2025, 6, 1), price=None, as_of=None)
+    db.commit()
+    risk = RiskService().dashboard(db)
+    assert [h["ticker"] for h in risk["valuation_hold"]] == [c.ticker]
+    assert risk["status"] == "incomplete_valuation"
+    rows = list_positions(limit=500, offset=0, db=db)
+    row = next(r for r in rows if r["ticker"] == c.ticker)
+    assert row["market_price"] is None and row["market_value"] is None
+    assert row["market_value_native"] is None and row["unrealized_pnl_native"] is None
+    assert row["valuation_hold"]["effective_date"] == "2025-06-01"
+
+
+def test_hold_alert_observation_ignores_the_zero_sentinel(db):
+    from types import SimpleNamespace
+
+    from app.services.alert_rule_service import AlertRuleService
+
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.commit()
+    _apply(db, c, "2", date(2025, 6, 1), price=None, as_of=None)
+    db.commit()
+    rule = SimpleNamespace(company_id=c.id, target={"kind": "market_price"})
+    value, info = AlertRuleService()._observe(db, rule)
+    assert value is None and info["status"] == "missing"

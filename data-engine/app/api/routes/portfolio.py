@@ -419,6 +419,7 @@ def positions(
     for position, company in rows:
         fiscal_info = fiscal.get(company.id) or _fiscal_info(db, company.id, position.as_of)
         has_cost = position.average_cost > 0 and (position.cost_basis_base or 0) > 0
+        held = bool(position.valuation_hold_reason)
         payloads.append(
             {
                 "ticker": company.ticker,
@@ -427,9 +428,23 @@ def positions(
             "analysis": analysis_states.get(company.ticker),
             "quantity": float(position.quantity),
             "average_cost": float(position.average_cost),
-            "market_price": float(position.market_price),
-            "market_value": float(position.market_value),
-            "unrealized_pnl": float(position.unrealized_pnl) if position.average_cost > 0 else None,
+            # Valoracion en suspenso: null con motivo, nunca un 0 presentado como cotizacion.
+            "market_price": None if held else float(position.market_price),
+            "market_value": None if held else float(position.market_value),
+            "valuation_hold": (
+                {
+                    "reason": position.valuation_hold_reason,
+                    "effective_date": position.valuation_hold_effective_date.isoformat()
+                    if position.valuation_hold_effective_date
+                    else None,
+                    "since": position.valuation_hold_since.isoformat()
+                    if position.valuation_hold_since
+                    else None,
+                }
+                if held
+                else None
+            ),
+            "unrealized_pnl": float(position.unrealized_pnl) if position.average_cost > 0 and not held else None,
             "realized_pnl": float(position.realized_pnl),
             "cost_basis": float(
                 position.cost_basis_native
@@ -441,7 +456,9 @@ def positions(
             "native_currency": position.currency,
             "base_currency": position.base_currency,
             "market_value_native": (
-                float(position.market_value_native)
+                None
+                if held
+                else float(position.market_value_native)
                 if position.market_value_native is not None
                 else float(position.market_value)
             ),
@@ -460,7 +477,7 @@ def positions(
                 if position.cost_basis_base is not None
                 else None
             ),
-            "unrealized_pnl_native": float(position.unrealized_pnl) if position.average_cost > 0 else None,
+            "unrealized_pnl_native": float(position.unrealized_pnl) if position.average_cost > 0 and not held else None,
             "unrealized_pnl_base": (
                 float(position.unrealized_pnl_base)
                 if has_cost and position.unrealized_pnl_base is not None

@@ -221,6 +221,7 @@ class PortfolioLedgerService:
             quantity -= transaction.quantity
 
         position = db.scalar(select(Position).where(Position.company_id == company_id))
+        held_as_of = position.as_of if position is not None else None
         if quantity <= 0:
             if position:
                 db.delete(position)
@@ -267,8 +268,51 @@ class PortfolioLedgerService:
         position.fx_rate = current_rate
         position.source = "postgres_ledger"
         position.as_of = valuation_date
+        if position.valuation_hold_reason:
+            self._blank_valuation(position)
+            position.as_of = held_as_of
         db.flush()
         return position
+
+    @staticmethod
+    def _blank_valuation(position: Position) -> None:
+        """Valoracion NO disponible: 0 es solo el centinela interno de market_price
+        (la columna no admite NULL); ningun consumidor debe leerlo como cotizacion."""
+        position.market_price = Decimal("0")
+        position.market_value = Decimal("0")
+        position.unrealized_pnl = Decimal("0")
+        position.market_value_native = None
+        position.market_value_base = None
+        position.unrealized_pnl_base = None
+
+    def hold_valuation(
+        self, db: Session, position: Position, *, reason: str, effective_date: date,
+        since: date | None = None,
+    ) -> None:
+        position.valuation_hold_reason = reason[:200]
+        position.valuation_hold_effective_date = effective_date
+        position.valuation_hold_since = since or date.today()
+        self._blank_valuation(position)
+        db.flush()
+
+    def release_valuation_hold(
+        self, db: Session, *, company_id: int, price: Decimal, as_of: date,
+    ) -> Position:
+        """Levanta la suspension SOLO con un precio verificado por quien llama:
+        finito > 0, fecha entre la fecha efectiva y hoy. Sin hold no hace nada raro:
+        falla, para no usarlo como atajo de repricing."""
+        position = db.scalar(select(Position).where(Position.company_id == company_id))
+        if position is None or not position.valuation_hold_reason:
+            raise ValueError("Position has no valuation hold")
+        from app.services.corporate_actions_service import _validate_verified_price
+
+        _validate_verified_price(
+            price, as_of, position.valuation_hold_effective_date or date.min
+        )
+        position.valuation_hold_reason = None
+        position.valuation_hold_effective_date = None
+        position.valuation_hold_since = None
+        return self.update_market_price(db, company_id=company_id, price=price, as_of=as_of, position=position)
 
     def delete_holding(self, db: Session, company_id: int) -> int:
         tenant_id = db.info.get("tenant_id")
@@ -300,6 +344,9 @@ class PortfolioLedgerService:
             position = db.scalar(select(Position).where(Position.company_id == company_id))
         if position is None:
             raise ValueError("Holding not found")
+        if position.valuation_hold_reason:
+            # Suspension de valoracion: un refresco no la levanta ni reescribe.
+            return position
         position.market_price = price
         position.market_value = position.quantity * price
         # Zero/missing cost is unknown, not a free acquisition. Never turn

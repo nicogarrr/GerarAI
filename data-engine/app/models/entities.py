@@ -248,6 +248,13 @@ class Position(TenantOwnedMixin, Base, TimestampMixin):
     fx_rate: Mapped[Decimal | None] = mapped_column(Numeric(20, 10), nullable=True)
     source: Mapped[str] = mapped_column(String(80), default="manual")
     as_of: Mapped[date] = mapped_column(Date, default=date.today)
+    # Valoracion en suspenso (p. ej. tras un split aplicado sin precio post-split
+    # verificado). NULL = sin suspension. Mientras haya motivo, market_price /
+    # market_value / unrealized_* NO son una cotizacion: ningun refresco ni rebuild
+    # los repone; solo release_valuation_hold con un precio verificado.
+    valuation_hold_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    valuation_hold_effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    valuation_hold_since: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     company: Mapped[Company] = relationship(back_populates="positions")
 

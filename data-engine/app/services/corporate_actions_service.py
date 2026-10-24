@@ -211,6 +211,7 @@ class CorporateActionService:
         if ratio <= 0:
             raise ValueError("Ratio must be positive")
         rebuild_company_id: int | None = None
+        hold_old_as_of: date | None = None
 
         if action.action_type in {"split", "reverse_split"}:
             _validate_verified_price(
@@ -260,13 +261,6 @@ class CorporateActionService:
                         raise ValueError(
                             "Split rejected: position source "
                             f"{position.source!r} is not the ledger; review the position"
-                        )
-                    if post_split_price is None:
-                        raise ValueError(
-                            "Split rejected: the stored market price has no "
-                            "provenance (it cannot be told whether it is pre- or "
-                            "post-split). Supply a verified post-split price and "
-                            "its date; nothing was changed"
                         )
                     if not legs:
                         raise ValueError(
@@ -318,8 +312,14 @@ class CorporateActionService:
                 # fecha los aporta quien aplica (verificados); jamas se deduce
                 # del precio guardado, que no tiene proveniencia.
                 if position is not None:
-                    position.market_price = post_split_price
-                    position.as_of = post_split_price_as_of
+                    if post_split_price is None:
+                        # Sin precio post-split verificado: la contabilidad (cantidad,
+                        # coste, realizado) se aplica; la valoracion queda en suspenso
+                        # persistente. Nada se deduce del precio guardado ni del ratio.
+                        hold_old_as_of = position.as_of
+                    else:
+                        position.market_price = post_split_price
+                        position.as_of = post_split_price_as_of
                     rebuild_company_id = action.company_id
 
             # Share-denominated legs only. Cash rows keep their amount in
@@ -356,6 +356,17 @@ class CorporateActionService:
             from app.services.portfolio_ledger_service import PortfolioLedgerService
 
             db.flush()
-            PortfolioLedgerService().rebuild_position(db, rebuild_company_id)
+            ledger = PortfolioLedgerService()
+            rebuilt = ledger.rebuild_position(db, rebuild_company_id)
+            if hold_old_as_of is not None and rebuilt is not None:
+                ledger.hold_valuation(
+                    db, rebuilt,
+                    reason=(
+                        f"split {action.ratio}:1 de {action.effective_date.isoformat()} aplicado "
+                        "sin precio post-split verificado: valoracion no disponible"
+                    ),
+                    effective_date=action.effective_date,
+                )
+                rebuilt.as_of = hold_old_as_of
         action.applied = True
         action.applied_at = datetime.now(UTC)

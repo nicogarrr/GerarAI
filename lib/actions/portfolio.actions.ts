@@ -125,9 +125,11 @@ type ResearchPortfolioPosition = {
     ticker: string;
     quantity: number;
     average_cost: number;
-    market_price: number;
-    market_value: number;
-    unrealized_pnl: number;
+    // null = valoración en suspenso (p. ej. split sin precio post-split verificado).
+    market_price: number | null;
+    market_value: number | null;
+    unrealized_pnl: number | null;
+    valuation_hold?: { reason: string; effective_date: string | null; since: string | null } | null;
     currency: string;
     native_currency: string;
     base_currency: string;
@@ -231,7 +233,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         getPortfolioDataQuality(canonicalUserId),
     ]);
     const holdings = positions.map((position): PortfolioHolding => {
-        const currentPrice = position.market_price;
+        const currentPrice = position.market_price ?? 0;
         const cost = position.cost_basis_base ?? 0;
         const value = position.market_value_base ?? 0;
         const gain = position.unrealized_pnl_base ?? 0;

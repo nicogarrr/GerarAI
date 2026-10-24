@@ -14,6 +14,7 @@ class RiskService:
         fx = PortfolioFXService()
         base_currency = fx.base_currency(db)
         missing_fx: list[dict] = []
+        held_valuation: list[dict] = []
         rows = db.execute(select(Position, Company).join(Company, Position.company_id == Company.id)).all()
         positions = []
         fx_used: dict[tuple, dict] = {}
@@ -30,6 +31,19 @@ class RiskService:
                     "rate": float(position.fx_rate),
                     "as_of": position.as_of.isoformat(),
                 }
+            if position.valuation_hold_reason:
+                # Valoracion en suspenso: no entra con peso 0 ni con precio guardado;
+                # queda declarada como excluida.
+                held_valuation.append(
+                    {
+                        "ticker": company.ticker,
+                        "reason": position.valuation_hold_reason,
+                        "effective_date": position.valuation_hold_effective_date.isoformat()
+                        if position.valuation_hold_effective_date
+                        else None,
+                    }
+                )
+                continue
             value_base = position.market_value_base
             if value_base is None and position.currency == base_currency:
                 value_base = position.market_value_native or position.market_value
@@ -100,7 +114,8 @@ class RiskService:
         )
         result.update(
             {
-                "status": "incomplete_fx" if missing_fx else "ok",
+                "status": "incomplete_fx" if missing_fx else ("incomplete_valuation" if held_valuation else "ok"),
+                "valuation_hold": held_valuation,
                 "base_currency": base_currency,
                 "cash_native": cash_native,
                 "cash_assets_base": cash_assets_base,
@@ -112,6 +127,7 @@ class RiskService:
             "method": "portfolio_risk_snapshot_fx_v2",
             "fx_policy": "quote amount multiplied by latest rate on or before as_of",
             "excluded_for_missing_fx": len(missing_fx),
+            "excluded_for_valuation_hold": len(held_valuation),
         }
         position_dates = [p["as_of"] for p in positions if p.get("as_of")]
         result["data_as_of"] = min(position_dates) if position_dates else None
@@ -126,7 +142,7 @@ class RiskService:
         result["provenance"] = provenance(
             "Base de datos de GerarAI",
             SourceKind.INTERNAL,
-            coverage=Coverage.PARTIAL if missing_fx else Coverage.OK,
+            coverage=Coverage.PARTIAL if (missing_fx or held_valuation) else Coverage.OK,
             note="Calculado desde posiciones/precios/FX persistidos; cada fila upstream lleva su propia procedencia.",
         )
         return result
