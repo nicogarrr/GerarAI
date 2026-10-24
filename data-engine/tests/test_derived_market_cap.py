@@ -19,7 +19,9 @@ from app.models.entities import (
 )
 from app.services.derived_market_cap_service import refresh_derived_market_cap
 
-TODAY = date(2026, 10, 19)
+# Fecha real: el endpoint usa date.today(); con una constante el test caducaba solo
+# (precio "de hace 3 dias" pasaba a viejo y el derivado se negaba a servirse, que es correcto).
+TODAY = date.today()
 
 
 @pytest.fixture

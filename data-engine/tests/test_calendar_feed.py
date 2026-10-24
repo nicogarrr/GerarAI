@@ -1,4 +1,5 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi import HTTPException
@@ -9,7 +10,11 @@ from app.core.database import SessionLocal, init_db
 from app.models import Company, EarningsDate, Position, Tenant, WatchItem
 from app.services import calendar_feed_service as svc
 
-TODAY = date(2026, 10, 19)
+# Fecha real de hoy (Madrid), no una constante: las filas automaticas ESTIMADAS ya
+# pasadas se descartan a proposito (_keep_auto_row: pueden no haber ocurrido), asi que con
+# una fecha fija el test caducaba solo al pasar esas fechas y parecia un fallo del feed.
+TODAY = datetime.now(ZoneInfo("Europe/Madrid")).date()
+D_HELD, D_WATCH, D_OTHER = TODAY + timedelta(days=2), TODAY + timedelta(days=3), TODAY + timedelta(days=4)
 
 
 def _company(db, ticker, name):
@@ -39,8 +44,8 @@ def _setup(db):
         Position(company_id=held.id, quantity=10, tenant_id=ta.id),
     ])
     now = datetime.now(UTC)
-    for t, d in (("FHELD", 21), ("FWATCH", 22), ("FOTHER", 23)):
-        db.add(EarningsDate(ticker=t, event_date=date(2026, 10, d), source="nasdaq+yahoo", source_label="NASDAQ + Yahoo",
+    for t, d in (("FHELD", D_HELD), ("FWATCH", D_WATCH), ("FOTHER", D_OTHER)):
+        db.add(EarningsDate(ticker=t, event_date=d, source="nasdaq+yahoo", source_label="NASDAQ + Yahoo",
                             session="after_market" if t == "FHELD" else None, fiscal_label="Sep/2026",
                             confirmed=t != "FWATCH", fetched_at=now))
     db.commit()
@@ -97,7 +102,7 @@ def test_public_feed_is_tenant_scoped_scope_filtered_and_has_no_portfolio_data()
         body = "\n".join(line for line in ics.splitlines() if not line.startswith("X-WR-CALNAME:"))
         for banned in ("quantity", "cartera", "watchlist", "cost", "price"):
             assert banned not in body.lower()
-        assert "DTSTART;VALUE=DATE:20261021" in ics and "T" not in ics.split("DTSTART;VALUE=DATE:")[1][:9]
+        assert f"DTSTART;VALUE=DATE:{D_HELD:%Y%m%d}" in ics and "T" not in ics.split("DTSTART;VALUE=DATE:")[1][:9]
         assert ics.endswith("END:VCALENDAR\r\n") and "\r\n" in ics
         assert all(len(line.encode()) <= 75 for line in ics.split("\r\n"))
     finally:
