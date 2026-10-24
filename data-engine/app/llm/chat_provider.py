@@ -59,6 +59,16 @@ def _note_failure(provider, model: str | None, exc: Exception) -> None:
         _cooldowns[_member_key(provider, model)] = time.monotonic() + QUOTA_COOLDOWN_SECONDS
 
 
+def _failure_label(provider, model: str | None, exc: BaseException) -> str:
+    """"proveedor:modelo:Clase[status]" sin mensaje, URL ni cabeceras."""
+    status = getattr(exc, "status_code", None) if isinstance(exc, ProviderHTTPError) else None
+    return f"{getattr(provider, 'name', '?')}:{model or '?'}:{type(exc).__name__}{status or ''}"
+
+
+def _with_trail(response: LLMResponse, trail: list[str]) -> LLMResponse:
+    return replace(response, fallback_trail=(*trail, *response.fallback_trail)) if trail else response
+
+
 def reset_quota_cooldowns() -> None:
     _cooldowns.clear()
 
@@ -143,6 +153,7 @@ class ChatFallbackProvider(LLMProvider):
         # Do not re-probe exhausted members until their cooldown expires.
         ready = [m for m in members if not _is_cooling(*m)]
         last: Exception | None = None
+        trail = [f"{getattr(p, 'name', '?')}:{m or '?'}:cooling" for p, m in members if _is_cooling(p, m)]
         if not ready:
             raise ProviderHTTPError(self.name, 429)
         for provider, model in ready:
@@ -152,8 +163,9 @@ class ChatFallbackProvider(LLMProvider):
             )
             logger.info("chat backup attempt provider=%s model=%s", provider.name, model)
             try:
-                return await self._candidate(provider, member_request, backup=True)
+                return _with_trail(await self._candidate(provider, member_request, backup=True), trail)
             except _FALL_THROUGH as exc:
+                trail.append(_failure_label(provider, model, exc))
                 logger.warning("chat backup failed provider=%s model=%s error=%s detail=%.200s",
                                provider.name, model, type(exc).__name__, exc)
                 # 503 de capacidad (Gemini "high demand"): un reintento corto
@@ -162,7 +174,7 @@ class ChatFallbackProvider(LLMProvider):
                     try:
                         await asyncio.sleep(min(0.5, remaining_seconds(self.total)))
                         logger.info("chat backup retry provider=%s model=%s", provider.name, model)
-                        return await self._candidate(provider, member_request, backup=True)
+                        return _with_trail(await self._candidate(provider, member_request, backup=True), trail)
                     except _FALL_THROUGH as retry_exc:
                         logger.warning("chat backup retry failed provider=%s model=%s error=%s detail=%.200s",
                                        provider.name, model, type(retry_exc).__name__, retry_exc)
@@ -176,10 +188,14 @@ class ChatFallbackProvider(LLMProvider):
         primary_model = self.primary.model_router.resolve(request) if getattr(self.primary, "model_router", None) else None
         if _is_cooling(self.primary, primary_model):
             # Cuota del primario agotada hace segundos: directo a la cadena.
-            return await self._backup_chain(request)
+            return _with_trail(
+                await self._backup_chain(request),
+                [f"{getattr(self.primary, 'name', '?')}:{primary_model or '?'}:cooling"],
+            )
         primary = asyncio.create_task(self._candidate(self.primary, request))
         tasks = [primary]
         rejected_primary = None
+        primary_label: str | None = None
         try:
             done, _ = await asyncio.wait({primary}, timeout=self.delay)
             if done:
@@ -190,6 +206,7 @@ class ChatFallbackProvider(LLMProvider):
                     return response
                 except _FALL_THROUGH as exc:
                     _note_failure(self.primary, primary_model, exc)
+                    primary_label = _failure_label(self.primary, primary_model, exc)
                     if isinstance(exc, _LanguageRejected):
                         rejected_primary = exc.response
             # Pin backup explicitly. Never send DeepSeek aliases or effort=max.
@@ -206,10 +223,17 @@ class ChatFallbackProvider(LLMProvider):
                         response = task.result()
                         if response.degraded or response.finish_reason == "length":
                             raise ProviderResponseError("chat response was truncated")
+                        if task is not primary:
+                            # Respondio la cadena de respaldo: el primario no llego a tiempo o fallo.
+                            label = primary_label or _failure_label(
+                                self.primary, primary_model, TimeoutError("not_answered")
+                            )
+                            response = _with_trail(response, [label])
                         return response
                     except _FALL_THROUGH as exc:
                         last = exc
                         if task is primary:
+                            primary_label = _failure_label(self.primary, primary_model, exc)
                             _note_failure(self.primary, primary_model, exc)
                         if task is primary and isinstance(exc, _LanguageRejected):
                             rejected_primary = exc.response
