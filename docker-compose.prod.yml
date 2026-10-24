@@ -269,11 +269,13 @@ services:
         limits:
           memory: 4G
 
+  # worker: 3 threads (antes 6). Con 6 el proceso dramatiq llegaba al limite de 3G
+  # (OOM de cgroup 24/10 19:09 y 19:13, jobs SEC): el hijo muere por SIGKILL.
   worker:
     image: cavaai-backend:prod
     container_name: cavaai-worker
     restart: unless-stopped
-    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "6", "-Q", "default", "prices"]
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "3", "-Q", "default", "prices"]
     environment:
       - EIA_API_KEY=${EIA_API_KEY:-}
       - IBKR_FLEX_TOKEN=${IBKR_FLEX_TOKEN:-}
