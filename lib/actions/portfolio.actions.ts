@@ -61,7 +61,10 @@ export type PortfolioHolding = {
     symbol: string;
     quantity: number;
     avgPrice: number;
-    currentPrice: number;
+    /** null = valoración en suspensión: no hay cotización actual que mostrar. */
+    currentPrice: number | null;
+    /** Motivo y fecha de la suspensión de valoración (p. ej. split sin precio post-split verificado). */
+    valuationHold: { reason: string; effectiveDate: string | null } | null;
     value: number;
     cost: number;
     gain: number;
@@ -94,8 +97,10 @@ export type PortfolioSummary = {
     cashAssets?: number;
     marginDebt?: number;
     baseCurrency: string;
-    status: 'ok' | 'incomplete_fx';
+    status: 'ok' | 'incomplete_fx' | 'incomplete_valuation';
     missingFx: Array<Record<string, unknown>>;
+    /** Posiciones excluidas de los totales por valoración en suspensión (independiente de FX). */
+    valuationHold: Array<{ ticker: string; reason: string; effective_date: string | null }>;
     /** Tipo (divisa base por unidad de divisa original) y fecha usados en cada conversion. */
     fxRates?: PortfolioFxRate[];
     cashAsOf?: string | null;
@@ -156,9 +161,10 @@ type ResearchPortfolioSummaryResponse = {
     margin_debt_base?: number;
     /** Diccionario por moneda ya en divisa base: { EUR: 1234.56 }. */
     cash: Record<string, number>;
-    status: 'ok' | 'incomplete_fx';
+    status: 'ok' | 'incomplete_fx' | 'incomplete_valuation';
     base_currency: string;
     missing_fx: Array<Record<string, unknown>>;
+    valuation_hold?: Array<{ ticker: string; reason: string; effective_date: string | null }>;
     fx_rates?: PortfolioFxRate[];
     cash_as_of?: string | null;
     data_as_of?: string | null;
@@ -233,7 +239,8 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         getPortfolioDataQuality(canonicalUserId),
     ]);
     const holdings = positions.map((position): PortfolioHolding => {
-        const currentPrice = position.market_price ?? 0;
+        const held = Boolean(position.valuation_hold);
+        const currentPrice = held ? null : position.market_price;
         const cost = position.cost_basis_base ?? 0;
         const value = position.market_value_base ?? 0;
         const gain = position.unrealized_pnl_base ?? 0;
@@ -243,13 +250,16 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
             quantity: position.quantity,
             avgPrice: position.average_cost,
             currentPrice,
+            valuationHold: position.valuation_hold ? { reason: position.valuation_hold.reason, effectiveDate: position.valuation_hold.effective_date } : null,
             value,
             cost,
             gain,
             gainPercent: cost > 0 ? (gain / cost) * 100 : 0,
             nativeCurrency: position.native_currency,
             baseCurrency: position.base_currency,
-            fxMissing: position.market_value_base === null || position.cost_basis_base === null,
+            // fxMissing = no hay valor/rentabilidad base válidos. En suspensión de valoración también
+            // (la UI muestra el motivo real vía valuationHold, no «conversión»).
+            fxMissing: held || position.market_value_base === null || position.cost_basis_base === null,
             nativeGain: position.unrealized_pnl_native ?? null,
             nativeCost: position.cost_basis_native ?? null,
             valueMissing: position.market_value_base === null,
@@ -274,6 +284,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         baseCurrency: backendSummary.base_currency,
         status: backendSummary.status,
         missingFx: backendSummary.missing_fx,
+        valuationHold: backendSummary.valuation_hold ?? [],
         fxRates: backendSummary.fx_rates,
         cashAsOf: backendSummary.cash_as_of,
         positionsAsOf: backendSummary.data_as_of,

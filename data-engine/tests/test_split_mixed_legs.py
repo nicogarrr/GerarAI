@@ -201,8 +201,10 @@ def test_hold_survives_rebuild_and_market_refresh_and_only_a_verified_price_rele
     pos = db.query(Position).filter_by(company_id=c.id).one()
     assert pos.valuation_hold_reason and pos.market_price == Decimal("0") and pos.market_value_base is None
     # un refresco con un precio cualquiera (p. ej. cache pre-split) NO levanta ni reescribe
-    ledger.update_market_price(db, company_id=c.id, price=Decimal("120"), as_of=date(2025, 12, 1))
-    db.commit()
+    from app.services.portfolio_ledger_service import ValuationHeldError
+    with pytest.raises(ValuationHeldError):
+        ledger.update_market_price(db, company_id=c.id, price=Decimal("120"), as_of=date(2025, 12, 1))
+    db.rollback()
     pos = db.query(Position).filter_by(company_id=c.id).one()
     assert pos.valuation_hold_reason and pos.market_price == Decimal("0")
     # liberar exige hold, precio Decimal valido y fecha >= efectiva
@@ -537,3 +539,66 @@ def test_hold_alert_observation_ignores_the_zero_sentinel(db):
     rule = SimpleNamespace(company_id=c.id, target={"kind": "market_price"})
     value, info = AlertRuleService()._observe(db, rule)
     assert value is None and info["status"] == "missing"
+
+
+def test_price_update_on_held_position_is_an_explicit_error_not_a_silent_noop(db):
+    import pytest
+
+    from app.services.portfolio_ledger_service import PortfolioLedgerService, ValuationHeldError
+
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.commit()
+    _apply(db, c, "2", date(2025, 6, 1), price=None, as_of=None)
+    db.commit()
+    with pytest.raises(ValuationHeldError, match="on hold"):
+        PortfolioLedgerService().update_market_price(db, company_id=c.id, price=Decimal("60"), as_of=date(2025, 12, 1))
+
+
+def test_manual_price_route_returns_409_on_held_position(db):
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.routes.portfolio import PortfolioPriceInput, update_price
+
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.commit()
+    _apply(db, c, "2", date(2025, 6, 1), price=None, as_of=None)
+    db.commit()
+    with pytest.raises(HTTPException) as exc:
+        update_price(PortfolioPriceInput(ticker=c.ticker, price=Decimal("60"), as_of=date(2025, 12, 1)), db)
+    assert exc.value.status_code == 409
+
+
+def test_summary_carries_the_hold(db):
+    from app.api.routes.portfolio import portfolio_summary
+
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.commit()
+    _apply(db, c, "2", date(2025, 6, 1), price=None, as_of=None)
+    db.commit()
+    summary = portfolio_summary(db)
+    assert [h["ticker"] for h in summary["valuation_hold"]] == [c.ticker]
+    assert summary["status"] in {"incomplete_valuation", "incomplete_fx"}
+
+
+def test_ibkr_flex_import_keeps_the_hold_and_reports_it(db):
+    from app.services.ibkr_import_service import IBKRImportService
+
+    c = _company(db)
+    _buy(db, c, "10", "100", date(2025, 1, 10))
+    db.commit()
+    _apply(db, c, "2", date(2025, 6, 1), price=None, as_of=None)
+    db.commit()
+    xml = (
+        '<FlexQueryResponse><FlexStatements><FlexStatement><OpenPositions>'
+        f'<OpenPosition symbol="{c.ticker}" position="20" markPrice="60" positionValue="1200" '
+        'costBasisPrice="50" currency="USD" reportDate="2025-12-01"/>'
+        '</OpenPositions></FlexStatement></FlexStatements></FlexQueryResponse>'
+    )
+    result = IBKRImportService().import_flex_xml(db, xml)
+    pos = db.query(Position).filter_by(company_id=c.id).one()
+    assert pos.valuation_hold_reason and pos.market_price == Decimal("0") and pos.market_value_base is None
+    assert result["valuation_hold_kept"] == [c.ticker]

@@ -15,3 +15,9 @@ export function holdingDisplayMode(h: HoldingDisplayInput): HoldingDisplayMode {
     if (!h.valueMissing && h.value > 0) return 'value';
     return 'na';
 }
+
+/** Texto visible de una valoración en suspensión: motivo y fecha, nunca un 0 como cotización. */
+export function valuationHoldLabel(hold: { reason: string; effectiveDate: string | null }): string {
+    const date = hold.effectiveDate ? hold.effectiveDate.split('-').reverse().join('/') : null;
+    return date ? `Valoración pendiente: split del ${date} sin precio post-split verificado` : 'Valoración pendiente: sin precio post-split verificado';
+}

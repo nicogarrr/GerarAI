@@ -33,6 +33,7 @@ from app.services.portfolio_ledger_service import (
     PortfolioLedgerService,
     PortfolioMixedCurrencyError,
     PortfolioOversellError,
+    ValuationHeldError,
 )
 from app.services.portfolio_snapshot_service import PortfolioSnapshotService
 from app.services.risk_service import RiskService
@@ -191,6 +192,7 @@ def portfolio_summary(db: Session = Depends(get_db)) -> dict:
         "cash_as_of": risk.get("cash_as_of"),
         "fx_rates": risk.get("fx_rates", []),
         "valuation_dates_differ": risk.get("valuation_dates_differ", False),
+        "valuation_hold": risk.get("valuation_hold", []),
         "provenance": risk.get("provenance"),
     }
 
@@ -696,6 +698,9 @@ def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) ->
         )
         db.commit()
         return {"ticker": company.ticker, "market_price": float(position.market_price)}
+    except ValuationHeldError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=404, detail=str(exc)) from exc

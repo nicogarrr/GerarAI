@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus';
 import ExtendedHoursLine from '@/components/common/ExtendedHoursLine';
+import { valuationHoldLabel } from '@/lib/portfolio/holding-display';
 import type { PortfolioHolding } from '@/lib/actions/portfolio.actions';
 import { deleteHolding, refreshPortfolioHoldings } from '@/lib/actions/portfolio.actions';
 import { useState, useEffect } from 'react';
@@ -211,9 +212,9 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <dl className="mt-3 space-y-1.5 text-sm">
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Cantidad</dt><dd className="text-gray-200">{formatNumber(holding.quantity, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Promedio</dt><dd className="text-gray-200">{holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : NA}</dd></div>
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Actual</dt><dd className="font-medium text-gray-200">{format(holding.currentPrice, holding.nativeCurrency)}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Actual</dt><dd className="font-medium text-gray-200">{holding.currentPrice === null ? 'N/D' : format(holding.currentPrice, holding.nativeCurrency)}</dd></div>
                       <div className="-mt-1 flex justify-end"><ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} /></div>
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Valor</dt><dd className="font-semibold text-gray-100">{holding.fxMissing ? 'Conversión o coste no disponible' : format(holding.value, holding.baseCurrency)}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Valor</dt><dd className="font-semibold text-gray-100">{holding.valuationHold ? valuationHoldLabel(holding.valuationHold) : holding.fxMissing ? 'Conversión o coste no disponible' : format(holding.value, holding.baseCurrency)}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Peso</dt><dd className="font-semibold text-gray-100">{weight(holding.symbol)}</dd></div>
                       <div className="flex items-center justify-between gap-2">
                         <dt className="text-gray-500">G/P</dt>
@@ -252,7 +253,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         </dd>
                       </div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">En cartera desde</dt><dd className="text-gray-200">{formatDate(holding.firstBuyDate)}</dd></div>
-                      <div className="flex items-center justify-between gap-2"><dt className="text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</dt><dd><AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice > 0 ? holding.currentPrice : null} /></dd></div>
+                      <div className="flex items-center justify-between gap-2"><dt className="text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</dt><dd><AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} /></dd></div>
                     </dl>
                   </div>
                 );
@@ -324,11 +325,11 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         {holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : NA}
                       </TableCell>
                       <TableCell className="text-right text-gray-300 font-medium">
-                        {format(holding.currentPrice, holding.nativeCurrency)}
+                        {holding.currentPrice === null ? 'N/D' : format(holding.currentPrice, holding.nativeCurrency)}
                         <ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} />
                       </TableCell>
                       <TableCell className="text-right font-semibold text-gray-100">
-                        {holding.fxMissing ? <Badge variant="outline">Conversión o coste no disponible</Badge> : format(holding.value, holding.baseCurrency)}
+                        {holding.valuationHold ? <Badge variant="outline">{valuationHoldLabel(holding.valuationHold)}</Badge> : holding.fxMissing ? <Badge variant="outline">Conversión o coste no disponible</Badge> : format(holding.value, holding.baseCurrency)}
                       </TableCell>
                       <TableCell className="text-right font-semibold text-gray-100">{weight(holding.symbol)}</TableCell>
                       <TableCell className="text-right">
@@ -346,7 +347,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-sm">
-                        <AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice > 0 ? holding.currentPrice : null} />
+                        <AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} />
                       </TableCell>
                     </TableRow>
                   );

@@ -17,3 +17,14 @@ test('sin conversion del valor es N/D, nunca 0', () => {
 test('valor 0 sin dato no se muestra como 0', () => {
     assert.equal(holdingDisplayMode({ cost: 0, value: 0, valueMissing: false, fxMissing: false }), 'na');
 });
+
+// @ts-expect-error guard importa .ts directamente
+import { valuationHoldLabel } from '../lib/portfolio/holding-display.ts';
+
+test('valuationHoldLabel muestra motivo y fecha efectiva, nunca una cotización', () => {
+    assert.equal(
+        valuationHoldLabel({ reason: 'x', effectiveDate: '2025-06-01' }),
+        'Valoración pendiente: split del 01/06/2025 sin precio post-split verificado',
+    );
+    assert.match(valuationHoldLabel({ reason: 'x', effectiveDate: null }), /Valoración pendiente/);
+});

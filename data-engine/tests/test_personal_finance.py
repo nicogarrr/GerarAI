@@ -108,22 +108,22 @@ def test_plan_metrics_and_drift(db: Session, rklb: Company):
     assert drift["plan_exists"] is True
 
 
-def test_split_without_verified_price_is_rejected_without_writes(db: Session, rklb: Company):
+def test_split_without_verified_price_applies_accounting_and_holds_valuation(db: Session, rklb: Company):
     ledger = PortfolioLedgerService()
     ledger.create_transaction(
         db, ticker="RKLB", action="buy", quantity=Decimal("50"), price=Decimal("30"),
         trade_date=date(2026, 1, 1), fees=Decimal("0"), currency="USD",
     )
     db.commit()
-    with pytest.raises(ValueError, match="no provenance"):
-        CorporateActionService().create_action(
-            db, ticker="RKLB", action_type="split",
-            effective_date=date(2026, 7, 1), ratio=Decimal("4"), description="1:4",
-        )
+    CorporateActionService().create_action(
+        db, ticker="RKLB", action_type="split",
+        effective_date=date(2026, 7, 1), ratio=Decimal("4"), description="1:4",
+    )
     position = db.scalar(select(Position).where(Position.company_id == rklb.id))
-    assert position.quantity == Decimal("50")
+    assert position.quantity == Decimal("200") and position.average_cost == Decimal("7.5")
+    assert position.valuation_hold_reason and position.market_value_base is None
     tx = db.scalar(select(Transaction).where(Transaction.company_id == rklb.id))
-    assert tx.quantity == Decimal("50") and tx.price == Decimal("30")
+    assert tx.quantity == Decimal("200") and tx.price == Decimal("7.5")
 
 
 def test_split_adjusts_position_and_historical_transactions(db: Session, rklb: Company):

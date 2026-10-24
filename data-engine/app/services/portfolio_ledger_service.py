@@ -29,6 +29,10 @@ class PortfolioMixedCurrencyError(ValueError):
     """Posición mult/divisa. La ruta la mapea a 422."""
 
 
+class ValuationHeldError(ValueError):
+    """La posicion tiene la valoracion en suspension: un precio no la levanta."""
+
+
 class PortfolioLedgerService:
     """Canonical transaction ledger and derived positions for one tenant."""
 
@@ -300,7 +304,13 @@ class PortfolioLedgerService:
     ) -> Position:
         """Levanta la suspension SOLO con un precio verificado por quien llama:
         finito > 0, fecha entre la fecha efectiva y hoy. Sin hold no hace nada raro:
-        falla, para no usarlo como atajo de repricing."""
+        falla, para no usarlo como atajo de repricing.
+
+        Frontera de autoridad: NO hay ruta HTTP ni job que lo llame; es solo una
+        puerta de servicio. Quien lo invoque debe traer un precio verificado fuera
+        de banda (la validacion de aqui solo descarta basura: no acredita
+        procedencia). Cablearlo a un endpoint, a la cache market_prices o a un
+        importador sin esa verificacion reintroduce una valoracion falsa."""
         position = db.scalar(select(Position).where(Position.company_id == company_id))
         if position is None or not position.valuation_hold_reason:
             raise ValueError("Position has no valuation hold")
@@ -312,6 +322,7 @@ class PortfolioLedgerService:
         position.valuation_hold_reason = None
         position.valuation_hold_effective_date = None
         position.valuation_hold_since = None
+        db.flush()
         return self.update_market_price(db, company_id=company_id, price=price, as_of=as_of, position=position)
 
     def delete_holding(self, db: Session, company_id: int) -> int:
@@ -345,8 +356,13 @@ class PortfolioLedgerService:
         if position is None:
             raise ValueError("Holding not found")
         if position.valuation_hold_reason:
-            # Suspension de valoracion: un refresco no la levanta ni reescribe.
-            return position
+            # Suspension de valoracion: un precio suelto no la levanta ni reescribe.
+            # Error explicito (nunca un no-op silencioso); el llamador decide como
+            # informarlo. El unico camino de salida es release_valuation_hold.
+            raise ValuationHeldError(
+                "Valuation is on hold "
+                f"({position.valuation_hold_reason}); a price update does not lift it"
+            )
         position.market_price = price
         position.market_value = position.quantity * price
         # Zero/missing cost is unknown, not a free acquisition. Never turn
