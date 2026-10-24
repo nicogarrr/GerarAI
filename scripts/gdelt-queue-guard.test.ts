@@ -33,10 +33,10 @@ test('la cola gdelt la consume EXACTAMENTE UN proceso dedicado (pacing por IP in
     assert.ok(workerCmd && !workerCmd.includes('gdelt'), 'el worker general NO consume gdelt');
 });
 
-test('el worker default sube a 6 hilos para la ingesta no-GDELT (I/O puro)', () => {
+test('el worker default usa 3 hilos (6 agotaba el limite de 3G por OOM de cgroup)', () => {
     assert.match(
         compose,
-        /worker:\n[\s\S]{0,200}"--processes", "1", "--threads", "6", "-Q", "default", "prices"/,
+        /worker:\n[\s\S]{0,200}"--processes", "1", "--threads", "3", "-Q", "default", "prices"/,
     );
 });
 
