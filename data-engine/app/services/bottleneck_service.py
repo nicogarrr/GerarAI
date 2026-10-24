@@ -153,10 +153,17 @@ def _identities(text: str, url: str | None, checksum: str | None = None) -> tupl
     return tuple(keys)
 
 
+# Lectura por lotes: sin yield_per el ORM carga TODAS las filas (cientos de miles de
+# chunks con texto) en memoria antes de iterar.
+_STREAM_BATCH = 500
+
+
 def stored_evidence(db: Session, tenant: int) -> Iterator[Evidence]:
     for chunk, doc in db.execute(select(DocumentChunk, Document).join(
         Document, Document.id == DocumentChunk.document_id
-    ).where(DocumentChunk.tenant_id == tenant, Document.tenant_id == tenant)):
+    ).where(DocumentChunk.tenant_id == tenant, Document.tenant_id == tenant).execution_options(
+        yield_per=_STREAM_BATCH
+    )):
         if doc.published_at is not None:
             host, _ = _url_identity(doc.source_url)
             yield Evidence(f"document_chunk:{chunk.id}", chunk.text, doc.published_at,
@@ -164,7 +171,7 @@ def stored_evidence(db: Session, tenant: int) -> Iterator[Evidence]:
     for chunk, doc in db.execute(select(KnowledgeChunk, KnowledgeDocument).join(
         KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.knowledge_document_id
     ).where(KnowledgeChunk.tenant_id == tenant, KnowledgeDocument.tenant_id == tenant,
-            KnowledgeDocument.status == "ready")):
+            KnowledgeDocument.status == "ready").execution_options(yield_per=_STREAM_BATCH)):
         if doc.publication_date is not None:
             host, _ = _url_identity(doc.source_url)
             origin = fold(doc.author).strip() if doc.author and doc.author.strip() else host
@@ -173,7 +180,8 @@ def stored_evidence(db: Session, tenant: int) -> Iterator[Evidence]:
                            datetime.combine(doc.publication_date, datetime.min.time(), UTC), origin,
                            (f"knowledge_document:{doc.id}", *linked,
                             *_identities(chunk.content, doc.source_url, doc.checksum)))
-    for news in db.scalars(select(NewsEvent).where(NewsEvent.tenant_id == tenant)):
+    for news in db.scalars(select(NewsEvent).where(NewsEvent.tenant_id == tenant).execution_options(
+            yield_per=_STREAM_BATCH)):
         host, _ = _url_identity(news.url)
         # source often names an aggregator (GDELT/RSS/manual), not a publisher.
         # El texto analizado es titular + resumen: la ingesta ya guarda
