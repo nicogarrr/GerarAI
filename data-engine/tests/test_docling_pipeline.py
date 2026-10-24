@@ -367,3 +367,56 @@ def test_lanes_disabled_serve_classic_pypdf(monkeypatch):
         get_settings.cache_clear()
     assert parsed.parser == "pypdf"
     assert {block.metadata["page"] for block in parsed.blocks} == {1, 2}
+
+
+# --- Contencion Pillow en el worker (SINTETICO: imagenes generadas en el test) ---
+
+
+def _png_bytes(w: int, h: int) -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("1", (w, h)).save(buf, "PNG")
+    return buf.getvalue()
+
+
+def test_heavy_context_bounds_and_restores_pillow_pixel_limit(monkeypatch):
+    from PIL import Image
+
+    monkeypatch.setenv("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", "100")
+    before = Image.MAX_IMAGE_PIXELS
+    with pipeline.docling_heavy_context():
+        assert Image.MAX_IMAGE_PIXELS == 100
+    assert before == Image.MAX_IMAGE_PIXELS
+
+
+def test_heavy_context_image_over_limit_fails_instead_of_warning(monkeypatch):
+    import io
+
+    import pytest
+    from PIL import Image
+
+    monkeypatch.setenv("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", "100")
+    with pipeline.docling_heavy_context():
+        # 2x-limit o mas: DecompressionBombError; entre 1x y 2x: el aviso pasa a error.
+        with pytest.raises((Image.DecompressionBombError, Image.DecompressionBombWarning)):
+            Image.open(io.BytesIO(_png_bytes(20, 20)))
+        with pytest.raises((Image.DecompressionBombError, Image.DecompressionBombWarning)):
+            Image.open(io.BytesIO(_png_bytes(12, 12)))
+        Image.open(io.BytesIO(_png_bytes(9, 9)))  # bajo el tope: normal
+    # fuera del contexto el comportamiento previo no cambia
+    Image.open(io.BytesIO(_png_bytes(20, 20)))
+
+
+def test_heavy_context_restores_even_if_body_raises(monkeypatch):
+    import pytest
+    from PIL import Image
+
+    monkeypatch.setenv("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", "100")
+    before = Image.MAX_IMAGE_PIXELS
+    with pytest.raises(RuntimeError), pipeline.docling_heavy_context():
+        raise RuntimeError("boom")
+    assert before == Image.MAX_IMAGE_PIXELS
+    assert pipeline.heavy_lane_allowed() is False

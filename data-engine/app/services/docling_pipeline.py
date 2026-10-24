@@ -56,6 +56,7 @@ from __future__ import annotations
 import contextvars
 import os
 import re
+import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -142,6 +143,40 @@ def heavy_lane_allowed() -> bool:
     return bool(_ALLOW_HEAVY.get())
 
 
+def docling_max_image_pixels() -> int:
+    """Tope de pixeles por imagen decodificada por Pillow en el carril docling.
+
+    Un A4 escaneado a 600 dpi son ~35 M px: el default de 50 M los admite. Pillow
+    solo avisa entre 1x y 2x del tope y falla por encima; aqui ambos casos
+    fallan (ver :func:`_bounded_image_pixels`). Es contencion de bombas de
+    descompresion, NO un parche de los fallos de memoria de Pillow.
+    """
+    return _env_int("CAVAAI_DOCLING_MAX_IMAGE_PIXELS", 50_000_000)
+
+
+@contextmanager
+def _bounded_image_pixels() -> Iterator[None]:
+    """Acota Pillow dentro del contexto del worker y restaura el estado previo.
+
+    Sin Pillow importable no hace nada. Una imagen sobre el tope levanta
+    ``DecompressionBombError``/``Warning`` -> el carril lanza ``_LaneFailed`` y el
+    orquestador degrada a pypdf (comportamiento ya existente ante fallos).
+    """
+    try:
+        from PIL import Image as _PilImage
+    except Exception:  # noqa: BLE001 - Pillow ausente: sin acotar
+        yield
+        return
+    previous = _PilImage.MAX_IMAGE_PIXELS
+    _PilImage.MAX_IMAGE_PIXELS = docling_max_image_pixels()
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", _PilImage.DecompressionBombWarning)
+            yield
+    finally:
+        _PilImage.MAX_IMAGE_PIXELS = previous
+
+
 @contextmanager
 def docling_heavy_context() -> Iterator[None]:
     """Habilita el conversor Docling en este hilo/contexto (solo worker).
@@ -149,10 +184,11 @@ def docling_heavy_context() -> Iterator[None]:
     Scoped y sin fugas entre mensajes: al salir se restaura el valor previo.
     """
     token = _ALLOW_HEAVY.set(True)
-    try:
-        yield
-    finally:
-        _ALLOW_HEAVY.reset(token)
+    with _bounded_image_pixels():
+        try:
+            yield
+        finally:
+            _ALLOW_HEAVY.reset(token)
 
 
 def resolve_allow_heavy(explicit: bool | None = None) -> bool:
