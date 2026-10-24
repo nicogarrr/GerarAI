@@ -94,7 +94,15 @@ def sin_datos() -> list[dict]:
     return [{"titulo": "Análisis narrativo", "parrafos": ["Sin datos"]}]
 
 
-def compendio_factual(items: list[dict], now: datetime) -> list[dict]:
+_RAZONES_COMPENDIO = {
+    "flag": "la narrativa con modelo está apagada por configuración",
+    "provider": "el proveedor de modelo no está disponible (desactivado, sin clave o modelo no gratuito)",
+    "budget": "no hay presupuesto de modelo disponible",
+    "error": "el modelo de lenguaje no está disponible ahora mismo: error del proveedor o respuesta rechazada",
+}
+
+
+def compendio_factual(items: list[dict], now: datetime, razon: str | None = None) -> list[dict]:
     """Enumeración factual de la evidencia reciente cuando la narrativa LLM
     está apagada por configuración (THESIS_NARRATIVE_LLM_ENABLED != "1").
     NO es análisis: lista titulares reales con fecha, medio y enlace, y lo
@@ -105,8 +113,9 @@ def compendio_factual(items: list[dict], now: datetime) -> list[dict]:
         return sin_datos()
     parrafos = [
         "Compendio factual de evidencia reciente: enumeración de titulares "
-        "con fecha y fuente, sin análisis (el modelo de lenguaje no está "
-        "disponible en esta generación). No es una interpretación.",
+        "con fecha y fuente, sin análisis ("
+        + _RAZONES_COMPENDIO.get(razon or "", "el modelo de lenguaje no está disponible en esta generación")
+        + "). No es una interpretación.",
     ]
     for row in headlines:
         fecha = str(row.get("fecha") or "")[:10] or "fecha no disponible"
@@ -222,7 +231,7 @@ def validate_output(raw: dict, headlines: list[dict]) -> list[dict]:
 def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now=None) -> list[dict]:
     """Invocado solo al generar una versión de tesis. Sin scheduler ni modelo de pago."""
     if os.getenv("THESIS_NARRATIVE_LLM_ENABLED") != "1":
-        return compendio_factual(news_items, now or datetime.now(UTC))
+        return compendio_factual(news_items, now or datetime.now(UTC), "flag")
     try:
         # Nunca finaliza ni mueve la transacción del llamador: lectura y
         # presupuesto usan sesiones cortas propias (otra conexión) y la red solo
@@ -237,7 +246,7 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
         if provider.name == "disabled" or paid_model_risk(provider, request=request):
             # Modelo no disponible NO es ausencia de evidencia: compendio
             # factual (fuentes explícitas, sin LLM, EUR 0) en vez de «Sin datos».
-            return compendio_factual(list(news_items or []), now or datetime.now(UTC))
+            return compendio_factual(list(news_items or []), now or datetime.now(UTC), "provider")
         budget = BudgetController()
         responses = []
 
@@ -249,7 +258,7 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
                 return budget.can_spend(short, 0)
 
         if not allowed():
-            return compendio_factual(list(news_items or []), now or datetime.now(UTC))
+            return compendio_factual(list(news_items or []), now or datetime.now(UTC), "budget")
 
         async def complete():
             # Únicamente escalares y proveedor en el puente. Ninguna Session.
@@ -295,7 +304,7 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
             detalle = "disabled"
         logger.warning("Narrativa de noticias: %s %s; compendio factual",
                        type(exc).__name__, detalle)
-        return compendio_factual(list(news_items or []), now or datetime.now(UTC))
+        return compendio_factual(list(news_items or []), now or datetime.now(UTC), "error")
     except Exception as exc:  # noqa: BLE001 - upstream inestable nunca rompe la tesis
         # Salida LLM rechazada (cifras inventadas, URLs, JSON inválido,
         # inyección) y cualquier otro fallo: FAIL-CLOSED como antes.

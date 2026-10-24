@@ -283,3 +283,40 @@ def test_hypothesis_with_price_but_no_valuation_says_so():
     assert "precio de mercado" in text
     assert "no es calculable" in text
     assert "faltan datos de mercado" not in text
+
+
+def test_compendio_factual_states_the_real_reason_for_each_degradation():
+    items = [{"id": "n1", "source_headline": "HYMC 8-K filed 2026-10-13",
+              "date": "2026-10-13T00:00:00+00:00", "date_source": "sec",
+              "source": "SEC", "url": "https://www.sec.gov/Archives/edgar/data/1718405/x"}]
+    now = datetime(2026, 10, 21, tzinfo=UTC)
+
+    def text_for(razon):
+        sections = compendio_factual(items, now, razon)
+        return "\n".join(p for sec in sections for p in sec["parrafos"])
+
+    assert "apagada por configuración" in text_for("flag")
+    assert "proveedor de modelo no está disponible" in text_for("provider")
+    assert "presupuesto" in text_for("budget")
+    assert "error del proveedor" in text_for("error")
+    # Sin razon: texto legado, sigue sin presentarse como análisis.
+    assert "sin análisis" in text_for(None)
+    # El flag apagado NO se presenta como «modelo no disponible»
+    assert "no está disponible" not in text_for("flag")
+
+
+def test_maybe_news_narrative_flag_off_reports_config_not_unavailability(monkeypatch):
+    from app.services.thesis_news_narrative import maybe_news_narrative_sections
+
+    monkeypatch.delenv("THESIS_NARRATIVE_LLM_ENABLED", raising=False)
+    items = [{"id": "n1", "source_headline": "HYMC 8-K filed 2026-10-13",
+              "date": "2026-10-13T00:00:00+00:00", "date_source": "sec",
+              "source": "SEC", "url": "https://www.sec.gov/Archives/edgar/data/1718405/x"}]
+
+    class _Co:
+        ticker = "HYMC"
+
+    sections = maybe_news_narrative_sections(None, _Co(), items, now=datetime(2026, 10, 21, tzinfo=UTC))
+    text = "\n".join(p for sec in sections for p in sec["parrafos"])
+    assert "apagada por configuración" in text
+    assert "HYMC 8-K filed 2026-10-13" in text
