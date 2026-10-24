@@ -1,5 +1,10 @@
 """Sidecar TTS (Piper, voz local es_ES). Una sintesis a la vez, cache en /w/cache."""
-import json, os, queue, re, threading, time
+import json
+import os
+import queue
+import re
+import threading
+import time
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 

@@ -73,9 +73,6 @@
       "maxDrawdown": "Caída máxima",
       "winRate": "Ratio de acierto"
     },
-    "tabs": {
-      "intelligence": "Inteligencia"
-    },
     "fxMissingNotice": "Los totales de la cartera excluyen {n} saldo o posición sin tipo de cambio válido."
   },
   "screener": {
@@ -206,9 +203,6 @@
     "title": "Plan de Inversión",
     "empty": "No hay plan de inversión configurado todavía.",
     "addTicker": "Añadir ticker"
-  },
-  "ownership": {
-    "title": "Propiedad"
   },
   "movers": {
     "gainers": "Subidas",
