@@ -24,7 +24,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Company, CorporateAction, Position, Transaction
+from app.models import Company, CorporateAction, MarketPrice, Position, Transaction
 from app.services.company_resolver import resolve_company
 
 SPLIT_TYPES = {"split", "reverse_split"}
@@ -53,6 +53,83 @@ def _validate_verified_price(price, as_of, effective_date) -> None:
         )
     if as_of > _today():
         raise ValueError("Split rejected: post_split_price_as_of is in the future")
+
+
+STORED_CLOSE_SOURCE = "yfinance"
+STORED_CLOSE_MAX_AGE_DAYS = 10
+# Un salto entre cierres consecutivos de la ventana post-fecha que se parece al
+# ratio del split indica que la fecha efectiva es dudosa (la barra puede seguir
+# en terminos pre-split): se rechaza en vez de adivinar.
+_JUMP_TOLERANCE = Decimal("0.30")
+
+
+def resolve_stored_close(
+    db: Session, action: CorporateAction, *, today: date | None = None
+) -> tuple[Decimal, date]:
+    """Cierre diario ALMACENADO (market_prices, job market_close_sync) tras el split.
+
+    No es el cierre oficial de bolsa ni del emisor: es una cache de un agregador
+    (yfinance/Yahoo) y esta fuente unica NO se ha contrastado con otra. Base de
+    ajuste (segun la documentacion de yfinance): con auto_adjust=False el Close de
+    Yahoo viene ajustado por splits, no por dividendos, a fecha de descarga. Una
+    barra con fecha >= efectiva es, por fecha, una sesion ya post-split, pero solo
+    es valida como precio de ESTE split si no hubo otro split posterior: se
+    rechaza si hay otra accion de split con fecha mayor en la base. Un split que la
+    base no conozca no se puede excluir: queda como limite declarado, no resuelto.
+    Falla explicito, sin fallback, si no hay serie (adj_close nulo = spot), si el
+    ultimo cierre es antiguo, si algun cierre no es positivo o si un salto entre
+    cierres de la ventana se parece al ratio (comprobacion extra, no prueba).
+    Devuelve (precio, fecha); el llamador lo valida con _validate_verified_price.
+    """
+    today = today or date.today()
+    rows = db.scalars(
+        select(MarketPrice)
+        .where(
+            MarketPrice.company_id == action.company_id,
+            MarketPrice.source == STORED_CLOSE_SOURCE,
+            MarketPrice.adj_close.is_not(None),
+            MarketPrice.date >= action.effective_date,
+            MarketPrice.date <= today,
+        )
+        .order_by(MarketPrice.date)
+    ).all()
+    if not rows:
+        raise ValueError(
+            "Split rejected: no stored daily close in market_prices "
+            f"(source {STORED_CLOSE_SOURCE}, on or after {action.effective_date}); "
+            "nothing was changed"
+        )
+    later = db.scalar(
+        select(func.count(CorporateAction.id)).where(
+            CorporateAction.company_id == action.company_id,
+            CorporateAction.action_type.in_(SPLIT_TYPES),
+            CorporateAction.effective_date > action.effective_date,
+        )
+    )
+    if later:
+        raise ValueError(
+            "Split rejected: a later split exists for this company, so a stored close "
+            "may be on another split basis; nothing was changed"
+        )
+    last = rows[-1]
+    if (today - last.date).days > STORED_CLOSE_MAX_AGE_DAYS:
+        raise ValueError(
+            f"Split rejected: latest stored close is stale ({last.date}); nothing was changed"
+        )
+    if any(r.close is None or r.close <= 0 for r in rows):
+        raise ValueError("Split rejected: a stored close in the window is not positive; nothing was changed")
+    ratio = action.ratio
+    if ratio > 1 or ratio < 1:
+        factor = ratio if ratio > 1 else Decimal(1) / ratio
+        if factor >= Decimal("1.5"):
+            for prev, nxt in zip(rows, rows[1:], strict=False):
+                jump = prev.close / nxt.close if action.ratio > 1 else nxt.close / prev.close
+                if abs(jump - factor) / factor <= _JUMP_TOLERANCE:
+                    raise ValueError(
+                        "Split rejected: closes after the effective date jump by about the "
+                        "split ratio, so the effective date is doubtful; nothing was changed"
+                    )
+    return last.close, last.date
 
 
 class CorporateActionService:
@@ -189,6 +266,26 @@ class CorporateActionService:
             raise ValueError("Corporate action not found")
         if action.applied:
             return action
+        if (
+            post_split_price is None
+            and post_split_price_as_of is None
+            and action.action_type in SPLIT_TYPES
+        ):
+            # Sin precio verificado del llamador: se intenta el cierre diario
+            # almacenado (cache de agregador, no oficial). Si no se puede verificar, el servicio sigue fallando
+            # cerrado mas abajo con el mismo mensaje de siempre.
+            try:
+                post_split_price, post_split_price_as_of = resolve_stored_close(db, action)
+            except ValueError:
+                post_split_price = post_split_price_as_of = None
+            else:
+                # Procedencia persistida: proveedor, fecha, base de ajuste y limite.
+                note = (
+                    f"Precio post-split {post_split_price} a {post_split_price_as_of}: cierre "
+                    f"diario almacenado de {STORED_CLOSE_SOURCE} (agregador; Close ajustado por "
+                    "splits, no por dividendos; fuente unica no contrastada)."
+                )
+                action.description = f"{note} | {action.description}".strip(" |")[:500]
         try:
             self._apply_in_txn(
                 db, action,
