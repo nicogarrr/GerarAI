@@ -558,6 +558,17 @@ class MarketRefreshService:
                         "age_days": age_days,
                     }
                 )
+            if position.valuation_hold_reason:
+                # Suspension de valoracion (p. ej. split sin precio post-split
+                # verificado): la cache de cierres no la levanta. Se declara.
+                stale_prices.append(
+                    {
+                        "ticker": company.ticker,
+                        "status": "valuation_hold",
+                        "reason": position.valuation_hold_reason,
+                    }
+                )
+                continue
             ledger.update_market_price(
                 db,
                 company_id=company.id,

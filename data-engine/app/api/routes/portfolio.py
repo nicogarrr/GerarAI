@@ -33,6 +33,7 @@ from app.services.portfolio_ledger_service import (
     PortfolioLedgerService,
     PortfolioMixedCurrencyError,
     PortfolioOversellError,
+    ValuationHeldError,
 )
 from app.services.portfolio_snapshot_service import PortfolioSnapshotService
 from app.services.risk_service import RiskService
@@ -191,6 +192,7 @@ def portfolio_summary(db: Session = Depends(get_db)) -> dict:
         "cash_as_of": risk.get("cash_as_of"),
         "fx_rates": risk.get("fx_rates", []),
         "valuation_dates_differ": risk.get("valuation_dates_differ", False),
+        "valuation_hold": risk.get("valuation_hold", []),
         "provenance": risk.get("provenance"),
     }
 
@@ -419,6 +421,7 @@ def positions(
     for position, company in rows:
         fiscal_info = fiscal.get(company.id) or _fiscal_info(db, company.id, position.as_of)
         has_cost = position.average_cost > 0 and (position.cost_basis_base or 0) > 0
+        held = bool(position.valuation_hold_reason)
         payloads.append(
             {
                 "ticker": company.ticker,
@@ -427,9 +430,23 @@ def positions(
             "analysis": analysis_states.get(company.ticker),
             "quantity": float(position.quantity),
             "average_cost": float(position.average_cost),
-            "market_price": float(position.market_price),
-            "market_value": float(position.market_value),
-            "unrealized_pnl": float(position.unrealized_pnl) if position.average_cost > 0 else None,
+            # Valoracion en suspenso: null con motivo, nunca un 0 presentado como cotizacion.
+            "market_price": None if held else float(position.market_price),
+            "market_value": None if held else float(position.market_value),
+            "valuation_hold": (
+                {
+                    "reason": position.valuation_hold_reason,
+                    "effective_date": position.valuation_hold_effective_date.isoformat()
+                    if position.valuation_hold_effective_date
+                    else None,
+                    "since": position.valuation_hold_since.isoformat()
+                    if position.valuation_hold_since
+                    else None,
+                }
+                if held
+                else None
+            ),
+            "unrealized_pnl": float(position.unrealized_pnl) if position.average_cost > 0 and not held else None,
             "realized_pnl": float(position.realized_pnl),
             "cost_basis": float(
                 position.cost_basis_native
@@ -441,7 +458,9 @@ def positions(
             "native_currency": position.currency,
             "base_currency": position.base_currency,
             "market_value_native": (
-                float(position.market_value_native)
+                None
+                if held
+                else float(position.market_value_native)
                 if position.market_value_native is not None
                 else float(position.market_value)
             ),
@@ -460,7 +479,7 @@ def positions(
                 if position.cost_basis_base is not None
                 else None
             ),
-            "unrealized_pnl_native": float(position.unrealized_pnl) if position.average_cost > 0 else None,
+            "unrealized_pnl_native": float(position.unrealized_pnl) if position.average_cost > 0 and not held else None,
             "unrealized_pnl_base": (
                 float(position.unrealized_pnl_base)
                 if has_cost and position.unrealized_pnl_base is not None
@@ -679,6 +698,9 @@ def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) ->
         )
         db.commit()
         return {"ticker": company.ticker, "market_price": float(position.market_price)}
+    except ValuationHeldError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -933,6 +955,21 @@ def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
     valued: list[tuple[Position, Company, float]] = []
     fx_excluded: list[dict] = []
     for position, company in rows:
+        if position.valuation_hold_reason:
+            # Valoracion en suspension (split sin precio post-split verificado): el
+            # market_price de la fila es un centinela 0, nunca un precio. Se declara
+            # con su causa real, no como "conversion N/D".
+            fx_excluded.append(
+                {
+                    "ticker": company.ticker,
+                    "name": company.name,
+                    "weight": None,
+                    "currency": position.currency,
+                    "reason_code": "valuation_hold",
+                    "reason": f"Valoración pendiente: {position.valuation_hold_reason}.",
+                }
+            )
+            continue
         if position.market_value_base is None:
             fx_excluded.append(
                 {

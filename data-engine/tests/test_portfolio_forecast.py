@@ -509,3 +509,30 @@ def test_forecast_full_coverage_emits_total_expected(db_session):
     assert result["portfolio"]["expected_coverage"] == pytest.approx(1.0)
     assert result["portfolio"]["expected_cagr"] == pytest.approx(2**0.2 - 1)
     assert result["portfolio"]["scenarios"]["bull"]["horizon_scope"] == "uniform"
+
+
+def test_forecast_excludes_held_position_with_its_real_reason(db_session):
+    """Hold post-split: el centinela market_price=0 nunca entra como precio ni como peso."""
+    aaa = _company(db_session, "AAA")
+    held = _company(db_session, "HELD")
+    _position(db_session, aaa, price=100, value=1000)
+    _thesis(db_session, aaa, version=1, status="published", bear=90, base=150, bull=200)
+    _thesis(db_session, held, version=1, status="published", bear=90, base=150, bull=200)
+    db_session.add(
+        Position(
+            company_id=held.id, quantity=40, average_cost=25, market_price=0,
+            market_value=0, market_value_base=None, currency="EUR", base_currency="EUR",
+            source="ibkr_flex", as_of=date(2026, 10, 9),
+            valuation_hold_reason="split 2:1 sin precio post-split verificado",
+            valuation_hold_effective_date=date(2026, 6, 1),
+        )
+    )
+    db_session.commit()
+
+    result = portfolio_forecast(db=db_session)
+    assert result["portfolio"]["total_value_base"] == 1000
+    excluded = {item["ticker"]: item for item in result["excluded"]}
+    assert excluded["HELD"]["reason_code"] == "valuation_hold"
+    assert excluded["HELD"]["weight"] is None
+    assert all(p["ticker"] != "HELD" for p in result["positions"])
+

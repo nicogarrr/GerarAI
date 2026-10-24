@@ -87,7 +87,7 @@ class PortfolioSnapshotService:
             native = position.quantity * position.market_price
             rate = position_rates.get(position.currency.upper())
             base = native * rate if rate is not None else None
-            if base is None or position.as_of != snapshot_date:
+            if base is None or position.as_of != snapshot_date or position.valuation_hold_reason:
                 missing_pricing.append(
                     {
                         "company_id": position.company_id,

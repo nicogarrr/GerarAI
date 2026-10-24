@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.models import CashBalance, Company, Position, Transaction
 from app.services.number_parsing import parse_localized_number
 from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.portfolio_ledger_service import PortfolioLedgerService
 
 
 class IBKRImportError(ValueError):
@@ -552,6 +553,7 @@ class IBKRImportService:
         portfolio = fx_service.ensure_portfolio(db)
         companies: dict[str, Company] = {}
         positions_imported = 0
+        valuation_hold_kept: list[str] = []
         cash_imported = 0
         trades_imported = 0
         dividends_imported = 0
@@ -643,6 +645,15 @@ class IBKRImportService:
                     else None
                 )
                 position.source = "ibkr_flex"
+                if position.valuation_hold_reason:
+                    # El hold no se levanta por una importacion: cantidad y coste
+                    # llegan del extracto, la valoracion sigue en suspension y se
+                    # declara (el extracto no es un precio post-split verificado
+                    # para esta via; liberar exige release_valuation_hold).
+                    held_as_of = position.as_of
+                    PortfolioLedgerService._blank_valuation(position)
+                    position.as_of = held_as_of
+                    valuation_hold_kept.append(symbol)
                 imported_company_ids.add(company.id)
                 positions_imported += 1
 
@@ -947,6 +958,7 @@ class IBKRImportService:
             "status": "imported",
             "price_backfills_enqueued": price_backfills_enqueued,
             "positions_imported": positions_imported,
+            "valuation_hold_kept": valuation_hold_kept,
             "cash_imported": cash_imported,
             "trades_imported": trades_imported,
             "dividends_imported": dividends_imported,

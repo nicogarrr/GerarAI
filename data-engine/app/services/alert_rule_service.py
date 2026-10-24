@@ -254,7 +254,10 @@ class AlertRuleService:
                 }
             position = db.scalar(
                 select(Position)
-                .where(Position.company_id == rule.company_id)
+                .where(
+                    Position.company_id == rule.company_id,
+                    Position.valuation_hold_reason.is_(None),
+                )
                 .order_by(desc(Position.as_of))
                 .limit(1)
             )
