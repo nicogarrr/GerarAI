@@ -17,6 +17,11 @@ _WHERE = "lower(btrim(source)) IN (" + ", ".join(f"'{label}'" for label in _JUNK
 
 
 def upgrade() -> None:
+    # Migracion de DATOS con SQL solo-Postgres (btrim, ->>, jsonb, regexp_replace): en
+    # otros dialectos (SQLite de tests/dev) no hay filas de prod que corregir y el SQL
+    # no existe. Mismo patron que 0059/0062.
+    if op.get_bind().dialect.name != "postgresql":
+        return
     # La corrección de label_google (#1814) solo aplica a ingestas nuevas: las
     # filas ya guardadas seguían mostrando la granja como medio («Bitcoin
     # Foundation» para una noticia de JPM, visto en prod 19-oct-2026). Se
@@ -37,6 +42,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Migracion de DATOS con SQL solo-Postgres (btrim, ->>, jsonb, regexp_replace): en
+    # otros dialectos (SQLite de tests/dev) no hay filas de prod que corregir y el SQL
+    # no existe. Mismo patron que 0059/0062.
+    if op.get_bind().dialect.name != "postgresql":
+        return
     # Restaura la fuente anterior donde se preservó y limpia la marca.
     op.execute(
         """
