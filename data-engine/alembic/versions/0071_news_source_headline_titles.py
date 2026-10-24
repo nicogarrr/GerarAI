@@ -16,6 +16,11 @@ _WHERE = (
 
 
 def upgrade() -> None:
+    # Migracion de DATOS con SQL solo-Postgres (btrim, ->>, jsonb, regexp_replace): en
+    # otros dialectos (SQLite de tests/dev) no hay filas de prod que corregir y el SQL
+    # no existe. Mismo patron que 0059/0062.
+    if op.get_bind().dialect.name != "postgresql":
+        return
     # El titular íntegro del medio ya estaba guardado en metadata.source_headline
     # mientras title quedaba como prefijo del resumen cortado a media frase
     # («…rivals scrambling, and one»). Se restaura el del medio: no se inventa
@@ -35,6 +40,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Migracion de DATOS con SQL solo-Postgres (btrim, ->>, jsonb, regexp_replace): en
+    # otros dialectos (SQLite de tests/dev) no hay filas de prod que corregir y el SQL
+    # no existe. Mismo patron que 0059/0062.
+    if op.get_bind().dialect.name != "postgresql":
+        return
     # Restaura el título anterior donde se preservó y limpia la marca.
     op.execute(
         """

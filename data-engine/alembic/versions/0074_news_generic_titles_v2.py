@@ -15,6 +15,11 @@ _PAT = r"se\s+abre\s+en\s+una\s+nueva\s+ventana|opens?\s+in\s+(?:a\s+)?new\s+win
 
 
 def upgrade() -> None:
+    # Migracion de DATOS con SQL solo-Postgres (btrim, ->>, jsonb, regexp_replace): en
+    # otros dialectos (SQLite de tests/dev) no hay filas de prod que corregir y el SQL
+    # no existe. Mismo patron que 0059/0062.
+    if op.get_bind().dialect.name != "postgresql":
+        return
     # 0071 rehidrató titles desde metadata.source_headline y algunos eran
     # texto de enlace del visor, no titulares («Comunicado de prensa del Q2
     # 2026, archivo PDF, (se abre en una nueva ventana)», visto en prod con
@@ -69,6 +74,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Migracion de DATOS con SQL solo-Postgres (btrim, ->>, jsonb, regexp_replace): en
+    # otros dialectos (SQLite de tests/dev) no hay filas de prod que corregir y el SQL
+    # no existe. Mismo patron que 0059/0062.
+    if op.get_bind().dialect.name != "postgresql":
+        return
     op.execute(
         sa.text(
             """
