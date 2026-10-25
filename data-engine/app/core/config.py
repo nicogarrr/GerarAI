@@ -445,8 +445,8 @@ class Settings(BaseSettings):
     # APAGADO por defecto en codigo; se enciende por entorno tras auditoria y
     # QA. Primario de chat por la suscripcion OpenCode Go de Nico (modelo
     # `deepseek-v4.1-flash`, endpoint /zen/go/v1), con respaldo Groq/Gemini
-    # intacto. Nico ordeno usarlo (25-oct 17:27); el encaje con las condiciones
-    # de Go sigue SIN confirmar (incertidumbre, no prohibicion expresa). Con el
+    # intacto. El encaje con las condiciones de Go sigue SIN confirmar
+    # (incertidumbre, no prohibicion expresa). Con el
     # interruptor apagado el chat sigue en la ruta gratuita verificada.
     # Env: CHAT_GO_SUBSCRIPTION_ENABLED.
     chat_go_subscription_enabled: bool = False
