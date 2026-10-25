@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { waitForScreenerOutcome } from "./fixtures/screener-outcome";
+
 const runUiE2E = process.env.E2E_UI_RUN === "1";
 
 test.describe("investor screener flow", () => {
@@ -7,6 +9,8 @@ test.describe("investor screener flow", () => {
 
   test("screener table renders one Seguir button per row", async ({ page }) => {
     await page.goto("/screener");
+    // Resolucion acotada: filas o estado final honesto; la carga indefinida falla.
+    await waitForScreenerOutcome(page);
 
     await expect(page.getByRole("heading", { name: "Mercado", level: 1 })).toBeVisible();
     // El sector se elige con un <select> accesible (SectorSelect), ya no con chips-enlace.
@@ -17,9 +21,7 @@ test.describe("investor screener flow", () => {
       // Backend caído (reintentar) o filtro sin resultados: ambas variantes honestas.
       const down = page.getByText("No hay datos ahora mismo");
       const empty = page.getByText(/Sin resultados para/);
-      // Caché del screener en frío: estado honesto "Cargando ... en segundo plano".
-      const loading = page.getByText(/Cargando precios del mercado/);
-      const states = (await down.count()) + (await empty.count()) + (await loading.count());
+      const states = (await down.count()) + (await empty.count());
       expect(states).toBeGreaterThan(0);
       return;
     }
