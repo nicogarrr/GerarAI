@@ -47,3 +47,10 @@ async def complete_with_deadline(provider, request, **kwargs):
             raise
         task.cancel()
         raise ProviderTransportError("chat", "timeout", 1) from None
+    except asyncio.CancelledError:
+        # El plazo del chat (bounded_chat) cancela a quien espera, y shield protege la
+        # tarea interna: sin esto la llamada al proveedor sigue en segundo plano hasta
+        # terminar y su respuesta se descarta (medido 25-oct: 17,4 s tras vencer el plazo).
+        if not task.done():
+            task.cancel()
+        raise
