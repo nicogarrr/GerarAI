@@ -189,3 +189,36 @@ def test_go_primario_eleva_max_tokens_a_2600_sin_tocar_otros_proveedores():
     big = chain.primary._build_payload(LLMRequest([Message("user", "hola")], max_tokens=3000), GO_SUBSCRIPTION_MODEL)
     assert big["max_tokens"] == 3000
     assert settings.llm_hidden_reasoning_min_tokens == 1024
+
+
+def test_go_compact_hint_only_for_the_sections_schema_and_not_mutating_request():
+    from app.llm.chat_provider import GO_COMPACT_SECTIONS_HINT
+    from app.services.chat_synthesis_service import RESPONSE_SCHEMA
+
+    provider = _go_subscription_primary(_settings(chat_go_subscription_enabled=True), None)
+    rich = LLMRequest(
+        [Message("system", "s"), Message("user", "q")],
+        max_tokens=1800,
+        response_format=ResponseFormat.json_schema(RESPONSE_SCHEMA, name="source_aware_chat", strict=True),
+    )
+    before = rich.messages[-1].content
+    payload = provider._build_payload(rich, GO_SUBSCRIPTION_MODEL)
+    last = payload["messages"][-1]["content"]
+    assert GO_COMPACT_SECTIONS_HINT in last and "response_format" not in payload
+    assert "8 apartados" in last and "citas exactas" in last
+    assert rich.messages[-1].content == before  # request intact (also for other providers)
+    simple = LLMRequest(
+        [Message("user", "q")],
+        response_format=ResponseFormat.json_schema(_SCHEMA, name="x", strict=True),
+    )
+    assert GO_COMPACT_SECTIONS_HINT not in provider._build_payload(simple, GO_SUBSCRIPTION_MODEL)["messages"][-1]["content"]
+
+
+def test_go_compact_hint_requires_exactly_eight_sections():
+    from app.llm.chat_provider import GO_COMPACT_SECTIONS_HINT
+
+    provider = _go_subscription_primary(_settings(chat_go_subscription_enabled=True), None)
+    for items in ({"type": "array"}, {"type": "array", "minItems": 3, "maxItems": 3}, {"type": "array", "minItems": 8, "maxItems": 9}):
+        schema = {"type": "object", "properties": {"sections": items, "answer": {"type": "string"}}}
+        req = LLMRequest([Message("user", "q")], response_format=ResponseFormat.json_schema(schema, name="x", strict=True))
+        assert GO_COMPACT_SECTIONS_HINT not in provider._build_payload(req, GO_SUBSCRIPTION_MODEL)["messages"][-1]["content"]

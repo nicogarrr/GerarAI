@@ -292,6 +292,13 @@ class SequentialFallbackProvider(LLMProvider):
         raise last
 
 
+GO_COMPACT_SECTIONS_HINT = (
+    " Salida compacta: cada `body` de seccion maximo 220 caracteres (una o dos frases con los"
+    " datos y su periodo; sin repetir el contexto); `answer` maximo 700 caracteres; mantén"
+    " todas las citas exactas que sostienen cada afirmacion y los 8 apartados."
+)
+
+
 class GoSubscriptionChatProvider(OpenAICompatibleProvider):
     """Adaptador del endpoint OpenCode Go (/zen/go/v1).
 
@@ -309,6 +316,12 @@ class GoSubscriptionChatProvider(OpenAICompatibleProvider):
             schema = (response_format.get("json_schema") or {}).get("schema")
             if schema:
                 instruction += " Debe cumplir este esquema JSON: " + json.dumps(schema, ensure_ascii=False, sort_keys=True)
+                sections = (schema.get("properties") or {}).get("sections")
+                if isinstance(sections, dict) and sections.get("minItems") == sections.get("maxItems") == 8:
+                    # Medido 25-oct: con la peticion real Go agoto los 2600 tokens de salida
+                    # (finish=length, JSON cortado). Salida corta = menos tokens y menos riesgo
+                    # de truncado; las citas y los hechos se conservan.
+                    instruction += GO_COMPACT_SECTIONS_HINT
             messages = payload["messages"]
             last = messages[-1] if messages else None
             if last and last.get("role") == "user" and isinstance(last.get("content"), str):
