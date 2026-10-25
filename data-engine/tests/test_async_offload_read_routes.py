@@ -174,3 +174,35 @@ def test_import_ibkr_owner_check_off_the_event_loop(monkeypatch):
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "not_configured"
     assert calls and all(calls)
+
+
+def test_chat_hard_deadline_cuts_a_worker_that_blocks_the_thread(monkeypatch, caplog):
+    """Un paso que bloquea el hilo no puede alargar la respuesta mas alla del muro."""
+    import time
+
+    init_db()
+    monkeypatch.setattr("app.api.routes.chat.CHAT_HARD_GRACE_SECONDS", 0.3)
+    monkeypatch.setattr(
+        "app.api.routes.chat.get_settings",
+        lambda: SimpleNamespace(chat_total_timeout_seconds=0.4),
+    )
+
+    def blocking_answer(self, db, question, scope, ticker, enable_debate=False, page=None, history=None):  # noqa: ARG001
+        async def _result():
+            time.sleep(3)  # bloquea el hilo y su loop: ningun wait_for interno puede cortarlo
+            return ChatResponse(answer="tarde", sources=[])
+
+        return _result()
+
+    monkeypatch.setattr("app.services.chat_service.ChatService.answer", blocking_answer)
+    started = time.monotonic()
+    with caplog.at_level("WARNING"):
+        response = client.post("/api/chat", json={"question": "que es el wacc"})
+    elapsed = time.monotonic() - started
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert elapsed < 1.5, elapsed
+    assert body["llm_trace"]["fallback_reason"] == "chat_hard_deadline"
+    assert body["model"] == "deterministic"
+    assert "worker thread stack" in caplog.text
+    assert "time.sleep" in caplog.text or "_result" in caplog.text

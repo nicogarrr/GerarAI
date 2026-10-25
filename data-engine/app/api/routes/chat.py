@@ -1,17 +1,37 @@
+import asyncio
+import logging
+import sys
+import threading
 import time
+import traceback
 
+import anyio.to_thread
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.schemas import ChatRequest, ChatResponse
 from app.services.async_bridge import run_from_any_context
 from app.services.chat_service import ChatService
 from app.services.chat_telemetry import classify_response, record_chat_event
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# Margen sobre el plazo cooperativo (chat_total_timeout_seconds). El plazo
+# interno solo se aplica en los puntos de espera: un paso que bloquea el hilo
+# (trabajo sincrono, CPU) lo deja vencido sin poder cortarlo y la peticion
+# acababa tardando 70-100 s. Este muro corta desde el event loop principal,
+# que no se bloquea con el trabajo del hilo.
+CHAT_HARD_GRACE_SECONDS = 6.0
+
+
+def _log_stuck_worker(ident: int | None, waited: float) -> None:
+    """Deja en el log DONDE esta parado el hilo (solo lineas de codigo, sin datos)."""
+    frame = sys._current_frames().get(ident) if ident is not None else None
+    where = "".join(traceback.format_stack(frame, limit=14)) if frame is not None else "hilo ya terminado"
+    logger.warning("chat hard deadline after %.1fs; worker thread stack:\n%s", waited, where)
 
 
 @router.post("", response_model=ChatResponse)
@@ -21,11 +41,18 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
     # puenteado. Awaitado inline bloqueaba el event loop del proceso.
     started = time.monotonic()
     tenant_id = db.info.get("tenant_id")
-    try:
-        response = await run_in_threadpool(
-            lambda: run_from_any_context(
+    worker: dict[str, int | None] = {"ident": None}
+    tenant_info = dict(db.info)
+
+    def _work() -> ChatResponse:
+        worker["ident"] = threading.get_ident()
+        # Sesion propia del hilo: si el muro corta la peticion, el hilo puede
+        # seguir un rato y no debe compartir la sesion que get_db va a cerrar.
+        with SessionLocal() as worker_db:
+            worker_db.info.update(tenant_info)
+            return run_from_any_context(
                 ChatService().answer(
-                    db,
+                    worker_db,
                     payload.question,
                     payload.scope,
                     payload.ticker,
@@ -34,7 +61,22 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
                     history=payload.history,
                 )
             )
-        )
+
+    hard_limit = get_settings().chat_total_timeout_seconds + CHAT_HARD_GRACE_SECONDS
+    try:
+        try:
+            response = await asyncio.wait_for(anyio.to_thread.run_sync(_work, abandon_on_cancel=True), timeout=hard_limit)
+        except TimeoutError:
+            waited = time.monotonic() - started
+            if waited < hard_limit - 0.5:
+                raise  # TimeoutError propio del servicio, no el muro
+            _log_stuck_worker(worker["ident"], waited)
+            response = ChatResponse(
+                answer="La respuesta tardó demasiado; vuelve a intentarlo en un momento.",
+                sources=[], model="deterministic", confidence=0,
+                llm_trace={"path": "chat_hard_deadline", "fallback": True, "fallback_reason": "chat_hard_deadline",
+                           "deadline_seconds": get_settings().chat_total_timeout_seconds},
+            )
     except TimeoutError:
         response = ChatResponse(
             answer="La respuesta tardó demasiado; vuelve a intentarlo en un momento.",
