@@ -84,9 +84,9 @@ _TREATY_CEILING_WITHHOLDING: dict[str, Decimal] = {
 # Jurisdicciones del emisor donde NO hay impuesto en origen sobre dividendos segun
 # fuente primaria (gov.ky: sin impuestos directos, ni sobre la renta ni de
 # sociedades). Es un ESCENARIO etiquetado, no la retencion efectiva del broker.
-_NO_SOURCE_TAX_SCENARIO: dict[str, Decimal] = {
-    "KY": Decimal("0"),
-}
+# VACIO a proposito: Caimán (BABA) no se cubre hasta leer la seccion fiscal completa
+# del 20-F para titulares de ADS y resolver excepciones (residencia fiscal CN, etc.).
+_NO_SOURCE_TAX_SCENARIO: dict[str, Decimal] = {}
 
 _VERIFIED_PAYERS: dict[str, dict[str, str]] = {
     "BN": {
@@ -97,7 +97,12 @@ _VERIFIED_PAYERS: dict[str, dict[str, str]] = {
     "BABA": {
         "jurisdiction": "KY",
         "source": "sec_baba_20f",
-        "reason_if_unrated": "",
+        "reason_if_unrated": (
+            "Emisor constituido en Islas Caimán (ADS en NYSE; la sede en Hong Kong es la que "
+            "figura como domicilio en la base de datos). Sin retención verificada para titulares "
+            "de ADS: falta leer la sección fiscal completa del 20-F y confirmar la retención "
+            "efectiva del broker. No se asume 0 %."
+        ),
     },
 }
 
@@ -109,8 +114,6 @@ _SOURCE_URLS = {
     "canada_part_xiii_rates": "https://www.canada.ca/en/revenue-agency/services/tax/international-non-residents/payments-non-residents/nr4-part-xiii-tax/part-xiii-withholding-tax/rates-part-xiii-tax.html",
     "convenio_es_ca_protocolo_2014": "https://www.canada.ca/en/department-finance/programs/tax-policy/tax-treaties/country/spain-protocol-2014.html",
     "sec_bn_40f": "https://www.sec.gov/Archives/edgar/data/1001085/000100108526000006/bn-20251231.htm",
-    "cayman_sin_impuestos_directos": "https://gov.ky/finance-economy",
-    "irs_fuente_dividendos_nra": "https://www.irs.gov/individuals/international-taxpayers/nonresident-aliens-sourcing-of-income",
     "sec_baba_20f": "https://www.sec.gov/Archives/edgar/data/1577552/000119312526231755/baba-20260331.htm",
     "hmrc_property_income_distributions": "https://www.gov.uk/hmrc-internal-manuals/investment-funds/ifm28125",
 }
@@ -136,7 +139,7 @@ _FISCAL_CONDITIONS = [
     "Escala del ahorro de la Renta 2025 aplicada a años futuros (hipótesis, sujeta a cambio legislativo).",
     "La retención ES del 19 % es pago a cuenta, no impuesto extranjero ni deducción por doble imposición.",
     "Canadá (p. ej. BN): se usa el techo del convenio ES-CA (15 %) como escenario; Canadá retiene 25 % si el broker no aplica el convenio (CRA, Part XIII), y la retención efectiva no está verificada.",
-    "Emisor en Islas Caimán (p. ej. BABA): sin impuesto en origen según el Gobierno de Caimán y, al ser sociedad extranjera, sin retención de EE. UU. sobre sus dividendos (IRS, fuente del dividendo según el pagador). Escenario 0 % con fuentes; no verificado: retención efectiva del broker/depositario, comisiones del depositario ni posible calificación como residente fiscal en China.",
+    "Emisor en Islas Caimán (p. ej. BABA): retención en origen sin verificar para titulares de ADS; se muestra el bruto y el neto queda N/D (no se asume 0 %).",
     "Emisor verificado por ticker (BN: Ontario; BABA: Islas Caimán). Domicilio de la base de datos o mercado de cotización no determinan la retención.",
     "Domicilios sin tipo verificado (p.ej. GB: HMRC IFM28125 distingue categorías) salen como sin datos.",
 ]
