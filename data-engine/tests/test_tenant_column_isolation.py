@@ -25,6 +25,11 @@ from app.models import (
     DividendRecord,
     Document,
     FinancialFact,
+    InsiderFiling,
+    InsiderTransaction,
+    KnowledgeChunk,
+    KnowledgeDocument,
+    KnowledgeGraphNode,
     MarketPrice,
     NewsEvent,
     Position,
@@ -32,6 +37,7 @@ from app.models import (
     Tenant,
     ThesisChange,
     ThesisVersion,
+    Transaction,
     WatchItem,
 )
 from app.models.entities import Base
