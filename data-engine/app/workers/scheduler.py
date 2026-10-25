@@ -7,7 +7,9 @@ from functools import partial
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+from app.core.config import get_settings
 from app.services.etf_holdings import refresh_etf_holdings
+from app.services.retention_service import run_retention
 from app.services.thesis_job_service import reconcile_thesis_dispatches
 from app.workers.dramatiq_app import (
     backfill_document_kpis,
@@ -509,6 +511,19 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         hour="4,16",
         minute=20,
     )
+    # Retencion de datos personales: opt-in explicito. Encendido por defecto
+    # seria un borrado silencioso en el primer deploy; el operador activa
+    # RETENTION_JOB_ENABLED y decide cuando salir de RETENTION_DRY_RUN.
+    if get_settings().retention_job_enabled:
+        _register(
+            scheduler,
+            run_retention,
+            "cron",
+            job_id="privacy_retention",
+            hour=4,
+            minute=35,
+            jitter=600,
+        )
     return scheduler
 
 
