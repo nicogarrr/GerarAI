@@ -302,7 +302,13 @@ def test_2_sin_key_extraccion_igual_que_antes():
 
 # ---------------------------------------------------------- (3) news_action
 
-_NEWS_TEXT = "TST fraud investigation, trading halted amid SEC probe into accounting"
+# news_relevance.company_is_central: la empresa debe citarse >= 3 veces (el ticker
+# inicial no cuenta); si no, requires_update baja a False por "mencion de pasada".
+_NEWS_TEXT = (
+    "TST fraud investigation, trading halted amid SEC probe into accounting. "
+    "TST said it received a subpoena. TST shares fell sharply after the halt. "
+    "Analysts said TST may restate results."
+)
 
 
 def _news_db():

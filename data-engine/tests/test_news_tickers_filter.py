@@ -12,7 +12,8 @@ from app.api.routes import news as news_module
 from app.core.database import get_db
 from app.models.entities import Base, Company, NewsEvent, Tenant
 
-NOW = datetime(2026, 10, 19, 12, tzinfo=UTC)
+# El carril macro oculta titulares de >72 h (news_events): fecha fija caducaba sola.
+NOW = datetime.now(UTC).replace(microsecond=0)
 
 
 def _client():
