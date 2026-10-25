@@ -48,18 +48,26 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
     started = time.monotonic()
     tenant_id = db.info.get("tenant_id")
     worker: dict[str, int | None] = {"ident": None}
+    slot = {"started": False, "cancelled": False, "released": False}
     tenant_info = dict(db.info)
 
-    def _work() -> ChatResponse:
+    def _release() -> None:
         global _live_workers
-        worker["ident"] = threading.get_ident()
         with _live_lock:
-            _live_workers += 1
+            if not slot["released"]:
+                slot["released"] = True
+                _live_workers -= 1
+
+    def _work() -> ChatResponse:
+        with _live_lock:
+            if slot["cancelled"]:
+                raise asyncio.CancelledError  # abandonado antes de arrancar
+            slot["started"] = True
+        worker["ident"] = threading.get_ident()
         try:
             return _work_inner()
         finally:
-            with _live_lock:
-                _live_workers -= 1
+            _release()  # el hueco vuelve cuando el hilo TERMINA, no al abandonarlo
 
     def _work_inner() -> ChatResponse:
         # Sesion propia del hilo: si el muro corta la peticion, el hilo puede
@@ -78,10 +86,12 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
                 )
             )
 
-    # Tope blando: la comprobacion y el alta (en _work) no son atomicas; un
-    # par de hilos de mas en una rafaga es aceptable, el objetivo es acotar.
+    # Reserva atomica del hueco antes de despachar: el tope es exacto.
+    global _live_workers
     with _live_lock:
         busy = _live_workers >= CHAT_MAX_LIVE_WORKERS
+        if not busy:
+            _live_workers += 1
     if busy:
         logger.warning("chat busy: %d live workers", CHAT_MAX_LIVE_WORKERS)
         return ChatResponse(
@@ -122,6 +132,13 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
             error=f"{type(exc).__name__}: {exc}",
         )
         raise
+    finally:
+        with _live_lock:
+            never_started = not slot["started"]
+            if never_started:
+                slot["cancelled"] = True
+        if never_started:
+            _release()
     route, used_llm = classify_response(response)
     record_chat_event(
         tenant_id=tenant_id,
