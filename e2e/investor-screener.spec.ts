@@ -9,14 +9,17 @@ test.describe("investor screener flow", () => {
     await page.goto("/screener");
 
     await expect(page.getByRole("heading", { name: "Mercado", level: 1 })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Tecnología" })).toBeVisible();
+    // El sector se elige con un <select> accesible (SectorSelect), ya no con chips-enlace.
+    await expect(page.getByLabel("Filtrar por sector")).toBeVisible();
 
     const rows = page.locator("table tbody tr");
     if ((await rows.count()) === 0) {
       // Backend caído (reintentar) o filtro sin resultados: ambas variantes honestas.
       const down = page.getByText("No hay datos ahora mismo");
       const empty = page.getByText(/Sin resultados para/);
-      const states = (await down.count()) + (await empty.count());
+      // Caché del screener en frío: estado honesto "Cargando ... en segundo plano".
+      const loading = page.getByText(/Cargando precios del mercado/);
+      const states = (await down.count()) + (await empty.count()) + (await loading.count());
       expect(states).toBeGreaterThan(0);
       return;
     }

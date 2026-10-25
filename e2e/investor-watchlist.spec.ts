@@ -12,7 +12,9 @@ test.describe("investor watchlist flow", () => {
     if ((await rows.count()) === 0) {
       const down = page.getByText("No hay datos ahora mismo");
       const empty = page.getByText(/Sin resultados para/);
-      const states = (await down.count()) + (await empty.count());
+      // Caché del screener en frío: estado honesto "Cargando ... en segundo plano".
+      const loading = page.getByText(/Cargando precios del mercado/);
+      const states = (await down.count()) + (await empty.count()) + (await loading.count());
       expect(states).toBeGreaterThan(0);
       return;
     }
