@@ -16,11 +16,13 @@ import dramatiq
 
 from app.core.config import get_settings
 from app.workers.bounded_broker import BoundedRedisBroker, QueueCapacityError, max_pending
+from app.workers.task_trace import TaskTraceMiddleware
 
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
 broker = BoundedRedisBroker(url=settings.redis_url)
+broker.add_middleware(TaskTraceMiddleware())
 dramatiq.set_broker(broker)
 
 
