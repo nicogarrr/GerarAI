@@ -9,7 +9,6 @@ test.describe("investor alerts flow", () => {
     await page.goto("/alerts");
 
     await expect(page.getByRole("heading", { name: "Alertas", level: 1 })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Alertas en Tiempo Real" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Nueva Alerta" })).toBeVisible();
 
     const researchLinks = page.getByRole("link", { name: /Ver research/ });

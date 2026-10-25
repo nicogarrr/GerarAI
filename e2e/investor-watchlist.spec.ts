@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { waitForScreenerOutcome } from "./fixtures/screener-outcome";
+
 const runUiE2E = process.env.E2E_UI_RUN === "1";
 
 test.describe("investor watchlist flow", () => {
@@ -7,6 +9,8 @@ test.describe("investor watchlist flow", () => {
 
   test("screener Seguir reports the add outcome via toast", async ({ page }) => {
     await page.goto("/screener");
+    // Resolucion acotada: filas o estado final honesto; la carga indefinida falla.
+    await waitForScreenerOutcome(page);
 
     const rows = page.locator("table tbody tr");
     if ((await rows.count()) === 0) {

@@ -41,12 +41,12 @@ test.describe("audit closure flows", () => {
     expect(states).toBeGreaterThan(0);
   });
 
-  test("insider shows monitor badge and no debug notify button", async ({ page }) => {
+  test("insider no longer shows monitor telemetry badge nor debug notify button", async ({ page }) => {
     await page.goto("/insider?ticker=AAPL");
     await expect(page.getByRole("heading", { name: "Señales Insider", level: 1 })).toBeVisible();
-    // El badge (con contador) es el objetivo; el resumen del desplegable
-    // "Cómo se calculan las señales" también menciona el monitor.
-    await expect(page.getByText(/Monitor cada 15 min · \d+/)).toBeVisible();
+    // La telemetría del monitor (badge con contador) se retiró a propósito
+    // (insider-degraded-honesty-guard): no debe volver a pintarse.
+    await expect(page.getByText(/Monitor cada 15 min · \d+/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Evaluar aviso Telegram ahora" })).toHaveCount(0);
   });
 
