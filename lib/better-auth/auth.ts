@@ -5,6 +5,10 @@ import {nextCookies} from "better-auth/next-js";
 import {twoFactor} from "better-auth/plugins";
 import {env} from "@/lib/env";
 import {DatabaseError, toAppError} from "@/lib/types/errors";
+import {
+    isPasswordResetEmailConfigured,
+    sendPasswordResetEmail,
+} from "@/lib/auth/email";
 
 
 const signUpDisabled =
@@ -41,6 +45,20 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
         minPasswordLength: 8,
         maxPasswordLength: 128,
         autoSignIn: !signUpDisabled && !requireEmailVerification,
+        // Un reset invalida las sesiones existentes: si alguien habia robado
+        // una cookie, deja de servir en cuanto se cambia la contrasena.
+        revokeSessionsOnPasswordReset: true,
+        // Sin SMTP no se registra el callback: request-password-reset responde
+        // 400 y la UI muestra un estado honesto en lugar de fingir un envio.
+        sendResetPassword: isPasswordResetEmailConfigured()
+            ? async ({ user, url }) => {
+                await sendPasswordResetEmail({
+                    to: user.email,
+                    name: user.name,
+                    url,
+                });
+            }
+            : undefined,
     },
     // Perfil inversor persistido en el documento `user` de MongoDB.
     // Mongo es schemaless: additionalFields no requiere migraciones SQL,

@@ -37,6 +37,21 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
                     <div className="flex-1 pb-6 lg:pb-8">
                         {children}
                     </div>
+
+                    {/* Registro y acceso: la aceptación de las condiciones debe
+                        estar a la vista sin depender del pie público, porque
+                        este layout es independiente de `(public)`. */}
+                    <nav aria-label="Privacidad y condiciones" className="flex flex-wrap gap-x-4 gap-y-2 pb-8 text-xs text-gray-500">
+                        <Link className="hover:text-teal-300 hover:underline" href="/privacidad">
+                            Privacidad
+                        </Link>
+                        <Link className="hover:text-teal-300 hover:underline" href="/terminos">
+                            Términos de uso
+                        </Link>
+                        <Link className="hover:text-teal-300 hover:underline" href="/metodologia">
+                            Metodología
+                        </Link>
+                    </nav>
                 </div>
             </section>
             <section className="auth-right-section">

@@ -18,6 +18,8 @@ const DISALLOWED = [
   // Acceso: formularios y ajustes de cuenta.
   '/sign-in',
   '/sign-up',
+  '/forgot-password',
+  '/reset-password',
   '/security',
   '/settings',
   // Espacio de trabajo autenticado (grupo de rutas `(root)`).
@@ -48,7 +50,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/metodologia', '/help'],
+        allow: ['/', '/metodologia', '/help', '/privacidad', '/terminos'],
         disallow: DISALLOWED,
       },
     ],

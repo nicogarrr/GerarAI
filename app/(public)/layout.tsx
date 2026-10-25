@@ -41,6 +41,8 @@ export const metadata: Metadata = {
 const legalLinks = [
     { href: '/metodologia', label: 'Metodología' },
     { href: '/help', label: 'Ayuda' },
+    { href: '/privacidad', label: 'Privacidad' },
+    { href: '/terminos', label: 'Términos' },
 ];
 
 const Layout = async ({ children }: { children: React.ReactNode }) => {
