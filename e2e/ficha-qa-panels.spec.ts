@@ -74,7 +74,13 @@ test.describe("ficha: panel de calidad financiera", () => {
     // Evidencia visual (artefacto de CI) y numeros reales de las cajas.
     console.log(`MOAT 390px titulo=${JSON.stringify(a)} enlace=${JSON.stringify(b)}`);
     await page.screenshot({ path: "test-results/ficha-moat-390.png", fullPage: false });
-    await panel.screenshot({ path: "test-results/ficha-moat-panel-390.png" });
+    // Recorte con contexto: desde 100 px sobre el titulo hasta 160 px bajo el enlace.
+    const top = Math.max(0, a!.y - 100);
+    await page.screenshot({
+      path: "test-results/ficha-moat-panel-390.png",
+      fullPage: true,
+      clip: { x: 0, y: top, width: 390, height: b!.y + b!.height + 160 - top },
+    });
     const solapan =
       a!.x < b!.x + b!.width && b!.x < a!.x + a!.width && a!.y < b!.y + b!.height && b!.y < a!.y + a!.height;
     expect(solapan, `titulo ${JSON.stringify(a)} vs accion ${JSON.stringify(b)}`).toBe(false);
@@ -90,7 +96,18 @@ test.describe("ficha: panel de calidad financiera", () => {
     await expect(panel).toHaveCount(1);
     await expect(panel.getByRole("link", { name: "Ver la evaluación del foso" })).toHaveCount(0);
     await expect(page.getByText("Sin evaluación de calidad generada todavía")).toBeAttached();
-    await panel.screenshot({ path: "test-results/ficha-nomoat-panel-390.png" });
+    const titulo = panel.getByRole("heading", { name: "Calidad financiera según la empresa" });
+    const vacio = page.getByText("Sin evaluación de calidad generada todavía").first();
+    const t = await titulo.boundingBox();
+    const v = await vacio.boundingBox();
+    console.log(`NOMOAT 390px titulo=${JSON.stringify(t)} vacio=${JSON.stringify(v)}`);
+    expect(t && v).toBeTruthy();
+    const top = Math.max(0, t!.y - 100);
+    await page.screenshot({
+      path: "test-results/ficha-nomoat-panel-390.png",
+      fullPage: true,
+      clip: { x: 0, y: top, width: 390, height: Math.max(v!.y + v!.height, t!.y + t!.height) + 120 - top },
+    });
   });
 });
 
