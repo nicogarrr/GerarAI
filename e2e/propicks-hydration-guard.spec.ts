@@ -156,6 +156,10 @@ for (const vp of [
 
     // Tras hidratar: los thumbs siguen montados (el input oculto puede
     // desaparecer sin <form>, ver nota superior — no se exige aqui).
+    // Bajo lg los filtros vienen plegados (d0048bee): se abren con su boton
+    // real; en desktop el boton no existe y el cuerpo ya esta visible.
+    const mostrar = page.getByRole("button", { name: "Mostrar filtros" });
+    if (await mostrar.isVisible()) await mostrar.click();
     const sliders = page.getByRole("slider");
     await expect(sliders.first(), "los filtros con Slider Radix deben estar montados (pagina con datos, no ProPicksLoadError)").toBeVisible({ timeout: 30000 });
     const sliderCount = await sliders.count();
