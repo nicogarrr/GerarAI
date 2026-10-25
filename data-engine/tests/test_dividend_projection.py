@@ -462,18 +462,32 @@ def test_canadian_domicile_without_verified_payer_stays_unverified(db):
     assert out["gross_summary"]["gross_unverified_base"] > 0
 
 
-def test_baba_cayman_issuer_overrides_db_domicile_and_is_not_assumed_zero(db):
+def test_baba_cayman_issuer_overrides_db_domicile_with_sourced_zero_scenario(db):
     _setup_payer(db, "BABA", "HK")
 
     out = DividendProjectionService().project(db, months=12)
 
     pos = out["positions"][0]
     assert pos["domicile_country"] == "KY"
+    assert pos["withholding_basis"] == "emisor_verificado"
+    assert pos["withholding_kind"] == "sin_impuesto_origen_escenario"
+    assert pos["source_withholding_rate"] == 0.0
+    assert pos["source_withheld_base"] == 0.0
+    assert pos["unverified_reason"] is None
+    assert out["coverage"]["unknown_source_withholding"] == []
+    assert any("Caimán" in c for c in out["fiscal_conditions"])
+    year = next(iter(out["fiscal_by_year"]))
+    fiscal = out["fiscal_by_year"][year]
+    assert fiscal["covered_tickers"] == ["BABA"]
+    assert fiscal["double_tax_deduction"] == 0.0
+    assert fiscal["source_withheld_foreign"] == 0.0
+
+
+def test_hk_domicile_without_verified_issuer_is_not_assumed_zero(db):
+    _setup_payer(db, "HKCO", "HK")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    pos = out["positions"][0]
     assert pos["source_withholding_rate"] is None
-    assert pos["source_withheld_base"] is None
-    assert "Caimán" in pos["unverified_reason"]
-    assert "No se asume 0 %" in out["coverage"]["unverified_reasons"]["BABA"]
-    assert out["gross_summary"]["gross_unverified_base"] > 0
-    assert out["fiscal_by_year"] == {} or all(
-        "BABA" not in y["covered_tickers"] for y in out["fiscal_by_year"].values()
-    )
+    assert out["coverage"]["unknown_source_withholding"] == ["HKCO"]

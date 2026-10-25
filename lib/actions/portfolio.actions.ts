@@ -930,7 +930,7 @@ export type DividendProjectionPosition = {
   source_withholding_rate: number | null;
   source_withheld_base: number | null;
   withholding_basis?: 'emisor_verificado' | 'domicilio_bd';
-  withholding_kind?: 'techo_convenio' | 'escenario_convenio' | null;
+  withholding_kind?: 'techo_convenio' | 'escenario_convenio' | 'sin_impuesto_origen_escenario' | null;
   unverified_reason?: string | null;
   months: Record<string, number>;
 };
