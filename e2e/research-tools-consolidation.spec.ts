@@ -4,6 +4,9 @@ for(const width of [390,820,1440]) test(`research tools stay contextual ${width}
  await page.setViewportSize({width,height:1000});
  await page.goto("/research");
  const nav=page.getByRole("navigation",{name:"Herramientas de la sección"});
+ // El subnav es plegable (1e172eb9): cerrado por defecto, se abre con su boton.
+ await page.locator('button[aria-controls="subnav-seccion-lista"]').click();
+ await expect(nav).toBeVisible();
  // "Asistente" salió del subnav en 317c5b3 (unificado en el Cerebro).
  for(const name of ["Empresas","Noticias","Fuentes"])
   await expect(nav.getByRole("link",{name,exact:true})).toBeVisible();
