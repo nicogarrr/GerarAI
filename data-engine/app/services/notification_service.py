@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.tenancy import tenant_filters
 from app.models import AlertDelivery, Company, NewsEvent, ResearchAlert
 
 # Un claim 'sending' mas viejo que esto se considera abandonado (worker muerto
@@ -34,7 +35,9 @@ def record_in_app_delivery(db: Session, alert: ResearchAlert) -> None:
         db.flush()
     exists = db.scalar(
         select(AlertDelivery.id).where(
-            AlertDelivery.alert_id == alert.id, AlertDelivery.channel == "in_app"
+            AlertDelivery.alert_id == alert.id,
+            AlertDelivery.channel == "in_app",
+            *tenant_filters(db, AlertDelivery),
         )
     )
     if exists is not None:

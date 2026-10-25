@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session, aliased
 
+from app.core.tenancy import tenant_filters
 from app.models import (
     CallClaim,
     ExpectationReview,
@@ -28,16 +29,20 @@ def tenant_condition(db: Session) -> Any:
     )
 
 
-def _human_approved_filter() -> Any:
+def _human_approved_filter(db: Session) -> Any:
     """Hechos con correccion humana: FactRevision aprobada o candidato KPI aprobado."""
     return or_(
         FinancialFact.id.in_(
-            select(FactRevision.financial_fact_id).where(FactRevision.status == "approved")
+            select(FactRevision.financial_fact_id).where(
+                FactRevision.status == "approved",
+                *tenant_filters(db, FactRevision),
+            )
         ),
         FinancialFact.id.in_(
             select(KPIExtractionCandidate.canonical_fact_id).where(
                 KPIExtractionCandidate.status == "approved",
                 KPIExtractionCandidate.canonical_fact_id.is_not(None),
+                *tenant_filters(db, KPIExtractionCandidate),
             )
         ),
     )
@@ -59,7 +64,7 @@ def delete_financial_facts(db: Session, *conditions: Any) -> int:
     aprobado gana al del proveedor. Es un skip, no un error. Devuelve cuantos
     hechos se borraron. Solo emite UPDATE/DELETE (sin SELECT de ida y vuelta).
     """
-    approved = _human_approved_filter()
+    approved = _human_approved_filter(db)
     deletable = (*conditions, ~approved)
     ids = select(FinancialFact.id).where(*deletable)
     opts = {"synchronize_session": False}
@@ -97,12 +102,16 @@ def drop_shadowed_facts(db: Session, company_id: int, source_id: int, *condition
             kept.tenant_id.is_not_distinct_from(FinancialFact.tenant_id),
             kept.id < FinancialFact.id,
             kept.id.in_(
-                select(FactRevision.financial_fact_id).where(FactRevision.status == "approved")
+                select(FactRevision.financial_fact_id).where(
+                    FactRevision.status == "approved",
+                    *tenant_filters(db, FactRevision),
+                )
             )
             | kept.id.in_(
                 select(KPIExtractionCandidate.canonical_fact_id).where(
                     KPIExtractionCandidate.status == "approved",
                     KPIExtractionCandidate.canonical_fact_id.is_not(None),
+                    *tenant_filters(db, KPIExtractionCandidate),
                 )
             ),
         )

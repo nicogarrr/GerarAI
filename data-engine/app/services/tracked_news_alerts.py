@@ -70,8 +70,21 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
     now = now or datetime.now(UTC)
     if now.tzinfo is None:
         raise ValueError("Timezone-aware now required")
-    held = set(db.scalars(select(Position.company_id).where(Position.quantity > 0)).all())
-    symbols = {symbol.upper() for symbol in db.scalars(select(WatchItem.symbol)).all() if symbol}
+    held = set(
+        db.scalars(
+            select(Position.company_id).where(
+                Position.quantity > 0,
+                Position.tenant_id == tenant_id,
+            )
+        ).all()
+    )
+    symbols = {
+        symbol.upper()
+        for symbol in db.scalars(
+            select(WatchItem.symbol).where(WatchItem.tenant_id == tenant_id)
+        ).all()
+        if symbol
+    }
     watched = set(db.scalars(select(Company.id).where(Company.ticker.in_(symbols))).all()) if symbols else set()
     tracked = held | watched
     stats = {"eligible_companies": len(tracked), "examined": 0, "created": 0,

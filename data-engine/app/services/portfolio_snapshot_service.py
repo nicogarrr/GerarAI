@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import (
     CashBalance,
     CashDailySnapshot,
@@ -157,6 +158,7 @@ class PortfolioSnapshotService:
                         Transaction.trade_date > previous.snapshot_date,
                         Transaction.trade_date < snapshot_date,
                         Transaction.action.in_(["deposit", "withdrawal", "cash_misc"]),
+                        *tenant_filters(db, Transaction),
                     )
                 ).all()
             )
@@ -170,6 +172,7 @@ class PortfolioSnapshotService:
                     .where(
                         PortfolioDailySnapshot.portfolio_id == portfolio.id,
                         PortfolioDailySnapshot.snapshot_date < previous.snapshot_date,
+                        *tenant_filters(db, PortfolioDailySnapshot),
                     )
                     .limit(1)
                 )
@@ -275,6 +278,7 @@ class PortfolioSnapshotService:
                     .where(
                         PortfolioDailySnapshot.portfolio_id == portfolio_id,
                         PortfolioDailySnapshot.snapshot_date < previous.snapshot_date,
+                        *tenant_filters(db, PortfolioDailySnapshot),
                     )
                     .limit(1)
                 )

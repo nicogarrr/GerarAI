@@ -18,6 +18,7 @@ from decimal import Decimal
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.llm import create_llm_provider
 from app.llm.model_aliases import VERIFIED_FREE_MODELS
 from app.models.entities import Company, NewsEvent
@@ -74,7 +75,9 @@ def todays_llm_proposals(db: Session, now: datetime) -> int:
     return int(
         db.scalar(
             select(func.count(PaperTrade.id)).where(
-                PaperTrade.proposal_key.like("llm:%"), PaperTrade.created_at >= start
+                PaperTrade.proposal_key.like("llm:%"),
+                PaperTrade.created_at >= start,
+                *tenant_filters(db, PaperTrade),
             )
         )
         or 0

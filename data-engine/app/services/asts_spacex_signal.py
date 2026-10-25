@@ -16,6 +16,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, NewsEvent, Position, ResearchAlert, WatchItem
 from app.services.notification_service import record_in_app_delivery
 from app.services.tracked_news_alerts import _valid_source_url
@@ -102,8 +103,23 @@ def evaluate(db: Session, *, now: datetime | None = None) -> dict:
     asts = db.scalar(select(Company).where(Company.ticker == "ASTS"))
     if asts is None:
         return stats
-    held = db.scalar(select(Position.id).where(Position.company_id == asts.id, Position.quantity > 0).limit(1))
-    watched = db.scalar(select(WatchItem.id).where(WatchItem.symbol == "ASTS").limit(1))
+    held = db.scalar(
+        select(Position.id)
+        .where(
+            Position.company_id == asts.id,
+            Position.quantity > 0,
+            *tenant_filters(db, Position),
+        )
+        .limit(1)
+    )
+    watched = db.scalar(
+        select(WatchItem.id)
+        .where(
+            WatchItem.symbol == "ASTS",
+            *tenant_filters(db, WatchItem),
+        )
+        .limit(1)
+    )
     if held is None and watched is None:
         return stats
     spcx = db.scalar(select(Company).where(Company.ticker == "SPCX"))

@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
+from app.core.tenancy import tenant_filters
 from app.models import Company, CorporateAction, Position
 from app.services.company_resolver import resolve_company
 from app.services.connectors.fmp import FMPClient
@@ -157,7 +158,11 @@ class ProviderIngestionService:
 
     async def sync_portfolio(self, db: Session) -> dict[str, Any]:
         """Ingest every currently held company."""
-        company_ids = db.scalars(select(Position.company_id).distinct()).all()
+        company_ids = db.scalars(
+            select(Position.company_id)
+            .where(*tenant_filters(db, Position))
+            .distinct()
+        ).all()
         tickers = list(
             db.scalars(select(Company.ticker).where(Company.id.in_(company_ids))).all()
         ) if company_ids else []

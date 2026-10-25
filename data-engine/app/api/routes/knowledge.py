@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.core.errors import safe_detail
+from app.core.tenancy import tenant_filters
 from app.models import (
     InvestmentPrinciple,
     KnowledgeChunk,
@@ -320,7 +321,10 @@ def delete_collection(collection_id: int, db: Session = Depends(get_db)) -> Resp
     documents = db.scalar(
         select(func.count())
         .select_from(KnowledgeDocument)
-        .where(KnowledgeDocument.collection_id == collection.id)
+        .where(
+            KnowledgeDocument.collection_id == collection.id,
+            *tenant_filters(db, KnowledgeDocument),
+        )
     )
     if documents:
         # 409 fijo: solo se borran colecciones vacias. Con documentos hay

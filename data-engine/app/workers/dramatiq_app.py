@@ -487,13 +487,17 @@ def _price_tracked_companies(db):
     """
     from sqlalchemy import select
 
+    from app.core.tenancy import tenant_filters
     from app.models import AlertRule, Company
 
     tracked = {company.id: company for company in _tracked_companies(db)}
     alert_company_ids = [
         row[0]
         for row in db.execute(
-            select(AlertRule.company_id).where(AlertRule.active.is_(True)).distinct()
+            select(AlertRule.company_id).where(
+                AlertRule.active.is_(True),
+                *tenant_filters(db, AlertRule),
+            ).distinct()
         ).all()
     ]
     missing = [company_id for company_id in alert_company_ids if company_id not in tracked]
@@ -511,16 +515,23 @@ def _tracked_companies(db):
     """
     from sqlalchemy import select
 
+    from app.core.tenancy import tenant_filters
     from app.models import Company, Position, WatchItem
 
     tickers: set[str] = set()
-    for (symbol,) in db.execute(select(WatchItem.symbol)).all():
+    for (symbol,) in db.execute(
+        select(WatchItem.symbol).where(*tenant_filters(db, WatchItem))
+    ).all():
         if symbol:
             tickers.add(str(symbol).upper())
             tickers.add(str(symbol).upper().split(".")[0])
     company_ids = [
         row[0]
-        for row in db.execute(select(Position.company_id).distinct()).all()
+        for row in db.execute(
+            select(Position.company_id)
+            .where(*tenant_filters(db, Position))
+            .distinct()
+        ).all()
         if row[0] is not None
     ]
     from sqlalchemy import or_
@@ -1643,14 +1654,26 @@ def split_sync_tickers(
     peticiones a Yahoo/FMP."""
     from sqlalchemy import select as _select
 
+    from app.core.tenancy import tenant_filters
     from app.models import Company, Position, WatchItem
 
     if scope == "tracked":
-        company_ids = list(db.scalars(_select(Position.company_id).distinct()).all())
+        company_ids = list(
+            db.scalars(
+                _select(Position.company_id)
+                .where(*tenant_filters(db, Position))
+                .distinct()
+            ).all()
+        )
         tickers = set(
             db.scalars(_select(Company.ticker).where(Company.id.in_(company_ids))).all()
         ) if company_ids else set()
-        tickers |= {str(sym).upper() for sym in db.scalars(_select(WatchItem.symbol).distinct()).all()}
+        tickers |= {
+            str(sym).upper()
+            for sym in db.scalars(
+                _select(WatchItem.symbol).where(*tenant_filters(db, WatchItem)).distinct()
+            ).all()
+        }
         return sorted(tickers), None
     tickers = list(db.scalars(_select(Company.ticker).order_by(Company.id)).all())
     chunk_tickers = tickers[cursor:cursor + chunk]
@@ -1739,6 +1762,7 @@ def refresh_portfolio_prices_intraday(
     """
     from sqlalchemy import select as _select
 
+    from app.core.tenancy import tenant_filters
     from app.models import Company, Position
     from app.services.market_refresh_service import (
         MarketRefreshService,
@@ -1774,7 +1798,10 @@ def refresh_portfolio_prices_intraday(
         # operador de igualdad. Dedup por id en subconsulta escalar.
         company_ids = (
             _select(Position.company_id)
-            .where(Position.company_id.is_not(None))
+            .where(
+                Position.company_id.is_not(None),
+                *tenant_filters(db, Position),
+            )
             .distinct()
             .scalar_subquery()
         )

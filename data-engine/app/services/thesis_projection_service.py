@@ -33,6 +33,7 @@ from typing import Any
 from sqlalchemy import delete, desc, func, select, text
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import (
     Company,
     Document,
@@ -1038,6 +1039,7 @@ class ThesisProjectionService:
             select(func.count(ValuationModel.id)).where(
                 ValuationModel.model_type == MODEL_TYPE,
                 ValuationModel.created_at >= start,
+                *tenant_filters(db, ValuationModel),
             )
         ) or 0
 

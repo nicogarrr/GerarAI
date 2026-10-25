@@ -9,6 +9,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.tenancy import tenant_filters
 from app.models.entities import Company, Document, InsiderFiling, InsiderTransaction
 from app.services import insider_feed, insider_operations, insider_service
 
@@ -31,7 +32,9 @@ def _foreign_issuer(db: Session, ticker: str) -> bool | None:
         return None
     rows = db.scalars(
         select(Document.metadata_["form"].as_string()).where(
-            Document.company_id == company.id, Document.source_type == "SEC"
+            Document.company_id == company.id,
+            Document.source_type == "SEC",
+            *tenant_filters(db, Document),
         )
     )
     forms = {str(form).strip().upper() for form in rows if form}
@@ -114,7 +117,10 @@ def insider_filings(
             db.scalar(
                 select(func.count())
                 .select_from(InsiderFiling)
-                .where(InsiderFiling.issuer_ticker == wanted)
+                .where(
+                    InsiderFiling.issuer_ticker == wanted,
+                    *tenant_filters(db, InsiderFiling),
+                )
             )
             or 0
         )

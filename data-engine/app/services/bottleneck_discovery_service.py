@@ -34,6 +34,7 @@ from typing import Any
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
 from app.llm.model_aliases import VERIFIED_FREE_MODELS
 from app.models import (
@@ -494,7 +495,9 @@ def _today(now: datetime) -> date:
 
 def todays_discoveries(db: Session, now: datetime) -> int:
     return int(db.scalar(select(func.count(BottleneckDiscovery.id)).where(
-        BottleneckDiscovery.day == _today(now))) or 0)
+        BottleneckDiscovery.day == _today(now),
+        *tenant_filters(db, BottleneckDiscovery),
+    )) or 0)
 
 
 def save_within_quota(
@@ -520,7 +523,10 @@ def save_within_quota(
             db.rollback()
             raise QuotaExceeded(DAILY_QUOTA)
         existing = set(db.scalars(select(BottleneckDiscovery.ticker).where(
-            BottleneckDiscovery.day == _today(now), BottleneckDiscovery.theme == context.theme)))
+            BottleneckDiscovery.day == _today(now),
+            BottleneckDiscovery.theme == context.theme,
+            *tenant_filters(db, BottleneckDiscovery),
+        )))
         saved = 0
         try:
             for candidate in candidates:

@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models.entities import InsiderFiling, InsiderTransaction
 from app.services import insider_service
 
@@ -145,6 +146,7 @@ def build_feed(
             InsiderTransaction.is_derivative.is_(False),
             InsiderTransaction.code.in_(("P", "S")),
             func.coalesce(InsiderTransaction.tx_date, InsiderFiling.filing_date) >= cutoff,
+            *tenant_filters(db, InsiderTransaction, InsiderFiling),
         )
     )
     rows = db.execute(stmt).all()
@@ -181,10 +183,19 @@ def build_feed(
     def _sum(items: list[dict]) -> float:
         return sum(float(t["value"]) for t in items if t.get("value") is not None)
 
-    total_filings = db.scalar(select(func.count()).select_from(InsiderFiling)) or 0
+    total_filings = (
+        db.scalar(
+            select(func.count())
+            .select_from(InsiderFiling)
+            .where(*tenant_filters(db, InsiderFiling))
+        )
+        or 0
+    )
     with_data = (
         db.scalar(
-            select(func.count(func.distinct(InsiderTransaction.filing_id)))
+            select(func.count(func.distinct(InsiderTransaction.filing_id))).where(
+                *tenant_filters(db, InsiderTransaction)
+            )
         )
         or 0
     )

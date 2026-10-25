@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.errors import safe_detail
+from app.core.tenancy import tenant_filters
 from app.models import Company
 from app.models.entities import WorkflowRun
 from app.services.async_bridge import run_from_any_context
@@ -194,6 +195,7 @@ def run_workflow(
                     select(WorkflowRun.id).where(
                         WorkflowRun.workflow_name == name,
                         WorkflowRun.idempotency_key == key,
+                        *tenant_filters(db, WorkflowRun),
                     )
                 )
             return {
@@ -230,7 +232,10 @@ def run_workflow(
         )
         run_id = db.scalar(
             select(WorkflowRun.id)
-            .where(WorkflowRun.workflow_name == name)
+            .where(
+                WorkflowRun.workflow_name == name,
+                *tenant_filters(db, WorkflowRun),
+            )
             .order_by(WorkflowRun.id.desc())
             .limit(1)
         )

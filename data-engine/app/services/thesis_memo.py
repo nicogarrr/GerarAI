@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Claim, ClaimEvidence, Company, ThesisSection, ThesisVersion
 from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, percent_es
 
@@ -46,7 +47,11 @@ def build_memo_markdown(
     evidence_rows = db.execute(
         select(Claim.statement, ClaimEvidence.source_url, ClaimEvidence.source_tier)
         .join(ClaimEvidence, ClaimEvidence.claim_id == Claim.id)
-        .where(Claim.thesis_version_id == thesis.id, ClaimEvidence.source_url.is_not(None))
+        .where(
+            Claim.thesis_version_id == thesis.id,
+            ClaimEvidence.source_url.is_not(None),
+            *tenant_filters(db, Claim, ClaimEvidence),
+        )
         .limit(30)
     ).all()
 

@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import delete, desc, func, select, update
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.llm import LLMProvider, LLMRequest, Message, ResponseFormat
 from app.llm.chat_provider import create_background_llm_provider
 from app.llm.json import parse_json_response
@@ -503,7 +504,8 @@ class KnowledgeLibraryService:
                 select(InvestmentPrinciple.version)
                 .where(
                     (InvestmentPrinciple.id == canonical_id)
-                    | (InvestmentPrinciple.canonical_principle_id == canonical_id)
+                    | (InvestmentPrinciple.canonical_principle_id == canonical_id),
+                    *tenant_filters(db, InvestmentPrinciple),
                 )
                 .order_by(desc(InvestmentPrinciple.version))
                 .limit(1)
@@ -858,7 +860,10 @@ class KnowledgeLibraryService:
         count = db.scalar(
             select(func.count())
             .select_from(KnowledgeChunk)
-            .where(KnowledgeChunk.knowledge_document_id == document_id)
+            .where(
+                KnowledgeChunk.knowledge_document_id == document_id,
+                *tenant_filters(db, KnowledgeChunk),
+            )
         )
         return {**KnowledgeLibraryService.document_dict(document), "chunk_count": int(count or 0)}
 

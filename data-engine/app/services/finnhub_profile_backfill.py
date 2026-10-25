@@ -31,6 +31,7 @@ import httpx
 from sqlalchemy import func, select
 
 from app.core.config import get_settings
+from app.core.tenancy import tenant_filters
 from app.models.entities import Company, Document, FinancialFact
 from app.services.company_enrichment_service import (
     _PLACEHOLDER_EXCHANGES,
@@ -89,6 +90,7 @@ class FinnhubProfileBackfill:
                 Document.company_id.in_(company_ids),
                 Document.source_type == PROFILE_DOC_SOURCE,
                 Document.created_at >= since,
+                *tenant_filters(db, Document),
             )
             .group_by(Document.company_id)
         ).all()
@@ -179,6 +181,7 @@ class FinnhubProfileBackfill:
                         FinancialFact.metric == "market_cap",
                         FinancialFact.period == period,
                         FinancialFact.source_type == "Finnhub",
+                        *tenant_filters(db, FinancialFact),
                     )
                 )
                 if not already:

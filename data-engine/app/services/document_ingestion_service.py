@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import redact_secrets
+from app.core.tenancy import tenant_filters
 from app.models import Document, DocumentChunk
 from app.services.company_resolver import resolve_company
 from app.services.document_store import DocumentStore
@@ -136,7 +137,12 @@ class DocumentIngestionService:
                 else "Document with same checksum already exists for this company."
             )
             chunk_count = db.scalar(
-                select(DocumentChunk.id).where(DocumentChunk.document_id == duplicate.id).limit(1)
+                select(DocumentChunk.id)
+                .where(
+                    DocumentChunk.document_id == duplicate.id,
+                    *tenant_filters(db, DocumentChunk),
+                )
+                .limit(1)
             )
             return {
                 "status": "duplicate",

@@ -16,6 +16,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import (
     Company,
     FinancialFact,
@@ -147,8 +148,8 @@ def _latest_fcf_and_shares(db: Session, min_fiscal_year: int) -> dict[int, tuple
         # joyas con FCF de FY2016 contra precio de hoy. Sin FY reciente la
         # empresa se queda sin fcf_yield y no entra (fail-closed, N/D).
         .where(FinancialFact.fiscal_year >= min_fiscal_year)
+        .where(*tenant_filters(db, FinancialFact))
         .order_by(FinancialFact.fiscal_year.desc(), FinancialFact.created_at.desc())
-        .execution_options(include_all_tenants=True)
     ).all()
     fcf: dict[int, tuple[int, float, str]] = {}
     sh: dict[int, tuple[int, float]] = {}
@@ -177,9 +178,11 @@ def _smart_money(
             d
             for d in db.scalars(
                 select(ManagerHolding.report_date)
-                .where(ManagerHolding.report_date.isnot(None))
+                .where(
+                    ManagerHolding.report_date.isnot(None),
+                    *tenant_filters(db, ManagerHolding),
+                )
                 .distinct()
-                .execution_options(include_all_tenants=True)
             ).all()
         },
         reverse=True,
@@ -201,7 +204,7 @@ def _smart_money(
         .where(ManagerHolding.report_date.in_([latest, prior]))
         .where(ManagerHolding.cusip.in_(list(cusip_ticker)))
         .where(ManagerHolding.put_call == "")
-        .execution_options(include_all_tenants=True)
+        .where(*tenant_filters(db, ManagerHolding))
     ).all():
         key = (h.report_date, h.cusip, h.manager_id)
         shares[key] = shares.get(key, 0.0) + float(h.shares or 0)
@@ -233,7 +236,6 @@ def find_gems(
         .where(MarketPrice.company_id.in_(list(companies)))
         .where(MarketPrice.close.isnot(None))
         .order_by(MarketPrice.date.desc())
-        .execution_options(include_all_tenants=True)
     ).all():
         prices.setdefault(p.company_id, p)
     since = (today - timedelta(days=INSIDER_WINDOW_DAYS)).isoformat()
@@ -245,7 +247,7 @@ def find_gems(
         .where(InsiderTransaction.tx_date >= since)
         .where(InsiderTransaction.is_derivative.is_(False))
         .where(InsiderTransaction.code.in_(["P", "S"]))
-        .execution_options(include_all_tenants=True)
+        .where(*tenant_filters(db, InsiderTransaction))
     ).all():
         if t.value is None or t.issuer_ticker is None:
             continue

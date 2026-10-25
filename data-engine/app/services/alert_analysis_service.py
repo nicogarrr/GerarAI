@@ -119,6 +119,7 @@ def reconcile_missing_analyses(db: Session, *, limit: int = 50) -> dict:
         .where(
             id_match,
             NewsEvent.company_id == ResearchAlert.company_id,
+            NewsEvent.tenant_id == tenant_id,
             or_(url_norm.like("http://%"), url_norm.like("https://%")),
             func.length(func.trim(NewsEvent.url)) >= 8,
             func.length(func.trim(NewsEvent.metadata_["source_headline"].as_string())) > 0,

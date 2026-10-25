@@ -29,6 +29,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, Document, FinancialFact
 from app.services.connectors.sec_edgar import default_headers
 from app.services.connectors.sec_xbrl_instance import (
@@ -223,6 +224,7 @@ def backfill_class_based_eps(
                         FinancialFact.company_id == company.id,
                         FinancialFact.metric == metric,
                         FinancialFact.period == period,
+                        *tenant_filters(db, FinancialFact),
                     )
                 )
                 if exists:
@@ -358,6 +360,7 @@ def backfill_class_shares_outstanding(
             FinancialFact.company_id == company.id,
             FinancialFact.metric == "shares_outstanding",
             FinancialFact.period == period,
+            *tenant_filters(db, FinancialFact),
         )
     )
     if exists:

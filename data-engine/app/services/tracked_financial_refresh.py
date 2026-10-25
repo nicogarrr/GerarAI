@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, Document, FinancialFact
 from app.services.financial_ingestion_service import FinancialIngestionService
 
@@ -48,6 +49,7 @@ async def refresh_free_financials(db: Session, company: Company, *, now: datetim
         return {**base, "status": "skipped", "reason": "emisor_no_sec"}
     stored = int(db.scalar(select(func.count(FinancialFact.id)).where(
         FinancialFact.company_id == company.id, FinancialFact.source_type == "SEC",
+        *tenant_filters(db, FinancialFact),
     )) or 0)
     if previous and timedelta(0) <= now - previous < timedelta(hours=24) and stored:
         return {**base, "status": "skipped", "reason": "actualizado_ultimas_24h"}
@@ -56,6 +58,7 @@ async def refresh_free_financials(db: Session, company: Company, *, now: datetim
         # Refresh can add zero new facts when the stored history is unchanged.
         count = int(db.scalar(select(func.count(FinancialFact.id)).where(
             FinancialFact.company_id == company.id, FinancialFact.source_type == "SEC",
+            *tenant_filters(db, FinancialFact),
         )) or 0)
         if not count:
             return {**base, "status": "error", "reason": "sin_hechos_financieros"}

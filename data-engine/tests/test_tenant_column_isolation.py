@@ -515,3 +515,580 @@ def test_short_position_alert_requires_the_active_tenants_tracking(two, monkeypa
     assert emitted == []
 
 
+def test_propicks_funnel_reads_only_the_active_tenants_facts(two):
+    db, tenant_a, tenant_b, company_a, company_b = two
+    _as(db, tenant_a)
+    db.add_all(
+        [
+            CalculatedMetric(
+                company_id=company_a.id,
+                metric="roic",
+                value=Decimal("1"),
+                period="FY2025",
+                status="ok",
+                formula="x",
+            ),
+            FinancialFact(
+                company_id=company_a.id,
+                metric="net_income",
+                value=Decimal("10"),
+                unit="USD",
+                period="FY2025",
+                fiscal_year=2025,
+                fiscal_quarter="FY",
+            ),
+            FinancialFact(
+                company_id=company_a.id,
+                metric="revenue",
+                value=Decimal("5"),
+                unit="USD",
+                period="FY2023",
+                fiscal_year=2023,
+                fiscal_quarter="FY",
+            ),
+            FinancialFact(
+                company_id=company_a.id,
+                metric="revenue",
+                value=Decimal("10"),
+                unit="USD",
+                period="FY2024",
+                fiscal_year=2024,
+                fiscal_quarter="FY",
+            ),
+            FinancialFact(
+                company_id=company_a.id,
+                metric="revenue",
+                value=Decimal("20"),
+                unit="USD",
+                period="FY2025",
+                fiscal_year=2025,
+                fiscal_quarter="FY",
+            ),
+            FinancialFact(
+                company_id=company_a.id,
+                metric="free_cash_flow",
+                value=Decimal("5"),
+                unit="USD",
+                period="FY2025",
+                fiscal_year=2025,
+                fiscal_quarter="FY",
+            ),
+            FinancialFact(
+                company_id=company_a.id,
+                metric="shares_diluted",
+                value=Decimal("2"),
+                unit="shares",
+                period="FY2025",
+                fiscal_year=2025,
+                fiscal_quarter="FY",
+            ),
+        ]
+    )
+    db.commit()
+    _as(db, tenant_b)
+    db.add_all(
+        [
+            CalculatedMetric(
+                company_id=company_b.id,
+                metric="roe_5y",
+                value=Decimal("2"),
+                period="FY2025",
+                status="ok",
+                formula="x",
+            ),
+            FinancialFact(
+                company_id=company_b.id,
+                metric="net_income",
+                value=Decimal("-10"),
+                unit="USD",
+                period="FY2025",
+                fiscal_year=2025,
+                fiscal_quarter="FY",
+            ),
+            FinancialFact(
+                company_id=company_b.id,
+                metric="revenue",
+                value=Decimal("15"),
+                unit="USD",
+                period="FY2023",
+                fiscal_year=2023,
+                fiscal_quarter="FY",
+            ),
+            FinancialFact(
+                company_id=company_b.id,
+                metric="revenue",
+                value=Decimal("30"),
+                unit="USD",
+                period="FY2024",
+                fiscal_year=2024,
+                fiscal_quarter="FY",
+            ),
+            FinancialFact(
+                company_id=company_b.id,
+                metric="revenue",
+                value=Decimal("60"),
+                unit="USD",
+                period="FY2025",
+                fiscal_year=2025,
+                fiscal_quarter="FY",
+            ),
+            FinancialFact(
+                company_id=company_b.id,
+                metric="free_cash_flow",
+                value=Decimal("6"),
+                unit="USD",
+                period="FY2025",
+                fiscal_year=2025,
+                fiscal_quarter="FY",
+            ),
+            FinancialFact(
+                company_id=company_b.id,
+                metric="shares_diluted",
+                value=Decimal("3"),
+                unit="shares",
+                period="FY2025",
+                fiscal_year=2025,
+                fiscal_quarter="FY",
+            ),
+        ]
+    )
+    db.commit()
+
+    from app.services import propicks_funnel_service as funnel
+    from app.services import propicks_gems_service as gems
+
+    _as(db, tenant_a)
+    assert set(funnel._latest_metrics(db)) == {(company_a.id, "roic")}
+    assert funnel._earnings_consistency(db) == {company_a.id: (1, 1)}
+    assert set(funnel._revenue_cagr(db)) == {company_a.id}
+    assert set(gems._latest_fcf_and_shares(db, 2024)) == {company_a.id}
+
+    _as(db, tenant_b)
+    assert set(funnel._latest_metrics(db)) == {(company_b.id, "roe_5y")}
+    assert funnel._earnings_consistency(db) == {company_b.id: (0, 1)}
+    assert set(funnel._revenue_cagr(db)) == {company_b.id}
+    assert set(gems._latest_fcf_and_shares(db, 2024)) == {company_b.id}
+
+
+def test_corporate_action_service_holding_and_first_trade_are_tenant_scoped(two):
+    db, tenant_a, tenant_b, company_a, company_b = two
+    _as(db, tenant_a)
+    db.add_all(
+        [
+            Position(company_id=company_a.id, quantity=1, base_currency="EUR"),
+            Transaction(
+                company_id=company_a.id,
+                action="buy",
+                quantity=1,
+                price=1,
+                trade_date=date(2024, 1, 1),
+            ),
+        ]
+    )
+    db.commit()
+    _as(db, tenant_b)
+    db.add_all(
+        [
+            Position(company_id=company_b.id, quantity=1, base_currency="EUR"),
+            Transaction(
+                company_id=company_b.id,
+                action="buy",
+                quantity=1,
+                price=1,
+                trade_date=date(2024, 2, 1),
+            ),
+        ]
+    )
+    db.commit()
+
+    from app.services.corporate_actions_service import CorporateActionService
+
+    service = CorporateActionService()
+    ids = {company_a.id, company_b.id}
+
+    _as(db, tenant_a)
+    assert service.first_trade_dates(db, ids) == {company_a.id: date(2024, 1, 1)}
+    assert service.companies_with_holding(db, ids) == {company_a.id}
+
+    _as(db, tenant_b)
+    assert service.first_trade_dates(db, ids) == {company_b.id: date(2024, 2, 1)}
+    assert service.companies_with_holding(db, ids) == {company_b.id}
+
+
+def test_insider_filings_and_feed_totals_are_tenant_scoped(two):
+    db, tenant_a, tenant_b, _, _ = two
+    today = date.today().isoformat()
+
+    _as(db, tenant_a)
+    filing_a = InsiderFiling(
+        accession_number="0000000000-26-000001",
+        form="4",
+        issuer_cik="0000000001",
+        issuer_ticker="AAA",
+        filing_date=today,
+        parser_version="test",
+    )
+    db.add(filing_a)
+    db.flush()
+    db.add(
+        InsiderTransaction(
+            fingerprint="a" * 64,
+            filing_id=filing_a.id,
+            accession_number=filing_a.accession_number,
+            form="4",
+            issuer_ticker="AAA",
+            code="P",
+            tx_date=today,
+            shares=1,
+            price=1,
+            value=1,
+        )
+    )
+    db.commit()
+
+    _as(db, tenant_b)
+    filing_b = InsiderFiling(
+        accession_number="0000000000-26-000002",
+        form="4",
+        issuer_cik="0000000002",
+        issuer_ticker="AAA",
+        filing_date=today,
+        parser_version="test",
+    )
+    db.add(filing_b)
+    db.flush()
+    db.add(
+        InsiderTransaction(
+            fingerprint="b" * 64,
+            filing_id=filing_b.id,
+            accession_number=filing_b.accession_number,
+            form="4",
+            issuer_ticker="AAA",
+            code="P",
+            tx_date=today,
+            shares=1,
+            price=1,
+            value=1,
+        )
+    )
+    db.commit()
+
+    from app.api.routes.insider import insider_filings
+    from app.services.insider_feed import build_feed
+
+    _as(db, tenant_a)
+    assert insider_filings(ticker="AAA", limit=20, db=db)["total"] == 1
+    feed_a = build_feed(db, today=date.today())
+    assert feed_a["totals"]["filings_total"] == 1
+    assert feed_a["totals"]["filings_with_transactions"] == 1
+
+    _as(db, tenant_b)
+    assert insider_filings(ticker="AAA", limit=20, db=db)["total"] == 1
+    feed_b = build_feed(db, today=date.today())
+    assert feed_b["totals"]["filings_total"] == 1
+    assert feed_b["totals"]["filings_with_transactions"] == 1
+
+
+def test_earnings_and_catalyst_followed_companies_are_tenant_scoped(two):
+    db, tenant_a, tenant_b, company_a, company_b = two
+    company_a.exchange = "NASDAQ"
+    company_b.exchange = "NASDAQ"
+    db.commit()
+
+    _as(db, tenant_a)
+    db.add_all(
+        [
+            Position(company_id=company_a.id, quantity=1, base_currency="USD"),
+            WatchItem(symbol="AAA"),
+        ]
+    )
+    db.commit()
+    _as(db, tenant_b)
+    db.add_all(
+        [
+            Position(company_id=company_b.id, quantity=1, base_currency="USD"),
+            WatchItem(symbol="BBB"),
+        ]
+    )
+    db.commit()
+
+    from app.services.catalyst_calendar_service import held_tickers, watchlist_us_tickers
+    from app.services.earnings_dates_service import followed_companies
+
+    _as(db, tenant_a)
+    assert set(followed_companies(db)) == {"AAA"}
+    assert held_tickers(db)[0] == {"AAA"}
+    assert watchlist_us_tickers(db, set()) == {"AAA"}
+
+    _as(db, tenant_b)
+    assert set(followed_companies(db)) == {"BBB"}
+    assert held_tickers(db)[0] == {"BBB"}
+    assert watchlist_us_tickers(db, set()) == {"BBB"}
+
+
+def test_knowledge_document_chunk_count_is_tenant_scoped(two):
+    db, tenant_a, tenant_b, _, _ = two
+
+    _as(db, tenant_a)
+    document_a = KnowledgeDocument(
+        title="A doc",
+        document_type="note",
+        status="ready",
+    )
+    db.add(document_a)
+    db.flush()
+    db.add(
+        KnowledgeChunk(
+            knowledge_document_id=document_a.id,
+            chunk_index=0,
+            content="A chunk",
+        )
+    )
+    db.commit()
+
+    _as(db, tenant_b)
+    db.add(
+        KnowledgeChunk(
+            knowledge_document_id=document_a.id,
+            chunk_index=1,
+            content="B chunk linked to A doc",
+        )
+    )
+    db.commit()
+
+    from app.services.knowledge_library_service import KnowledgeLibraryService
+
+    _as(db, tenant_a)
+    document = KnowledgeLibraryService.get_document(db, document_a.id)
+    assert document is not None
+    assert document["chunk_count"] == 1
+
+
+def test_knowledge_graph_counts_are_tenant_scoped(two):
+    db, tenant_a, tenant_b, company_a, company_b = two
+    _as(db, tenant_a)
+    db.add(
+        KnowledgeGraphNode(
+            node_key="node:a",
+            node_type="company",
+            label="AAA",
+            company_id=company_a.id,
+        )
+    )
+    db.commit()
+    _as(db, tenant_b)
+    db.add(
+        KnowledgeGraphNode(
+            node_key="node:b",
+            node_type="company",
+            label="BBB",
+            company_id=company_b.id,
+        )
+    )
+    db.commit()
+
+    from app.services.knowledge_graph_service import KnowledgeGraphService
+
+    service = KnowledgeGraphService()
+    _as(db, tenant_a)
+    payload_a = service.graph(db)
+    assert payload_a["total_node_count"] == 1
+    assert [node["label"] for node in payload_a["nodes"]] == ["AAA"]
+
+    _as(db, tenant_b)
+    payload_b = service.graph(db)
+    assert payload_b["total_node_count"] == 1
+    assert [node["label"] for node in payload_b["nodes"]] == ["BBB"]
+
+
+def test_bottleneck_discovery_quota_is_tenant_scoped(two):
+    db, tenant_a, tenant_b, company_a, company_b = two
+    from app.models.bottleneck_discovery import BottleneckDiscovery
+    from app.services.bottleneck_discovery_service import todays_discoveries
+
+    today = date.today()
+    now = datetime.now(UTC)
+    _as(db, tenant_a)
+    db.add(
+        BottleneckDiscovery(
+            theme="energy",
+            ticker=company_a.ticker,
+            reasoning="A",
+            model="test",
+            day=today,
+            created_at=now,
+        )
+    )
+    db.commit()
+    _as(db, tenant_b)
+    db.add(
+        BottleneckDiscovery(
+            theme="energy",
+            ticker=company_b.ticker,
+            reasoning="B",
+            model="test",
+            day=today,
+            created_at=now,
+        )
+    )
+    db.commit()
+
+    _as(db, tenant_a)
+    assert todays_discoveries(db, now) == 1
+    _as(db, tenant_b)
+    assert todays_discoveries(db, now) == 1
+
+
+def test_llm_proposal_daily_count_is_tenant_scoped(two):
+    db, tenant_a, tenant_b, company_a, company_b = two
+    from app.models.paper_trading import PaperTrade
+    from app.services.llm_proposal_runner import todays_llm_proposals
+
+    def _trade(company: Company) -> PaperTrade:
+        return PaperTrade(
+            proposal_key="llm:test",
+            ticker=company.ticker,
+            direction="long",
+            horizon="1m",
+            thesis="test",
+            conviction=Decimal("0.5"),
+            proposed_entry=Decimal("1"),
+            stop=Decimal("0.9"),
+            target=Decimal("1.1"),
+            quantity=Decimal("1"),
+            inference_basis="test",
+        )
+
+    now = datetime.now(UTC)
+    _as(db, tenant_a)
+    db.add(_trade(company_a))
+    db.commit()
+    _as(db, tenant_b)
+    db.add(_trade(company_b))
+    db.commit()
+
+    _as(db, tenant_a)
+    assert todays_llm_proposals(db, now) == 1
+    _as(db, tenant_b)
+    assert todays_llm_proposals(db, now) == 1
+
+
+def test_propicks_price_run_lookup_is_tenant_scoped(two):
+    db, tenant_a, tenant_b, company_a, company_b = two
+    from app.models import ProPickCandidate, ProPickRun
+    from app.services.propicks_price_service import latest_run_passed_companies
+
+    now = datetime.now(UTC)
+    _as(db, tenant_a)
+    run_a = ProPickRun(as_of=now, status="completed", funnel_version="v1")
+    db.add(run_a)
+    db.flush()
+    db.add(
+        ProPickCandidate(
+            run_id=run_a.id,
+            company_id=company_a.id,
+            passed=True,
+            rank=1,
+            score=1.0,
+        )
+    )
+    db.commit()
+    _as(db, tenant_b)
+    run_b = ProPickRun(as_of=now, status="completed", funnel_version="v1")
+    db.add(run_b)
+    db.flush()
+    db.add(
+        ProPickCandidate(
+            run_id=run_b.id,
+            company_id=company_b.id,
+            passed=True,
+            rank=1,
+            score=2.0,
+        )
+    )
+    db.commit()
+
+    _as(db, tenant_a)
+    assert [company.ticker for company in latest_run_passed_companies(db)] == ["AAA"]
+    _as(db, tenant_b)
+    assert [company.ticker for company in latest_run_passed_companies(db)] == ["BBB"]
+
+
+def test_split_sync_uses_only_the_active_tenants_positions(two, monkeypatch):
+    db, tenant_a, tenant_b, company_a, company_b = two
+    _as(db, tenant_a)
+    db.add(Position(company_id=company_a.id, quantity=1, base_currency="EUR"))
+    db.commit()
+    _as(db, tenant_b)
+    db.add(Position(company_id=company_b.id, quantity=1, base_currency="EUR"))
+    db.commit()
+
+    from app.services.split_ingestion_service import SplitIngestionService
+
+    seen: list[str] = []
+
+    async def _fake_sync_company(self, db, *, ticker):
+        seen.append(ticker)
+        return {"ticker": ticker, "status": "ok", "inserted": 0, "existing": 0}
+
+    monkeypatch.setattr(SplitIngestionService, "sync_company", _fake_sync_company)
+    service = SplitIngestionService()
+
+    _as(db, tenant_a)
+    asyncio.run(service.sync_portfolio(db))
+    assert seen == ["AAA"]
+
+    seen.clear()
+    _as(db, tenant_b)
+    asyncio.run(service.sync_portfolio(db))
+    assert seen == ["BBB"]
+
+
+def test_portfolio_ledger_held_quantity_is_tenant_scoped(two):
+    db, tenant_a, tenant_b, company_a, _ = two
+    _as(db, tenant_a)
+    db.add(
+        Transaction(
+            company_id=company_a.id,
+            action="buy",
+            quantity=2,
+            price=1,
+            trade_date=date(2024, 1, 1),
+        )
+    )
+    db.commit()
+    _as(db, tenant_b)
+    db.add(
+        Transaction(
+            company_id=company_a.id,
+            action="buy",
+            quantity=3,
+            price=1,
+            trade_date=date(2024, 1, 2),
+        )
+    )
+    db.commit()
+
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+
+    service = PortfolioLedgerService()
+    _as(db, tenant_a)
+    assert service._held_quantity(db, company_a.id) == Decimal("2")
+    _as(db, tenant_b)
+    assert service._held_quantity(db, company_a.id) == Decimal("3")
+
+
+def test_tenant_filters_fail_closed_when_context_is_required(db, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.core.tenancy import tenant_filters
+
+    monkeypatch.setattr(
+        "app.core.tenancy.get_settings",
+        lambda: SimpleNamespace(research_auth_required=True, is_production=False),
+    )
+    with pytest.raises(RuntimeError):
+        tenant_filters(db, FinancialFact)
+
+    db.info["tenant_id"] = 42
+    assert len(tenant_filters(db, FinancialFact)) == 1

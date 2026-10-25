@@ -25,6 +25,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import InvestorMovement, InvestorPosition
 from app.services.investors import (
     NO_13F_NOTE,
@@ -577,6 +578,7 @@ def sync_form4(db: Session, slug: str, *, limit: int = 20, fetch=None, filings=N
                     InvestorMovement.investor_slug == slug,
                     InvestorMovement.accession_number == filing["accession_number"],
                     InvestorMovement.line_no == line_no,
+                    *tenant_filters(db, InvestorMovement),
                 )
             )
             if exists:

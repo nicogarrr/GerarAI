@@ -23,6 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models.entities import Company, NewsEvent
 from app.models.paper_trading import PaperTrade
 from app.services.llm_proposal_runner import (
@@ -73,7 +74,8 @@ def select_candidates(db: Session, now: datetime, limit: int) -> list[str]:
         .join(NewsEvent, NewsEvent.company_id == Company.id)
         .where(NewsEvent.date >= since,
             NewsEvent.date <= _utc(now),  # nunca evidencia con fecha futura
-            NewsEvent.materiality_score >= MIN_MATERIALITY)
+            NewsEvent.materiality_score >= MIN_MATERIALITY,
+            *tenant_filters(db, NewsEvent))
         .group_by(Company.ticker)
         .order_by(func.max(NewsEvent.materiality_score).desc(), func.count(NewsEvent.id).desc(), Company.ticker)
     ).all()
@@ -84,6 +86,7 @@ def select_candidates(db: Session, now: datetime, limit: int) -> list[str]:
             select(PaperTrade.ticker).where(
                 (PaperTrade.author == "LLM") | PaperTrade.proposal_key.like("llm:%"),
                 (PaperTrade.status.in_(("pending", "open"))) | (PaperTrade.created_at >= start),
+                *tenant_filters(db, PaperTrade),
             )
         ).all()
     }

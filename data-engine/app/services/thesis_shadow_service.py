@@ -42,6 +42,7 @@ from langgraph.types import Command
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, ThesisVersion
 from app.services.company_resolver import resolve_company
 from app.services.thesis_job_service import THESIS_PHASES
@@ -118,9 +119,25 @@ def _compare_probes(db: Session, company: Company, artifacts: dict[str, str]) ->
     )
 
     cid = company.id
-    facts = db.scalar(select(func.count()).select_from(FinancialFact).where(FinancialFact.company_id == cid)) or 0
-    prices = db.scalar(select(func.count()).select_from(MarketPrice).where(MarketPrice.company_id == cid)) or 0
-    documents = db.scalar(select(func.count()).select_from(Document).where(Document.company_id == cid)) or 0
+    facts = db.scalar(
+        select(func.count())
+        .select_from(FinancialFact)
+        .where(
+            FinancialFact.company_id == cid,
+            *tenant_filters(db, FinancialFact),
+        )
+    ) or 0
+    prices = db.scalar(
+        select(func.count()).select_from(MarketPrice).where(MarketPrice.company_id == cid)
+    ) or 0
+    documents = db.scalar(
+        select(func.count())
+        .select_from(Document)
+        .where(
+            Document.company_id == cid,
+            *tenant_filters(db, Document),
+        )
+    ) or 0
 
     model = db.scalar(
         select(FundamentalModelVersion)
@@ -142,18 +159,28 @@ def _compare_probes(db: Session, company: Company, artifacts: dict[str, str]) ->
 
     fact_rows = db.execute(
         select(FinancialFact.source_type, func.count())
-        .where(FinancialFact.company_id == cid)
+        .where(
+            FinancialFact.company_id == cid,
+            *tenant_filters(db, FinancialFact),
+        )
         .group_by(FinancialFact.source_type)
     ).all()
     doc_rows = db.execute(
         select(Document.source_type, func.count())
-        .where(Document.company_id == cid)
+        .where(
+            Document.company_id == cid,
+            *tenant_filters(db, Document),
+        )
         .group_by(Document.source_type)
     ).all()
     low_confidence = db.scalar(
         select(func.count())
         .select_from(FinancialFact)
-        .where(FinancialFact.company_id == cid, FinancialFact.confidence < 0.5)
+        .where(
+            FinancialFact.company_id == cid,
+            FinancialFact.confidence < 0.5,
+            *tenant_filters(db, FinancialFact),
+        )
     ) or 0
     facts_by_source = {str(src): count for src, count in fact_rows}
     docs_by_source = {str(src): count for src, count in doc_rows}

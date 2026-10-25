@@ -31,6 +31,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import (
     CalculatedMetric,
     Company,
@@ -129,7 +130,14 @@ class FunnelResult:
 
 
 def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
-    """Latest stored value per (company, metric) across the metrics we read."""
+    """Latest stored value per (company, metric) across the metrics we read.
+
+    ProPicks runs per tenant: CalculatedMetric/FinancialFact are
+    TenantOwnedMixin and every tenant has its own ingested copy. There is no
+    global market-data table to read here, so the old include_all_tenants
+    bypass (which mixed other tenants' rows into the funnel) is gone;
+    MarketPrice/Company remain global and need no tenant predicate.
+    """
     wanted = set(COVERAGE_METRICS) | {"wacc", LEVERAGE_METRIC, "fcf_conversion", "momentum_12m"}
     latest_period = (
         select(
@@ -137,9 +145,11 @@ def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
             CalculatedMetric.metric.label("metric"),
             func.max(CalculatedMetric.period).label("max_period"),
         )
-        .where(CalculatedMetric.metric.in_(wanted))
+        .where(
+            CalculatedMetric.metric.in_(wanted),
+            *tenant_filters(db, CalculatedMetric),
+        )
         .group_by(CalculatedMetric.company_id, CalculatedMetric.metric)
-        .execution_options(include_all_tenants=True)
         .subquery()
     )
     rows = db.execute(
@@ -153,8 +163,8 @@ def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
             & (CalculatedMetric.metric == latest_period.c.metric)
             & (CalculatedMetric.period == latest_period.c.max_period),
         )
+        .where(*tenant_filters(db, CalculatedMetric))
         .order_by(CalculatedMetric.tenant_id.desc().nulls_last())
-        .execution_options(include_all_tenants=True)
     ).all()
     return {
         (cid, metric): float(value)
@@ -177,12 +187,12 @@ def _earnings_consistency(db: Session) -> dict[int, tuple[int, int]]:
         .where(FinancialFact.metric == "net_income")
         .where(FinancialFact.fiscal_quarter.in_(["FY", ""]))
         .where(FinancialFact.fiscal_year.isnot(None))
+        .where(*tenant_filters(db, FinancialFact))
         .order_by(
             FinancialFact.company_id,
             FinancialFact.fiscal_year.desc(),
             FinancialFact.created_at.desc(),
         )
-        .execution_options(include_all_tenants=True)
     ).all()
     by_company: dict[int, list[tuple[int, float]]] = {}
     seen: set[tuple[int, int]] = set()
@@ -210,12 +220,12 @@ def _revenue_cagr(db: Session) -> dict[int, float]:
         .where(FinancialFact.metric == "revenue")
         .where(FinancialFact.fiscal_quarter.in_(["FY", ""]))
         .where(FinancialFact.fiscal_year.isnot(None))
+        .where(*tenant_filters(db, FinancialFact))
         .order_by(
             FinancialFact.company_id,
             FinancialFact.fiscal_year.asc(),
             FinancialFact.created_at.desc(),
         )
-        .execution_options(include_all_tenants=True)
     ).all()
     by_company: dict[int, list[tuple[int, float]]] = {}
     seen: set[tuple[int, int]] = set()
@@ -333,7 +343,6 @@ def _average_volumes(db: Session, company_ids: list[int]) -> dict[int, float]:
             MarketPrice.volume > 0,
         )
         .group_by(MarketPrice.company_id)
-        .execution_options(include_all_tenants=True)
     ).all()
     return {int(cid): float(avg) for cid, avg in rows if avg is not None}
 

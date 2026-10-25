@@ -7,6 +7,7 @@ from uuid import uuid4
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, Position, Transaction
 from app.services.portfolio_fx_service import PortfolioFXService
 
@@ -138,10 +139,11 @@ class PortfolioLedgerService:
         """Shares currently on the ledger, from the buy/sell legs only."""
         total = Decimal("0")
         for action, quantity in db.execute(
-            select(Transaction.action, Transaction.quantity).where(
-                Transaction.company_id == company_id,
-                Transaction.action.in_(BUY_ACTIONS | SELL_ACTIONS),
-            )
+        select(Transaction.action, Transaction.quantity).where(
+            Transaction.company_id == company_id,
+            Transaction.action.in_(BUY_ACTIONS | SELL_ACTIONS),
+            *tenant_filters(db, Transaction),
+        )
         ).all():
             amount = Decimal(quantity or 0)
             total += amount if str(action).lower() in BUY_ACTIONS else -amount

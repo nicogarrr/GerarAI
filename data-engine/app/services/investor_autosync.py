@@ -11,6 +11,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models.entities import FundManager
 
 # El actor tarda minutos; reintentos como mucho uno por hora por tenant.
@@ -27,7 +28,11 @@ def maybe_autosync_holdings(db: Session) -> bool:
     fallo devuelve False y la respuesta sale con datos o sin ellos.
     """
     try:
-        if db.scalar(select(FundManager.id).limit(1)) is not None:
+        if db.scalar(
+            select(FundManager.id)
+            .where(*tenant_filters(db, FundManager))
+            .limit(1)
+        ) is not None:
             return False
         from app.workers.dramatiq_app import _redis_client, sync_investor_holdings
 

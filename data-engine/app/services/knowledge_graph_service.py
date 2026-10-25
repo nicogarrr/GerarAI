@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import func, or_, select, union_all
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import (
     Company,
     CompanyKPI,
@@ -375,11 +376,14 @@ class KnowledgeGraphService:
         statement = select(KnowledgeGraphNode).where(*conds)
         # Rank by actual active degree within the requested scope, not insertion
         # order (sync inserts all companies before their connected knowledge).
-        eligible = select(KnowledgeGraphNode.id).where(*conds).subquery()
+        eligible = select(KnowledgeGraphNode.id).where(
+            *conds, *tenant_filters(db, KnowledgeGraphNode)
+        ).subquery()
         active_edges = select(KnowledgeGraphEdge).where(
             KnowledgeGraphEdge.status == "active",
             KnowledgeGraphEdge.from_node_id.in_(select(eligible.c.id)),
             KnowledgeGraphEdge.to_node_id.in_(select(eligible.c.id)),
+            *tenant_filters(db, KnowledgeGraphEdge),
         ).subquery()
         endpoints = union_all(
             select(active_edges.c.from_node_id.label("node_id")),
@@ -414,7 +418,7 @@ class KnowledgeGraphService:
             db.scalar(
                 select(func.count())
                 .select_from(KnowledgeGraphNode)
-                .where(*conds)
+                .where(*conds, *tenant_filters(db, KnowledgeGraphNode))
             )
             or 0
         )
