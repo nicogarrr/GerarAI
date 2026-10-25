@@ -507,3 +507,43 @@ async def test_extra_openrouter_member_is_last_resort():
     orr.name = "openrouter"
     out = await ChatFallbackProvider(p, groq, total=.5, delay=.01, extra_backups=((orr, "x:free"),)).complete(LLMRequest([Message("user", "hola")], task="chat"))
     assert out.provider == "openrouter" and orr.calls[0].model == "x:free"
+
+
+@run_async
+async def test_fallback_trail_names_failed_members_without_messages_and_is_not_degraded():
+    """SINTETICO: el miembro que respondio queda en provider/model y los que fallaron en fallback_trail."""
+    p, b = Fake(ProviderHTTPError("opencode-go", 429)), Fake(response(model=GROQ_MODEL, provider="groq"))
+    out = await ChatFallbackProvider(p, b, total=.3, delay=.1).complete(
+        LLMRequest([Message("user", "hola")], task="chat", model="deepseek-v4.1-flash-free"))
+    assert out.provider == "groq" and not out.degraded and out.warnings == ()
+    assert out.fallback_trail == ("fake:?:ProviderHTTPError429",)
+
+
+@run_async
+async def test_fallback_trail_lists_each_failed_backup_and_empty_for_primary():
+    primary_ok = await ChatFallbackProvider(Fake(), Fake(), total=.3, delay=.1).complete(
+        LLMRequest([Message("user", "hola")], task="chat"))
+    assert primary_ok.fallback_trail == ()
+    p = Fake(ProviderHTTPError("opencode-go", 500))
+    b = Fake(ProviderHTTPError("groq", 503))
+    b2 = Fake(response(model="gemini-x", provider="gemini"))
+    out = await ChatFallbackProvider(p, b, total=2, delay=.05, backup2=b2).complete(
+        LLMRequest([Message("user", "hola")], task="chat"))
+    assert out.provider == "gemini"
+    assert out.fallback_trail[0].startswith("fake:") and "ProviderHTTPError500" in out.fallback_trail[0]
+    assert any("ProviderHTTPError503" in t for t in out.fallback_trail)
+
+
+@run_async
+async def test_fallback_trail_labels_a_pending_primary_as_pending_not_timeout():
+    """Si el respaldo gana la carrera mientras el primario sigue pendiente, NO se inventa un TimeoutError."""
+    class Slow(Fake):
+        async def complete(self, request):
+            await asyncio.sleep(5)
+            return await super().complete(request)
+
+    out = await ChatFallbackProvider(Slow(), Fake(response(model=GROQ_MODEL, provider="groq")), total=2, delay=.05).complete(
+        LLMRequest([Message("user", "hola")], task="chat"))
+    assert out.provider == "groq"
+    assert out.fallback_trail == ("fake:?:pending_when_fallback_won",)
+    assert not any("TimeoutError" in t for t in out.fallback_trail)

@@ -695,6 +695,8 @@ class ChatSynthesisService:
                     "json_validity": True,
                     "evaluation_score": confidence,
                     "request_id": response.request_id,
+                    # Que miembros fallaron antes de responder este (vacio = el primero).
+                    "fallback_trail": list(response.fallback_trail),
                 }
                 trace.update(**baseline.llm_trace)
                 trace.output = {
@@ -966,6 +968,7 @@ class ChatSynthesisService:
             llm_trace={
                 "path": "general",
                 "provider": guarded.response.provider,
+                "fallback_trail": list(guarded.response.fallback_trail),
                 "cost": spent["cost"],
                 "doctrine_chunks": len(doctrine),
             },

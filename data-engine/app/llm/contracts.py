@@ -283,9 +283,14 @@ class LLMResponse:
     from_cache: bool = False
     #: Clave de cache que produjo la respuesta (hash sha256, sin secretos).
     cache_key: str | None = None
+    #: Miembros que se probaron y FALLARON antes de esta respuesta ("proveedor:modelo:
+    #: ClaseDeError"), sin mensajes ni URLs. Vacio = respondio el primero. NO es un
+    #: aviso del proveedor: no marca `degraded`.
+    fallback_trail: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "tool_calls", tuple(self.tool_calls))
+        object.__setattr__(self, "fallback_trail", tuple(str(t) for t in self.fallback_trail))
         object.__setattr__(self, "warnings", tuple(str(w) for w in self.warnings))
         if any(not isinstance(call, ToolCall) for call in self.tool_calls):
             raise TypeError("All tool_calls must be ToolCall instances")
