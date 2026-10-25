@@ -4,7 +4,7 @@ import re
 from collections import Counter
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import delete, or_, select, tuple_
 from sqlalchemy.orm import Session
@@ -564,7 +564,7 @@ def _compose_total_debt(
                     parts = pick(((TOTAL_DEBT_LAST_RESORT, ()),), end)
         if not parts:
             continue
-        total = sum((_decimal(e["val"]) for _, e in parts), Decimal("0"))
+        total = sum((cast(Decimal, _decimal(e["val"])) for _, e in parts), Decimal("0"))
         latest = max((e for _, e in parts), key=lambda e: str(e.get("filed") or ""))
         components = {tag: str(_decimal(e["val"])) for tag, e in parts}
         out[end] = {

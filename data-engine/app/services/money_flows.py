@@ -22,6 +22,7 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from typing import Any
 
 import httpx
 from sqlalchemy import or_, select
@@ -285,7 +286,7 @@ def map_recipient_to_ticker(name: str) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _cached(key: str, loader):
+def _cached(key: str, loader) -> Any:
     now = time.monotonic()
     with _cache_lock:
         hit = _cache.get(key)
@@ -395,7 +396,9 @@ def build_sec_spender(db: Session, cfg: SpenderConfig, tenant: int | None) -> di
     return base
 
 
-def build_usaspending_theme(theme: FlowTheme) -> dict:
+def build_usaspending_theme(
+    theme: FlowTheme,
+) -> tuple[list[dict], list[dict], list[dict], str, list[str], str | None, str | None]:
     """Tema alimentado por la API oficial de USAspending (defensa)."""
     start, end, fy_label = _fy_window()
     agency = theme.agency_name

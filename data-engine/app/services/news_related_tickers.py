@@ -82,11 +82,11 @@ def _name_key(name: str | None) -> str | None:
     return key if len(key) >= 7 else None
 
 
-def build_index(companies: list[CompanyRef | Company]) -> tuple[dict[str, Company], dict[str, Company]]:
+def build_index(companies: list[CompanyRef | Company]) -> tuple[dict[str, CompanyRef | Company], dict[str, CompanyRef | Company]]:
     """(nombre -> empresa, ticker -> empresa). Un nombre compartido por dos
     empresas se descarta: ambiguo."""
-    by_name: dict[str, Company | None] = {}
-    by_ticker: dict[str, Company] = {}
+    by_name: dict[str, CompanyRef | Company | None] = {}
+    by_ticker: dict[str, CompanyRef | Company] = {}
     for company in companies:
         if company.ticker:
             by_ticker.setdefault(company.ticker.upper(), company)
@@ -167,7 +167,9 @@ def quotes_for(db: Session, company_ids: set[int]) -> dict[int, dict]:
         out[company_id] = {
             "price": close,
             "date": day.isoformat(),
-            "change_pct": round((close - prev[1]) / prev[1] * 100, 2) if comparable else None,
+            "change_pct": (
+                round((close - prev[1]) / prev[1] * 100, 2) if comparable and prev is not None else None
+            ),
         }
     return out
 
@@ -229,5 +231,6 @@ def related_for_events(
             for c in chain
         ]
         primary_ticker = next((c.ticker for c in chain if c.id == primary_ids.get(event_id)), None)
-        result[event_id].extend(etf_by_ticker.get(primary_ticker, []))
+        if primary_ticker is not None:
+            result[event_id].extend(etf_by_ticker.get(primary_ticker, []))
     return result

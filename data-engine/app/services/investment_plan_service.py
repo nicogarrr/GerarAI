@@ -342,6 +342,7 @@ class InvestmentPlanService:
                     }
                 )
                 continue
+            assert found is not None  # rate no es None => hubo cotizacion
             total += plan.monthly_contribution * rate
             periods.append(
                 {
