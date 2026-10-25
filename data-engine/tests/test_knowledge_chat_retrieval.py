@@ -64,3 +64,22 @@ def test_fragmento_irrelevante_no_cuela():
     rows, _ = retrieve(db, "¿Cuándo tiene sentido recomprar acciones?", scope="letters")
     contents = [row[0].content for row in rows]
     assert not any("camiones" in c for c in contents)
+
+
+def test_frase_exacta_no_se_pierde_tras_120_fragmentos_genericos():
+    """Con muchos fragmentos que solo comparten 'margen' y 'seguridad', el que
+    contiene la frase 'margin of safety' (id mayor) debe entrar en el candidato."""
+    db = Session(create_engine("sqlite://"))
+    Base.metadata.create_all(db.get_bind())
+    doc = KnowledgeDocument(tenant_id=1, title="A", author="A", document_type="fund_letter", status="ready")
+    db.add(doc)
+    db.flush()
+    for i in range(130):
+        db.add(KnowledgeChunk(tenant_id=1, knowledge_document_id=doc.id, chunk_index=i, page_number=1,
+                              content=f"El margen de solvencia y la seguridad del asegurado {i} en seguros de vida."))
+    db.add(KnowledgeChunk(tenant_id=1, knowledge_document_id=doc.id, chunk_index=999, page_number=2,
+                          content="The margin of safety is the gap between price and intrinsic value."))
+    db.commit()
+    db.info["tenant_id"] = 1
+    rows, _ = retrieve(db, "¿Qué es el margen de seguridad?", scope="letters")
+    assert any("margin of safety" in row[0].content for row in rows)
