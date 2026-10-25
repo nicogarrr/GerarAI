@@ -25,7 +25,12 @@ const SelectField = ({name, label, placeholder, options, control, error, require
                 }}
                 render={({field}) => (
                     <>
-                        <Select value={field.value} onValueChange={field.onChange} required={required}>
+                        {/* Radix renderiza un <select> nativo oculto para
+                            formularios; con `required` el navegador lo valida y
+                            aborta el submit sin emitir el evento (no tiene
+                            opciones). La obligatoriedad la aplica
+                            react-hook-form en `rules`. */}
+                        <Select value={field.value} onValueChange={field.onChange}>
                             <SelectTrigger
                                 id={selectId}
                                 aria-required={required}
@@ -43,7 +48,6 @@ const SelectField = ({name, label, placeholder, options, control, error, require
                                 ))}
                             </SelectContent>
                         </Select>
-                        {error ? <p className="text-red-600" id={errorId}>{error.message}</p> : null}
                     </>
                 )}
             />
