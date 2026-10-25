@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import Base, SessionLocal, engine
+from app.core.tenancy import tenant_filters
 from app.models import (
     AlertRule,
     AlertSubscription,
@@ -208,7 +209,9 @@ class PrivacyService:
         fk = getattr(chunk_model, fk_name)
         counts = dict(
             db.execute(
-                select(fk, func.count()).group_by(fk)
+                select(fk, func.count())
+                .where(*tenant_filters(db, chunk_model))
+                .group_by(fk)
             ).all()
         )
         return [
