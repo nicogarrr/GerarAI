@@ -4,7 +4,7 @@ El hallazgo de auditoria era que `FactAnchor` existia en el ORM sin migracion:
 una base creada solo por Alembic no tenia `fact_anchors`. Este test aplica
 `alembic upgrade head` sobre una SQLite temporal (patron de test_migrations) y
 compara columnas, nullability, tipos, indices, unique y FKs contra el modelo.
-Tambien exige que 0079 sea el unico head, encadene con 0078 y que downgrade -1
+Tambien exige que 0079 encadene con 0078 y pertenezca al head unico, y que downgrade -1
 elimine la tabla y un upgrade posterior la recree.
 """
 
@@ -108,12 +108,20 @@ def test_migrated_fact_anchors_matches_model(migrated_engine: Engine) -> None:
     assert migrated_fks == model_fks
 
 
-def test_0079_is_the_single_head_and_chains_to_0078() -> None:
+def test_0079_chains_to_0078_and_belongs_to_the_single_head() -> None:
+    """No fija el head a 0079: futuras migraciones (0080+) deben poder
+    añadirse sin editar este test. La invariante de un solo head ya la cubre
+    `test_alembic_chain.py`."""
     script = ScriptDirectory(str(DATA_ENGINE_DIR / "alembic"))
-    assert script.get_heads() == [REVISION]
+    heads = script.get_heads()
+    assert len(heads) == 1
     revision = script.get_revision(REVISION)
     assert revision is not None
     assert revision.down_revision == DOWN_REVISION
+    ancestry = {
+        item.revision for item in script.iterate_revisions(heads[0], "base")
+    }
+    assert REVISION in ancestry
 
 
 def test_0079_downgrade_drops_table_and_upgrade_recreates_it(tmp_path: Path) -> None:
