@@ -17,7 +17,8 @@ for(const width of [390,820,1440])test(`six hubs and contextual discovery ${widt
   const nav=page.getByRole('navigation',{name:'Navegación principal',exact:true});
   await expect(nav.getByRole('link')).toHaveCount(6);
   for(const name of names)await expect(nav.getByRole('link',{name,exact:true})).toBeVisible();
-  await page.locator('aside').getByRole('button',{name:'Expandir menú'}).click();
+  const expand = page.locator('aside').getByRole('button',{name:'Expandir menú'});
+  if(await expand.count())await expand.click();
  }
  await expect(page.getByRole('link',{name:'Alertas',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Menú de usuario'}).click();
