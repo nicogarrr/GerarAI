@@ -201,6 +201,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/screeners/ScreenBreadcrumbName.tsx': 'useEffect, browser:window',
   'components/screeners/SubmitButton.tsx': 'useFormStatus',
   'components/security/TwoFactorSettings.tsx': 'useState, browser:navigator, jsx-onSubmit, jsx-onClick, libreria cliente: sonner, libreria cliente: react-hook-form',
+  'components/security/PrivacySettings.tsx': 'useState, useRouter, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/settings/TaxDeclarantForm.tsx': 'useState, jsx-onSubmit, jsx-onChange, libreria cliente: sonner',
   'components/system/BackendOfflineAutoRetry.tsx': 'useRouter, useState, useEffect',
   // Estado de error en línea compartido: botón Reintentar con onClick.

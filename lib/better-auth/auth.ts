@@ -52,6 +52,13 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
             riskTolerance: { type: 'string', required: false },
             preferredIndustry: { type: 'string', required: false },
         },
+        // Autoservicio real: delete-user borra user, sessions y accounts de
+        // Mongo. El endpoint exige sesion fresca y, cuando se envia, valida la
+        // contrasena (reauth). La accion de servidor borra antes Postgres y
+        // storage, y solo entonces llama aqui.
+        deleteUser: {
+            enabled: true,
+        },
     },
     // nextCookies() SIEMPRE el ultimo: su hook `after` copia a next/headers los
     // Set-Cookie acumulados hasta ese momento. Si va antes de twoFactor(), el
