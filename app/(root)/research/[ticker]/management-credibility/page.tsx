@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, RefreshCcw, UploadCloud } from 'lucide-react';
 
@@ -5,7 +6,7 @@ import { MutationForm } from '@/components/forms/MutationForm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { formatPercent, NA } from '@/lib/format';
+import { formatPercent, formatUserDate, NA } from '@/lib/format';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/ui/page-header';
 import { Stat } from '@/components/ui/stat';
@@ -14,6 +15,11 @@ import { createManagementPromise, getManagementCredibility, importManagementCall
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: 'Credibilidad de la directiva',
+  description: 'Promesas fechadas de la directiva reconciliadas con los hechos financieros.',
+};
 
 /** Etiquetas en español para los estados persistidos por el backend */
 const STATUS_LABELS: Record<string, string> = {
@@ -46,7 +52,7 @@ export default async function ManagementCredibilityPage({ params }: { params: Pr
     <MutationForm action={createManagementPromise.bind(null, ticker)} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Promesa registrada">
 <h2 className="font-semibold text-gray-100">Registrar una promesa</h2><div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"><Textarea className="md:col-span-3" name="promise" placeholder="Promesa o guidance exacta de la directiva" required /><Input name="promise_date" required type="date" /><Input name="expected_period" placeholder="FY2027 o Q4 2026" required /><Input name="metric" placeholder="Métrica canónica (opcional)" /><select className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200" defaultValue="" name="operator"><option value="">Cualitativa / sin objetivo</option>{['>', '>=', '<', '<=', '=='].map((item) => <option key={item}>{item}</option>)}</select><Input name="target_value" placeholder="Valor objetivo" step="any" type="number" /><Input name="unit" placeholder="Unidad" /><Input name="source_document_id" placeholder="ID del documento fuente" type="number" min="1" /><Button className="w-fit" type="submit">Registrar promesa</Button></div></MutationForm>
         <section className="grid gap-4">{dashboard.promises.map((promise) => <article className="rounded-xl border border-gray-800 bg-surface-1 p-5" key={promise.id}>
-<div className="flex flex-col gap-3 md:flex-row md:items-start"><div><div className="flex flex-wrap items-center gap-2"><Badge className={promise.status === 'met' ? 'border-teal-800 text-teal-300' : promise.status === 'missed' ? 'border-red-900 text-red-300' : promise.status === 'partial' ? 'border-amber-900 text-amber-300' : ''} variant="outline">{label(promise.status)}</Badge><span className="text-xs text-gray-500">prometida {promise.promise_date} · esperada {promise.expected_period}</span></div><h2 className="mt-3 font-semibold leading-6 text-gray-100">{promise.promise}</h2></div><div className="rounded-lg border border-gray-800 p-3 text-sm md:ml-auto md:min-w-56"><div className="text-xs uppercase text-gray-500">Objetivo / real</div><div className="mt-2 text-gray-200">{promise.metric ?? 'cualitativa'} {promise.operator ?? ''} {promise.target_value ?? NA} {promise.unit ?? ''}</div><div className="mt-1 text-teal-300">real {promise.actual_value ?? 'pendiente'}</div></div></div><MutationForm action={updateManagementExplanation.bind(null, ticker, promise.id)} className="mt-4 flex flex-col gap-2 md:flex-row" successMessage="Explicación guardada"><Input className="flex-1" defaultValue={promise.management_explanation ?? ''} name="explanation" placeholder="Explicación de la directiva o contexto del analista" required /><Button type="submit" variant="outline">Guardar explicación</Button></MutationForm></article>)}{!dashboard.promises.length ? <EmptyState title="Aún no hay promesas registradas." /> : null}</section>
+<div className="flex flex-col gap-3 md:flex-row md:items-start"><div><div className="flex flex-wrap items-center gap-2"><Badge className={promise.status === 'met' ? 'border-teal-800 text-teal-300' : promise.status === 'missed' ? 'border-red-900 text-red-300' : promise.status === 'partial' ? 'border-amber-900 text-amber-300' : ''} variant="outline">{label(promise.status)}</Badge><span className="text-xs text-gray-500">prometida {formatUserDate(promise.promise_date)} · esperada {promise.expected_period}</span></div><h2 className="mt-3 font-semibold leading-6 text-gray-100">{promise.promise}</h2></div><div className="rounded-lg border border-gray-800 p-3 text-sm md:ml-auto md:min-w-56"><div className="text-xs uppercase text-gray-500">Objetivo / real</div><div className="mt-2 text-gray-200">{promise.metric ?? 'cualitativa'} {promise.operator ?? ''} {promise.target_value ?? NA} {promise.unit ?? ''}</div><div className="mt-1 text-teal-300">real {promise.actual_value ?? 'pendiente'}</div></div></div><MutationForm action={updateManagementExplanation.bind(null, ticker, promise.id)} className="mt-4 flex flex-col gap-2 md:flex-row" successMessage="Explicación guardada"><Input className="flex-1" defaultValue={promise.management_explanation ?? ''} name="explanation" placeholder="Explicación de la directiva o contexto del analista" required /><Button type="submit" variant="outline">Guardar explicación</Button></MutationForm></article>)}{!dashboard.promises.length ? <EmptyState title="Aún no hay promesas registradas." /> : null}</section>
 <p className="text-xs text-gray-500">Método: {METHOD_ES[dashboard.method] ?? dashboard.method}. Los resultados dependen del mapeo de métricas canónicas y de los hechos reportados disponibles.</p>
   </main>;
 }

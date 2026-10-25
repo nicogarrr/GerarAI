@@ -20,9 +20,18 @@ export function SyncPortfoliosButton({
 
     const handleSync = async () => {
         setState('syncing');
-        const result = await syncInvestorPortfoliosNow();
-        setState(result.success ? 'queued' : 'error');
-        return result.success;
+        let success = false;
+        try {
+            const result = await syncInvestorPortfoliosNow();
+            success = result.success;
+        } catch {
+            success = false;
+        } finally {
+            // Un rechazo de la server action no puede dejar el botón en
+            // «Encolando…» para siempre: el estado final se fija aquí.
+            setState(success ? 'queued' : 'error');
+        }
+        return success;
     };
 
     // Estado vacío: primer uso sin datos encola la sincronización una vez; si ya

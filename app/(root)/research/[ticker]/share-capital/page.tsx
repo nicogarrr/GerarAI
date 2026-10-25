@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { getShareCapital } from '@/lib/actions/share-capital.actions';
@@ -8,6 +9,12 @@ import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Dilución y recompras',
+  description: 'Saldos de acciones, emisiones y recompras con fuente verificable.',
+};
+
 export default async function ShareCapitalPage({ params }: { params: Promise<{ ticker: string }> }) {
   await requireAuthenticatedUser();
   const ticker = (await params).ticker.toUpperCase();

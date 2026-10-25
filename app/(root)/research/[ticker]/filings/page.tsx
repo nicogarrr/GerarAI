@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
@@ -8,6 +9,11 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Panel } from '@/components/ui/panel';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Documentos SEC',
+  description: 'Formularios y cambios reportados por la empresa ante la SEC, con su fuente.',
+};
 
 type Side = { value: string; period: string; unit: string; source: { url: string | null; published_at: string | null } } | null;
 type Figure = { metric: string; unit: string; outflow?: boolean; current: Side; previous: Side; label: string; change_pct: string | null; highlight: boolean };

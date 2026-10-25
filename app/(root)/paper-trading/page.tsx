@@ -224,7 +224,7 @@ export default async function PaperTradingPage() {
     }
 
     return (
-        <div className="mx-auto w-full max-w-3xl px-4 py-6">
+        <main id="content" tabIndex={-1} className="mx-auto w-full max-w-3xl px-4 py-6">
             <h1 className="text-2xl font-semibold break-words text-gray-100">Cuenta demo</h1>
             <p className="mt-1 text-sm text-gray-400">
                 Práctica con dinero ficticio: 100.000 € iniciales, operaciones manuales y contabilidad FIFO.
@@ -246,6 +246,6 @@ export default async function PaperTradingPage() {
                 valuationAsOf={valuationAsOf}
                 refreshValuation={refreshValuation}
             />
-        </div>
+        </main>
     );
 }

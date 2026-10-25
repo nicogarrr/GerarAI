@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, GitCompare, Plus } from 'lucide-react';
 
@@ -13,6 +14,11 @@ import { formatConfidence, formatDate, formatNumber } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: 'Supuestos de drivers',
+  description: 'Ajustes bear/base/bull versionados que reconstruyen el modelo de la empresa.',
+};
 
 /** Etiquetas en español para los escenarios bear/base/bull */
 const STATUS_LABELS: Record<string, string> = {

@@ -12,8 +12,16 @@ export function IngestLettersButton() {
 
     const handleIngest = async () => {
         setState('ingesting');
-        const result = await ingestLettersCorpusNow();
-        setState(result.success ? 'queued' : 'error');
+        let success = false;
+        try {
+            const result = await ingestLettersCorpusNow();
+            success = result.success;
+        } catch {
+            success = false;
+        } finally {
+            // Sin finally, un rechazo dejaba el botón en «Encolando…».
+            setState(success ? 'queued' : 'error');
+        }
     };
 
     const loading = state === 'ingesting';

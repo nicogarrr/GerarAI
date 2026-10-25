@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Check, RefreshCcw, X } from 'lucide-react';
 
@@ -12,6 +13,11 @@ import { decideDecisionLesson, getDecisionLessons, proposeDecisionLessons, updat
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: 'Lecciones de decisiones',
+  description: 'Desvíos de previsión convertidos en lecciones revisadas de cada empresa.',
+};
 
 /** Etiquetas en español para los estados persistidos por el backend */
 const STATUS_LABELS: Record<string, string> = {
