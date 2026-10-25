@@ -69,10 +69,12 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
         finally:
             _release()  # el hueco vuelve cuando el hilo TERMINA, no al abandonarlo
 
+    worker_bind = db.get_bind()  # en el hilo de la peticion, antes de despachar
+
     def _work_inner() -> ChatResponse:
-        # Sesion propia del hilo: si el muro corta la peticion, el hilo puede
+        # Sesion propia del hilo (mismo engine que la peticion): si el muro corta, el hilo puede
         # seguir un rato y no debe compartir la sesion que get_db va a cerrar.
-        with SessionLocal() as worker_db:
+        with SessionLocal(bind=worker_bind) as worker_db:
             worker_db.info.update(tenant_info)
             return run_from_any_context(
                 ChatService().answer(
