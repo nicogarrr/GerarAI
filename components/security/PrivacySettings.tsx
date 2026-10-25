@@ -67,16 +67,16 @@ export default function PrivacySettings({ email }: { email: string }) {
     };
 
     return (
-        <div className="space-y-8">
-            <section className="rounded-lg border border-gray-800 p-5">
-                <h2 className="text-xl font-semibold text-white">Exportar mis datos</h2>
+        <div className="min-w-0 space-y-8">
+            <section className="min-w-0 rounded-lg border border-gray-800 p-5">
+                <h2 className="break-words text-xl font-semibold text-white">Exportar mis datos</h2>
                 <p className="mt-1 text-sm text-gray-400">
                     Descarga un JSON con tu perfil, cartera, tesis, claims y evidencia,
                     watchlist, alertas, conocimiento y ajustes. Los originales de los
                     documentos no se incrustan; solo su metadata.
                 </p>
                 <Button
-                    className="mt-4"
+                    className="mt-4 w-full min-w-0 whitespace-normal text-left sm:w-auto"
                     disabled={exporting}
                     onClick={handleExport}
                     type="button"
@@ -87,11 +87,11 @@ export default function PrivacySettings({ email }: { email: string }) {
                 </Button>
             </section>
 
-            <section className="rounded-lg border border-red-900/60 bg-red-950/10 p-5">
-                <div className="flex items-start gap-3">
+            <section className="min-w-0 rounded-lg border border-red-900/60 bg-red-950/10 p-5">
+                <div className="flex min-w-0 items-start gap-3">
                     <ShieldAlert aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
-                    <div>
-                        <h2 className="text-xl font-semibold text-white">Borrar mi cuenta</h2>
+                    <div className="min-w-0">
+                        <h2 className="break-words text-xl font-semibold text-white">Borrar mi cuenta</h2>
                         <p className="mt-1 text-sm text-gray-400">
                             Es irreversible. Se eliminan la cartera, tesis, claims,
                             watchlist, alertas, documentos y sus originales, vectores de
@@ -103,8 +103,8 @@ export default function PrivacySettings({ email }: { email: string }) {
 
                 <form className="mt-5 space-y-4" onSubmit={handleDelete}>
                     <div>
-                        <Label htmlFor="delete-confirmation">
-                            Escribe <span className="font-mono text-gray-200">{email}</span> para confirmar
+                        <Label className="break-words" htmlFor="delete-confirmation">
+                            Escribe <span className="font-mono text-gray-200 [overflow-wrap:anywhere]">{email}</span> para confirmar
                         </Label>
                         <Input
                             autoComplete="off"
@@ -141,6 +141,7 @@ export default function PrivacySettings({ email }: { email: string }) {
                         Entiendo que esta acción es irreversible y que no se puede deshacer.
                     </label>
                     <Button
+                        className="w-full min-w-0 whitespace-normal text-left sm:w-auto"
                         disabled={deleting || !understood || !confirmation || !password}
                         type="submit"
                         variant="destructive"
