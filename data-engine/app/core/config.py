@@ -535,3 +535,9 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+# Los logs no deben contener claves de proveedores (query strings, cabeceras).
+from app.core import log_redaction  # noqa: E402
+
+log_redaction.install()
