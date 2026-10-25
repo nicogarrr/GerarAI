@@ -11,8 +11,16 @@ function PaperFeedButton() {
     const [state, setState] = useState<'idle' | 'feeding' | 'queued' | 'error'>('idle');
     const handleFeed = async () => {
         setState('feeding');
-        const result = await feedPaperProposalsNow();
-        setState(result.success ? 'queued' : 'error');
+        let success = false;
+        try {
+            const result = await feedPaperProposalsNow();
+            success = result.success;
+        } catch {
+            success = false;
+        } finally {
+            // Un rechazo no puede dejar el botón en «Encolando…» para siempre.
+            setState(success ? 'queued' : 'error');
+        }
     };
     const loading = state === 'feeding';
     return (

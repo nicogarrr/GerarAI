@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Control, Controller, FieldError, FieldValues, Path } from 'react-hook-form';
 import {
     Popover,
@@ -21,6 +21,27 @@ import { Label } from '@/components/ui/label';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import countryList from 'react-select-country-list';
+
+// Los nombres visibles van en español; el value sigue siendo el código ISO.
+// `react-select-country-list` solo trae etiquetas en inglés. Si el runtime no
+// implementa `Intl.DisplayNames` (o falla para un código), se conserva la
+// etiqueta inglesa: la pantalla nunca se queda sin nombre.
+const regionNames = (() => {
+    try {
+        if (typeof Intl === 'undefined' || typeof Intl.DisplayNames !== 'function') return null;
+        return new Intl.DisplayNames(['es'], { type: 'region' });
+    } catch {
+        return null;
+    }
+})();
+
+function countryLabel(code: string, fallback: string): string {
+    try {
+        return regionNames?.of(code) ?? fallback;
+    } catch {
+        return fallback;
+    }
+}
 
 type CountrySelectProps<TFieldValues extends FieldValues = FieldValues> = {
     name: Path<TFieldValues>;
@@ -45,8 +66,20 @@ const CountrySelect = ({
 }) => {
     const [open, setOpen] = useState(false);
 
-    // Get country options with flags
-    const countries = countryList().getData();
+    // Get country options with Spanish labels and flags. `search` lleva el
+    // nombre español, el inglés original y el ISO para que buscar «España»
+    // (o «Spain», o «ES») encuentre la misma opción.
+    const countries = useMemo(
+        () => countryList().getData().map((country) => {
+            const label = countryLabel(country.value, country.label);
+            return {
+                value: country.value,
+                label,
+                search: `${label} ${country.label} ${country.value}`,
+            };
+        }),
+        [],
+    );
 
     // Helper function to get flag emoji
     const getFlagEmoji = (countryCode: string) => {
@@ -97,7 +130,7 @@ const CountrySelect = ({
                             {countries.map((country) => (
                                 <CommandItem
                                     key={country.value}
-                                    value={`${country.label} ${country.value}`}
+                                    value={country.search}
                                     onSelect={() => {
                                         onChange(country.value);
                                         setOpen(false);

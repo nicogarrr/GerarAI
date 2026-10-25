@@ -1,9 +1,10 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, FileDown, FileText } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
-import { formatGeneratedDate, formatPercent } from '@/lib/format';
+import { formatGeneratedDate, formatPercent, formatUserDate } from '@/lib/format';
 import {
   getResearchCompanySnapshot,
   getResearchThesisWorkspace,
@@ -19,6 +20,11 @@ import { metricLabel } from '@/lib/research/metric-labels';
 import { publicEditorial } from '@/lib/public-fonts';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Tesis de inversión',
+  description: 'Documento de lectura de la tesis publicada, con cifras, procedencia y márgenes.',
+};
 
 type PageProps = { params: Promise<{ ticker: string }> };
 
@@ -160,7 +166,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                   <FileDown className="h-4 w-4" />Ficha del borrador (PDF, v{latest.version})
                 </a>
                 <span className="text-xs text-gray-500">
-                  El PDF solo lleva la ficha del borrador (lista blanca del backend); el documento completo es esta página. PDF completo de tesis: pendiente.
+                  El PDF solo lleva la ficha del borrador (lista blanca del backend); el documento completo es esta página.
                 </span>
                 <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink>
               </div>
@@ -204,7 +210,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                 <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200">
                   {(latest.catalysts ?? []).map((catalyst, index) => (
                     <li key={index}>
-                      {catalyst.label ?? 'Catalizador'}{catalyst.date ? ` (${catalyst.date})` : ''}
+                      {catalyst.label ?? 'Catalizador'}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
                     </li>
                   ))}
                 </ul>
@@ -375,7 +381,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                 <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200">
                   {(published.catalysts ?? []).map((catalyst, index) => (
                     <li key={index}>
-                      {catalyst.label ?? 'Catalizador'}{catalyst.date ? ` (${catalyst.date})` : ''}
+                      {catalyst.label ?? 'Catalizador'}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
                     </li>
                   ))}
                 </ul>

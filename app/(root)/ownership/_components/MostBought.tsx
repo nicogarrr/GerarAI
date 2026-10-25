@@ -21,7 +21,7 @@ export async function MostBought({ pagina }: { pagina?: string }) {
         data = await getMostBought();
     } catch (error) {
         if (isBackendUnavailableError(error)) {
-            return <BackendOffline feature="Más compradas" retryHref="/ownership?vista=mas-compradas" />;
+            return <BackendOffline as="section" feature="Más compradas" retryHref="/ownership?vista=mas-compradas" />;
         }
         throw error;
     }

@@ -14,7 +14,7 @@ export async function Overlap({ pagina, compras }: { pagina?: string; compras?: 
   let data: Awaited<ReturnType<typeof getPortfolioOverlap>>;
   try { data = await getPortfolioOverlap(); }
   catch (error) {
-    if (isBackendUnavailableError(error)) return <BackendOffline feature="Solape de cartera" retryHref="/ownership?vista=solape" />;
+    if (isBackendUnavailableError(error)) return <BackendOffline as="section" feature="Solape de cartera" retryHref="/ownership?vista=solape" />;
     throw error;
   }
   const paged = paginate(data.positions, pagina, 10);

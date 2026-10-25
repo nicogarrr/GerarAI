@@ -197,7 +197,7 @@ export async function MarketRegimeVista() {
   const { data: regimen, error } = await getMarketRegimeResult();
   if (error || !regimen) {
     if (error && isBackendUnavailableError(error)) {
-      return <BackendOffline feature="Mercado" retryHref="/screener?vista=regimen" />;
+      return <BackendOffline as="section" feature="Mercado" retryHref="/screener?vista=regimen" />;
     }
     throw error ?? new Error('Sin respuesta de régimen de mercado');
   }

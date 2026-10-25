@@ -72,6 +72,8 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     const [copied, setCopied] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
     // La conversación se conserva al navegar: se restaura al montar (solo
     // cliente, así el SSR siempre pinta el saludo y no hay desajuste de
     // hidratación) y se guarda recortada tras cada cambio.
@@ -176,25 +178,96 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
 
     /**
      * Modal de verdad (WCAG 2.1.2): con `aria-modal` el fondo se marca inaccesible
-     * para el lector de pantalla, el foco entra por el campo de mensaje y Escape
-     * cierra sin enviar nada. El listener va en `document` porque el panel no
-     * recibe el foco por si solo.
+     * para el lector de pantalla, el foco entra por el campo de mensaje, Tab y
+     * Shift+Tab circulan solo por el panel y Escape cierra sin enviar nada. El
+     * resto del arbol queda `inert` + `aria-hidden` mientras dura el dialogo (el
+     * mismo patron de components/MobileNav.tsx) y el foco vuelve a quien lo abrio
+     * al cerrar. El listener va en `document` porque el panel no recibe el foco
+     * por si solo.
      */
     useEffect(() => {
         if (!isOpen) return;
+        const dialog = dialogRef.current;
+        if (!dialog) return;
+
+        previousFocusRef.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
         inputRef.current?.focus();
+
+        // Hermanos del panel hacia arriba: todo lo que no es el propio panel ni
+        // sus ancestros deja de ser alcanzable por teclado/lector. Se guardan
+        // los valores previos para no pisar `inert`/`aria-hidden` ajenos.
+        const hidden: Array<{ element: HTMLElement; inert: boolean; ariaHidden: string | null }> = [];
+        let node: HTMLElement | null = dialog;
+        while (node && node !== document.body && node.parentElement) {
+            const parent: HTMLElement = node.parentElement;
+            for (const sibling of Array.from(parent.children)) {
+                if (sibling === node || !(sibling instanceof HTMLElement)) continue;
+                if (['SCRIPT', 'STYLE', 'LINK', 'TEMPLATE'].includes(sibling.tagName)) continue;
+                hidden.push({
+                    element: sibling,
+                    inert: sibling.inert,
+                    ariaHidden: sibling.getAttribute('aria-hidden'),
+                });
+                sibling.inert = true;
+                sibling.setAttribute('aria-hidden', 'true');
+            }
+            node = parent;
+        }
+
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
 
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key !== 'Escape') return;
-            event.preventDefault();
-            setIsOpen(false);
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                setIsOpen(false);
+                return;
+            }
+            if (event.key !== 'Tab') return;
+            const activeDialog = dialogRef.current;
+            if (!activeDialog) return;
+            // Mismo filtro que MobileNav: fuera los focusables invisibles por
+            // breakpoint y los que no son tab stops reales.
+            const focusable = Array.from(
+                activeDialog.querySelectorAll<HTMLElement>(
+                    'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                ),
+            ).filter((el) => el.tabIndex >= 0 && el.getClientRects().length > 0);
+            if (focusable.length === 0) {
+                event.preventDefault();
+                activeDialog.focus();
+                return;
+            }
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            // El panel (tabIndex=-1) y el body no estan en el ciclo: sin esto,
+            // Shift+Tab desde ahi salia al chrome del navegador.
+            if (document.activeElement === activeDialog || document.activeElement === document.body) {
+                event.preventDefault();
+                (event.shiftKey ? last : first).focus();
+                return;
+            }
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
         };
         document.addEventListener('keydown', onKeyDown);
         return () => {
             document.removeEventListener('keydown', onKeyDown);
             document.body.style.overflow = previousOverflow;
+            for (const item of hidden) {
+                item.element.inert = item.inert;
+                if (item.ariaHidden === null) item.element.removeAttribute('aria-hidden');
+                else item.element.setAttribute('aria-hidden', item.ariaHidden);
+            }
+            const previous = previousFocusRef.current;
+            if (previous && previous.isConnected && previous.getClientRects().length > 0) previous.focus();
+            else (document.activeElement as HTMLElement | null)?.blur?.();
         };
     }, [isOpen]);
 
@@ -281,6 +354,8 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     // BottomNav en móvil.
     return (
         <Card
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="global-brain-title"

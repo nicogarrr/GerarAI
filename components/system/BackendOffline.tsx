@@ -9,6 +9,12 @@ type Props = {
   feature: string;
   /** Ruta a la que vuelve el botón Reintentar (la propia página). */
   retryHref: string;
+  /**
+   * `main` para una página completa; `section` cuando el estado se pinta
+   * dentro del `<main>` de la página (una vista embebida) y repetir el
+   * landmark anidaría dos `<main>`.
+   */
+  as?: 'main' | 'section';
 };
 
 /**
@@ -16,9 +22,13 @@ type Props = {
  * consulta falla. Sustituye al crash de Server Components (error #441) por una
  * explicación accionable. Mismo patrón que el empty state de /screener.
  */
-export default function BackendOffline({ feature, retryHref }: Props) {
+export default function BackendOffline({ feature, retryHref, as = 'main' }: Props) {
+  const Tag = as;
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col items-center gap-5 px-4 py-24 text-center">
+    <Tag
+      {...(as === 'main' ? { id: 'content', tabIndex: -1 } : {})}
+      className="mx-auto flex w-full max-w-2xl flex-col items-center gap-5 px-4 py-24 text-center"
+    >
       <span className="rounded-full border border-amber-900/60 bg-amber-950/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-300">
         Motor de análisis desconectado
       </span>
@@ -38,6 +48,6 @@ export default function BackendOffline({ feature, retryHref }: Props) {
       <p className="text-xs text-gray-500">
         El servidor de GerarAI no ha podido completar la consulta. Reintenta en unos segundos.
       </p>
-    </main>
+    </Tag>
   );
 }

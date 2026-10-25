@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Database, SlidersHorizontal } from 'lucide-react';
 
@@ -16,6 +17,11 @@ import { formatProvenanceValue } from '@/lib/research/provenance-format';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: 'Terminal financiero',
+  description: 'Estados financieros por periodo, segmento y métrica con su procedencia.',
+};
 
 /** Etiquetas en español para los estados persistidos por el backend */
 const STATUS_LABELS: Record<string, string> = {
