@@ -49,6 +49,8 @@ FORM4_TX_KEYS: tuple[str, ...] = (
     "value",
     "date",
     "is_derivative",
+    # form4.parse_form4_xml lo emite entre is_derivative y rule_10b5_1.
+    "security_title",
     "rule_10b5_1",
 )
 
@@ -168,7 +170,9 @@ def transactions_from_edgartools_dataframe(
                 "value": value,
                 "date": _iso_date(raw_date),
                 "is_derivative": is_derivative,
-                # El DataFrame de edgartools no trae notas al pie: desconocido.
+                # El DataFrame de edgartools no trae titulo del valor ni notas al
+                # pie: desconocidos (None), igual que el conector cuando faltan.
+                "security_title": None,
                 "rule_10b5_1": None,
             }
         )
