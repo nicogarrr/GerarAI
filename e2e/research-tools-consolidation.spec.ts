@@ -4,8 +4,10 @@ for(const width of [390,820,1440]) test(`research tools stay contextual ${width}
  await page.setViewportSize({width,height:1000});
  await page.goto("/research");
  const nav=page.getByRole("navigation",{name:"Herramientas de la sección"});
- // El subnav es plegable (1e172eb9): cerrado por defecto, se abre con su boton.
- await page.locator('button[aria-controls="subnav-seccion-lista"]').click();
+ // En movil el subnav es plegable; desde sm ya esta visible y el toggle
+ // esta oculto (SectionNav visible desde sm).
+ const subnavToggle = page.locator('button[aria-controls="subnav-seccion-lista"]');
+ if(await subnavToggle.isVisible())await subnavToggle.click();
  await expect(nav).toBeVisible();
  // "Asistente" salió del subnav en 317c5b3 (unificado en el Cerebro).
  for(const name of ["Empresas","Noticias","Fuentes"])
