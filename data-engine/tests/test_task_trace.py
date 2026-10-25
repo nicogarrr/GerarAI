@@ -104,3 +104,44 @@ def test_registered_on_worker_broker():
 @pytest.mark.parametrize("hook", ["before_process_message", "after_skip_message"])
 def test_hooks_tolerate_unknown_message(hook):
     getattr(TaskTraceMiddleware(), hook)(None, msg())
+
+
+def test_duplicate_inflight_message_id_keeps_both():
+    mw = TaskTraceMiddleware()
+    a = msg()
+    b = a.copy()  # mismo message_id (reentrega)
+    assert a.message_id == b.message_id
+    mw.before_process_message(None, a)
+    mw.before_process_message(None, b)
+    assert len(mw.inflight()) == 2
+    mw.after_process_message(None, a)
+    assert len(mw.inflight()) == 1
+    mw.after_process_message(None, b)
+    assert mw.inflight() == []
+
+
+def test_snapshot_size_cap_counts_truncated(tmp_path, monkeypatch):
+    monkeypatch.setenv("TRACE_SNAPSHOT_DIR", str(tmp_path / "s"))
+    monkeypatch.setenv("TRACE_SNAPSHOT_MAX_BYTES", "4096")
+    mw = TaskTraceMiddleware()
+    for _ in range(40):
+        m = dramatiq.Message("default", "x", ("p" * 500,), {}, {})
+        mw.before_process_message(None, m)
+    mw.before_worker_shutdown(None, object())
+    (path,) = (tmp_path / "s").iterdir()
+    body = json.loads(path.read_text())
+    assert body["truncated"] > 0 and len(body["inflight"]) + body["truncated"] == 40
+    assert len(path.read_text()) < 4096 + 1024
+
+
+def test_slow_snapshot_does_not_block_shutdown(tmp_path, monkeypatch):
+    import time
+
+    monkeypatch.setenv("TRACE_SNAPSHOT_DIR", str(tmp_path / "s"))
+    monkeypatch.setenv("TRACE_SNAPSHOT_TIMEOUT_S", "1")
+    mw = TaskTraceMiddleware()
+    monkeypatch.setattr(mw, "_write_snapshot", lambda d, p: time.sleep(3))
+    mw.before_process_message(None, msg())
+    start = time.monotonic()
+    mw.before_worker_shutdown(None, object())
+    assert time.monotonic() - start < 2.5

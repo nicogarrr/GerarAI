@@ -13,7 +13,11 @@ Privacidad:
 - La captura del payload completo antes de parar el worker es opt-in
   (`TRACE_SNAPSHOT_DIR`), dir 0700, ficheros 0600, retencion finita
   (`TRACE_SNAPSHOT_KEEP`, 5 por defecto). Contiene args reales: no exponer ni
-  copiar fuera del host.
+  copiar fuera del host. Tope de tamano (`TRACE_SNAPSHOT_MAX_BYTES`, 1 MiB; el
+  resto se cuenta en `truncated`) y de tiempo (`TRACE_SNAPSHOT_TIMEOUT_S`, 3 s,
+  hilo daemon). Limites: el hook corre antes de parar los workers, asi que
+  mensajes que entren durante la captura no quedan incluidos, y no recupera
+  nada tras SIGKILL.
 """
 from __future__ import annotations
 
@@ -48,6 +52,13 @@ def args_digest(message: Any) -> str:
     return hmac.new(key, raw.encode(), hashlib.sha256).hexdigest()[:16]
 
 
+def _int_env(name: str, default: int, minimum: int) -> int:
+    try:
+        return max(minimum, int(os.getenv(name, str(default))))
+    except ValueError:
+        return default
+
+
 def _keep() -> int:
     try:
         return max(1, int(os.getenv("TRACE_SNAPSHOT_KEEP", "5")))
@@ -61,6 +72,7 @@ class TaskTraceMiddleware(Middleware):
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._inflight: dict[str, dict[str, Any]] = {}
+        self._seq = 0
 
     @staticmethod
     def _fields(message: Any) -> str:
@@ -75,7 +87,9 @@ class TaskTraceMiddleware(Middleware):
 
     def before_process_message(self, broker: Any, message: Any) -> None:
         with self._lock:
-            self._inflight[message.message_id] = {
+            # un message_id repetido en vuelo (reentrega) no pisa la entrada anterior
+            self._seq += 1
+            self._inflight[f"{message.message_id}#{self._seq}"] = {
                 "started": time.monotonic(),
                 "started_at": datetime.now(UTC).isoformat(),
                 "message": message,
@@ -84,7 +98,10 @@ class TaskTraceMiddleware(Middleware):
 
     def _finish(self, message: Any, outcome: str) -> None:
         with self._lock:
-            entry = self._inflight.pop(message.message_id, None)
+            key = next(
+                (k for k, e in self._inflight.items() if e["message"] is message), None
+            )
+            entry = self._inflight.pop(key, None) if key else None
         ms = int((time.monotonic() - entry["started"]) * 1000) if entry else -1
         logger.info("task_end %s outcome=%s duration_ms=%d", self._fields(message), outcome, ms)
 
@@ -100,14 +117,14 @@ class TaskTraceMiddleware(Middleware):
         with self._lock:
             return [
                 {
-                    "message_id": mid,
+                    "message_id": entry["message"].message_id,
                     "started_at": entry["started_at"],
                     "actor": entry["message"].actor_name,
                     "queue": entry["message"].queue_name,
                     "retries": entry["message"].options.get("retries", 0),
                     "args_hash": args_digest(entry["message"]),
                 }
-                for mid, entry in self._inflight.items()
+                for entry in self._inflight.values()
             ]
 
     def before_worker_shutdown(self, broker: Any, worker: Any) -> None:
@@ -117,20 +134,44 @@ class TaskTraceMiddleware(Middleware):
         logger.info("worker_shutdown inflight=%d", len(pending))
         if not directory or not pending:
             return
-        try:
-            self._write_snapshot(directory, pending)
-        except OSError as exc:  # la parada no debe bloquearse por la traza
-            logger.warning("snapshot_failed type=%s", type(exc).__name__)
+        # Hilo daemon con tope de tiempo: un FS lento no bloquea la parada.
+        timeout = _int_env("TRACE_SNAPSHOT_TIMEOUT_S", 3, 1)
+        outcome: dict[str, str] = {}
+
+        def run() -> None:
+            try:
+                self._write_snapshot(directory, pending)
+            except Exception as exc:  # noqa: BLE001 - la traza nunca rompe la parada
+                outcome["error"] = type(exc).__name__
+
+        worker_thread = threading.Thread(target=run, name="task-trace-snapshot", daemon=True)
+        worker_thread.start()
+        worker_thread.join(timeout)
+        if worker_thread.is_alive():
+            logger.warning("snapshot_timeout seconds=%d", timeout)
+        elif "error" in outcome:
+            logger.warning("snapshot_failed type=%s", outcome["error"])
 
     def _write_snapshot(self, directory: str, pending: list[Any]) -> None:
         os.makedirs(directory, mode=0o700, exist_ok=True)
         os.chmod(directory, 0o700)
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
         path = os.path.join(directory, f"inflight-{stamp}-{os.getpid()}.json")
+        max_bytes = _int_env("TRACE_SNAPSHOT_MAX_BYTES", 1_048_576, 4096)
+        items: list[dict[str, Any]] = []
+        used = 0
+        for m in pending:
+            item = m.asdict()
+            size = len(json.dumps(item, default=str))
+            if used + size > max_bytes:
+                break
+            items.append(item)
+            used += size
         body = {
             "ts": datetime.now(UTC).isoformat(),
             "pid": os.getpid(),
-            "inflight": [m.asdict() for m in pending],
+            "inflight": items,
+            "truncated": len(pending) - len(items),
         }
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as handle:
