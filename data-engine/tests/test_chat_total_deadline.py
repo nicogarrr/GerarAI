@@ -304,3 +304,38 @@ async def test_gemini_503_persistent_falls_to_next_model():
     out = await provider.complete(chat_request())
     assert out.model == "gemini-3.8-flash"
     assert [c.model for c in gemini.calls] == [GEMINI_MODEL, GEMINI_MODEL, "gemini-3.8-flash"]
+
+
+@run_async
+async def test_deadline_cancels_the_provider_call_instead_of_leaving_it_running(monkeypatch):
+    monkeypatch.setattr(interactive_deadline, "get_settings",
+                        lambda: SimpleNamespace(chat_total_timeout_seconds=.2))
+    provider = Fake(delay=5)
+
+    @bounded_chat
+    async def ask():
+        return await complete_with_deadline(provider, chat_request(), source="test")
+
+    with pytest.raises(TimeoutError):
+        await ask()
+    await asyncio.sleep(.1)
+    assert provider.calls and provider.cancelled  # no hidden call keeps running
+
+
+@run_async
+async def test_cancelling_the_waiter_cancels_the_provider_call():
+    provider = Fake(delay=5)
+    waiter = asyncio.ensure_future(complete_with_deadline(provider, chat_request(), source="test"))
+    await asyncio.sleep(.05)
+    waiter.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiter
+    await asyncio.sleep(.1)
+    assert provider.cancelled
+
+
+@run_async
+async def test_a_finished_provider_call_is_not_cancelled_by_the_fix():
+    provider = Fake(delay=0)
+    result = await complete_with_deadline(provider, chat_request(), source="test")
+    assert result is not None and not provider.cancelled
