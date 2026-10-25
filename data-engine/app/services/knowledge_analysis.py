@@ -56,9 +56,28 @@ def clean_quote(quote, sent: str) -> str | None:
     if not isinstance(quote, str):
         return None
     quote = quote.strip()
-    if not 20 <= len(quote) <= 900 or sum(c.isalnum() for c in quote) < 20 or quote not in sent:
+    if not 20 <= len(quote) <= 900 or sum(c.isalnum() for c in quote) < 20:
         return None
-    return quote
+    # Los modelos colapsan saltos de linea y espacios dobles al copiar. Solo se
+    # tolera esa diferencia de espacios en blanco: se devuelve el tramo EXACTO
+    # del texto enviado (nunca la version del modelo), asi la cita sigue siendo
+    # literal. Los bordes no pueden cortar una palabra ("precio" no vale dentro
+    # de "sobreprecio" ni "valor" como prefijo de "valorado"). Palabras distintas
+    # o puntos suspensivos se rechazan.
+    words = quote.split()
+    if not words:
+        return None
+    body = r"\s+".join(re.escape(w) for w in words)
+    left = r"(?<!\w)" if words[0][0].isalnum() or words[0][0] == "_" else ""
+    right = r"(?!\w)" if words[-1][-1].isalnum() or words[-1][-1] == "_" else ""
+    match = re.search(left + body + right, sent)
+    if match is None:
+        return None
+    span = match.group(0)
+    # Los espacios del texto original pueden inflar el tramo: se revalida.
+    if not 20 <= len(span) <= 900:
+        return None
+    return span
 
 
 def _plain(value, low: int = 1, high: int = _MAX_TEXT) -> str | None:
