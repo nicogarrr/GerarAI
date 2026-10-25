@@ -236,6 +236,8 @@ services:
       - KNOWLEDGE_RAG_MIN_FREE_GB=${KNOWLEDGE_RAG_MIN_FREE_GB:-3}
       - KNOWLEDGE_RAG_RERANKER_MODEL=${KNOWLEDGE_RAG_RERANKER_MODEL:-}
       - FASTEMBED_CACHE_PATH=/data/fastembed-cache
+      # huggingface_hub/xet escribe en $HOME/.cache; el usuario cavaai no tiene HOME.
+      - HF_HOME=/data/hf-home
       - LANGFUSE_ENABLED=false
       - SEC_USER_AGENT=${SEC_USER_AGENT:-CavaAI research contact@cavaai.local}
       - SEC_SNAPSHOT_DIR=${SEC_SNAPSHOT_DIR:-}
@@ -334,6 +336,8 @@ services:
       # Opt-in (#726): top_ten_sp500 se calcula en refresh_macro_context (cola default).
       - SP500_FACTSHEET_SNAPSHOT_DIR=${SP500_FACTSHEET_SNAPSHOT_DIR:-/data/sp500-factsheet-snapshots}
       - RSS_FEEDS=${RSS_FEEDS:-}
+      - FASTEMBED_CACHE_PATH=/data/fastembed-cache
+      - HF_HOME=/data/hf-home
     volumes:
       - duckdb_data:/data
       - ./data-esef-snapshots:/data/esef-snapshots:ro
