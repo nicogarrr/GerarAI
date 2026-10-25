@@ -36,9 +36,15 @@ async function post(request: import("@playwright/test").APIRequestContext, path:
   expect(res.status(), await res.text()).toBeLessThan(300);
 }
 
+// La portada agrupa titulares de la misma historia (news_story_cluster.py,
+// Jaccard/contencion en 48 h): 25 titulares casi identicos colapsan en uno.
+// Cada item lleva dos palabras distintivas propias para ser historias distintas.
+const WORDS_A = ["granite","harbour","lantern","meadow","orchard","pelican","quarry","ribbon","saddles","thicket","uplands","verdant","willows","yachting","zeppelin","amethyst","bramble","cobalt","dolphin","emerald","falcons","gargoyle","hamlets","iceberg","juniper"];
+const WORDS_B = ["kestrels","limpets","mustang","nutmegs","ospreys","pumice","quokkas","rapids","sparrow","tundras","urchins","vellum","walnuts","xylitol","yarrows","zinnias","abalone","badgers","cormorant","dragonfly","eclipses","foxglove","glaciers","herons","ironwood"];
+
 for(const width of [390,820,1440]) test(`news pages replace rather than append ${width}`,async({page,request})=>{
  const marker=randomUUID().slice(0,8);
- await post(request,"/api/news/ingest",{source:"manual_feed",items:Array.from({length:25},(_,i)=>({ticker:"MSFT",title:`Microsoft PageFixture ${marker} item ${i}`,text:"Microsoft announced a product.",url:`https://example.com/${marker}/${i}`}))});
+ await post(request,"/api/news/ingest",{source:"manual_feed",items:Array.from({length:25},(_,i)=>({ticker:"MSFT",title:`Microsoft ${WORDS_A[i]} ${WORDS_B[i]} ${marker}`,text:"Microsoft announced a product.",url:`https://example.com/${marker}/${i}`}))});
  await page.setViewportSize({width,height:1000});await page.goto("/research/news?lane=empresa");
  await page.addStyleTag({content:"nextjs-portal{display:none!important}"});
  const pager=page.getByRole("navigation",{name:"Paginación",exact:true});
