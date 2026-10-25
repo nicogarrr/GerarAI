@@ -216,6 +216,7 @@ services:
       # Primario de chat por la suscripcion OpenCode Go (solo backend de chat).
       # Apagado por defecto; ver chat_go_subscription_enabled en config.py.
       - CHAT_GO_SUBSCRIPTION_ENABLED=${CHAT_GO_SUBSCRIPTION_ENABLED:-false}
+      - CHAT_GO_HEAD_START_SECONDS=${CHAT_GO_HEAD_START_SECONDS:-2.0}
       - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
       - REDIS_URL=redis://redis:6379/0
       - KPI_QUEUE_MAX_PENDING=${KPI_QUEUE_MAX_PENDING:-500}
