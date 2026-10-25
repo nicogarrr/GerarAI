@@ -38,16 +38,22 @@ export async function AnalystTargetsSection({ symbol, currency }: { symbol: stri
             ) : (
                 <>
                     {data.consensus ? (
-                        <p className="mt-1 text-sm text-gray-300">
-                            Consenso: mediana {fmtTarget(data.consensus.median)} · media {fmtTarget(data.consensus.mean)} · rango {fmtTarget(data.consensus.low)} a {fmtTarget(data.consensus.high)}
-                        </p>
+                        <div className="mt-1 text-sm text-gray-300">
+                            <p>
+                                Consenso agregado de Yahoo: mediana {fmtTarget(data.consensus.median)} · media {fmtTarget(data.consensus.mean)} · rango {fmtTarget(data.consensus.low)} a {fmtTarget(data.consensus.high)}
+                            </p>
+                            <p className="mt-0.5 text-xs text-gray-500" data-testid="analyst-consensus-note">
+                                Cifra publicada por Yahoo; no indica cuántos analistas incluye ni su fecha, y puede no coincidir con las firmas de abajo.
+                            </p>
+                        </div>
                     ) : null}
                     {data.rows.length === 0 ? (
                         <p className="mt-2 text-sm text-gray-400" role="status">{data.note ?? 'Solo consenso agregado, sin detalle por firma.'}</p>
                     ) : null}
                     {data.rows.length > 0 ? (
                     <>
-                    <ul aria-label="Precios objetivo por firma" className="mt-3 divide-y divide-gray-800 sm:hidden">
+                    <p className="mt-3 text-xs text-gray-500">Detalle por firma: último objetivo de cada firma en los últimos 12 meses.</p>
+                    <ul aria-label="Precios objetivo por firma" className="mt-1 divide-y divide-gray-800 sm:hidden">
                         {data.rows.map((row) => (
                             <li className="py-2 text-sm" key={`${row.firm}-${row.date}`}>
                                 <div className="flex items-baseline justify-between gap-3">
@@ -61,7 +67,7 @@ export async function AnalystTargetsSection({ symbol, currency }: { symbol: stri
                             </li>
                         ))}
                     </ul>
-                    <div className="mt-3 hidden overflow-x-auto sm:block">
+                    <div className="mt-1 hidden overflow-x-auto sm:block">
                         <table className="w-full min-w-[34rem] text-left text-sm">
                             <caption className="sr-only">Último precio objetivo por firma, de los últimos 12 meses</caption>
                             <thead className="text-xs text-gray-500">
