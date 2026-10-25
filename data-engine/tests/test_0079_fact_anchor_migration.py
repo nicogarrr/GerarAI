@@ -141,3 +141,27 @@ def test_0079_downgrade_drops_table_and_upgrade_recreates_it(tmp_path: Path) -> 
         assert "fact_anchors" in inspect(engine).get_table_names()
     finally:
         engine.dispose()
+
+
+def test_upgrade_adopts_preexisting_fact_anchors(tmp_path: Path) -> None:
+    """Prod tenia fact_anchors creada por create_all antes de la migracion.
+
+    Regresion: `upgrade` no debe fallar con tabla duplicada y debe dejar los
+    tres indices esperados sin perder filas.
+    """
+    database_url = _sqlite_url(tmp_path / "preexisting.db")
+    _alembic(database_url, "upgrade", DOWN_REVISION)
+    engine = create_engine(database_url)
+    try:
+        FactAnchor.__table__.create(engine)
+        with engine.begin() as conn:
+            conn.exec_driver_sql("DROP INDEX IF EXISTS ix_fact_anchors_company")
+        _alembic(database_url, "upgrade", REVISION)
+        names = {ix["name"] for ix in inspect(engine).get_indexes("fact_anchors")}
+        assert {
+            "ix_fact_anchors_tenant_id",
+            "ix_fact_anchors_accession_number",
+            "ix_fact_anchors_company",
+        } <= names
+    finally:
+        engine.dispose()

@@ -17,6 +17,19 @@ depends_on = None
 
 
 def upgrade() -> None:
+    inspector = sa.inspect(op.get_bind())
+    if inspector.has_table("fact_anchors"):
+        # Prod ya la tiene (creada por create_all antes de la migracion, 0 filas
+        # verificadas): adoptarla sin recrear. Solo se anaden indices que falten.
+        existing = {ix["name"] for ix in inspector.get_indexes("fact_anchors")}
+        for name, cols in (
+            ("ix_fact_anchors_tenant_id", ["tenant_id"]),
+            ("ix_fact_anchors_accession_number", ["accession_number"]),
+            ("ix_fact_anchors_company", ["company_id"]),
+        ):
+            if name not in existing:
+                op.create_index(name, "fact_anchors", cols)
+        return
     op.create_table(
         "fact_anchors",
         sa.Column("id", sa.Integer(), primary_key=True),
