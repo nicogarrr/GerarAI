@@ -26,8 +26,15 @@ def clean_breaker():
 
 
 def settings(**kw):
-    return Settings(_env_file=None, llm_enabled=True, llm_provider="opencode-go",
-                    opencode_go_api_key="test-key", **kw)
+    # Este fichero fija la ruta free/legacy: la suscripcion Go se apaga aqui.
+    base = dict(
+        _env_file=None, llm_enabled=True, llm_provider="opencode-go",
+        opencode_go_api_key="test-key", chat_go_subscription_enabled=False,
+        opencode_go_model="deepseek-v4.1-flash-free",
+        opencode_go_fallback_model="space-bunny-free",
+    )
+    base.update(kw)
+    return Settings(**base)
 
 
 def envelope(text="Caso alcista: crecimiento con datos de la tesis."):
@@ -170,7 +177,7 @@ def test_bad_chat_configuration_degrades_at_call_not_constructor(config):
         asyncio.run(provider.complete(LLMRequest([Message("user", "hola")], task="chat")))
 
 
-def test_chat_primary_is_capped_at_twenty_seconds_without_groq():
+def test_chat_primary_is_capped_at_the_shared_chat_budget_without_groq():
     provider = create_chat_llm_provider(settings(llm_timeout_seconds=120, llm_total_timeout_seconds=240))
-    assert provider._timeout.read == 20
-    assert provider._total_timeout_seconds == 20
+    assert provider._timeout.read == 45
+    assert provider._total_timeout_seconds == 45

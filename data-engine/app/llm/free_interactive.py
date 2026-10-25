@@ -1,4 +1,9 @@
-"""Bounded OpenCode -> confirmed-no-billing AI Studio debate chain."""
+"""Bounded owner-approved debate chain.
+
+Orden: modelo Go aprobado (si la suscripcion esta confirmada) -> free reales
+verificados (bridge opcional) -> AI Studio con plan sin facturacion confirmado.
+Nunca usa la cascada generica Gemini/OpenRouter ni overrides de pago.
+"""
 from __future__ import annotations
 
 import logging
@@ -11,7 +16,11 @@ from app.llm.chat_provider import GEMINI_MODELS, _gemini_backup
 from app.llm.contracts import LLMRequest
 from app.llm.errors import LLMError, ProviderHTTPError, ProviderResponseError, ProviderTransportError
 from app.llm.factory import _opencode_go, _pin_to_model
-from app.llm.model_aliases import VERIFIED_FREE_MODELS
+from app.llm.model_aliases import (
+    GO_SUBSCRIPTION_MODELS,
+    VERIFIED_FREE_MODELS,
+    is_owner_approved_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +62,13 @@ def create_free_interactive_provider(settings: Settings | None = None, *, client
     if not settings.llm_enabled or settings.llm_provider == "disabled" or not settings.opencode_go_api_key:
         raise FreeLLMUnavailable()
     # Never use the generic Gemini/OpenRouter cascade: keys may carry billing.
-    # Ignore paid environment overrides rather than silently widening cost scope.
+    # El modelo Go aprobado (suscripcion del dueno) va primero si esta
+    # confirmado; los free reales quedan como respaldo legacy (bridge).
     configured = (settings.opencode_go_model, settings.opencode_go_fallback_model)
-    models = list(dict.fromkeys([m for m in configured if m in VERIFIED_FREE_MODELS]
-                               + ["deepseek-v4.1-flash-free", "space-bunny-free"]))
+    models = list(dict.fromkeys(
+        [m for m in configured if m and is_owner_approved_model(m, settings)]
+        + sorted(VERIFIED_FREE_MODELS)
+    ))
     members = []
     for model in models:
         pinned = settings.model_copy(update={
@@ -65,7 +77,9 @@ def create_free_interactive_provider(settings: Settings | None = None, *, client
         })
         members.append(_opencode_go(pinned, client=client, max_retries=0,
                                     timeout_seconds=12, total_timeout_seconds=14,
-                                    reasoning_effort="low"))
+                                    reasoning_effort=(
+                                        "high" if model in GO_SUBSCRIPTION_MODELS else "low"
+                                    )))
     for member in members:
         member.interactive_quota_breaker = True
     # AI Studio is free only with confirmed no billing, not merely by model ID.

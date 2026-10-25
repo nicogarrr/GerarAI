@@ -1,6 +1,7 @@
-"""Primario de chat por la suscripcion OpenCode Go: apagado por defecto.
+"""Primario de chat por la suscripcion OpenCode Go: encendido por decision del dueno.
 
-Solo mocks (httpx.MockTransport): ninguna llamada real ni trafico de usuario.
+El interruptor sigue permitiendo volver a la ruta free. Solo mocks
+(httpx.MockTransport): ninguna llamada real ni trafico de usuario.
 """
 from __future__ import annotations
 
@@ -36,16 +37,21 @@ def _ok(content: str) -> dict:
     }
 
 
-def test_apagado_por_defecto():
+def test_encendido_por_defecto_por_decision_del_dueno():
     settings = _settings()
-    assert settings.chat_go_subscription_enabled is False
-    assert _go_subscription_primary(settings, None) is None
+    assert settings.chat_go_subscription_enabled is True
+    assert isinstance(_go_subscription_primary(settings, None), GoSubscriptionChatProvider)
 
 
-def test_apagado_no_cambia_el_primario_gratuito():
-    provider = create_chat_llm_provider(_settings())
+def test_apagado_vuelve_a_la_ruta_free_verificada():
+    provider = create_chat_llm_provider(
+        _settings(
+            chat_go_subscription_enabled=False,
+            opencode_go_model="deepseek-v4.1-flash-free",
+        )
+    )
+    assert getattr(provider, "name", "") == "opencode-go"
     assert getattr(provider, "name", "") != GO_SUBSCRIPTION_PROVIDER
-    assert getattr(getattr(provider, "primary", provider), "name", "") != GO_SUBSCRIPTION_PROVIDER
 
 
 def test_encendido_sin_clave_no_crea_primario():
@@ -173,6 +179,8 @@ def test_la_ventaja_por_defecto_solo_se_aplica_con_primario_go():
     assert chain.primary.name == GO_SUBSCRIPTION_PROVIDER
     assert chain.delay == settings.chat_go_head_start_seconds == 2.0
     off = create_chat_llm_provider(_settings(
+        chat_go_subscription_enabled=False,
+        opencode_go_model="deepseek-v4.1-flash-free",
         groq_chat_fallback_enabled=True, groq_api_key="g-test",
         groq_free_plan_confirmed=True, groq_zdr_confirmed=True,
     ))

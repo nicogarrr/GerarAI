@@ -28,7 +28,7 @@
 | FRED | Macro (IPC, paro, tipos) | Gratis (key gratuita) |
 | Calendario NASDAQ | Earnings y dividendos | Gratis |
 | FMP (opcional, con `FMP_API_KEY`) | Perfiles, dividendos, splits y contraste de cifras SEC | Free tier |
-| OpenCode Go (+ Jev) | Solo texto de análisis y micro-decisiones; **nunca inventa cifras** | Suscripción / $0.042 por millón de tokens |
+| OpenCode Go (DeepSeek v4.1 Flash) + Jev | Solo texto de análisis y micro-decisiones; **nunca inventa cifras** | Suscripción Go ya contratada; Jev opcional, factura por uso si se activa |
 
 Si FMP no está configurado o el proveedor falla, esa cobertura se marca como no disponible en lugar de inventarse; no hay tickers ni nombres hardcodeados: todo nombre visible viene de una API real.
 

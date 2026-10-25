@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
-from app.llm.model_aliases import VERIFIED_FREE_MODELS
+from app.llm.model_aliases import is_owner_approved_model
 from app.services.asts_catalog_service import read_catalog
 from app.services.asts_llm_quota import reserve_llm_call
 from app.services.async_bridge import run_from_any_context
@@ -119,6 +119,12 @@ async def _analyze_with_llm(payload: str, *, on_response=None, before_retry=None
     provider = create_llm_provider()
     if provider.name == "disabled":
         raise RuntimeError("LLM not configured")
+    settings = get_settings()
+    model = (
+        settings.opencode_go_model
+        if is_owner_approved_model(settings.opencode_go_model, settings)
+        else "space-bunny-free"
+    )
     request = LLMRequest(
         messages=[
             Message("system", (
@@ -134,14 +140,14 @@ async def _analyze_with_llm(payload: str, *, on_response=None, before_retry=None
             Message("user", payload),
         ],
         task="asts_catalog_analysis",
-        model="space-bunny-free",
+        model=model,
         temperature=0,
         max_tokens=900,
         response_format=ResponseFormat.json_schema(_SCHEMA, name="asts_catalog_analysis"),
     )
-    # Pin the exact free model: task overrides and env defaults may route to paid models.
-    if provider.model_router.resolve(request) not in VERIFIED_FREE_MODELS:
-        raise RuntimeError("ASTS catalog model is not the verified free model")
+    # Pin an approved model: task overrides may route to paid models.
+    if not is_owner_approved_model(provider.model_router.resolve(request), settings):
+        raise RuntimeError("ASTS catalog model is not owner-approved")
     response = (await complete_guarded(
         provider, request, source="asts_catalog_analysis",
         on_response=on_response, before_retry=before_retry,

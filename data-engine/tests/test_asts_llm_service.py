@@ -219,7 +219,7 @@ def test_llm_request_pins_free_model_even_with_paid_override(monkeypatch):
             raise AssertionError("should not call the paid model")
 
     monkeypatch.setattr(service, "create_llm_provider", lambda: Provider())
-    with pytest.raises(RuntimeError, match="verified free model"):
+    with pytest.raises(RuntimeError, match="owner-approved"):
         asyncio.run(service._analyze_with_llm("payload"))
 
 

@@ -96,10 +96,13 @@ def stored(db):
     return list(db.scalars(select(BottleneckDiscovery)))
 
 
-def test_route_is_free_and_registered():
+def test_route_is_owner_approved_and_registered():
+    from app.core.config import Settings
+    from app.llm.model_aliases import is_owner_approved_model
+
     assert "bottleneck_discovery" in ROUTES
     assert route_model("bottleneck_discovery").task == "bottleneck_discovery"
-    assert route_model("bottleneck_discovery").model in svc.VERIFIED_FREE_MODELS
+    assert is_owner_approved_model(route_model("bottleneck_discovery").model, Settings(_env_file=None))
 
 
 def test_happy_path_saves_inferred_with_budget_record(db):
@@ -499,15 +502,15 @@ def test_resolves_document_and_knowledge_lanes_with_real_urls(db):
 
 # --- modelo gratuito RESUELTO ---------------------------------------------------
 
-def test_request_pins_the_free_model(db):
+def test_request_pins_the_go_model(db):
     provider = Provider(out(cand()))
     run(db, provider)
-    assert provider.requests[0].model == "deepseek-v4.1-flash-free" and provider.requests[0].task == "bottleneck_discovery"
+    assert provider.requests[0].model == "deepseek-v4.1-flash" and provider.requests[0].task == "bottleneck_discovery"
 
 
 @pytest.mark.parametrize("overrides", [
-    {"deepseek-v4.1-flash-free": "paid-model"},
-    {"bottleneck_discovery": "paid-model", "deepseek-v4.1-flash-free": "paid-model"},
+    {"deepseek-v4.1-flash": "paid-model"},
+    {"bottleneck_discovery": "paid-model", "deepseek-v4.1-flash": "paid-model"},
 ])
 def test_env_override_to_paid_model_skips_before_any_call(db, overrides):
     provider = Provider(out(cand()))
@@ -523,11 +526,11 @@ def test_real_task_model_router_override_is_caught(db):
 
     provider = Provider(out(cand()))
     provider.model_router = TaskModelRouter(default_model="space-bunny-free",
-                                            overrides={"deepseek-v4.1-flash-free": "paid-model"})
+                                            overrides={"deepseek-v4.1-flash": "paid-model"})
     assert run(db, provider)["stop_reason"] == "modelo_no_gratuito" and provider.calls == 0
     ok = Provider(out(cand()))
     ok.model_router = TaskModelRouter(default_model="space-bunny-free", overrides={"bottleneck_discovery": "paid"})
-    # el modelo fijado en el request gana al override por tarea, y el resuelto es gratuito
+    # el modelo fijado en el request gana al override por tarea, y el resuelto es aprobado
     assert run(db, ok)["status"] == "ok" and ok.calls == 1
 
 

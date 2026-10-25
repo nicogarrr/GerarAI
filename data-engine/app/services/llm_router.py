@@ -31,38 +31,38 @@ class ModelRoute:
 
 
 ROUTES = {
-    "cheap_extraction": ModelRoute("cheap_extraction", "deepseek-v4.1-flash-free", "low-cost structured extraction"),
-    "main_financial_analysis": ModelRoute("main_financial_analysis", "deepseek-v4.1-flash-free", "source-grounded financial analysis"),
+    "cheap_extraction": ModelRoute("cheap_extraction", "deepseek-v4.1-flash", "low-cost structured extraction"),
+    "main_financial_analysis": ModelRoute("main_financial_analysis", "deepseek-v4.1-flash", "source-grounded financial analysis"),
     "agentic_red_team": ModelRoute(
         "agentic_red_team",
-        "deepseek-v4.1-flash-free",
+        "deepseek-v4.1-flash",
         "adversarial review that MAY request tools; no tools are registered, so "
         "the run stays single-shot and deterministic",
         required_capabilities=_TOOL,
     ),
-    "news_triage": ModelRoute("news_triage", "deepseek-v4.1-flash-free", "cheap high-volume triage"),
-    "dedupe_news": ModelRoute("dedupe_news", "deepseek-v4.1-flash-free", "cheap semantic dedupe"),
-    "claim_extraction": ModelRoute("claim_extraction", "deepseek-v4.1-flash-free", "structured extraction"),
-    "kpi_extraction": ModelRoute("kpi_extraction", "deepseek-v4.1-flash-free", "company-specific KPI extraction"),
-    "pdf_summary": ModelRoute("pdf_summary", "deepseek-v4.1-flash-free", "long-context extraction summary"),
-    "chat": ModelRoute("chat", "deepseek-v4.1-flash-free", "grounded portfolio chat"),
-    "thesis_update": ModelRoute("thesis_update", "deepseek-v4.1-flash-free", "partial thesis update"),
-    "deep_thesis": ModelRoute("deep_thesis", "deepseek-v4.1-flash-free", "deep thesis workflow"),
-    "red_team": ModelRoute("red_team", "deepseek-v4.1-flash-free", "adversarial review; the model may request tools but none are registered"),
-    "source_audit": ModelRoute("source_audit", "deepseek-v4.1-flash-free", "critical source audit"),
+    "news_triage": ModelRoute("news_triage", "deepseek-v4.1-flash", "cheap high-volume triage"),
+    "dedupe_news": ModelRoute("dedupe_news", "deepseek-v4.1-flash", "cheap semantic dedupe"),
+    "claim_extraction": ModelRoute("claim_extraction", "deepseek-v4.1-flash", "structured extraction"),
+    "kpi_extraction": ModelRoute("kpi_extraction", "deepseek-v4.1-flash", "company-specific KPI extraction"),
+    "pdf_summary": ModelRoute("pdf_summary", "deepseek-v4.1-flash", "long-context extraction summary"),
+    "chat": ModelRoute("chat", "deepseek-v4.1-flash", "grounded portfolio chat"),
+    "thesis_update": ModelRoute("thesis_update", "deepseek-v4.1-flash", "partial thesis update"),
+    "deep_thesis": ModelRoute("deep_thesis", "deepseek-v4.1-flash", "deep thesis workflow"),
+    "red_team": ModelRoute("red_team", "deepseek-v4.1-flash", "adversarial review; the model may request tools but none are registered"),
+    "source_audit": ModelRoute("source_audit", "deepseek-v4.1-flash", "critical source audit"),
     "tool_workflow": ModelRoute(
         "tool_workflow",
-        "deepseek-v4.1-flash-free",
+        "deepseek-v4.1-flash",
         "tool-calling workflow; the adapter sends `tools` when a caller registers "
         "them, and this app registers none, so the route is single-shot",
         required_capabilities=_TOOL,
     ),
-    "code": ModelRoute("code", "deepseek-v4.1-flash-free", "product coding"),
-    "premium_financial_analysis": ModelRoute("premium_financial_analysis", "deepseek-v4.1-flash-free", "eval-gated premium escalation"),
+    "code": ModelRoute("code", "deepseek-v4.1-flash", "product coding"),
+    "premium_financial_analysis": ModelRoute("premium_financial_analysis", "deepseek-v4.1-flash", "eval-gated premium escalation"),
     "bottleneck_discovery": ModelRoute(
-        "bottleneck_discovery", "deepseek-v4.1-flash-free", "free-tier inferred candidates per bottleneck theme"
+        "bottleneck_discovery", "deepseek-v4.1-flash", "owner-approved inferred candidates per bottleneck theme"
     ),
-    "fallback": ModelRoute("fallback", "deepseek-v4.1-flash-free", "cheap fallback"),
+    "fallback": ModelRoute("fallback", "deepseek-v4.1-flash", "cheap fallback"),
 }
 
 

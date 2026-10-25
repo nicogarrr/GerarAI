@@ -80,7 +80,9 @@ def test_public_routes_are_registered_once():
     assert duplicates == set()
 
 
-def test_root_and_health():
+def test_root_and_health(monkeypatch):
+    # La sonda LLM real requiere clave; aqui se aisla para probar el cableado.
+    monkeypatch.setattr(main, "_probe_llm", lambda _settings: "ok")
     client = TestClient(main.app)
 
     assert client.get("/").json() == {"status": "ok", "service": "CavaAI Research Engine"}
@@ -90,6 +92,7 @@ def test_root_and_health():
     assert ready.status_code == 200
     assert "checks" in ready.json()
     assert "database" in ready.json()["checks"]
+    assert ready.json()["checks"]["llm"] == "ok"
 
 
 def test_health_ready_returns_503_when_database_is_down(monkeypatch):

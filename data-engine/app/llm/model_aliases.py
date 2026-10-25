@@ -76,10 +76,44 @@ class ModelAlias:
 DEFAULT_MODEL_ENV_VAR = "OPENCODE_GO_MODEL"
 #: Fallback when the env var is unset/blank. Kept in sync with
 #: Settings.opencode_go_model in app/core/config.py.
-DEFAULT_MODEL_FALLBACK = "deepseek-v4.1-flash-free"
+DEFAULT_MODEL_FALLBACK = "deepseek-v4.1-flash"
 
-#: Modelos gratuitos verificados; los guards de tareas fijadas aceptan solo estos.
+#: Modelos gratuitos verificados; los guards de tareas fijadas aceptan solo estos
+#: (ademas del modelo Go aprobado cuando la suscripcion esta confirmada).
 VERIFIED_FREE_MODELS = frozenset({"deepseek-v4.1-flash-free", "space-bunny-free"})
+
+#: Modelo cubierto por la suscripcion OpenCode Go contratada por el dueno.
+#: NO es gratis: el coste es la suscripcion, no una tarifa por token.
+GO_SUBSCRIPTION_MODELS = frozenset({"deepseek-v4.1-flash"})
+
+
+def go_subscription_confirmed(settings: object) -> bool:
+    """True si el dueno confirmo la suscripcion Go para este despliegue."""
+    return bool(getattr(settings, "chat_go_subscription_enabled", False))
+
+
+def verified_models(settings: object) -> frozenset[str]:
+    """Modelos que los guards aceptan: free reales + Go aprobado si aplica.
+
+    El nombre historico ``VERIFIED_FREE_MODELS`` se conserva para los free
+    reales; este helper anade ``GO_SUBSCRIPTION_MODELS`` SOLO cuando la
+    suscripcion Go esta confirmada, sin afirmar que el modelo Go sea gratis.
+    """
+    models = set(VERIFIED_FREE_MODELS)
+    if go_subscription_confirmed(settings):
+        models |= GO_SUBSCRIPTION_MODELS
+    return frozenset(models)
+
+
+def is_owner_approved_model(model: str, settings: object) -> bool:
+    """True si ``model`` es free verificado o el Go aprobado por el dueno.
+
+    El flag explicito ``opencode_go_allow_unverified_model`` (solo para un
+    piloto auditado) tambien se acepta: el arranque de produccion ya lo exige.
+    """
+    if getattr(settings, "opencode_go_allow_unverified_model", False):
+        return True
+    return model in verified_models(settings)
 
 
 def default_model_from_env(
@@ -103,6 +137,22 @@ class _ModelRoute(Protocol):
 
 
 OPENCODE_GO_MODEL_ALIASES = (
+    ModelAlias(
+        # Cerebro aprobado por el dueno: cubierto por la suscripcion OpenCode
+        # Go (no free, no tarifa por token). cost_basis="unknown" porque Go no
+        # publica tarifa por token para la suscripcion.
+        internal_alias="deepseek-v4.1-flash",
+        provider="opencode-go",
+        provider_model_id="deepseek-v4.1-flash",
+        enabled=True,
+        context_window=1_048_576,
+        input_cost=Decimal("0"),
+        output_cost=Decimal("0"),
+        cost_basis="unknown",
+        supported_capabilities=frozenset(
+            {"text", "reasoning", "tool_calling", "structured_output"}
+        ),
+    ),
     ModelAlias(
         internal_alias="deepseek-v4.1-flash-free",
         provider="opencode-go",
@@ -180,6 +230,11 @@ class ModelAliasRegistry:
         if not alias.enabled:
             raise ValueError(f"Model alias {model!r} is disabled")
         if alias.provider != provider:
+            # La suscripcion Go es el mismo proveedor logico con otro nombre de
+            # adaptador (opencode-go-subscription); sus modelos aprobados son
+            # los del registro de opencode-go.
+            if provider == "opencode-go-subscription" and alias.provider == "opencode-go":
+                return alias.provider_model_id
             raise ValueError(
                 f"Model alias {model!r} belongs to provider {alias.provider!r}, "
                 f"not active provider {provider!r}"

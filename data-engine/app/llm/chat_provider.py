@@ -28,7 +28,7 @@ from app.llm.errors import (
 )
 from app.llm.factory import _pin_to_model, create_llm_provider
 from app.llm.interactive_deadline import remaining_seconds
-from app.llm.model_aliases import VERIFIED_FREE_MODELS
+from app.llm.model_aliases import is_owner_approved_model
 
 logger = logging.getLogger(__name__)
 
@@ -92,12 +92,13 @@ class _LanguageRejected(ProviderResponseError):
 class ChatFallbackProvider(LLMProvider):
     name = "chat-independent-fallback"
 
-    def __init__(self, primary: LLMProvider, backup: LLMProvider, *, total: float = 45, delay: float = 2, validator: Callable[[LLMResponse], None] | None = None, on_response: Callable[[LLMResponse], None] | None = None, backup2: LLMProvider | None = None, extra_backups: tuple[tuple[LLMProvider, str], ...] = (), backup_model: str = GROQ_MODEL):
+    def __init__(self, primary: LLMProvider, backup: LLMProvider, *, total: float = 45, delay: float = 2, validator: Callable[[LLMResponse], None] | None = None, on_response: Callable[[LLMResponse], None] | None = None, backup2: LLMProvider | None = None, extra_backups: tuple[tuple[LLMProvider, str], ...] = (), backup_model: str = GROQ_MODEL, settings: Settings | None = None):
         self.backup_model = backup_model
         self.backup2 = backup2
         self.extra_backups = extra_backups
         self.validator = validator
         self.on_response = on_response
+        self.settings = settings
         self.primary = primary
         self.backup = backup
         self.total = total
@@ -109,7 +110,7 @@ class ChatFallbackProvider(LLMProvider):
     def with_candidate_validator(self, validator, on_response=None):
         # Per-call clone: concurrent requests never share validation context.
         return ChatFallbackProvider(self.primary, self.backup, total=self.total,
-                                    delay=self.delay, validator=validator, on_response=on_response, backup2=self.backup2, extra_backups=self.extra_backups, backup_model=self.backup_model)
+                                    delay=self.delay, validator=validator, on_response=on_response, backup2=self.backup2, extra_backups=self.extra_backups, backup_model=self.backup_model, settings=self.settings)
 
     async def _candidate(self, provider, request, *, backup=False):
         response = await provider.complete(request)
@@ -132,8 +133,14 @@ class ChatFallbackProvider(LLMProvider):
         # Chat synthesis only. Other uses retain their own provider/cost gates.
         if request.task not in {"chat", "main_financial_analysis"} or request.tools:
             return await self.primary.complete(request)
-        if self.primary.name == "opencode-go" and self.primary.model_router.resolve(request) not in VERIFIED_FREE_MODELS:
-            raise ProviderRequestError("Chat fallback refuses a primary not verified free")
+        if self.primary.name == "opencode-go":
+            settings = self.settings or get_settings()
+            if not is_owner_approved_model(
+                self.primary.model_router.resolve(request), settings
+            ):
+                raise ProviderRequestError(
+                    "Chat fallback refuses a primary not owner-approved"
+                )
         try:
             return await asyncio.wait_for(self._race(request), timeout=remaining_seconds(self.total))
         except TimeoutError:
@@ -474,17 +481,17 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
     # que compita en la carrera en vez de perderla siempre y quedar cancelado
     # a medias en el bridge (BrokenPipe).
     go_subscription = _go_subscription_primary(settings, client) if settings.llm_enabled else None
-    if go_subscription is None and settings.llm_enabled and settings.llm_provider != "disabled" and settings.opencode_go_model not in VERIFIED_FREE_MODELS:
+    if (
+        go_subscription is None
+        and settings.llm_enabled
+        and settings.llm_provider != "disabled"
+        and not is_owner_approved_model(settings.opencode_go_model, settings)
+    ):
         return DisabledProvider("chat_primary_not_verified_free")
     fallback = settings.opencode_go_fallback_model
-    if fallback and fallback not in VERIFIED_FREE_MODELS:
+    if fallback and not is_owner_approved_model(fallback, settings):
         return DisabledProvider("chat_fallback_not_verified_free")
-    settings = settings.model_copy(update={
-        "opencode_go_fallback_model": fallback or (
-            "space-bunny-free" if settings.opencode_go_model != "space-bunny-free"
-            else "deepseek-v4.1-flash-free"
-        ),
-    })
+    # Sin fallback implicito: la cadena Go/Groq/Gemini ya es el respaldo.
     primary = go_subscription or create_llm_provider(
         settings,
         client=client,
@@ -503,7 +510,10 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
         routes = (probe, replace(probe, task="main_financial_analysis"),
                   replace(probe, model=settings.opencode_go_fallback_model))
         try:
-            verified = all(primary.model_router.resolve(route) in VERIFIED_FREE_MODELS for route in routes)
+            verified = all(
+                is_owner_approved_model(primary.model_router.resolve(route), settings)
+                for route in routes
+            )
         except (ValueError, KeyError):
             verified = False
         if not verified:
@@ -520,6 +530,7 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
             primary, backup2, backup_model=GEMINI_MODEL,
             total=settings.chat_total_timeout_seconds,
             extra_backups=((backup2, GEMINI_MODEL_2),),
+            settings=settings,
         )
     if primary.name not in {"opencode-go", GO_SUBSCRIPTION_PROVIDER}:
         raise ValueError("Groq chat fallback requires the verified OpenCode primary")
@@ -527,7 +538,7 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
     assert backup is not None  # el flag de arriba lo garantiza
     head_start = {"delay": settings.chat_go_head_start_seconds} if primary.name == GO_SUBSCRIPTION_PROVIDER else {}
     return ChatFallbackProvider(primary, backup, total=settings.chat_total_timeout_seconds, backup2=backup2,
-                                extra_backups=_openrouter_backup(settings, client), **head_start)
+                                extra_backups=_openrouter_backup(settings, client), settings=settings, **head_start)
 
 
 def create_background_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:

@@ -60,7 +60,7 @@ def test_free_provider_never_uses_cascade_or_paid_override(monkeypatch):
     assert service.free_provider()[0].name=='fake'
     assert captured[0].llm_provider=='opencode-go'
     assert captured[0].llm_model_overrides=={} and captured[0].opencode_go_fallback_model==''
-    monkeypatch.setattr(service,'_resolved_verified_free_model',lambda _:None)
+    monkeypatch.setattr(service,'_resolved_verified_free_model',lambda *_:None)
     assert service.free_provider()==(None,None)
 
 

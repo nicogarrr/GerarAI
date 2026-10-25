@@ -14,7 +14,7 @@ from app.core.config import get_settings
 from app.llm import LLMRequest, Message, ResponseFormat
 from app.llm.chat_provider import create_chat_llm_provider
 from app.llm.json import parse_json_response
-from app.llm.model_aliases import VERIFIED_FREE_MODELS
+from app.llm.model_aliases import is_owner_approved_model
 from app.models import KnowledgeChunk, KnowledgeDocument
 from app.services import knowledge_analysis
 
@@ -223,17 +223,17 @@ async def ask_library(db: Session, question: str, *, scope: str = "letters",
         if provider is None:
             settings = get_settings()
             model = settings.opencode_go_model
-            if model not in VERIFIED_FREE_MODELS:
+            if not is_owner_approved_model(model, settings):
                 result["message"] = (
                     "Fragmentos encontrados. Sintesis no disponible: el modelo "
-                    "configurado para la biblioteca no es un modelo gratuito "
-                    "verificado."
+                    "configurado para la biblioteca no es un modelo aprobado "
+                    "(free verificado o suscripcion Go)."
                 )
                 return result
             # Ni overrides ni el fallback de OpenCode pueden salir de los
-            # modelos gratuitos en esta función. La cadena de chat (OpenCode ->
-            # Groq -> Gemini, todas gratuitas verificadas) sí: sin ella, un 403
-            # de OpenCode dejaba el análisis siempre degradado.
+            # modelos aprobados (free verificado o Go del dueno). La cadena de
+            # chat (OpenCode -> Groq -> Gemini) sí: sin ella, un 403 dejaba el
+            # análisis siempre degradado.
             settings = settings.model_copy(update={"llm_model_overrides": {}, "opencode_go_fallback_model": ""})
             provider = create_chat_llm_provider(settings)
         else:
