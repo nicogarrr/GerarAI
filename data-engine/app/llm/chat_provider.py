@@ -7,6 +7,7 @@ Chat: carrera acotada (ChatFallbackProvider). Trabajos en segundo plano
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from collections.abc import Callable
@@ -25,13 +26,17 @@ from app.llm.errors import (
     ProviderResponseError,
     ProviderTransportError,
 )
-from app.llm.factory import create_llm_provider
+from app.llm.factory import _pin_to_model, create_llm_provider
 from app.llm.interactive_deadline import remaining_seconds
 from app.llm.model_aliases import VERIFIED_FREE_MODELS
 
 logger = logging.getLogger(__name__)
 
 GROQ_MODEL = "openai/gpt-oss-120b"
+#: Modelo de la suscripcion OpenCode Go (no es gratuito; solo con el interruptor
+#: CHAT_GO_SUBSCRIPTION_ENABLED). Id verificado en /zen/go/v1/models.
+GO_SUBSCRIPTION_MODEL = "deepseek-v4.1-flash"
+GO_SUBSCRIPTION_PROVIDER = "opencode-go-subscription"
 GEMINI_MODEL = "gemini-3.5-flash-lite"
 GEMINI_MODEL_2 = "gemini-3.8-flash"
 GEMINI_MODELS = (GEMINI_MODEL, GEMINI_MODEL_2)
@@ -287,6 +292,70 @@ class SequentialFallbackProvider(LLMProvider):
         raise last
 
 
+class GoSubscriptionChatProvider(OpenAICompatibleProvider):
+    """Adaptador del endpoint OpenCode Go (/zen/go/v1).
+
+    Go responde HTTP 400 a `response_format`: el contrato JSON se pide en el
+    prompt y se retira del sobre. Si el modelo envuelve el JSON en un bloque
+    ``` se desenvuelve para que los validadores de citas vean el JSON puro.
+    Cabeceras: User-Agent propio y `x-opencode-session` (documentado por Go).
+    """
+
+    def _build_payload(self, request: LLMRequest, model: str) -> dict:
+        payload = super()._build_payload(request, model)
+        response_format = payload.pop("response_format", None)
+        if response_format:
+            instruction = "Responde SOLO con un objeto JSON valido, sin texto fuera del JSON ni bloque de codigo."
+            schema = (response_format.get("json_schema") or {}).get("schema")
+            if schema:
+                instruction += " Debe cumplir este esquema JSON: " + json.dumps(schema, ensure_ascii=False, sort_keys=True)
+            messages = payload["messages"]
+            last = messages[-1] if messages else None
+            if last and last.get("role") == "user" and isinstance(last.get("content"), str):
+                last["content"] = f"{last['content']}\n\n{instruction}"
+            else:
+                messages.append({"role": "user", "content": instruction})
+        return payload
+
+    async def _complete(self, request: LLMRequest, model: str) -> LLMResponse:
+        response = await super()._complete(request, model)
+        if request.response_format is not None:
+            text = response.message.content.strip()
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1] if "\n" in text else ""
+                text = text.rsplit("```", 1)[0].strip()
+                response = replace(response, message=replace(response.message, content=text))
+        return response
+
+
+def _go_subscription_primary(settings: Settings, client: httpx.AsyncClient | None) -> OpenAICompatibleProvider | None:
+    """Primario por la suscripcion Go; None si el interruptor esta apagado."""
+    if not settings.chat_go_subscription_enabled:
+        return None
+    if not (settings.opencode_go_api_key and settings.opencode_go_api_key.strip()):
+        return None
+    return GoSubscriptionChatProvider(
+        api_key=settings.opencode_go_api_key,
+        base_url=settings.chat_go_subscription_base_url,
+        default_model=GO_SUBSCRIPTION_MODEL,
+        provider_name=GO_SUBSCRIPTION_PROVIDER,
+        model_overrides=_pin_to_model(GO_SUBSCRIPTION_MODEL),
+        extra_headers={
+            "User-Agent": "GerarAI-chat/1.0",
+            "x-opencode-session": settings.opencode_go_session,
+        },
+        reasoning_effort=settings.opencode_go_chat_reasoning_effort,
+        reasoning_effort_models={GO_SUBSCRIPTION_MODEL},
+        hidden_reasoning_models={GO_SUBSCRIPTION_MODEL},
+        hidden_reasoning_min_tokens=settings.llm_hidden_reasoning_min_tokens,
+        max_output_tokens=settings.llm_max_output_tokens,
+        max_retries=0,
+        timeout_seconds=min(settings.llm_timeout_seconds, settings.chat_total_timeout_seconds),
+        total_timeout_seconds=settings.chat_total_timeout_seconds,
+        client=client,
+    )
+
+
 def _groq_backup(
     settings: Settings,
     client: httpx.AsyncClient | None,
@@ -366,7 +435,8 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
     # no el tope de llamadas largas) y primario con reasoning reducido para
     # que compita en la carrera en vez de perderla siempre y quedar cancelado
     # a medias en el bridge (BrokenPipe).
-    if settings.llm_enabled and settings.llm_provider != "disabled" and settings.opencode_go_model not in VERIFIED_FREE_MODELS:
+    go_subscription = _go_subscription_primary(settings, client) if settings.llm_enabled else None
+    if go_subscription is None and settings.llm_enabled and settings.llm_provider != "disabled" and settings.opencode_go_model not in VERIFIED_FREE_MODELS:
         return DisabledProvider("chat_primary_not_verified_free")
     fallback = settings.opencode_go_fallback_model
     if fallback and fallback not in VERIFIED_FREE_MODELS:
@@ -377,7 +447,7 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
             else "deepseek-v4.1-flash-free"
         ),
     })
-    primary = create_llm_provider(
+    primary = go_subscription or create_llm_provider(
         settings,
         client=client,
         reasoning_effort=settings.opencode_go_chat_reasoning_effort,
@@ -387,7 +457,9 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
         timeout_seconds=min(settings.llm_timeout_seconds, settings.chat_total_timeout_seconds),
         total_timeout_seconds=settings.chat_total_timeout_seconds,
     )
-    if primary.name == "opencode-go":
+    if primary.name == GO_SUBSCRIPTION_PROVIDER:
+        primary.interactive_quota_breaker = True
+    elif primary.name == "opencode-go":
         primary.interactive_quota_breaker = True
         probe = LLMRequest([Message("user", "route validation")], task="chat")
         routes = (probe, replace(probe, task="main_financial_analysis"),
@@ -411,7 +483,7 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
             total=settings.chat_total_timeout_seconds,
             extra_backups=((backup2, GEMINI_MODEL_2),),
         )
-    if primary.name != "opencode-go":
+    if primary.name not in {"opencode-go", GO_SUBSCRIPTION_PROVIDER}:
         raise ValueError("Groq chat fallback requires the verified OpenCode primary")
     backup = _groq_backup(settings, client)
     assert backup is not None  # el flag de arriba lo garantiza

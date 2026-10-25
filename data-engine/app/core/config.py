@@ -442,6 +442,13 @@ class Settings(BaseSettings):
     # puede esperar una generacion larga; el primario compite con reasoning
     # reducido (opencode_go_chat_reasoning_effort).
     chat_total_timeout_seconds: float = Field(default=20.0, gt=0)
+    # APAGADO por defecto. Primario de chat por la suscripcion OpenCode Go de
+    # Nico (modelo `deepseek-v4.1-flash`, endpoint /zen/go/v1). No se activa
+    # hasta aclarar que las condiciones de uso de Go cubren este trafico. Con
+    # el interruptor apagado el chat sigue en la ruta gratuita verificada.
+    # Env: CHAT_GO_SUBSCRIPTION_ENABLED.
+    chat_go_subscription_enabled: bool = False
+    chat_go_subscription_base_url: str = "https://opencode.ai/zen/go/v1"
     # Modelos con razonamiento oculto: gastan tokens de salida pensando y con un
     # max_tokens bajo devuelven "no assistant message". Suelo de salida para ellos.
     llm_hidden_reasoning_models: str = "longcat-2.5-preview-free"
