@@ -3,6 +3,7 @@
 import asyncio
 import copy
 
+from app.services import knowledge_analysis
 from app.services.knowledge_chat import ask_library, retrieve
 from tests.test_knowledge_chat import Provider, setup_library
 
@@ -189,3 +190,27 @@ def test_ruta_normal_tampoco_acepta_citas_en_blanco(monkeypatch):
         ask_library(db, "repurchases", author="Buffett", provider=Provider({"answers": [item]}))
     )
     assert result["status"] == "fragmentos" and all(a["text"] is None for a in result["answers"])
+
+
+_SENT = "El margen de seguridad es\nla diferencia entre el precio  y el valor intrínseco.\nEs la clave de la inversión."
+
+
+def test_clean_quote_literal_unchanged():
+    quote = "la diferencia entre el precio  y el valor intrínseco."
+    assert knowledge_analysis.clean_quote(quote, _SENT) == quote
+
+
+def test_clean_quote_whitespace_collapse_returns_exact_source_span():
+    got = knowledge_analysis.clean_quote("El margen de seguridad es la diferencia entre el precio y el valor", _SENT)
+    assert got == "El margen de seguridad es\nla diferencia entre el precio  y el valor"
+    assert got in _SENT
+
+
+def test_clean_quote_still_rejects_non_literal_words():
+    for bad in (
+        "El margen de seguridad es ... la clave de la inversión.",
+        "El margen de seguridad es la distancia entre el precio y el valor",
+        "margen de seguridad",
+        "   ",
+    ):
+        assert knowledge_analysis.clean_quote(bad, _SENT) is None

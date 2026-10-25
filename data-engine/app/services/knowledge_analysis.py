@@ -56,9 +56,19 @@ def clean_quote(quote, sent: str) -> str | None:
     if not isinstance(quote, str):
         return None
     quote = quote.strip()
-    if not 20 <= len(quote) <= 900 or sum(c.isalnum() for c in quote) < 20 or quote not in sent:
+    if not 20 <= len(quote) <= 900 or sum(c.isalnum() for c in quote) < 20:
         return None
-    return quote
+    if quote in sent:
+        return quote
+    # Los modelos colapsan saltos de linea y espacios dobles al copiar. Solo se
+    # tolera esa diferencia de espacios en blanco: se devuelve el tramo EXACTO
+    # del texto enviado (nunca la version del modelo), asi la cita sigue siendo
+    # literal. Cualquier otra diferencia (palabras, puntos suspensivos) se rechaza.
+    words = quote.split()
+    if not words:
+        return None
+    match = re.search(r"\s+".join(re.escape(w) for w in words), sent)
+    return match.group(0) if match else None
 
 
 def _plain(value, low: int = 1, high: int = _MAX_TEXT) -> str | None:
