@@ -681,6 +681,19 @@ jobs:
       CI: "true"
       E2E_UI_RUN: "1"
       RESEARCH_AUTH_SECRET: cavaai-browser-e2e-research-secret-at-least-32-characters
+      # El shell de auth (2FA) consulta Mongo y los jobs de fondo tocan Redis.
+      # Sin estos servicios el navegador arrancaba con errores ruidosos que no
+      # eran del test, pero podían tumbar la página que se estaba midiendo.
+      MONGODB_URI: mongodb://127.0.0.1:27017/cavaai_e2e
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v7
         with:

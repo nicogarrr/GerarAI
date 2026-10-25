@@ -69,6 +69,53 @@ def test_imported_holding_stub_gets_master_taxonomy_and_identity():
     assert company.currency == "USD"
 
 
+def test_master_payload_missing_optional_keys_skips_them(monkeypatch):
+    """Un payload del maestro sin una clave de taxonomía o identidad no debe
+    reventar ni borrar lo existente. Cubre las ramas `key not in payload` y el
+    nombre ya verificado (no placeholder)."""
+    from app import seed as seed_module
+
+    monkeypatch.setattr(
+        seed_module,
+        "COMPANY_MASTER",
+        [
+            {
+                "ticker": "ASTS",
+                "company_type": seed_module.STUB_TYPE,
+                "valuation_model": seed_module.STUB_MODEL,
+                "name": "Astera Labs",
+                # Sin special_sources/special_risks/factor_tags ni exchange:
+                # esas claves se saltan.
+            }
+        ],
+    )
+    db = _db()
+    db.add(_stub("ASTS"))
+    db.commit()
+
+    assert apply_master_taxonomy_to_stubs(db) == ["ASTS"]
+    db.commit()
+    company = db.query(Company).filter_by(ticker="ASTS").one()
+    assert company.name == "Astera Labs"
+    assert company.exchange == "UNKNOWN"
+    assert company.factor_tags == []
+
+
+def test_seed_installs_only_global_taxonomy(monkeypatch):
+    """`seed()` no crea usuario, cartera ni evidencia: solo init + maestro."""
+    from app import seed as seed_module
+
+    calls: list[str] = []
+    monkeypatch.setattr(seed_module, "init_db", lambda: calls.append("init"))
+    monkeypatch.setattr(
+        seed_module, "ensure_company_master", lambda: calls.append("master")
+    )
+
+    seed_module.seed()
+
+    assert calls == ["init", "master"]
+
+
 def test_real_identity_fields_are_not_overwritten():
     """Un campo de identidad con dato real (no placeholder) no se pisa aunque
     la fila sea un stub reparable."""

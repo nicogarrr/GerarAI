@@ -58,6 +58,9 @@ def _clean_caches():
     ):
         cache.clear()
     screeners._real_items_cache.clear()
+    screeners._real_refresh_futures.clear()
+    screeners._real_refresh_generations.clear()
+    screeners._real_refresh_last_attempt.clear()
     yield
     for cache in (
         screeners._real_quote_cache,
@@ -66,6 +69,35 @@ def _clean_caches():
     ):
         cache.clear()
     screeners._real_items_cache.clear()
+    screeners._real_refresh_futures.clear()
+    screeners._real_refresh_generations.clear()
+    screeners._real_refresh_last_attempt.clear()
+
+
+def test_empty_refresh_becomes_honest_unavailable_without_infinite_loading(monkeypatch):
+    """Con el proveedor sin datos, el primer intento termina vacío; el request
+    siguiente NO debe programar otro refresh (la UI vería 'Cargando' eterno):
+    devuelve `refreshing=false` + `unavailable=true`."""
+
+    class _Settings:
+        finnhub_api_key = ""
+        screener_quote_vendor = "offline"
+        is_production = False
+
+    monkeypatch.setattr(screeners, "get_settings", lambda: _Settings())
+    monkeypatch.setattr(
+        screeners, "_refetch_real_items", lambda **kwargs: []
+    )
+
+    first = screeners.real_time_screener(db=_FakeDb(tenant_id=7))
+    future = screeners._real_refresh_futures[7]
+    future.result(timeout=5)  # type: ignore[attr-defined]
+
+    second = screeners.real_time_screener(db=_FakeDb(tenant_id=7))
+    assert second["screener"] == []
+    assert second["refreshing"] is False
+    assert second["unavailable"] is True
+    assert screeners._real_refresh_futures[7] is future
 
 
 def test_finnhub_quote_missing_fields_are_none_not_zero():

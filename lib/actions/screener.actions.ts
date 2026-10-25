@@ -261,6 +261,9 @@ export type RealScreenerResponse = {
   /** true = sin datos todavía y un refresco en vuelo (carga fría), no un filtro
    *  sin resultados. */
   refreshing?: boolean;
+  /** true = el universo entero está vacío (proveedor sin datos): no es un
+   *  filtro sin coincidencias. */
+  unavailable?: boolean;
   /** Tamaño del universo seguido, para declarar el alcance real del listado. */
   universe_size?: number;
 };
@@ -282,6 +285,7 @@ export const getScreenerStocksRealWithStatus = cache(
   async (filters: RealScreenerFilters = {}): Promise<{
     rows: RealScreenerRow[];
     refreshing: boolean;
+    unavailable: boolean;
     universeSize: number | null;
   }> => {
     await requireAuthenticatedUser();
@@ -300,6 +304,9 @@ export const getScreenerStocksRealWithStatus = cache(
     );
     const rows = data?.screener ?? [];
     const refreshing = data?.refreshing === true;
+    // Sin filas y sin refresh en vuelo: el proveedor no tiene datos. No se
+    // presenta como «filtro sin resultados».
+    const unavailable = rows.length === 0 && data?.unavailable === true && !refreshing;
     const universeSize = typeof data?.universe_size === 'number' ? data.universe_size : null;
     // Precio, variación y fecha salen de los mismos cierres datados que Movers.
     const dated = await fetchDatedChanges(rows.map((row) => row.symbol));
@@ -315,7 +322,7 @@ export const getScreenerStocksRealWithStatus = cache(
         priceDate: d.date,
       };
     });
-    return { rows: mapped, refreshing, universeSize };
+    return { rows: mapped, refreshing, unavailable, universeSize };
   },
 );
 
