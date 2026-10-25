@@ -174,3 +174,121 @@ def test_import_ibkr_owner_check_off_the_event_loop(monkeypatch):
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "not_configured"
     assert calls and all(calls)
+
+
+def test_chat_hard_deadline_cuts_a_worker_that_blocks_the_thread(monkeypatch, caplog):
+    """Un paso que bloquea el hilo no puede alargar la respuesta mas alla del muro."""
+    import time
+
+    init_db()
+    monkeypatch.setattr("app.api.routes.chat.CHAT_HARD_GRACE_SECONDS", 0.3)
+    monkeypatch.setattr(
+        "app.api.routes.chat.get_settings",
+        lambda: SimpleNamespace(chat_total_timeout_seconds=0.4),
+    )
+
+    def blocking_answer(self, db, question, scope, ticker, enable_debate=False, page=None, history=None):  # noqa: ARG001
+        async def _result():
+            time.sleep(3)  # bloquea el hilo y su loop: ningun wait_for interno puede cortarlo
+            return ChatResponse(answer="tarde", sources=[])
+
+        return _result()
+
+    monkeypatch.setattr("app.services.chat_service.ChatService.answer", blocking_answer)
+    started = time.monotonic()
+    with caplog.at_level("WARNING"):
+        response = client.post("/api/chat", json={"question": "que es el wacc"})
+    elapsed = time.monotonic() - started
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert elapsed < 1.5, elapsed
+    assert body["llm_trace"]["fallback_reason"] == "chat_hard_deadline"
+    assert body["model"] == "deterministic"
+    assert "worker thread stack" in caplog.text
+    assert "time.sleep" in caplog.text or "_result" in caplog.text
+
+
+def test_chat_stuck_workers_are_capped_and_released(monkeypatch):
+    """Hilos abandonados por el muro siguen contando hasta que terminan."""
+    import time
+
+    import app.api.routes.chat as chat_route
+
+    init_db()
+    deadline = time.monotonic() + 6
+    while chat_route._live_workers and time.monotonic() < deadline:
+        time.sleep(0.1)  # hilos abandonados de otros tests
+    assert chat_route._live_workers == 0
+    monkeypatch.setattr(chat_route, "CHAT_HARD_GRACE_SECONDS", 0.2)
+    monkeypatch.setattr(chat_route, "CHAT_MAX_LIVE_WORKERS", 2)
+    monkeypatch.setattr(
+        chat_route, "get_settings", lambda: SimpleNamespace(chat_total_timeout_seconds=0.2)
+    )
+
+    def blocking_answer(self, db, question, scope, ticker, enable_debate=False, page=None, history=None):  # noqa: ARG001
+        async def _result():
+            time.sleep(2.5)
+            return ChatResponse(answer="tarde", sources=[])
+
+        return _result()
+
+    monkeypatch.setattr("app.services.chat_service.ChatService.answer", blocking_answer)
+    reasons = [
+        client.post("/api/chat", json={"question": "que es el wacc"}).json()["llm_trace"]["fallback_reason"]
+        for _ in range(3)
+    ]
+    assert reasons == ["chat_hard_deadline", "chat_hard_deadline", "chat_busy"]
+    time.sleep(3)  # los hilos terminan y liberan su hueco
+    assert chat_route._live_workers == 0
+
+
+def test_chat_live_worker_cap_is_exact_under_a_burst(monkeypatch):
+    """Rafaga concurrente real: nunca mas hilos vivos que el tope, y todos se liberan."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    import app.api.routes.chat as chat_route
+
+    init_db()
+    deadline = time.monotonic() + 8
+    while chat_route._live_workers and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert chat_route._live_workers == 0
+    cap = 3
+    monkeypatch.setattr(chat_route, "CHAT_HARD_GRACE_SECONDS", 0.2)
+    monkeypatch.setattr(chat_route, "CHAT_MAX_LIVE_WORKERS", cap)
+    monkeypatch.setattr(
+        chat_route, "get_settings", lambda: SimpleNamespace(chat_total_timeout_seconds=0.2)
+    )
+    running = 0
+    peak = 0
+    lock = threading.Lock()
+
+    def blocking_answer(self, db, question, scope, ticker, enable_debate=False, page=None, history=None):  # noqa: ARG001
+        async def _result():
+            nonlocal running, peak
+            with lock:
+                running += 1
+                peak = max(peak, running)
+            try:
+                time.sleep(2)
+            finally:
+                with lock:
+                    running -= 1
+            return ChatResponse(answer="tarde", sources=[])
+
+        return _result()
+
+    monkeypatch.setattr("app.services.chat_service.ChatService.answer", blocking_answer)
+
+    def call(_):
+        return client.post("/api/chat", json={"question": "que es el wacc"}).json()["llm_trace"]["fallback_reason"]
+
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        reasons = list(pool.map(call, range(20)))
+    assert peak <= cap, peak
+    assert reasons.count("chat_hard_deadline") == cap, reasons
+    assert reasons.count("chat_busy") == 20 - cap, reasons
+    time.sleep(2.5)
+    assert chat_route._live_workers == 0
