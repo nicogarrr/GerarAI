@@ -28,6 +28,8 @@ def engine():
 
 
 class _Snap:
+    # FinancialSnapshot.excluded_present (928a2cec): los motores lo leen siempre.
+    excluded_present: list = []
     coherent = True
     as_of_period = "2026-06-30:Q2"
     income_statement = None
