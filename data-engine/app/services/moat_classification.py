@@ -22,7 +22,7 @@ def classification(moat_type: str) -> dict:
     key = MAPPING.get(moat_type)
     return {
         "type": key,
-        "label": NICO_MOAT_TYPES.get(key, "Sin clasificar"),
+        "label": NICO_MOAT_TYPES.get(key, "Sin clasificar") if key is not None else "Sin clasificar",
         "method": "NICO_MOAT_MAPPING_V1",
         "basis": "Correspondencia editorial de categoría; no modifica el score.",
     }
