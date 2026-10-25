@@ -9,15 +9,25 @@ class FakeMinio:
     def __init__(self) -> None:
         self.created: list[str] = []
         self.objects: list[tuple[str, str, bytes, str]] = []
+        self.removed: list[tuple[str, str]] = []
 
     def bucket_exists(self, bucket: str) -> bool:
-        return False
+        return bool(self.objects)
 
     def make_bucket(self, bucket: str) -> None:
         self.created.append(bucket)
 
     def put_object(self, bucket, object_name, stream, *, length, content_type):
         self.objects.append((bucket, object_name, stream.read(length), content_type))
+
+    def remove_object(self, bucket, object_name):
+        self.removed.append((bucket, object_name))
+
+    def list_objects(self, bucket, *, prefix="", recursive=False):
+        for item in self.objects:
+            if item[0] != bucket or not item[1].startswith(prefix):
+                continue
+            yield type("Object", (), {"object_name": item[1]})()
 
 
 def test_document_store_uses_tenant_scoped_minio_original(monkeypatch):
@@ -125,3 +135,41 @@ def test_document_store_rejects_local_symlink_escape(tmp_path):
 
     assert not (outside / "filing" / "escaped.pdf").exists()
     assert not (outside / "filing").exists()
+
+def test_document_store_deletes_minio_object_and_tenant_prefix(monkeypatch):
+    store = DocumentStore()
+    store.settings.app_env = "production"
+    store.settings.document_storage_backend = "minio"
+    fake = FakeMinio()
+    monkeypatch.setattr(store, "_client", lambda: fake)
+
+    uri = store.put_bytes(
+        "MSFT", "filing", "10-k.pdf", b"raw", tenant_id=7
+    )
+    assert store.delete(uri) is True
+    assert fake.removed == [("research", "tenant-7/MSFT/filing/10-k.pdf")]
+
+    fake.objects[:] = [
+        ("research", "tenant-7/MSFT/filing/10-k.pdf", b"raw", "application/pdf"),
+        ("research", "tenant-8/MSFT/filing/10-k.pdf", b"raw", "application/pdf"),
+    ]
+    assert store.delete_tenant_prefix(7) == 1
+    assert fake.removed == [
+        ("research", "tenant-7/MSFT/filing/10-k.pdf"),
+        ("research", "tenant-7/MSFT/filing/10-k.pdf"),
+    ]
+    assert all(not name.startswith("tenant-8/") for _, name in fake.removed)
+
+
+def test_document_store_delete_is_idempotent_and_rejects_escape(tmp_path):
+    store = DocumentStore()
+    store.local_root = tmp_path / "storage" / "raw"
+    path = store.put_bytes_local("MSFT", "filing", "10-k.pdf", b"raw", tenant_id=9)
+    assert store.delete(path) is True
+    assert store.delete(path) is False
+
+    outside = tmp_path / "outside.pdf"
+    outside.write_bytes(b"do-not-delete")
+    with pytest.raises(ValueError, match="local document storage"):
+        store.delete(str(outside))
+    assert outside.exists()

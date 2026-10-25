@@ -472,6 +472,12 @@ class Document(TenantOwnedMixin, Base, TimestampMixin):
     storage_uri: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     checksum: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Retencion: fecha en que se borro el original y los chunks y la fila
+    # quedo como tombstone auditable. NULL = documento vivo. Se indexa para
+    # que la purga no vuelva a examinar tombstones en cada corrida.
+    retention_tombstoned_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
 
     chunks: Mapped[list["DocumentChunk"]] = relationship(back_populates="document")
@@ -2714,3 +2720,26 @@ class EtfHolding(Base):
     weight_pct: Mapped[Decimal] = mapped_column(Numeric(9, 4))
     as_of: Mapped[_DateT] = mapped_column(Date)
     source_url: Mapped[str] = mapped_column(Text)
+
+
+class PrivacyAuditEvent(Base):
+    """Auditoria de operaciones de privacidad que debe sobrevivir al borrado.
+
+    No es tenant-owned a proposito: el evento de ``account.delete`` tiene que
+    seguir existiendo despues de eliminar la fila de ``tenants``. Solo guarda
+    identificadores externos (nunca email, documentos ni contenido) y un
+    detalle agregado sin datos personales.
+    """
+
+    __tablename__ = "privacy_audit_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(60), index=True)
+    tenant_external_id: Mapped[str | None] = mapped_column(
+        String(160), nullable=True, index=True
+    )
+    user_id: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )

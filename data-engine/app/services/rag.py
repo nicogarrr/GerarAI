@@ -342,6 +342,60 @@ class RAGIndex:
             result["sparse_skipped"] = True
         return result
 
+    def delete_tenant_points(self, tenant_id: int) -> int:
+        """Borra todos los puntos del tenant (indice desechable, datos derivados).
+
+        No crea la coleccion si no existe: un tenant que nunca activo la
+        ingesta vectorial no debe provocar efectos laterales al borrarse. Un
+        fallo de Qdrant se propaga: el llamador decide si puede publicar
+        exito (borrado de cuenta) o solo registrar la incidencia (retencion).
+        """
+        return self._delete_points(tenant_id)
+
+    def delete_document_points(self, tenant_id: int, document_id: int) -> int:
+        """Borra los puntos de un documento financiero concreto."""
+        return self._delete_points(tenant_id, ("document_id", document_id))
+
+    def delete_knowledge_document_points(
+        self, tenant_id: int, knowledge_document_id: int
+    ) -> int:
+        """Borra los puntos de un documento de la biblioteca de conocimiento."""
+        return self._delete_points(
+            tenant_id, ("knowledge_document_id", knowledge_document_id)
+        )
+
+    def _delete_points(
+        self, tenant_id: int, extra: tuple[str, int] | None = None
+    ) -> int:
+        from qdrant_client.models import (
+            FieldCondition,
+            Filter,
+            FilterSelector,
+            MatchValue,
+        )
+
+        client = self.client()
+        collection = self._collection()
+        if not client.collection_exists(collection):
+            return 0
+        must = [
+            FieldCondition(
+                key="tenant_id",
+                match=MatchValue(value=tenant_id),
+            )
+        ]
+        if extra is not None:
+            key, value = extra
+            must.append(
+                FieldCondition(key=key, match=MatchValue(value=value))
+            )
+        client.delete(
+            collection_name=collection,
+            points_selector=FilterSelector(filter=Filter(must=must)),
+            wait=True,
+        )
+        return 1
+
     def rebuild_tenant(self, db) -> dict:
         """Recreate one tenant's disposable Qdrant index from PostgreSQL chunks."""
         from qdrant_client.models import (

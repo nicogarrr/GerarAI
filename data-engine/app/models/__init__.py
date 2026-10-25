@@ -74,6 +74,7 @@ from app.models.entities import (
     Position,
     PositionDailySnapshot,
     PrimarySourceRecord,
+    PrivacyAuditEvent,
     ProcessingJob,
     ProPickCandidate,
     ProPickRun,
@@ -179,6 +180,7 @@ __all__ = [
     "PortfolioDailySnapshot",
     "PortfolioMoveDigest",
     "PrimarySourceRecord",
+    "PrivacyAuditEvent",
     "ProcessingJob",
     "RedTeamRun",
     "AlertAnalysis",
@@ -237,3 +239,12 @@ __all__.append("ThesisProjectionYear")
 from app.models.benchmark_price import BenchmarkPrice as BenchmarkPrice  # noqa: E402
 
 __all__.append("BenchmarkPrice")
+
+from app.models.knowledge_rag import (  # noqa: E402
+    KnowledgeRagParent as KnowledgeRagParent,
+)
+from app.models.knowledge_rag import (
+    KnowledgeRagSource as KnowledgeRagSource,
+)
+
+__all__.extend(["KnowledgeRagParent", "KnowledgeRagSource"])
