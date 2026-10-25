@@ -19,7 +19,7 @@ export async function GET(
 ) {
     const { token } = await params;
     if (!TOKEN_RE.test(token)) {
-        return new NextResponse('Not found', { status: 404 });
+        return new NextResponse('No encontrado', { status: 404 });
     }
     if (!BACKEND_URL) {
         return NextResponse.json({ error: 'Backend no configurado' }, { status: 503 });
@@ -35,7 +35,7 @@ export async function GET(
         // 404; un 5xx/401 del backend o un fallo de red son un 502/503, nunca
         // un 404 que haría parecer revocado un feed sano.
         return upstream.status === 404
-            ? new NextResponse('Not found', { status: 404 })
+            ? new NextResponse('No encontrado', { status: 404 })
             : NextResponse.json({ error: 'Backend no disponible' }, { status: 502 });
     }
     const body = await upstream.text();
