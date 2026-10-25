@@ -206,3 +206,37 @@ def test_chat_hard_deadline_cuts_a_worker_that_blocks_the_thread(monkeypatch, ca
     assert body["model"] == "deterministic"
     assert "worker thread stack" in caplog.text
     assert "time.sleep" in caplog.text or "_result" in caplog.text
+
+
+def test_chat_stuck_workers_are_capped_and_released(monkeypatch):
+    """Hilos abandonados por el muro siguen contando hasta que terminan."""
+    import time
+
+    import app.api.routes.chat as chat_route
+
+    init_db()
+    deadline = time.monotonic() + 6
+    while chat_route._live_workers and time.monotonic() < deadline:
+        time.sleep(0.1)  # hilos abandonados de otros tests
+    assert chat_route._live_workers == 0
+    monkeypatch.setattr(chat_route, "CHAT_HARD_GRACE_SECONDS", 0.2)
+    monkeypatch.setattr(chat_route, "CHAT_MAX_LIVE_WORKERS", 2)
+    monkeypatch.setattr(
+        chat_route, "get_settings", lambda: SimpleNamespace(chat_total_timeout_seconds=0.2)
+    )
+
+    def blocking_answer(self, db, question, scope, ticker, enable_debate=False, page=None, history=None):  # noqa: ARG001
+        async def _result():
+            time.sleep(2.5)
+            return ChatResponse(answer="tarde", sources=[])
+
+        return _result()
+
+    monkeypatch.setattr("app.services.chat_service.ChatService.answer", blocking_answer)
+    reasons = [
+        client.post("/api/chat", json={"question": "que es el wacc"}).json()["llm_trace"]["fallback_reason"]
+        for _ in range(3)
+    ]
+    assert reasons == ["chat_hard_deadline", "chat_hard_deadline", "chat_busy"]
+    time.sleep(3)  # los hilos terminan y liberan su hueco
+    assert chat_route._live_workers == 0

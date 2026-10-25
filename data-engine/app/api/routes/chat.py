@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 # acababa tardando 70-100 s. Este muro corta desde el event loop principal,
 # que no se bloquea con el trabajo del hilo.
 CHAT_HARD_GRACE_SECONDS = 6.0
+# anyio libera el hueco del pool al abandonar un hilo, asi que sin tope propio
+# varios hilos atascados se acumularian. Cuenta hilos de chat realmente vivos
+# (hasta que terminan, no hasta que se abandonan) y rechaza con honestidad.
+CHAT_MAX_LIVE_WORKERS = 6
+_live_workers = 0
+_live_lock = threading.Lock()
 
 
 def _log_stuck_worker(ident: int | None, waited: float) -> None:
@@ -45,7 +51,17 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
     tenant_info = dict(db.info)
 
     def _work() -> ChatResponse:
+        global _live_workers
         worker["ident"] = threading.get_ident()
+        with _live_lock:
+            _live_workers += 1
+        try:
+            return _work_inner()
+        finally:
+            with _live_lock:
+                _live_workers -= 1
+
+    def _work_inner() -> ChatResponse:
         # Sesion propia del hilo: si el muro corta la peticion, el hilo puede
         # seguir un rato y no debe compartir la sesion que get_db va a cerrar.
         with SessionLocal() as worker_db:
@@ -62,6 +78,17 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
                 )
             )
 
+    # Tope blando: la comprobacion y el alta (en _work) no son atomicas; un
+    # par de hilos de mas en una rafaga es aceptable, el objetivo es acotar.
+    with _live_lock:
+        busy = _live_workers >= CHAT_MAX_LIVE_WORKERS
+    if busy:
+        logger.warning("chat busy: %d live workers", CHAT_MAX_LIVE_WORKERS)
+        return ChatResponse(
+            answer="El asistente está ocupado con otras consultas; vuelve a intentarlo en un momento.",
+            sources=[], model="deterministic", confidence=0,
+            llm_trace={"path": "chat_busy", "fallback": True, "fallback_reason": "chat_busy"},
+        )
     hard_limit = get_settings().chat_total_timeout_seconds + CHAT_HARD_GRACE_SECONDS
     try:
         try:
