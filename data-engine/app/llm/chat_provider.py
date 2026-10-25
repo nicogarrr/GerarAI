@@ -316,7 +316,8 @@ class GoSubscriptionChatProvider(OpenAICompatibleProvider):
             schema = (response_format.get("json_schema") or {}).get("schema")
             if schema:
                 instruction += " Debe cumplir este esquema JSON: " + json.dumps(schema, ensure_ascii=False, sort_keys=True)
-                if isinstance((schema.get("properties") or {}).get("sections"), dict):
+                sections = (schema.get("properties") or {}).get("sections")
+                if isinstance(sections, dict) and sections.get("minItems") == sections.get("maxItems") == 8:
                     # Medido 25-oct: con la peticion real Go agoto los 2600 tokens de salida
                     # (finish=length, JSON cortado). Salida corta = menos tokens y menos riesgo
                     # de truncado; las citas y los hechos se conservan.
