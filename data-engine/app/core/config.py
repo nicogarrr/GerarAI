@@ -442,12 +442,12 @@ class Settings(BaseSettings):
     # puede esperar una generacion larga; el primario compite con reasoning
     # reducido (opencode_go_chat_reasoning_effort).
     chat_total_timeout_seconds: float = Field(default=20.0, gt=0)
-    # Ventaja del primario Go antes de lanzar el respaldo en paralelo. Con el
-    # valor por defecto del proveedor (2 s) Groq ganaba casi siempre a Go
-    # (medido en prod 25-oct: Go 2-3 s; chat servido por Groq). El valor no esta
-    # medido como optimo: se ajusta por entorno. Si Go falla, el respaldo entra
-    # al instante; el tope total sigue siendo chat_total_timeout_seconds.
-    chat_go_head_start_seconds: float = Field(default=8.0, gt=0)
+    # Ventaja del primario Go antes de lanzar el respaldo en paralelo. Default 2 s
+    # (igual que antes de #2142). Prueba real 25-oct: con la peticion real del chat
+    # (JSON estricto, max_tokens 1800) Go tardo 12-14 s y 1 de 3 salio truncada,
+    # asi que una ventaja de 8 s solo anadio espera. Se ajusta por entorno cuando
+    # haya medicion representativa; Go sigue apagado por defecto.
+    chat_go_head_start_seconds: float = Field(default=2.0, gt=0)
     # APAGADO por defecto en codigo; se enciende por entorno tras auditoria y
     # QA. Primario de chat por la suscripcion OpenCode Go de Nico (modelo
     # `deepseek-v4.1-flash`, endpoint /zen/go/v1), con respaldo Groq/Gemini
