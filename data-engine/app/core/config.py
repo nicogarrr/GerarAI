@@ -448,6 +448,10 @@ class Settings(BaseSettings):
     # asi que una ventaja de 8 s solo anadio espera. Se ajusta por entorno cuando
     # haya medicion representativa; Go sigue apagado por defecto.
     chat_go_head_start_seconds: float = Field(default=2.0, gt=0)
+    # Suelo de max_tokens SOLO para el primario Go del chat. Medicion 25-oct con la
+    # peticion real (JSON estricto): 1800 truncaba 1-2 de 3; 2600 dio 2/2 completas
+    # (muestra pequena, sintetica). Con el flag apagado no se usa.
+    chat_go_min_output_tokens: int = Field(default=2600, ge=1024, le=8000)
     # APAGADO por defecto en codigo; se enciende por entorno tras auditoria y
     # QA. Primario de chat por la suscripcion OpenCode Go de Nico (modelo
     # `deepseek-v4.1-flash`, endpoint /zen/go/v1), con respaldo Groq/Gemini

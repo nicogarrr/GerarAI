@@ -177,3 +177,15 @@ def test_la_ventaja_por_defecto_solo_se_aplica_con_primario_go():
         groq_free_plan_confirmed=True, groq_zdr_confirmed=True,
     ))
     assert off.delay == 2
+
+
+def test_go_primario_eleva_max_tokens_a_2600_sin_tocar_otros_proveedores():
+    settings = _race_settings()
+    chain = create_chat_llm_provider(settings)
+    request = LLMRequest([Message("user", "hola")], max_tokens=1800)
+    go_payload = chain.primary._build_payload(request, GO_SUBSCRIPTION_MODEL)
+    assert settings.chat_go_min_output_tokens == 2600
+    assert go_payload["max_tokens"] == 2600
+    big = chain.primary._build_payload(LLMRequest([Message("user", "hola")], max_tokens=3000), GO_SUBSCRIPTION_MODEL)
+    assert big["max_tokens"] == 3000
+    assert settings.llm_hidden_reasoning_min_tokens == 1024

@@ -347,7 +347,7 @@ def _go_subscription_primary(settings: Settings, client: httpx.AsyncClient | Non
         reasoning_effort=settings.opencode_go_chat_reasoning_effort,
         reasoning_effort_models={GO_SUBSCRIPTION_MODEL},
         hidden_reasoning_models={GO_SUBSCRIPTION_MODEL},
-        hidden_reasoning_min_tokens=settings.llm_hidden_reasoning_min_tokens,
+        hidden_reasoning_min_tokens=max(settings.llm_hidden_reasoning_min_tokens, settings.chat_go_min_output_tokens),
         max_output_tokens=settings.llm_max_output_tokens,
         max_retries=0,
         timeout_seconds=min(settings.llm_timeout_seconds, settings.chat_total_timeout_seconds),
