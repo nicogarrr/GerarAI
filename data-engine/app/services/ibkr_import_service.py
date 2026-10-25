@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import CashBalance, Company, Position, Transaction
 from app.services.number_parsing import parse_localized_number
 from app.services.portfolio_fx_service import PortfolioFXService
@@ -542,7 +543,8 @@ class IBKRImportService:
                 row[0]
                 for row in db.execute(
                     select(Transaction.external_id).where(
-                        Transaction.external_id.in_(report_ids)
+                        Transaction.external_id.in_(report_ids),
+                        *tenant_filters(db, Transaction),
                     )
                 ).all()
             }
@@ -1074,7 +1076,12 @@ class IBKRImportService:
                 rows_skipped += 1
                 row_errors.append(f"Fila {line_number} del CSV: identificador de operación demasiado largo.")
                 continue
-            if db.scalar(select(Transaction.id).where(Transaction.external_id == external_id)) is not None:
+            if db.scalar(
+                select(Transaction.id).where(
+                    Transaction.external_id == external_id,
+                    *tenant_filters(db, Transaction),
+                )
+            ) is not None:
                 duplicate_trades += 1
                 continue
             try:
@@ -1096,7 +1103,12 @@ class IBKRImportService:
             except IntegrityError:
                 # A concurrent identical upload won the unique (tenant, external_id)
                 # race. The savepoint also restores its position rebuild.
-                if db.scalar(select(Transaction.id).where(Transaction.external_id == external_id)) is None:
+                if db.scalar(
+                    select(Transaction.id).where(
+                        Transaction.external_id == external_id,
+                        *tenant_filters(db, Transaction),
+                    )
+                ) is None:
                     raise
                 duplicate_trades += 1
             except ValueError as exc:

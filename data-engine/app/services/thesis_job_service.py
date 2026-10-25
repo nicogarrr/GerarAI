@@ -306,6 +306,9 @@ def run_thesis_job(run_id: int) -> None:
     """Run a thesis delivery with tenant context and recoverable retries."""
     db = SessionLocal()
     try:
+        # Bootstrap cross-tenant: el worker recibe solo run_id y el tenant
+        # viaja dentro del payload del run; hay que leerlo antes de poder
+        # fijar db.info["tenant_id"]. No es una lectura expuesta a un tenant.
         run = db.scalar(
             select(WorkflowRun)
             .where(WorkflowRun.id == run_id)
@@ -461,6 +464,8 @@ def run_thesis_job(run_id: int) -> None:
             # handler can re-create the step it was running.
             open_step_name = state["open_step_name"] if state.get("open_step") is not None else None
             db.rollback()
+            # Recuperacion por run_id tras el rollback: el run ya fue validado
+            # contra su tenant al arrancar; este GET no es una lectura expuesta.
             run = db.get(WorkflowRun, run_id, execution_options={"include_all_tenants": True})
             retryable = _is_retryable_error(exc)
             if run is not None:

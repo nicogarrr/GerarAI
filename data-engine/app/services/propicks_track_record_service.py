@@ -143,7 +143,6 @@ def _latest_price(db: Session, company_id: int) -> MarketPrice | None:
         select(MarketPrice)
         .where(MarketPrice.company_id == company_id, MarketPrice.close.isnot(None))
         .order_by(MarketPrice.date.desc())
-        .execution_options(include_all_tenants=True)
         .limit(1)
     )
 

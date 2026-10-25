@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Document, FinancialFact, NewsEvent, ResearchReview, ThesisChange
 from app.services.news_headline_translation import display_translation, original_headline
 from app.services.thesis_change_identity import ChangeItem, group_change_items
@@ -34,19 +35,27 @@ def changes_since(db: Session, company_id: int, since: datetime) -> dict[str, An
     ).scalars().all()
     docs_total = db.scalar(
         select(func.count()).select_from(Document).where(
-            Document.company_id == company_id, Document.created_at > since
+            Document.company_id == company_id,
+            Document.created_at > since,
+            *tenant_filters(db, Document),
         )
     ) or 0
     fact_rows = db.execute(
         select(FinancialFact.metric, func.count())
-        .where(FinancialFact.company_id == company_id, FinancialFact.created_at > since)
+        .where(
+            FinancialFact.company_id == company_id,
+            FinancialFact.created_at > since,
+            *tenant_filters(db, FinancialFact),
+        )
         .group_by(FinancialFact.metric)
         .order_by(func.count().desc(), FinancialFact.metric)
         .limit(MAX_ITEMS)
     ).all()
     facts_total = db.scalar(
         select(func.count()).select_from(FinancialFact).where(
-            FinancialFact.company_id == company_id, FinancialFact.created_at > since
+            FinancialFact.company_id == company_id,
+            FinancialFact.created_at > since,
+            *tenant_filters(db, FinancialFact),
         )
     ) or 0
     changes = db.execute(
@@ -94,6 +103,7 @@ def _project_changes(db: Session, changes: list[ThesisChange]) -> list[dict[str,
         select(ResearchReview.thesis_change_id, ResearchReview.news_event_id).where(
             ResearchReview.thesis_change_id.in_([c.id for c in changes]),
             ResearchReview.news_event_id.is_not(None),
+            *tenant_filters(db, ResearchReview),
         )
     ).all()
     event_id_by_change: dict[int, int] = {}

@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.tenancy import tenant_filters
 from app.models import Company, EarningsDate, FinancialFact, MarketPrice, ThesisVersion, WatchItem
 from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.derived_market_cap_service import DERIVED_SOURCE
@@ -128,7 +129,8 @@ async def watchlist_monitor(
         func.row_number().over(partition_by=ThesisVersion.company_id,
                                order_by=ThesisVersion.version.desc()).label("rank"),
     ).where(ThesisVersion.company_id.in_(company_ids), ThesisVersion.status == "published",
-            ThesisVersion.expected_value.isnot(None)).subquery()
+            ThesisVersion.expected_value.isnot(None),
+            *tenant_filters(db, ThesisVersion)).subquery()
     theses = {row.company_id: row for row in db.scalars(
         select(ThesisVersion).join(ranked_theses, ThesisVersion.id == ranked_theses.c.id)
         .where(ranked_theses.c.rank == 1)

@@ -24,6 +24,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, CorporateAction, Position, Transaction
 from app.services.company_resolver import resolve_company
 
@@ -66,6 +67,7 @@ class CorporateActionService:
             .where(
                 Transaction.company_id.in_(company_ids),
                 Transaction.action.in_(("buy", "sell")),
+                *tenant_filters(db, Transaction),
             )
             .group_by(Transaction.company_id)
         ).all()
@@ -79,7 +81,12 @@ class CorporateActionService:
         if not company_ids:
             return set()
         with_position = set(
-            db.scalars(select(Position.company_id).where(Position.company_id.in_(company_ids)))
+            db.scalars(
+                select(Position.company_id).where(
+                    Position.company_id.in_(company_ids),
+                    *tenant_filters(db, Position),
+                )
+            )
         )
         with_trades = set(
             db.scalars(
@@ -87,6 +94,7 @@ class CorporateActionService:
                 .where(
                     Transaction.company_id.in_(company_ids),
                     Transaction.action.in_(("buy", "sell")),
+                    *tenant_filters(db, Transaction),
                 )
                 .distinct()
             )

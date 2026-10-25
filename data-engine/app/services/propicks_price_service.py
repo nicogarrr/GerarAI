@@ -23,6 +23,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, MarketPrice, ProPickCandidate, ProPickRun
 
 # Dias de CALENDARIO (momentum_from_series resta timedelta(days=...)): 126/252
@@ -311,7 +312,10 @@ def latest_run_passed_companies(db: Session, *, limit: int = 500) -> list[Compan
     """
     run = db.scalar(
         select(ProPickRun)
-        .where(ProPickRun.status == "completed")
+        .where(
+            ProPickRun.status == "completed",
+            *tenant_filters(db, ProPickRun),
+        )
         .order_by(desc(ProPickRun.id))
         .limit(1)
     )
@@ -320,7 +324,11 @@ def latest_run_passed_companies(db: Session, *, limit: int = 500) -> list[Compan
     rows = db.execute(
         select(Company)
         .join(ProPickCandidate, ProPickCandidate.company_id == Company.id)
-        .where(ProPickCandidate.run_id == run.id, ProPickCandidate.passed.is_(True))
+        .where(
+            ProPickCandidate.run_id == run.id,
+            ProPickCandidate.passed.is_(True),
+            *tenant_filters(db, ProPickCandidate),
+        )
         .order_by(
             ProPickCandidate.rank.asc().nulls_last(),
             ProPickCandidate.score.desc(),
@@ -334,7 +342,10 @@ def latest_run_top_companies(db: Session, *, top_n: int = 40) -> list[Company]:
     """Top-N aprobadas del ultimo run completado del embudo."""
     run = db.scalar(
         select(ProPickRun)
-        .where(ProPickRun.status == "completed")
+        .where(
+            ProPickRun.status == "completed",
+            *tenant_filters(db, ProPickRun),
+        )
         .order_by(desc(ProPickRun.id))
         .limit(1)
     )
@@ -343,7 +354,11 @@ def latest_run_top_companies(db: Session, *, top_n: int = 40) -> list[Company]:
     rows = db.execute(
         select(Company)
         .join(ProPickCandidate, ProPickCandidate.company_id == Company.id)
-        .where(ProPickCandidate.run_id == run.id, ProPickCandidate.passed.is_(True))
+        .where(
+            ProPickCandidate.run_id == run.id,
+            ProPickCandidate.passed.is_(True),
+            *tenant_filters(db, ProPickCandidate),
+        )
         .order_by(ProPickCandidate.rank)
         .limit(top_n)
     ).scalars().all()

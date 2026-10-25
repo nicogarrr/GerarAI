@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import redact_secrets
+from app.core.tenancy import tenant_filters
 from app.models import ThesisSection, ThesisVersion
 
 APPROVAL_SECTION_KEY = "approval"
@@ -268,7 +269,10 @@ def _assert_approvable(db: Session, thesis: ThesisVersion) -> None:
         )
     latest = db.scalar(
         select(ThesisVersion.version)
-        .where(ThesisVersion.company_id == thesis.company_id)
+        .where(
+            ThesisVersion.company_id == thesis.company_id,
+            *tenant_filters(db, ThesisVersion),
+        )
         .order_by(ThesisVersion.version.desc())
         .limit(1)
     )

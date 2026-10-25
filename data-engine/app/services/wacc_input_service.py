@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.tenancy import tenant_filters
 from app.models import Company, Document, FinancialFact
 from app.services.connectors.fred import FREDClient
 
@@ -236,6 +237,7 @@ class WaccInputService:
                     .where(
                         FinancialFact.company_id == company.id,
                         FinancialFact.metric == metric,
+                        *tenant_filters(db, FinancialFact),
                     )
                     .limit(1)
                 )

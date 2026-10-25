@@ -30,6 +30,7 @@ import httpx
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models.entities import Company, EarningsDate, Position, WatchItem
 from app.services.async_bridge import run_from_any_context
 from app.services.connectors.earnings_calendar import BROWSER_HEADERS, EARNINGS_URL
@@ -53,9 +54,15 @@ YAHOO_PAUSE_S = 0.25
 def followed_companies(db: Session) -> dict[str, dict[str, Any]]:
     """ticker -> {company, origin} de cartera (posicion abierta) y watchlist del tenant."""
     held = db.scalars(
-        select(Company).join(Position, Position.company_id == Company.id).where(Position.quantity > 0)
+        select(Company)
+        .join(Position, Position.company_id == Company.id)
+        .where(Position.quantity > 0, *tenant_filters(db, Position))
     ).all()
-    watched = db.scalars(select(Company).join(WatchItem, WatchItem.symbol == Company.ticker)).all()
+    watched = db.scalars(
+        select(Company)
+        .join(WatchItem, WatchItem.symbol == Company.ticker)
+        .where(*tenant_filters(db, WatchItem))
+    ).all()
     out: dict[str, dict[str, Any]] = {}
     for company in watched:
         if company.ticker:

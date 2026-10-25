@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.tenancy import tenant_filters
 from app.models import CustomMetricDefinition, SavedScreen
 from app.services.screener_service import CustomMetricService, ScreenerService
 
@@ -135,7 +136,9 @@ def update_screen(screen_id: int, payload: ScreenCreate, db: Session = Depends(g
     if not payload.name.strip():
         raise HTTPException(status_code=400, detail="El nombre no puede estar vacío")
     duplicate = db.scalar(select(SavedScreen.id).where(
-        SavedScreen.name == payload.name.strip(), SavedScreen.id != screen.id,
+        SavedScreen.name == payload.name.strip(),
+        SavedScreen.id != screen.id,
+        *tenant_filters(db, SavedScreen),
     ))
     if duplicate is not None:
         raise HTTPException(status_code=400, detail="Ya existe un filtro con ese nombre")

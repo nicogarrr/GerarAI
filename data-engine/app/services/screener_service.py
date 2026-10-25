@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import (
     CalculatedMetric,
     Company,
@@ -237,11 +238,18 @@ class ScreenerService:
                 .where(
                     CalculatedMetric.value.is_not(None),
                     CalculatedMetric.status == "ok",
+                    *tenant_filters(db, CalculatedMetric),
                 )
                 .distinct()
             ).all()
         )
-        facts = set(db.scalars(select(FinancialFact.metric).distinct()).all())
+        facts = set(
+            db.scalars(
+                select(FinancialFact.metric)
+                .where(*tenant_filters(db, FinancialFact))
+                .distinct()
+            ).all()
+        )
         return sorted(calculated | facts)
 
     def run_saved(self, db: Session, screen: SavedScreen) -> dict[str, Any]:
@@ -509,7 +517,10 @@ class ScreenerService:
                     ),
                 ).label("rn"),
             )
-            .where(FinancialFact.metric.in_(sorted(metrics)))
+            .where(
+                FinancialFact.metric.in_(sorted(metrics)),
+                *tenant_filters(db, FinancialFact),
+            )
             .subquery("bounded_financial_facts")
         )
         facts_by_company: dict[int, list[FinancialFact]] = {}

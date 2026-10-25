@@ -51,6 +51,7 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from app.core.tenancy import tenant_filters
 from app.workflows.thesis_graph.state import ThesisGraphState
 
 THESIS_GRAPH_NODES: tuple[str, ...] = (
@@ -179,7 +180,10 @@ def _ensure_ingestion_complete_node(session_factory: Callable[[], Any]):
             facts = db.scalar(
                 select(func.count())
                 .select_from(FinancialFact)
-                .where(FinancialFact.company_id == company_id)
+                .where(
+                    FinancialFact.company_id == company_id,
+                    *tenant_filters(db, FinancialFact),
+                )
             ) or 0
             prices = db.scalar(
                 select(func.count())
@@ -187,7 +191,12 @@ def _ensure_ingestion_complete_node(session_factory: Callable[[], Any]):
                 .where(MarketPrice.company_id == company_id)
             ) or 0
             documents = db.scalar(
-                select(func.count()).select_from(Document).where(Document.company_id == company_id)
+                select(func.count())
+                .select_from(Document)
+                .where(
+                    Document.company_id == company_id,
+                    *tenant_filters(db, Document),
+                )
             ) or 0
         coverage = {"financial_facts": facts, "market_prices": prices, "documents": documents}
         artifacts["ensure_ingestion_complete"] = (
@@ -341,7 +350,10 @@ def _draft_synthesis_node(session_factory: Callable[[], Any]):
                     db.scalar(
                         select(func.count())
                         .select_from(ThesisSection)
-                        .where(ThesisSection.thesis_version_id == version.id)
+                        .where(
+                            ThesisSection.thesis_version_id == version.id,
+                            *tenant_filters(db, ThesisSection),
+                        )
                     )
                     or 0
                 )
@@ -398,18 +410,28 @@ def _source_audit_node(session_factory: Callable[[], Any]):
         with session_factory() as db:
             fact_rows = db.execute(
                 select(FinancialFact.source_type, func.count())
-                .where(FinancialFact.company_id == company_id)
+                .where(
+                    FinancialFact.company_id == company_id,
+                    *tenant_filters(db, FinancialFact),
+                )
                 .group_by(FinancialFact.source_type)
             ).all()
             doc_rows = db.execute(
                 select(Document.source_type, func.count())
-                .where(Document.company_id == company_id)
+                .where(
+                    Document.company_id == company_id,
+                    *tenant_filters(db, Document),
+                )
                 .group_by(Document.source_type)
             ).all()
             low_confidence = db.scalar(
                 select(func.count())
                 .select_from(FinancialFact)
-                .where(FinancialFact.company_id == company_id, FinancialFact.confidence < 0.5)
+                .where(
+                    FinancialFact.company_id == company_id,
+                    FinancialFact.confidence < 0.5,
+                    *tenant_filters(db, FinancialFact),
+                )
             ) or 0
         facts_by_source = {str(src): count for src, count in fact_rows}
         docs_by_source = {str(src): count for src, count in doc_rows}

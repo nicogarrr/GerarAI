@@ -39,6 +39,7 @@ from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, Document, FinancialFact, MarketPrice, NewsEvent, Transcript
 from app.services.connectors import earnings_calendar as earnings_calendar_connector
 from app.services.connectors import sec_edgar as sec_edgar_connector
@@ -636,7 +637,14 @@ class ThesisEvidenceService:
             items.append({"form": form, "filing_date": filed, "url": url})
             if not url:
                 continue
-            exists = db.scalar(select(Document.id).where(Document.source_url == url).limit(1))
+            exists = db.scalar(
+                select(Document.id)
+                .where(
+                    Document.source_url == url,
+                    *tenant_filters(db, Document),
+                )
+                .limit(1)
+            )
             if exists:
                 continue
             db.add(
@@ -805,7 +813,12 @@ class ThesisEvidenceService:
             if not item.url:
                 continue
             exists = db.scalar(
-                select(Document.id).where(Document.source_url == item.url).limit(1)
+                select(Document.id)
+                .where(
+                    Document.source_url == item.url,
+                    *tenant_filters(db, Document),
+                )
+                .limit(1)
             )
             if exists:
                 continue

@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import batch_refresh
+from app.core.tenancy import tenant_filters
 from app.llm import LLMRequest, Message, ResponseFormat, parse_json_response
 from app.llm.base import LLMProvider
 from app.llm.factory import create_llm_provider
@@ -471,7 +472,8 @@ class KPIExtractionService:
             previous_value = fact.value
             latest_version = db.scalar(
                 select(func.max(FactRevision.canonical_version)).where(
-                    FactRevision.financial_fact_id == fact.id
+                    FactRevision.financial_fact_id == fact.id,
+                    *tenant_filters(db, FactRevision),
                 )
             )
             revision = FactRevision(

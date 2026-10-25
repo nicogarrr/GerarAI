@@ -33,6 +33,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models.entities import Company, CorporateAction, Position
 from app.services.market_refresh_service import _us_listed
 
@@ -245,7 +246,9 @@ def watchlist_us_tickers(db: Session, held_us: set[str]) -> set[str]:
     from app.models import WatchItem
 
     rows = db.scalars(
-        select(Company).join(WatchItem, WatchItem.symbol == Company.ticker)
+        select(Company)
+        .join(WatchItem, WatchItem.symbol == Company.ticker)
+        .where(*tenant_filters(db, WatchItem))
     ).all()
     return {
         str(c.ticker).upper()
@@ -260,7 +263,9 @@ def held_tickers(db: Session) -> tuple[set[str], set[str]]:
     ``solo_us`` (bolsa US y USD) es el unico conjunto valido para cruzar con
     NASDAQ; ``todos`` sirve para las acciones corporativas propias."""
     companies = db.scalars(
-        select(Company).join(Position, Position.company_id == Company.id).where(Position.quantity > 0)
+        select(Company)
+        .join(Position, Position.company_id == Company.id)
+        .where(Position.quantity > 0, *tenant_filters(db, Position))
     ).all()
     todos = {str(c.ticker).upper() for c in companies if c.ticker}
     solo_us = {str(c.ticker).upper() for c in companies if c.ticker and _us_listed(c)}

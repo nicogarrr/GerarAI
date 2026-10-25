@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
+from app.core.tenancy import tenant_filters
 from app.models import FundManager, ManagerHolding
 from app.services.connectors import form13f
 from app.services.provenance import Coverage, SourceKind, provenance
@@ -346,7 +347,10 @@ class ManagerHoldingIngestionService:
             row[0]
             for row in db.execute(
                 select(ManagerHolding.report_date)
-                .where(ManagerHolding.manager_id == manager.id)
+                .where(
+                    ManagerHolding.manager_id == manager.id,
+                    *tenant_filters(db, ManagerHolding),
+                )
                 .group_by(ManagerHolding.report_date)
                 .order_by(ManagerHolding.report_date.desc())
             )

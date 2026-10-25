@@ -11,6 +11,7 @@ from decimal import Decimal
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, object_session
 
+from app.core.tenancy import tenant_filters
 from app.models import (
     Claim,
     ClaimEvidence,
@@ -567,7 +568,10 @@ class ThesisService:
         documents = list(
             db.execute(
                 select(Document.id, Document.checksum, Document.updated_at)
-                .where(Document.company_id == company.id)
+                .where(
+                    Document.company_id == company.id,
+                    *tenant_filters(db, Document),
+                )
                 .order_by(Document.id)
             ).all()
         )
@@ -579,7 +583,10 @@ class ThesisService:
                     FinancialFact.period,
                     FinancialFact.value,
                 )
-                .where(FinancialFact.company_id == company.id)
+                .where(
+                    FinancialFact.company_id == company.id,
+                    *tenant_filters(db, FinancialFact),
+                )
                 .order_by(FinancialFact.id)
             ).all()
         )

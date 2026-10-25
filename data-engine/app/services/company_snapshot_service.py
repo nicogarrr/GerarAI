@@ -4,6 +4,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session, aliased
 
+from app.core.tenancy import tenant_filters
 from app.models import (
     CalculatedMetric,
     Claim,
@@ -232,6 +233,7 @@ class CompanySnapshotService:
             select(ResearchReview.thesis_change_id, ResearchReview.news_event_id).where(
                 ResearchReview.thesis_change_id.in_([c.id for c in all_changes]),
                 ResearchReview.news_event_id.is_not(None),
+                *tenant_filters(db, ResearchReview),
             )
         ).all()
         event_id_by_change: dict[int, int] = {}

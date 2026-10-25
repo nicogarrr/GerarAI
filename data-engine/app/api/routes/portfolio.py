@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.tenancy import tenant_filters
 from app.models import (
     CashBalance,
     Company,
@@ -66,6 +67,7 @@ def _fiscal_info(db: Session, company_id: int, as_of: date) -> dict:
         select(func.min(Transaction.trade_date)).where(
             Transaction.company_id == company_id,
             Transaction.action == "buy",
+            *tenant_filters(db, Transaction),
         )
     )
     if first_buy is None:
@@ -95,6 +97,7 @@ def _fiscal_info_batch(
             .where(
                 Transaction.company_id.in_(set(as_of_by_company)),
                 Transaction.action == "buy",
+                *tenant_filters(db, Transaction),
             )
             .group_by(Transaction.company_id)
         ).all()
@@ -280,7 +283,11 @@ def update_portfolio_configuration(
     ledger = PortfolioLedgerService()
     try:
         portfolio = service.set_base_currency(db, payload.base_currency)
-        company_ids = list(db.scalars(select(Position.company_id)).all())
+        company_ids = list(
+            db.scalars(
+                select(Position.company_id).where(*tenant_filters(db, Position))
+            ).all()
+        )
         for company_id in company_ids:
             ledger.rebuild_position(db, company_id)
         db.commit()
@@ -332,7 +339,11 @@ def upsert_fx_rate(payload: FXRateInput, db: Session = Depends(get_db)) -> dict:
             rate_date=payload.rate_date,
             source=payload.source,
         )
-        company_ids = list(db.scalars(select(Position.company_id)).all())
+        company_ids = list(
+            db.scalars(
+                select(Position.company_id).where(*tenant_filters(db, Position))
+            ).all()
+        )
         for company_id in company_ids:
             ledger.rebuild_position(db, company_id)
         db.commit()

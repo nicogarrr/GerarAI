@@ -102,6 +102,10 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expi
 
 @event.listens_for(Session, "do_orm_execute")
 def _scope_tenant_queries(execute_state) -> None:
+    # Entity loads get the criteria below. Column/aggregate selects
+    # (`select(Model.columna)`, func.count/max, window functions) must add
+    # explicit predicates with app.core.tenancy.tenant_filters: on SQLAlchemy
+    # 2.0 the loader criteria does not reach those compiled column queries.
     if execute_state.execution_options.get("include_all_tenants"):
         return
     tenant_id = execute_state.session.info.get("tenant_id")

@@ -263,7 +263,10 @@ def backfill_empty_filings(
     """
     stats: dict[str, Any] = {"examined": 0, "filled": 0, "empty": 0, "failed": 0}
     has_tx = select(InsiderTransaction.filing_id).where(
-        InsiderTransaction.filing_id == InsiderFiling.id
+        InsiderTransaction.filing_id == InsiderFiling.id,
+        InsiderTransaction.tenant_id.is_(tenant_id)
+        if tenant_id is None
+        else InsiderTransaction.tenant_id == tenant_id,
     )
     stmt = (
         select(InsiderFiling)
@@ -335,7 +338,10 @@ def backfill_rule_10b5_1(
     """
     stats: dict[str, Any] = {"examined": 0, "updated": 0, "flagged": 0, "failed": 0}
     has_tx = select(InsiderTransaction.id).where(
-        InsiderTransaction.filing_id == InsiderFiling.id
+        InsiderTransaction.filing_id == InsiderFiling.id,
+        InsiderTransaction.tenant_id.is_(tenant_id)
+        if tenant_id is None
+        else InsiderTransaction.tenant_id == tenant_id,
     )
     stmt = (
         select(InsiderFiling)

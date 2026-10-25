@@ -24,6 +24,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models.entities import Company, FinancialFact
 from app.services.connectors import esef as esef_connector
 
@@ -80,7 +81,8 @@ def tenant_has_facts(db: Session, company: Company) -> bool:
     return bool(
         db.scalar(
             select(func.count(FinancialFact.id)).where(
-                FinancialFact.company_id == company.id
+                FinancialFact.company_id == company.id,
+                *tenant_filters(db, FinancialFact),
             )
         )
     )

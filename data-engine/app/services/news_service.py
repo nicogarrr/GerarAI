@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, ExternalClaim, NewsEvent, ThesisChange, ThesisVersion
 from app.schemas import ManualNewsResponse, NewsFeedItem, NewsIngestResponse
 from app.services.claim_intelligence_service import ClaimIntelligenceService
@@ -213,7 +214,11 @@ class NewsService:
         headline: str | None = None,
     ) -> bool:
         if url:
-            duplicate_url = db.scalar(select(NewsEvent.id).where(NewsEvent.url == url).limit(1))
+            duplicate_url = db.scalar(
+                select(NewsEvent.id)
+                .where(NewsEvent.url == url, *tenant_filters(db, NewsEvent))
+                .limit(1)
+            )
             if duplicate_url:
                 return True
         if not title_is_identity:
@@ -241,6 +246,7 @@ class NewsService:
             .where(
                 NewsEvent.company_id == (company.id if company else None),
                 NewsEvent.title.in_(candidates),
+                *tenant_filters(db, NewsEvent),
             )
             .limit(1)
         )
@@ -407,8 +413,22 @@ class NewsService:
             tracked = bool(
                 company
                 and (
-                    db.scalar(select(Position.id).where(Position.company_id == company.id).limit(1))
-                    or db.scalar(select(WatchItem.id).where(WatchItem.symbol == company.ticker).limit(1))
+                    db.scalar(
+                        select(Position.id)
+                        .where(
+                            Position.company_id == company.id,
+                            *tenant_filters(db, Position),
+                        )
+                        .limit(1)
+                    )
+                    or db.scalar(
+                        select(WatchItem.id)
+                        .where(
+                            WatchItem.symbol == company.ticker,
+                            *tenant_filters(db, WatchItem),
+                        )
+                        .limit(1)
+                    )
                 )
             )
             if source.lower() == "gdelt" and company:

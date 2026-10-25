@@ -13,6 +13,7 @@ from datetime import date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import CashBalance, Company, Position, Tenant
 
 KEY = "tax_declarant"
@@ -39,12 +40,16 @@ def partidas(db: Session) -> list[str]:
     """Claves de custodia de las posiciones y cuentas actuales (ISIN o ticker, cash:DIVISA)."""
     keys: set[str] = set()
     for isin, ticker in db.execute(
-        select(Company.isin, Company.ticker).join(Position, Position.company_id == Company.id)
+        select(Company.isin, Company.ticker)
+        .join(Position, Position.company_id == Company.id)
+        .where(*tenant_filters(db, Position))
     ):
         key = (isin or ticker or "").strip().upper()
         if key:
             keys.add(key)
-    for currency in db.scalars(select(CashBalance.currency)):
+    for currency in db.scalars(
+        select(CashBalance.currency).where(*tenant_filters(db, CashBalance))
+    ):
         if currency and currency.strip():
             keys.add(f"cash:{currency.strip().upper()}")
     return sorted(keys)

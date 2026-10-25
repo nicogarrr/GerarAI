@@ -22,6 +22,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, Document, FinancialFact
 from app.services.fact_chunk_service import sync_company_fact_chunks
 from app.services.fact_deletion import (
@@ -122,11 +123,12 @@ def refresh_from_yahoo(
     official_pairs = {
         (metric, fiscal_year)
         for metric, fiscal_year in db.execute(
-            select(FinancialFact.metric, FinancialFact.fiscal_year).where(
-                FinancialFact.company_id == company.id,
-                FinancialFact.source_type.in_(OFFICIAL_SOURCE_TYPES),
-                FinancialFact.fiscal_quarter == "FY",
-            )
+        select(FinancialFact.metric, FinancialFact.fiscal_year).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.source_type.in_(OFFICIAL_SOURCE_TYPES),
+            FinancialFact.fiscal_quarter == "FY",
+            *tenant_filters(db, FinancialFact),
+        )
         ).all()
     }
 

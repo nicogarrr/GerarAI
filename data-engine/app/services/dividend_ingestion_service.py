@@ -18,6 +18,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, DividendRecord, Position, WatchItem
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.split_ingestion_service import ProviderIngestionService
@@ -113,8 +114,20 @@ class DividendIngestionService(ProviderIngestionService):
 
         El rendimiento de cartera (portfolio_yields) sigue contando solo posiciones.
         """
-        held = set(db.scalars(select(Position.company_id).distinct()).all())
-        symbols = {x.upper() for x in db.scalars(select(WatchItem.symbol)).all() if x}
+        held = set(
+            db.scalars(
+                select(Position.company_id)
+                .where(*tenant_filters(db, Position))
+                .distinct()
+            ).all()
+        )
+        symbols = {
+            x.upper()
+            for x in db.scalars(
+                select(WatchItem.symbol).where(*tenant_filters(db, WatchItem))
+            ).all()
+            if x
+        }
         watched = set(db.scalars(select(Company.id).where(Company.ticker.in_(symbols))).all()) if symbols else set()
         ids = held | watched
         tickers = sorted(db.scalars(select(Company.ticker).where(Company.id.in_(ids))).all()) if ids else []

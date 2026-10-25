@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, Document, FinancialFact
 from app.services.financial_ingestion_service import SOURCE_PRIORITY, _is_bank_like
 from app.services.metric_calculation_service import METRIC_DEFINITIONS
@@ -205,6 +206,7 @@ class FinancialTerminalService:
                     .where(
                         FinancialFact.company_id == company.id,
                         FinancialFact.metric == "operating_cash_flow",
+                        *tenant_filters(db, FinancialFact),
                     )
                     .limit(1)
                 )
