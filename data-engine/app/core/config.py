@@ -442,10 +442,12 @@ class Settings(BaseSettings):
     # puede esperar una generacion larga; el primario compite con reasoning
     # reducido (opencode_go_chat_reasoning_effort).
     chat_total_timeout_seconds: float = Field(default=20.0, gt=0)
-    # APAGADO por defecto. Primario de chat por la suscripcion OpenCode Go de
-    # Nico (modelo `deepseek-v4.1-flash`, endpoint /zen/go/v1). No se activa
-    # hasta aclarar que las condiciones de uso de Go cubren este trafico. Con
-    # el interruptor apagado el chat sigue en la ruta gratuita verificada.
+    # APAGADO por defecto en codigo; se enciende por entorno tras auditoria y
+    # QA. Primario de chat por la suscripcion OpenCode Go de Nico (modelo
+    # `deepseek-v4.1-flash`, endpoint /zen/go/v1), con respaldo Groq/Gemini
+    # intacto. Nico ordeno usarlo (25-oct 17:27); el encaje con las condiciones
+    # de Go sigue SIN confirmar (incertidumbre, no prohibicion expresa). Con el
+    # interruptor apagado el chat sigue en la ruta gratuita verificada.
     # Env: CHAT_GO_SUBSCRIPTION_ENABLED.
     chat_go_subscription_enabled: bool = False
     chat_go_subscription_base_url: str = "https://opencode.ai/zen/go/v1"
