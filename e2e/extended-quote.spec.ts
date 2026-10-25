@@ -65,7 +65,7 @@ test('real authenticated proxy serves the gated E2E fixture without Yahoo', asyn
     await expect(header.getByText('336,56 US$', { exact: true })).toBeVisible();
     await expect(header.getByText('+2,34', { exact: false })).toBeVisible();
     await header.getByText('Más detalle', { exact: true }).click();
-    await expect(header.getByText('Fixture local · Sesión regular del 2026-09-09 · 17:00 (Madrid)', { exact: true })).toBeVisible();
+    await expect(header.getByText(/^Fixture local · Sesión regular del 9 sept\.? 2026 · 17:00 \(Madrid\)$/)).toBeVisible();
     await page.screenshot({ path: '/downloads/extended-quote-test-fixture.png', fullPage: true });
 });
 
