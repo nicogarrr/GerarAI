@@ -74,7 +74,7 @@ export default async function LetterReaderPage({ params, searchParams }: PagePro
                         Abrir el PDF original
                     </a>
                 ) : (
-                    <span className="text-xs text-gray-600">Sin PDF original</span>
+                    <span className="text-xs text-gray-500">Sin PDF original</span>
                 )}
             </header>
 

@@ -115,7 +115,7 @@ export default function AddTransactionButton({ userId }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="flex h-auto min-h-[44px] items-center gap-2 whitespace-normal bg-teal-600 py-1.5 text-center leading-tight hover:bg-teal-700 sm:h-9 sm:min-h-0 sm:whitespace-nowrap">
+        <Button className="flex h-auto min-h-[44px] items-center gap-2 whitespace-normal py-1.5 text-center leading-tight sm:h-9 sm:min-h-0 sm:whitespace-nowrap">
           <Plus className="h-4 w-4" />
           Añadir inversión
         </Button>
@@ -269,7 +269,6 @@ export default function AddTransactionButton({ userId }: Props) {
             <Button
               type="submit"
               disabled={loading}
-              className="bg-teal-600 hover:bg-teal-700"
             >
               {loading ? 'Guardando...' : 'Guardar Inversión'}
             </Button>

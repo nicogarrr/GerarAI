@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   createKnowledgeCollection,
   decideKnowledgePrinciple,
@@ -194,19 +195,15 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
     <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6 overflow-x-clip md:pr-20">
       <ExtractionRefresh active={activeJobs.length > 0} />
       <LibraryChat scope="library" />
-      <header className="flex flex-col gap-4 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase text-teal-300">Conocimiento de inversión</p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-100">{t('knowledge.library')}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
-            Libros, cartas y casos de estudio, con principios aprobados a mano y trazables.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+      <PageHeader
+        kicker="Conocimiento de inversión"
+        title={t('knowledge.library')}
+        description="Libros, cartas y casos de estudio, con principios aprobados a mano y trazables."
+        actions={<div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
           <Button asChild className="h-11 w-full sm:w-auto" variant="outline"><Link href="/search"><FileSearch aria-hidden="true" className="h-4 w-4" />Buscar en todo</Link></Button>
           <Button asChild className="h-11 w-full sm:w-auto" variant="outline"><Link href="/knowledge-graph"><Library aria-hidden="true" className="h-4 w-4" />Grafo de conocimiento</Link></Button>
-        </div>
-      </header>
+        </div>}
+      />
 
       {/*
         Antes eran stats, jobs, dos formularios, tabla, explorador y curación de
@@ -225,7 +222,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
           {(['biblioteca', 'principios', 'subir'] as TabKey[]).map((key) => (
             <TabsTrigger
               asChild
-              className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300"
+              className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap"
               key={key}
               value={key}
             >

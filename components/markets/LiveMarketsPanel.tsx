@@ -81,7 +81,7 @@ function QuoteRow({ spec, quote, fetchedAt }: { spec: LiveQuoteSpec; quote: Live
             </tr>
         );
     }
-    const changeClass = quote.changePercent === null ? 'text-gray-500' : quote.changePercent >= 0 ? 'text-teal-300' : 'text-red-400';
+    const changeClass = quote.changePercent === null ? 'text-gray-500' : quote.changePercent >= 0 ? 'text-good' : 'text-bad';
     const age = quoteAgeSeconds(fetchedAt, quote.timestamp);
     const session = sessionLabel(quote.session);
     return (

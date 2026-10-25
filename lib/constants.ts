@@ -124,7 +124,7 @@ export const NAV_SECTIONS: NavSection[] = [{
   title: '',
   items: [
     { href: '/inicio', label: 'Inicio', icon: Home },
-    { href: '/portfolio', label: 'Cartera', icon: Briefcase },
+    { href: '/portfolio', label: 'Resumen', icon: Briefcase },
     { href: '/research', label: 'Research', icon: FileSearch },
     { href: '/discover', label: 'Descubrir', icon: Filter },
     { href: '/watchlist', label: 'Watchlist', icon: Star },
@@ -150,7 +150,7 @@ export const ROUTE_CATALOG: NavSection[] = [
       { href: '/corporate-actions', label: 'Acciones corp.', icon: Building2, hub: '/portfolio' },
       { href: '/calendar', label: 'Calendario', icon: CalendarDays, hub: '/portfolio' },
       { href: '/portfolio/stress', label: 'Estrés histórico', icon: LineChart, hub: '/portfolio' },
-      { href: '/paper-trading', label: 'Cuenta demo manual', icon: FlaskConical, hub: '/portfolio' },
+      { href: '/paper-trading', label: 'Cuenta demo', icon: FlaskConical, hub: '/portfolio' },
     ],
   },
   {
@@ -177,14 +177,14 @@ export const ROUTE_CATALOG: NavSection[] = [
       },
       {
         href: '/mercados',
-        label: 'Cotizaciones',
+        label: 'Mercados',
         icon: LineChart,
         hub: '/discover',
         description: 'Índices, futuros, acciones, materias primas y divisas con la hora de cada cotización.',
       },
       {
         href: '/knowledge',
-        label: 'Conocimiento',
+        label: 'Biblioteca',
         icon: BookOpen,
         hub: '/knowledge',
         subnavHideSelf: true,
@@ -240,7 +240,7 @@ export const MOBILE_TAB_ITEMS: NavItem[] = [
   { href: '/inicio', label: 'Inicio', icon: Home },
   { href: '/discover', label: 'Descubrir', icon: Filter },
   { href: '/watchlist', label: 'Watchlist', icon: Star },
-  { href: '/portfolio', label: 'Cartera', icon: Briefcase },
+  { href: '/portfolio', label: 'Resumen', icon: Briefcase },
   { href: '/research', label: 'Research', icon: FileSearch },
 ];
 
@@ -261,6 +261,16 @@ export function isNavItemActive(pathname: string, href: string): boolean {
   if (NAV_SECTIONS[0].items.some((item) => item.href === href)) return family === href;
   if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/**
+ * Coincidencia EXACTA de la ruta. `isNavItemActive` mantiene encendido el hub
+ * cuando la pagina actual es una subruta; eso no convierte al hub en la pagina
+ * (`aria-current="page"`). El menu usa esta funcion para decidir entre `page`
+ * (destino exacto) y `true` (hub que contiene la pagina actual).
+ */
+export function isNavItemExact(pathname: string, href: string): boolean {
+  return pathname === href;
 }
 
 /**

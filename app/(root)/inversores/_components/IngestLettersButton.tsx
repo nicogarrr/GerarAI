@@ -31,7 +31,7 @@ export function IngestLettersButton() {
                 onClick={handleIngest}
                 disabled={loading || state === 'queued'}
                 aria-busy={loading}
-                className="gap-2 bg-teal-600 text-white hover:bg-teal-700"
+                className="gap-2"
             >
                 <BookOpen aria-hidden="true" className="h-4 w-4" />
                 {loading ? 'Encolando descarga...' : 'Descargar cartas gratuitas'}

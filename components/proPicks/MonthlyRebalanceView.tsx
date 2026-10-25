@@ -184,7 +184,7 @@ export default function MonthlyRebalanceView({
                         <Upload className="h-4 w-4" />
                         Cargar snapshot anterior
                     </Button>
-                    <Button onClick={downloadSnapshot} disabled={picksStatus !== 'ready'} className="h-11 gap-2 bg-teal-600 hover:bg-teal-700">
+                    <Button onClick={downloadSnapshot} disabled={picksStatus !== 'ready'} className="h-11 gap-2">
                         <ArrowDownToLine className="h-4 w-4" />
                         Descargar snapshot JSON
                     </Button>

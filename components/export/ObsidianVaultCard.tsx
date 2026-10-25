@@ -58,7 +58,7 @@ export default function ObsidianVaultCard() {
             <CardContent className="pt-4">
                 <a
                     aria-busy={downloading}
-                    className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 sm:min-h-0"
+                    className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 sm:min-h-0"
                     href="/api/obsidian/vault.zip"
                     onClick={(event) => {
                         event.preventDefault();

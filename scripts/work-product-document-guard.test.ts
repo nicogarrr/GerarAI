@@ -32,7 +32,7 @@ describe('el botón conserva su texto mientras genera', () => {
     it('la etiqueta es un nodo propio, siempre presente', () => {
         const source = readFileSync(COMPONENT, 'utf8');
         assert.match(source, /<span>\{loading \? 'Generando\.\.\.' : 'Generar documento'\}<\/span>/, 'la etiqueta no desaparece con el spinner');
-        assert.match(source, /bg-teal-600 text-white/, 'contraste explícito en todos los estados');
+        assert.doesNotMatch(source, /bg-teal-600/, 'sin override de primario: usa el Button por defecto');
     });
 });
 

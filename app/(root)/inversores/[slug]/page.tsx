@@ -102,7 +102,7 @@ export default async function InvestorPage({
           </h1>
           <p className="text-base text-gray-500">{investor.firm}</p>
           {photo ? (
-            <p className="mt-1 text-xs text-gray-600">
+            <p className="mt-1 text-xs text-gray-500">
               Foto: {photo.author},{" "}
               <a
                 className="hover:underline"

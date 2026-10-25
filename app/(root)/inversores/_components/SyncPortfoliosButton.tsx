@@ -55,7 +55,7 @@ export function SyncPortfoliosButton({
                 onClick={handleSync}
                 disabled={loading || state === 'queued'}
                 aria-busy={loading}
-                className="gap-2 bg-teal-600 text-white hover:bg-teal-700"
+                className="gap-2"
             >
                 <RefreshCw aria-hidden="true" className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 {loading ? 'Encolando sincronización...' : label}

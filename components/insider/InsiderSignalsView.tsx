@@ -144,7 +144,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                     ariaLabel={t('insider.searchPlaceholder')}
                     className="h-11 w-full bg-gray-900"
                 />
-                <Button type="submit" className="h-11 shrink-0 gap-2 bg-teal-600 hover:bg-teal-700">
+                <Button type="submit" className="h-11 shrink-0 gap-2">
                     <Search aria-hidden="true" className="h-4 w-4" />
                     Buscar
                 </Button>

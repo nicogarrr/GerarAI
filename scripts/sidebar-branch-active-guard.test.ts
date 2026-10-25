@@ -22,7 +22,10 @@ test('F283: el estado rama es texto claro sin fondo ni barra', () => {
     }
 });
 
-test('F283: aria-current sigue solo en el destino exacto', () => {
-    assert.match(sidebar, /aria-current=\{active \? 'page' : undefined\}/);
-    assert.match(navItems, /aria-current=\{active \? 'page' : undefined\}/);
+test('F283: aria-current solo es «page» en el destino exacto; el hub es «true»', () => {
+    for (const src of [sidebar, navItems]) {
+        assert.match(src, /isNavItemExact/, 'el menu distingue coincidencia exacta de hub');
+        assert.match(src, /ariaCurrent\(active, isNavItemExact\(pathname, item\.href\)\)/, 'el item usa page/true');
+    }
+    assert.match(sidebar, /return exact \? 'page' : 'true'/, 'el hub activo no se publica como pagina');
 });

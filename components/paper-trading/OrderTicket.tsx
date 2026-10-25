@@ -248,7 +248,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                         onSelect={onSelectInstrument}
                         placeholder={kind === 'accion' ? 'p. ej. ASTS' : 'p. ej. AAPL'}
                         ariaLabel={kind === 'accion' ? 'Buscar acción por nombre o ticker' : 'Buscar subyacente por nombre o ticker'}
-                        className="h-10 w-full bg-gray-800/50 uppercase placeholder:text-gray-600"
+                        className="h-10 w-full bg-gray-800/50 uppercase placeholder:text-gray-500"
                         dropdownSide="bottom"
                         required
                     />
@@ -257,7 +257,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-name`}>Nombre</Label>
                     <Input
-                        className="placeholder:text-gray-600"
+                        className="placeholder:text-gray-500"
                         id={`${uid}-name`}
                         value={name}
                         onChange={(event) => setName(event.target.value)}
@@ -290,7 +290,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     <div className="space-y-1.5">
                         <Label htmlFor={`${uid}-strike`}>Strike</Label>
                         <Input
-                        className="placeholder:text-gray-600"
+                        className="placeholder:text-gray-500"
                             id={`${uid}-strike`}
                             value={strike}
                             onChange={(event) => setStrike(event.target.value)}
@@ -302,7 +302,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     <div className="space-y-1.5">
                         <Label htmlFor={`${uid}-expiry`}>Vencimiento</Label>
                         <Input
-                            className="w-full min-w-0 max-w-full px-3 text-sm placeholder:text-gray-600"
+                            className="w-full min-w-0 max-w-full px-3 text-sm placeholder:text-gray-500"
                             id={`${uid}-expiry`}
                             type="date"
                             value={expiry}
@@ -339,7 +339,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     <Label htmlFor={`${uid}-quantity`}>Cantidad</Label>
                     <div className="relative">
                         <Input
-                            className="pr-20 placeholder:text-gray-600"
+                            className="pr-20 placeholder:text-gray-500"
                             id={`${uid}-quantity`}
                             aria-describedby={`${uid}-quantity-unit`}
                             value={quantity}
@@ -354,7 +354,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-price`}>{kind === 'opcion' ? 'Prima por acción' : 'Precio por acción'}</Label>
                     <Input
-                        className="placeholder:text-gray-600"
+                        className="placeholder:text-gray-500"
                         id={`${uid}-price`}
                         value={price}
                         onChange={(event) => setPrice(event.target.value)}

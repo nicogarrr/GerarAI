@@ -2,7 +2,7 @@
 
 import IntentLink from '@/components/layout/IntentLink'
 import {usePathname} from 'next/navigation'
-import {isNavItemActive, NAV_SECTIONS, showsNavSectionTitle, type NavItem} from '@/lib/constants'
+import {isNavItemActive, isNavItemExact, NAV_SECTIONS, showsNavSectionTitle, type NavItem} from '@/lib/constants'
 
 /**
  * Version movil del menu. Comparte arbol, reglas de estado activo y titulos con
@@ -34,6 +34,11 @@ const NavItems = () => {
     )
 }
 
+function ariaCurrent(active: boolean, exact: boolean): 'page' | 'true' | undefined {
+    if (!active) return undefined
+    return exact ? 'page' : 'true'
+}
+
 function ItemLink({item, pathname}: {item: NavItem; pathname: string}) {
     const active = isNavItemActive(pathname, item.href)
     const branchActive = active || (item.children ?? []).some((child) => isNavItemActive(pathname, child.href))
@@ -42,7 +47,7 @@ function ItemLink({item, pathname}: {item: NavItem; pathname: string}) {
         <>
             <IntentLink
                 href={item.href}
-                aria-current={active ? 'page' : undefined}
+                aria-current={ariaCurrent(active, isNavItemExact(pathname, item.href))}
                 className={classes(active, 'text-base', branchActive)}
             >
                 {item.icon && <item.icon aria-hidden="true" className="h-4 w-4 shrink-0" />}
@@ -50,17 +55,20 @@ function ItemLink({item, pathname}: {item: NavItem; pathname: string}) {
             </IntentLink>
             {item.children && (
                 <ul className="mt-1 flex flex-col gap-1 border-l border-gray-700/50 pl-3">
-                    {item.children.map((child) => (
-                        <li className="shrink-0" key={child.href}>
-                            <IntentLink
-                                href={child.href}
-                                aria-current={isNavItemActive(pathname, child.href) ? 'page' : undefined}
-                                className={classes(isNavItemActive(pathname, child.href), 'text-base')}
-                            >
-                                <span className="truncate">{child.label}</span>
-                            </IntentLink>
-                        </li>
-                    ))}
+                    {item.children.map((child) => {
+                        const childActive = isNavItemActive(pathname, child.href)
+                        return (
+                            <li className="shrink-0" key={child.href}>
+                                <IntentLink
+                                    href={child.href}
+                                    aria-current={ariaCurrent(childActive, isNavItemExact(pathname, child.href))}
+                                    className={classes(childActive, 'text-base')}
+                                >
+                                    <span className="truncate">{child.label}</span>
+                                </IntentLink>
+                            </li>
+                        )
+                    })}
                 </ul>
             )}
         </>

@@ -177,7 +177,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                         onClick={handleRefresh}
                         disabled={loading}
                         aria-busy={loading}
-                        className="h-11 w-full gap-2 bg-teal-600 text-white hover:bg-teal-700"
+                        className="h-11 w-full gap-2"
                     >
                         {loading ? (
                             <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
@@ -185,7 +185,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                             <RefreshCw aria-hidden="true" className="h-4 w-4" />
                         )}
                         {/* QA: el botón debe anunciar el estado por sí mismo
-                            (texto blanco legible y etiqueta que cambia). */}
+                            (primario legible y etiqueta que cambia). */}
                         <span>{loading ? 'Actualizando selección...' : 'Actualizar selección'}</span>
                     </Button>
                     <p aria-live="polite" role="status" className="mt-3 text-xs text-gray-400">
@@ -245,7 +245,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                             onClick={handleRefresh}
                             disabled={loading}
                             aria-busy={loading}
-                            className="mt-4 h-11 w-full gap-2 bg-teal-600 hover:bg-teal-700 sm:w-auto"
+                            className="mt-4 h-11 w-full gap-2 sm:w-auto"
                         >
                             {loading ? (
                                 <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
@@ -275,7 +275,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                             onClick={lastGenerated && passedCount !== 0 ? handleRefresh : handleGenerateRun}
                             disabled={loading}
                             aria-busy={loading}
-                            className="mt-4 h-11 w-full gap-2 bg-teal-600 text-white hover:bg-teal-700 sm:w-auto"
+                            className="mt-4 h-11 w-full gap-2 sm:w-auto"
                         >
                             {loading ? (
                                 <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />

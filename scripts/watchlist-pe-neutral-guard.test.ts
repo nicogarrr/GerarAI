@@ -26,6 +26,6 @@ describe('watchlist PER neutral guard (F144)', () => {
   });
 
   it('el cambio de sesión sí conserva su color (signo real, no juicio)', () => {
-    assert.match(page, /changePercent >= 0 \? 'text-green-400' : 'text-red-400'/, 'el color por signo no se toca');
+    assert.match(page, /changePercent >= 0 \? 'text-good' : 'text-bad'/, 'el color por signo usa el par semantico good/bad');
   });
 });

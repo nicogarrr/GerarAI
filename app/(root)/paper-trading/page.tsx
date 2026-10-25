@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { revalidatePath } from 'next/cache';
 
 import { ManualDemoPanel } from '@/components/paper-trading/ManualDemoPanel';
+import { PageHeader } from '@/components/ui/page-header';
 import {
     convertManualDemoCurrency,
     getManualDemoAccount,
@@ -225,10 +226,10 @@ export default async function PaperTradingPage() {
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto w-full max-w-3xl px-4 py-6">
-            <h1 className="text-2xl font-semibold break-words text-gray-100">Cuenta demo</h1>
-            <p className="mt-1 text-sm text-gray-400">
-                Práctica con dinero ficticio: 100.000 € iniciales, operaciones manuales y contabilidad FIFO.
-            </p>
+            <PageHeader
+                title="Cuenta demo"
+                description="Práctica con dinero ficticio: 100.000 € iniciales, operaciones manuales y contabilidad FIFO."
+            />
             {loadError ? (
                 <p role="alert" className="mt-4 rounded-lg border border-amber-900/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
                     No se pudo cargar la cuenta demo: {loadError}
