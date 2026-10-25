@@ -248,9 +248,16 @@ async def ask_library(db: Session, question: str, *, scope: str = "letters",
             return result
         answers = []
         dropped = 0
+        reasons: dict[str, int] = {}
+
+        def drop(reason: str) -> None:
+            nonlocal dropped
+            dropped += 1
+            reasons[reason] = reasons.get(reason, 0) + 1
+
         for item in payload.get("answers", [])[:6]:
             if not isinstance(item, dict):
-                dropped += 1
+                drop("item_no_objeto")
                 continue
             # Los modelos devuelven a menudo chunk_id como cadena ("3" en vez
             # de 3): se acepta el entero literal, nunca un redondeo ni un float.
@@ -258,20 +265,26 @@ async def ask_library(db: Session, question: str, *, scope: str = "letters",
             if isinstance(raw_id, str) and raw_id.isdecimal():
                 raw_id = int(raw_id)
             if type(raw_id) is not int:
-                dropped += 1
+                drop("chunk_id_invalido")
                 continue
             source = sources.get(raw_id)
             text = item.get("text")
-            if not source or not isinstance(text, str):
-                dropped += 1
+            if not source:
+                drop("chunk_id_no_enviado")
+                continue
+            if not isinstance(text, str):
+                drop("texto_no_cadena")
                 continue
             quote = knowledge_analysis.clean_quote(item.get("quote"), source["text"])
-            if quote is None or not 1 <= len(text) <= 1400:
-                dropped += 1
+            if quote is None:
+                drop("cita_no_literal_o_longitud")
+                continue
+            if not 1 <= len(text) <= 1400:
+                drop("texto_longitud")
                 continue
             # Cifras nuevas se rechazan en vez de presentarlas como verificadas.
             if not set(re.findall(r"\d+(?:[.,]\d+)*", text)) <= set(re.findall(r"\d+(?:[.,]\d+)*", quote)):
-                dropped += 1
+                drop("cifras_fuera_de_la_cita")
                 continue
             answers.append({"text": text, "citation": {**source["citation"], "quote": quote}})
         if answers:
@@ -279,7 +292,7 @@ async def ask_library(db: Session, question: str, *, scope: str = "letters",
         elif payload.get("answers"):
             # El modelo respondio pero nada supero la verificacion de citas:
             # se dice, distinto de un fallo del proveedor o de cuota.
-            logger.warning("Knowledge chat: %s respuestas descartadas en verificacion", dropped)
+            logger.warning("Knowledge chat: %s respuestas descartadas en verificacion motivos=%s", dropped, reasons)
             result["message"] = (
                 "Fragmentos encontrados. El modelo respondio pero sus respuestas "
                 "no superaron la verificacion de citas. Los fragmentos citados "
