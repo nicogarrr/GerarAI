@@ -71,6 +71,10 @@ test.describe("ficha: panel de calidad financiera", () => {
     const a = await titulo.boundingBox();
     const b = await accion.boundingBox();
     expect(a && b).toBeTruthy();
+    // Evidencia visual (artefacto de CI) y numeros reales de las cajas.
+    console.log(`MOAT 390px titulo=${JSON.stringify(a)} enlace=${JSON.stringify(b)}`);
+    await page.screenshot({ path: "test-results/ficha-moat-390.png", fullPage: false });
+    await panel.screenshot({ path: "test-results/ficha-moat-panel-390.png" });
     const solapan =
       a!.x < b!.x + b!.width && b!.x < a!.x + a!.width && a!.y < b!.y + b!.height && b!.y < a!.y + a!.height;
     expect(solapan, `titulo ${JSON.stringify(a)} vs accion ${JSON.stringify(b)}`).toBe(false);
@@ -86,6 +90,7 @@ test.describe("ficha: panel de calidad financiera", () => {
     await expect(panel).toHaveCount(1);
     await expect(panel.getByRole("link", { name: "Ver la evaluación del foso" })).toHaveCount(0);
     await expect(page.getByText("Sin evaluación de calidad generada todavía")).toBeAttached();
+    await panel.screenshot({ path: "test-results/ficha-nomoat-panel-390.png" });
   });
 });
 
