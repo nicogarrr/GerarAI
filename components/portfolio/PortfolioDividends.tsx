@@ -134,7 +134,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
         <div className="space-y-6">
             {userId ? <div className="flex justify-end"><SyncDividendsButton userId={userId} /></div> : null}
             {/* Sin badge INFERIDO/INGESTADO: lo inferido no se etiqueta (decisión de producto);
-                la procedencia se explica en «Método y condiciones». */}
+                la procedencia se explica en «Hipótesis y fuentes» y en el aviso junto al bruto. */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                 <span>
                     Proyección a {projection.horizon_months} meses · datos al {formatDate(projection.as_of)}
@@ -150,7 +150,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                             {' '}(de ellos {formatMoney(projection.gross_summary.gross_unverified_base, baseCurrency)} con retención en origen no verificada)
                         </span>
                     ) : null}
-                    . Neto e IRPF: N/D salvo posiciones con retención verificada.
+                    . INFERIDO: réplica de los dividendos de los últimos 12 meses, no pagos confirmados. Neto e IRPF: N/D salvo posiciones con retención verificada.
                     {projection.coverage.fx_missing.length > 0 ? (
                         <span className="text-amber-400/90">
                             {' '}No incluye: {projection.coverage.fx_missing.length} {projection.coverage.fx_missing.length === 1 ? 'posición' : 'posiciones'} sin tipo de cambio ({projection.coverage.fx_missing.join(', ')}).
@@ -281,6 +281,12 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                                                 {position.domicile_country ? (
                                                     <span className="ml-1 text-xs text-gray-500">({position.domicile_country})</span>
                                                 ) : null}
+                                                {position.source_withholding_rate !== null && position.withholding_kind === 'techo_convenio' ? (
+                                                    <span className="block text-xs text-gray-500">techo de convenio (escenario); la retención efectiva puede ser mayor</span>
+                                                ) : null}
+                                                {position.source_withholding_rate === null && position.unverified_reason ? (
+                                                    <span className="block max-w-xs text-xs text-amber-300/80">{position.unverified_reason}</span>
+                                                ) : null}
                                             </td>
                                             <td className="py-2">{formatMoney(position.source_withheld_base, baseCurrency)}</td>
                                         </tr>
@@ -303,6 +309,15 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                         {coverageLists.map((entry) => (
                             <li key={entry.label}>
                                 {entry.label}: <TickerList tickers={entry.tickers} className="font-medium text-amber-300 underline-offset-2 hover:text-amber-200 hover:underline" />
+                                {entry.label === 'Retención de origen sin verificar' && projection.coverage.unverified_reasons ? (
+                                    <ul className="ml-4 mt-1 list-disc space-y-0.5 text-xs text-amber-100/70">
+                                        {entry.tickers.map((ticker) => (
+                                            <li key={ticker}>
+                                                {ticker}: {projection.coverage.unverified_reasons?.[ticker] ?? 'retención no verificada'}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : null}
                             </li>
                         ))}
                     </ul>
@@ -310,7 +325,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
             ) : null}
 
             <details className="rounded-lg border border-gray-800 p-3 text-xs text-gray-500">
-                <summary className="cursor-pointer select-none text-gray-400">Método y condiciones</summary>
+                <summary className="cursor-pointer select-none text-gray-400">Hipótesis y fuentes</summary>
                 <p className="mt-2 leading-5">{projection.method}</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5 leading-5">
                     {projection.fiscal_conditions.map((condition) => (
