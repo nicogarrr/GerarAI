@@ -396,3 +396,46 @@ def test_status_reports_backend_additively(index, monkeypatch):
     assert status["collections"] == ["portfolio_research_documents"]
     assert status["embedding_backend"] == "fastembed"
     assert status["hybrid_enabled"] is False
+
+
+class _IndexClient:
+    def __init__(self, schema, exists=True, fail=False):
+        self.schema = schema
+        self.exists = exists
+        self.fail = fail
+        self.created = []
+        self.indexes = []
+
+    def get_collections(self):
+        return SimpleNamespace(collections=[SimpleNamespace(name="portfolio_research_documents")] if self.exists else [])
+
+    def create_collection(self, *args, **kwargs):
+        self.created.append(args)
+
+    def get_collection(self, name):
+        if self.fail:
+            raise RuntimeError("down")
+        return SimpleNamespace(payload_schema={k: object() for k in self.schema})
+
+    def create_payload_index(self, collection, field_name, field_schema, wait=True):
+        self.indexes.append((field_name, str(getattr(field_schema, "value", field_schema))))
+
+
+def test_payload_indexes_created_only_for_missing_fields():
+    from app.services.rag import RAGIndex
+
+    client = _IndexClient(schema=["ticker"])
+    RAGIndex()._ensure_collection(client)
+    assert sorted(client.indexes) == [("entity_type", "keyword"), ("tenant_id", "integer")]
+    again = _IndexClient(schema=["ticker", "tenant_id", "entity_type"])
+    RAGIndex()._ensure_collection(again)
+    assert again.indexes == []
+
+
+def test_payload_indexes_created_for_a_new_collection_and_failure_does_not_break():
+    from app.services.rag import RAGIndex
+
+    fresh = _IndexClient(schema=[], exists=False)
+    RAGIndex()._ensure_collection(fresh)
+    assert fresh.created and len(fresh.indexes) == 3
+    RAGIndex()._ensure_collection(_IndexClient(schema=[], fail=True))  # no raise

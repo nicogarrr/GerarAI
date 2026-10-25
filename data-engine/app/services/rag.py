@@ -123,7 +123,9 @@ class RAGIndex:
                 vectors_config=VectorParams(size=self._dims(), distance=Distance.COSINE),
                 **kwargs,
             )
+            self._ensure_payload_indexes(client, collection)
             return
+        self._ensure_payload_indexes(client, collection)
         if self._hybrid_wanted(None):
             from app.services import hybrid_retrieval as _hybrid
 
@@ -133,6 +135,28 @@ class RAGIndex:
             )
             if not _hybrid.collection_has_sparse(client, collection, sparse_name):
                 _hybrid.ensure_sparse_vector(client, collection, sparse_name)
+
+    _PAYLOAD_INDEXES = (("tenant_id", "integer"), ("ticker", "keyword"), ("entity_type", "keyword"))
+
+    def _ensure_payload_indexes(self, client: QdrantClient, collection: str) -> None:
+        """Indices de payload de los campos que filtra la busqueda.
+
+        Sin ellos cada busqueda filtrada recorre los payloads: medido 25-oct en
+        prod (176k puntos) 5-30 s por consulta y el cliente cortaba a ~5 s;
+        con indices 0,01 s. Idempotente (solo crea los que faltan) y nunca
+        rompe la busqueda: ante fallo registra y sigue.
+        """
+        try:
+            from qdrant_client.models import PayloadSchemaType
+
+            existing = set((client.get_collection(collection).payload_schema or {}).keys())
+            for field, kind in self._PAYLOAD_INDEXES:
+                if field not in existing:
+                    client.create_payload_index(
+                        collection, field_name=field, field_schema=PayloadSchemaType(kind), wait=True
+                    )
+        except Exception as exc:
+            logger.warning("RAG payload index check failed: %s", type(exc).__name__)
 
     def ingest_document(self, db, document) -> dict:
         import uuid
