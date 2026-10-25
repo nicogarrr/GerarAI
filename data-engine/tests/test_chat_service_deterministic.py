@@ -185,7 +185,7 @@ def test_library_doctrine_kept_for_doctrine_questions(db, monkeypatch):
 
     calls = []
 
-    def fake_retrieve(db_, q, limit=3):
+    def fake_retrieve(db_, q, limit=3, vector=None):
         calls.append(q)
         return []
 
