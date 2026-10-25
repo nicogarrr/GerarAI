@@ -235,3 +235,27 @@ def test_respuestas_descartadas_en_verificacion_se_distinguen(monkeypatch):
     result = asyncio.run(ask_library(db, "repurchases", author="Buffett", provider=provider))
     assert result["status"] == "fragmentos"
     assert "no superaron la verificacion de citas" in result["message"]
+
+
+def test_motivos_de_descarte_se_registran_sin_texto_ni_citas(monkeypatch, caplog):
+    import logging
+
+    monkeypatch.setenv("CAVAAI_ENABLE_VECTOR_SEARCH", "0")
+    db = setup_library()
+    secret = "SECRETO-NO-DEBE-SALIR"
+    provider = Provider({"answers": [
+        "no es objeto",
+        {"text": secret, "chunk_id": "x", "quote": secret},
+        {"text": secret, "chunk_id": 99999, "quote": secret},
+        {"text": secret, "chunk_id": 1, "quote": secret + " no esta en el chunk de origen"},
+        {"text": "Compra 777 acciones", "chunk_id": 1,
+         "quote": "Repurchases can add value at sensible prices."},
+    ]})
+    with caplog.at_level(logging.WARNING):
+        result = asyncio.run(ask_library(db, "repurchases", author="Buffett", provider=provider))
+    assert "no superaron la verificacion de citas" in result["message"]
+    line = next(r.getMessage() for r in caplog.records if "descartadas" in r.getMessage())
+    for reason in ("item_no_objeto", "chunk_id_invalido", "chunk_id_no_enviado",
+                   "cita_no_literal_o_longitud", "cifras_fuera_de_la_cita"):
+        assert reason in line
+    assert secret not in line and "777" not in line
