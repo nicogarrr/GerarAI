@@ -1,4 +1,5 @@
 import re
+import shutil
 from io import BytesIO
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
@@ -108,6 +109,74 @@ class DocumentStore:
             content_type=content_type,
         )
         return f"minio://{bucket}/{object_name}"
+
+    def delete(self, storage_uri: str | None) -> bool:
+        """Borra el original apuntado por ``storage_uri`` (idempotente).
+
+        Acepta las dos formas que produce esta clase: ``minio://bucket/key``
+        y una ruta local absoluta dentro de ``storage/raw``. Un objeto que ya
+        no existe devuelve ``False`` sin error; una URI fuera del almacen es
+        un error de seguridad, nunca un borrado silencioso de otro fichero.
+        """
+        if not storage_uri:
+            return False
+        if storage_uri.startswith("minio://"):
+            bucket, _, object_name = storage_uri[len("minio://"):].partition("/")
+            if not bucket or not object_name:
+                raise ValueError("Unsafe document storage URI")
+            client = self._client()
+            if not client.bucket_exists(bucket):
+                return False
+            client.remove_object(bucket, object_name)
+            return True
+
+        root = self.local_root.resolve()
+        path = Path(storage_uri).resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            raise ValueError("Unsafe local document storage path") from None
+        if not path.is_file():
+            return False
+        path.unlink()
+        return True
+
+    def delete_tenant_prefix(self, tenant_id: int) -> int:
+        """Borra todos los originales de un tenant antes de eliminar sus filas.
+
+        MinIO/Garage se limpia por prefijo ``tenant-<id>/``; el backend local
+        borra el directorio equivalente dentro de ``storage/raw``. Es
+        idempotente: un tenant ya limpio devuelve 0. Cualquier fallo del
+        almacen se propaga para que el borrado de cuenta no publique exito
+        dejando objetos huerfanos.
+        """
+        prefix = f"tenant-{int(tenant_id)}"
+        if (
+            self.settings.app_env == "test"
+            or self.settings.document_storage_backend == "local"
+        ):
+            root = self.local_root.resolve()
+            target = (self.local_root / prefix).resolve()
+            try:
+                target.relative_to(root)
+            except ValueError:
+                raise ValueError("Unsafe local document storage path") from None
+            if target.is_symlink():
+                raise ValueError("Unsafe local document storage path")
+            if not target.is_dir():
+                return 0
+            shutil.rmtree(target)
+            return 1
+
+        bucket = self.settings.minio_bucket
+        client = self._client()
+        if not client.bucket_exists(bucket):
+            return 0
+        removed = 0
+        for item in client.list_objects(bucket, prefix=f"{prefix}/", recursive=True):
+            client.remove_object(bucket, item.object_name)
+            removed += 1
+        return removed
 
     def _directory(
         self, ticker: str, category: str, tenant_id: int | None

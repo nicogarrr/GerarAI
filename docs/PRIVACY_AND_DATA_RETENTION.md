@@ -12,10 +12,34 @@ GerarAI treats uploaded filings, earnings material, research notes, portfolio da
 
 ## Retention and deletion
 
-The default retention period for financial documents is 2,555 days (seven years), configurable through `FINANCIAL_DOCUMENT_RETENTION_DAYS`. A tenant may delete a document earlier; deletion must remove the original object, chunks, vector entries and pending extraction candidates. Canonical facts already used in a thesis must retain a tombstoned source reference so historical decisions remain auditable.
+The default retention period for financial documents is 2,555 days (seven years), configurable through `FINANCIAL_DOCUMENT_RETENTION_DAYS`. A tenant may delete a document earlier; deletion removes the original object, chunks and vector entries. `KnowledgeLibraryService.delete_document` also deletes the MinIO/Garage original and clears Qdrant points even when `CAVAAI_ENABLE_VECTOR_INGEST` is off in the current process.
 
-Tenant deletion is a controlled operation: export on request, revoke access immediately, then remove relational data, object storage and vector data after the configured recovery window. Backups expire under the same retention schedule and are encrypted and access-controlled outside the application runtime.
+### Automated purge (opt-in)
+
+`app/services/retention_service.py` implements an idempotent purge:
+
+- financial documents older than `FINANCIAL_DOCUMENT_RETENTION_DAYS`: deletes the object and vectors, deletes `document_chunks`, and keeps the `documents` row as a tombstone. `storage_uri` becomes `NULL`; title, checksum, publication date and `metadata.retention_tombstone` remain so historical facts, claims and theses stay auditable. `financial_facts.source_id` is not deleted.
+- `chat_telemetry_events` older than `CHAT_TELEMETRY_RETENTION_DAYS` (default 90): the raw question row is deleted.
+- access requests do not live in Postgres. The Mongo model has a TTL index on `createdAt` controlled by `ACCESS_REQUEST_RETENTION_DAYS` (default 365); Mongo expires the whole request, including email, name, note and hashed IP.
+
+The scheduler registers `privacy_retention` only when `RETENTION_JOB_ENABLED=true`. `RETENTION_DRY_RUN=true` is the default even after enabling the job: it reports candidates in logs and metrics without changing data. Set `RETENTION_DRY_RUN=false` deliberately after reviewing a dry-run. `RETENTION_BATCH_LIMIT` caps documents per tenant per run. External cleanup failures leave the document untouched (object URI and chunks preserved) so the next run can retry instead of publishing a partial deletion.
+
+### Account self-service
+
+`GET /api/privacy/export` returns a tenant-scoped JSON export (profile, portfolio, theses, claims/evidence, watchlist, alerts, knowledge metadata, plan, tax and journal). It omits storage URIs, token hashes, chat IDs and raw chunks; it never queries another tenant.
+
+`DELETE /api/privacy/account` requires the signed principal plus the literal confirmation phrase. The Next.js server action first validates the typed email against the session and reauthenticates the password, then calls the backend. The backend deletes externals first (MinIO/Garage prefix and Qdrant tenant points), then runs one PostgreSQL transaction over every tenant-owned table plus `tenants`, and finally writes a `privacy_audit_events` row that survives the tenant. Better Auth deletes the Mongo `user`, `sessions` and `accounts` only after the backend returns success; all sessions are revoked. A retry is safe. If external cleanup fails, the endpoint returns 502 and does not claim success.
+
+Tenant deletion is irreversible and immediate (there is no recovery window in the application). Backups are outside the application runtime and must expire under an operator-defined schedule that is encrypted and access-controlled.
 
 ## Public deployment requirements
 
-Before onboarding external users, the operator must publish the controller identity and contact channel, lawful basis, subprocessors and regions, user rights process, breach-response channel, deletion recovery window and the exact LLM-provider data controls for the deployed configuration. This operational policy is not a substitute for jurisdiction-specific legal review.
+Before onboarding external users, the operator must publish the controller identity and contact channel, lawful basis, subprocessors and regions, user rights process, breach-response channel, deletion recovery window and the exact LLM-provider data controls for the deployed configuration. This operational policy is not a substitute for jurisdiction-specific legal review. `/privacidad` and `/terminos` contain explicit `[PENDIENTE]` fields for those decisions.
+
+## Password reset and SMTP
+
+`emailAndPassword.sendResetPassword` is registered only when `SMTP_USER` and `SMTP_PASS` are present. Without SMTP, `/forgot-password` states that no email will be sent and `/security` offers the authenticated password change instead. Reset links revoke every existing session (`revokeSessionsOnPasswordReset`). Password changes require the current password and revoke the other sessions.
+
+`privacy_audit_events` is global (not tenant-owned) and intentionally minimal: event type, external tenant id, signed user id and aggregate counts. It is written for export and deletion so an operator can prove the operation after the tenant rows are gone.
+
+Account deletion clears both Qdrant collections used by the engine (`portfolio_research_documents` / configured `RAG_COLLECTION` and the knowledge RAG collection) before touching PostgreSQL. If either object storage or Qdrant cannot be reached, the backend returns 502 and does not delete rows.

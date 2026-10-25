@@ -8,6 +8,7 @@ import AuthPitch from '@/components/forms/AuthPitch';
 import {signInWithEmail, verifyTwoFactorTotp} from "@/lib/actions/auth.actions";
 import {toast} from "sonner";
 import {useRouter} from "next/navigation";
+import Link from "next/link";
 import React, {useState} from "react";
 
 const SignIn = () => {
@@ -157,6 +158,15 @@ const SignIn = () => {
                     error={errors.password}
                     validation={{ required: 'La contraseña es obligatoria', minLength: { value: 8, message: 'La contraseña debe tener al menos 8 caracteres' } }}
                 />
+
+                <div className="text-right">
+                    <Link
+                        className="text-sm text-gray-400 underline-offset-4 transition-colors hover:text-teal-300 hover:underline"
+                        href="/forgot-password"
+                    >
+                        ¿Has olvidado tu contraseña?
+                    </Link>
+                </div>
 
                 <Button type="submit" disabled={isSubmitting} className="brand-btn w-full mt-5">
                     {isSubmitting ? 'Iniciando sesión…' : 'Iniciar sesión'}

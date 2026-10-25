@@ -44,6 +44,6 @@ export const config = {
     // que deja fuera la landing (`/`): sin él `.*` casa también la cadena
     // vacía y la portada quedaría protegida.
     matcher: [
-        '/((?!$|api|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|robots.txt|sitemap.xml|assets|investors|landing|sign-in|sign-up|metodologia|help).*)',
+        '/((?!$|api|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|robots.txt|sitemap.xml|assets|investors|landing|sign-in|sign-up|forgot-password|reset-password|metodologia|help|privacidad|terminos).*)',
     ],
 };
