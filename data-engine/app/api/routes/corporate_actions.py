@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
+from app.core.tenancy import tenant_filters
 from app.models import Company, CorporateAction, DividendRecord, Position
 from app.services.async_bridge import run_from_any_context
 from app.services.corporate_actions_service import CorporateActionService
@@ -65,8 +66,12 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
         .where(
             DividendRecord.ex_date >= since,
             DividendRecord.company_id.in_(
-                select(Position.company_id).where(Position.quantity > 0)
+                select(Position.company_id).where(
+                    Position.quantity > 0,
+                    *tenant_filters(db, Position),
+                )
             ),
+            *tenant_filters(db, DividendRecord),
         )
         .order_by(DividendRecord.ex_date.desc(), Company.ticker)
     ).all()
@@ -123,9 +128,16 @@ def sync_status(db: Session = Depends(get_db)) -> dict:
     sincronización que no trajo filas nuevas no deja huella, así que no se
     presenta como "última comprobación".
     """
-    dividends = db.scalar(select(func.max(DividendRecord.fetched_at)))
+    dividends = db.scalar(
+        select(func.max(DividendRecord.fetched_at)).where(
+            *tenant_filters(db, DividendRecord)
+        )
+    )
     splits = db.scalar(
-        select(func.max(CorporateAction.fetched_at)).where(CorporateAction.fetched_at.is_not(None))
+        select(func.max(CorporateAction.fetched_at)).where(
+            CorporateAction.fetched_at.is_not(None),
+            *tenant_filters(db, CorporateAction),
+        )
     )
     return {
         "dividends_last_import": dividends.isoformat() if dividends else None,

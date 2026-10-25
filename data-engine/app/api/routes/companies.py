@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.core.errors import safe_detail
+from app.core.tenancy import tenant_filters
 from app.models import (
     CalculatedMetric,
     Company,
@@ -211,7 +212,13 @@ def thesis_tickers(db: Session = Depends(get_db)) -> ThesisTickersOut:
     """
     rows = db.scalars(
         select(Company.ticker)
-        .where(Company.id.in_(select(ThesisVersion.company_id).distinct()))
+        .where(
+            Company.id.in_(
+                select(ThesisVersion.company_id)
+                .where(*tenant_filters(db, ThesisVersion))
+                .distinct()
+            )
+        )
         .order_by(Company.ticker)
     ).all()
     return ThesisTickersOut(tickers=list(rows))

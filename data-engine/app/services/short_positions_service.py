@@ -8,6 +8,7 @@ import httpx
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, ConnectorState
 from app.services.cnmv_mapping import resolve_issuer
 from app.services.connectors.cnmv_shorts import fetch_positions
@@ -102,8 +103,23 @@ def emit_shorts_increase(db: Session, company: Company, previous: dict, current:
 
     # Solo valores que el tenant sigue: abrir la ficha de cualquier ticker no
     # debe generar alertas de un valor que no está en cartera ni watchlist.
-    held = db.scalar(select(Position.id).where(Position.company_id == company.id, Position.quantity > 0).limit(1))
-    watched = db.scalar(select(WatchItem.id).where(func.upper(WatchItem.symbol) == company.ticker.upper()).limit(1))
+    held = db.scalar(
+        select(Position.id)
+        .where(
+            Position.company_id == company.id,
+            Position.quantity > 0,
+            *tenant_filters(db, Position),
+        )
+        .limit(1)
+    )
+    watched = db.scalar(
+        select(WatchItem.id)
+        .where(
+            func.upper(WatchItem.symbol) == company.ticker.upper(),
+            *tenant_filters(db, WatchItem),
+        )
+        .limit(1)
+    )
     if held is None and watched is None:
         return
     parts = None
