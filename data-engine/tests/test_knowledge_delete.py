@@ -32,7 +32,21 @@ def _document(title: str) -> KnowledgeDocument:
     )
 
 
-def test_delete_document_cascada_fragmentos_principios_y_casos():
+def test_delete_document_cascada_fragmentos_principios_y_casos(monkeypatch):
+    deleted_originals: list[str | None] = []
+    vector_deletes: list[tuple[int, int]] = []
+    monkeypatch.setattr(
+        "app.services.knowledge_library_service.DocumentStore.delete",
+        lambda _self, uri: deleted_originals.append(uri) or True,
+    )
+    monkeypatch.setattr(
+        "app.services.rag.RAGIndex.delete_knowledge_document_points",
+        lambda _self, tenant_id, document_id: vector_deletes.append(
+            (tenant_id, document_id)
+        )
+        or 1,
+    )
+    monkeypatch.delenv("CAVAAI_ENABLE_VECTOR_INGEST", raising=False)
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
@@ -43,6 +57,7 @@ def test_delete_document_cascada_fragmentos_principios_y_casos():
 
         kept = _document("Se queda")
         gone = _document("Se borra")
+        gone.storage_uri = "minio://research/tenant-1/KNOWLEDGE/note/gone.txt"
         db.add_all([kept, gone])
         db.flush()
         db.add_all([
@@ -77,6 +92,9 @@ def test_delete_document_cascada_fragmentos_principios_y_casos():
             )
         )
         db.commit()
+        gone_storage_uri = gone.storage_uri
+        gone_id = gone.id
+        tenant_id = tenant.id
 
         result = KnowledgeLibraryService.delete_document(db, gone)
         assert result == {"chunks_deleted": 2, "principles_deleted": 1}
@@ -100,9 +118,17 @@ def test_delete_document_cascada_fragmentos_principios_y_casos():
         )
         assert case_study is not None
         assert case_study.knowledge_document_id is None
+        # El original y el vector se limpian aunque la ingesta vectorial este
+        # apagada en este proceso: el flag no puede dejar huerfanos.
+        assert deleted_originals == [gone_storage_uri]
+        assert vector_deletes == [(tenant_id, gone_id)]
 
 
 def test_delete_document_cross_tenant_devuelve_404(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.rag.RAGIndex.delete_knowledge_document_points",
+        lambda _self, tenant_id, document_id: 1,
+    )
     init_db()
     seed()
     secret = "tenant-test-secret-with-at-least-32-characters"
@@ -166,6 +192,10 @@ def test_delete_document_cross_tenant_devuelve_404(monkeypatch):
 
 
 def test_delete_collection_vacia_y_aislamiento(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.rag.RAGIndex.delete_knowledge_document_points",
+        lambda _self, tenant_id, document_id: 1,
+    )
     init_db()
     seed()
     secret = "tenant-test-secret-with-at-least-32-characters"

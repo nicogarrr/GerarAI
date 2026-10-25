@@ -783,11 +783,16 @@ class KnowledgeLibraryService:
             )
         ).rowcount
         KnowledgeLibraryService._delete_vector_points(db, document)
+        # El original en MinIO/Garage forma parte del documento: borrar solo
+        # las filas dejaba el fichero accesible para siempre. Si el almacen
+        # falla, no se confirma el borrado y el usuario puede reintentarlo.
+        storage_uri = document.storage_uri
+        DocumentStore().delete(storage_uri)
         db.delete(document)
         db.commit()
         logger.info(
-            "knowledge document %s deleted (%s chunks, %s principles)",
-            document.id, chunks, principles,
+            "knowledge document %s deleted (%s chunks, %s principles, original=%s)",
+            document.id, chunks, principles, bool(storage_uri),
         )
         return {"chunks_deleted": int(chunks), "principles_deleted": int(principles)}
 
@@ -807,42 +812,19 @@ class KnowledgeLibraryService:
     def _delete_vector_points(db: Session, document: KnowledgeDocument) -> None:
         """Mejor esfuerzo: quita los puntos Qdrant del documento.
 
-        La ingesta vectorial es opt-in y el indice es reconstruible; un
-        fallo se loguea y no impide borrar la fila y sus fragmentos.
+        Se intenta siempre, aunque la ingesta vectorial este apagada en este
+        proceso: el flag solo controla si se *escriben* vectores, no si se
+        limpian los que otro worker pudo escribir. Si Qdrant no responde se
+        registra el fallo y no se bloquea el borrado de la fila, sus
+        fragmentos y el original; el indice es reconstruible.
         """
         try:
-            if os.getenv("CAVAAI_ENABLE_VECTOR_INGEST") != "1":
-                return
             tenant_id = db.info.get("tenant_id")
             if tenant_id is None:
                 return
-            from qdrant_client.models import (
-                FieldCondition,
-                Filter,
-                FilterSelector,
-                MatchValue,
-            )
-
             from app.services.rag import RAGIndex
 
-            index = RAGIndex()
-            index.client().delete(
-                collection_name=index._collection(),
-                points_selector=FilterSelector(
-                    filter=Filter(
-                        must=[
-                            FieldCondition(
-                                key="tenant_id", match=MatchValue(value=tenant_id)
-                            ),
-                            FieldCondition(
-                                key="knowledge_document_id",
-                                match=MatchValue(value=document.id),
-                            ),
-                        ]
-                    )
-                ),
-                wait=True,
-            )
+            RAGIndex().delete_knowledge_document_points(tenant_id, document.id)
         except Exception:  # noqa: BLE001 - mejor esfuerzo, ver docstring
             logger.warning(
                 "knowledge vector delete failed for document %s",

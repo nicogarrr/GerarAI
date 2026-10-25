@@ -125,6 +125,14 @@ class Settings(BaseSettings):
     # exigian Redis. Ahora es un valor explicito y la prediccion es una sola.
     rate_limit_local_request_floor: int = Field(default=10000, ge=0)
     financial_document_retention_days: int = Field(default=2555, ge=1)
+    # Retencion de la pregunta cruda de chat (chat_telemetry_events). El
+    # evento agregado (ruta/modelo/latencia) no se publica fuera del tenant.
+    chat_telemetry_retention_days: int = Field(default=90, ge=1)
+    # Purga automatica opt-in: apagada por defecto y, cuando se enciende,
+    # nace en modo dry-run. El operador la activa en el scheduler.
+    retention_job_enabled: bool = False
+    retention_dry_run: bool = True
+    retention_batch_limit: int = Field(default=500, ge=1, le=10000)
     market_price_max_age_days: int = Field(default=3, ge=0, le=30)
 
     database_url: str = "sqlite:///./portfolio_research_os.db"
