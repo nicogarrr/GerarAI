@@ -214,3 +214,27 @@ def test_clean_quote_still_rejects_non_literal_words():
         "   ",
     ):
         assert knowledge_analysis.clean_quote(bad, _SENT) is None
+
+
+def test_clean_quote_rejects_cut_words_collapsed_path():
+    sent = "El sobreprecio y el valor intrínseco es la clave real de todo esto"
+    assert knowledge_analysis.clean_quote("precio y el valor intrínseco es la clave", sent) is None
+    sent2 = "la diferencia entre el precio y el valorado hoy es alta"
+    assert knowledge_analysis.clean_quote("la diferencia entre el precio y el valor", sent2) is None
+
+
+def test_clean_quote_rejects_cut_words_literal_path():
+    sent = "xx sobreprecio y el valor intrínseco es la clave real"
+    assert knowledge_analysis.clean_quote("precio y el valor intrínseco es la clave", sent) is None
+    assert knowledge_analysis.clean_quote("sobreprecio y el valor intrínseco es la clave", sent) is not None
+
+
+def test_clean_quote_span_inflated_by_whitespace_is_rejected():
+    sent = "uno" + " " * 1000 + "dos tres cuatro cinco seis siete ocho nueve"
+    assert knowledge_analysis.clean_quote("uno dos tres cuatro cinco seis siete ocho nueve", sent) is None
+
+
+def test_clean_quote_punctuation_edges_ok():
+    sent = "dijo: «el margen de seguridad es clave», y siguio."
+    assert knowledge_analysis.clean_quote("el margen de seguridad es clave", sent) == "el margen de seguridad es clave"
+    assert knowledge_analysis.clean_quote("«el margen de seguridad es clave»", sent) == "«el margen de seguridad es clave»"
