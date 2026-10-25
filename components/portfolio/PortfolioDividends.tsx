@@ -284,9 +284,6 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                                                 {position.source_withholding_rate !== null && position.withholding_kind === 'techo_convenio' ? (
                                                     <span className="block text-xs text-gray-500">techo de convenio (escenario); la retención efectiva puede ser mayor</span>
                                                 ) : null}
-                                                {position.withholding_kind === 'sin_impuesto_origen_escenario' ? (
-                                                    <span className="block text-xs text-gray-500">sin impuesto en origen (emisor en Caimán, escenario); retención del broker no verificada</span>
-                                                ) : null}
                                                 {position.source_withholding_rate === null && position.unverified_reason ? (
                                                     <span className="block max-w-xs text-xs text-amber-300/80">{position.unverified_reason}</span>
                                                 ) : null}
