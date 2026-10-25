@@ -145,3 +145,62 @@ def test_real_itu_fixture_ingests_field_locator_chunks_without_publication_date(
     assert any("Total number of satellites: 344" in c.text for c in chunks)
     assert any(any("NumberOfSatellites" in m["locator"] for m in c.metadata_["block_metadata"])
                for c in chunks)
+
+
+def test_fcc_icfs_attachment_path_is_official_but_rest_of_host_is_not():
+    from app.services.primary_source_ingestion import _official
+
+    ok = "https://api-prod.fcc.gov/icfs-attachment/exp/api/v1/fc1a94b6cf489b109d5eb42b1f851c7a"
+    assert _official(ok)
+    for bad in (
+        "http://api-prod.fcc.gov/icfs-attachment/exp/api/v1/x",
+        "https://api-prod.fcc.gov/",
+        "https://api-prod.fcc.gov/icfs-attachment/",
+        "https://api-prod.fcc.gov/other/path",
+        "https://api-prod.fcc.gov/icfs-attachment/../secret",
+        "https://api-prod.fcc.gov/icfs-attachment/%2e%2e/secret",
+        "https://api-prod.fcc.gov/icfs-attachment/a%2Fb",
+        "https://api-prod.fcc.gov/icfs-attachmentx/y",
+        "https://api-prod.fcc.gov:8443/icfs-attachment/x",
+        "https://user:pw@api-prod.fcc.gov/icfs-attachment/x",
+        "https://evil.example/icfs-attachment/x",
+        "https://api-prod.fcc.gov.evil.example/icfs-attachment/x",
+        "https://other.fcc.gov/icfs-attachment/x",
+    ):
+        assert not _official(bad), bad
+
+
+def test_fcc_icfs_redirect_to_other_path_or_host_is_denied(monkeypatch):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+
+    import httpx
+
+    from app.services import public_fetch
+    from app.services.primary_source_ingestion import _official
+
+    def resolve(url):
+        return SimpleNamespace(url=url, request_url=url, host_header="api-prod.fcc.gov", sni_hostname="api-prod.fcc.gov")
+
+    @contextmanager
+    def stream(method, url, **kwargs):
+        if url.endswith("/icfs-attachment/start"):
+            yield SimpleNamespace(status_code=302, headers={"location": "https://api-prod.fcc.gov/other/private"})
+        else:
+            pytest.fail("Redirect outside the allowed ICFS path was fetched")
+
+    class Client:
+        def stream(self, method, url, **kwargs):
+            return stream(method, url, **kwargs)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+    monkeypatch.setattr(public_fetch, "_resolve_public_url", resolve)
+    monkeypatch.setattr(public_fetch, "_connect_pinned_httpcore", lambda **kw: None)
+    monkeypatch.setattr(httpx, "Client", lambda **kw: Client())
+    with pytest.raises(ValueError, match="redirect denied"):
+        public_fetch.fetch_public_url("https://api-prod.fcc.gov/icfs-attachment/start", allowed_url=_official)

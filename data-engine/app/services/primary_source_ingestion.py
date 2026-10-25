@@ -25,12 +25,27 @@ OFFICIAL_HOSTS = frozenset({"www.sec.gov", "sec.gov", "www.itu.int", "itu.int", 
 CONTENT_TYPES = {"text/html", "application/xhtml+xml", "application/pdf", "text/plain"}
 
 
+# Host oficial restringido a UN prefijo de ruta (no se abre el host entero).
+# api-prod.fcc.gov/icfs-attachment/ sirve los adjuntos del registro ICFS de la FCC
+# (p. ej. solicitudes de modificacion de satelites); el resto del host no cuenta.
+OFFICIAL_PATH_HOSTS = {"api-prod.fcc.gov": ("/icfs-attachment/",)}
+
+
 def _official(url: str) -> bool:
     try:
         parts = urlsplit(url)
-        return (parts.scheme == "https" and parts.hostname in OFFICIAL_HOSTS
-                and parts.username is None and parts.password is None
-                and parts.port in (None, 443))
+        if not (parts.scheme == "https" and parts.username is None and parts.password is None
+                and parts.port in (None, 443)):
+            return False
+        if parts.hostname in OFFICIAL_HOSTS:
+            return True
+        prefixes = OFFICIAL_PATH_HOSTS.get(parts.hostname or "")
+        if not prefixes:
+            return False
+        lowered = parts.path.lower()
+        if ".." in lowered or "%2e" in lowered or "%2f" in lowered or "\\" in parts.path or ";" in parts.path:
+            return False
+        return any(parts.path.startswith(prefix) and len(parts.path) > len(prefix) for prefix in prefixes)
     except ValueError:
         return False
 
