@@ -22,6 +22,24 @@ test.describe("public authentication shell", () => {
     await expect(page).toHaveURL(/\/sign-up$/);
     await expect(page.getByRole("heading", { name: "Crea tu cuenta" })).toBeVisible();
   });
+
+  test("sign-up keeps Radix selects out of native validation and preloads canonical defaults", async ({ page }) => {
+    await page.goto("/sign-up");
+
+    const form = page.locator("form");
+    await expect(form).toBeVisible();
+    // Radix renderiza un <select> oculto sin opciones; si lleva `required`, el
+    // navegador aborta el submit antes de react-hook-form. La obligatoriedad
+    // vive en las reglas del formulario, no en el control nativo.
+    expect(await form.locator("select[required]").count()).toBe(0);
+
+    // Los defaults deben ser valores canonicos de las opciones (no etiquetas
+    // en mayusculas que dejan el Select en blanco y envian un payload invalido).
+    await expect(form.getByRole("combobox").nth(1)).toHaveText(/Crecimiento a largo plazo/);
+    await expect(form.getByRole("combobox").nth(2)).toHaveText(/Moderado/);
+    await expect(form.getByRole("combobox").nth(3)).toHaveText(/Tecnolog/);
+    await expect(form.getByRole("button", { name: "Empieza tu viaje inversor" })).toBeEnabled();
+  });
 });
 
 

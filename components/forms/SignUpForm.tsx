@@ -32,9 +32,9 @@ const SignUpForm = ({ signUpOpen }: { signUpOpen: boolean }) => {
             email: '',
             password: '',
             country: 'ES',
-            investmentGoals: 'Growth',
-            riskTolerance: 'Medium',
-            preferredIndustry: 'Technology'
+            investmentGoals: 'growth',
+            riskTolerance: 'moderate',
+            preferredIndustry: 'technology'
         },
         mode: 'onBlur'
     }, );
