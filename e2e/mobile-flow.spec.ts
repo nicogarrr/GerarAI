@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { waitForScreenerOutcome } from "./fixtures/screener-outcome";
+
 const runUiE2E = process.env.E2E_UI_RUN === "1";
 
 // iPhone 14 viewport: 390x844 con táctil. Todo el flujo usa toques (tap),
@@ -26,6 +28,9 @@ test.describe("mobile flujo screener→watchlist→tesis→alerta solo con toque
     // 1. Screener carga sin overflow.
     await page.goto("/screener");
     await expect(page.getByRole("heading", { name: "Mercado", level: 1 })).toBeVisible();
+    // La carga de precios es asíncrona: sin esta espera acotada, el test
+    // decidía "sin datos" antes de que la página pintara su estado final.
+    await waitForScreenerOutcome(page);
     await expectNoPageOverflow(page, "screener");
 
     // 2. Seguir con toque: en móvil (<md) el screener renderiza cards con
