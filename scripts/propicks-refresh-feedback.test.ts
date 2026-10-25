@@ -15,6 +15,5 @@ test('el botón anuncia el estado por sí mismo (QA: sin feedback)', () => {
   assert.equal(simple.length, 1, 'el botón principal «Actualizar selección» cambia su etiqueta mientras carga');
   const condicional = source.match(/<span>\{lastGenerated \? \(loading \? 'Actualizando selección\.\.\.' : 'Actualizar selección'\) : \(loading \? 'Generando selección\.\.\.' : 'Generar selección ahora'\)\}<\/span>/g) ?? [];
   assert.equal(condicional.length, 1, 'el botón del estado vacío anuncia «Actualizando selección...» al actualizar y «Generando selección...» al generar el primer run');
-  const teal = source.match(/bg-teal-600 text-white/g) ?? [];
-  assert.equal(teal.length, 2, 'texto blanco legible también deshabilitado (opacity-50)');
+  assert.doesNotMatch(source, /bg-teal-600/, 'el primario vive en Button, no en overrides locales');
 });

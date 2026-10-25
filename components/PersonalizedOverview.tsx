@@ -373,7 +373,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             <PortfolioValueBreakdown summary={portfolioSummary} />
                             <div className="flex items-center justify-between gap-3 text-sm">
                                 <span className="text-gray-400">Ganancia/Pérdida desde la compra</span>
-                                <span className={`font-semibold ${insight.kind !== 'movement' ? 'text-gray-500' : portfolioSummary.totalGainPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                <span className={`font-semibold ${insight.kind !== 'movement' ? 'text-gray-500' : portfolioSummary.totalGainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                     {insight.kind !== 'movement' ? 'N/D' : formatPercent(portfolioSummary.totalGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                                 </span>
                             </div>
@@ -397,7 +397,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                         >
                                             <span className="text-white font-semibold">{h.symbol}</span>
                                             {holdingDisplayMode(h) === 'gain' ? (
-                                                <span className={`font-mono ${h.gainPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                <span className={`font-mono ${h.gainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                                     {formatPercent(h.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                                                 </span>
                                             ) : holdingDisplayMode(h) === 'value' && isValidCurrencyCode(h.baseCurrency) ? (
@@ -432,7 +432,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             </div>
                             <h3 className="text-lg font-medium text-white mb-2">Comienza tu viaje</h3>
                             <p className="text-gray-400 text-sm max-w-xs mx-auto mb-6">Añade tu primera inversión para ver análisis y métricas detalladas.</p>
-                            <Link href="/portfolio" className="inline-flex min-h-[44px] items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full transition-colors font-medium">
+                            <Link href="/portfolio" className="brand-btn inline-flex min-h-[44px] items-center justify-center px-6">
                                 Añadir inversión
                             </Link>
                         </div>
@@ -582,7 +582,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                         <div className="text-[10px] text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</div>
                                                     )}
                                                     {stock.changePercent != null && (
-                                                        <div className={`text-xs ${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                        <div className={`text-xs ${stock.changePercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                                             {formatPercent(stock.changePercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                                                         </div>
                                                     )}
@@ -661,13 +661,13 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                             {priceLabel}: {isValidCurrencyCode(op.currency) ? formatPrice(op.price, op.currency) : formatNumber(op.price)}
                                                         </p>
                                                     </div>
-                                                    <Badge className="bg-green-900/30 text-green-400 border-green-800">
+                                                    <Badge className="border-good/30 bg-good/10 text-good">
                                                         {formatPercent(op.upside, { fromRatio: false, digits: 1, signDisplay: 'always' })} potencial
                                                     </Badge>
                                                 </div>
                                                 <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
                                                     <div
-                                                        className="h-full bg-gradient-to-r from-green-600 to-green-400"
+                                                        className="h-full bg-gradient-to-r from-good-strong to-good"
                                                         style={{ width: `${Math.min(op.upside, 100)}%` }}
                                                     />
                                                 </div>

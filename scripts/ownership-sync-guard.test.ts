@@ -10,7 +10,7 @@ test('ownership: el estado «Sin datos 13F» tiene el botón que el texto anunci
   const button = readFileSync('app/(root)/inversores/_components/SyncPortfoliosButton.tsx', 'utf8');
   assert.ok(page.includes('label="Sincronizar 13F"'), 'la etiqueta coincide con lo que el estado anunciaba');
   assert.ok(button.includes("label = 'Sincronizar carteras ahora'"), 'etiqueta por defecto conservada');
-  assert.ok(button.includes('bg-teal-600 text-white'), 'botón teal con texto blanco legible');
+  assert.ok(!button.includes('bg-teal-600'), 'sin override de primario: usa el Button por defecto');
   assert.ok(button.includes('syncInvestorPortfoliosNow'), 'encola el actor existente, no reimplementa la descarga');
 });
 

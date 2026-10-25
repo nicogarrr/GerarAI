@@ -328,7 +328,7 @@ export default async function WatchlistPage({
             ) : watchlistStocks.length === 0 ? (
                 <Card className="border-gray-700 bg-gray-800/50">
                     <CardContent className="flex flex-col items-center justify-center px-4 py-12 text-center sm:py-16">
-                        <Eye className="mb-4 h-12 w-12 text-gray-600 sm:h-16 sm:w-16" aria-hidden="true" />
+                        <Eye className="mb-4 h-12 w-12 text-gray-500 sm:h-16 sm:w-16" aria-hidden="true" />
                         <h2 className="mb-2 text-lg font-semibold text-gray-300 sm:text-xl">Tu Watchlist está vacía</h2>
                         <p className="mb-6 max-w-md text-sm text-gray-500 sm:text-base">
                             Busca la empresa en la búsqueda universal (o con Ctrl+K desde cualquier pantalla) y
@@ -395,7 +395,7 @@ export default async function WatchlistPage({
                                             </Badge>
                                         ) : null}
                                     </div>
-                                    <div className={`flex shrink-0 items-center gap-1 font-mono text-sm ${stock.changePercent === null ? 'text-gray-500' : stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    <div className={`flex shrink-0 items-center gap-1 font-mono text-sm ${stock.changePercent === null ? 'text-gray-500' : stock.changePercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                         {stock.changePercent === null ? null : stock.changePercent >= 0 ? <TrendingUp className="h-4 w-4" aria-hidden="true" /> : <TrendingDown className="h-4 w-4" aria-hidden="true" />}
                                         <span>
                                             {formatChangePercent(stock.changePercent)}
@@ -520,7 +520,7 @@ export default async function WatchlistPage({
                                             {stock.changePercent === null ? (
                                                 <span className="font-mono text-gray-500">{NA}</span>
                                             ) : (
-                                                <div className={`flex items-center justify-end gap-1 ${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                <div className={`flex items-center justify-end gap-1 ${stock.changePercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                                     {stock.changePercent >= 0 ? <TrendingUp aria-hidden="true" className="h-3 w-3" /> : <TrendingDown aria-hidden="true" className="h-3 w-3" />}
                                                     <span className="font-mono">
                                                         {formatChangePercent(stock.changePercent)}

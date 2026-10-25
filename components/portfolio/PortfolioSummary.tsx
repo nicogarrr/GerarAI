@@ -77,14 +77,14 @@ export default function PortfolioSummary({ summary }: Props) {
         <div className="absolute top-0 right-0 hidden p-4 opacity-10 transition-opacity group-hover:opacity-20 sm:block">
           {!noData ? (
             isPositive ? (
-              <TrendingUp className="h-12 w-12 text-green-500" />
+              <TrendingUp className="h-12 w-12 text-good" />
             ) : (
-              <TrendingDown className="h-12 w-12 text-red-500" />
+              <TrendingDown className="h-12 w-12 text-bad" />
             )
           ) : null}
         </div>
         <p className="text-gray-400 text-[11px] sm:text-xs uppercase tracking-normal sm:tracking-wider font-semibold mb-1">Ganancia/Pérdida</p>
-        <p className={`text-base min-[420px]:text-lg sm:text-2xl font-bold tracking-tight break-words ${noData ? 'text-gray-500' : isPositive ? 'text-green-400' : 'text-red-400'}`}>
+        <p className={`text-base min-[420px]:text-lg sm:text-2xl font-bold tracking-tight break-words ${noData ? 'text-gray-500' : isPositive ? 'text-good' : 'text-bad'}`}>
           {noData
             ? NA
             : formatMoney(summary.totalGain, summary.baseCurrency, {
@@ -98,7 +98,7 @@ export default function PortfolioSummary({ summary }: Props) {
       <div className="bg-[#111111] border border-gray-800 rounded-xl p-4 sm:p-5 relative overflow-hidden group hover:border-orange-500/30 transition-colors">
         <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Rendimiento</p>
         <div className="flex items-baseline gap-2">
-          <p className={`text-base min-[420px]:text-lg sm:text-2xl font-bold tracking-tight break-words ${noData ? 'text-gray-500' : isPositive ? 'text-green-400' : 'text-red-400'}`}>
+          <p className={`text-base min-[420px]:text-lg sm:text-2xl font-bold tracking-tight break-words ${noData ? 'text-gray-500' : isPositive ? 'text-good' : 'text-bad'}`}>
             {noData ? NA : formatPercent(summary.totalGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
           </p>
         </div>
@@ -106,7 +106,7 @@ export default function PortfolioSummary({ summary }: Props) {
         {!noData ? (
           <div className="w-full bg-gray-800 h-1.5 rounded-full mt-3 overflow-hidden">
             <div
-              className={`h-full rounded-full ${isPositive ? 'bg-green-500' : 'bg-red-500'}`}
+              className={`h-full rounded-full ${isPositive ? 'bg-good-strong' : 'bg-bad'}`}
               style={{ width: `${Math.min(Math.abs(summary.totalGainPercent), 100)}%` }}
             />
           </div>

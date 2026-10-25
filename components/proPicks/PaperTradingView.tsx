@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { PaperProposalCard } from './PaperProposalCard';
 import { PaperCalibrationView } from './PaperCalibrationView';
 import { feedPaperProposalsNow, getPaperTrading, type PaperState } from '@/lib/actions/paper-trading.actions';
@@ -25,14 +26,13 @@ function PaperFeedButton() {
     const loading = state === 'feeding';
     return (
         <div className="flex flex-col items-center gap-2">
-            <button
+            <Button
                 onClick={handleFeed}
                 disabled={loading || state === 'queued'}
                 aria-busy={loading}
-                className="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
             >
                 {loading ? 'Encolando generación...' : 'Generar propuestas simuladas'}
-            </button>
+            </Button>
             {state === 'queued' ? (
                 <p className="text-sm text-teal-300">Generación en curso; recarga la página en unos minutos para ver las propuestas.</p>
             ) : null}

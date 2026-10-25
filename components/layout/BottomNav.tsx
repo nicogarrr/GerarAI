@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
-import { MOBILE_TAB_ITEMS, isNavItemActive } from '@/lib/constants';
+import { MOBILE_TAB_ITEMS, isNavItemActive, isNavItemExact } from '@/lib/constants';
 
 /**
  * Barra inferior del movil: cinco destinos con etiqueta y el Cerebro como
@@ -47,7 +47,7 @@ export default function BottomNav() {
                         <li key={item.href}>
                             <Link
                                 href={item.href}
-                                aria-current={active ? 'page' : undefined}
+                                aria-current={active ? (isNavItemExact(pathname, item.href) ? 'page' : 'true') : undefined}
                                 className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
                                     active ? 'text-teal-300' : 'text-gray-500 hover:text-gray-300'
                                 }`}

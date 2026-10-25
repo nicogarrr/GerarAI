@@ -92,12 +92,11 @@ export function buildCrumbs(pathname: string): Crumb[] {
     crumbs.push({ label: sectionTitle });
   }
   // Cualquier nivel que sea un HUB (padre por cruce o el propio ancla) se
-  // nombra como en el menu lateral (NAV_SECTIONS): el catalogo etiqueta
-  // /knowledge como «Conocimiento» porque esa es la cabecera de su subnav
-  // contextual, pero la miga dice «Biblioteca» como el sidebar - un mismo
-  // sitio, un mismo nombre. Si el nombre canonico repite el de la seccion
-  // (/portfolio en Cartera), se conserva la etiqueta del catalogo
-  // («Resumen») para no duplicar niveles.
+  // nombra como en el menu lateral (NAV_SECTIONS): una sola etiqueta por
+  // ruta (/knowledge y /portfolio dicen «Biblioteca» y «Resumen» tambien en
+  // el catalogo). Si el nombre canonico repite el de la seccion (/portfolio
+  // en Cartera), se conserva la etiqueta del catalogo para no duplicar
+  // niveles.
   const canonicalName = (href: string) => {
     const name = HUB_LABELS.get(href);
     return name && name !== sectionTitle ? name : undefined;

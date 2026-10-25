@@ -18,9 +18,7 @@ import { NAV_SECTIONS } from '../lib/constants.ts';
 const labels = (path: string) => buildCrumbs(path).map((crumb) => crumb.label);
 
 void test('canales: el nivel intermedio es el hub con su nombre canónico del menú lateral', () => {
-    // ROUTE_CATALOG etiqueta /knowledge como «Conocimiento» (cabecera del
-    // subnav contextual); NAV_SECTIONS lo llama «Biblioteca» y ese es el
-    // nombre que la miga debe mostrar para coincidir con el sidebar.
+    // /knowledge se llama «Biblioteca» en NAV_SECTIONS, ROUTE_CATALOG y H1.
     assert.deepEqual(labels('/inversores/canales'), ['Inicio', 'Análisis', 'Biblioteca', 'Canales']);
     const crumbs = buildCrumbs('/inversores/canales');
     assert.equal(crumbs[2].href, '/knowledge', 'Biblioteca enlaza a su ruta real');
@@ -57,6 +55,12 @@ void test('el hub /knowledge se nombra Biblioteca también en su propia ruta', (
 
 void test('dedupe: /portfolio no repite Cartera cuando la sección ya lo dice', () => {
     assert.deepEqual(labels('/portfolio'), ['Inicio', 'Cartera', 'Resumen']);
+});
+
+void test('una etiqueta por ruta: Mercados, Cuenta demo y Biblioteca', () => {
+    assert.deepEqual(labels('/mercados'), ['Inicio', 'Análisis', 'Mercados']);
+    assert.deepEqual(labels('/paper-trading'), ['Inicio', 'Cartera', 'Cuenta demo']);
+    assert.deepEqual(labels('/knowledge'), ['Inicio', 'Análisis', 'Biblioteca']);
 });
 
 void test('ningún hub muestra un nombre divergente del canónico del menú lateral', () => {

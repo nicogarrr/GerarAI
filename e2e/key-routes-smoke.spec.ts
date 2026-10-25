@@ -16,7 +16,7 @@ const BOUNDARY_TEXTS = [
 
 const ROUTES: Array<{ path: string; heading: string }> = [
   { path: "/inicio", heading: "Qué ha cambiado" },
-  { path: "/portfolio", heading: "Mi Cartera" },
+  { path: "/portfolio", heading: "Resumen" },
   { path: "/watchlist", heading: "Watchlist" },
   { path: "/research", heading: "Índice de research" },
   { path: "/taxes", heading: "Impuestos" },

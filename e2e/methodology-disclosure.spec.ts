@@ -102,7 +102,7 @@ test("/portfolio Resumen sin frase de arquitectura (móvil y 768)", async ({ pag
     await page.setViewportSize(viewport);
     await page.goto("/portfolio");
 
-    await expect(page.getByRole("heading", { name: "Mi Cartera", level: 1 })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: "Resumen", level: 1 })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText("Riesgo y exposiciones, en detalle:")).toBeVisible();
     await expect(page.getByText(/están fuera de la cartera: en su propia/)).toHaveCount(0);
     await page.screenshot({ path: `test-results/methodology-portfolio-${name}.png` });

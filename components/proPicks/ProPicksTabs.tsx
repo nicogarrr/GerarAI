@@ -219,7 +219,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                         onClick={() => runBacktest()}
                         disabled={loading}
                         aria-busy={loading}
-                        className="h-11 w-full gap-2 bg-teal-600 hover:bg-teal-700 md:w-auto"
+                        className="h-11 w-full gap-2 md:w-auto"
                     >
                         {loading ? (
                             <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
@@ -240,7 +240,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                             onClick={() => runBacktest()}
                             disabled={loading}
                             aria-busy={loading}
-                            className="mt-4 h-11 w-full gap-2 bg-teal-600 hover:bg-teal-700 sm:w-auto"
+                            className="mt-4 h-11 w-full gap-2 sm:w-auto"
                         >
                             {loading ? (
                                 <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />

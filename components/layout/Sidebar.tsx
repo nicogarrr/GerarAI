@@ -4,7 +4,7 @@ import { useState } from 'react';
 import IntentLink from '@/components/layout/IntentLink';
 import { usePathname } from 'next/navigation';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { isNavItemActive, NAV_SECTIONS, showsNavSectionTitle, type NavItem } from '@/lib/constants';
+import { isNavItemActive, isNavItemExact, NAV_SECTIONS, showsNavSectionTitle, type NavItem } from '@/lib/constants';
 
 import { SIDEBAR_COLLAPSED_COOKIE } from '@/lib/ui/sidebar-preference';
 
@@ -81,6 +81,11 @@ export default function Sidebar({ collapsed: initiallyCollapsed }: { collapsed: 
     );
 }
 
+function ariaCurrent(active: boolean, exact: boolean): 'page' | 'true' | undefined {
+    if (!active) return undefined;
+    return exact ? 'page' : 'true';
+}
+
 function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: string; collapsed: boolean }) {
     const active = isNavItemActive(pathname, item.href);
     // Un padre se ilumina cuando la ruta cae en un hijo suyo, para que la
@@ -93,7 +98,7 @@ function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: strin
                 href={item.href}
                 aria-label={item.label}
                 title={collapsed ? item.label : undefined}
-                aria-current={active ? 'page' : undefined}
+                aria-current={ariaCurrent(active, isNavItemExact(pathname, item.href))}
                 className={linkClasses(active, collapsed, 'text-sm', branchActive)}
             >
                 {item.icon && <item.icon aria-hidden="true" className="h-4 w-4 shrink-0" />}
@@ -101,19 +106,22 @@ function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: strin
             </IntentLink>
             {item.children && (
                 <ul className={collapsed ? "mt-1 flex flex-col gap-1" : "mt-1 flex flex-col gap-1 border-l border-gray-700/50 pl-3"}>
-                    {item.children.map((child) => (
-                        <li key={child.href}>
-                            <IntentLink
-                                href={child.href}
-                                aria-label={child.label}
-                                title={collapsed ? child.label : undefined}
-                                aria-current={isNavItemActive(pathname, child.href) ? 'page' : undefined}
-                                className={linkClasses(isNavItemActive(pathname, child.href), collapsed, 'text-sm')}
-                            >
-                                {collapsed ? <child.icon aria-hidden="true" className="h-4 w-4 shrink-0" /> : <span className="truncate">{child.label}</span>}
-                            </IntentLink>
-                        </li>
-                    ))}
+                    {item.children.map((child) => {
+                        const childActive = isNavItemActive(pathname, child.href);
+                        return (
+                            <li key={child.href}>
+                                <IntentLink
+                                    href={child.href}
+                                    aria-label={child.label}
+                                    title={collapsed ? child.label : undefined}
+                                    aria-current={ariaCurrent(childActive, isNavItemExact(pathname, child.href))}
+                                    className={linkClasses(childActive, collapsed, 'text-sm')}
+                                >
+                                    {collapsed ? <child.icon aria-hidden="true" className="h-4 w-4 shrink-0" /> : <span className="truncate">{child.label}</span>}
+                                </IntentLink>
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
         </>
