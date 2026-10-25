@@ -15,7 +15,11 @@ Privacidad:
   (`TRACE_SNAPSHOT_KEEP`, 5 por defecto). Contiene args reales: no exponer ni
   copiar fuera del host. Tope de tamano (`TRACE_SNAPSHOT_MAX_BYTES`, 1 MiB; el
   resto se cuenta en `truncated`) y de tiempo (`TRACE_SNAPSHOT_TIMEOUT_S`, 3 s,
-  hilo daemon). Limites: el hook corre antes de parar los workers, asi que
+  hilo daemon). El tiempo solo acota la ESPERA del hook: un hilo colgado puede
+  terminar su escritura despues (efectos de IO posteriores no acotados) y, con
+  hilos colgados, KEEP no queda garantizado. Escritura atomica (tmp + replace);
+  si el dir ya existe se valida (dueno = usuario del worker, sin permisos para
+  grupo/otros) y no se modifica. Limites: el hook corre antes de parar los workers, asi que
   mensajes que entren durante la captura no quedan incluidos, y no recupera
   nada tras SIGKILL.
 """
@@ -26,6 +30,7 @@ import hmac
 import json
 import logging
 import os
+import stat
 import threading
 import time
 from datetime import UTC, datetime
@@ -152,11 +157,38 @@ class TaskTraceMiddleware(Middleware):
         elif "error" in outcome:
             logger.warning("snapshot_failed type=%s", outcome["error"])
 
+    @staticmethod
+    def _prepare_dir(directory: str) -> None:
+        """Crea el dir 0700 solo si no existe; si existe, valida y no lo cambia."""
+        if not os.path.exists(directory):
+            os.makedirs(directory, mode=0o700)
+            os.chmod(directory, 0o700)  # solo un dir que acabamos de crear (umask)
+            return
+        st = os.stat(directory)
+        if not stat.S_ISDIR(st.st_mode):
+            raise NotADirectoryError(directory)
+        if st.st_uid != os.geteuid() or stat.S_IMODE(st.st_mode) & 0o077:
+            raise PermissionError("snapshot dir must be owned by the worker user and 0700")
+
+    @staticmethod
+    def _drop_stale_partials(directory: str) -> None:
+        cutoff = time.time() - 60  # no tocar el tmp de otro proceso en curso
+        for name in os.listdir(directory):
+            if name.startswith(".inflight-") and name.endswith(".tmp"):
+                full = os.path.join(directory, name)
+                try:
+                    if os.stat(full).st_mtime < cutoff:
+                        os.remove(full)
+                except OSError:
+                    pass
+
     def _write_snapshot(self, directory: str, pending: list[Any]) -> None:
-        os.makedirs(directory, mode=0o700, exist_ok=True)
-        os.chmod(directory, 0o700)
+        self._prepare_dir(directory)
+        self._drop_stale_partials(directory)
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
-        path = os.path.join(directory, f"inflight-{stamp}-{os.getpid()}.json")
+        name = f"inflight-{stamp}-{os.getpid()}.json"
+        path = os.path.join(directory, name)
+        tmp = os.path.join(directory, f".{name}.tmp")
         max_bytes = _int_env("TRACE_SNAPSHOT_MAX_BYTES", 1_048_576, 4096)
         items: list[dict[str, Any]] = []
         used = 0
@@ -173,13 +205,25 @@ class TaskTraceMiddleware(Middleware):
             "inflight": items,
             "truncated": len(pending) - len(items),
         }
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w") as handle:
-            json.dump(body, handle, default=str)
+        # Escritura atomica: tmp 0600 + fsync + replace. Nunca queda un JSON a medias
+        # con el nombre final; un fallo borra el tmp.
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            with os.fdopen(fd, "w") as handle:
+                json.dump(body, handle, default=str)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            raise
         files = sorted(f for f in os.listdir(directory) if f.startswith("inflight-"))
         for old in files[: -_keep()]:
             try:
                 os.remove(os.path.join(directory, old))
             except OSError:
                 pass
-        logger.info("snapshot_written n=%d file=%s", len(pending), os.path.basename(path))
+        logger.info("snapshot_written n=%d file=%s", len(pending), name)

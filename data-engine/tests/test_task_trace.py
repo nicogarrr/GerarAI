@@ -72,7 +72,8 @@ def test_snapshot_private_and_retained(tmp_path, monkeypatch):
     mw = TaskTraceMiddleware()
     m = msg()
     mw.before_process_message(None, m)
-    target.mkdir()
+    target.mkdir(mode=0o700)
+    os.chmod(target, 0o700)
     for i in range(4):  # ficheros viejos: la retencion debe borrarlos primero
         (target / f"inflight-2000010{i}T000000-1.json").write_text("{}")
     mw.before_worker_shutdown(None, object())
@@ -145,3 +146,57 @@ def test_slow_snapshot_does_not_block_shutdown(tmp_path, monkeypatch):
     start = time.monotonic()
     mw.before_worker_shutdown(None, object())
     assert time.monotonic() - start < 2.5
+
+
+def test_snapshot_written_atomically_no_tmp_left(tmp_path, monkeypatch):
+    d = tmp_path / "s"
+    monkeypatch.setenv("TRACE_SNAPSHOT_DIR", str(d))
+    mw = TaskTraceMiddleware()
+    mw.before_process_message(None, msg())
+    mw.before_worker_shutdown(None, object())
+    names = os.listdir(d)
+    assert len(names) == 1 and names[0].endswith(".json") and not names[0].startswith(".")
+
+
+def test_failed_write_removes_tmp_and_keeps_old(tmp_path, monkeypatch):
+    d = tmp_path / "s"
+    mw = TaskTraceMiddleware()
+    mw.before_process_message(None, msg())
+    mw._write_snapshot(str(d), [msg()])
+    before = sorted(os.listdir(d))
+
+    def boom(src, dst):
+        raise OSError("disk")
+
+    monkeypatch.setattr("app.workers.task_trace.os.replace", boom)
+    with pytest.raises(OSError):
+        mw._write_snapshot(str(d), [msg()])
+    assert sorted(os.listdir(d)) == before  # sin tmp huerfano ni fichero parcial
+
+
+def test_stale_partials_are_cleaned_fresh_ones_kept(tmp_path):
+    d = tmp_path / "s"
+    d.mkdir(mode=0o700)
+    old, fresh = d / ".inflight-a.json.tmp", d / ".inflight-b.json.tmp"
+    old.write_text("x")
+    fresh.write_text("x")
+    os.utime(old, (1, 1))
+    TaskTraceMiddleware()._write_snapshot(str(d), [msg()])
+    assert not old.exists() and fresh.exists()
+
+
+def test_existing_dir_validated_not_chmodded(tmp_path):
+    loose = tmp_path / "loose"
+    loose.mkdir()
+    os.chmod(loose, 0o755)
+    with pytest.raises(PermissionError):
+        TaskTraceMiddleware()._write_snapshot(str(loose), [msg()])
+    assert stat.S_IMODE(loose.stat().st_mode) == 0o755  # no se toco
+    ok = tmp_path / "ok"
+    ok.mkdir()
+    os.chmod(ok, 0o700)
+    TaskTraceMiddleware()._write_snapshot(str(ok), [msg()])
+    notdir = tmp_path / "f"
+    notdir.write_text("x")
+    with pytest.raises(NotADirectoryError):
+        TaskTraceMiddleware()._write_snapshot(str(notdir), [msg()])
