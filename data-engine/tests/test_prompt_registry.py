@@ -77,7 +77,7 @@ def test_migrated_services_use_registry_text():
         kpi_extraction_service,
     )
 
-    assert chat_synthesis_service.PROMPT_VERSION == "source-aware-synthesis-v4"
+    assert chat_synthesis_service.PROMPT_VERSION == "source-aware-synthesis-v5"
     assert kpi_extraction_service.PROMPT_VERSION == "company-kpi-extraction-v1"
     assert (
         knowledge_library_service.PRINCIPLE_PROMPT_VERSION

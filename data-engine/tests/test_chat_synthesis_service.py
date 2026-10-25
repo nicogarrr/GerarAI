@@ -156,3 +156,49 @@ def test_budget_exhaustion_falls_back(monkeypatch, db_session=None):
         ))
     assert result.model == "deterministic"
     assert result.llm_trace["fallback_reason"] == "BudgetExceededError"
+
+
+def _two_source_baseline() -> ChatResponse:
+    per_section = {"facts": ["financial_fact:1"], "calculations": ["market_price:2"]}
+    sections = [
+        SynthesisSection(key=key, body=f"baseline {key}", citations=per_section.get(key, []))
+        for key in SECTION_ORDER
+    ]
+    sources = [{"type": "financial_fact", "id": 1}, {"type": "market_price", "id": 2}]
+    return ChatResponse(answer="baseline answer", sections=sections, sources=sources)
+
+
+def _per_section_payload(facts: list[str], calculations: list[str]) -> dict:
+    payload = _llm_payload(citations=[])
+    for section in payload["sections"]:
+        if section["key"] == "facts":
+            section["citations"] = facts
+        if section["key"] == "calculations":
+            section["citations"] = calculations
+    return payload
+
+
+def test_globally_valid_id_in_the_wrong_section_still_falls_back():
+    """The validator is NOT relaxed: market_price:2 exists, but not in the facts baseline."""
+    provider = StubProvider(payload=_per_section_payload(["financial_fact:1", "market_price:2"], ["market_price:2"]))
+    result = asyncio.run(ChatSynthesisService(provider).synthesize(
+        question="q", ticker="AAA", baseline=_two_source_baseline()
+    ))
+    assert result.model == "deterministic"
+    assert result.llm_trace["fallback_reason"] == "ValueError"
+
+
+def test_each_section_citing_its_own_ids_is_accepted():
+    provider = StubProvider(payload=_per_section_payload(["financial_fact:1"], ["market_price:2"]))
+    result = asyncio.run(ChatSynthesisService(provider).synthesize(
+        question="q", ticker="AAA", baseline=_two_source_baseline()
+    ))
+    assert result.model == "stub-model"
+    assert result.llm_trace["citation_verification"] is True
+
+
+def test_prompt_states_the_per_section_citation_contract():
+    from app.services.prompt_registry import get_prompt
+
+    text = get_prompt("chat_source_synthesis", allow_remote=False).text
+    assert "ONLY the IDs listed in that same section of deterministic_sections" in text
