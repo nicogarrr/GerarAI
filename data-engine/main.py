@@ -106,6 +106,7 @@ async def lifespan(_: FastAPI):
     # wait=False porque pueden tener sondas colgadas.
     _HEALTH_REQUIRED_EXECUTOR.shutdown(wait=False)
     _HEALTH_PROBE_EXECUTOR.shutdown(wait=False)
+    _HEALTH_LLM_EXECUTOR.shutdown(wait=False)
 
 
 _app_env = get_settings().app_env.strip().lower()
@@ -238,6 +239,12 @@ _HEALTH_REQUIRED_EXECUTOR = ThreadPoolExecutor(
 _HEALTH_PROBE_EXECUTOR = ThreadPoolExecutor(
     max_workers=4, thread_name_prefix="cavaai-health-probe"
 )
+# La sonda LLM es barata (config + bridge local) pero hard-required: un pool
+# propio evita que sondas opcionales colgadas la dejen sin hilo y conviertan
+# un backend sano en 503.
+_HEALTH_LLM_EXECUTOR = ThreadPoolExecutor(
+    max_workers=1, thread_name_prefix="cavaai-health-llm"
+)
 
 
 def _probe_database(_settings) -> str:
@@ -305,6 +312,34 @@ def _probe_minio(settings) -> str:
         return "ok" if exc.code < 500 else f"error:status_{exc.code}"
 
 
+def _probe_llm(settings) -> str:
+    """Comprueba la configuracion LLM sin generar ni llamar a proveedores remotos.
+
+    Un proveedor deshabilitado o una config incoherente (sin clave, modelo no
+    aprobado, URL invalida) devuelve ``error:<motivo>``. Si la URL apunta al
+    bridge local, se sondea su ``/health`` con timeout corto; el endpoint Go
+    oficial nunca se contacta desde readiness.
+    """
+    from app.llm.readiness import bridge_health_url, llm_configuration_issue
+
+    issue = llm_configuration_issue(settings)
+    if issue:
+        return f"error:{issue}"
+    health_url = bridge_health_url(getattr(settings, "opencode_go_base_url", ""))
+    if not health_url:
+        return "ok"
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(health_url, timeout=HEALTH_READY_TIMEOUT_SECONDS) as resp:
+            return "ok" if resp.status < 500 else f"error:status_{resp.status}"
+    except urllib.error.HTTPError as exc:
+        return "ok" if exc.code < 500 else f"error:status_{exc.code}"
+    except Exception as exc:  # noqa: BLE001 — readiness reports the failure class
+        return f"error:{type(exc).__name__}"
+
+
 async def _run_health_probe(
     name: str, probe, settings, executor=None
 ) -> tuple[str, str]:
@@ -348,12 +383,14 @@ async def health_ready():
                 ("minio", _probe_minio),
             )
         ),
+        _run_health_probe("llm", _probe_llm, settings, _HEALTH_LLM_EXECUTOR),
     )
     checks = dict(results)
 
-    # La BD es la única dependencia hard-required. Redis, Qdrant y MinIO se
-    # reportan sin convertir una caída opcional en un 503 ni alargar la ruta.
-    ready = checks.get("database") == "ok"
+    # La BD y una configuración LLM sana son hard-required: sin cerebro no hay
+    # producto. Redis, Qdrant y MinIO se reportan sin convertir una caída
+    # opcional en un 503 ni alargar la ruta.
+    ready = checks.get("database") == "ok" and checks.get("llm") == "ok"
 
     from fastapi.responses import JSONResponse
 

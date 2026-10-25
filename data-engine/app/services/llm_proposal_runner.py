@@ -18,9 +18,10 @@ from decimal import Decimal
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings, get_settings
 from app.core.tenancy import tenant_filters
 from app.llm import create_llm_provider
-from app.llm.model_aliases import VERIFIED_FREE_MODELS
+from app.llm.model_aliases import is_owner_approved_model
 from app.models.entities import Company, NewsEvent
 from app.models.paper_trading import PaperTrade
 from app.schemas.paper_trading import PaperProposal
@@ -45,15 +46,20 @@ def _utc(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
-def paid_model_risk(provider, *, request=None) -> str | None:
-    """Motivo de bloqueo si la peticion REAL del proposal podria usar un modelo no gratuito.
+def paid_model_risk(
+    provider, *, request=None, settings: Settings | None = None
+) -> str | None:
+    """Motivo de bloqueo si la peticion REAL podria usar un modelo no aprobado.
 
-    `request` permite verificar la petición real de otros flujos (p. ej. narrativa).
-    Por defecto la sonda es la misma peticion que `propose` envia (build_request: sin modelo fijado,
-    solo task), de modo que los overrides de entorno por tarea se resuelven igual que
+    Aprobados: free verificados o el modelo Go de la suscripcion del dueno (solo
+    con ``chat_go_subscription_enabled``). `request` permite verificar la
+    petición real de otros flujos (p. ej. narrativa). Por defecto la sonda es la
+    misma peticion que `propose` envia (build_request: sin modelo fijado, solo
+    task), de modo que los overrides de entorno por tarea se resuelven igual que
     en la llamada real. Tambien se mira el modelo de fallback del adaptador.
     Fail-closed: si no se puede verificar, se bloquea.
     """
+    settings = settings or get_settings()
     router = getattr(provider, "model_router", None)
     if router is None:
         return "modelo_no_verificable"
@@ -62,10 +68,10 @@ def paid_model_risk(provider, *, request=None) -> str | None:
         resolved = router.resolve(probe)
     except Exception:  # noqa: BLE001 - alias deshabilitado o inconsistente
         return "modelo_no_verificable"
-    if resolved not in VERIFIED_FREE_MODELS:
+    if not is_owner_approved_model(resolved, settings):
         return "modelo_no_gratuito"
     fallback = getattr(provider, "_fallback_model", None)
-    if fallback and fallback not in VERIFIED_FREE_MODELS:
+    if fallback and not is_owner_approved_model(fallback, settings):
         return "fallback_no_gratuito"
     return None
 

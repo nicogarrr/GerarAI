@@ -36,6 +36,7 @@ def test_health_ready_times_out_dependencies_without_serial_wait(monkeypatch):
         return "ok"
 
     monkeypatch.setattr(main, "_probe_database", lambda _settings: "ok")
+    monkeypatch.setattr(main, "_probe_llm", lambda _settings: "ok")
     monkeypatch.setattr(main, "_probe_redis", slow_optional_probe)
     monkeypatch.setattr(main, "_probe_qdrant", slow_optional_probe)
     monkeypatch.setattr(main, "_probe_minio", slow_optional_probe)
@@ -50,13 +51,14 @@ def test_health_ready_times_out_dependencies_without_serial_wait(monkeypatch):
     # y hacia fallar el test con carga de maquina sin que hubiera una regresion.
     # 0,18 s sigue fallando una espera serial (0,20 s) y tolera el ruido.
     assert elapsed < 0.18, f"health_ready tardó {elapsed:.3f}s"
-    assert response.status_code == 200
     payload = json.loads(response.body)
+    assert response.status_code == 200, payload["checks"]
     assert payload["checks"] == {
         "database": "ok",
         "redis": "error:TimeoutError",
         "qdrant": "error:TimeoutError",
         "minio": "error:TimeoutError",
+        "llm": "ok",
     }
 
 

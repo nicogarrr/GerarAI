@@ -1,11 +1,9 @@
-"""Timeouts de llamadas largas al bridge OpenCode y presupuesto corto del chat.
+"""Timeouts de llamadas largas y presupuesto del chat interactivo.
 
-Decision (2026-10-19): el bridge con reasoning=max tarda ~26 s o mas por
-lote y un corte de cliente a los 30 s tiraba ~30 % de las peticiones
-(BrokenPipe en el bridge). Las llamadas largas (extraccion de
-documentos/principios, tesis, KPIs) pasan a 120 s por intento con 1
-reintento y tope total de 250 s; el chat interactivo conserva su
-presupuesto corto (45 s) y compite con reasoning reducido.
+Decision: las llamadas largas (extraccion de documentos/principios, tesis,
+KPIs) usan 120 s por intento con 1 reintento y tope total de 250 s. El chat
+interactivo conserva un presupuesto propio de 45 s (fuente unica en config,
+compose y docs) con reasoning high (DeepSeek v4.1 Flash, suscripcion Go).
 """
 
 from app.core.config import Settings
@@ -69,10 +67,10 @@ def _chat_chain(**overrides) -> ChatFallbackProvider:
 
 def test_chat_keeps_its_own_short_total_budget() -> None:
     chain = _chat_chain()
-    assert chain.total == 20.0
+    assert chain.total == 45.0
     # Even without an independent backup, interactive primary calls obey
-    # the short chat budget rather than the background-job timeout.
-    assert chain.primary._timeout.read == 20.0  # noqa: SLF001
+    # the shared chat budget rather than the background-job timeout.
+    assert chain.primary._timeout.read == 45.0  # noqa: SLF001
 
 
 def test_chat_primary_makes_a_single_attempt_per_model() -> None:
@@ -80,9 +78,9 @@ def test_chat_primary_makes_a_single_attempt_per_model() -> None:
     assert chain.primary._max_retries == 0  # noqa: SLF001
 
 
-def test_chat_primary_uses_reduced_reasoning_by_default() -> None:
+def test_chat_primary_uses_high_reasoning_by_default() -> None:
     chain = _chat_chain()
-    assert chain.primary._reasoning_effort == "low"  # noqa: SLF001
+    assert chain.primary._reasoning_effort == "high"  # noqa: SLF001
 
 
 def test_chat_reasoning_override_is_configurable() -> None:
@@ -95,12 +93,12 @@ def test_chat_reasoning_effort_reaches_the_payload() -> None:
     request = LLMRequest(messages=[Message("user", "hola")], task="chat")
     model = chain.primary.model_router.resolve(request)
     payload = chain.primary._build_payload(request, model)  # noqa: SLF001
-    assert payload["reasoning_effort"] == "low"
+    assert payload["reasoning_effort"] == "high"
 
 
-def test_non_chat_primary_keeps_reasoning_max() -> None:
+def test_non_chat_primary_keeps_reasoning_high() -> None:
     provider = create_llm_provider(_settings())
     request = LLMRequest(messages=[Message("user", "extrae")], task="claim_extraction")
     model = provider.model_router.resolve(request)
     payload = provider._build_payload(request, model)  # noqa: SLF001
-    assert payload["reasoning_effort"] == "max"
+    assert payload["reasoning_effort"] == "high"

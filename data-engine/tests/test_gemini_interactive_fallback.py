@@ -13,6 +13,8 @@ from app.llm.free_interactive import FreeLLMUnavailable, create_free_interactive
 
 def cfg(**kw):
     values = dict(llm_enabled=True, llm_provider="opencode-go", opencode_go_api_key="fake",
+                  chat_go_subscription_enabled=False,
+                  opencode_go_model="deepseek-v4.1-flash-free",
                   gemini_api_key="fake", gemini_chat_fallback_enabled=True,
                   gemini_free_plan_confirmed=True, groq_chat_fallback_enabled=False)
     values.update(kw)
@@ -43,7 +45,12 @@ def test_two_opencode_429_then_gemini_without_groq(kind):
             assert out.provider == "gemini"
             assert out.model == GEMINI_MODEL
     asyncio.run(run())
-    assert [model for _, model in seen] == ["deepseek-v4.1-flash-free", "space-bunny-free", GEMINI_MODEL]
+    free_calls = (
+        ["deepseek-v4.1-flash-free"]
+        if kind == "chat"
+        else ["deepseek-v4.1-flash-free", "space-bunny-free"]
+    )
+    assert [model for _, model in seen] == [*free_calls, GEMINI_MODEL]
 
 
 @pytest.mark.parametrize("kind", ["chat", "debate"])

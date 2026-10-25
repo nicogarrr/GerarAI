@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
-from app.llm.model_aliases import VERIFIED_FREE_MODELS
+from app.llm.model_aliases import is_owner_approved_model
 from app.models import Company, NewsEvent, PeerRelationship
 from app.services.async_bridge import run_from_any_context
 from app.services.llm_output_guard import complete_guarded
@@ -96,6 +96,12 @@ async def _extract_with_llm(text: str, context: str = "", before_retry=None) -> 
     provider = create_llm_provider()
     if provider.name == "disabled":
         raise RuntimeError("LLM not configured")
+    settings = get_settings()
+    model = (
+        settings.opencode_go_model
+        if is_owner_approved_model(settings.opencode_go_model, settings)
+        else "space-bunny-free"
+    )
     request = LLMRequest(
         messages=[
             Message("system", (
@@ -116,14 +122,14 @@ async def _extract_with_llm(text: str, context: str = "", before_retry=None) -> 
             Message("user", (context + "\n\nNoticia:\n" if context else "") + text[:3500]),
         ],
         task="news_second_order",
-        model="space-bunny-free",
+        model=model,
         temperature=0,
         max_tokens=900,
         response_format=ResponseFormat.json_schema(_SCHEMA, name="second_order_themes"),
     )
-    # Pin the exact free model: task overrides and env defaults may route to paid models.
-    if provider.model_router.resolve(request) not in VERIFIED_FREE_MODELS:
-        raise RuntimeError("Second-order model is not the verified free model")
+    # Pin an approved model: task overrides may route to paid models.
+    if not is_owner_approved_model(provider.model_router.resolve(request), settings):
+        raise RuntimeError("Second-order model is not owner-approved")
     # Salida con CJK, ingles mezclado o tokens corruptos: un reintento y, si falla, el
     # llamador degrada al camino determinista. before_retry reserva cuota para el 2o intento.
     response = (

@@ -120,7 +120,7 @@ async def test_real_adapter_envelope_is_groq_not_deepseek():
         assert body["model"] == GROQ_MODEL and body["reasoning_effort"] == "low"
         return httpx.Response(200, json={"model": GROQ_MODEL, "choices": [{"message": {"role": "assistant", "content": "Respuesta factual"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        cfg = Settings(llm_enabled=True, opencode_go_api_key="synthetic", opencode_go_base_url="https://primary.invalid/v1", llm_max_retries=0, groq_api_key="synthetic", groq_chat_fallback_enabled=True, groq_free_plan_confirmed=True, groq_zdr_confirmed=True)
+        cfg = Settings(llm_enabled=True, chat_go_subscription_enabled=False, opencode_go_model="deepseek-v4.1-flash-free", opencode_go_fallback_model="space-bunny-free", opencode_go_api_key="synthetic", opencode_go_base_url="https://primary.invalid/v1", llm_max_retries=0, groq_api_key="synthetic", groq_chat_fallback_enabled=True, groq_free_plan_confirmed=True, groq_zdr_confirmed=True)
         out = await create_chat_llm_provider(cfg, client=client).complete(LLMRequest([Message("user", "hola")], task="chat"))
     assert out.provider == "groq" and len(seen) == 3
     assert [row["model"] for row in seen[:2]] == ["deepseek-v4.1-flash-free", "space-bunny-free"]
@@ -164,7 +164,10 @@ async def test_tools_never_go_to_backup():
 
 
 def test_disabled_flag_keeps_primary_unchanged():
-    provider = create_chat_llm_provider(Settings(llm_enabled=True, opencode_go_api_key="synthetic"))
+    provider = create_chat_llm_provider(Settings(
+        llm_enabled=True, chat_go_subscription_enabled=False,
+        opencode_go_model="deepseek-v4.1-flash-free", opencode_go_api_key="synthetic",
+    ))
     assert provider.name == "opencode-go"
 
 
@@ -175,7 +178,7 @@ async def test_paid_primary_override_rejected_before_network():
         seen.append(req)
         raise AssertionError("network must not run")
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        cfg = Settings(llm_enabled=True, opencode_go_api_key="synthetic", opencode_go_model="paid-unknown", llm_model_overrides={"chat": "paid-unknown"}, groq_api_key="synthetic", groq_chat_fallback_enabled=True, groq_free_plan_confirmed=True, groq_zdr_confirmed=True)
+        cfg = Settings(llm_enabled=True, chat_go_subscription_enabled=False, opencode_go_api_key="synthetic", opencode_go_model="paid-unknown", llm_model_overrides={"chat": "paid-unknown"}, groq_api_key="synthetic", groq_chat_fallback_enabled=True, groq_free_plan_confirmed=True, groq_zdr_confirmed=True)
         from app.llm.errors import ProviderDisabledError
         with pytest.raises(ProviderDisabledError, match="not_verified_free"):
             await create_chat_llm_provider(cfg, client=client).complete(LLMRequest([Message("user", "hola")], task="chat"))
@@ -428,7 +431,12 @@ async def test_chain_without_gemini_behaves_as_before():
 
 
 def _gemini_cfg(**over):
-    cfg = dict(llm_enabled=True, opencode_go_api_key="synthetic", groq_api_key="synthetic", groq_chat_fallback_enabled=True, groq_free_plan_confirmed=True, groq_zdr_confirmed=True)
+    cfg = dict(
+        llm_enabled=True, chat_go_subscription_enabled=False,
+        opencode_go_model="deepseek-v4.1-flash-free", opencode_go_api_key="synthetic",
+        groq_api_key="synthetic", groq_chat_fallback_enabled=True,
+        groq_free_plan_confirmed=True, groq_zdr_confirmed=True,
+    )
     cfg.update(over)
     return Settings(**cfg)
 

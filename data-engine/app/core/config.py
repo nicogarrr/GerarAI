@@ -354,45 +354,44 @@ class Settings(BaseSettings):
     )
     instrument_snapshot_dir: str = "./data/instruments"
     opencode_go_api_key: str | None = Field(default=None, repr=False)
-    opencode_go_base_url: str = "https://opencode.ai/zen/v1"
-    # Default cheap-but-good model. Overridable WITHOUT code change via env
-    # OPENCODE_GO_MODEL (e.g. OPENCODE_GO_MODEL=qwen3.7-plus). Ver también
-    # default_model_from_env() en app/llm/model_aliases.py.
-    opencode_go_model: str = "deepseek-v4.1-flash-free"
-    # Fallback automatico: si el modelo resuelto falla (cualquier error de
-    # capa LLM tras sus reintentos internos), la llamada se reintenta UNA
-    # vez con este modelo antes de propagar el error. Cadena vacia = sin
-    # fallback. Env: OPENCODE_GO_FALLBACK_MODEL.
-    # 2026-10-16: TODOS los free de Zen (space-bunny incluido) devuelven 403
-    # FreeTierError por API directa; prod usa el puente local
-    # (data-engine/bridge/opencode_bridge.py -> serve opencode enjaulado),
-    # con deepseek-v4.1-flash-free principal y space-bunny-free de respaldo
-    # (verificado con generacion real en la VM ese mismo dia).
+    # Decision del dueno (2026-10-25): el cerebro es OpenCode Go con el modelo
+    # `deepseek-v4.1-flash`, cubierto por su suscripcion ya contratada. El
+    # endpoint /zen/go/v1 es el aprobado; el bridge local queda como opcion
+    # para free/legacy, no como camino obligatorio.
+    opencode_go_base_url: str = "https://opencode.ai/zen/go/v1"
+    # Modelo aprobado por el dueno (no es free: lo paga la suscripcion Go).
+    # Overridable via OPENCODE_GO_MODEL; en produccion solo se aceptan free
+    # verificados o el modelo Go aprobado (ver validate_production_llm_model).
+    opencode_go_model: str = "deepseek-v4.1-flash"
+    # Fallback automatico interno del adaptador. Vacio por defecto: no hay
+    # fallback implicito. En produccion solo se aceptan free verificados o el
+    # modelo Go aprobado. Env: OPENCODE_GO_FALLBACK_MODEL.
     opencode_go_fallback_model: str = ""
+    # Escotilla explicita y auditada para produccion: permite un modelo no
+    # aprobado (p. ej. un piloto). Sin ella, el arranque falla. Nunca se usa
+    # para saltarse los guards de coste sin decision del dueno.
+    # Env: OPENCODE_GO_ALLOW_UNVERIFIED_MODEL.
+    opencode_go_allow_unverified_model: bool = False
     # OpenCode Go exige cabecera x-opencode-session en todas las llamadas
     # (sin ella: MissingSessionID). ID estable por despliegue, mejora el
     # enrutado/cacheo del proveedor. Env: OPENCODE_GO_SESSION.
     opencode_go_session: str = "cavaai-prod"
     # Nivel de razonamiento para los modelos de OpenCode Go que lo soportan.
-    # space-bunny-free acepta effort low|medium|high|xhigh|max (catalogo
-    # models.dev, verificado 2026-09-30); se envia como `reasoning_effort`
-    # en el sobre OpenAI-compatible de Zen. Cadena vacia = no enviar el
-    # parametro. Env: OPENCODE_GO_REASONING_EFFORT.
-    opencode_go_reasoning_effort: str | None = "max"
-    # Modelos a los que se aplica reasoning_effort (lista separada por
-    # comas). El fallback muse-spark-1.3-contributor-free SI es modelo de
-    # razonamiento, pero su catalogo llega solo hasta xhigh (sin max):
-    # la lista por defecto lo excluye para que el respaldo nunca reciba
-    # un nivel que rechazaria. Env: OPENCODE_GO_REASONING_EFFORT_MODELS.
-    opencode_go_reasoning_effort_models: str = "space-bunny-free,deepseek-v4.1-flash-free"
+    # DeepSeek v4.1 Flash acepta high; se envia como `reasoning_effort` en el
+    # sobre OpenAI-compatible. Cadena vacia = no enviar el parametro.
+    # Env: OPENCODE_GO_REASONING_EFFORT.
+    opencode_go_reasoning_effort: str | None = "high"
+    # Modelos a los que se aplica reasoning_effort (lista separada por comas).
+    # Incluye los free de legacy para que el bridge opcional siga funcionando.
+    # Env: OPENCODE_GO_REASONING_EFFORT_MODELS.
+    opencode_go_reasoning_effort_models: str = (
+        "deepseek-v4.1-flash,deepseek-v4.1-flash-free,space-bunny-free"
+    )
     # Nivel de razonamiento SOLO para el chat interactivo (cadena
-    # create_chat_llm_provider). Con "max" el bridge tarda ~26 s o mas y el
-    # chat (presupuesto total corto, carrera a los 2 s) casi siempre acababa
-    # en los respaldos Groq/Gemini, dejando la generacion del primario
-    # cancelada a medias (BrokenPipe en el bridge). "low" hace al primario
-    # competitivo en la carrera; "max" iguala al resto de llamadas.
-    # Env: OPENCODE_GO_CHAT_REASONING_EFFORT.
-    opencode_go_chat_reasoning_effort: str | None = "low"
+    # create_chat_llm_provider). Decision 2026-10-25: high para DeepSeek v4.1
+    # Flash, alineado con compose y docs. Env:
+    # OPENCODE_GO_CHAT_REASONING_EFFORT.
+    opencode_go_chat_reasoning_effort: str | None = "high"
 
     # Cascada gratuita (LLM_PROVIDER=cascade): Gemini AI Studio -> OpenRouter :free
     # -> OpenCode, solo los que tengan clave. Env: GEMINI_API_KEY / OPENROUTER_API_KEY.
@@ -446,28 +445,26 @@ class Settings(BaseSettings):
     # respaldos); el resto de llamadas largas vive en workers/segundo plano.
     llm_total_timeout_seconds: float = Field(default=250.0, gt=0)
     # Presupuesto total del chat interactivo (carrera primario/respaldos en
-    # ChatFallbackProvider). Corto a proposito: la respuesta al usuario no
-    # puede esperar una generacion larga; el primario compite con reasoning
-    # reducido (opencode_go_chat_reasoning_effort).
-    chat_total_timeout_seconds: float = Field(default=20.0, gt=0)
+    # ChatFallbackProvider). Fuente de verdad unica: compose y docs pasan o
+    # documentan este mismo 45 s (antes config decia 20 y docs 45).
+    chat_total_timeout_seconds: float = Field(default=45.0, gt=0)
     # Ventaja del primario Go antes de lanzar el respaldo en paralelo. Default 2 s
     # (igual que antes de #2142). Prueba real 25-oct: con la peticion real del chat
     # (JSON estricto, max_tokens 1800) Go tardo 12-14 s y 1 de 3 salio truncada,
     # asi que una ventaja de 8 s solo anadio espera. Se ajusta por entorno cuando
-    # haya medicion representativa; Go sigue apagado por defecto.
+    # haya medicion representativa.
     chat_go_head_start_seconds: float = Field(default=2.0, gt=0)
     # Suelo de max_tokens SOLO para el primario Go del chat. Medicion 25-oct con la
     # peticion real (JSON estricto): 1800 truncaba 1-2 de 3; 2600 dio 2/2 completas
     # (muestra pequena, sintetica). Con el flag apagado no se usa.
     chat_go_min_output_tokens: int = Field(default=2600, ge=1024, le=8000)
-    # APAGADO por defecto en codigo; se enciende por entorno tras auditoria y
-    # QA. Primario de chat por la suscripcion OpenCode Go de Nico (modelo
-    # `deepseek-v4.1-flash`, endpoint /zen/go/v1), con respaldo Groq/Gemini
-    # intacto. El encaje con las condiciones de Go sigue SIN confirmar
-    # (incertidumbre, no prohibicion expresa). Con el
-    # interruptor apagado el chat sigue en la ruta gratuita verificada.
-    # Env: CHAT_GO_SUBSCRIPTION_ENABLED.
-    chat_go_subscription_enabled: bool = False
+    # ENCENDIDO por decision explicita del dueno (2026-10-25): el primario del
+    # chat es la suscripcion OpenCode Go ya contratada (modelo
+    # `deepseek-v4.1-flash`, endpoint /zen/go/v1), con Groq/Gemini intactos y
+    # apagados. El interruptor sigue existiendo para volver a la ruta free
+    # verificada (bridge opcional) sin tocar codigo. Env:
+    # CHAT_GO_SUBSCRIPTION_ENABLED.
+    chat_go_subscription_enabled: bool = True
     chat_go_subscription_base_url: str = "https://opencode.ai/zen/go/v1"
     # Modelos con razonamiento oculto: gastan tokens de salida pensando y con un
     # max_tokens bajo devuelven "no assistant message". Suelo de salida para ellos.
@@ -556,6 +553,50 @@ class Settings(BaseSettings):
         # Ultimo, para no tapar los mensajes de las demas garantias.
         if database_scheme.startswith("sqlite"):
             raise ValueError("SQLite is not allowed as DATABASE_URL in production")
+        return self
+
+    @model_validator(mode="after")
+    def validate_production_llm_model(self) -> Self:
+        """Falla el arranque si produccion usa un modelo no aprobado.
+
+        Aprobados: los free verificados reales o el modelo de la suscripcion
+        OpenCode Go del dueno (``deepseek-v4.1-flash``), y solo este ultimo si
+        la suscripcion esta confirmada. Un override silencioso a un modelo de
+        pago desconocido rompe el arranque; la unica salida es el flag
+        explicito ``OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=true``.
+        """
+        if not self.is_production or not self.llm_enabled:
+            return self
+        requested = (self.llm_provider or "").strip().lower()
+        if requested in {"auto", "opencode", "opencode_go"}:
+            requested = "opencode-go"
+        if requested != "opencode-go":
+            return self
+        if self.opencode_go_allow_unverified_model:
+            return self
+        # Import perezoso: app.llm.__init__ importa factory -> config, y un
+        # import de nivel de modulo crearia un ciclo.
+        from app.llm.model_aliases import GO_SUBSCRIPTION_MODELS, VERIFIED_FREE_MODELS
+
+        def _approved(model: str) -> bool:
+            return model in VERIFIED_FREE_MODELS or (
+                self.chat_go_subscription_enabled and model in GO_SUBSCRIPTION_MODELS
+            )
+
+        if not _approved(self.opencode_go_model.strip()):
+            raise ValueError(
+                "OPENCODE_GO_MODEL is not an owner-approved model in production: "
+                f"{self.opencode_go_model!r}. Use a verified free model "
+                f"({', '.join(sorted(VERIFIED_FREE_MODELS))}) or the Go subscription "
+                f"model ({', '.join(sorted(GO_SUBSCRIPTION_MODELS))}); set "
+                "OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=true only for an audited pilot."
+            )
+        fallback = self.opencode_go_fallback_model.strip()
+        if fallback and not _approved(fallback):
+            raise ValueError(
+                "OPENCODE_GO_FALLBACK_MODEL is not an owner-approved model in "
+                f"production: {fallback!r}. Leave it empty or use an approved model."
+            )
         return self
 
 

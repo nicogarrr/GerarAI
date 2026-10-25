@@ -34,9 +34,10 @@ from typing import Any
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.tenancy import tenant_filters
 from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
-from app.llm.model_aliases import VERIFIED_FREE_MODELS
+from app.llm.model_aliases import is_owner_approved_model
 from app.models import (
     BottleneckDiscovery,
     BottleneckSignal,
@@ -546,14 +547,16 @@ def save_within_quota(
         return saved
 
 
-def paid_model_risk(provider: Any, model: str) -> str | None:
-    """Motivo de bloqueo si la llamada REAL podria usar un modelo no gratuito, o None.
+def paid_model_risk(provider: Any, model: str, *, settings: Any = None) -> str | None:
+    """Motivo de bloqueo si la llamada REAL podria usar un modelo no aprobado.
 
-    Resuelve con el mismo router que usara el proveedor (incluidos overrides de
-    entorno) sobre una peticion con el modelo ya fijado, y mira tambien el modelo
-    de fallback del adaptador. Todo ANTES de gastar nada. Fail-closed: si no se
-    puede verificar, se bloquea.
+    Aprobados: free verificados o el modelo Go de la suscripcion del dueno (solo
+    con ``chat_go_subscription_enabled``). Resuelve con el mismo router que usara
+    el proveedor (incluidos overrides de entorno) sobre una peticion con el modelo
+    ya fijado, y mira tambien el modelo de fallback del adaptador. Todo ANTES de
+    gastar nada. Fail-closed: si no se puede verificar, se bloquea.
     """
+    settings = settings or get_settings()
     router = getattr(provider, "model_router", None)
     if router is None:
         return "modelo_no_verificable"
@@ -562,10 +565,10 @@ def paid_model_risk(provider: Any, model: str) -> str | None:
         resolved = router.resolve(probe)
     except Exception:  # noqa: BLE001 - alias deshabilitado o inconsistente
         return "modelo_no_verificable"
-    if resolved not in VERIFIED_FREE_MODELS:
+    if not is_owner_approved_model(resolved, settings):
         return "modelo_no_gratuito"
     fallback = getattr(provider, "_fallback_model", None)
-    if fallback and fallback not in VERIFIED_FREE_MODELS:
+    if fallback and not is_owner_approved_model(fallback, settings):
         return "fallback_no_gratuito"
     return None
 
@@ -592,13 +595,14 @@ async def discover(
         result["stop_reason"] = reason
         return result
 
+    settings = get_settings()
     route = route_model(TASK)
-    if route.model not in VERIFIED_FREE_MODELS:
+    if not is_owner_approved_model(route.model, settings):
         return {**result, "status": "skipped", "stop_reason": "modelo_no_gratuito"}
     provider = provider or create_llm_provider()
     if provider.name == "disabled":
         return {**result, "status": "skipped", "stop_reason": "llm_deshabilitado"}
-    blocked = paid_model_risk(provider, route.model)
+    blocked = paid_model_risk(provider, route.model, settings=settings)
     if blocked:
         return {**result, "status": "skipped", "stop_reason": blocked}
     if todays_discoveries(db, now) >= DAILY_QUOTA:

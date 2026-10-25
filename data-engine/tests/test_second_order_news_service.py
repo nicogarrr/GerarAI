@@ -151,7 +151,7 @@ def test_llm_request_pins_free_model_even_with_paid_override(monkeypatch):
     monkeypatch.setattr(service, "create_llm_provider", lambda: Provider())
     result, _ = asyncio.run(service._extract_with_llm("Una noticia general"))
     assert result.themes == []
-    assert captured[0].model == "space-bunny-free"
+    assert captured[0].model == "deepseek-v4.1-flash"
     result, _ = asyncio.run(service._extract_with_llm("Una noticia", context="- Ticker: ASTS"))
     assert "ASTS" in captured[1].messages[-1].content
     assert "Noticia:" in captured[1].messages[-1].content

@@ -61,13 +61,13 @@ def test_factory_only_accepts_opencode_go_and_routes_to_default_model():
 
 
 def test_task_router_uses_one_opencode_model_for_every_task():
-    assert all(route.model == "deepseek-v4.1-flash-free" for route in ROUTES.values())
-    assert route_model("deep_thesis").model == "deepseek-v4.1-flash-free"
-    assert route_model("cheap_extraction").model == "deepseek-v4.1-flash-free"
+    assert all(route.model == "deepseek-v4.1-flash" for route in ROUTES.values())
+    assert route_model("deep_thesis").model == "deepseek-v4.1-flash"
+    assert route_model("cheap_extraction").model == "deepseek-v4.1-flash"
     assert (
         TaskModelRouter(default_model="space-bunny-free")
         .resolve(LLMRequest(messages=[Message("user", "Extract")], task="chat"))
-        == "deepseek-v4.1-flash-free"
+        == "deepseek-v4.1-flash"
     )
 
 
@@ -76,8 +76,8 @@ def test_opencode_model_alias_resolves_to_chat_completions_model():
         "deepseek-v4.1-flash-free", provider="opencode-go"
     ) == "deepseek-v4.1-flash-free"
     rows = {row["model"]: row for row in route_table()}
-    assert rows["deepseek-v4.1-flash-free"]["provider"] == "opencode-go"
-    assert rows["deepseek-v4.1-flash-free"]["provider_model_id"] == "deepseek-v4.1-flash-free"
+    assert rows["deepseek-v4.1-flash"]["provider"] == "opencode-go"
+    assert rows["deepseek-v4.1-flash"]["provider_model_id"] == "deepseek-v4.1-flash"
 
 
 def test_active_route_validation_rejects_other_providers():
@@ -111,7 +111,7 @@ def test_opencode_go_completion_uses_chat_completions_endpoint():
         assert request.url == "https://opencode.test/zen/go/v1/chat/completions"
         assert request.headers["authorization"] == "Bearer test-secret"
         assert request.headers["x-opencode-session"] == "cavaai-prod"
-        assert payload["model"] == "deepseek-v4.1-flash-free"
+        assert payload["model"] == "deepseek-v4.1-flash"
         return httpx.Response(
             200,
             json={
@@ -309,7 +309,7 @@ def test_reasoning_effort_goes_to_allowlisted_model_only():
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
         seen.append(payload)
-        if payload["model"] == "deepseek-v4.1-flash-free":
+        if payload["model"] == "deepseek-v4.1-flash":
             return httpx.Response(500, json={"error": "boom"})
         return _ok_response(payload["model"])
 
@@ -329,10 +329,10 @@ def test_reasoning_effort_goes_to_allowlisted_model_only():
             )
 
     assert run(scenario()).text == "ok"
-    assert seen[0]["model"] == "deepseek-v4.1-flash-free"
-    assert seen[0]["reasoning_effort"] == "max"
-    # El fallback (muse-spark) no esta en la lista por defecto: su
-    # catalogo no admite max y no debe recibir el parametro.
+    assert seen[0]["model"] == "deepseek-v4.1-flash"
+    assert seen[0]["reasoning_effort"] == "high"
+    # El fallback (muse-spark) no esta en la lista por defecto y no debe
+    # recibir el parametro.
     assert seen[-1]["model"] == "muse-spark-1.3-contributor-free"
     assert "reasoning_effort" not in seen[-1]
 
@@ -378,7 +378,7 @@ def test_reasoning_effort_models_list_is_configurable():
                     opencode_go_api_key="test-secret",
                     opencode_go_base_url="https://opencode.test/zen/go/v1",
                     opencode_go_reasoning_effort="high",
-                    opencode_go_reasoning_effort_models="otro-modelo, deepseek-v4.1-flash-free ",
+                    opencode_go_reasoning_effort_models="otro-modelo, deepseek-v4.1-flash ",
                 ),
                 client=client,
             )

@@ -6,6 +6,7 @@ from app.core.config import Settings, get_settings
 from app.llm.adapters import DisabledProvider, OpenAICompatibleProvider
 from app.llm.base import LLMProvider
 from app.llm.cascade import CascadeProvider
+from app.llm.model_aliases import VERIFIED_FREE_MODELS
 from app.llm.response_cache import build_response_cache
 
 
@@ -56,6 +57,17 @@ def create_llm_provider(
         total_timeout_seconds=total_timeout_seconds,
         reasoning_effort=reasoning_effort,
     )
+
+
+def _pin_routes_to_model(model: str) -> dict[str, str]:
+    """Manda SOLO los modelos por defecto de las rutas al modelo indicado.
+
+    A diferencia de ``_pin_to_model`` no toca alias explicitos (p. ej. el
+    ``fallback_model``), que deben seguir siendo distintos del primario.
+    """
+    from app.services.llm_router import ROUTES
+
+    return {route.model: model for route in ROUTES.values()}
 
 
 def _pin_to_model(model: str) -> dict[str, str]:
@@ -125,6 +137,12 @@ def _opencode_go(
     total_timeout_seconds: float | None = None,
     reasoning_effort: str | None = None,
 ) -> OpenAICompatibleProvider:
+    overrides = settings.llm_model_overrides
+    if settings.opencode_go_model in VERIFIED_FREE_MODELS:
+        # Free/legacy: las rutas por defecto apuntan al modelo Go. Si el
+        # operador elige un free (bridge), se fijan todas las rutas a ese
+        # modelo para que ninguna llamada acabe pidiendo el Go al bridge.
+        overrides = {**_pin_routes_to_model(settings.opencode_go_model), **overrides}
     return OpenAICompatibleProvider(
         api_key=settings.opencode_go_api_key,
         base_url=settings.opencode_go_base_url,
@@ -136,7 +154,7 @@ def _opencode_go(
             "User-Agent": "cavaai/1.0",
             "x-opencode-session": settings.opencode_go_session,
         },
-        model_overrides=settings.llm_model_overrides,
+        model_overrides=overrides,
         fallback_model=settings.opencode_go_fallback_model,
         reasoning_effort=(
             settings.opencode_go_reasoning_effort

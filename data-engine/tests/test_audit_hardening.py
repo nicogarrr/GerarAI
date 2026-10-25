@@ -465,12 +465,12 @@ def test_chat_resolve_company_avoids_substring_false_positive(db):
 def test_no_premium_route_in_contract():
     from app.services.llm_router import ROUTES, route_model, route_table
 
-    # Tras #213 la ruta premium existe como alias eval-gated, pero apunta al
-    # modelo real gratuito: ningun modelo premium ficticio ni de pago.
-    assert ROUTES["premium_financial_analysis"].model == "deepseek-v4.1-flash-free"
-    assert route_model("premium_financial_analysis").model == "deepseek-v4.1-flash-free"
+    # La ruta premium existe como alias eval-gated, pero apunta al modelo Go
+    # aprobado por el dueno: ningun modelo premium ficticio ni de pago.
+    assert ROUTES["premium_financial_analysis"].model == "deepseek-v4.1-flash"
+    assert route_model("premium_financial_analysis").model == "deepseek-v4.1-flash"
     premium_rows = [row for row in route_table() if row["task"].startswith("premium_")]
-    assert premium_rows and all(row["model"] == "deepseek-v4.1-flash-free" for row in premium_rows)
+    assert premium_rows and all(row["model"] == "deepseek-v4.1-flash" for row in premium_rows)
 
 
 # ---------------------------------------------------------------------------

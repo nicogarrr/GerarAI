@@ -63,3 +63,30 @@ def test_prod_backend_forces_signed_research_identity():
     backend_env = _service_env(compose, "backend")
     assert backend_env.get("APP_ENV") == "production"
     assert backend_env.get("RESEARCH_AUTH_REQUIRED") == "true"
+
+
+def test_prod_llm_defaults_match_the_owner_approved_go_model():
+    compose = _load_compose()
+    for service in ("backend", "worker", "worker-thesis", "worker-kpis"):
+        env = _service_env(compose, service)
+        assert env.get("LLM_PROVIDER") == "${LLM_PROVIDER:-opencode-go}", service
+        assert env.get("CHAT_TOTAL_TIMEOUT_SECONDS") == "${CHAT_TOTAL_TIMEOUT_SECONDS:-45}", service
+        assert env.get("OPENCODE_GO_CHAT_REASONING_EFFORT") == (
+            "${OPENCODE_GO_CHAT_REASONING_EFFORT:-high}"
+        ), service
+        assert env.get("OPENCODE_GO_BASE_URL") == (
+            "${OPENCODE_GO_BASE_URL:-https://opencode.ai/zen/go/v1}"
+        ), service
+        assert env.get("OPENCODE_GO_MODEL") == (
+            "${OPENCODE_GO_MODEL:-deepseek-v4.1-flash}"
+        ), service
+        assert env.get("OPENCODE_GO_FALLBACK_MODEL") == "${OPENCODE_GO_FALLBACK_MODEL:-}", service
+
+
+def test_prod_chat_uses_the_go_subscription_and_backups_stay_off():
+    compose = _load_compose()
+    env = _service_env(compose, "backend")
+    assert env.get("CHAT_GO_SUBSCRIPTION_ENABLED") == "${CHAT_GO_SUBSCRIPTION_ENABLED:-true}"
+    assert env.get("GROQ_CHAT_FALLBACK_ENABLED") == "${GROQ_CHAT_FALLBACK_ENABLED:-false}"
+    assert env.get("GEMINI_CHAT_FALLBACK_ENABLED") == "${GEMINI_CHAT_FALLBACK_ENABLED:-false}"
+    assert "OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}" in compose["services"]["backend"]["environment"]

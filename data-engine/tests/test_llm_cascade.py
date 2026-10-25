@@ -89,7 +89,7 @@ def test_user_model_overrides_only_apply_to_opencode() -> None:
         _settings(
             gemini_api_key="g",
             opencode_go_api_key="c",
-            llm_model_overrides={"deepseek-v4.1-flash-free": "longcat-2.5-preview-free"},
+            llm_model_overrides={"deepseek-v4.1-flash": "longcat-2.5-preview-free"},
         )
     )
     gemini, opencode = provider.members  # type: ignore[attr-defined]
@@ -184,7 +184,7 @@ def test_cost_guards_fail_closed_with_the_real_cascade() -> None:
     resolved = provider.model_router.resolve(_request(task="cheap_extraction"))  # type: ignore[attr-defined]
     assert resolved == (
         "cascade[gemini=gemini-3.8-flash,openrouter=google/gemma-4-31b-it:free,"
-        "opencode-go=deepseek-v4.1-flash-free]"
+        "opencode-go=deepseek-v4.1-flash]"
     )
     assert proposal_risk(provider) == "modelo_no_gratuito"
     assert proposal_risk(provider, request=_request(model="space-bunny-free")) == "modelo_no_gratuito"

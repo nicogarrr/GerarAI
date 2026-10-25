@@ -24,7 +24,7 @@ import time
 
 from app.core.config import Settings, get_settings
 from app.llm import LLMRequest, Message, create_llm_provider
-from app.llm.model_aliases import MODEL_ALIASES, VERIFIED_FREE_MODELS
+from app.llm.model_aliases import MODEL_ALIASES, is_owner_approved_model
 
 logger = logging.getLogger(__name__)
 
@@ -66,20 +66,25 @@ def _clean_translation(raw: str) -> str | None:
     return text
 
 
-def _resolved_verified_free_model(model: str) -> str | None:
-    """ID de proveedor que se llamaria de verdad, o None si no es gratuito verificado.
+def _resolved_verified_free_model(
+    model: str, settings: Settings | None = None
+) -> str | None:
+    """ID de proveedor que se llamaria de verdad, o None si no esta aprobado.
 
-    No basta con el alias: el registro (persistido en DB, ``configure_model_aliases``)
-    puede apuntar un alias gratuito a un ID de proveedor de pago. Se verifica el ID
-    RESUELTO, el mismo que aplicara ``TaskModelRouter`` al enviar la peticion.
+    Aprobados: free verificados o el modelo Go de la suscripcion del dueno. El
+    nombre historico se conserva por compatibilidad. No basta con el alias: el
+    registro (persistido en DB, ``configure_model_aliases``) puede apuntar un
+    alias aprobado a un ID de proveedor de pago. Se verifica el ID RESUELTO, el
+    mismo que aplicara ``TaskModelRouter`` al enviar la peticion.
     """
-    if model not in VERIFIED_FREE_MODELS:
+    settings = settings or get_settings()
+    if not is_owner_approved_model(model, settings):
         return None
     try:
         resolved = MODEL_ALIASES.resolve(model, provider="opencode-go")
     except ValueError:
         return None
-    return resolved if resolved in VERIFIED_FREE_MODELS else None
+    return resolved if is_owner_approved_model(resolved, settings) else None
 
 
 def _cache_key(query: str) -> str:
@@ -126,8 +131,8 @@ async def english_variant(
         return None, "traduccion de consulta no disponible (fallo reciente en cache)"
     settings = settings or get_settings()
     model = settings.opencode_go_model
-    if _resolved_verified_free_model(model) is None:
-        return None, "traduccion de consulta omitida: modelo no verificado como gratuito"
+    if _resolved_verified_free_model(model, settings) is None:
+        return None, "traduccion de consulta omitida: modelo no aprobado (free o Go)"
     request = LLMRequest(
         model=model,
         temperature=0,

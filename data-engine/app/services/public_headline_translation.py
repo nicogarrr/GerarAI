@@ -60,7 +60,7 @@ def needs_translation(text: str) -> bool:
 def free_provider():
     settings = get_settings()
     model = settings.opencode_go_model
-    if _resolved_verified_free_model(model) is None:
+    if _resolved_verified_free_model(model, settings) is None:
         return None, None
     # A cascade can contain billable keys. Pin its verified-free OpenCode member only.
     pinned = settings.model_copy(update={"llm_provider": "opencode-go", "llm_model_overrides": {}, "opencode_go_fallback_model": ""})
