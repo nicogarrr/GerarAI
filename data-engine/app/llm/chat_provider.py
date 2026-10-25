@@ -487,8 +487,9 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
         raise ValueError("Groq chat fallback requires the verified OpenCode primary")
     backup = _groq_backup(settings, client)
     assert backup is not None  # el flag de arriba lo garantiza
+    head_start = {"delay": settings.chat_go_head_start_seconds} if primary.name == GO_SUBSCRIPTION_PROVIDER else {}
     return ChatFallbackProvider(primary, backup, total=settings.chat_total_timeout_seconds, backup2=backup2,
-                                extra_backups=_openrouter_backup(settings, client))
+                                extra_backups=_openrouter_backup(settings, client), **head_start)
 
 
 def create_background_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:

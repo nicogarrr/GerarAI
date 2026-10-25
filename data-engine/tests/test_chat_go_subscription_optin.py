@@ -109,3 +109,71 @@ def test_encendido_construye_cadena_con_respaldo_groq():
     provider = create_chat_llm_provider(settings)
     assert provider.primary.name == GO_SUBSCRIPTION_PROVIDER
     assert provider.backup.name == "groq"
+
+
+# --- Carrera Go (primario) vs Groq (respaldo): ventaja, errores y citas -----------
+import asyncio  # noqa: E402
+
+from app.llm.chat_provider import ChatFallbackProvider, _groq_backup  # noqa: E402
+
+
+def _race_settings(**extra) -> Settings:
+    return _settings(
+        chat_go_subscription_enabled=True,
+        groq_chat_fallback_enabled=True,
+        groq_api_key="g-test",
+        groq_free_plan_confirmed=True,
+        groq_zdr_confirmed=True,
+        **extra,
+    )
+
+
+def _race(go_delay: float, go_status: int, delay: float, go_text: str = "Go [S1]") -> str:
+    async def probe():
+        async def go_handler(request: httpx.Request) -> httpx.Response:
+            await asyncio.sleep(go_delay)
+            if go_status != 200:
+                return httpx.Response(go_status, json={"error": "x"}, request=request)
+            return httpx.Response(200, json=_ok(go_text), request=request)
+
+        async def groq_handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=_ok("Groq [S1]"), request=request)
+
+        settings = _race_settings()
+        async with httpx.AsyncClient(transport=httpx.MockTransport(go_handler)) as go_client, \
+                httpx.AsyncClient(transport=httpx.MockTransport(groq_handler)) as groq_client:
+            primary = _go_subscription_primary(settings, go_client)
+            backup = _groq_backup(settings, groq_client)
+            chain = ChatFallbackProvider(primary, backup, total=10, delay=delay)
+            response = await chain.complete(LLMRequest([Message("user", "q")], task="chat", max_tokens=64))
+            return response.text
+
+    return run_async(probe())
+
+
+def test_go_gana_si_responde_dentro_de_su_ventaja():
+    assert _race(go_delay=0.2, go_status=200, delay=2.0) == "Go [S1]"
+
+
+def test_ventaja_corta_deja_ganar_a_groq_comportamiento_medido_en_prod():
+    assert _race(go_delay=0.6, go_status=200, delay=0.1) == "Groq [S1]"
+
+
+def test_si_go_falla_groq_responde_sin_esperar_la_ventaja():
+    import time
+
+    start = time.monotonic()
+    assert _race(go_delay=0.0, go_status=500, delay=5.0) == "Groq [S1]"
+    assert time.monotonic() - start < 3.0
+
+
+def test_la_ventaja_por_defecto_solo_se_aplica_con_primario_go():
+    settings = _race_settings()
+    chain = create_chat_llm_provider(settings)
+    assert chain.primary.name == GO_SUBSCRIPTION_PROVIDER
+    assert chain.delay == settings.chat_go_head_start_seconds == 8.0
+    off = create_chat_llm_provider(_settings(
+        groq_chat_fallback_enabled=True, groq_api_key="g-test",
+        groq_free_plan_confirmed=True, groq_zdr_confirmed=True,
+    ))
+    assert off.delay == 2
