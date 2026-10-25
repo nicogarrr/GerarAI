@@ -34,6 +34,8 @@ def db():
 
 
 class _Snap:
+    # FinancialSnapshot.excluded_present (928a2cec): los motores lo leen siempre.
+    excluded_present: list = []
     coherent = False
     as_of_period = None
     income_statement = None
