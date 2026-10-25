@@ -264,6 +264,10 @@ _ETF_SYMBOLS = {"SPY", "QQQ", "IWM", "DIA", "VOO", "VTI", "GLD"}
 _FINNHUB_BASE = "https://finnhub.io/api/v1"
 _PROFILE_TTL = 6 * 3600.0  # 6h: nombre/market cap/sector cambian lento
 _QUOTE_TTL = 60.0  # precio real del día, refrescado cada minuto (como market.py)
+# Sin datos, cada request programaba un refresh nuevo y la UI veía
+# `refreshing=true` para siempre (carga indefinida). Tras un intento que
+# termina vacío se espera este cooldown antes de volver a intentarlo.
+_REAL_REFRESH_COOLDOWN_SECONDS = 30.0
 # El universo tiene 35 símbolos: un burst de seis workers está por debajo del
 # límite global de 60 llamadas/min y evita el antiguo sleep O(n) de 0,3 s.
 # El presupuesto efectivo de 55 deja margen para otros consumidores del mismo
@@ -309,6 +313,7 @@ _real_refresh_state_lock = threading.RLock()
 # DCF de Inicio) salia vacia de forma permanente.
 _real_refresh_futures: dict[int | None, object] = {}
 _real_refresh_generations: dict[int | None, int] = {}
+_real_refresh_last_attempt: dict[int | None, float] = {}
 _real_refresh_executor = ThreadPoolExecutor(
     max_workers=1, thread_name_prefix="cavaai-screener-refresh"
 )
@@ -581,9 +586,28 @@ class YahooScreenVendor:
 
 
 
+class OfflineScreenVendor:
+    """Vendor determinista para E2E/CI: no toca la red y declara vacío.
+
+    Existe para que el navegador no dependa de Finnhub/Yahoo en CI. No es un
+    modo de producto: `resolve_screener_vendor` lo ignora en producción.
+    """
+
+    name = "offline"
+    source_label = "offline"
+    supports_profiles = True
+
+    def fetch_quote(self, client: httpx.Client, symbol: str) -> dict | None:
+        return None
+
+    def fetch_profile(self, client: httpx.Client, symbol: str) -> dict | None:
+        return None
+
+
 SCREEN_VENDORS: dict[str, ScreenQuoteVendor] = {
     FinnhubScreenVendor.name: FinnhubScreenVendor(),
     YahooScreenVendor.name: YahooScreenVendor(),
+    OfflineScreenVendor.name: OfflineScreenVendor(),
 }
 DEFAULT_SCREENER_VENDOR = "finnhub"
 
@@ -605,11 +629,20 @@ def resolve_profile_vendor(active: ScreenQuoteVendor) -> ScreenQuoteVendor:
 
 
 def resolve_screener_vendor(name: str | None) -> ScreenQuoteVendor:
-    """Devuelve el vendor pedido o el default (Finnhub) si es desconocido/vacío."""
-    if not name:
+    """Devuelve el vendor pedido o el default (Finnhub) si es desconocido/vacío.
+
+    `offline` es un fixture determinista para E2E: nunca se acepta en
+    producción, aunque venga en el entorno.
+    """
+    requested = (name or "").strip().lower()
+    if requested == OfflineScreenVendor.name and getattr(
+        get_settings(), "is_production", False
+    ):
+        requested = ""
+    if not requested:
         return SCREEN_VENDORS[DEFAULT_SCREENER_VENDOR]
     return SCREEN_VENDORS.get(
-        name.strip().lower(), SCREEN_VENDORS[DEFAULT_SCREENER_VENDOR]
+        requested, SCREEN_VENDORS[DEFAULT_SCREENER_VENDOR]
     )
 
 
@@ -702,6 +735,9 @@ def _real_response_payload(
         # Carga fría: sin items y con un refresh en vuelo la respuesta vacía no
         # es «filtro sin resultados»; el front lo distingue con este flag.
         "refreshing": bool(refreshing),
+        # El universo entero está vacío (proveedor caído o sin datos): no es un
+        # filtro sin coincidencias y el front no debe decir «Sin resultados».
+        "unavailable": not items,
         # Tamaño del universo seguido: el subtítulo declara el alcance real en
         # vez de prometer «large caps» a secas con 4 filas de Salud o 2 de Energía.
         "universe_size": len(_REAL_UNIVERSE),
@@ -776,10 +812,22 @@ def _refresh_real_items_background(
 
 
 def _schedule_real_refresh(vendor: str, tenant_id: int | None = None):
-    """Programa el refresh DE ESTE TENANT y devuelve su Future (cold start)."""
+    """Programa el refresh DE ESTE TENANT y devuelve su Future (cold start).
+
+    Con un intento ya terminado y sin datos se respeta un cooldown: antes cada
+    request creaba otro Future vacío y `refreshing` nunca volvía a false.
+    """
     with _real_refresh_state_lock:
         current = _real_refresh_futures.get(tenant_id)
         if current is not None and not current.done():
+            return current
+        now = time.monotonic()
+        last_attempt = _real_refresh_last_attempt.get(tenant_id)
+        if (
+            current is not None
+            and last_attempt is not None
+            and now - last_attempt < _REAL_REFRESH_COOLDOWN_SECONDS
+        ):
             return current
         generation = _real_refresh_generations.get(tenant_id, 0) + 1
         _real_refresh_generations[tenant_id] = generation
@@ -787,6 +835,7 @@ def _schedule_real_refresh(vendor: str, tenant_id: int | None = None):
             _refresh_real_items_background, vendor, generation, tenant_id
         )
         _real_refresh_futures[tenant_id] = future
+        _real_refresh_last_attempt[tenant_id] = now
         return future
 
 
