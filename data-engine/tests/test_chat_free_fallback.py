@@ -517,7 +517,6 @@ async def test_fallback_trail_names_failed_members_without_messages_and_is_not_d
         LLMRequest([Message("user", "hola")], task="chat", model="deepseek-v4.1-flash-free"))
     assert out.provider == "groq" and not out.degraded and out.warnings == ()
     assert out.fallback_trail == ("fake:?:ProviderHTTPError429",)
-    assert all("429" in t or ":" in t for t in out.fallback_trail)
 
 
 @run_async
@@ -533,3 +532,18 @@ async def test_fallback_trail_lists_each_failed_backup_and_empty_for_primary():
     assert out.provider == "gemini"
     assert out.fallback_trail[0].startswith("fake:") and "ProviderHTTPError500" in out.fallback_trail[0]
     assert any("ProviderHTTPError503" in t for t in out.fallback_trail)
+
+
+@run_async
+async def test_fallback_trail_labels_a_pending_primary_as_pending_not_timeout():
+    """Si el respaldo gana la carrera mientras el primario sigue pendiente, NO se inventa un TimeoutError."""
+    class Slow(Fake):
+        async def complete(self, request):
+            await asyncio.sleep(5)
+            return await super().complete(request)
+
+    out = await ChatFallbackProvider(Slow(), Fake(response(model=GROQ_MODEL, provider="groq")), total=2, delay=.05).complete(
+        LLMRequest([Message("user", "hola")], task="chat"))
+    assert out.provider == "groq"
+    assert out.fallback_trail == ("fake:?:pending_when_fallback_won",)
+    assert not any("TimeoutError" in t for t in out.fallback_trail)

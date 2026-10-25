@@ -230,8 +230,9 @@ class ChatFallbackProvider(LLMProvider):
                             raise ProviderResponseError("chat response was truncated")
                         if task is not primary:
                             # Respondio la cadena de respaldo: el primario no llego a tiempo o fallo.
-                            label = primary_label or _failure_label(
-                                self.primary, primary_model, TimeoutError("not_answered")
+                            # Sin error del primario = seguia pendiente (NO un TimeoutError real).
+                            label = primary_label or (
+                                f"{getattr(self.primary, 'name', '?')}:{primary_model or '?'}:pending_when_fallback_won"
                             )
                             response = _with_trail(response, [label])
                         return response
