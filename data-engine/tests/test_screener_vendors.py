@@ -62,13 +62,31 @@ def _clean_caches():
     screeners._real_profile_cache.clear()
 
 
-def test_registry_has_both_vendors_and_finnhub_default():
-    assert set(SCREEN_VENDORS) == {"finnhub", "yahoo"}
+def test_registry_has_all_vendors_and_finnhub_default():
+    assert set(SCREEN_VENDORS) == {"finnhub", "yahoo", "offline"}
     assert DEFAULT_SCREENER_VENDOR == "finnhub"
     assert isinstance(SCREEN_VENDORS["finnhub"], FinnhubScreenVendor)
     assert isinstance(SCREEN_VENDORS["yahoo"], YahooScreenVendor)
     assert SCREEN_VENDORS["finnhub"].source_label == "finnhub_free"
     assert SCREEN_VENDORS["yahoo"].source_label == "yahoo_finance"
+    assert SCREEN_VENDORS["offline"].source_label == "offline"
+
+
+def test_offline_vendor_is_a_deterministic_fixture_only_outside_production(monkeypatch):
+    class _Local:
+        is_production = False
+
+    class _Prod:
+        is_production = True
+
+    monkeypatch.setattr(screeners, "get_settings", lambda: _Local())
+    offline = resolve_screener_vendor("offline")
+    assert offline.name == "offline"
+    assert offline.fetch_quote(None, "AAPL") is None  # type: ignore[arg-type]
+    assert offline.fetch_profile(None, "AAPL") is None  # type: ignore[arg-type]
+
+    monkeypatch.setattr(screeners, "get_settings", lambda: _Prod())
+    assert resolve_screener_vendor("offline").name == "finnhub"
 
 
 def test_profile_vendor_falls_back_to_finnhub_when_quotes_have_no_profiles(monkeypatch):

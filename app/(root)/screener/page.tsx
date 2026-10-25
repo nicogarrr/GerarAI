@@ -161,6 +161,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
       (error: unknown) => ({
         rows: [] as Awaited<ReturnType<typeof getScreenerStocksRealWithStatus>>['rows'],
         refreshing: false,
+        unavailable: false,
         universeSize: null as number | null,
         error,
       }),
@@ -178,8 +179,14 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
     getWatchlistState(),
   ]);
   const followed = new Set(watchlist.items.map((item) => item.symbol.trim().toUpperCase()));
-  const { rows, refreshing: screenerRefreshing, universeSize, error: screenerError } = screenerResult;
-  const backendDown = screenerError !== null;
+  const {
+    rows,
+    refreshing: screenerRefreshing,
+    unavailable: screenerUnavailable,
+    universeSize,
+    error: screenerError,
+  } = screenerResult;
+  const backendDown = screenerError !== null || screenerUnavailable;
   // Un indice sin precio real (fallo del proveedor) no se pinta como $0.00.
   const validIndices = indicesResult.data.filter((i) => i.price > 0);
   // «Desconectado» solo lo decide el error PROPIO de índices (5xx o sin red

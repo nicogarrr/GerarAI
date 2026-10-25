@@ -44,6 +44,10 @@ export default defineConfig({
           RESEARCH_AUTH_MAX_AGE_SECONDS: "3600",
           CAVAAI_ENABLE_VECTOR_INGEST: "0",
           CAVAAI_ENABLE_VECTOR_CHAT: "0",
+          // E2E determinista: no depende de Finnhub/Yahoo ni de la red. El
+          // endpoint responde vacío con `unavailable=true` y la UI muestra el
+          // estado final honesto en lugar de "cargando" indefinidamente.
+          SCREENER_QUOTE_VENDOR: "offline",
         },
         url: `${uiBackendURL}/health`,
         reuseExistingServer: !process.env.CI,
