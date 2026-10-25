@@ -124,7 +124,7 @@ export const NAV_SECTIONS: NavSection[] = [{
   title: '',
   items: [
     { href: '/inicio', label: 'Inicio', icon: Home },
-    { href: '/portfolio', label: 'Resumen', icon: Briefcase },
+    { href: '/portfolio', label: 'Cartera', icon: Briefcase },
     { href: '/research', label: 'Research', icon: FileSearch },
     { href: '/discover', label: 'Descubrir', icon: Filter },
     { href: '/watchlist', label: 'Watchlist', icon: Star },
@@ -240,7 +240,7 @@ export const MOBILE_TAB_ITEMS: NavItem[] = [
   { href: '/inicio', label: 'Inicio', icon: Home },
   { href: '/discover', label: 'Descubrir', icon: Filter },
   { href: '/watchlist', label: 'Watchlist', icon: Star },
-  { href: '/portfolio', label: 'Resumen', icon: Briefcase },
+  { href: '/portfolio', label: 'Cartera', icon: Briefcase },
   { href: '/research', label: 'Research', icon: FileSearch },
 ];
 
