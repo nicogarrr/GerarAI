@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 // Hallazgos QA de la ficha (Nico, 2026-10-19):
 //  (6) 390px: el enlace "Ver la evaluación del foso" se pintaba encima del
@@ -41,6 +41,22 @@ async function signedPost(path: string, payload?: unknown): Promise<Response> {
   });
 }
 
+// Captura el panel completo con 100 px de contexto arriba y abajo, en
+// coordenadas de DOCUMENTO (rect de viewport + scroll), para que no se desplace.
+async function capturarPanel(page: Page, panel: Locator, nombre: string): Promise<void> {
+  await panel.scrollIntoViewIfNeeded();
+  const caja = await panel.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { x: 0, y: r.top + window.scrollY, h: r.height };
+  });
+  const top = Math.max(0, caja.y - 100);
+  await page.screenshot({
+    path: `test-results/${nombre}.png`,
+    fullPage: true,
+    clip: { x: 0, y: top, width: 390, height: caja.y + caja.h + 100 - top },
+  });
+}
+
 async function ensureCompany(ticker: string, name: string): Promise<void> {
   const res = await signedPost("/api/companies/ensure", { ticker, name });
   if (!res.ok) throw new Error(`ensure ${ticker} fallo: ${res.status} ${await res.text()}`);
@@ -73,14 +89,11 @@ test.describe("ficha: panel de calidad financiera", () => {
     expect(a && b).toBeTruthy();
     // Evidencia visual (artefacto de CI) y numeros reales de las cajas.
     console.log(`MOAT 390px titulo=${JSON.stringify(a)} enlace=${JSON.stringify(b)}`);
-    await page.screenshot({ path: "test-results/ficha-moat-390.png", fullPage: false });
-    // Recorte con contexto: desde 100 px sobre el titulo hasta 160 px bajo el enlace.
-    const top = Math.max(0, a!.y - 100);
-    await page.screenshot({
-      path: "test-results/ficha-moat-panel-390.png",
-      fullPage: true,
-      clip: { x: 0, y: top, width: 390, height: b!.y + b!.height + 160 - top },
-    });
+    await capturarPanel(page, panel, "ficha-moat-colapsado-390");
+    // En movil el panel arranca plegado: se expande como lo haria el usuario.
+    await panel.getByRole("button", { name: /Expandir Calidad financiera/ }).click();
+    await expect(panel.getByRole("button", { name: /Contraer Calidad financiera/ })).toBeVisible();
+    await capturarPanel(page, panel, "ficha-moat-expandido-390");
     const solapan =
       a!.x < b!.x + b!.width && b!.x < a!.x + a!.width && a!.y < b!.y + b!.height && b!.y < a!.y + a!.height;
     expect(solapan, `titulo ${JSON.stringify(a)} vs accion ${JSON.stringify(b)}`).toBe(false);
@@ -95,19 +108,13 @@ test.describe("ficha: panel de calidad financiera", () => {
     const panel = page.locator("section", { has: page.getByRole("heading", { name: "Calidad financiera según la empresa" }) });
     await expect(panel).toHaveCount(1);
     await expect(panel.getByRole("link", { name: "Ver la evaluación del foso" })).toHaveCount(0);
-    await expect(page.getByText("Sin evaluación de calidad generada todavía")).toBeAttached();
-    const titulo = panel.getByRole("heading", { name: "Calidad financiera según la empresa" });
-    const vacio = page.getByText("Sin evaluación de calidad generada todavía").first();
-    const t = await titulo.boundingBox();
-    const v = await vacio.boundingBox();
-    console.log(`NOMOAT 390px titulo=${JSON.stringify(t)} vacio=${JSON.stringify(v)}`);
-    expect(t && v).toBeTruthy();
-    const top = Math.max(0, t!.y - 100);
-    await page.screenshot({
-      path: "test-results/ficha-nomoat-panel-390.png",
-      fullPage: true,
-      clip: { x: 0, y: top, width: 390, height: Math.max(v!.y + v!.height, t!.y + t!.height) + 120 - top },
-    });
+    const vacio = panel.getByText("Sin evaluación de calidad generada todavía");
+    await expect(vacio).toBeAttached();
+    await capturarPanel(page, panel, "ficha-nomoat-colapsado-390");
+    // Plegado en movil no se ve: se expande como lo haria el usuario y debe verse.
+    await panel.getByRole("button", { name: /Expandir Calidad financiera/ }).click();
+    await expect(vacio).toBeVisible();
+    await capturarPanel(page, panel, "ficha-nomoat-expandido-390");
   });
 });
 
