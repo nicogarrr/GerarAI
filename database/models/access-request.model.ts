@@ -1,4 +1,5 @@
 import { Schema, model, models, type Document, type Model } from 'mongoose';
+import { accessRequestTtlSeconds } from '@/lib/access-request-retention';
 
 export interface AccessRequestDoc extends Document {
     email: string;
@@ -32,19 +33,12 @@ AccessRequestSchema.index({ email: 1 }, { unique: true });
 AccessRequestSchema.index({ ipHash: 1, createdAt: -1 });
 AccessRequestSchema.index({ status: 1, createdAt: -1 });
 
-// Retencion: Mongo expira la solicitud completa (email, nombre, nota e IP
-// hasheada) pasado el periodo configurado. El indice TTL se nombra aparte
-// para no competir con el indice normal de createdAt. Un valor invalido cae
-// al default seguro de 365 dias.
-const retentionDays = Number(process.env.ACCESS_REQUEST_RETENTION_DAYS ?? 365);
-AccessRequestSchema.index(
-    { createdAt: 1 },
-    {
-        name: 'access_request_retention_ttl',
-        expireAfterSeconds:
-            (Number.isFinite(retentionDays) && retentionDays > 0 ? retentionDays : 365) * 86_400,
-    }
-);
+// Retencion por TTL de Mongo: APAGADA por defecto (ver lib/access-request-retention.ts).
+// Antes de activarla hay que contar los candidatos y revisar el alcance.
+const ttlSeconds = accessRequestTtlSeconds(process.env);
+if (ttlSeconds !== null) {
+    AccessRequestSchema.index({ createdAt: 1 }, { name: 'access_request_retention_ttl', expireAfterSeconds: ttlSeconds });
+}
 
 export const AccessRequest: Model<AccessRequestDoc> =
     (models?.AccessRequest as Model<AccessRequestDoc>) ||
