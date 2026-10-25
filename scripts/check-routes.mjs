@@ -102,7 +102,9 @@ for (const [file, content] of sources) {
   for (const match of content.matchAll(apiHrefPattern)) {
     // '/api/thesis/${encoded}/epub' -> '/api/thesis/*/epub': dynamic parts
     // match any [param] segment of the proxy route.
-    const normalized = match[1].split('${').join('*').split('}').join('');
+    // La query/hash no forma parte de la ruta ('/pdf?draft=1' -> '/pdf').
+    const pathOnly = match[1].split(/[?#]/)[0];
+    const normalized = pathOnly.split('${').join('*').split('}').join('');
     apiHrefCount += 1;
     const segments = normalized.split('/').filter(Boolean);
     const matches = apiPatterns.some((pattern) => {
