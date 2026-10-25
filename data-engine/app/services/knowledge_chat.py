@@ -7,7 +7,7 @@ import os
 import re
 import unicodedata
 
-from sqlalchemy import or_, select
+from sqlalchemy import case, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -101,6 +101,19 @@ def _fold(text: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(c))
 
 
+def _phrase_priority(question: str, terms: list[str]):
+    """Los fragmentos con la frase exacta ("margin of safety") van antes del tope de
+    120 candidatos: con terminos sueltos comunes ("margen", "seguridad") el orden por
+    id los dejaba fuera. Solo reordena candidatos, no relaja ningun filtro."""
+    folded = _fold(question)
+    phrases = [t for t in terms if " " in t]
+    phrases += [es for es, _ in _ES_EN_GLOSSARY if " " in es and es in folded]
+    phrases = [p.replace("%", "").replace("_", "") for p in dict.fromkeys(phrases)]
+    if not phrases:
+        return KnowledgeChunk.id * 0
+    return case((or_(*[KnowledgeChunk.content.ilike(f"%{p}%") for p in phrases]), 0), else_=1)
+
+
 def retrieve(db: Session, question: str, *, scope: str, author: str | None = None,
              document_id: int | None = None, collection_id: int | None = None) -> tuple[list, str]:
     tenant = db.info.get("tenant_id")
@@ -136,10 +149,11 @@ def retrieve(db: Session, question: str, *, scope: str, author: str | None = Non
     if terms:
         lexical = list(db.execute(statement.where(or_(
             *[KnowledgeChunk.content.ilike(f"%{term.replace('%', '').replace('_', '')}%") for term in terms]
-        )).order_by(KnowledgeChunk.id).limit(120)).all())
+        )).order_by(_phrase_priority(question, terms), KnowledgeChunk.id).limit(120)).all())
         covered = sorted(
             (
-                (sum(_fold(t) in _fold(row[0].content) for t in terms), row)
+                # Una frase exacta ("margin of safety") pesa mas que dos palabras sueltas.
+                (sum((2 if " " in t else 1) for t in terms if _fold(t) in _fold(row[0].content)), row)
                 for row in lexical
             ),
             key=lambda item: -item[0],
