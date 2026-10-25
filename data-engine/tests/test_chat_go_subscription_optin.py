@@ -171,7 +171,7 @@ def test_la_ventaja_por_defecto_solo_se_aplica_con_primario_go():
     settings = _race_settings()
     chain = create_chat_llm_provider(settings)
     assert chain.primary.name == GO_SUBSCRIPTION_PROVIDER
-    assert chain.delay == settings.chat_go_head_start_seconds == 8.0
+    assert chain.delay == settings.chat_go_head_start_seconds == 2.0
     off = create_chat_llm_provider(_settings(
         groq_chat_fallback_enabled=True, groq_api_key="g-test",
         groq_free_plan_confirmed=True, groq_zdr_confirmed=True,
