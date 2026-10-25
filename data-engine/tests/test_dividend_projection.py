@@ -426,3 +426,54 @@ def test_fiscal_year_with_only_excluded_positions_shows_row(db):
     assert row["irpf_scenario"] is None
     assert row["net_scenario"] is None
     assert "Sin datos" in row["note"]
+
+
+def _setup_payer(db, ticker, country):
+    company = _company(db, ticker=ticker, country=country)
+    _position(db, company, quantity="100")
+    _dividend(db, company, date.today() - timedelta(days=100), "1.00")
+    _fx(db)
+    return company
+
+
+def test_verified_canadian_payer_uses_treaty_ceiling_as_scenario(db):
+    _setup_payer(db, "BN", "CA")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    pos = out["positions"][0]
+    assert pos["source_withholding_rate"] == pytest.approx(0.15)
+    assert pos["withholding_basis"] == "emisor_verificado"
+    assert pos["withholding_kind"] == "techo_convenio"
+    assert pos["unverified_reason"] is None
+    assert out["coverage"]["unknown_source_withholding"] == []
+    assert any("25 %" in c for c in out["fiscal_conditions"])
+
+
+def test_canadian_domicile_without_verified_payer_stays_unverified(db):
+    _setup_payer(db, "XYZ", "CA")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    pos = out["positions"][0]
+    assert pos["source_withholding_rate"] is None
+    assert out["coverage"]["unknown_source_withholding"] == ["XYZ"]
+    assert "CA" in out["coverage"]["unverified_reasons"]["XYZ"]
+    assert out["gross_summary"]["gross_unverified_base"] > 0
+
+
+def test_baba_cayman_issuer_overrides_db_domicile_and_is_not_assumed_zero(db):
+    _setup_payer(db, "BABA", "HK")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    pos = out["positions"][0]
+    assert pos["domicile_country"] == "KY"
+    assert pos["source_withholding_rate"] is None
+    assert pos["source_withheld_base"] is None
+    assert "Caimán" in pos["unverified_reason"]
+    assert "No se asume 0 %" in out["coverage"]["unverified_reasons"]["BABA"]
+    assert out["gross_summary"]["gross_unverified_base"] > 0
+    assert out["fiscal_by_year"] == {} or all(
+        "BABA" not in y["covered_tickers"] for y in out["fiscal_by_year"].values()
+    )
