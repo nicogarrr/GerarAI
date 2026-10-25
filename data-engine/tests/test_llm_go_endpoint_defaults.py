@@ -19,7 +19,8 @@ from app.llm.model_aliases import (
 )
 from app.services.llm_router import ROUTES
 
-_PROD_DB = "postgresql://app_user:not-a-real-secret-fixture@db:5432/app"
+# Host-only fixture: no user/password shape for the secret scanner to flag.
+_PROD_DB = "postgresql+psycopg://fixture-db.invalid/fixture_db"
 _PROD_SECRET = "research-security-test-secret-at-least-32-chars"
 
 
