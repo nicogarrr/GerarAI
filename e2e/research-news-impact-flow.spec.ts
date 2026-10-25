@@ -48,7 +48,7 @@ test("news -> materiality -> thesis change", async ({ request }) => {
   const url = `https://www.sec.gov/Archives/${marker}`;
   const item = {
     ticker: "MSFT",
-    title: `MSFT cuts guidance after earnings miss ${marker}`,
+    title: `Microsoft cuts guidance after earnings miss ${marker}`,
     text:
       "Microsoft disclosed an SEC fraud investigation, a share offering with dilution, " +
       "and lower revenue and FCF margin guidance.",
