@@ -19,8 +19,9 @@ from app.llm.model_aliases import (
 )
 from app.services.llm_router import ROUTES
 
-# Host-only fixture: no user/password shape for the secret scanner to flag.
-_PROD_DB = "postgresql+psycopg://fixture-db.invalid/fixture_db"
+# Falsa a proposito: el driver lleva +psycopg y el host .invalid, asi el
+# detector de formas de secreto no confunde una credencial de test con una real.
+_PROD_DB = "postgresql+psycopg://fixture_user:fixture_pass@fixture-db.invalid/fixture_db"
 _PROD_SECRET = "research-security-test-secret-at-least-32-chars"
 
 
