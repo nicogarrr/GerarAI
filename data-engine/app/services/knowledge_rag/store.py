@@ -156,6 +156,33 @@ class KnowledgeStore:
             self.collection, points_selector=FilterSelector(filter=Filter(must=must)), wait=True
         )
 
+    def delete_tenant(self, tenant_id: int) -> int:
+        """Borra todos los puntos del tenant en esta coleccion (idempotente).
+
+        No crea la coleccion si no existe. Devuelve 1 si limpio una coleccion
+        existente y 0 si no habia nada que limpiar; un fallo de Qdrant se
+        propaga para que el borrado de cuenta no publique exito parcial.
+        """
+        from qdrant_client.models import FieldCondition, Filter, FilterSelector, MatchValue
+
+        existing = {c.name for c in self.client.get_collections().collections}
+        if self.collection not in existing:
+            return 0
+        self.client.delete(
+            self.collection,
+            points_selector=FilterSelector(
+                filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="tenant_id", match=MatchValue(value=tenant_id)
+                        )
+                    ]
+                )
+            ),
+            wait=True,
+        )
+        return 1
+
     def search_dense(self, vector: list[float], query_filter: Any, limit: int) -> list[Any]:
         return list(
             self.client.query_points(
