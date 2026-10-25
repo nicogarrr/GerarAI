@@ -11,22 +11,25 @@ const uiBackendURL = process.env.E2E_UI_BACKEND_URL ?? "http://127.0.0.1:8100";
 const e2eResearchSecret =
   process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 
-// Firma ligada al request (misma que e2e/fixtures/research-api.ts) con la
-// identidad que comparte el backend de UI.
+// Firma ligada al request (misma que e2e/fixtures/research-api.ts). La UI en
+// E2E (E2E_AUTH_BYPASS) llama al backend con tenant = user.id =
+// "e2e-browser-user" (ver lib/auth/research-identity.ts): el fixture debe
+// sembrarse en ESE tenant o la pagina no vera nunca lo que persiste el test.
+const uiTenant = "e2e-browser-user";
 async function signedPost(path: string, payload?: unknown): Promise<Response> {
   const body = payload === undefined ? "" : JSON.stringify(payload);
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const nonce = randomUUID().replaceAll("-", "");
   const bodyHash = createHash("sha256").update(body).digest("hex");
   const signature = createHmac("sha256", e2eResearchSecret)
-    .update(`e2e-api-tenant:e2e-api-user:${timestamp}:${nonce}:POST:${path}:${bodyHash}`)
+    .update(`${uiTenant}:${uiTenant}:${timestamp}:${nonce}:POST:${path}:${bodyHash}`)
     .digest("hex");
   return fetch(`${uiBackendURL}${path}`, {
     method: "POST",
     headers: {
       ...(body ? { "content-type": "application/json" } : {}),
-      "X-CavaAI-Tenant": "e2e-api-tenant",
-      "X-CavaAI-User": "e2e-api-user",
+      "X-CavaAI-Tenant": uiTenant,
+      "X-CavaAI-User": uiTenant,
       "X-CavaAI-Timestamp": timestamp,
       "X-CavaAI-Nonce": nonce,
       "X-CavaAI-Method": "POST",
