@@ -14,8 +14,8 @@ test.describe("audit closure flows", () => {
     await expect(page.getByRole("heading", { name: "Mercado", level: 1 })).toBeVisible();
     await expect(page.getByText("Motor de análisis", { exact: true })).toBeVisible();
     // Motor caído (fallback Finnhub) o motor con filtros: uno de los dos estados honestos.
-    const fallback = page.getByText("Finnhub como fallback offline");
-    const empty = page.getByText("Motor operativo pero sin filtros guardados");
+    const fallback = page.getByText("motor de filtros no disponible");
+    const empty = page.getByText("El motor de análisis responde, pero no hay filtros guardados");
     const filters = page.locator('a[href^="/screeners/"]');
     const states = (await fallback.count()) + (await empty.count()) + (await filters.count());
     expect(states).toBeGreaterThan(0);

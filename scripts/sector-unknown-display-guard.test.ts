@@ -28,9 +28,9 @@ test('variantes del placeholder (espacios, capitalización) también son ausenci
 
 test('los valores conocidos se traducen; lo sin mapa pasa tal cual (nunca inventado)', () => {
     // Quick win UX 4: la cabecera de la ficha lee en español.
-    assert.equal(sectorIndustryLine('Health Care', 'Pharmaceuticals'), 'Salud · Pharmaceuticals');
+    assert.equal(sectorIndustryLine('Health Care', 'Pharmaceuticals'), 'Salud · Farmacéutica');
     assert.equal(sectorIndustryLine('Health Care', 'Unknown'), 'Salud');
-    assert.equal(sectorIndustryLine('Unknown', 'Pharmaceuticals'), 'Pharmaceuticals');
+    assert.equal(sectorIndustryLine('Unknown', 'Pharmaceuticals'), 'Farmacéutica');
     // Sector e industria que traducen lo mismo no se duplican (AAPL:
     // «Information Technology · Technology» -> una sola «Tecnología»).
     assert.equal(sectorIndustryLine('Information Technology', 'Technology'), 'Tecnología');

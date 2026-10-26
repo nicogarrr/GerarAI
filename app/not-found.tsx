@@ -16,17 +16,25 @@ function NotFoundContent() {
         que conozcas.
       </p>
       <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+        {/* Un 404 puede llegar sin sesión: solo rutas públicas, nunca el panel
+            privado (/inicio, /discover, /watchlist). */}
         <Link
-          href="/inicio"
+          href="/"
           className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-teal-400 px-5 text-sm font-semibold text-gray-950 transition-colors hover:bg-teal-300"
         >
           Volver al inicio
         </Link>
         <Link
-          href="/watchlist"
+          href="/metodologia"
           className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-gray-700 px-5 text-sm text-gray-200 transition-colors hover:bg-gray-800"
         >
-          Ir a la watchlist
+          Ver la metodología
+        </Link>
+        <Link
+          href="/help"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-gray-700 px-5 text-sm text-gray-200 transition-colors hover:bg-gray-800"
+        >
+          Centro de ayuda
         </Link>
       </div>
     </main>
@@ -39,11 +47,11 @@ export default async function NotFound() {
   if (authenticated) return <AuthenticatedLayout><NotFoundContent /></AuthenticatedLayout>;
   return <div className="min-h-dvh text-gray-300">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 px-4 py-3">
-      <Link href="/inicio" className="inline-flex min-h-11 items-center" aria-label="GerarAI, inicio"><GerarAIWordmark /></Link>
+      <Link href="/" className="inline-flex min-h-11 items-center" aria-label="GerarAI, inicio"><GerarAIWordmark /></Link>
       <nav aria-label="Navegación principal" className="flex flex-wrap gap-4">
-        <Link className="inline-flex min-h-11 items-center" href="/inicio">Inicio</Link>
-        <Link className="inline-flex min-h-11 items-center" href="/discover">Descubrir</Link>
-        <Link className="inline-flex min-h-11 items-center" href="/watchlist">Watchlist</Link>
+        <Link className="inline-flex min-h-11 items-center" href="/">Inicio</Link>
+        <Link className="inline-flex min-h-11 items-center" href="/metodologia">Metodología</Link>
+        <Link className="inline-flex min-h-11 items-center" href="/help">Ayuda</Link>
       </nav>
     </header>
     <NotFoundContent />

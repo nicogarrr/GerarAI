@@ -100,6 +100,7 @@ test.describe("hardening frontend en navegador", () => {
     const response = await page.goto("/ruta-inexistente-cavaai");
     expect(response?.status()).toBe(404);
     await expect(page.getByRole("heading", { name: "Página no encontrada", level: 1 })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Volver al inicio" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Volver al inicio" })).toHaveAttribute("href", "/");
+    await expect(page.locator('a[href="/inicio"], a[href="/discover"], a[href="/watchlist"]')).toHaveCount(0);
   });
 });

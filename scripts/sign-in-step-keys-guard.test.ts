@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const page = readFileSync(join(root, 'app/(auth)/sign-in/page.tsx'), 'utf8');
+const page = readFileSync(join(root, 'components/forms/SignInForm.tsx'), 'utf8');
 
 describe('sign-in: pasos con key propia', () => {
     it('credenciales y 2FA no comparten nodos DOM', () => {

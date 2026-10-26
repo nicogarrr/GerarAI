@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { companyTypeLabel } from '../lib/labels.ts';
+import { companyTypeLabel, sectorIndustryLine } from '../lib/labels.ts';
 
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 
@@ -34,13 +34,19 @@ test('los tipos compuestos del master sin factorización tienen etiqueta exacta'
     const exact: Record<string, string> = {
         ai_infra_capacity: 'infraestructura de IA',
         asset_manager_holding: 'holding gestora de activos',
+        auto_energy_optionality: 'automoción con opcionalidad energética',
         china_adr_holding: 'holding china (ADR)',
         defense_contract_backlog: 'cartera de contratos de defensa',
+        healthcare_regulatory: 'salud regulada',
         mining_pre_revenue: 'minería pre ingresos',
         platform_fcf_compounder: 'plataforma de crecimiento compuesto de FCL',
         software_ai_disruption: 'software en disrupción por IA',
+        software_ai_platform: 'plataforma de software con IA',
         software_durable_growth: 'software de crecimiento duradero',
+        space_defense_growth: 'espacio y defensa en crecimiento',
         speculative_scenario: 'escenario especulativo',
+        subscriber_media: 'medios por suscripción',
+        uranium_mining: 'minería de uranio',
     };
     for (const [type, label] of Object.entries(exact)) {
         assert.equal(companyTypeLabel(type), label, type);
@@ -54,4 +60,11 @@ test('un token desconocido devuelve el tipo tal cual, nunca inventado', () => {
 
 test('el badge de la cabecera usa la etiqueta, no el valor crudo', () => {
     assert.match(page, /companyTypeLabel\(company\.company_type/);
+});
+
+test('las industrias del master no salen en inglés en la ficha ni en el índice', () => {
+    assert.equal(sectorIndustryLine('Technology', 'Software and cloud'), 'Tecnología · Software y nube');
+    assert.equal(sectorIndustryLine('Industrials', 'Aerospace and defense'), 'Industriales · Aeroespacial y defensa');
+    assert.equal(sectorIndustryLine('Communication Services', 'Satellite telecom'), 'Servicios de comunicación · Telecomunicaciones por satélite');
+    assert.equal(sectorIndustryLine('Technology', 'AI infrastructure'), 'Tecnología · Infraestructura de IA');
 });

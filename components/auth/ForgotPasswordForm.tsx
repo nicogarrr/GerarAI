@@ -31,7 +31,7 @@ export default function ForgotPasswordForm({
                     {supportEmail ? (
                         <> Si no puedes entrar, escribe a <a className="underline" href={`mailto:${supportEmail}`}>{supportEmail}</a>.</>
                     ) : (
-                        <> Si no puedes entrar, usa el canal de contacto publicado en la página legal.</>
+                        <> Si no puedes entrar, consulta el <Link className="underline" href="/help">centro de ayuda</Link> para contactar con soporte.</>
                     )}
                 </p>
             </div>

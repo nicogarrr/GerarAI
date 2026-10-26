@@ -24,7 +24,7 @@ test('el titular SEC es español y no repite ticker ni fecha', () => {
 
 test('la ficha traduce sector e industria y colapsa duplicados', () => {
     assert.equal(sectorIndustryLine('Information Technology', 'Technology'), 'Tecnología');
-    assert.equal(sectorIndustryLine('Health Care', 'Pharmaceuticals'), 'Salud · Pharmaceuticals');
+    assert.equal(sectorIndustryLine('Health Care', 'Pharmaceuticals'), 'Salud · Farmacéutica');
     assert.equal(sectorIndustryLine('Financials', 'Unknown'), 'Servicios financieros');
     assert.equal(sectorIndustryLine('Communication Services', 'Telecommunication'), 'Servicios de comunicación · Telecomunicaciones');
 });

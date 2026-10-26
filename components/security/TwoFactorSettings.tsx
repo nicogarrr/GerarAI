@@ -19,10 +19,24 @@ type Props = {
 type PasswordForm = { password: string };
 type TotpForm = { totpCode: string };
 
+/** Extrae el secreto Base32 del URI otpauth que devuelve el backend. */
+function totpSecretFromUri(uri: string): string | null {
+    try {
+        const parsed = new URL(uri);
+        if (parsed.protocol !== 'otpauth:') return null;
+        const secret = parsed.searchParams.get('secret')?.trim().toUpperCase();
+        return secret || null;
+    } catch {
+        return null;
+    }
+}
+
 export default function TwoFactorSettings({ initiallyEnabled }: Props) {
     const [enabled, setEnabled] = useState(initiallyEnabled);
     const [setup, setSetup] = useState<{ totpURI: string; backupCodes: string[] } | null>(null);
     const [busy, setBusy] = useState(false);
+
+    const totpSecret = setup ? totpSecretFromUri(setup.totpURI) : null;
 
     const passwordForm = useForm<PasswordForm>({ mode: 'onBlur' });
     const totpForm = useForm<TotpForm>({
@@ -91,6 +105,16 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
         }
     };
 
+    const copyTotpSecret = async () => {
+        if (!totpSecret) return;
+        try {
+            await navigator.clipboard.writeText(totpSecret);
+            toast.success('Clave de configuración copiada');
+        } catch {
+            toast.error('No se pudo copiar — selecciona la clave y cópiala a mano');
+        }
+    };
+
     return (
         <div className="max-w-xl space-y-6">
             <div>
@@ -132,14 +156,37 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
                 <div className="space-y-5 rounded-lg border border-gray-800 p-5">
                     <p className="text-sm text-gray-300 font-medium">1 · Escanea el código QR</p>
                     <div className="flex items-center gap-5">
-                        <div className="rounded-lg bg-white p-3">
-                            <QRCodeSVG value={setup.totpURI} size={160} />
+                        <div
+                            className="rounded-lg bg-white p-3"
+                            role="img"
+                            aria-label="Código QR para configurar la verificación en dos pasos"
+                        >
+                            <QRCodeSVG value={setup.totpURI} size={160} aria-hidden="true" />
                         </div>
                         <p className="text-xs text-gray-400 max-w-[220px]">
                             Abre tu app de autenticación y escanea este código, o introduce
                             la clave manualmente desde los ajustes de la app.
                         </p>
                     </div>
+
+                    {totpSecret ? (
+                        <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-3">
+                            <p className="text-sm text-gray-300 font-medium">Clave manual (Base32)</p>
+                            <p className="mt-1 text-xs text-gray-500">
+                                Si no puedes escanear el QR, elige «introducir clave manualmente» en tu app
+                                y pega esta clave. Es el mismo secreto, no un código de un solo uso.
+                            </p>
+                            <code
+                                aria-label="Clave TOTP en Base32"
+                                className="mt-2 block break-all rounded bg-gray-950 p-2 font-mono text-xs text-gray-200 select-all"
+                            >
+                                {totpSecret}
+                            </code>
+                            <Button type="button" variant="outline" size="sm" className="mt-2" onClick={copyTotpSecret}>
+                                Copiar clave
+                            </Button>
+                        </div>
+                    ) : null}
 
                     <div>
                         <p className="text-sm text-gray-300 font-medium">2 · Guarda tus códigos de respaldo</p>

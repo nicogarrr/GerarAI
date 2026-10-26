@@ -62,8 +62,8 @@ const COMPONENTS_EXCEPTIONS: Record<string, string> = {
 /**
  * Excepciones de `app/`.
  *
- * Vacia a proposito: los cuatro ficheros de `app/` con la directiva
- * (sign-in/page, error, global-error, ownership/SyncButton) la necesitan de
+ * Vacia a proposito: los ficheros de `app/` con la directiva
+ * (error, global-error, ownership/SyncButton) la necesitan de
  * verdad (useState/useEffect/useTransition + handlers de submit), asi que el
  * mismo guard pasa sin excepciones. Se deja la lista declarada para que anadir
  * una excepcion aqui sea un acto explicito y no un descuido.
@@ -96,7 +96,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'app/(root)/inversores/_components/InvestorSelector.tsx': 'useRouter, jsx-onChange',
   'app/(root)/inversores/_components/InvestorViewSelector.tsx': 'useRouter, jsx-onChange',
 
-  'app/(auth)/sign-in/page.tsx': 'useRouter, useState, jsx-onSubmit, jsx-onClick, libreria cliente: react-hook-form, libreria cliente: sonner',
+  'components/forms/SignInForm.tsx': 'useRouter, useState, jsx-onSubmit, jsx-onClick, libreria cliente: react-hook-form, libreria cliente: sonner',
   'app/(root)/error.tsx': 'useEffect, jsx-onClick',
   'app/(root)/inversores/_components/HubNav.tsx': 'usePathname',
   'app/(root)/inversores/_components/IngestLettersButton.tsx': 'useState, jsx-onClick',

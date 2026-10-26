@@ -236,7 +236,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                * tiraría el H1 y el panel del motor. */
               <div className="px-4 py-10 text-center">
                 <span className="inline-block rounded-full border border-amber-900/60 bg-amber-950/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-300">
-                  Motor de análisis desconectado
+                  Datos de mercado no disponibles
                 </span>
                 <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-gray-400 sm:text-base">
                   No hay datos ahora mismo.
@@ -360,7 +360,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                * es la lectura honesta. */
               <div className="py-6 text-center">
                 <span className="inline-block rounded-full border border-amber-900/60 bg-amber-950/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-300">
-                  Motor de análisis desconectado
+                  Índices no disponibles
                 </span>
                 <p className="mt-4 text-xs text-gray-500">
                   El servidor de GerarAI no ha podido completar la consulta. Reintenta en unos segundos.
@@ -396,7 +396,9 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-base break-words">Motor de análisis</CardTitle>
             {engineScreens.engineDown ? (
-              <Badge variant="outline">motor no disponible · Finnhub como fallback offline</Badge>
+              <Badge variant="outline">motor de filtros no disponible</Badge>
+            ) : engineScreens.screens.length === 0 ? (
+              <Badge variant="outline">Sin filtros guardados</Badge>
             ) : (
               <Badge>{engineScreens.screens.length} {engineScreens.screens.length === 1 ? 'filtro guardado' : 'filtros guardados'}</Badge>
             )}
@@ -408,11 +410,11 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
         <CardContent>
           {engineScreens.engineDown ? (
             <p className="text-sm text-gray-500">
-La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertura.
+              La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertura. El motor de filtros guardados no está disponible.
             </p>
           ) : engineScreens.screens.length === 0 ? (
             <p className="text-sm text-gray-500">
-              Motor operativo pero sin filtros guardados.{' '}
+              El motor de análisis responde, pero no hay filtros guardados.{' '}
               <Link href="/screeners" className="text-teal-300 hover:text-teal-200 hover:underline">
                 Crea el primero en Screeners
               </Link>.

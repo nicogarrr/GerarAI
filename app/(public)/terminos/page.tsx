@@ -8,7 +8,9 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
     title: 'Términos de uso',
     description: 'Condiciones de uso del servicio GerarAI.',
-    robots: { index: true, follow: true },
+    // Documento en borrador: no se indexa hasta que el titular complete y
+    // valide los campos [PENDIENTE].
+    robots: { index: false, follow: false },
     alternates: { canonical: '/terminos' },
 };
 
@@ -23,12 +25,13 @@ export default function TermsPage() {
                 Última revisión editorial: <span className={pendingClass}>[PENDIENTE: fecha]</span>.
             </p>
 
-            <div className="mt-6 rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100">
-                <p className="font-semibold">Borrador operativo.</p>
+            <div className="mt-6 rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100" role="note">
+                <p className="font-semibold">Aviso de borrador.</p>
                 <p className="mt-1">
                     Los campos <span className={pendingClass}>[PENDIENTE]</span> los debe
                     completar el titular del servicio antes de abrirlo a usuarios externos.
-                    Este documento no es asesoramiento jurídico.
+                    Mientras siga siendo borrador, esta página no se indexa y no debe citarse
+                    como términos definitivos. Este documento no es asesoramiento jurídico.
                 </p>
             </div>
 

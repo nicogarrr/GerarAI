@@ -8,7 +8,9 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
     title: 'Privacidad',
     description: 'Política de privacidad y tratamiento de datos personales de GerarAI.',
-    robots: { index: true, follow: true },
+    // Documento en borrador: no se indexa hasta que el responsable complete y
+    // valide los campos [PENDIENTE].
+    robots: { index: false, follow: false },
     alternates: { canonical: '/privacidad' },
 };
 
@@ -23,13 +25,15 @@ export default function PrivacyPage() {
                 Última revisión editorial: <span className={pendingClass}>[PENDIENTE: fecha]</span>.
             </p>
 
-            <div className="mt-6 rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100">
-                <p className="font-semibold">Borrador operativo, no una política legal cerrada.</p>
+            <div className="mt-6 rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100" role="note">
+                <p className="font-semibold">Aviso de borrador: este texto no es una política legal cerrada.</p>
                 <p className="mt-1">
                     Los campos marcados como <span className={pendingClass}>[PENDIENTE]</span> debe
                     completarlos el responsable del tratamiento (identidad, base jurídica,
                     regiones, encargados y autoridad de control) antes de abrir el servicio a
-                    usuarios externos. Este texto no sustituye una revisión jurídica.
+                    usuarios externos. Mientras siga siendo borrador, esta página no se indexa
+                    y no debe citarse como política definitiva. Este texto no sustituye una
+                    revisión jurídica.
                 </p>
             </div>
 
@@ -147,9 +151,13 @@ export default function PrivacyPage() {
                         Puedes solicitar acceso, rectificación, supresión, limitación,
                         portabilidad y oposición. Desde{' '}
                         <Link className="text-teal-300 underline" href="/security">/security</Link>{' '}
-                        puedes descargar una copia completa en JSON y borrar tu cuenta y todos
-                        sus datos. El borrado elimina PostgreSQL, documentos originales, vectores
-                        y sesiones; es irreversible.
+                        puedes descargar una copia en JSON de tus datos estructurados y
+                        metadatos (perfil, cartera, tesis, claims y evidencia, watchlist,
+                        alertas, conocimiento, planes y ajustes) y borrar tu cuenta y todos
+                        sus datos. La exportación no incluye los archivos originales de los
+                        documentos que hayas subido: de cada documento solo viajan sus
+                        metadatos y el recuento de fragmentos. El borrado elimina PostgreSQL,
+                        documentos originales, vectores y sesiones; es irreversible.
                     </p>
                     <p>
                         También puedes reclamar ante la autoridad de control competente:{' '}

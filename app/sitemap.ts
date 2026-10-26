@@ -3,11 +3,13 @@ import { MetadataRoute } from 'next';
 import { siteUrl } from '@/lib/config/site';
 
 /**
- * Solo las rutas públicas.
+ * Solo las rutas públicas indexables.
  *
  * `/propicks` estaba aquí y es una de las pantallas autenticadas: anunciarla en
  * el sitemap invita a los buscadores a indexar un módulo privado. El árbol
- * público es el de `app/(public)`: landing, metodología, ayuda y páginas legales.
+ * público es el de `app/(public)`: landing, metodología y ayuda. Las páginas
+ * legales siguen siendo borradores con `robots: noindex`, así que tampoco se
+ * anuncian aquí hasta que el titular las valide.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteUrl();
@@ -32,16 +34,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${base}/help`,
       changeFrequency: 'monthly',
       priority: 0.5,
-    },
-    {
-      url: `${base}/privacidad`,
-      changeFrequency: 'yearly',
-      priority: 0.4,
-    },
-    {
-      url: `${base}/terminos`,
-      changeFrequency: 'yearly',
-      priority: 0.4,
     },
   ];
 }

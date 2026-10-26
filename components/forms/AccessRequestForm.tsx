@@ -13,9 +13,14 @@ export default function AccessRequestForm() {
     const [pending, setPending] = useState(false);
     const [done, setDone] = useState<string | null>(null);
     const [error, setError] = useState<{ message: string; field?: string } | null>(null);
+    const [accepted, setAccepted] = useState(false);
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (!accepted) {
+            setError({ message: 'Debes aceptar los Términos de uso y la Política de privacidad para enviar la solicitud.' });
+            return;
+        }
         const form = new FormData(event.currentTarget);
         setPending(true);
         setError(null);
@@ -63,7 +68,27 @@ export default function AccessRequestForm() {
                 <input id="ar-website" name="website" tabIndex={-1} autoComplete="off" />
             </div>
             {error ? <p role="alert" className="text-sm text-red-400">{error.message}</p> : null}
-            <Button type="submit" size="lg" disabled={pending} className="w-full">
+            <label className="flex items-start gap-2 text-sm leading-6 text-gray-300" htmlFor="ar-accept-terms">
+                <input
+                    id="ar-accept-terms"
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 shrink-0 accent-teal-500"
+                    checked={accepted}
+                    onChange={(event) => setAccepted(event.target.checked)}
+                />
+                <span>
+                    He leído y acepto los{' '}
+                    <a className="text-teal-300 underline underline-offset-4 hover:text-teal-200" href="/terminos" target="_blank" rel="noreferrer">
+                        Términos de uso
+                    </a>{' '}
+                    y la{' '}
+                    <a className="text-teal-300 underline underline-offset-4 hover:text-teal-200" href="/privacidad" target="_blank" rel="noreferrer">
+                        Política de privacidad
+                    </a>
+                    . Ambos documentos están en fase de borrador.
+                </span>
+            </label>
+            <Button type="submit" size="lg" disabled={pending || !accepted} className="w-full">
                 {pending ? 'Enviando…' : 'Pedir acceso'}
             </Button>
         </form>

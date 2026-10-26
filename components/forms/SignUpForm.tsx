@@ -34,7 +34,8 @@ const SignUpForm = ({ signUpOpen }: { signUpOpen: boolean }) => {
             country: 'ES',
             investmentGoals: 'growth',
             riskTolerance: 'moderate',
-            preferredIndustry: 'technology'
+            preferredIndustry: 'technology',
+            acceptTerms: false,
         },
         mode: 'onBlur'
     }, );
@@ -160,6 +161,46 @@ const SignUpForm = ({ signUpOpen }: { signUpOpen: boolean }) => {
                     error={errors.preferredIndustry}
                     required
                 />
+
+                {/* Consentimiento obligatorio: sin aceptar los documentos
+                    legales no se crea la cuenta. Los enlaces abren en otra
+                    pestaña para no perder lo ya rellenado. */}
+                <div>
+                    <label className="flex items-start gap-2 text-sm leading-6 text-gray-300" htmlFor="acceptTerms">
+                        <input
+                            id="acceptTerms"
+                            type="checkbox"
+                            className="mt-1 h-4 w-4 shrink-0 accent-teal-500"
+                            {...register('acceptTerms', {
+                                required: 'Debes aceptar los Términos de uso y la Política de privacidad para crear la cuenta',
+                            })}
+                        />
+                        <span>
+                            He leído y acepto los{' '}
+                            <a
+                                className="text-teal-300 underline underline-offset-4 hover:text-teal-200"
+                                href="/terminos"
+                                target="_blank"
+                                rel="noreferrer"
+                            >
+                                Términos de uso
+                            </a>{' '}
+                            y la{' '}
+                            <a
+                                className="text-teal-300 underline underline-offset-4 hover:text-teal-200"
+                                href="/privacidad"
+                                target="_blank"
+                                rel="noreferrer"
+                            >
+                                Política de privacidad
+                            </a>
+                            . Ambos documentos están en fase de borrador.
+                        </span>
+                    </label>
+                    {errors.acceptTerms ? (
+                        <p className="mt-2 text-sm text-red-400" role="alert">{errors.acceptTerms.message}</p>
+                    ) : null}
+                </div>
 
                 <Button type="submit" disabled={isSubmitting || !signUpOpen} className="brand-btn w-full mt-5">
                     {isSubmitting ? 'Creando cuenta…' : signUpOpen ? 'Empieza tu viaje inversor' : 'Registro cerrado'}

@@ -19,7 +19,7 @@ test('successful authentication actions never serialize session tokens or user o
     authGlobal.__authBoundaryTestAuth = { api: { signInEmail: reply, signUpEmail: reply, verifyTOTP: reply } };
     const results = [
         await signInWithEmail(credentials),
-        await signUpWithEmail({ ...credentials, fullName: 'Synthetic', country: 'ES', investmentGoals: 'Growth', riskTolerance: 'Medium', preferredIndustry: 'Technology' }),
+        await signUpWithEmail({ ...credentials, fullName: 'Synthetic', country: 'ES', investmentGoals: 'Growth', riskTolerance: 'Medium', preferredIndustry: 'Technology', acceptTerms: true }),
         await verifyTwoFactorTotp({ ...credentials, totpCode: '123456' }),
     ];
     assert.equal(inputs.length, 3);
@@ -46,7 +46,7 @@ test('actions preserve structured endpoint copy instead of guessing from substri
     ] as const) {
         errorState.__authBoundaryEndpointError = new AppError(message, code, status);
         assert.deepEqual(await signInWithEmail(credentials), { success: false, error: message });
-        assert.deepEqual(await signUpWithEmail({ ...credentials, fullName: 'Synthetic', country: 'ES', investmentGoals: 'Growth', riskTolerance: 'Medium', preferredIndustry: 'Technology' }), { success: false, error: message });
+        assert.deepEqual(await signUpWithEmail({ ...credentials, fullName: 'Synthetic', country: 'ES', investmentGoals: 'Growth', riskTolerance: 'Medium', preferredIndustry: 'Technology', acceptTerms: true }), { success: false, error: message });
     }
     delete errorState.__authBoundaryEndpointError;
 });

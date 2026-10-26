@@ -13,6 +13,7 @@ declare global {
         investmentGoals: string;
         riskTolerance: string;
         preferredIndustry: string;
+        acceptTerms: boolean;
     };
 
     type CountrySelectProps = {
