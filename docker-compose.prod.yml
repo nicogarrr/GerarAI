@@ -196,6 +196,12 @@ services:
       - SECOND_ORDER_LLM_ENABLED=${SECOND_ORDER_LLM_ENABLED:-0}
       - ASTS_LLM_ENABLED=${ASTS_LLM_ENABLED:-0}
       - THESIS_NARRATIVE_LLM_ENABLED=${THESIS_NARRATIVE_LLM_ENABLED:-0}
+      # Go DEDICADO solo a las narrativas de tesis (backend y worker-thesis). Defecto
+      # apagado: mergear no activa gasto. La clave solo llega a estos dos servicios.
+      - THESIS_GO_ENABLED=${THESIS_GO_ENABLED:-false}
+      - THESIS_GO_BASE_URL=${THESIS_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
+      - THESIS_GO_MODEL=${THESIS_GO_MODEL:-deepseek-v4.1-flash}
+      - THESIS_GO_API_KEY=${THESIS_GO_API_KEY:-}
       # RAG: sin =1 no hay ingesta/busqueda/chat vectorial (degradado a SQL).
       - CAVAAI_ENABLE_VECTOR_INGEST=${CAVAAI_ENABLE_VECTOR_INGEST:-0}
       - CAVAAI_ENABLE_VECTOR_SEARCH=${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
@@ -420,6 +426,12 @@ services:
       - OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=${OPENCODE_GO_ALLOW_UNVERIFIED_MODEL:-false}
       - LLM_MODEL_OVERRIDES=${LLM_MODEL_OVERRIDES:-{}}
       - THESIS_NARRATIVE_LLM_ENABLED=${THESIS_NARRATIVE_LLM_ENABLED:-0}
+      # Go DEDICADO solo a las narrativas de tesis (backend y worker-thesis). Defecto
+      # apagado: mergear no activa gasto. La clave solo llega a estos dos servicios.
+      - THESIS_GO_ENABLED=${THESIS_GO_ENABLED:-false}
+      - THESIS_GO_BASE_URL=${THESIS_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
+      - THESIS_GO_MODEL=${THESIS_GO_MODEL:-deepseek-v4.1-flash}
+      - THESIS_GO_API_KEY=${THESIS_GO_API_KEY:-}
       - CAVAAI_ENABLE_VECTOR_INGEST=${CAVAAI_ENABLE_VECTOR_INGEST:-0}
       - CAVAAI_ENABLE_VECTOR_SEARCH=${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
       - CAVAAI_ENABLE_VECTOR_CHAT=${CAVAAI_ENABLE_VECTOR_CHAT:-0}
