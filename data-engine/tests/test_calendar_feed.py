@@ -215,3 +215,42 @@ def test_ics_drops_events_older_than_seven_days_even_manual_rows():
     ics = svc.build_ics(cal, min_date=today - timedelta(days=svc.PAST_DAYS))
     assert "OLDX" not in ics and "EDGE" in ics and "NEXT" in ics
     assert "OLDX" in svc.build_ics(cal)  # sin min_date no filtra (compat)
+
+
+@pytest.mark.parametrize("tenant_status", ["suspended", "deleted", "missing"])
+def test_public_feed_hides_disabled_or_missing_tenant(monkeypatch, tenant_status):
+    """A bearer URL must not bypass the signed API's active-tenant gate."""
+    from sqlalchemy import delete, update
+
+    from app.models.entities import CalendarFeedToken
+
+    init_db()
+    with SessionLocal() as db:
+        ta, _ = _setup(db)
+        tenant_id = ta.id
+        db.info["tenant_id"] = tenant_id
+        token, row = svc.create_token(db, "watchlist")
+        row_id = row.id
+    with SessionLocal() as admin:
+        if tenant_status == "missing":
+            admin.execute(delete(Tenant).where(Tenant.id == tenant_id))
+        else:
+            admin.execute(
+                update(Tenant).where(Tenant.id == tenant_id).values(status=tenant_status)
+            )
+        admin.commit()
+
+    def forbidden_calendar(*args, **kwargs):
+        pytest.fail("Disabled tenant must not load a calendar")
+
+    monkeypatch.setattr(svc, "followed_calendar", forbidden_calendar)
+    with SessionLocal() as anonymous:
+        assert svc.feed_for_token(anonymous, token, today=TODAY) is None
+        assert "tenant_id" not in anonymous.info
+        stored = anonymous.get(CalendarFeedToken, row_id)
+        assert stored is not None and stored.last_used_at is None
+
+    # Same 404 as an unknown/revoked token, without disclosing account status.
+    with pytest.raises(HTTPException) as exc:
+        calendar_routes.calendar_feed_public(f"{token}.ics")
+    assert exc.value.status_code == 404
