@@ -8,6 +8,7 @@ financiero.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -19,9 +20,6 @@ from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, percent_es
 from app.services.thesis_approval_service import APPROVAL_SECTION_TITLE
 
 
-_EXTRACT_LIMIT = 420
-
-
 def _full_analysis_lines(markdown: str) -> list[str]:
     """Cuerpo del análisis persistido (thesis_markdown) listo para el memo.
 
@@ -30,16 +28,21 @@ def _full_analysis_lines(markdown: str) -> list[str]:
     se rellena nada.
     """
     out: list[str] = []
+    seen_refs: set[str] = set()
     for raw in markdown.splitlines():
         line = raw.rstrip()
         if line.startswith("# "):
             continue
-        if len(line) > _EXTRACT_LIMIT and (
-            line.startswith("Doctrina de inversión") or line.startswith("Extracto documental")
-        ):
-            # Contexto recuperado (biblioteca o documentos): solo un extracto con su
-            # fuente, nunca el fragmento íntegro volcado en un documento exportable.
-            line = line[:_EXTRACT_LIMIT].rstrip() + "… [extracto recortado; texto completo en la ficha]"
+        if line.startswith("Doctrina de inversión") or line.startswith("Extracto documental"):
+            # Contexto recuperado (biblioteca o documentos): solo la referencia
+            # (título y fuente), nunca el texto del fragmento en un documento exportable.
+            ref = re.split(r"\s(?:Biblioteca|Documento)\s\d+:", line, maxsplit=1)[0].rstrip()
+            if ref in seen_refs:
+                continue
+            seen_refs.add(ref)
+            line = f"- {ref} [texto del extracto omitido; consultar en la ficha]"
+            out.append(line)
+            continue
         if line.startswith("### "):
             out.append(f"**{line[4:]}**")
         elif line.startswith("## "):
@@ -115,9 +118,8 @@ def build_memo_markdown(
         ).first()
         if audit is not None and not audit.passed:
             lines.append(
-                "> AVISO: valoración INDICATIVA: la auditoría de fuentes de esta versión no la dio por "
-                "publicable. Las cifras son escenarios del modelo con los supuestos y datos "
-                "disponibles, no un veredicto de valoración."
+                "> AVISO: la auditoría de fuentes de esta versión NO pasó. La valoración puede estar "
+                "incompleta y es solo indicativa, no un veredicto. Correcciones pendientes de la auditoría:"
             )
             for fix in (audit.required_fixes or [])[:5]:
                 lines.append(f"> - {fix}")

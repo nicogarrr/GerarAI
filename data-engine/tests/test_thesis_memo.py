@@ -238,7 +238,10 @@ def test_published_memo_includes_full_analysis_without_approval_section_or_dupli
 
 def test_unpublishable_valuation_gets_visible_indicative_banner_and_rag_is_trimmed(db):
     company = _company(db)
-    long_extract = "Extracto documental (no verificado): Doc. Fuente: URL no disponible. Documento 1: " + "x" * 900
+    long_extract = (
+        "Extracto documental (no verificado): Doc. Fuente: URL no disponible. Documento 1: " + "x" * 900
+        + "\nExtracto documental (no verificado): Doc. Fuente: URL no disponible. Documento 2: " + "y" * 900
+    )
     thesis = ThesisVersion(
         company_id=company.id, version=4, status="published", rating="seguimiento",
         thesis_markdown="# t\n\n## 23. Contexto\n" + long_extract,
@@ -254,7 +257,9 @@ def test_unpublishable_valuation_gets_visible_indicative_banner_and_rag_is_trimm
 
     memo = build_memo_markdown(db, company, thesis)
 
-    assert "valoración INDICATIVA" in memo
+    assert "auditoría de fuentes de esta versión NO pasó" in memo
     assert "churn" in memo
-    assert "extracto recortado" in memo
-    assert "x" * 600 not in memo
+    assert "texto del extracto omitido" in memo
+    assert "Doc. Fuente: URL no disponible." in memo
+    assert "x" * 50 not in memo
+    assert memo.count("Doc. Fuente") == 1
