@@ -290,6 +290,17 @@ const FACTORES: Record<string, string> = {
 /** Tipos de empresa simples con etiqueta propia (no son factores). */
 const TIPOS_EMPRESA: Record<string, string> = {
   ai_big_tech: 'big tech de IA',
+  // Etiquetas exactas de los tipos compuestos del master cuyos tokens no
+  // son todos factores: traducción fiel del concepto, sin reclasificar.
+  ai_infra_capacity: 'infraestructura de IA',
+  asset_manager_holding: 'holding gestora de activos',
+  china_adr_holding: 'holding china (ADR)',
+  defense_contract_backlog: 'cartera de contratos de defensa',
+  mining_pre_revenue: 'minería pre ingresos',
+  platform_fcf_compounder: 'plataforma de crecimiento compuesto de FCL',
+  software_ai_disruption: 'software en disrupción por IA',
+  software_durable_growth: 'software de crecimiento duradero',
+  speculative_scenario: 'escenario especulativo',
   operating_company: 'empresa operativa',
   research_candidate: 'candidato de análisis',
   fund: 'fondo',

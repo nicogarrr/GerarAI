@@ -30,6 +30,24 @@ test('la etiqueta exacta no es el enum crudo ni lleva guiones bajos', () => {
     assert.ok(!label.includes('_'), `la etiqueta no puede contener _: ${label}`);
 });
 
+test('los tipos compuestos del master sin factorización tienen etiqueta exacta', () => {
+    const exact: Record<string, string> = {
+        ai_infra_capacity: 'infraestructura de IA',
+        asset_manager_holding: 'holding gestora de activos',
+        china_adr_holding: 'holding china (ADR)',
+        defense_contract_backlog: 'cartera de contratos de defensa',
+        mining_pre_revenue: 'minería pre ingresos',
+        platform_fcf_compounder: 'plataforma de crecimiento compuesto de FCL',
+        software_ai_disruption: 'software en disrupción por IA',
+        software_durable_growth: 'software de crecimiento duradero',
+        speculative_scenario: 'escenario especulativo',
+    };
+    for (const [type, label] of Object.entries(exact)) {
+        assert.equal(companyTypeLabel(type), label, type);
+        assert.ok(!label.includes('_'), `la etiqueta de ${type} no puede contener _`);
+    }
+});
+
 test('un token desconocido devuelve el tipo tal cual, nunca inventado', () => {
     assert.equal(companyTypeLabel('algo_que_no_existe'), 'algo_que_no_existe');
 });
