@@ -665,6 +665,94 @@ def test_fenced_failure_cannot_overwrite_recovered_run(monkeypatch):
         assert stored.error_class is None
 
 
+def _steal_at_terminal_update(armed, run_container):
+    """Hook before_cursor_execute: roba el run (attempt+1) en el instante en
+    que el UPDATE terminal de workflow_runs YA se esta ejecutando: el hueco
+    exacto entre check y write del fencing lectura-escritura. Si la sesion del
+    job retiene locks (sqlite, flujo antiguo con lecturas previas), el robo
+    falla y se traga: el assert final sobre el estado robado es el que manda.
+    """
+    from sqlalchemy import event
+
+    from app.core.database import engine
+
+    def hook(conn, cursor, statement, parameters, context, executemany):
+        if armed["on"] and not armed["done"] and statement.lstrip().upper().startswith("UPDATE WORKFLOW_RUNS"):
+            armed["done"] = True
+            try:
+                _steal_run(run_container["id"])
+            except Exception:  # noqa: BLE001 - lock ambiental sqlite, ver docstring
+                pass
+
+    event.listen(engine, "before_cursor_execute", hook)
+    return hook
+
+
+def test_atomic_success_close_survives_steal_during_terminal_update(monkeypatch):
+    """Regresion: robo del run DURANTE la escritura terminal de exito. El
+    UPDATE condicional por attempt observa el robo (rowcount=0) y aborta con
+    rollback; el fencing de lectura previa lo pisaba."""
+
+    class _T:
+        id = 7
+        version = 3
+        status = "final"
+
+    def fake_generate(self, db, ticker, force_new_version=False, phase_callback=None):
+        armed["on"] = True
+        return _T()
+
+    armed = {"on": False, "done": False}
+    run, _ = _enqueue_without_dispatch(monkeypatch, ticker="ATOMOK")
+    run_container = {"id": run.id}
+    monkeypatch.setattr(ThesisService, "generate", fake_generate)
+    hook = _steal_at_terminal_update(armed, run_container)
+    from sqlalchemy import event
+
+    from app.core.database import engine
+
+    try:
+        jobs.run_thesis_job(run.id)
+    finally:
+        event.remove(engine, "before_cursor_execute", hook)
+
+    assert armed["done"] is True
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        assert stored.status == "running" and stored.attempt == 2
+        assert stored.result_payload is None
+
+
+def test_atomic_failure_close_survives_steal_during_terminal_update(monkeypatch):
+    """Regresion: mismo robo DURANTE la escritura terminal de fallo. El
+    intento cercado no escribe ni failed ni error_class."""
+
+    def generate_and_fail(self, db, ticker, force_new_version=False, phase_callback=None):
+        armed["on"] = True
+        raise ValueError("boom")
+
+    armed = {"on": False, "done": False}
+    run, _ = _enqueue_without_dispatch(monkeypatch, ticker="ATOMFAIL")
+    run_container = {"id": run.id}
+    monkeypatch.setattr(ThesisService, "generate", generate_and_fail)
+    hook = _steal_at_terminal_update(armed, run_container)
+    from sqlalchemy import event
+
+    from app.core.database import engine
+
+    try:
+        with pytest.raises(ValueError):
+            jobs.run_thesis_job(run.id)
+    finally:
+        event.remove(engine, "before_cursor_execute", hook)
+
+    assert armed["done"] is True
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        assert stored.status == "running" and stored.attempt == 2
+        assert stored.error_class is None
+
+
 def test_recovery_caps_repeated_interrupted_deliveries(monkeypatch):
     """Un ticker que tumba al worker en cada intento no re-bota cada 6 h para
     siempre: al agotar MAX_ATTEMPTS el run queda en failed honesto."""

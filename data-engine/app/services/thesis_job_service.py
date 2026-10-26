@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, desc, or_, select, text
+from sqlalchemy import and_, desc, or_, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -534,18 +534,10 @@ def run_thesis_job(run_id: int) -> None:
                 phase_callback=on_phase,
                 **kwargs,
             )
-            db.refresh(run)
-            if int(run.attempt or 1) != fence:
-                # Recuperacion posterior tomo el run: este intento esta
-                # cercado. Rollback: la tesis generada queda descartada con
-                # la transaccion y el nuevo dueno decide el estado final.
-                db.rollback()
-                return
             open_step = state["open_step"]
             if open_step is not None:
                 open_step.status = "succeeded"
                 open_step.finished_at = datetime.now(UTC)
-            run.status = "succeeded"
             result_payload = {
                 "thesis_version_id": thesis.id,
                 "version": thesis.version,
@@ -553,10 +545,28 @@ def run_thesis_job(run_id: int) -> None:
             }
             if financial_refresh is not None:
                 result_payload["financial_refresh"] = financial_refresh
-            run.result_payload = result_payload
-            run.error_class = None
-            run.error_message = None
-            run.finished_at = datetime.now(UTC)
+            # Cierre atomico: el UPDATE condicional ES el fence. No hay
+            # lectura previa que pueda quedar obsoleta entre check y write:
+            # si otra entrega reclamo el run (attempt cambio) en cualquier
+            # momento anterior a esta sentencia, rowcount=0 y el rollback
+            # descarta la tesis y los pasos de este intento cercado; el
+            # nuevo dueno decide el estado final. (autoflush=False: los
+            # pasos pendientes se insertan en el commit, misma transaccion.)
+            claimed = db.execute(
+                update(WorkflowRun)
+                .where(WorkflowRun.id == run_id, WorkflowRun.attempt == fence)
+                .values(
+                    status="succeeded",
+                    result_payload=result_payload,
+                    error_class=None,
+                    error_message=None,
+                    finished_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
+                )
+            ).rowcount
+            if claimed != 1:
+                db.rollback()
+                return
             db.commit()
         except (Exception, TimeLimitExceeded) as exc:
             # The rollback discards the step rows flushed by on_phase, so the
@@ -568,44 +578,45 @@ def run_thesis_job(run_id: int) -> None:
             # handler can re-create the step it was running.
             open_step_name = state["open_step_name"] if state.get("open_step") is not None else None
             db.rollback()
-            # Recuperacion por run_id tras el rollback: el run ya fue validado
-            # contra su tenant al arrancar; esta lectura no es expuesta.
-            # populate_existing es obligatorio: Session.get devuelve la instancia
-            # del identity map con atributos obsoletos (el intento robado por el
-            # reconciliador no se ve) y el fencing compararia un attempt viejo.
-            run = db.scalars(
-                select(WorkflowRun)
-                .where(WorkflowRun.id == run_id)
-                .execution_options(include_all_tenants=True, populate_existing=True)
-            ).first()
             retryable = _is_retryable_error(exc)
-            if run is not None and int(run.attempt or 1) != fence:
-                # Intento cercado: el nuevo dueno escribe su propio estado.
+            terminal = not (retryable and fence < MAX_ATTEMPTS)
+            values: dict = {
+                "status": "failed" if terminal else "retrying",
+                "error_class": type(exc).__name__,
+                "error_message": (
+                    "Thesis generation failed" if terminal else "Transient failure; delivery will be retried"
+                ),
+                "updated_at": datetime.now(UTC),
+            }
+            if terminal:
+                values["finished_at"] = datetime.now(UTC)
+            # Cierre atomico, mismo patron que el camino de exito: el UPDATE
+            # condicional por attempt ES el fence (sin lectura previa que
+            # pueda quedar obsoleta entre check y write). rowcount=0 significa
+            # que otra entrega reclamo el run (o la fila ya no existe): este
+            # intento cercado no escribe nada y el nuevo dueno decide.
+            claimed = db.execute(
+                update(WorkflowRun)
+                .where(WorkflowRun.id == run_id, WorkflowRun.attempt == fence)
+                .values(**values)
+            ).rowcount
+            if claimed != 1:
+                db.rollback()
                 raise
-            if run is not None:
-                if open_step_name is not None:
-                    step = WorkflowStepRun(
-                        run_id=run.id,
-                        step_name=open_step_name,
-                        position=int(state["position"]),
-                        attempt=int(run.attempt or 1),
-                        status="retrying" if retryable else "failed",
-                        started_at=now,
-                        finished_at=None if retryable else datetime.now(UTC),
-                        error_class=type(exc).__name__,
-                        tenant_id=tenant.id if tenant is not None else None,
-                    )
-                    db.add(step)
-                run.error_class = type(exc).__name__
-                run.error_message = (
-                    "Transient failure; delivery will be retried" if retryable else "Thesis generation failed"
+            if open_step_name is not None:
+                step = WorkflowStepRun(
+                    run_id=run_id,
+                    step_name=open_step_name,
+                    position=int(state["position"]),
+                    attempt=fence,
+                    status="failed" if terminal else "retrying",
+                    started_at=now,
+                    finished_at=datetime.now(UTC) if terminal else None,
+                    error_class=type(exc).__name__,
+                    tenant_id=tenant.id if tenant is not None else None,
                 )
-                if retryable and int(run.attempt or 1) < MAX_ATTEMPTS:
-                    run.status = "retrying"
-                else:
-                    run.status = "failed"
-                    run.finished_at = datetime.now(UTC)
-                db.commit()
+                db.add(step)
+            db.commit()
             raise
     finally:
         db.close()
