@@ -114,7 +114,9 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
                 // Dividendo declarado del proveedor: solo informativo, el cobro
                 // se registra a mano en la cartera.
                 if (record.action_type === 'dividend') {
-                    return <span className="text-xs text-gray-500">Declarado</span>;
+                    return record.declared === false
+                        ? <span className="text-xs text-amber-400/90">Importe incierto</span>
+                        : <span className="text-xs text-gray-500">Declarado</span>;
                 }
                 if (isApplied(record)) {
                     return (

@@ -219,6 +219,7 @@ class DividendProjectionService:
 
         per_position: list[dict[str, Any]] = []
         sin_datos: list[str] = []
+        uncertain_dividends: list[str] = []
         fx_missing: list[str] = []
         unknown_country: list[str] = []
         unverified_reasons: dict[str, str] = {}
@@ -262,16 +263,14 @@ class DividendProjectionService:
                                 "(no verificado contra fuente primaria); no alimenta la réplica.",
                     }
                 )
-            if not trailing or (
-                company.id in uncertain_by_company
-                and any(
-                    cutoff < e.ex_date <= today
-                    for e in uncertain_events
-                    if e.company_id == company.id
-                )
+            if company.id in uncertain_by_company and any(
+                cutoff < e.ex_date <= today for e in uncertain_events if e.company_id == company.id
             ):
-                # Sin datos, o con evento Yahoo de importes distintos sin
-                # evidencia de split: no se proyecta (dato incierto).
+                # Evento Yahoo con importes distintos sin evidencia de split: NO es
+                # «sin dividendos», es dato incierto; se excluye y se senala aparte.
+                uncertain_dividends.append(company.ticker)
+                continue
+            if not trailing:
                 sin_datos.append(company.ticker)
                 continue
 
@@ -543,12 +542,14 @@ class DividendProjectionService:
                 # posiciones sin dividendos conocidos: nunca es "la cartera".
                 "excluded_no_fx": sorted(set(fx_missing)),
                 "excluded_no_dividends": sorted(sin_datos),
-                "complete": not (set(fx_missing) or set(sin_datos)),
+                "excluded_uncertain_dividends": sorted(uncertain_dividends),
+                "complete": not (set(fx_missing) or set(sin_datos) or set(uncertain_dividends)),
             },
             "declared_future": declared_future,
             "coverage": {
                 "with_data": len(per_position),
                 "sin_datos": sorted(sin_datos),
+                "uncertain_dividends": sorted(uncertain_dividends),
                 "fx_missing": sorted(set(fx_missing)),
                 "unknown_source_withholding": sorted(set(unknown_country)),
                 "unverified_reasons": dict(sorted(unverified_reasons.items())),

@@ -152,6 +152,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
     const fiscalYears = Object.entries(projection.fiscal_by_year);
     const coverageLists: Array<{ label: string; tickers: string[] }> = [
         { label: 'Sin dividendos declarados registrados', tickers: projection.coverage.sin_datos },
+        { label: 'Excluidos: importes de dividendo inciertos (no es «sin dividendos»)', tickers: projection.coverage.uncertain_dividends ?? [] },
         { label: 'Sin tipo de cambio', tickers: projection.coverage.fx_missing },
         { label: 'Retención de origen sin verificar', tickers: projection.coverage.unknown_source_withholding },
     ].filter((entry) => entry.tickers.length > 0);
@@ -180,6 +181,11 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                     {projection.coverage.fx_missing.length > 0 ? (
                         <span className="text-amber-400/90">
                             {' '}No incluye: {projection.coverage.fx_missing.length} {projection.coverage.fx_missing.length === 1 ? 'posición' : 'posiciones'} sin tipo de cambio ({projection.coverage.fx_missing.join(', ')}).
+                        </span>
+                    ) : null}
+                    {(projection.coverage.uncertain_dividends ?? []).length > 0 ? (
+                        <span className="text-amber-400/90">
+                            {' '}Excluidos por importe de dividendo incierto: {(projection.coverage.uncertain_dividends ?? []).join(', ')}.
                         </span>
                     ) : null}
                     {projection.coverage.sin_datos.length > 0 ? (

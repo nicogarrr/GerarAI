@@ -511,3 +511,25 @@ def test_fiscal_conditions_have_no_garbled_characters():
     from app.services import dividend_projection_service as svc
 
     assert "segên" not in " ".join(svc._FISCAL_CONDITIONS)  # noqa: SLF001
+
+
+def test_uncertain_yahoo_event_is_not_sin_datos_and_not_projected(db):
+    from datetime import datetime
+
+    from app.models.entities import DividendRecord
+
+    company = _company(db, ticker="UNC")
+    _position(db, company)
+    _fx(db)
+    ex = date.today() - timedelta(days=30)
+    for amount, fetched in (("0.5", datetime(2026, 1, 1)), ("2.0", datetime(2026, 9, 1))):
+        db.add(DividendRecord(company_id=company.id, ex_date=ex, amount=Decimal(amount), currency="USD", source="yahoo_finance", fetched_at=fetched))
+    db.commit()
+
+    out = DividendProjectionService().project(db, months=12)
+
+    assert out["coverage"]["uncertain_dividends"] == ["UNC"]
+    assert out["coverage"]["sin_datos"] == []  # incierto no es «sin dividendos»
+    assert out["gross_summary"]["excluded_uncertain_dividends"] == ["UNC"]
+    assert out["gross_summary"]["complete"] is False
+    assert out["positions"] == []

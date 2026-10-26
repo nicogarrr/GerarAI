@@ -959,11 +959,12 @@ export type PortfolioDividendProjection = {
   months: DividendProjectionMonth[];
   fiscal_by_year: Record<string, DividendProjectionFiscalYear>;
   positions: DividendProjectionPosition[];
-  gross_summary?: { label: string; gross_total_base: number; gross_unverified_base: number; net_irpf: string; excluded_no_fx?: string[]; excluded_no_dividends?: string[]; complete?: boolean };
+  gross_summary?: { label: string; gross_total_base: number; gross_unverified_base: number; net_irpf: string; excluded_no_fx?: string[]; excluded_no_dividends?: string[]; excluded_uncertain_dividends?: string[]; complete?: boolean };
   declared_future: DividendProjectionDeclaredFuture[];
   coverage: {
     with_data: number;
     sin_datos: string[];
+    uncertain_dividends?: string[];
     fx_missing: string[];
     unknown_source_withholding: string[];
     unverified_reasons?: Record<string, string>;
