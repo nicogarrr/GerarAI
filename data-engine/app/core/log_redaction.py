@@ -27,6 +27,12 @@ _HEADER_RE = re.compile(
 _BEARER_RE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}")
 _USERINFO_RE = re.compile(r"(?i)(\b[a-z][a-z0-9+.-]*://)[^/\s:@]+:[^/\s@]+@")
 
+# Token de la ruta del feed ICS (/api/calendar/feed/gfc_<token>.ics): el secreto va
+# en el PATH, no en la query, y uvicorn.access lo imprime. Se enmascara el token
+# conservando metodo, ruta, estado e IP para que el log siga siendo util.
+_FEED_TOKEN_RE = re.compile(r"(?i)(/api/calendar/feed/)gfc_[A-Za-z0-9_-]+(\.ics)?")
+_GFC_RE = re.compile(r"\bgfc_[A-Za-z0-9_-]{16,}")
+
 REDACTED = "[REDACTED]"
 
 
@@ -40,6 +46,8 @@ def _mask(match: re.Match[str]) -> str:
 
 
 def redact(text: str) -> str:
+    text = _FEED_TOKEN_RE.sub(lambda m: m.group(1) + REDACTED + (m.group(2) or ""), text)
+    text = _GFC_RE.sub(REDACTED, text)
     text = _QUERY_RE.sub(_mask, text)
     text = _USERINFO_RE.sub(lambda m: m.group(1) + REDACTED + "@", text)
     text = _BEARER_RE.sub(lambda m: m.group(1) + " " + REDACTED, text)
@@ -48,6 +56,16 @@ def redact(text: str) -> str:
 
 class SecretRedactingFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
+        # Los args se enmascaran EN SU SITIO conservando la estructura: el
+        # formateador de uvicorn.access desempaqueta 5 args
+        # (cliente, metodo, ruta, version, estado); vaciarlos romperia la linea.
+        if isinstance(record.args, tuple) and record.args:
+            try:
+                masked = tuple(redact(a) if isinstance(a, str) else a for a in record.args)
+                if masked != record.args:
+                    record.args = masked
+            except Exception:  # noqa: BLE001
+                pass
         try:
             message = record.getMessage()
         except Exception:  # un record roto no debe romper el logging
