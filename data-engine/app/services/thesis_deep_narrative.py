@@ -188,7 +188,18 @@ def _norm_number(token: str) -> str | None:
     Acepta formato es-ES (1.234,56) y en-US (1234.56): el modelo copia la
     cifra tal cual aparece en el hecho y ambas superficies deben casar.
     """
-    t = token.strip().rstrip("%").strip()
+    t = token.strip()
+    if t.endswith("%"):
+        # El % cierra el token: la puntuación natural de la prosa queda fuera
+        # («22,9%.» tokeniza «22,9%»). Un separador antes del % («22,9.%») es
+        # token malformado, no puntuación de cierre: no se arregla el interior.
+        t = t[:-1].strip()
+    elif len(t) >= 2 and t[-1] in ".," and t[-2].isdigit():
+        # Una UNICA puntuación de cierre arrastrada por la tokenización
+        # («642.62,» al final de una enumeración) nunca es parte de la cifra.
+        # «642.62,,» o «642.62.,» son basura tipográfica y siguen rechazándose;
+        # los separadores internos (miles/decimales es-ES) no se tocan nunca.
+        t = t[:-1]
     if not t:
         return None
     neg = t.startswith("-")
