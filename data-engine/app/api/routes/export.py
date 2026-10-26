@@ -41,7 +41,11 @@ def _csv_cell(value: object) -> object:
     ``= + - @ | %`` llevan prefijo ``'`` (convención Excel/Sheets)."""
     if not isinstance(value, str):
         return value
-    if value[:1] in {"=", "+", "-", "@", "|", "%"}:
+    # Spreadsheet importers may ignore leading whitespace, and control
+    # characters/full-width operators can initiate formulas in some locales.
+    # Preserve the text verbatim after the existing apostrophe escape.
+    dangerous = {"=", "+", "-", "@", "|", "%", "＝", "＋", "－", "＠"}
+    if value[:1] in {"\t", "\r", "\n"} or value.lstrip()[:1] in dangerous:
         return "'" + value
     return value
 
