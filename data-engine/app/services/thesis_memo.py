@@ -20,6 +20,26 @@ from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, percent_es
 from app.services.thesis_approval_service import APPROVAL_SECTION_TITLE
 
 
+def _fraction_row_to_percent(line: str) -> str:
+    """Fila de tabla con unidad EXPLÍCITA «fracción» y valor 0,xx -> «xx %».
+
+    Solo si la celda de unidad dice exactamente «fracción» y el valor es un
+    decimal simple; en cualquier otro caso la fila queda tal cual.
+    """
+    cells = line.split("|")
+    # cells[0] y cells[-1] son los bordes vacíos de la fila.
+    if len(cells) < 5 or cells[3].strip() != "fracción":
+        return line
+    raw = cells[2].strip()
+    if not re.fullmatch(r"-?\d+,\d+", raw):
+        return line
+    pct = float(raw.replace(",", ".")) * 100
+    text = f"{pct:.1f}".replace(".", ",").removesuffix(",0")
+    cells[2] = f" {text} % "
+    cells[3] = " porcentaje "
+    return "|".join(cells)
+
+
 def _full_analysis_lines(markdown: str) -> list[str]:
     """Cuerpo del análisis persistido (thesis_markdown) listo para el memo.
 
@@ -51,6 +71,7 @@ def _full_analysis_lines(markdown: str) -> list[str]:
             line = re.sub(r"\s+publicable=(?:True|False|None)\s*$", "", line)
         if line.startswith("|"):
             line = re.sub(r"(\d+ hechos? citados?) \(\d+(?:, \d+)*\)", r"\1", line)
+            line = _fraction_row_to_percent(line)
         if line.startswith("### "):
             out.append(f"**{line[4:]}**")
         elif line.startswith("## "):
