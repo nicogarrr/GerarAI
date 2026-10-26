@@ -168,6 +168,7 @@ class OpenAICompatibleProvider(LLMProvider):
         extra_headers: Mapping[str, str] | None = None,
         model_overrides: Mapping[str, str] | None = None,
         fallback_model: str | None = None,
+        strip_response_format: bool = False,
         reasoning_effort: str | None = None,
         reasoning_effort_models: frozenset[str] | set[str] | None = None,
         response_cache: LLMResponseCache | None = None,
@@ -202,6 +203,13 @@ class OpenAICompatibleProvider(LLMProvider):
         # reintenta una vez con este modelo (p.ej. el primario deja de
         # existir en el catalogo del proveedor). None = sin fallback.
         self._fallback_model = (fallback_model or "").strip() or None
+        # Endpoints que rechazan `response_format` con HTTP 400 (verificado en
+        # vivo contra /zen/go/v1 con deepseek-v4.1-flash el 2026-10-26 por el
+        # piloto: json_schema estricto -> 400; json_object/plain -> 200): el
+        # contrato JSON viaja en el prompt y el sobre se retira. La validacion
+        # local del llamador (parse_json_response + validadores fail-closed)
+        # sigue siendo la puerta; el servidor nunca fue la garantia.
+        self._strip_response_format = bool(strip_response_format)
         # Nivel de razonamiento (sobre OpenAI-compatible: campo
         # `reasoning_effort`). Solo se envia a los modelos de
         # reasoning_effort_models (None = a todos); un modelo que no
@@ -355,7 +363,25 @@ class OpenAICompatibleProvider(LLMProvider):
                 requested,
                 self._max_output_tokens,
             )
-        if request.response_format is not None:
+        if request.response_format is not None and self._strip_response_format:
+            # Mismo tratamiento probado en el chat (GoSubscriptionChatProvider):
+            # sobre fuera, contrato en el ultimo mensaje de usuario.
+            response_format = request.response_format
+            instruction = (
+                "Responde SOLO con un objeto JSON valido, sin texto fuera del "
+                "JSON ni bloque de codigo."
+            )
+            if response_format.type == "json_schema" and response_format.schema:
+                instruction += " Debe cumplir este esquema JSON: " + json.dumps(
+                    dict(response_format.schema), ensure_ascii=False, sort_keys=True
+                )
+            messages = payload["messages"]
+            last = messages[-1] if messages else None
+            if last and last.get("role") == "user" and isinstance(last.get("content"), str):
+                last["content"] = f"{last['content']}\n\n{instruction}"
+            else:
+                messages.append({"role": "user", "content": instruction})
+        elif request.response_format is not None:
             response_format = request.response_format
             if response_format.type == "json_schema":
                 payload["response_format"] = {
@@ -467,6 +493,14 @@ class OpenAICompatibleProvider(LLMProvider):
         tool_calls = parse_tool_calls(assistant.get("tool_calls"))
         if not content and not tool_calls:
             raise ProviderResponseError(f"{self.name} returned an empty assistant message")
+
+        if self._strip_response_format and request.response_format is not None:
+            # El modelo a veces envuelve el JSON en un bloque ```: se desenvuelve
+            # para que los validadores locales vean el JSON puro.
+            content = content.strip()
+            if content.startswith("```"):
+                content = content.split("\n", 1)[1] if "\n" in content else ""
+                content = content.rsplit("```", 1)[0].strip()
 
         usage_body = body.get("usage")
         if not isinstance(usage_body, dict):
