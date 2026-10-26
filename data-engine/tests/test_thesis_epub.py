@@ -339,3 +339,35 @@ def test_uid_epub_estable_tras_rebrand():
     from app.services.thesis_epub_service import EPUB_UID_TEMPLATE
 
     assert EPUB_UID_TEMPLATE.format(ticker="SAN", version=2) == "cavaai-thesis-SAN-v2"
+
+
+def test_build_epub_enums_traducidos_fecha_es_y_banner_de_estado():
+    """La portada nunca muestra el enum crudo ni una fecha ISO en prosa española.
+
+    Regresión: el EPUB de una tesis no publicada salía con «rating: buy ·
+    estado: final · generada el 2026-09-21» y sin el aviso de estado que el
+    memo declara (no publicada -> lectura de seguimiento, no veredicto).
+    """
+    payload = build_thesis_epub(_sample_data())  # rating buy, status final
+    portada = _chapter_raw(payload, "portada.xhtml")
+    assert "rating: compra" in portada
+    assert "estado: final" in portada
+    assert "generada el 21 de septiembre de 2026" in portada
+    assert "rating: buy" not in portada
+    assert "2026-09-21" not in portada
+    assert "no publicada ni aprobada" in portada
+    assert "no un veredicto ni una recomendación" in portada
+
+    # El metadato DC conserva la fecha ISO (Dublin Core), solo cambia la prosa.
+    book = _read_book(payload)
+    assert book.get_metadata("DC", "date") == [("2026-09-21", {})]
+
+
+def test_build_epub_publicada_sin_banner_de_estado():
+    data = _sample_data()
+    data.status = "published"
+    data.rating = "hold"
+    portada = _chapter_raw(build_thesis_epub(data), "portada.xhtml")
+    assert "estado: publicada" in portada
+    assert "rating: mantener" in portada
+    assert "no publicada ni aprobada" not in portada
