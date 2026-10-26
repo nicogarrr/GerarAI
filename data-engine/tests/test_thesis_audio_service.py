@@ -229,22 +229,40 @@ def test_audio_post_does_not_requeue_while_pending(monkeypatch):
     assert route.thesis_audio_generate("EXEL", None, None) == {"state": "pending", "key": "K"}
 
 
-def test_memo_to_speech_text_truncado_conserva_aviso_legal_y_palabras():
-    """Un memo > MAX_CHARS no puede leerse sin el aviso legal ni cortar a media palabra.
+DISCLAIMER_MEMO = (
+    "Documento informativo de investigación. "
+    "NO es asesoramiento financiero ni recomendación de compra o venta."
+)
 
-    Regresión: el corte fijo [:MAX_CHARS] soltaba la síntesis a media palabra
-    y se tragaba el «NO es asesoramiento financiero» final del memo.
-    """
-    body = "\n".join(f"## Sección {i}\n\n" + ("Análisis extenso con cifras y matices. " * 40) for i in range(60))
-    md = body + "\n---\nDocumento informativo de investigación. NO es asesoramiento financiero ni recomendación de compra o venta.\n"
-    text = svc.memo_to_speech_text(md, ticker="SAN", version=3)
+
+def _memo_largo(palabras: int) -> str:
+    body = "Análisis " + "extenso " * palabras
+    return f"## Sección\n\n{body}\n---\n{DISCLAIMER_MEMO}\n"
+
+
+# Barrido de offsets: el punto de corte cae ANTES del aviso, a mitad de la
+# primera frase, tras «NO» suelto, a mitad de la segunda frase y DESPUES del
+# aviso completo. En todos: aviso completo, sin duplicar, sin resto parcial.
+import pytest
+
+
+@pytest.mark.parametrize("palabras", range(7480, 7545))
+def test_memo_to_speech_text_truncado_aviso_completo_en_cualquier_offset(palabras):
+    text = svc.memo_to_speech_text(_memo_largo(palabras), ticker="SAN", version=3)
 
     assert len(text) <= svc.MAX_CHARS
-    assert text.endswith("No es asesoramiento financiero ni recomendación de compra o venta.")
-    # Corte en borde de palabra: lo anterior al aviso acaba en palabra COMPLETA
-    # del fixture (nunca un fragmento como «Aná» o «matic»).
-    cuerpo = text[: -len(svc._DISCLAIMER_SPOKEN)].rstrip()
-    assert cuerpo.split()[-1] in ["Análisis", "extenso", "con", "cifras", "y", "matices."]
+    # Si aparece «Documento informativo», el aviso va COMPLETO hasta
+    # «asesoramiento financiero» (nunca «...investigación. NO» suelto).
+    idx = text.rfind("Documento informativo")
+    assert idx != -1, "el aviso legal no puede perderse por el corte"
+    assert "asesoramiento financiero" in text[idx:]
+    # Aviso completo y único al final: el hablado o el propio del memo entero.
+    assert text.endswith(svc._DISCLAIMER_SPOKEN) or text.endswith(DISCLAIMER_MEMO)
+    assert text.count("Documento informativo de investigación") == 1
+    # Corte en borde de palabra: sin fragmentos («exten», «Aná», «mati»...).
+    cuerpo = text[:idx].rstrip()
+    if cuerpo:
+        assert cuerpo.split()[-1] in ["Análisis", "extenso", "Sección"]
 
 
 def test_memo_to_speech_text_corto_no_duplica_aviso():

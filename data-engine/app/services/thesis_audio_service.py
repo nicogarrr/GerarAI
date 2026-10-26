@@ -48,13 +48,21 @@ def memo_to_speech_text(markdown: str, *, ticker: str, version: int) -> str:
         return text
     # Corte en borde de palabra (no a media palabra) y el aviso legal siempre
     # al final: un audio truncado sin él leería la tesis sin la advertencia.
-    cut = text[: MAX_CHARS - len(_DISCLAIMER_SPOKEN) - 1]
+    budget = MAX_CHARS - len(_DISCLAIMER_SPOKEN) - 1
+    cut = text[:budget]
     last_space = cut.rfind(" ")
     if last_space > 0:
         cut = cut[:last_space]
     cut = cut.rstrip()
-    if "Documento informativo de investigación" in cut:
+    idx = cut.rfind("Documento informativo")
+    if idx != -1 and "asesoramiento financiero" in cut[idx:]:
+        # El aviso propio del memo sobrevivio entero al corte: no se duplica.
         return cut
+    if idx != -1:
+        # Resto PARCIAL del aviso (p. ej. «...investigación. NO»): se retira
+        # y se sustituye por el aviso completo. «Documento» va tras un espacio,
+        # asi que el nuevo corte tambien queda en borde de palabra.
+        cut = cut[:idx].rstrip()
     return f"{cut} {_DISCLAIMER_SPOKEN}"
 
 
