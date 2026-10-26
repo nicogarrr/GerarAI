@@ -57,7 +57,7 @@ class _Net:
         )
 
 
-def _call(net, *, max_tokens=1000, base_url=URL, fresh_provider=True, _shared={}):
+def _call(net, *, max_tokens=1000, base_url=URL):
     async def scenario():
         async with httpx.AsyncClient(transport=httpx.MockTransport(net.handler)) as client:
             provider = create_llm_provider(
