@@ -7,7 +7,7 @@ fichero RELATIVO al inbox del servidor, que el actor lee tras comprobar disco.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, date, datetime, timedelta
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -35,22 +35,6 @@ from app.services.knowledge_rag.store import SearchFilters
 
 router = APIRouter()
 _logger = logging.getLogger(__name__)
-
-# Umbrales de "entrega perdida" para el re-encolado en re-POST (ver create_source):
-# - queued: la recogida normal son segundos; 15 min sin moverse = mensaje perdido.
-# - processing: el actor tiene time_limit de 1 h; 2 h sin terminar = worker
-#   muerto Y entrega perdida (la re-entrega del broker cubre la muerte sola).
-STALE_QUEUED_SECONDS = 15 * 60
-STALE_PROCESSING_SECONDS = 2 * 60 * 60
-
-
-def _is_stale(source: KnowledgeRagSource, seconds: int) -> bool:
-    updated = source.updated_at
-    if updated is None:
-        return True
-    if updated.tzinfo is None:
-        updated = updated.replace(tzinfo=UTC)
-    return updated < datetime.now(UTC) - timedelta(seconds=seconds)
 
 
 def _enabled():
@@ -150,28 +134,13 @@ def create_source(payload: SourceCreate, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=507, detail=str(exc)) from exc
     source = result.source
     if not result.created:
-        # Una entrega perdida (reinicio/flush de Redis) dejaba la fuente en
-        # queued/processing PARA SIEMPRE: el dedupe por checksum era un no-op
-        # silencioso y ningun reconciliador tocaba la cola knowledge. Solo un
-        # estado claramente atascado se re-encola: un queued normal lo recoge
-        # el worker en segundos y un processing vivo dura menos que el
-        # time_limit del actor (1 h); por encima de esos umbrales la entrega
-        # original ya no existe y re-indexar es idempotente (limpia lo
-        # parcial antes de escribir).
-        stale_after = {
-            "queued": STALE_QUEUED_SECONDS,
-            "processing": STALE_PROCESSING_SECONDS,
-        }.get(source.status)
         if source.status != "failed":
-            if stale_after is None or not _is_stale(source, stale_after):
-                return {**_source(source), "deduplicated": True, "requeued": False}
-        # Reintento explicito y seguro: mismos bytes de una fuente fallida o
-        # de una fuente cuya entrega se perdio estando queued/processing.
+            return {**_source(source), "deduplicated": True, "requeued": False}
+        # Reintento explicito y seguro: mismos bytes de una fuente fallida.
         source.filename = payload.path
         source.status = "queued"
         source.error = None
         db.commit()
-        return {**_source(_dispatch(db, source)), "deduplicated": True, "requeued": True}
     return {**_source(_dispatch(db, source)), "deduplicated": not result.created, "requeued": not result.created}
 
 
