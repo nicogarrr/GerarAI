@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from app.services.document_store import DocumentStore
@@ -173,3 +175,55 @@ def test_document_store_delete_is_idempotent_and_rejects_escape(tmp_path):
     with pytest.raises(ValueError, match="local document storage"):
         store.delete(str(outside))
     assert outside.exists()
+
+
+@pytest.mark.parametrize("operation", ["prefix", "file", "parent"])
+def test_local_deletion_rejects_in_root_cross_tenant_symlinks(tmp_path, operation):
+    store = DocumentStore()
+    store.local_root = tmp_path / "raw"
+    store.local_root.mkdir()
+    victim = store.local_root / "tenant-2"
+    victim.mkdir()
+    original = victim / "private.txt"
+    original.write_bytes(b"synthetic tenant two original")
+    link = store.local_root / "tenant-1"
+    if operation == "file":
+        link.mkdir()
+        link = link / "alias.txt"
+        link.symlink_to(original)
+    else:
+        link.symlink_to(victim, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="Unsafe local document storage path"):
+        if operation == "prefix":
+            store.delete_tenant_prefix(1)
+        else:
+            store.delete(str(link if operation == "file" else link / "private.txt"))
+    assert original.read_bytes() == b"synthetic tenant two original"
+    assert link.is_symlink()
+
+
+def test_local_prefix_deletion_is_scoped_and_idempotent(tmp_path):
+    store = DocumentStore()
+    store.local_root = tmp_path / "raw"
+    own = store.put_bytes_local("QA", "note", "a.txt", b"own", tenant_id=1)
+    other = store.put_bytes_local("QA", "note", "b.txt", b"other", tenant_id=2)
+    assert store.delete_tenant_prefix(1) == 1
+    assert not Path(own).exists()
+    assert Path(other).read_bytes() == b"other"
+    assert store.delete_tenant_prefix(1) == 0
+
+
+def test_local_deletion_supports_explicit_symlink_storage_root(tmp_path):
+    real_root = tmp_path / "actual-storage"
+    real_root.mkdir()
+    configured_root = tmp_path / "raw"
+    configured_root.symlink_to(real_root, target_is_directory=True)
+    store = DocumentStore()
+    store.local_root = configured_root
+    first = store.put_bytes_local("QA", "note", "a.txt", b"own", tenant_id=1)
+    assert store.delete(first) is True
+    store.put_bytes_local("QA", "note", "b.txt", b"own", tenant_id=1)
+    other = store.put_bytes_local("QA", "note", "c.txt", b"other", tenant_id=2)
+    assert store.delete_tenant_prefix(1) == 1
+    assert Path(other).read_bytes() == b"other"
