@@ -143,6 +143,9 @@ async def _analyze_with_llm(payload: str, *, on_response=None, before_retry=None
         model=model,
         temperature=0,
         max_tokens=900,
+        # Piloto Go 2026-10-26: con effort alto y 900 tokens la respuesta llego vacia.
+        # Salida estructurada corta: sin razonamiento oculto (como la narrativa de noticias, #2183).
+        reasoning_effort="none",
         response_format=ResponseFormat.json_schema(_SCHEMA, name="asts_catalog_analysis"),
     )
     # Pin an approved model: task overrides may route to paid models.
