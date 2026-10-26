@@ -252,11 +252,10 @@ class PortfolioSnapshotService:
                 )
             )
         db.flush()
-        if existing:
-            # F363: recapturar un día antiguo cambia su valor; las fotos
-            # posteriores enlazaban con el valor anterior, así que su retorno y
-            # TWR se recalculan desde sus propios datos guardados.
-            self._relink_following(db, portfolio.id, snapshot_date)
+        # A new historical snapshot changes the next snapshot's predecessor
+        # just as a recapture changes its value. Relink both cases, using only
+        # saved valuations (never today's balances for a later historical day).
+        self._relink_following(db, portfolio.id, snapshot_date)
         return snapshot
 
     def _relink_following(self, db: Session, portfolio_id: int, after: date) -> None:
@@ -284,20 +283,46 @@ class PortfolioSnapshotService:
                 )
                 is None
             )
-            # Evidencia de ventana: solo las fotos con contador de flujos
-            # intermedios y ventana (after_previous_snapshot_through_as_of)
-            # acreditan que net_external_flow_base cubre todo el intervalo.
-            # Una foto legacy sin esa evidencia no prueba flujo cero: se deja None.
+            # Only snapshots with an explicit interval-flow contract may
+            # have their window recomputed. A legacy snapshot without that
+            # evidence never proves zero flow and stays unlinked.
             intermediate = meta.get("unvalued_intermediate_flows")
             window_proven = (
                 meta.get("flow_window") == "after_previous_snapshot_through_as_of"
                 and isinstance(intermediate, int)
                 and not isinstance(intermediate, bool)
-                and intermediate == 0
+                and intermediate >= 0
                 and "ambiguous_external_flows" in meta
             )
+            if window_proven:
+                # A backfill narrows (previous, current]. Reusing the old
+                # net flow would subtract a deposit twice, or keep a resolved
+                # gap blocked. Recompute the flow window, not the valuation.
+                net_flow, ambiguous = self._external_flows(
+                    db, portfolio_id=portfolio_id, as_of=current.snapshot_date,
+                    base_currency=current.base_currency,
+                    after=previous.snapshot_date,
+                )
+                interval_days = (current.snapshot_date - previous.snapshot_date).days
+                intermediate = len(db.scalars(select(Transaction.id).where(
+                    Transaction.portfolio_id == portfolio_id,
+                    Transaction.trade_date > previous.snapshot_date,
+                    Transaction.trade_date < current.snapshot_date,
+                    Transaction.action.in_(["deposit", "withdrawal", "cash_misc"]),
+                    *tenant_filters(db, Transaction),
+                )).all()) if interval_days > 1 else 0
+                current.net_external_flow_base = net_flow
+                meta = {
+                    **meta,
+                    "ambiguous_external_flows": ambiguous,
+                    "interval_days": interval_days,
+                    "unvalued_intermediate_flows": intermediate,
+                    "twr_blocked_by_gap_flows": bool(intermediate),
+                }
+                current.metadata_ = meta
             linkable = (
                 window_proven
+                and intermediate == 0
                 and previous.total_value_base > 0
                 and previous.pricing_coverage == Decimal("1")
                 and previous.base_currency == current.base_currency
