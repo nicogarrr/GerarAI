@@ -18,8 +18,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
+from app.llm import LLMRequest, Message, ResponseFormat, parse_json_response
 from app.llm.errors import ProviderDisabledError, ProviderHTTPError, ProviderTransportError
+from app.llm.thesis_go import create_thesis_narrative_provider
 from app.models.entities import Company, NewsEvent
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
@@ -250,7 +251,7 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
         if not headlines:
             return sin_datos()
         request = build_request(company.ticker, headlines)
-        provider = provider or create_llm_provider()
+        provider = provider or create_thesis_narrative_provider()
         if provider.name == "disabled" or paid_model_risk(provider, request=request):
             # Modelo no disponible NO es ausencia de evidencia: compendio
             # factual (fuentes explícitas, sin LLM, EUR 0) en vez de «Sin datos».

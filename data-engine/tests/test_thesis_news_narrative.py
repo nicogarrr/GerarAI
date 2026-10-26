@@ -516,3 +516,23 @@ def test_news_narrative_request_carries_reasoning_effort_none(context):
     # el endpoint real; el default del proveedor (chat, otros) no cambia.
     assert provider.requests
     assert provider.requests[0].reasoning_effort == "none"
+
+
+def test_wiring_usa_factoria_tesis_go_y_compendio_si_disabled(context, monkeypatch):
+    from app.llm.adapters import DisabledProvider
+
+    llamadas = []
+
+    def factoria(settings=None, *, client=None):
+        llamadas.append(True)
+        return DisabledProvider("thesis_go_model_not_allowed")
+
+    def prohibida(*a, **k):
+        raise AssertionError("la factoría global no debe usarse aquí")
+
+    monkeypatch.setattr(svc, "create_thesis_narrative_provider", factoria)
+    monkeypatch.setattr("app.llm.thesis_go.create_llm_provider", prohibida)
+    db, company, _ = context
+    result = svc.maybe_news_narrative_sections(db, company, [ITEM], now=NOW)
+    # Config Go inválida = compendio factual honesto, nunca narrativa de bridge.
+    assert result is not None and llamadas

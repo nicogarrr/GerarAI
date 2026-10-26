@@ -598,3 +598,26 @@ def test_assumption_fcf_margin_not_equated_with_reported_period_margin():
     assert "no son la misma cifra" in sup
     rep = next(f["texto"] for f in facts if "Margen de FCF de META" in f["texto"])
     assert "23,0 %" in rep and "2025-12-31:FY" in rep
+
+
+def test_wiring_usa_factoria_tesis_go_y_falla_cerrado(context, monkeypatch):
+    # Con provider=None el servicio resuelve por la factoría dedicada; si esa
+    # factoría dice disabled (config Go inválida), la narrativa se omite y la
+    # factoría GLOBAL no se toca (nunca bridge presentado como Go).
+    from app.llm.adapters import DisabledProvider
+
+    llamadas = []
+
+    def factoria(settings=None, *, client=None):
+        llamadas.append(True)
+        return DisabledProvider("thesis_go_api_key_not_configured")
+
+    def prohibida(*a, **k):
+        raise AssertionError("la factoría global no debe usarse aquí")
+
+    monkeypatch.setattr(svc, "create_thesis_narrative_provider", factoria)
+    monkeypatch.setattr("app.llm.thesis_go.create_llm_provider", prohibida)
+    db, _ = context
+    assert svc.maybe_deep_narrative(
+        db, _company(), _valuation(), _long_term_model(), "H.", NEWS) is None
+    assert llamadas
