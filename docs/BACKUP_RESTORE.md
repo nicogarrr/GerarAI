@@ -25,8 +25,19 @@ After restore, run `docker compose run --rm backend alembic upgrade head`, verif
 En la VM de produccion los equivalentes en bash son `scripts/backup.sh` y
 `scripts/restore.sh` (mismo contrato: Postgres `pg_dump -Fc`, snapshots de
 Qdrant, tar de MinIO y DuckDB, manifest por backup; restore exige
-`--confirm-restore`). `backup.sh` sube a Cloudflare R2 si se define
-`RCLONE_REMOTE`. Guia completa en `docs/oracle-setup.md`.
+`--confirm-restore`). Ambos usan
+`docker compose -f docker-compose.prod.yml --env-file .env.production` (o
+`COMPOSE_CMD` externo).
+
+- `backup.sh --stop-storage` para backend, TODOS los workers (worker,
+  worker-thesis, worker-kpis, worker-alerts, worker-gdelt, worker-knowledge),
+  el scheduler y MinIO; sin eso el tar puede capturar un original a medias.
+- Antes de subir a R2 o purgar retencion, `backup.sh` recalcula los checksums
+  del manifest y aborta si no cuadran. `restore.sh` verifica esos mismos
+  checksums antes del primer `dropdb`: un artefacto corrupto no llega a tocar
+  los datos.
+- `backup.sh` sube a Cloudflare R2 si se define `RCLONE_REMOTE`. Guia completa
+  en `docs/oracle-setup.md`.
 
 ## Retencion
 
@@ -57,5 +68,8 @@ Coste 0 EUR, solo lectura sobre Atlas:
   VM. En R2, `rclone copy` nunca borra; la expiracion la impone el lifecycle
   del bucket.
 - Probar el primer backup a mano antes de programar el cron.
-- Programacion (cron semanal) pendiente: se activa solo tras verificar tier y
-  destino. Ejemplo: `0 4 * * 0 cd ~/GerarAI && ./scripts/mongo-backup.sh`.
+- Programacion: cron semanal (domingo 04:30 UTC), despues del backup del
+  stack de las 04:17. Ejemplo:
+  `30 4 * * 0 cd ~/GerarAI && ./scripts/mongo-backup.sh`.
+- M0 no tiene backups gestionados: si el cron no corre, no hay segunda copia.
+  Verifica el primer domingo que aparece un `backups/mongo-*.age` nuevo.

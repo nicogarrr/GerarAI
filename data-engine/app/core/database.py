@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker, with_loader_criteria
 
 from app.core.auth import ResearchPrincipal, get_research_principal
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,25 @@ def _engine_connect_args(database_url: str, idle_timeout_ms: int) -> dict:
     return {}
 
 
+def _engine_pool_kwargs(database_url: str, settings: Settings) -> dict:
+    """Parametros de pool SOLO para Postgres.
+
+    sqlite (tests y desarrollo local) conserva su pool por defecto: pasarle
+    pool_size/max_overflow no aporta y cambia su semantica de conexiones.
+    Los valores llegan de DB_POOL_SIZE / DB_MAX_OVERFLOW / DB_POOL_TIMEOUT /
+    DB_POOL_RECYCLE; el compose fija 20+10 en el backend y 4+2 en los workers.
+    """
+    scheme = database_url.split(":", 1)[0].lower().split("+", 1)[0]
+    if scheme not in {"postgres", "postgresql"}:
+        return {}
+    return {
+        "pool_size": settings.db_pool_size,
+        "max_overflow": settings.db_max_overflow,
+        "pool_timeout": settings.db_pool_timeout,
+        "pool_recycle": settings.db_pool_recycle,
+    }
+
+
 settings = get_settings()
 engine = create_engine(
     settings.database_url,
@@ -96,6 +115,7 @@ engine = create_engine(
         settings.database_url, settings.idle_in_transaction_session_timeout_ms
     ),
     pool_pre_ping=True,
+    **_engine_pool_kwargs(settings.database_url, settings),
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 

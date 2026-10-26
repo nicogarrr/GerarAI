@@ -105,7 +105,11 @@ def test_prod_compose_passes_app_version_to_backend():
     from pathlib import Path
 
     compose = (Path(__file__).resolve().parents[2] / "docker-compose.prod.yml").read_text()
-    assert "APP_VERSION=${APP_VERSION:-}" in compose
+    # El compose puede declarar environment como lista o como mapa (anchors).
+    assert (
+        "APP_VERSION=${APP_VERSION:-}" in compose
+        or "APP_VERSION: ${APP_VERSION:-}" in compose
+    )
 
 
 def test_required_probe_has_its_own_executor():

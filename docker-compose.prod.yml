@@ -2,11 +2,93 @@
 # Docker Compose - Produccion personal (Oracle Ampere Always Free)
 # ============================================================
 # Una sola VM ARM64 (2 OCPU / 12 GB RAM, Always Free sin upgrade), un solo usuario.
-# El frontend sigue en Vercel Hobby; la auth vive en MongoDB Atlas
-# (M0 gratis), asi que aqui NO va ni frontend ni MongoDB.
+# El frontend vive en Vercel Hobby; la auth en MongoDB Atlas (M0 gratis), asi
+# que aqui NO va ni frontend ni MongoDB.
 #
-# Uso: docker compose -f docker-compose.prod.yml up -d
-# Requisitos: .env.production (ver docs/oracle-setup.md)
+# Presupuesto de memoria: la suma de `memory` de TODOS los servicios es
+# 10.176 MiB (~9,94 GiB), por debajo de los 10 GiB reales que se reservan al
+# stack. El resto de la VM queda para el kernel, page cache y una swap de
+# 2-4 GB (ver docs/oracle-setup.md). Los `cpus` son techos por servicio, no
+# reservas: la VM tiene 2 OCPU y varios servicios pueden turnarse.
+#
+# Uso: docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+# Requisitos: .env.production (ver docs/oracle-setup.md y scripts/deploy.sh)
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Entorno comun a backend, workers y scheduler. En forma de mapa para poder
+# fusionarlo con `<<` en cada servicio: APP_ENV=production deja de depender de
+# que cada bloque se acuerde de ponerlo, y las garantias de config.py
+# (auth firmada, MinIO, pool de BD) se aplican en TODOS los procesos.
+x-app-env: &app-env
+  APP_ENV: production
+  PYTHONUNBUFFERED: "1"
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
+  REDIS_URL: redis://redis:6379/0
+  KPI_QUEUE_MAX_PENDING: ${KPI_QUEUE_MAX_PENDING:-500}
+  KPI_DEFER_LEASE_SECONDS: ${KPI_DEFER_LEASE_SECONDS:-900}
+  QDRANT_URL: http://qdrant:6333
+  VECTOR_STORE: qdrant
+  # Backend de objetos: por defecto MinIO; el corte a Garage es solo cambiar
+  # OBJECT_STORAGE_* en .env.production (docs/OBJECT_STORAGE_MIGRATION.md).
+  MINIO_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-minio:9000}
+  MINIO_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:-${MINIO_ROOT_USER}}
+  MINIO_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
+  MINIO_REGION: ${OBJECT_STORAGE_REGION:-}
+  MINIO_BUCKET: research
+  # La SEC rechaza UAs con placeholders (403): sin un contacto real declarado
+  # el compose no interpola y el deploy se detiene.
+  SEC_USER_AGENT: ${SEC_USER_AGENT:?Define SEC_USER_AGENT con un contacto real en .env.production}
+  # Retencion operativa: el scheduler la necesita para el job privacy_retention
+  # y MinIO/Qdrant para borrar originales, chunks y vectores. Sin estas
+  # variables el job arrancaba pero no podia purgar storage.
+  RETENTION_JOB_ENABLED: ${RETENTION_JOB_ENABLED:-false}
+  RETENTION_DRY_RUN: ${RETENTION_DRY_RUN:-true}
+  RETENTION_BATCH_LIMIT: ${RETENTION_BATCH_LIMIT:-500}
+  FINANCIAL_DOCUMENT_RETENTION_DAYS: ${FINANCIAL_DOCUMENT_RETENTION_DAYS:-2555}
+  CHAT_TELEMETRY_RETENTION_DAYS: ${CHAT_TELEMETRY_RETENTION_DAYS:-90}
+
+# Pool de BD de los workers: 4 conexiones + 2 de overflow por proceso. Con 7
+# workers + scheduler son ~48 conexiones, mas las 30 del backend (20+10): muy
+# por debajo de max_connections=200 de Postgres.
+x-worker-db-env: &worker-db-env
+  DB_POOL_SIZE: ${WORKER_DB_POOL_SIZE:-4}
+  DB_MAX_OVERFLOW: ${WORKER_DB_MAX_OVERFLOW:-2}
+  DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
+  DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
+
+# Configuracion LLM compartida por los procesos que generan texto.
+x-llm-env: &llm-env
+  LLM_ENABLED: ${LLM_ENABLED:-true}
+  LLM_PROVIDER: ${LLM_PROVIDER:-opencode-go}
+  CHAT_TOTAL_TIMEOUT_SECONDS: ${CHAT_TOTAL_TIMEOUT_SECONDS:-45}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  GROQ_CHAT_FALLBACK_ENABLED: ${GROQ_CHAT_FALLBACK_ENABLED:-false}
+  GROQ_FREE_PLAN_CONFIRMED: ${GROQ_FREE_PLAN_CONFIRMED:-false}
+  GROQ_ZDR_CONFIRMED: ${GROQ_ZDR_CONFIRMED:-false}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  GEMINI_CHAT_FALLBACK_ENABLED: ${GEMINI_CHAT_FALLBACK_ENABLED:-false}
+  GEMINI_FREE_PLAN_CONFIRMED: ${GEMINI_FREE_PLAN_CONFIRMED:-false}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemma-4-31b-it:free}
+  OPENCODE_GO_API_KEY: ${OPENCODE_GO_API_KEY:-}
+  OPENCODE_GO_BASE_URL: ${OPENCODE_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
+  OPENCODE_GO_MODEL: ${OPENCODE_GO_MODEL:-deepseek-v4.1-flash}
+  OPENCODE_GO_REASONING_EFFORT: ${OPENCODE_GO_REASONING_EFFORT:-high}
+  OPENCODE_GO_REASONING_EFFORT_MODELS: ${OPENCODE_GO_REASONING_EFFORT_MODELS:-deepseek-v4.1-flash,deepseek-v4.1-flash-free,space-bunny-free}
+  OPENCODE_GO_CHAT_REASONING_EFFORT: ${OPENCODE_GO_CHAT_REASONING_EFFORT:-high}
+  OPENCODE_GO_FALLBACK_MODEL: ${OPENCODE_GO_FALLBACK_MODEL:-}
+  OPENCODE_GO_ALLOW_UNVERIFIED_MODEL: ${OPENCODE_GO_ALLOW_UNVERIFIED_MODEL:-false}
+  LLM_MODEL_OVERRIDES: ${LLM_MODEL_OVERRIDES:-{}}
+  CHAT_GO_SUBSCRIPTION_ENABLED: ${CHAT_GO_SUBSCRIPTION_ENABLED:-true}
+  CHAT_GO_SUBSCRIPTION_BASE_URL: ${CHAT_GO_SUBSCRIPTION_BASE_URL:-https://opencode.ai/zen/go/v1}
+  SECOND_ORDER_LLM_ENABLED: ${SECOND_ORDER_LLM_ENABLED:-0}
+  ASTS_LLM_ENABLED: ${ASTS_LLM_ENABLED:-0}
+  THESIS_NARRATIVE_LLM_ENABLED: ${THESIS_NARRATIVE_LLM_ENABLED:-0}
 
 services:
   # TLS + reverse proxy hacia el backend (un subdominio DuckDNS gratis).
@@ -15,17 +97,18 @@ services:
     container_name: cavaai-caddy
     restart: unless-stopped
     ports:
-      # Solo la IP publica: tailscaled sirve :443 en la IP tailnet
-      # (100.109.106.23, tailscale serve -> 127.0.0.1:8080) y un bind
-      # 0.0.0.0 colisiona con el. Verificado 2026-10-16.
-      - "10.0.0.64:80:80"
-      - "10.0.0.64:443:443"
+      # BIND_IP configurable: por defecto 0.0.0.0 (VM normal). Si tailscaled
+      # ocupa :443 en la IP tailnet, pon BIND_IP=<ip-privada-de-la-VM> en
+      # .env.production (antes estaba fijada a 10.0.0.64). Ver oracle-setup.md.
+      - "${BIND_IP:-0.0.0.0}:80:80"
+      - "${BIND_IP:-0.0.0.0}:443:443"
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     environment:
       - BACKEND_DOMAIN=${BACKEND_DOMAIN:?Define BACKEND_DOMAIN (p.ej. 51.170.37.134.sslip.io) en .env.production}
+    logging: *default-logging
     healthcheck:
       # Sin endpoint HTTP neutro (TLS/SNI depende del dominio): se verifica el binario.
       test: ["CMD", "caddy", "version"]
@@ -35,11 +118,20 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: 64M
 
   postgres:
     image: postgres:17
     container_name: cavaai-postgres
     restart: unless-stopped
+    # 200 conexiones: 30 del backend (20+10) + ~48 de los workers (4+2 cada
+    # uno) + salud/diagnostico. Sin subirlo, el pool por defecto (100) dejaba
+    # a los workers esperando conexiones bajo fan-out.
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=256MB"]
     # Sin puerto publico: solo red interna de compose.
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -53,6 +145,7 @@ services:
       - ASTS_LLM_ENABLED=${ASTS_LLM_ENABLED:-0}
       - THESIS_NARRATIVE_LLM_ENABLED=${THESIS_NARRATIVE_LLM_ENABLED:-0}
       - PGTZ=UTC
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-portfolio} -d ${POSTGRES_DB:-cavaai_research}"]
       interval: 10s
@@ -61,21 +154,32 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          cpus: "0.75"
+          memory: 896M
 
   redis:
     image: redis:7-alpine
     container_name: cavaai-redis
     restart: unless-stopped
     # Cola Dramatiq + cache; AOF para no perder jobs en reinicio.
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "noeviction"]
+    # maxmemory 768 MB: con 512 MB el backlog de ingesta expulsaba/fallaba
+    # jobs legitimos (noeviction convierte presion en QueueCapacityError, no
+    # en perdida silenciosa). Alerta operativa: `INFO memory` >
+    # 80% de 768 MB o `LLEN` de colas creciendo durante >30 min.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "768mb", "--maxmemory-policy", "noeviction"]
     volumes:
       - redis_data:/data
+    logging: *default-logging
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 896M
 
   qdrant:
     image: qdrant/qdrant:v1.19.2
@@ -89,6 +193,7 @@ services:
       - "127.0.0.1:6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    logging: *default-logging
     healthcheck:
       # La imagen de Qdrant no incluye curl/wget: GET /healthz con bash (/dev/tcp).
       test:
@@ -101,7 +206,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          cpus: "0.50"
+          memory: 768M
 
   minio:
     # Build local desde el codigo fuente de MinIO (la imagen de quay ya no es publica): docker/minio/Dockerfile.
@@ -117,6 +223,7 @@ services:
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env.production}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?Define MINIO_ROOT_PASSWORD en .env.production}
+    logging: *default-logging
     healthcheck:
       # La imagen minio/minio no incluye curl/mc: sonda HTTP al endpoint live con bash (/dev/tcp).
       test:
@@ -126,11 +233,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
 
   garage:
-    # Garage (S3 compatible, mantenido, nodo unico). Convive con MinIO durante el
-    # puente: MinIO no se toca hasta cerrar la migracion (rollback = volver las
-    # variables OBJECT_STORAGE_* a su valor por defecto).
+    # Garage (S3 compatible, mantenido, nodo unico). Convive con MinIO durante
+    # la migracion: MinIO no se toca hasta cerrar la migracion (rollback =
+    # volver las variables OBJECT_STORAGE_* a su valor por defecto). Limite
+    # ajustado porque en regimen normal solo MinIO sirve objetos.
     image: dxflrs/garage:v2.4.1
     container_name: cavaai-garage
     restart: unless-stopped
@@ -144,6 +257,7 @@ services:
       - GARAGE_DEFAULT_ACCESS_KEY=${GARAGE_ACCESS_KEY:?Define GARAGE_ACCESS_KEY (GK + 24 hex) en .env.production}
       - GARAGE_DEFAULT_SECRET_KEY=${GARAGE_SECRET_KEY:?Define GARAGE_SECRET_KEY (64 hex) en .env.production}
       - GARAGE_DEFAULT_BUCKET=research
+    logging: *default-logging
     healthcheck:
       # La imagen solo trae el binario /garage (sin shell ni curl).
       test: ["CMD", "/garage", "status"]
@@ -154,7 +268,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          cpus: "0.10"
+          memory: 192M
 
   backend:
     build:
@@ -164,109 +279,71 @@ services:
     container_name: cavaai-backend
     restart: unless-stopped
     environment:
-      - EIA_API_KEY=${EIA_API_KEY:-}
-      - IBKR_FLEX_TOKEN=${IBKR_FLEX_TOKEN:-}
-      - IBKR_FLEX_QUERY_ID=${IBKR_FLEX_QUERY_ID:-}
-      - IBKR_FLEX_TENANT_ID=${IBKR_FLEX_TENANT_ID:-}
-      - IBKR_FLEX_ACCOUNT_ID=${IBKR_FLEX_ACCOUNT_ID:-}
-      - IBKR_FLEX_COMPLETE_QUERY_ID=${IBKR_FLEX_COMPLETE_QUERY_ID:-}
-      - APP_ENV=production
+      <<: [*app-env, *llm-env]
+      EIA_API_KEY: ${EIA_API_KEY:-}
+      IBKR_FLEX_TOKEN: ${IBKR_FLEX_TOKEN:-}
+      IBKR_FLEX_QUERY_ID: ${IBKR_FLEX_QUERY_ID:-}
+      IBKR_FLEX_TENANT_ID: ${IBKR_FLEX_TENANT_ID:-}
+      IBKR_FLEX_ACCOUNT_ID: ${IBKR_FLEX_ACCOUNT_ID:-}
+      IBKR_FLEX_COMPLETE_QUERY_ID: ${IBKR_FLEX_COMPLETE_QUERY_ID:-}
       # Version desplegada que expone /api/health (la imagen no lleva git):
       # se exporta al desplegar, p. ej. APP_VERSION=main-$(git rev-parse --short HEAD).
-      - APP_VERSION=${APP_VERSION:-}
+      APP_VERSION: ${APP_VERSION:-}
       # El scheduler corre en su propio servicio (cavaai-scheduler);
       # sin esto, el backend arrancaria una segunda copia embebida.
-      - WORKERS_ENABLED=false
-      - RESEARCH_AUTH_REQUIRED=true
-      - RESEARCH_AUTH_SECRET=${RESEARCH_AUTH_SECRET:?Obligatorio}
-      - FMP_API_KEY=${FMP_API_KEY:-}
+      WORKERS_ENABLED: "false"
+      RESEARCH_AUTH_REQUIRED: "true"
+      RESEARCH_AUTH_SECRET: ${RESEARCH_AUTH_SECRET:?Obligatorio}
+      # Pool del backend: 30 conexiones como maximo (20 + 10 de overflow).
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
+      DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
+      FMP_API_KEY: ${FMP_API_KEY:-}
       # Solo adiciones de mapeo: sin FINNHUB no hay screener Finnhub en prod
       # (fallback Yahoo); sin FRED no hay macro; sin TYPESAFE no hay Jev;
       # sin TELEGRAM_* no se envia nada (degradado a UI).
-      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
-      - FRED_API_KEY=${FRED_API_KEY:-}
-      - SCREENER_QUOTE_VENDOR=${SCREENER_QUOTE_VENDOR:-finnhub}
-      - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
-      - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_LINK_SECRET=${TELEGRAM_LINK_SECRET:-}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
-      - TELEGRAM_APPROVAL_ENABLED=${TELEGRAM_APPROVAL_ENABLED:-false}
-      - INSIDER_ALERTS_ENABLED=${INSIDER_ALERTS_ENABLED:-false}
-      - SECOND_ORDER_LLM_ENABLED=${SECOND_ORDER_LLM_ENABLED:-0}
-      - ASTS_LLM_ENABLED=${ASTS_LLM_ENABLED:-0}
-      - THESIS_NARRATIVE_LLM_ENABLED=${THESIS_NARRATIVE_LLM_ENABLED:-0}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      SCREENER_QUOTE_VENDOR: ${SCREENER_QUOTE_VENDOR:-finnhub}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_LINK_SECRET: ${TELEGRAM_LINK_SECRET:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_APPROVAL_ENABLED: ${TELEGRAM_APPROVAL_ENABLED:-false}
+      INSIDER_ALERTS_ENABLED: ${INSIDER_ALERTS_ENABLED:-false}
       # Go DEDICADO solo a las narrativas de tesis (backend y worker-thesis). Defecto
       # apagado: mergear no activa gasto. La clave solo llega a estos dos servicios.
-      - THESIS_GO_ENABLED=${THESIS_GO_ENABLED:-false}
-      - THESIS_GO_BASE_URL=${THESIS_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
-      - THESIS_GO_MODEL=${THESIS_GO_MODEL:-deepseek-v4.1-flash}
-      - THESIS_GO_API_KEY=${THESIS_GO_API_KEY:-}
+      THESIS_GO_ENABLED: ${THESIS_GO_ENABLED:-false}
+      THESIS_GO_BASE_URL: ${THESIS_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
+      THESIS_GO_MODEL: ${THESIS_GO_MODEL:-deepseek-v4.1-flash}
+      THESIS_GO_API_KEY: ${THESIS_GO_API_KEY:-}
       # RAG: sin =1 no hay ingesta/busqueda/chat vectorial (degradado a SQL).
-      - CAVAAI_ENABLE_VECTOR_INGEST=${CAVAAI_ENABLE_VECTOR_INGEST:-0}
-      - CAVAAI_ENABLE_VECTOR_SEARCH=${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
-      - CAVAAI_ENABLE_VECTOR_CHAT=${CAVAAI_ENABLE_VECTOR_CHAT:-0}
-      # LLM: OpenCode Go con DeepSeek v4.1 Flash es el cerebro aprobado por
-      # el dueno (suscripcion ya contratada). Groq/Gemini/OpenRouter siguen
-      # opt-in y apagados por defecto.
-      - LLM_ENABLED=${LLM_ENABLED:-true}
-      - LLM_PROVIDER=${LLM_PROVIDER:-opencode-go}
-      - CHAT_TOTAL_TIMEOUT_SECONDS=${CHAT_TOTAL_TIMEOUT_SECONDS:-45}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GROQ_CHAT_FALLBACK_ENABLED=${GROQ_CHAT_FALLBACK_ENABLED:-false}
-      - GROQ_FREE_PLAN_CONFIRMED=${GROQ_FREE_PLAN_CONFIRMED:-false}
-      - GROQ_ZDR_CONFIRMED=${GROQ_ZDR_CONFIRMED:-false}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_CHAT_FALLBACK_ENABLED=${GEMINI_CHAT_FALLBACK_ENABLED:-false}
-      - GEMINI_FREE_PLAN_CONFIRMED=${GEMINI_FREE_PLAN_CONFIRMED:-false}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemma-4-31b-it:free}
-      - OPENCODE_GO_API_KEY=${OPENCODE_GO_API_KEY:-}
-      - OPENCODE_GO_BASE_URL=${OPENCODE_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
-      - OPENCODE_GO_MODEL=${OPENCODE_GO_MODEL:-deepseek-v4.1-flash}
-      - OPENCODE_GO_REASONING_EFFORT=${OPENCODE_GO_REASONING_EFFORT:-high}
-      - OPENCODE_GO_REASONING_EFFORT_MODELS=${OPENCODE_GO_REASONING_EFFORT_MODELS:-deepseek-v4.1-flash,deepseek-v4.1-flash-free,space-bunny-free}
-      - OPENCODE_GO_CHAT_REASONING_EFFORT=${OPENCODE_GO_CHAT_REASONING_EFFORT:-high}
-      - OPENCODE_GO_FALLBACK_MODEL=${OPENCODE_GO_FALLBACK_MODEL:-}
-      - OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=${OPENCODE_GO_ALLOW_UNVERIFIED_MODEL:-false}
-      - LLM_MODEL_OVERRIDES=${LLM_MODEL_OVERRIDES:-{}}
-      # Primario de chat por la suscripcion OpenCode Go (aprobada por el dueno).
-      # El interruptor sigue permitiendo volver a la ruta free verificada.
-      - CHAT_GO_SUBSCRIPTION_ENABLED=${CHAT_GO_SUBSCRIPTION_ENABLED:-true}
-      - CHAT_GO_SUBSCRIPTION_BASE_URL=${CHAT_GO_SUBSCRIPTION_BASE_URL:-https://opencode.ai/zen/go/v1}
-      - CHAT_GO_HEAD_START_SECONDS=${CHAT_GO_HEAD_START_SECONDS:-2.0}
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
-      - REDIS_URL=redis://redis:6379/0
-      - KPI_QUEUE_MAX_PENDING=${KPI_QUEUE_MAX_PENDING:-500}
-      - KPI_DEFER_LEASE_SECONDS=${KPI_DEFER_LEASE_SECONDS:-900}
-      - QDRANT_URL=http://qdrant:6333
-      - VECTOR_STORE=qdrant
-      # Backend de objetos: por defecto MinIO; el corte a Garage es solo cambiar
-      # OBJECT_STORAGE_* en .env.production (docs/OBJECT_STORAGE_MIGRATION.md).
-      - MINIO_ENDPOINT=${OBJECT_STORAGE_ENDPOINT:-minio:9000}
-      - MINIO_ACCESS_KEY=${OBJECT_STORAGE_ACCESS_KEY:-${MINIO_ROOT_USER}}
-      - MINIO_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
-      - MINIO_REGION=${OBJECT_STORAGE_REGION:-}
-      - MINIO_BUCKET=research
-      - DUCKDB_PATH=/data/analytics.duckdb
+      CAVAAI_ENABLE_VECTOR_INGEST: ${CAVAAI_ENABLE_VECTOR_INGEST:-0}
+      CAVAAI_ENABLE_VECTOR_SEARCH: ${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
+      CAVAAI_ENABLE_VECTOR_CHAT: ${CAVAAI_ENABLE_VECTOR_CHAT:-0}
+      CHAT_GO_HEAD_START_SECONDS: ${CHAT_GO_HEAD_START_SECONDS:-2.0}
+      DUCKDB_PATH: /data/analytics.duckdb
       # RAG de conocimiento profesional (#924): la API responde 503 mientras
       # el flag este a 0. La ingesta la hace worker-knowledge (cola knowledge).
-      - KNOWLEDGE_RAG_ENABLED=${KNOWLEDGE_RAG_ENABLED:-0}
-      - KNOWLEDGE_RAG_COLLECTION=${KNOWLEDGE_RAG_COLLECTION:-knowledge_rag_v1}
-      - KNOWLEDGE_RAG_INBOX_DIR=/data/knowledge-inbox
-      - KNOWLEDGE_RAG_MAX_FILE_MB=${KNOWLEDGE_RAG_MAX_FILE_MB:-60}
-      - KNOWLEDGE_RAG_MIN_FREE_GB=${KNOWLEDGE_RAG_MIN_FREE_GB:-3}
-      - KNOWLEDGE_RAG_RERANKER_MODEL=${KNOWLEDGE_RAG_RERANKER_MODEL:-}
-      - FASTEMBED_CACHE_PATH=/data/fastembed-cache
-      - LANGFUSE_ENABLED=false
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
-      - SEC_SNAPSHOT_DIR=${SEC_SNAPSHOT_DIR:-}
-      - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
-      - ESEF_SNAPSHOT_DIR=${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
+      KNOWLEDGE_RAG_ENABLED: ${KNOWLEDGE_RAG_ENABLED:-0}
+      # v2 = e5-large (1024 dims), coherente con knowledge_rag_dense_dims.
+      KNOWLEDGE_RAG_COLLECTION: ${KNOWLEDGE_RAG_COLLECTION:-knowledge_rag_v2}
+      KNOWLEDGE_RAG_INBOX_DIR: /data/knowledge-inbox
+      KNOWLEDGE_RAG_MAX_FILE_MB: ${KNOWLEDGE_RAG_MAX_FILE_MB:-60}
+      KNOWLEDGE_RAG_MIN_FREE_GB: ${KNOWLEDGE_RAG_MIN_FREE_GB:-3}
+      KNOWLEDGE_RAG_RERANKER_MODEL: ${KNOWLEDGE_RAG_RERANKER_MODEL:-}
+      FASTEMBED_CACHE_PATH: /data/fastembed-cache
+      LANGFUSE_ENABLED: "false"
+      SEC_SNAPSHOT_DIR: ${SEC_SNAPSHOT_DIR:-}
+      SEC_HF_MIRROR_DATASET: ${SEC_HF_MIRROR_DATASET:-}
+      ESEF_SNAPSHOT_DIR: ${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
     volumes:
       - duckdb_data:/data
       - ./data-esef-snapshots:/data/esef-snapshots:ro
       - ./knowledge-inbox:/data/knowledge-inbox:ro
+    logging: *default-logging
     healthcheck:
       # python:3.12-slim no trae curl: sonda equivalente a `curl -f http://localhost:8000/health/ready`.
       test:
@@ -289,7 +366,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
+          cpus: "1.00"
+          memory: 2G
 
   # worker: 3 threads (antes 6). Con 6 el proceso dramatiq llegaba al limite de 3G
   # (OOM de cgroup 24/10 19:09 y 19:13): el hijo muere por SIGKILL. Causa medida:
@@ -302,79 +380,41 @@ services:
     restart: unless-stopped
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "3", "-Q", "default", "prices"]
     environment:
-      - EIA_API_KEY=${EIA_API_KEY:-}
-      - IBKR_FLEX_TOKEN=${IBKR_FLEX_TOKEN:-}
-      - IBKR_FLEX_QUERY_ID=${IBKR_FLEX_QUERY_ID:-}
-      - IBKR_FLEX_TENANT_ID=${IBKR_FLEX_TENANT_ID:-}
-      - IBKR_FLEX_ACCOUNT_ID=${IBKR_FLEX_ACCOUNT_ID:-}
-      - IBKR_FLEX_COMPLETE_QUERY_ID=${IBKR_FLEX_COMPLETE_QUERY_ID:-}
-      - PYTHONUNBUFFERED=1
+      <<: [*app-env, *worker-db-env, *llm-env]
+      EIA_API_KEY: ${EIA_API_KEY:-}
+      IBKR_FLEX_TOKEN: ${IBKR_FLEX_TOKEN:-}
+      IBKR_FLEX_QUERY_ID: ${IBKR_FLEX_QUERY_ID:-}
+      IBKR_FLEX_TENANT_ID: ${IBKR_FLEX_TENANT_ID:-}
+      IBKR_FLEX_ACCOUNT_ID: ${IBKR_FLEX_ACCOUNT_ID:-}
+      IBKR_FLEX_COMPLETE_QUERY_ID: ${IBKR_FLEX_COMPLETE_QUERY_ID:-}
       # Solo adiciones de mapeo: el worker ejecuta los actores (refresh de
       # mercado, feeds, alertas) y necesita las mismas claves que el backend.
       # Sin FMP_API_KEY no hay contraste FMP en el refresh programado.
-      - FMP_API_KEY=${FMP_API_KEY:-}
-      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
-      - FRED_API_KEY=${FRED_API_KEY:-}
-      - SCREENER_QUOTE_VENDOR=${SCREENER_QUOTE_VENDOR:-finnhub}
-      - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
-      - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_LINK_SECRET=${TELEGRAM_LINK_SECRET:-}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
-      - TELEGRAM_APPROVAL_ENABLED=${TELEGRAM_APPROVAL_ENABLED:-false}
-      - INSIDER_ALERTS_ENABLED=${INSIDER_ALERTS_ENABLED:-false}
-      - SECOND_ORDER_LLM_ENABLED=${SECOND_ORDER_LLM_ENABLED:-0}
-      - ASTS_LLM_ENABLED=${ASTS_LLM_ENABLED:-0}
-      - THESIS_NARRATIVE_LLM_ENABLED=${THESIS_NARRATIVE_LLM_ENABLED:-0}
-      - CAVAAI_ENABLE_VECTOR_INGEST=${CAVAAI_ENABLE_VECTOR_INGEST:-0}
-      - CAVAAI_ENABLE_VECTOR_SEARCH=${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
-      - CAVAAI_ENABLE_VECTOR_CHAT=${CAVAAI_ENABLE_VECTOR_CHAT:-0}
-      # Mismas variables LLM que el backend: los workers tambien generan.
-      - LLM_ENABLED=${LLM_ENABLED:-true}
-      - LLM_PROVIDER=${LLM_PROVIDER:-opencode-go}
-      - CHAT_TOTAL_TIMEOUT_SECONDS=${CHAT_TOTAL_TIMEOUT_SECONDS:-45}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GROQ_CHAT_FALLBACK_ENABLED=${GROQ_CHAT_FALLBACK_ENABLED:-false}
-      - GROQ_FREE_PLAN_CONFIRMED=${GROQ_FREE_PLAN_CONFIRMED:-false}
-      - GROQ_ZDR_CONFIRMED=${GROQ_ZDR_CONFIRMED:-false}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_CHAT_FALLBACK_ENABLED=${GEMINI_CHAT_FALLBACK_ENABLED:-false}
-      - GEMINI_FREE_PLAN_CONFIRMED=${GEMINI_FREE_PLAN_CONFIRMED:-false}
-      - OPENCODE_GO_API_KEY=${OPENCODE_GO_API_KEY:-}
-      - OPENCODE_GO_BASE_URL=${OPENCODE_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
-      - OPENCODE_GO_MODEL=${OPENCODE_GO_MODEL:-deepseek-v4.1-flash}
-      - OPENCODE_GO_REASONING_EFFORT=${OPENCODE_GO_REASONING_EFFORT:-high}
-      - OPENCODE_GO_REASONING_EFFORT_MODELS=${OPENCODE_GO_REASONING_EFFORT_MODELS:-deepseek-v4.1-flash,deepseek-v4.1-flash-free,space-bunny-free}
-      - OPENCODE_GO_CHAT_REASONING_EFFORT=${OPENCODE_GO_CHAT_REASONING_EFFORT:-high}
-      - OPENCODE_GO_FALLBACK_MODEL=${OPENCODE_GO_FALLBACK_MODEL:-}
-      - OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=${OPENCODE_GO_ALLOW_UNVERIFIED_MODEL:-false}
-      - LLM_MODEL_OVERRIDES=${LLM_MODEL_OVERRIDES:-{}}
-      - CHAT_GO_SUBSCRIPTION_ENABLED=${CHAT_GO_SUBSCRIPTION_ENABLED:-true}
-      - CHAT_GO_SUBSCRIPTION_BASE_URL=${CHAT_GO_SUBSCRIPTION_BASE_URL:-https://opencode.ai/zen/go/v1}
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
-      - REDIS_URL=redis://redis:6379/0
-      - KPI_QUEUE_MAX_PENDING=${KPI_QUEUE_MAX_PENDING:-500}
-      - KPI_DEFER_LEASE_SECONDS=${KPI_DEFER_LEASE_SECONDS:-900}
-      - QDRANT_URL=http://qdrant:6333
-      - VECTOR_STORE=qdrant
-      # Backend de objetos: por defecto MinIO; el corte a Garage es solo cambiar
-      # OBJECT_STORAGE_* en .env.production (docs/OBJECT_STORAGE_MIGRATION.md).
-      - MINIO_ENDPOINT=${OBJECT_STORAGE_ENDPOINT:-minio:9000}
-      - MINIO_ACCESS_KEY=${OBJECT_STORAGE_ACCESS_KEY:-${MINIO_ROOT_USER}}
-      - MINIO_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
-      - MINIO_REGION=${OBJECT_STORAGE_REGION:-}
-      - MINIO_BUCKET=research
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
-      - SEC_SNAPSHOT_DIR=${SEC_SNAPSHOT_DIR:-}
-      - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
-      - ESEF_SNAPSHOT_DIR=${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
+      FMP_API_KEY: ${FMP_API_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      SCREENER_QUOTE_VENDOR: ${SCREENER_QUOTE_VENDOR:-finnhub}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_LINK_SECRET: ${TELEGRAM_LINK_SECRET:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_APPROVAL_ENABLED: ${TELEGRAM_APPROVAL_ENABLED:-false}
+      INSIDER_ALERTS_ENABLED: ${INSIDER_ALERTS_ENABLED:-false}
+      CAVAAI_ENABLE_VECTOR_INGEST: ${CAVAAI_ENABLE_VECTOR_INGEST:-0}
+      CAVAAI_ENABLE_VECTOR_SEARCH: ${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
+      CAVAAI_ENABLE_VECTOR_CHAT: ${CAVAAI_ENABLE_VECTOR_CHAT:-0}
+      SEC_SNAPSHOT_DIR: ${SEC_SNAPSHOT_DIR:-}
+      SEC_HF_MIRROR_DATASET: ${SEC_HF_MIRROR_DATASET:-}
+      ESEF_SNAPSHOT_DIR: ${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
       # Opt-in (#726): top_ten_sp500 se calcula en refresh_macro_context (cola default).
-      - SP500_FACTSHEET_SNAPSHOT_DIR=${SP500_FACTSHEET_SNAPSHOT_DIR:-/data/sp500-factsheet-snapshots}
-      - RSS_FEEDS=${RSS_FEEDS:-}
+      SP500_FACTSHEET_SNAPSHOT_DIR: ${SP500_FACTSHEET_SNAPSHOT_DIR:-/data/sp500-factsheet-snapshots}
+      RSS_FEEDS: ${RSS_FEEDS:-}
     volumes:
       - duckdb_data:/data
       - ./data-esef-snapshots:/data/esef-snapshots:ro
       - ./data-sp500-factsheet-snapshots:/data/sp500-factsheet-snapshots:ro
+    logging: *default-logging
     healthcheck:
       # Sin HTTP: dramatiq vivo (PID 1) + Redis de cola accesible.
       test:
@@ -393,7 +433,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3G
+          cpus: "0.50"
+          memory: 1280M
 
   worker-thesis:
     image: cavaai-backend:prod
@@ -404,65 +445,27 @@ services:
     # cuando la ingesta por lotes ocupaba los threads (7476 mensajes).
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "2", "-Q", "thesis"]
     environment:
-      - PYTHONUNBUFFERED=1
-      - FMP_API_KEY=${FMP_API_KEY:-}
-      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
-      - FRED_API_KEY=${FRED_API_KEY:-}
-      - LLM_ENABLED=${LLM_ENABLED:-true}
-      - LLM_PROVIDER=${LLM_PROVIDER:-opencode-go}
-      - CHAT_TOTAL_TIMEOUT_SECONDS=${CHAT_TOTAL_TIMEOUT_SECONDS:-45}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GROQ_CHAT_FALLBACK_ENABLED=${GROQ_CHAT_FALLBACK_ENABLED:-false}
-      - GROQ_FREE_PLAN_CONFIRMED=${GROQ_FREE_PLAN_CONFIRMED:-false}
-      - GROQ_ZDR_CONFIRMED=${GROQ_ZDR_CONFIRMED:-false}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_CHAT_FALLBACK_ENABLED=${GEMINI_CHAT_FALLBACK_ENABLED:-false}
-      - GEMINI_FREE_PLAN_CONFIRMED=${GEMINI_FREE_PLAN_CONFIRMED:-false}
-      - OPENCODE_GO_API_KEY=${OPENCODE_GO_API_KEY:-}
-      - OPENCODE_GO_BASE_URL=${OPENCODE_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
-      - OPENCODE_GO_MODEL=${OPENCODE_GO_MODEL:-deepseek-v4.1-flash}
-      - OPENCODE_GO_REASONING_EFFORT=${OPENCODE_GO_REASONING_EFFORT:-high}
-      - OPENCODE_GO_REASONING_EFFORT_MODELS=${OPENCODE_GO_REASONING_EFFORT_MODELS:-deepseek-v4.1-flash,deepseek-v4.1-flash-free,space-bunny-free}
-      - OPENCODE_GO_CHAT_REASONING_EFFORT=${OPENCODE_GO_CHAT_REASONING_EFFORT:-high}
-      - OPENCODE_GO_FALLBACK_MODEL=${OPENCODE_GO_FALLBACK_MODEL:-}
-      - OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=${OPENCODE_GO_ALLOW_UNVERIFIED_MODEL:-false}
-      - LLM_MODEL_OVERRIDES=${LLM_MODEL_OVERRIDES:-{}}
-      - CHAT_GO_SUBSCRIPTION_ENABLED=${CHAT_GO_SUBSCRIPTION_ENABLED:-true}
-      - CHAT_GO_SUBSCRIPTION_BASE_URL=${CHAT_GO_SUBSCRIPTION_BASE_URL:-https://opencode.ai/zen/go/v1}
-      - THESIS_NARRATIVE_LLM_ENABLED=${THESIS_NARRATIVE_LLM_ENABLED:-0}
+      <<: [*app-env, *worker-db-env, *llm-env]
+      FMP_API_KEY: ${FMP_API_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      FRED_API_KEY: ${FRED_API_KEY:-}
       # Go DEDICADO solo a las narrativas de tesis (backend y worker-thesis). Defecto
       # apagado: mergear no activa gasto. La clave solo llega a estos dos servicios.
-      - THESIS_GO_ENABLED=${THESIS_GO_ENABLED:-false}
-      - THESIS_GO_BASE_URL=${THESIS_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
-      - THESIS_GO_MODEL=${THESIS_GO_MODEL:-deepseek-v4.1-flash}
-      - THESIS_GO_API_KEY=${THESIS_GO_API_KEY:-}
-      - CAVAAI_ENABLE_VECTOR_INGEST=${CAVAAI_ENABLE_VECTOR_INGEST:-0}
-      - CAVAAI_ENABLE_VECTOR_SEARCH=${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
-      - CAVAAI_ENABLE_VECTOR_CHAT=${CAVAAI_ENABLE_VECTOR_CHAT:-0}
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
-      - REDIS_URL=redis://redis:6379/0
-      - KPI_QUEUE_MAX_PENDING=${KPI_QUEUE_MAX_PENDING:-500}
-      - KPI_DEFER_LEASE_SECONDS=${KPI_DEFER_LEASE_SECONDS:-900}
-      - QDRANT_URL=http://qdrant:6333
-      - VECTOR_STORE=qdrant
-      # Backend de objetos: por defecto MinIO; el corte a Garage es solo cambiar
-      # OBJECT_STORAGE_* en .env.production (docs/OBJECT_STORAGE_MIGRATION.md).
-      - MINIO_ENDPOINT=${OBJECT_STORAGE_ENDPOINT:-minio:9000}
-      - MINIO_ACCESS_KEY=${OBJECT_STORAGE_ACCESS_KEY:-${MINIO_ROOT_USER}}
-      - MINIO_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
-      - MINIO_REGION=${OBJECT_STORAGE_REGION:-}
-      - MINIO_BUCKET=research
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
-      - SEC_SNAPSHOT_DIR=${SEC_SNAPSHOT_DIR:-}
-      - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
-      - ESEF_SNAPSHOT_DIR=${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
-      - RSS_FEEDS=${RSS_FEEDS:-}
+      THESIS_GO_ENABLED: ${THESIS_GO_ENABLED:-false}
+      THESIS_GO_BASE_URL: ${THESIS_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
+      THESIS_GO_MODEL: ${THESIS_GO_MODEL:-deepseek-v4.1-flash}
+      THESIS_GO_API_KEY: ${THESIS_GO_API_KEY:-}
+      CAVAAI_ENABLE_VECTOR_INGEST: ${CAVAAI_ENABLE_VECTOR_INGEST:-0}
+      CAVAAI_ENABLE_VECTOR_SEARCH: ${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
+      CAVAAI_ENABLE_VECTOR_CHAT: ${CAVAAI_ENABLE_VECTOR_CHAT:-0}
+      SEC_SNAPSHOT_DIR: ${SEC_SNAPSHOT_DIR:-}
+      SEC_HF_MIRROR_DATASET: ${SEC_HF_MIRROR_DATASET:-}
+      ESEF_SNAPSHOT_DIR: ${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
+      RSS_FEEDS: ${RSS_FEEDS:-}
     volumes:
-      - ./data-engine:/app
-      - /app/__pycache__
-      - /app/.venv
       - duckdb_data:/data
       - ./data-esef-snapshots:/data/esef-snapshots:ro
+    logging: *default-logging
     healthcheck:
       # Sin HTTP: dramatiq vivo (PID 1) + Redis de cola accesible.
       test:
@@ -481,7 +484,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          cpus: "0.50"
+          memory: 1024M
 
   worker-kpis:
     image: cavaai-backend:prod
@@ -491,73 +495,32 @@ services:
     # ahogaba los 2 hilos compartidos y los KPI morian de inanicion.
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "4", "-Q", "kpis"]
     environment:
-      - PYTHONUNBUFFERED=1
+      <<: [*app-env, *worker-db-env, *llm-env]
       # Limita prefetch local; HLEN sigue contando los jobs en curso.
-      - dramatiq_queue_prefetch=4
-      - dramatiq_delay_queue_prefetch=4
-      - FMP_API_KEY=${FMP_API_KEY:-}
-      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
-      - FRED_API_KEY=${FRED_API_KEY:-}
-      - SCREENER_QUOTE_VENDOR=${SCREENER_QUOTE_VENDOR:-finnhub}
-      - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
-      - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_LINK_SECRET=${TELEGRAM_LINK_SECRET:-}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
-      - TELEGRAM_APPROVAL_ENABLED=${TELEGRAM_APPROVAL_ENABLED:-false}
-      - INSIDER_ALERTS_ENABLED=${INSIDER_ALERTS_ENABLED:-false}
-      - SECOND_ORDER_LLM_ENABLED=${SECOND_ORDER_LLM_ENABLED:-0}
-      - ASTS_LLM_ENABLED=${ASTS_LLM_ENABLED:-0}
-      - THESIS_NARRATIVE_LLM_ENABLED=${THESIS_NARRATIVE_LLM_ENABLED:-0}
-      - CAVAAI_ENABLE_VECTOR_INGEST=${CAVAAI_ENABLE_VECTOR_INGEST:-0}
-      - CAVAAI_ENABLE_VECTOR_SEARCH=${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
-      - CAVAAI_ENABLE_VECTOR_CHAT=${CAVAAI_ENABLE_VECTOR_CHAT:-0}
-      # Mismas variables LLM que el backend: los workers tambien generan.
-      - LLM_ENABLED=${LLM_ENABLED:-true}
-      - LLM_PROVIDER=${LLM_PROVIDER:-opencode-go}
-      - CHAT_TOTAL_TIMEOUT_SECONDS=${CHAT_TOTAL_TIMEOUT_SECONDS:-45}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GROQ_CHAT_FALLBACK_ENABLED=${GROQ_CHAT_FALLBACK_ENABLED:-false}
-      - GROQ_FREE_PLAN_CONFIRMED=${GROQ_FREE_PLAN_CONFIRMED:-false}
-      - GROQ_ZDR_CONFIRMED=${GROQ_ZDR_CONFIRMED:-false}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_CHAT_FALLBACK_ENABLED=${GEMINI_CHAT_FALLBACK_ENABLED:-false}
-      - GEMINI_FREE_PLAN_CONFIRMED=${GEMINI_FREE_PLAN_CONFIRMED:-false}
-      - OPENCODE_GO_API_KEY=${OPENCODE_GO_API_KEY:-}
-      - OPENCODE_GO_BASE_URL=${OPENCODE_GO_BASE_URL:-https://opencode.ai/zen/go/v1}
-      - OPENCODE_GO_MODEL=${OPENCODE_GO_MODEL:-deepseek-v4.1-flash}
-      - OPENCODE_GO_REASONING_EFFORT=${OPENCODE_GO_REASONING_EFFORT:-high}
-      - OPENCODE_GO_REASONING_EFFORT_MODELS=${OPENCODE_GO_REASONING_EFFORT_MODELS:-deepseek-v4.1-flash,deepseek-v4.1-flash-free,space-bunny-free}
-      - OPENCODE_GO_CHAT_REASONING_EFFORT=${OPENCODE_GO_CHAT_REASONING_EFFORT:-high}
-      - OPENCODE_GO_FALLBACK_MODEL=${OPENCODE_GO_FALLBACK_MODEL:-}
-      - OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=${OPENCODE_GO_ALLOW_UNVERIFIED_MODEL:-false}
-      - LLM_MODEL_OVERRIDES=${LLM_MODEL_OVERRIDES:-{}}
-      - CHAT_GO_SUBSCRIPTION_ENABLED=${CHAT_GO_SUBSCRIPTION_ENABLED:-true}
-      - CHAT_GO_SUBSCRIPTION_BASE_URL=${CHAT_GO_SUBSCRIPTION_BASE_URL:-https://opencode.ai/zen/go/v1}
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
-      - REDIS_URL=redis://redis:6379/0
-      - KPI_QUEUE_MAX_PENDING=${KPI_QUEUE_MAX_PENDING:-500}
-      - KPI_DEFER_LEASE_SECONDS=${KPI_DEFER_LEASE_SECONDS:-900}
-      - QDRANT_URL=http://qdrant:6333
-      - VECTOR_STORE=qdrant
-      # Backend de objetos: por defecto MinIO; el corte a Garage es solo cambiar
-      # OBJECT_STORAGE_* en .env.production (docs/OBJECT_STORAGE_MIGRATION.md).
-      - MINIO_ENDPOINT=${OBJECT_STORAGE_ENDPOINT:-minio:9000}
-      - MINIO_ACCESS_KEY=${OBJECT_STORAGE_ACCESS_KEY:-${MINIO_ROOT_USER}}
-      - MINIO_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
-      - MINIO_REGION=${OBJECT_STORAGE_REGION:-}
-      - MINIO_BUCKET=research
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
-      - SEC_SNAPSHOT_DIR=${SEC_SNAPSHOT_DIR:-}
-      - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
-      - ESEF_SNAPSHOT_DIR=${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
-      - RSS_FEEDS=${RSS_FEEDS:-}
+      dramatiq_queue_prefetch: "4"
+      dramatiq_delay_queue_prefetch: "4"
+      FMP_API_KEY: ${FMP_API_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      SCREENER_QUOTE_VENDOR: ${SCREENER_QUOTE_VENDOR:-finnhub}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_LINK_SECRET: ${TELEGRAM_LINK_SECRET:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_APPROVAL_ENABLED: ${TELEGRAM_APPROVAL_ENABLED:-false}
+      INSIDER_ALERTS_ENABLED: ${INSIDER_ALERTS_ENABLED:-false}
+      CAVAAI_ENABLE_VECTOR_INGEST: ${CAVAAI_ENABLE_VECTOR_INGEST:-0}
+      CAVAAI_ENABLE_VECTOR_SEARCH: ${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
+      CAVAAI_ENABLE_VECTOR_CHAT: ${CAVAAI_ENABLE_VECTOR_CHAT:-0}
+      SEC_SNAPSHOT_DIR: ${SEC_SNAPSHOT_DIR:-}
+      SEC_HF_MIRROR_DATASET: ${SEC_HF_MIRROR_DATASET:-}
+      ESEF_SNAPSHOT_DIR: ${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
+      RSS_FEEDS: ${RSS_FEEDS:-}
     volumes:
-      - ./data-engine:/app
-      - /app/__pycache__
-      - /app/.venv
       - duckdb_data:/data
       - ./data-esef-snapshots:/data/esef-snapshots:ro
+    logging: *default-logging
     healthcheck:
       test:
         - CMD-SHELL
@@ -575,7 +538,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3G
+          cpus: "0.40"
+          memory: 640M
 
   worker-alerts:
     image: cavaai-backend:prod
@@ -585,30 +549,16 @@ services:
     # reglas cada 5 min y las entregas se hambreaban detras de la ingesta
     # larga de GDELT (~3 h) en la cola default compartida.
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "2", "-Q", "alerts"]
-    volumes:
-      - ./data-engine:/app
-      - /app/__pycache__
-      - /app/.venv
     environment:
-      - PYTHONUNBUFFERED=1
-      - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
-      - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_LINK_SECRET=${TELEGRAM_LINK_SECRET:-}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
-      - TELEGRAM_APPROVAL_ENABLED=${TELEGRAM_APPROVAL_ENABLED:-false}
-      - INSIDER_ALERTS_ENABLED=${INSIDER_ALERTS_ENABLED:-false}
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
-      - REDIS_URL=redis://redis:6379/0
-      - KPI_QUEUE_MAX_PENDING=${KPI_QUEUE_MAX_PENDING:-500}
-      - KPI_DEFER_LEASE_SECONDS=${KPI_DEFER_LEASE_SECONDS:-900}
-      # Backend de objetos: por defecto MinIO; el corte a Garage es solo cambiar
-      # OBJECT_STORAGE_* en .env.production (docs/OBJECT_STORAGE_MIGRATION.md).
-      - MINIO_ENDPOINT=${OBJECT_STORAGE_ENDPOINT:-minio:9000}
-      - MINIO_ACCESS_KEY=${OBJECT_STORAGE_ACCESS_KEY:-${MINIO_ROOT_USER}}
-      - MINIO_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
-      - MINIO_REGION=${OBJECT_STORAGE_REGION:-}
-      - MINIO_BUCKET=research
+      <<: [*app-env, *worker-db-env]
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_LINK_SECRET: ${TELEGRAM_LINK_SECRET:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_APPROVAL_ENABLED: ${TELEGRAM_APPROVAL_ENABLED:-false}
+      INSIDER_ALERTS_ENABLED: ${INSIDER_ALERTS_ENABLED:-false}
+    logging: *default-logging
     healthcheck:
       test:
         - CMD-SHELL
@@ -626,7 +576,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          cpus: "0.20"
+          memory: 320M
 
   worker-gdelt:
     image: cavaai-backend:prod
@@ -639,42 +590,26 @@ services:
     # por su cuenta y la tasa combinada provocaria 429 en tormenta.
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "2", "-Q", "gdelt"]
     environment:
-      - PYTHONUNBUFFERED=1
-      - FMP_API_KEY=${FMP_API_KEY:-}
-      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
-      - FRED_API_KEY=${FRED_API_KEY:-}
-      - SCREENER_QUOTE_VENDOR=${SCREENER_QUOTE_VENDOR:-finnhub}
-      - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
-      - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_LINK_SECRET=${TELEGRAM_LINK_SECRET:-}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
-      - TELEGRAM_APPROVAL_ENABLED=${TELEGRAM_APPROVAL_ENABLED:-false}
-      - INSIDER_ALERTS_ENABLED=${INSIDER_ALERTS_ENABLED:-false}
-      - SECOND_ORDER_LLM_ENABLED=${SECOND_ORDER_LLM_ENABLED:-0}
-      - THESIS_NARRATIVE_LLM_ENABLED=${THESIS_NARRATIVE_LLM_ENABLED:-0}
-      - CAVAAI_ENABLE_VECTOR_INGEST=${CAVAAI_ENABLE_VECTOR_INGEST:-0}
-      - CAVAAI_ENABLE_VECTOR_SEARCH=${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
-      - REDIS_URL=redis://redis:6379/0
-      - KPI_QUEUE_MAX_PENDING=${KPI_QUEUE_MAX_PENDING:-500}
-      - KPI_DEFER_LEASE_SECONDS=${KPI_DEFER_LEASE_SECONDS:-900}
-      - QDRANT_URL=http://qdrant:6333
-      - VECTOR_STORE=qdrant
-      # Backend de objetos: por defecto MinIO; el corte a Garage es solo cambiar
-      # OBJECT_STORAGE_* en .env.production (docs/OBJECT_STORAGE_MIGRATION.md).
-      - MINIO_ENDPOINT=${OBJECT_STORAGE_ENDPOINT:-minio:9000}
-      - MINIO_ACCESS_KEY=${OBJECT_STORAGE_ACCESS_KEY:-${MINIO_ROOT_USER}}
-      - MINIO_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
-      - MINIO_REGION=${OBJECT_STORAGE_REGION:-}
-      - MINIO_BUCKET=research
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
-      - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
+      <<: [*app-env, *worker-db-env]
+      FMP_API_KEY: ${FMP_API_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      SCREENER_QUOTE_VENDOR: ${SCREENER_QUOTE_VENDOR:-finnhub}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_LINK_SECRET: ${TELEGRAM_LINK_SECRET:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_APPROVAL_ENABLED: ${TELEGRAM_APPROVAL_ENABLED:-false}
+      INSIDER_ALERTS_ENABLED: ${INSIDER_ALERTS_ENABLED:-false}
+      SECOND_ORDER_LLM_ENABLED: ${SECOND_ORDER_LLM_ENABLED:-0}
+      THESIS_NARRATIVE_LLM_ENABLED: ${THESIS_NARRATIVE_LLM_ENABLED:-0}
+      CAVAAI_ENABLE_VECTOR_INGEST: ${CAVAAI_ENABLE_VECTOR_INGEST:-0}
+      CAVAAI_ENABLE_VECTOR_SEARCH: ${CAVAAI_ENABLE_VECTOR_SEARCH:-0}
+      SEC_HF_MIRROR_DATASET: ${SEC_HF_MIRROR_DATASET:-}
     volumes:
-      - ./data-engine:/app
-      - /app/__pycache__
-      - /app/.venv
       - duckdb_data:/data
+    logging: *default-logging
     healthcheck:
       test:
         - CMD-SHELL
@@ -692,7 +627,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          cpus: "0.30"
+          memory: 640M
 
   worker-knowledge:
     image: cavaai-backend:prod
@@ -702,34 +638,28 @@ services:
     # cola knowledge va en worker dedicado de 1 proceso / 1 hilo (no compartir).
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "1", "-Q", "knowledge"]
     environment:
-      - PYTHONUNBUFFERED=1
+      <<: [*app-env, *worker-db-env]
       # Un job pesado en curso como mucho: sin prefetch extra.
-      - dramatiq_queue_prefetch=1
-      - dramatiq_delay_queue_prefetch=1
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
-      - REDIS_URL=redis://redis:6379/0
-      - QDRANT_URL=http://qdrant:6333
-      - VECTOR_STORE=qdrant
-      - FASTEMBED_CACHE_PATH=/data/fastembed-cache
+      dramatiq_queue_prefetch: "1"
+      dramatiq_delay_queue_prefetch: "1"
+      FASTEMBED_CACHE_PATH: /data/fastembed-cache
       # Pesos Docling/HF fuera de la imagen, en el volumen con espacio.
-      - DOCLING_ARTIFACTS_PATH=/data/docling-artifacts
-      - HF_HOME=/data/hf-home
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
+      DOCLING_ARTIFACTS_PATH: /data/docling-artifacts
+      HF_HOME: /data/hf-home
       # Con el flag a 0 el actor rechaza el trabajo (apagado por defecto).
-      - KNOWLEDGE_RAG_ENABLED=${KNOWLEDGE_RAG_ENABLED:-0}
-      - KNOWLEDGE_RAG_COLLECTION=${KNOWLEDGE_RAG_COLLECTION:-knowledge_rag_v1}
-      - KNOWLEDGE_RAG_INBOX_DIR=/data/knowledge-inbox
-      - KNOWLEDGE_RAG_MAX_FILE_MB=${KNOWLEDGE_RAG_MAX_FILE_MB:-60}
-      - KNOWLEDGE_RAG_MIN_FREE_GB=${KNOWLEDGE_RAG_MIN_FREE_GB:-3}
-      - KNOWLEDGE_RAG_DOCLING_OCR=${KNOWLEDGE_RAG_DOCLING_OCR:-0}
-      - KNOWLEDGE_RAG_DOCLING_TABLE_MODE=${KNOWLEDGE_RAG_DOCLING_TABLE_MODE:-fast}
-      - KNOWLEDGE_RAG_RERANKER_MODEL=${KNOWLEDGE_RAG_RERANKER_MODEL:-}
+      KNOWLEDGE_RAG_ENABLED: ${KNOWLEDGE_RAG_ENABLED:-0}
+      # v2 = e5-large (1024 dims), coherente con knowledge_rag_dense_dims.
+      KNOWLEDGE_RAG_COLLECTION: ${KNOWLEDGE_RAG_COLLECTION:-knowledge_rag_v2}
+      KNOWLEDGE_RAG_INBOX_DIR: /data/knowledge-inbox
+      KNOWLEDGE_RAG_MAX_FILE_MB: ${KNOWLEDGE_RAG_MAX_FILE_MB:-60}
+      KNOWLEDGE_RAG_MIN_FREE_GB: ${KNOWLEDGE_RAG_MIN_FREE_GB:-3}
+      KNOWLEDGE_RAG_DOCLING_OCR: ${KNOWLEDGE_RAG_DOCLING_OCR:-0}
+      KNOWLEDGE_RAG_DOCLING_TABLE_MODE: ${KNOWLEDGE_RAG_DOCLING_TABLE_MODE:-fast}
+      KNOWLEDGE_RAG_RERANKER_MODEL: ${KNOWLEDGE_RAG_RERANKER_MODEL:-}
     volumes:
-      - ./data-engine:/app
-      - /app/__pycache__
-      - /app/.venv
       - duckdb_data:/data
       - ./knowledge-inbox:/data/knowledge-inbox:ro
+    logging: *default-logging
     healthcheck:
       # Sin HTTP: dramatiq vivo (PID 1) + Redis de cola accesible.
       test:
@@ -750,7 +680,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3G
+          cpus: "0.50"
+          memory: 1024M
 
   scheduler:
     image: cavaai-backend:prod
@@ -758,21 +689,18 @@ services:
     restart: unless-stopped
     command: ["python", "-m", "app.workers.scheduler"]
     environment:
-      - EIA_API_KEY=${EIA_API_KEY:-}
-      - IBKR_FLEX_TOKEN=${IBKR_FLEX_TOKEN:-}
-      - IBKR_FLEX_QUERY_ID=${IBKR_FLEX_QUERY_ID:-}
-      - IBKR_FLEX_TENANT_ID=${IBKR_FLEX_TENANT_ID:-}
-      - IBKR_FLEX_ACCOUNT_ID=${IBKR_FLEX_ACCOUNT_ID:-}
-      - IBKR_FLEX_COMPLETE_QUERY_ID=${IBKR_FLEX_COMPLETE_QUERY_ID:-}
-      - PYTHONUNBUFFERED=1
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
-      - REDIS_URL=redis://redis:6379/0
-      - KPI_QUEUE_MAX_PENDING=${KPI_QUEUE_MAX_PENDING:-500}
-      - KPI_DEFER_LEASE_SECONDS=${KPI_DEFER_LEASE_SECONDS:-900}
-      - TZ=UTC
-      - SECOND_ORDER_LLM_ENABLED=${SECOND_ORDER_LLM_ENABLED:-0}
-      - ASTS_LLM_ENABLED=${ASTS_LLM_ENABLED:-0}
-      - THESIS_NARRATIVE_LLM_ENABLED=${THESIS_NARRATIVE_LLM_ENABLED:-0}
+      <<: [*app-env, *worker-db-env]
+      EIA_API_KEY: ${EIA_API_KEY:-}
+      IBKR_FLEX_TOKEN: ${IBKR_FLEX_TOKEN:-}
+      IBKR_FLEX_QUERY_ID: ${IBKR_FLEX_QUERY_ID:-}
+      IBKR_FLEX_TENANT_ID: ${IBKR_FLEX_TENANT_ID:-}
+      IBKR_FLEX_ACCOUNT_ID: ${IBKR_FLEX_ACCOUNT_ID:-}
+      IBKR_FLEX_COMPLETE_QUERY_ID: ${IBKR_FLEX_COMPLETE_QUERY_ID:-}
+      TZ: UTC
+      SECOND_ORDER_LLM_ENABLED: ${SECOND_ORDER_LLM_ENABLED:-0}
+      ASTS_LLM_ENABLED: ${ASTS_LLM_ENABLED:-0}
+      THESIS_NARRATIVE_LLM_ENABLED: ${THESIS_NARRATIVE_LLM_ENABLED:-0}
+    logging: *default-logging
     healthcheck:
       # Sin HTTP: scheduler vivo (PID 1) + Redis accesible.
       test:
@@ -789,21 +717,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          cpus: "0.10"
+          memory: 128M
 
-
-  # 2026-10-16 (perf): frontend en MODO PRODUCCION. Antes heredaba de
-  # docker-compose.yml el servicio dev (Dockerfile.dev + next dev --turbopack
-  # + montaje del codigo vivo): cada pantalla compilaba al vuelo (TTFB de
-  # compilacion 1-6s) y servia react/react-dom de desarrollo. Con el Dockerfile
-  # multi-stage (next build -> standalone) las pantallas van precompiladas.
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes: !reset []
-    environment:
-      - NODE_ENV=production
+  # El frontend NO va aqui: Vercel sirve la app. Tenerlo en el compose
+  # consumia CPU/RAM de la VM y no publicaba puertos utiles. Si algun dia se
+  # sirve desde la VM, anadelo como servicio con perfil explicito y su limite.
 
 volumes:
   postgres_data:
