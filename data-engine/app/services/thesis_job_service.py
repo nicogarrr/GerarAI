@@ -385,6 +385,7 @@ def build_run_guard(run: WorkflowRun, settings, store=None, db: Session | None =
     Fail closed si el store no se puede construir. TTS/Telegram no son LLM y no
     pasan por este guard: un run aislado debe bloquearlos por configuracion.
     """
+    import math
     import time
 
     from app.llm.run_guard import LLMGuardAbort, LLMRunGuard, RedisCounterStore
@@ -410,10 +411,22 @@ def build_run_guard(run: WorkflowRun, settings, store=None, db: Session | None =
     hosts = frozenset(h.strip() for h in settings.llm_run_guard_allowed_hosts.split(",") if h.strip())
     models = frozenset(m.strip() for m in settings.llm_run_guard_allowed_models.split(",") if m.strip())
     run_key = f"thesis:{run.id}"
-    marker = (run.input_payload or {}).get("llm_guard")
+    payload_now = run.input_payload or {}
     now_ts = time.time()
-    if isinstance(marker, dict) and isinstance(marker.get("deadline_ts"), (int, float)):
-        deadline_ts = float(marker["deadline_ts"])
+    if "llm_guard" in payload_now:
+        # Marcador PRESENTE: jamas se trata como ausente ni se reinicializa.
+        marker = payload_now["llm_guard"]
+        deadline = marker.get("deadline_ts") if isinstance(marker, dict) else None
+        if (
+            not isinstance(marker, dict)
+            or isinstance(deadline, bool)
+            or not isinstance(deadline, (int, float))
+            or not math.isfinite(deadline)
+            or deadline <= 0
+            or deadline > now_ts + window + 86400
+        ):
+            raise LLMGuardAbort("guard_marker_invalid")
+        deadline_ts = float(deadline)
         if now_ts >= deadline_ts:
             raise LLMGuardAbort("run_guard_window_expired")
     else:
@@ -421,7 +434,7 @@ def build_run_guard(run: WorkflowRun, settings, store=None, db: Session | None =
             raise LLMGuardAbort("guard_marker_unavailable")
         deadline_ts = now_ts + window
         store.init(run_key, deadline_ts=deadline_ts)  # primero el contador...
-        run.input_payload = {**(run.input_payload or {}), "llm_guard": {"deadline_ts": deadline_ts}}
+        run.input_payload = {**payload_now, "llm_guard": {"deadline_ts": deadline_ts}}
         db.commit()  # ...despues el marcador durable; ninguna reserva antes
     try:
         return LLMRunGuard(

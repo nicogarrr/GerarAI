@@ -35,8 +35,11 @@ class _DB:
         self.commits += 1
 
 
-def _run(marker=None):
-    payload = {} if marker is None else {"llm_guard": marker}
+_ABSENT = object()
+
+
+def _run(marker=_ABSENT):
+    payload = {} if marker is _ABSENT else {"llm_guard": marker}
     return SimpleNamespace(id=41, input_payload=payload)
 
 
@@ -82,6 +85,21 @@ def test_deadline_crossing_during_generate_blocks_late_post(monkeypatch):
         activate_and_post(g)
     assert e.value.reason == "run_deadline_exceeded"
     assert store.state["thesis:41"] == (1, 0)
+
+
+@pytest.mark.parametrize(
+    "marker",
+    ["x", None, [], {}, {"deadline_ts": "9"}, {"deadline_ts": float("nan")},
+     {"deadline_ts": float("inf")}, {"deadline_ts": -1}, {"deadline_ts": True},
+     {"deadline_ts": 9e18}],
+)
+def test_present_invalid_marker_aborts_and_never_reinits_even_if_counter_deleted(marker):
+    store = InMemoryCounterStore()  # contador ausente (DEL/evicción) + marcador invalido
+    run, db = _run(marker), _DB()
+    with pytest.raises(LLMGuardAbort) as e:
+        jobs.build_run_guard(run, _settings(), store=store, db=db)
+    assert e.value.reason == "guard_marker_invalid"
+    assert store.state == {} and db.commits == 0
 
 
 def test_marker_missing_without_db_fails_closed():

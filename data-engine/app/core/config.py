@@ -371,8 +371,10 @@ class Settings(BaseSettings):
     llm_run_guard_max_total_output_tokens: int = 0
     llm_run_guard_allowed_hosts: str = ""
     llm_run_guard_allowed_models: str = ""
-    #: Ventana fija del run: el contador Redis expira a los N s del primer uso
-    #: y un run mas viejo que N s NO se reanuda (evita revivir contadores).
+    #: Ventana del guard: se ancla en el PRIMER init del guard de ese run
+    #: (marcador durable en BD), no en created_at. Un run viejo que inicializa
+    #: por primera vez con el guard activo recibe ventana nueva desde ese init.
+    #: Pasado el deadline, o con contador ausente tras el init, aborta.
     llm_run_guard_window_seconds: int = 7 * 24 * 3600
     thesis_go_base_url: str = "https://opencode.ai/zen/go/v1"
     thesis_go_api_key: str | None = Field(default=None, repr=False)
