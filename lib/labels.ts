@@ -289,6 +289,7 @@ const FACTORES: Record<string, string> = {
 
 /** Tipos de empresa simples con etiqueta propia (no son factores). */
 const TIPOS_EMPRESA: Record<string, string> = {
+  ai_big_tech: 'big tech de IA',
   operating_company: 'empresa operativa',
   research_candidate: 'candidato de análisis',
   fund: 'fondo',

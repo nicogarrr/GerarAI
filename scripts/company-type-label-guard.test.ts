@@ -18,6 +18,16 @@ test('los tipos compuestos se descomponen en factores conocidos', () => {
 test('los tipos simples conservan su etiqueta propia', () => {
     assert.equal(companyTypeLabel('operating_company'), 'empresa operativa');
     assert.equal(companyTypeLabel('research_candidate'), 'candidato de análisis');
+    // ai_big_tech (MSFT/META/AMZN/NVDA/AMD en el master) tiene etiqueta
+    // exacta: sin ella sus tokens big/tech no son factores y la ficha
+    // pintaba el enum crudo.
+    assert.equal(companyTypeLabel('ai_big_tech'), 'big tech de IA');
+});
+
+test('la etiqueta exacta no es el enum crudo ni lleva guiones bajos', () => {
+    const label = companyTypeLabel('ai_big_tech');
+    assert.notEqual(label, 'ai_big_tech');
+    assert.ok(!label.includes('_'), `la etiqueta no puede contener _: ${label}`);
 });
 
 test('un token desconocido devuelve el tipo tal cual, nunca inventado', () => {
