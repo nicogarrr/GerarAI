@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal
+from app.core.tenancy import tenant_filters
 from app.models import ChatTelemetryEvent, Document, DocumentChunk, Tenant
 from app.services.document_store import DocumentStore
 from app.services.rag import RAGIndex
@@ -142,6 +143,7 @@ class RetentionService:
         documents = db.scalars(
             select(Document)
             .where(
+                *tenant_filters(db, Document),
                 Document.retention_tombstoned_at.is_(None),
                 or_(
                     Document.published_at < document_cutoff,
@@ -176,7 +178,8 @@ class RetentionService:
             result["chunks_deleted"] += int(
                 db.execute(
                     delete(DocumentChunk).where(
-                        DocumentChunk.document_id == document.id
+                        *tenant_filters(db, DocumentChunk),
+                        DocumentChunk.document_id == document.id,
                     )
                 ).rowcount
             )
@@ -193,7 +196,10 @@ class RetentionService:
             db.add(document)
             result["documents_tombstoned"] += 1
 
-        telemetry_filter = ChatTelemetryEvent.created_at < telemetry_cutoff
+        telemetry_filter = and_(
+            *tenant_filters(db, ChatTelemetryEvent),
+            ChatTelemetryEvent.created_at < telemetry_cutoff,
+        )
         if dry_run:
             result["telemetry_deleted"] = int(
                 db.scalar(

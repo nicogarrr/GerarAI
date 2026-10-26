@@ -2,7 +2,8 @@
 
 El principal firmado resuelve el tenant; ningun identificador del cliente
 decide que se exporta o se borra. El borrado no publica exito hasta que la
-base de datos y el almacen de objetos/vectores del tenant estan limpios.
+base de datos, el almacen de objetos/vectores y la cache LLM del tenant estan
+limpios, y deja un tombstone por external_id que impide recrear el tenant.
 """
 
 from __future__ import annotations
@@ -18,17 +19,21 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import Base, SessionLocal, engine
 from app.core.tenancy import tenant_filters
+from app.llm.response_cache import purge_llm_response_cache
 from app.models import (
     AlertRule,
     AlertSubscription,
     CashBalance,
     CashDailySnapshot,
     ChatSession,
+    ChatTelemetryEvent,
     Claim,
     ClaimEvidence,
     CustomMetricDefinition,
     DecisionJournalEntry,
+    DecisionLesson,
     Document,
+    ExpectationReview,
     InvestmentCaseStudy,
     InvestmentPlan,
     InvestmentPrinciple,
@@ -36,8 +41,10 @@ from app.models import (
     KnowledgeDocument,
     KnowledgeGraphEdge,
     KnowledgeGraphNode,
+    KnowledgeRagParent,
     KnowledgeRagSource,
     MemoryItem,
+    PaperTrade,
     PlanContribution,
     Portfolio,
     PortfolioDailySnapshot,
@@ -45,6 +52,7 @@ from app.models import (
     PositionDailySnapshot,
     PrivacyAuditEvent,
     ResearchAlert,
+    ResearchReview,
     ResearchSession,
     SavedScreen,
     TaxReport,
@@ -61,6 +69,18 @@ from app.services.rag import RAGIndex
 
 logger = logging.getLogger(__name__)
 
+
+class PrivacyConfirmationError(ValueError):
+    """La frase de confirmacion no coincide; nunca se toca ningun dato."""
+
+
+class PrivacyPartialFailure(RuntimeError):
+    """La limpieza externa no termino: no se publica un 200 ni se borra SQL."""
+
+    def __init__(self, failures: list[str]) -> None:
+        super().__init__("External privacy cleanup did not complete")
+        self.failures = tuple(failures)
+
 SENSITIVE_COLUMNS = {
     "tenant_id",
     "storage_uri",
@@ -73,8 +93,8 @@ SENSITIVE_COLUMNS = {
 }
 
 # Categorias pedidas por privacidad. No se incluyen las tablas derivadas del
-# mercado (hechos, metricas, chunks crudos ni telemetria) porque no son datos
-# aportados por el usuario y multiplicarian el tamano sin valor de portabilidad.
+# mercado (hechos, metricas ni chunks crudos) porque no son datos aportados por
+# el usuario y multiplicarian el tamano sin valor de portabilidad.
 EXPORT_TABLES: tuple[tuple[str, Any], ...] = (
     ("portfolios", Portfolio),
     ("positions", Position),
@@ -96,6 +116,7 @@ EXPORT_TABLES: tuple[tuple[str, Any], ...] = (
     ("knowledge_collections", KnowledgeCollection),
     ("knowledge_documents", KnowledgeDocument),
     ("knowledge_rag_sources", KnowledgeRagSource),
+    ("knowledge_rag_parents", KnowledgeRagParent),
     ("investment_principles", InvestmentPrinciple),
     ("investment_case_studies", InvestmentCaseStudy),
     ("knowledge_graph_nodes", KnowledgeGraphNode),
@@ -108,6 +129,11 @@ EXPORT_TABLES: tuple[tuple[str, Any], ...] = (
     ("plan_contributions", PlanContribution),
     ("tax_reports", TaxReport),
     ("decision_journal_entries", DecisionJournalEntry),
+    ("decision_lessons", DecisionLesson),
+    ("expectation_reviews", ExpectationReview),
+    ("research_reviews", ResearchReview),
+    ("paper_trades", PaperTrade),
+    ("chat_telemetry_events", ChatTelemetryEvent),
     ("saved_screens", SavedScreen),
     ("custom_metric_definitions", CustomMetricDefinition),
 )
@@ -178,7 +204,11 @@ class PrivacyService:
             },
         }
         for key, model in EXPORT_TABLES:
-            rows = db.scalars(select(model).order_by(model.id)).all()
+            rows = db.scalars(
+                select(model)
+                .where(*tenant_filters(db, model))
+                .order_by(model.id)
+            ).all()
             data[key] = [_dump_row(row) for row in rows]
         data["knowledge_documents"] = self._with_chunk_counts(
             db, data["knowledge_documents"], KnowledgeDocument, "knowledge_document_id"
@@ -228,13 +258,16 @@ class PrivacyService:
     ) -> dict[str, Any]:
         """Borra el tenant de la sesion de forma compensada e idempotente.
 
-        Orden: limpieza externa (objetos y vectores) -> transaccion unica de
-        borrado en Postgres -> auditoria. Si el almacen externo falla no se
-        toca Postgres y el cliente recibe un error: nunca se publica un
-        borrado parcial como exitoso. Reintentar es seguro.
+        Orden: limpieza externa (objetos, vectores, cache LLM) -> transaccion
+        unica de borrado en Postgres -> auditoria. Si la limpieza externa falla
+        no se toca Postgres y se lanza ``PrivacyPartialFailure``: nunca se
+        publica un exito parcial. El tenant NO se elimina: queda como tombstone
+        ``deleted`` por ``external_id`` para que ``get_db`` no lo recree.
         """
         if confirmation.strip().upper() != DELETE_CONFIRMATION:
-            raise ValueError("Account deletion confirmation does not match")
+            raise PrivacyConfirmationError(
+                "La confirmación no coincide con la frase exigida."
+            )
         tenant_id = db.info.get("tenant_id")
         user_id = db.info.get("user_id")
         if tenant_id is None:
@@ -251,9 +284,21 @@ class PrivacyService:
                 detail={"status": "already_deleted", "reason": reason},
                 tenant_external_id=external_id,
             )
-            return {"status": "deleted", "already_deleted": True, "tables": {}}
+            return self._deleted_result(already_deleted=True)
 
-        # 1) Externo primero. Si falla, Postgres sigue intacto y se puede
+        if tenant.status == "deleted":
+            # Tombstone: la cuenta ya se borro y la fila se conserva para que
+            # get_db rechace cualquier recreacion del mismo external_id.
+            self._audit(
+                "account.delete",
+                tenant_id=None,
+                user_id=user_id,
+                detail={"status": "already_deleted", "reason": reason},
+                tenant_external_id=external_id,
+            )
+            return self._deleted_result(already_deleted=True)
+
+        # 1) Externo primero. Si algo falla, Postgres sigue intacto y se puede
         # reintentar sin perder la referencia a los objetos. Se borran tanto
         # las URIs registradas (pueden apuntar a un bucket anterior) como el
         # prefijo actual del tenant. Hay dos indices Qdrant: el de documentos
@@ -264,17 +309,49 @@ class PrivacyService:
             storage_uris.update(
                 uri
                 for uri in db.scalars(
-                    select(model.storage_uri).where(model.storage_uri.is_not(None))
+                    select(model.storage_uri)
+                    .where(model.storage_uri.is_not(None), *tenant_filters(db, model))
                 ).all()
                 if uri
             )
-        objects_removed = sum(1 for uri in storage_uris if store.delete(uri))
-        objects_removed += store.delete_tenant_prefix(tenant_id)
-        RAGIndex().delete_tenant_points(tenant_id)
-        knowledge_collections_cleared = self._delete_knowledge_vectors(tenant_id)
+        failures: list[str] = []
+        objects_removed = 0
+        for uri in sorted(storage_uris):
+            try:
+                objects_removed += int(bool(store.delete(uri)))
+            except Exception:  # noqa: BLE001 - se agrega y se falla cerrado
+                failures.append("object_storage")
+                logger.warning("privacy storage delete failed", exc_info=True)
+        try:
+            objects_removed += store.delete_tenant_prefix(tenant_id)
+        except Exception:  # noqa: BLE001
+            failures.append("object_storage_prefix")
+            logger.warning("privacy storage prefix delete failed", exc_info=True)
+        try:
+            RAGIndex().delete_tenant_points(tenant_id)
+        except Exception:  # noqa: BLE001
+            failures.append("document_vectors")
+            logger.warning("privacy document vector delete failed", exc_info=True)
+        try:
+            knowledge_collections_cleared = self._delete_knowledge_vectors(tenant_id)
+        except Exception:  # noqa: BLE001
+            failures.append("knowledge_vectors")
+            knowledge_collections_cleared = 0
+            logger.warning("privacy knowledge vector delete failed", exc_info=True)
+        try:
+            llm_cache_entries_purged = purge_llm_response_cache(
+                tenant_id=external_id
+            )
+        except Exception:  # noqa: BLE001
+            failures.append("llm_cache")
+            llm_cache_entries_purged = 0
+            logger.warning("privacy LLM cache purge failed", exc_info=True)
+        if failures:
+            raise PrivacyPartialFailure(sorted(set(failures)))
 
         # 2) Postgres en una sola transaccion. Orden inverso a las
-        # dependencias: hijos antes que padres.
+        # dependencias: hijos antes que padres. La fila ``tenants`` no se
+        # borra: se convierte en tombstone sin nombre ni metadata.
         counts: dict[str, int] = {}
         tenant_tables = [
             table
@@ -298,14 +375,12 @@ class PrivacyService:
                 if count:
                     counts[table.name] = int(count)
                     connection.execute(table.delete().where(where))
-            connection.execute(
-                Tenant.__table__.delete().where(Tenant.__table__.c.id == tenant_id)
-            )
-            # Un reintento crea un tenant vacio nuevo porque get_db lo
-            # materializa antes de entrar aqui. Si ya hay auditoria de borrado
-            # y no habia filas, es un reintento: se informa sin fingir un
-            # segundo borrado.
-            already_deleted = bool(previous) and not counts
+            tombstoned = connection.execute(
+                Tenant.__table__.update()
+                .where(Tenant.__table__.c.id == tenant_id)
+                .values(status="deleted", name="Cuenta eliminada", metadata={})
+            ).rowcount
+            already_deleted = tombstoned == 0 or (bool(previous) and not counts)
             connection.execute(
                 PrivacyAuditEvent.__table__.insert().values(
                     event_type="account.delete",
@@ -319,26 +394,46 @@ class PrivacyService:
                         "knowledge_vector_collections_cleared": (
                             knowledge_collections_cleared
                         ),
+                        "llm_cache_entries_purged": llm_cache_entries_purged,
                     },
                     created_at=datetime.now(UTC),
                 )
             )
 
         logger.info(
-            "account deleted tenant_external=%s tables=%s objects=%s already=%s",
+            "account deleted tenant_external=%s tables=%s objects=%s cache=%s already=%s",
             external_id,
             len(counts),
             objects_removed,
+            llm_cache_entries_purged,
             already_deleted,
         )
+        return self._deleted_result(
+            already_deleted=already_deleted,
+            tables=counts,
+            external_objects_removed=objects_removed,
+            knowledge_collections_cleared=knowledge_collections_cleared,
+            llm_cache_entries_purged=llm_cache_entries_purged,
+        )
+
+    @staticmethod
+    def _deleted_result(
+        *,
+        already_deleted: bool,
+        tables: dict[str, int] | None = None,
+        external_objects_removed: int = 0,
+        knowledge_collections_cleared: int = 0,
+        llm_cache_entries_purged: int = 0,
+    ) -> dict[str, Any]:
         return {
             "status": "deleted",
             "already_deleted": already_deleted,
-            "tables": counts,
-            "external_objects_removed": objects_removed,
+            "tables": tables or {},
+            "external_objects_removed": external_objects_removed,
             "knowledge_vector_collections_cleared": (
                 knowledge_collections_cleared
             ),
+            "llm_cache_entries_purged": llm_cache_entries_purged,
         }
 
     @staticmethod

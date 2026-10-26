@@ -237,7 +237,18 @@ def get_db(
                     if tenant is None:
                         raise
                 db.refresh(tenant)
-            if tenant.status != "active":
+            # Tombstone: un tenant ``deleted`` nunca se materializa de nuevo
+            # (la fila sigue existiendo por external_id). La unica excepcion
+            # es el propio DELETE de privacidad, que solo devuelve la
+            # respuesta idempotente ``already_deleted`` sin leer ni escribir
+            # datos del tenant. Cualquier otro endpoint recibe 403.
+            deleted_retry = (
+                tenant.status == "deleted"
+                and request is not None
+                and request.method == "DELETE"
+                and request.url.path.rstrip("/") == "/api/privacy/account"
+            )
+            if tenant.status != "active" and not deleted_retry:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Tenant access is not active",

@@ -912,8 +912,8 @@ def test_bottleneck_discovery_quota_is_tenant_scoped(two):
     from app.models.bottleneck_discovery import BottleneckDiscovery
     from app.services.bottleneck_discovery_service import todays_discoveries
 
-    today = date.today()
     now = datetime.now(UTC)
+    today = now.date()
     _as(db, tenant_a)
     db.add(
         BottleneckDiscovery(

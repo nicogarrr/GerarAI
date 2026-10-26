@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { APIError, betterAuth } from "better-auth";
 import {mongodbAdapter} from "better-auth/adapters/mongodb";
 import {connectToDatabase} from "@/database/mongoose";
 import {nextCookies} from "better-auth/next-js";
@@ -9,6 +9,11 @@ import {
     isPasswordResetEmailConfigured,
     sendPasswordResetEmail,
 } from "@/lib/auth/email";
+import {
+    DELETE_REAUTH_HEADER,
+    verifyDeleteReauthToken,
+} from "@/lib/auth/delete-reauth";
+import {deleteAuthAccountResidue} from "@/lib/better-auth/account-residue";
 
 
 const signUpDisabled =
@@ -60,6 +65,20 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
             }
             : undefined,
     },
+    rateLimit: {
+        enabled: env.NODE_ENV === 'production'
+            || process.env.APP_ENV === 'production'
+            || process.env.AUTH_RATE_LIMIT_ENABLED === 'true',
+        window: 60,
+        max: 100,
+        customRules: {
+            '/request-password-reset': { window: 60, max: 3 },
+            '/reset-password': { window: 60, max: 5 },
+            '/change-password': { window: 10, max: 3 },
+            '/verify-password': { window: 60, max: 10 },
+            '/delete-user': { window: 60, max: 3 },
+        },
+    },
     // Perfil inversor persistido en el documento `user` de MongoDB.
     // Mongo es schemaless: additionalFields no requiere migraciones SQL,
     // better-auth los persiste y los devuelve en sesion cuando se piden.
@@ -71,11 +90,39 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
             preferredIndustry: { type: 'string', required: false },
         },
         // Autoservicio real: delete-user borra user, sessions y accounts de
-        // Mongo. El endpoint exige sesion fresca y, cuando se envia, valida la
-        // contrasena (reauth). La accion de servidor borra antes Postgres y
-        // storage, y solo entonces llama aqui.
+        // Mongo. El endpoint publico NO acepta una sesion fresca como unica
+        // prueba: exige un token de reautenticacion firmado que solo emite la
+        // accion de servidor despues de verificar la contrasena. Ademas se
+        // limpian el secreto TOTP/codigos y las verificaciones pendientes.
         deleteUser: {
             enabled: true,
+            beforeDelete: async (deletedUser, request) => {
+                const token = request?.headers.get(DELETE_REAUTH_HEADER);
+                if (!verifyDeleteReauthToken(
+                    token,
+                    deletedUser.id,
+                    env.BETTER_AUTH_SECRET,
+                )) {
+                    throw new APIError(401, {
+                        message: 'Reautenticación requerida para borrar la cuenta',
+                    });
+                }
+            },
+            afterDelete: async (deletedUser) => {
+                try {
+                    const mongoose = await connectToDatabase();
+                    const db = mongoose?.connection?.db;
+                    if (!db) {
+                        throw new Error('MongoDB is required to clean account residue');
+                    }
+                    await deleteAuthAccountResidue(db, deletedUser);
+                } catch (error: unknown) {
+                    console.error(
+                        'Better Auth residue cleanup failed:',
+                        toAppError(error).code,
+                    );
+                }
+            },
         },
     },
     // nextCookies() SIEMPRE el ultimo: su hook `after` copia a next/headers los

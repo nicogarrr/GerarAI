@@ -625,6 +625,48 @@ def test_encoded_response_never_contains_the_api_key():
     assert "test-secret" not in blob
 
 
+def test_purge_invalidates_only_the_configured_deployment_namespace():
+    from app.core.config import Settings
+    from app.llm.response_cache import (
+        _cache_namespace,
+        _deployment_id,
+        purge_llm_response_cache,
+    )
+
+    class SyncRedis:
+        def __init__(self, keys):
+            self.keys = set(keys)
+            self.closed = False
+
+        def scan_iter(self, match, count=500):
+            prefix = match[:-1]
+            return iter([key for key in self.keys if key.startswith(prefix)])
+
+        def delete(self, *keys):
+            removed = sum(1 for key in keys if key in self.keys)
+            self.keys.difference_update(keys)
+            return removed
+
+        def close(self):
+            self.closed = True
+
+    settings = Settings(_env_file=None)
+    namespace = _cache_namespace(settings)
+    cache = LLMResponseCache(namespace=_deployment_id(settings))
+    own = cache.build_key(
+        tenant_id="tenant-a", provider="p", model="m", task="t", payload={}
+    )
+    other = LLMResponseCache(namespace="otro-despliegue").build_key(
+        tenant_id="tenant-b", provider="p", model="m", task="t", payload={}
+    )
+    fake = SyncRedis({own, other, f"{namespace}:index"})
+    assert purge_llm_response_cache(
+        settings, tenant_id="tenant-a", redis_factory=lambda: fake
+    ) == 1
+    assert fake.keys == {other}
+    assert fake.closed is True
+
+
 def test_tool_call_response_round_trips_through_the_cache():
     body = {
         "id": "req-2",

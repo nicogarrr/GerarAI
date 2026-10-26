@@ -165,6 +165,55 @@ def test_retention_tombstones_document_but_keeps_financial_fact(monkeypatch):
     assert again["telemetry_deleted"] == 0
 
 
+def test_retention_telemetry_counts_and_deletes_only_active_tenant():
+    session, tenant, _ = _db()
+    session.info["tenant_id"] = tenant.id
+    session.add(
+        ChatTelemetryEvent(
+            question="pregunta A",
+            route="small_talk",
+            created_at=NOW - timedelta(days=120),
+        )
+    )
+    tenant_b = Tenant(external_id="retention-other", name="Other")
+    session.add(tenant_b)
+    session.flush()
+    session.info["tenant_id"] = tenant_b.id
+    session.add(
+        ChatTelemetryEvent(
+            question="pregunta B",
+            route="small_talk",
+            created_at=NOW - timedelta(days=120),
+        )
+    )
+    session.commit()
+
+    service = RetentionService()
+    session.info["tenant_id"] = tenant.id
+    dry = service.purge_tenant(
+        session,
+        now=NOW,
+        dry_run=True,
+        retention_days=2555,
+        telemetry_days=90,
+    )
+    assert dry["telemetry_deleted"] == 1
+
+    real = service.purge_tenant(
+        session,
+        now=NOW,
+        dry_run=False,
+        retention_days=2555,
+        telemetry_days=90,
+    )
+    assert real["telemetry_deleted"] == 1
+
+    session.info["tenant_id"] = tenant_b.id
+    assert [row.question for row in session.scalars(select(ChatTelemetryEvent))] == [
+        "pregunta B"
+    ]
+
+
 def test_retention_dry_run_counts_without_deleting(monkeypatch):
     session, _, company = _db()
     old = _old_document(session, company, "Viejo dry", "minio://research/tenant-1/x.pdf")

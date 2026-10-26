@@ -1,8 +1,6 @@
 'use server';
 
-import { headers } from 'next/headers';
-
-import { getAuth } from '@/lib/better-auth/auth';
+import { callAuthEndpoint } from '@/lib/auth/endpoint';
 import { isPasswordResetEmailConfigured } from '@/lib/auth/email';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { toAppError } from '@/lib/types/errors';
@@ -41,13 +39,9 @@ export async function requestPasswordReset(email: string): Promise<PasswordActio
         return { success: false, emailConfigured: true, message: 'Introduce un email válido.' };
     }
     try {
-        const auth = await getAuth();
-        await auth.api.requestPasswordReset({
-            body: {
-                email: normalized,
-                redirectTo: `${siteUrl()}/reset-password`,
-            },
-            headers: await headers(),
+        await callAuthEndpoint('/request-password-reset', {
+            email: normalized,
+            redirectTo: `${siteUrl()}/reset-password`,
         });
     } catch (error: unknown) {
         // No se revela si el email existe ni el detalle del proveedor.
@@ -77,10 +71,9 @@ export async function resetPasswordWithToken(input: {
         return { success: false, message: 'Las contraseñas no coinciden.' };
     }
     try {
-        const auth = await getAuth();
-        await auth.api.resetPassword({
-            body: { newPassword: input.newPassword, token: input.token.trim() },
-            headers: await headers(),
+        await callAuthEndpoint('/reset-password', {
+            newPassword: input.newPassword,
+            token: input.token.trim(),
         });
         return {
             success: true,
@@ -117,15 +110,11 @@ export async function changePassword(input: {
         return { success: false, message: 'La contraseña nueva debe ser distinta de la actual.' };
     }
     try {
-        const auth = await getAuth();
-        await auth.api.changePassword({
-            body: {
-                currentPassword: input.currentPassword,
-                newPassword: input.newPassword,
-                // Mantiene la sesion actual y revoca las demas.
-                revokeOtherSessions: true,
-            },
-            headers: await headers(),
+        await callAuthEndpoint('/change-password', {
+            currentPassword: input.currentPassword,
+            newPassword: input.newPassword,
+            // Mantiene la sesion actual y revoca las demas.
+            revokeOtherSessions: true,
         });
         return {
             success: true,
@@ -138,7 +127,9 @@ export async function changePassword(input: {
             success: false,
             message: appError.statusCode === 429
                 ? 'Demasiados intentos. Espera un momento antes de volver a intentarlo.'
-                : 'No se pudo cambiar la contraseña. Revisa que la actual sea correcta.',
+                : appError.statusCode === 400 || appError.statusCode === 401
+                    ? 'No se pudo cambiar la contraseña. Revisa que la actual sea correcta.'
+                    : 'No se pudo cambiar la contraseña. Inténtalo de nuevo.',
         };
     }
 }
