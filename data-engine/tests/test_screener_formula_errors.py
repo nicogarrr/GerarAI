@@ -28,7 +28,7 @@ from app.core.database import Base
 from app.models import Company, FinancialFact, MarketPrice, Portfolio, Position, SavedScreen, Tenant
 from app.services.connectors.ecb import ECBRates
 from app.services.market_refresh_service import MarketRefreshService, PriceObservation
-from app.services.screener_service import ScreenerService
+from app.services.screener_service import SafeFormula, ScreenerService
 
 # `free_cash_flow / revenue` con revenue == 0 es DivisionByZero dentro de
 # SafeFormula: exactamente el caso que antes escapaba como ValueError.
@@ -291,3 +291,17 @@ def test_a_failing_screen_does_not_discard_the_already_committed_prices(monkeypa
         assert db.scalars(
             select(MarketPrice).where(MarketPrice.date == date(2026, 9, 22))
         ).one().close == Decimal("100")
+
+
+@pytest.mark.parametrize("expr", ["min()", "max()", "abs()", "abs(1, 2)", "min(1)", "max(xx)", "abs(xxx, yy)"])
+def test_safe_formula_rejects_bad_arity_as_value_error_before_evaluating(expr):
+    with pytest.raises(ValueError):
+        SafeFormula(expr)
+
+
+@pytest.mark.parametrize(
+    ("expr", "expected"),
+    [("min(xx, 3)", "2"), ("max(xx, 3, 1)", "3"), ("abs(0 - xx)", "2"), ("min(abs(0 - xx), max(1, xx))", "2")],
+)
+def test_safe_formula_valid_arity_still_evaluates(expr, expected):
+    assert SafeFormula(expr).evaluate({"xx": Decimal("2")}) == Decimal(expected)
