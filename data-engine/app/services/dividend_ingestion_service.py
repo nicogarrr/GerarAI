@@ -47,10 +47,15 @@ class DividendIngestionService(ProviderIngestionService):
 
     @staticmethod
     def _known_currency(*candidates: Any) -> str | None:
-        """Primera divisa presente, o None. Nunca se inventa USD: sin divisa el
-        dividendo no se ingiere (se reintenta cuando la empresa la tenga)."""
+        """Primera divisa presente, o None. La divisa sale del dividendo/listado
+        (Yahoo meta.currency, fila FMP), NUNCA de company.currency (divisa de
+        reporte: Novartis SIX reporta en USD y paga en CHF) ni de USD por
+        omision: sin divisa el dividendo no se ingiere."""
         for value in candidates:
-            text = str(value or "").strip().upper()[:10]
+            raw = str(value or "").strip()
+            if raw == "GBp":  # peniques: no son libras
+                return "GBX"
+            text = raw.upper()[:10]
             if text:
                 return text
         return None
@@ -66,7 +71,9 @@ class DividendIngestionService(ProviderIngestionService):
         """
         symbol = self._provider_symbol(company)
         try:
-            payload = await self.yahoo.dividends(symbol)
+            events = await self.yahoo.dividend_events(symbol)
+            payload = events["rows"]
+            listing_currency = self._known_currency(events.get("currency"))
         except Exception:
             payload = await self.fmp.dividends(symbol)
             rows = payload if isinstance(payload, list) else payload.get("historical", [])
@@ -75,7 +82,7 @@ class DividendIngestionService(ProviderIngestionService):
                     "ex_date": self._parse_date(row.get("date") or row.get("recordDate")),
                     "pay_date": self._parse_date(row.get("paymentDate") or row.get("payDate")),
                     "amount": self._parse_amount(row),
-                    "currency": self._known_currency(row.get("currency"), company.currency),
+                    "currency": self._known_currency(row.get("currency")),
                 }
                 for row in rows
                 if isinstance(row, dict)
@@ -85,7 +92,7 @@ class DividendIngestionService(ProviderIngestionService):
                 "ex_date": self._epoch_to_date(row.get("date")),
                 "pay_date": None,  # chart API no expone fecha de pago
                 "amount": self._parse_amount(row),
-                "currency": self._known_currency(None, company.currency),
+                "currency": listing_currency,
             }
             for row in payload
             if isinstance(row, dict)

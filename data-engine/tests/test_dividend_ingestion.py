@@ -24,9 +24,15 @@ class FakeFMP:
 
 
 class FakeYahoo:
-    def __init__(self, payload=None, error=None):
+    def __init__(self, payload=None, error=None, currency="USD"):
         self.payload = payload if payload is not None else []
         self.error = error
+        self.currency = currency
+
+    async def dividend_events(self, ticker: str):
+        if self.error:
+            raise self.error
+        return {"rows": self.payload, "currency": self.currency}
 
     async def dividends(self, ticker: str):
         if self.error:
@@ -92,6 +98,7 @@ def _position(db: Session, company: Company, price: float = 200.0, currency: str
 PAYLOAD = [
     {
         "symbol": "AAPL",
+        "currency": "USD",  # fixture: la fila FMP declara su divisa
         "date": str(date.today()),
         "recordDate": str(date.today()),
         "paymentDate": str(date.today()),
@@ -254,30 +261,73 @@ def test_sync_portfolio_includes_watchlist_companies(db):
     assert "KO" in synced and "MSFT" not in synced
 
 
+_NO_CUR = [{k: v for k, v in PAYLOAD[0].items() if k != "currency"}]
+
+
 def _no_symbol_guard(monkeypatch):
-    # El guard de simbolo ya frena currency vacia; aislamos la defensa en profundidad.
+    # Aislamos la defensa de divisa del guard de simbolo.
     monkeypatch.setattr(DividendIngestionService, "_provider_symbol", lambda self, company: company.ticker)
 
 
-def test_unknown_currency_is_not_invented_as_usd(db, monkeypatch):
-    """Alta verificada con currency vacia: ni Yahoo ni FMP rellenan USD."""
-    _no_symbol_guard(monkeypatch)
-    _company(db, ticker="BWMX", currency="")
-    yahoo = DividendIngestionService(fmp=FakeFMP(payload=PAYLOAD), yahoo=FakeYahoo(payload=YAHOO_PAYLOAD))
-    result = asyncio.run(yahoo.sync_company(db, ticker="BWMX"))
-    assert result["status"] == "ok" and result["inserted"] == 0
-    fmp = DividendIngestionService(fmp=FakeFMP(payload=PAYLOAD), yahoo=_YAHOO_DOWN)
-    assert asyncio.run(fmp.sync_company(db, ticker="BWMX"))["inserted"] == 0
+def _swiss(db: Session):
+    company = _company(db, ticker="NOVN", currency="USD")  # divisa de REPORTE
+    company.exchange = "SWISS EXCHANGE"
+    db.commit()
+    return company
+
+
+def test_yahoo_dividend_currency_is_listing_currency_not_reporting(db):
+    """Novartis SIX: company.currency=USD (reporte), dividendo en CHF (meta Yahoo)."""
+    _swiss(db)
+    service = DividendIngestionService(fmp=FakeFMP(payload=PAYLOAD), yahoo=FakeYahoo(payload=YAHOO_PAYLOAD, currency="CHF"))
+    assert asyncio.run(service.sync_company(db, ticker="NOVN"))["inserted"] == 2
+    assert {r.currency for r in db.scalars(select(DividendRecord)).all()} == {"CHF"}
+
+
+def test_yahoo_without_listing_currency_is_not_ingested(db):
+    _swiss(db)
+    service = DividendIngestionService(fmp=FakeFMP(payload=PAYLOAD), yahoo=FakeYahoo(payload=YAHOO_PAYLOAD, currency=None))
+    assert asyncio.run(service.sync_company(db, ticker="NOVN"))["inserted"] == 0
     assert db.scalars(select(DividendRecord)).all() == []
 
 
-def test_fmp_row_currency_is_kept_when_company_currency_unknown(db, monkeypatch):
+def test_fmp_fallback_never_uses_company_reporting_currency(db):
+    """FMP sin divisa en la fila + company USD (reporte) -> no se ingiere."""
+    _swiss(db)
+    service = DividendIngestionService(fmp=FakeFMP(payload=_NO_CUR), yahoo=_YAHOO_DOWN)
+    assert asyncio.run(service.sync_company(db, ticker="NOVN"))["inserted"] == 0
+    with_currency = [{**PAYLOAD[0], "currency": "chf"}]
+    service = DividendIngestionService(fmp=FakeFMP(payload=with_currency), yahoo=_YAHOO_DOWN)
+    assert asyncio.run(service.sync_company(db, ticker="NOVN"))["inserted"] == 1
+    assert [r.currency for r in db.scalars(select(DividendRecord)).all()] == ["CHF"]
+
+
+def test_other_markets_keep_their_own_currency(db):
+    for ticker, exch, cur in (("SAP", "XETRA", "EUR"), ("SHEL", "LONDON STOCK EXCHANGE", "GBp"), ("AAPL", "NASDAQ", "USD")):
+        company = _company(db, ticker=ticker, currency="USD")
+        company.exchange = exch
+        db.commit()
+    expected = {"SAP": "EUR", "SHEL": "GBX", "AAPL": "USD"}
+    import pytest as _pt
+    mp = _pt.MonkeyPatch()
+    mp.setattr(DividendIngestionService, "_provider_symbol", lambda self, company: company.ticker)
+    try:
+        for ticker, cur in (("SAP", "EUR"), ("SHEL", "GBp"), ("AAPL", "USD")):
+            service = DividendIngestionService(fmp=FakeFMP(payload=[]), yahoo=FakeYahoo(payload=YAHOO_PAYLOAD, currency=cur))
+            assert asyncio.run(service.sync_company(db, ticker=ticker))["inserted"] == 2
+    finally:
+        mp.undo()
+    got = {}
+    for r in db.execute(select(DividendRecord, Company).join(Company, Company.id == DividendRecord.company_id)).all():
+        got[r[1].ticker] = r[0].currency
+    assert got == expected
+
+
+def test_empty_company_currency_still_ingests_when_listing_currency_known(db, monkeypatch):
     _no_symbol_guard(monkeypatch)
     _company(db, ticker="BWMX", currency="")
-    payload = [{**PAYLOAD[0], "currency": "mxn"}]
-    service = DividendIngestionService(fmp=FakeFMP(payload=payload), yahoo=_YAHOO_DOWN)
-    assert asyncio.run(service.sync_company(db, ticker="BWMX"))["inserted"] == 1
-    assert [r.currency for r in db.scalars(select(DividendRecord)).all()] == ["MXN"]
+    service = DividendIngestionService(fmp=FakeFMP(payload=[]), yahoo=FakeYahoo(payload=YAHOO_PAYLOAD, currency="USD"))
+    assert asyncio.run(service.sync_company(db, ticker="BWMX"))["inserted"] == 2
 
 
 def test_empty_currency_company_is_stopped_by_symbol_guard(db):
