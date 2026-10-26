@@ -41,6 +41,7 @@ def _money(value, currency) -> str:
 
 from app.services.display_es import fecha_es as _fecha_es
 from app.services.display_es import source_label as _source_label
+from app.services.dividend_records import collapse_yahoo_readjusted
 
 
 def _link(company: Company, view: str = "financials") -> str:
@@ -113,9 +114,9 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     portfolio = bool(re.search(r"(?i)\bmi\s+cartera\b|\bmis\s+(?:posiciones|acciones|empresas)\b|\bcobrar\w*\b", question))
     company = None if portfolio else _company_in_question(db, question)
     if company is not None:
-        records = list(db.scalars(select(DividendRecord).where(
+        records = sorted(collapse_yahoo_readjusted(db.scalars(select(DividendRecord).where(
             DividendRecord.company_id == company.id, DividendRecord.tenant_id == tenant,
-        ).order_by(DividendRecord.ex_date.desc()).limit(40)).all())
+        ).order_by(DividendRecord.ex_date.desc()).limit(40)).all()), key=lambda r: r.ex_date, reverse=True)
         sources = [_source("dividend_record", r.id, f"Dividendo {company.ticker} · {r.ex_date}", _link(company)) for r in records[:1]]
         upcoming = sorted((r for r in records if r.ex_date >= today), key=lambda r: r.ex_date)
         past = [r for r in records if r.ex_date < today]
@@ -139,21 +140,21 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
         return _response(["No hay posiciones abiertas en tu cartera."], [], "portfolio_dividends")
     lines, sources, totals, without = [], [], {}, []
     for position, comp in sorted(rows, key=lambda r: r[1].ticker):
-        records = [r for r in db.scalars(select(DividendRecord).where(
+        records = sorted((r for r in collapse_yahoo_readjusted(db.scalars(select(DividendRecord).where(
             DividendRecord.company_id == comp.id, DividendRecord.tenant_id == tenant,
             DividendRecord.ex_date >= date(today.year, 1, 1), DividendRecord.ex_date <= date(today.year, 12, 31),
-        ).order_by(DividendRecord.ex_date)).all() if r.currency == position.currency]
+        ).order_by(DividendRecord.ex_date)).all()) if r.currency == position.currency), key=lambda r: r.ex_date)
         if not records:
             without.append(comp.ticker)
             continue
         amount = sum((r.amount for r in records), Decimal("0")) * Decimal(str(position.quantity))
         totals[position.currency] = totals.get(position.currency, Decimal("0")) + amount
         lines.append(f"- {comp.ticker}: {len(records)} pago(s) en {today.year}, {_money(amount, position.currency)} "
-                     f"({_number(position.quantity)} acciones, importes brutos declarados).")
+                     f"({_number(position.quantity)} acciones, importes brutos del proveedor; los de Yahoo van ajustados por splits).")
         sources.append(_source("dividend_record", records[-1].id, f"Dividendo {comp.ticker} · {records[-1].ex_date}", _link(comp)))
     if not lines:
         return _response([f"No hay dividendos guardados de tus posiciones para {today.year}. No he consultado el proveedor en directo."], [], "portfolio_dividends")
-    head = f"Dividendos declarados guardados de tus posiciones abiertas en {today.year} (brutos, cantidad actual por acción declarada):"
+    head = f"Dividendos declarados guardados de tus posiciones abiertas en {today.year} (brutos, cantidad actual por acción según el proveedor):"
     total = "Total: " + " · ".join(f"{_money(v, cur)}" for cur, v in sorted(totals.items())) + "."
     tail = [f"Sin dividendos guardados: {', '.join(without)}."] if without else []
     return _response([head, *lines, total, *tail], sources, "portfolio_dividends")

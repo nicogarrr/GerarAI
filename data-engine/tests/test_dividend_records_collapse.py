@@ -14,7 +14,7 @@ from tests.test_dividend_ingestion import FakeFMP, FakeYahoo, _company, _positio
 def _row(db, company, ex, amount, source, fetched, currency="USD"):
     r = DividendRecord(
         company_id=company.id, ex_date=ex, amount=Decimal(amount), currency=currency,
-        source=source, fetched_at=fetched,
+        source=source, fetched_at=fetched, tenant_id=db.info.get("tenant_id"),
     )
     db.add(r)
     db.commit()
@@ -50,3 +50,18 @@ def test_different_currencies_and_dates_are_kept(db):
         _row(db, company, ex - timedelta(days=90), "1", "yahoo_finance", datetime(2026, 9, 1)),
     ]
     assert len(collapse_yahoo_readjusted(rows)) == 3
+
+
+def test_brain_year_total_does_not_sum_readjusted_duplicates(db):
+    from app.services.brain_data_tools import _dividend_answer
+
+    db.info["tenant_id"] = 1
+    company = _company(db)
+    _position(db, company, price=100.0)
+    ex = date(date.today().year, 1, 2)
+    _row(db, company, ex, "0.77", "yahoo_finance", datetime(2026, 1, 1))
+    _row(db, company, ex, "0.1925", "yahoo_finance", datetime(2026, 9, 1))
+    answer = _dividend_answer(db, "cuanto voy a cobrar de mi cartera", tenant=1)
+    assert answer is not None
+    assert "1 pago(s)" in answer.answer and "$1.93" in answer.answer and "$9.6" not in answer.answer
+    assert "ajustados por splits" in answer.answer

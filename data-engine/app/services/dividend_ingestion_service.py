@@ -28,7 +28,8 @@ from app.services.split_ingestion_service import ProviderIngestionService
 class DividendIngestionService(ProviderIngestionService):
     _PROVENANCE_SOURCE = "Yahoo Finance chart/dividends (fallback FMP stable/dividends)"
     _PROVENANCE_NOTE = (
-        "Declared dividends from data providers; reconcile against issuer/regulator "
+        "Dividends from data providers (Yahoo amounts are split-adjusted, not the original "
+        "declared per-share figure); reconcile against issuer/regulator "
         "notices for material decisions."
     )
 
