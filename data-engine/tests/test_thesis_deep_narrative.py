@@ -7,6 +7,7 @@ Sin red ni BD real: proveedor y presupuesto falsos.
 """
 
 import json
+import re
 from types import SimpleNamespace
 
 from app.services import thesis_deep_narrative as svc
@@ -373,3 +374,60 @@ def test_validate_sections_reports_rule_codes():
     bad_ids["secciones"][0]["fact_ids"] = ["f999"]
     _, reason = svc._validate_sections(bad_ids, facts)
     assert reason == "fact_ids_invalidos"
+
+
+def test_fact_ids_have_no_digits_and_scale_past_26():
+    facts = _facts()
+    assert facts, "el pack debe tener hechos"
+    for fact in facts:
+        assert re.fullmatch(r"f[A-Z]+", fact["id"]), fact["id"]
+    assert svc._fact_id(1) == "fA"
+    assert svc._fact_id(26) == "fZ"
+    assert svc._fact_id(27) == "fAA"
+
+
+def test_model_never_sees_urls_but_citations_keep_real_locator(context):
+    facts = _facts()
+    assert any("example.org" in f["fuente"] for f in facts), "el pack de prueba debe tener una fuente con URL"
+    provider = Provider(payload=_model_output(facts))
+    result = _call(context, provider)
+    assert result is not None
+    # Lo que ve el modelo: sin URL ni host en el paquete visible.
+    prompt_json = provider.requests[0].messages[-1].content
+    assert "example.org" not in prompt_json
+    assert "https://" not in prompt_json
+    # Lo que publica el código: la cita conserva el localizador real.
+    published = json.dumps(result["sections"], ensure_ascii=False)
+    assert "example.org" in published
+
+
+def test_model_writing_pack_domain_is_still_rejected(context, caplog):
+    import logging
+
+    facts = _facts()
+    out = _model_output(facts)
+    out["secciones"][2]["parrafos"] = [
+        "El medio example.org publicó el titular citado y el escenario base "
+        "de 800.00 USD queda anclado al motor interno de valoracion del memo."
+    ]
+    provider = Provider(payload=out)
+    with caplog.at_level(logging.WARNING, logger="app.services.thesis_deep_narrative"):
+        assert _call(context, provider) is None
+    msgs = [r.getMessage() for r in caplog.records if "rechazada" in r.getMessage()]
+    assert any("url_detectada" in m for m in msgs)
+
+
+def test_fact_id_digits_in_prose_are_rejected_as_unanchored(context, caplog):
+    import logging
+
+    facts = _facts()
+    out = _model_output(facts)
+    out["secciones"][0]["parrafos"] = [
+        "Según el hecho 15 del paquete, Meta Platforms cotiza a 733.12 USD "
+        "frente al escenario base de 800.00 USD registrado por el motor."
+    ]
+    provider = Provider(payload=out)
+    with caplog.at_level(logging.WARNING, logger="app.services.thesis_deep_narrative"):
+        assert _call(context, provider) is None
+    msgs = [r.getMessage() for r in caplog.records if "rechazada" in r.getMessage()]
+    assert any("cifra_no_anclada" in m for m in msgs)
