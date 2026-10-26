@@ -16,6 +16,7 @@ from app.models.entities import (
     Claim,
     ClaimEvidence,
     Company,
+    SourceAudit,
     ThesisSection,
     ThesisVersion,
 )
@@ -233,3 +234,27 @@ def test_published_memo_includes_full_analysis_without_approval_section_or_dupli
     assert "## Hipótesis y resumen ejecutivo" in memo
     assert "Aprobación Telegram" not in memo
     assert "## Secciones" not in memo
+
+
+def test_unpublishable_valuation_gets_visible_indicative_banner_and_rag_is_trimmed(db):
+    company = _company(db)
+    long_extract = "Extracto documental (no verificado): Doc. Fuente: URL no disponible. Documento 1: " + "x" * 900
+    thesis = ThesisVersion(
+        company_id=company.id, version=4, status="published", rating="seguimiento",
+        thesis_markdown="# t\n\n## 23. Contexto\n" + long_extract,
+        hypothesis="H.", executive_summary="S.",
+    )
+    db.add(thesis)
+    db.flush()
+    db.add(SourceAudit(
+        thesis_version_id=thesis.id, passed=False,
+        required_fixes=["Faltan entradas de valoración (variables del modelo): churn"],
+    ))
+    db.commit()
+
+    memo = build_memo_markdown(db, company, thesis)
+
+    assert "Valoración INDICATIVA" in memo
+    assert "churn" in memo
+    assert "extracto recortado" in memo
+    assert "x" * 600 not in memo

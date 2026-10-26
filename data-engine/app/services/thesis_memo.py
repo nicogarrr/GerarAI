@@ -14,9 +14,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
-from app.models import Claim, ClaimEvidence, Company, ThesisSection, ThesisVersion
+from app.models import Claim, ClaimEvidence, Company, SourceAudit, ThesisSection, ThesisVersion
 from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, percent_es
 from app.services.thesis_approval_service import APPROVAL_SECTION_TITLE
+
+
+_EXTRACT_LIMIT = 420
 
 
 def _full_analysis_lines(markdown: str) -> list[str]:
@@ -31,6 +34,12 @@ def _full_analysis_lines(markdown: str) -> list[str]:
         line = raw.rstrip()
         if line.startswith("# "):
             continue
+        if len(line) > _EXTRACT_LIMIT and (
+            line.startswith("Doctrina de inversión") or line.startswith("Extracto documental")
+        ):
+            # Contexto recuperado (biblioteca o documentos): solo un extracto con su
+            # fuente, nunca el fragmento íntegro volcado en un documento exportable.
+            line = line[:_EXTRACT_LIMIT].rstrip() + "… [extracto recortado; texto completo en la ficha]"
         if line.startswith("### "):
             out.append(f"**{line[4:]}**")
         elif line.startswith("## "):
@@ -96,6 +105,23 @@ def build_memo_markdown(
         when = f"{latest_data_at:%Y-%m-%d}" if latest_data_at else "desconocida"
         lines.append(f"\n> ⚠ Tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).")
     lines.append("")
+
+    if not draft:
+        audit = db.scalars(
+            select(SourceAudit)
+            .where(SourceAudit.thesis_version_id == thesis.id, *tenant_filters(db, SourceAudit))
+            .order_by(SourceAudit.id.desc())
+            .limit(1)
+        ).first()
+        if audit is not None and not audit.passed:
+            lines.append(
+                "> ⚠ Valoración INDICATIVA: la auditoría de fuentes de esta versión no la dio por "
+                "publicable. Las cifras son escenarios del modelo con los supuestos y datos "
+                "disponibles, no un veredicto de valoración."
+            )
+            for fix in (audit.required_fixes or [])[:5]:
+                lines.append(f"> - {fix}")
+            lines.append("")
 
     if draft:
         lines.append(
