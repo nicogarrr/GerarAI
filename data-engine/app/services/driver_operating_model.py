@@ -190,6 +190,18 @@ FORMULAS: dict[str, FormulaDefinition] = {
         _single("reported_business", lambda v: v["revenue"]),
         "reported_revenue projected from its sourced historical series; no pipeline value is assumed",
     ),
+    "advertising_platform": FormulaDefinition(
+        "reported_ad_revenue_bridge",
+        ("revenue",),
+        "revenue",
+        _single("family_of_apps", lambda v: v["revenue"]),
+        # Meta desglosa las VARIACIONES interanuales de impresiones y precio
+        # por anuncio, no los absolutos: la identidad impresiones × precio no
+        # es calculable con hechos publicados y exigirla seria inventar una
+        # demanda imposible. El ancla es el ingreso reportado; el detalle de
+        # drivers vive en los KPIs del marco (extraccion desde resultados).
+        "reported_revenue projected from its sourced historical series; ad impression and price-per-ad absolutes are not disclosed",
+    ),
     "generic_fcf": FormulaDefinition(
         "reported_revenue_bridge",
         ("revenue",),
