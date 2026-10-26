@@ -24,7 +24,7 @@ type InlineToken = { text: string; bold?: boolean; italic?: boolean };
 /** Inline minimo del memo: **negrita**, _cursiva_, [texto](url). */
 function parseInline(input: string): InlineToken[] {
   const tokens: InlineToken[] = [];
-  const pattern = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)|_[^_\n]+_|`[^`]+`)/g;
+  const pattern = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)|(?<![\p{L}\p{N}_])_[^_\n]+_(?![\p{L}\p{N}_])|`[^`]+`)/gu;
   let last = 0;
   for (const match of input.matchAll(pattern)) {
     const index = match.index ?? 0;
@@ -64,6 +64,14 @@ function tableRow(
   x: number,
   bold: boolean,
 ) {
+  // Altura de la fila entera antes de pintar: si no cabe, salto de pagina
+  // antes de la primera celda (si no, cada celda saltaba de pagina sola).
+  doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9.5);
+  const rowHeight = Math.max(
+    ...cells.map((cell, i) => doc.heightOfString(cell, { width: widths[i] - 8 })),
+  );
+  const bottom = doc.page.height - doc.page.margins.bottom;
+  if (doc.y + rowHeight > bottom) doc.addPage();
   const y = doc.y;
   let maxHeight = 0;
   cells.forEach((cell, i) => {

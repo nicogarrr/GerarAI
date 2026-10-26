@@ -43,12 +43,37 @@ def _full_analysis_lines(markdown: str) -> list[str]:
             line = f"- {ref} [texto del extracto omitido; consultar en la ficha]"
             out.append(line)
             continue
+        # Marca interna ("publicable=True") que contradice el estado del memo y
+        # listas largas de ids de hechos: siguen en la ficha, no en el documento.
+        line = re.sub(r"\s+publicable=(?:True|False|None)", "", line)
+        line = re.sub(r"\s*\(\d{5,}(?:, \d{5,})*\)", "", line)
         if line.startswith("### "):
             out.append(f"**{line[4:]}**")
         elif line.startswith("## "):
             out.append(f"### {line[3:]}")
         else:
             out.append(line)
+    return out
+
+
+def _narrative_lines(narrative: list | None) -> list[str]:
+    """Secciones narrativas persistidas (mismo texto que la ficha), sin reescribir."""
+    out: list[str] = []
+    for section in narrative or []:
+        if not isinstance(section, dict):
+            continue
+        titulo = re.sub(r"\s*-?\s*INFERIDO$", "", str(section.get("titulo") or "")).strip()
+        parrafos = [
+            re.sub(r"^INFERIDO:\s*", "", str(p)).strip()
+            for p in (section.get("parrafos") or [])
+            if str(p).strip()
+        ]
+        if not titulo or not parrafos:
+            continue
+        out.append(f"### {titulo}")
+        for parrafo in parrafos:
+            out.append(f"- {parrafo}" if parrafo.startswith("Evidencia ") else parrafo)
+        out.append("")
     return out
 
 
@@ -128,6 +153,13 @@ def build_memo_markdown(
             lines.append("> Sin auditoría de fuentes registrada para esta versión.")
             lines.append("")
 
+    if not draft and thesis.status != "published":
+        lines.append(
+            f"> ESTADO: versión en estado «{label_es(STATUS_ES, thesis.status)}», no publicada ni "
+            "aprobada. Es una lectura de seguimiento, no un veredicto ni una recomendación."
+        )
+        lines.append("")
+
     if draft:
         lines.append(
             "> BORRADOR sin publicar. No incluye veredicto, hipótesis, resumen, "
@@ -199,6 +231,11 @@ def build_memo_markdown(
     if not draft:
         # La aprobación por Telegram es un registro operativo, no análisis.
         sections = [sec for sec in sections if sec.title != APPROVAL_SECTION_TITLE]
+        narrative = _narrative_lines(thesis.narrative_sections)
+        if narrative:
+            lines.append("## Análisis narrativo")
+            lines.extend(narrative)
+
         if sections:
             lines.append("## Secciones")
             for section in sections:
