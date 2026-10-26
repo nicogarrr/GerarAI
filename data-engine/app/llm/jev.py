@@ -17,6 +17,8 @@ from typing import Any
 
 import httpx
 
+from app.llm.run_guard import LLMGuardAbort, reserve_post_without_tokens
+
 
 @dataclass(frozen=True)
 class JevDecision:
@@ -56,6 +58,8 @@ class JevDecisionClient:
         self._timeout = timeout_seconds
         self._max_retries = max_retries
         self._client = client
+        #: True = fail-closed: sin guard activo no se envia nada.
+        self.guard_required = False
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._api_key}"}
@@ -74,6 +78,9 @@ class JevDecisionClient:
         }
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
+            # Guard por corrida: cada POST (reintentos incluidos) reserva 1 POST
+            # y exige destino permitido antes de la red; abortar no es reintentable.
+            reserve_post_without_tokens(f"{self._base_url}/v1/systemone", guard_required=self.guard_required)
             try:
                 if self._client is not None:
                     response = await self._client.post(
@@ -106,7 +113,7 @@ class JevDecisionClient:
                     raise JevAuthError(f"TypeSafe auth HTTP {response.status_code}")
                 response.raise_for_status()
                 return response.json()
-            except (JevCreditExhausted, JevAuthError):
+            except (JevCreditExhausted, JevAuthError, LLMGuardAbort):
                 raise
             except Exception as exc:  # noqa: BLE001 — reintento best-effort
                 last_error = exc

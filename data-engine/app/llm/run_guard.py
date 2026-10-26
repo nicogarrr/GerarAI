@@ -17,6 +17,11 @@ Contrato:
   (peor caso de salida facturable). El cupo se reserva por lo SOLICITADO, no
   por lo consumido: contar despues no es un tope.
 
+Vida del contador: el TTL se fija UNA vez (en la primera reserva del run_id) y
+NO se renueva. Pasado el TTL (7 dias por defecto) el contador de ese run_id
+desaparece y el cupo vuelve a empezar: el tope es por ciclo de vida de la
+corrida, no perpetuo. Un run_id nuevo tiene cupo nuevo por construccion.
+
 Limites del diseno (no son garantias): no cuenta tokens de entrada, no
 conoce el precio real y no impide llamadas por rutas que no pasen por
 ``LLMProvider._send``.
@@ -90,7 +95,9 @@ if p + tonumber(ARGV[1]) > tonumber(ARGV[3]) or t + tonumber(ARGV[2]) > tonumber
 end
 redis.call('HINCRBY', KEYS[1], 'posts', ARGV[1])
 redis.call('HINCRBY', KEYS[1], 'tokens', ARGV[2])
-redis.call('EXPIRE', KEYS[1], tonumber(ARGV[5]))
+if redis.call('TTL', KEYS[1]) < 0 then
+  redis.call('EXPIRE', KEYS[1], tonumber(ARGV[5]))
+end
 return 1
 """
 
@@ -151,6 +158,29 @@ def reserve_request(url: str, payload: Any, *, guard_required: bool = False) -> 
         guard.run_id,
         posts=1,
         tokens=requested,
+        max_posts=guard.max_posts,
+        max_tokens=guard.max_total_output_tokens,
+    ):
+        raise LLMGuardAbort("run_budget_exhausted")
+
+
+def reserve_post_without_tokens(url: str, *, guard_required: bool = False) -> None:
+    """Para clientes que no envian ``max_tokens`` (p.ej. Jev): con guard activo
+    el destino debe estar permitido y CADA POST (reintentos incluidos) reserva
+    1 POST contra el tope de la corrida antes de la red. Tokens de salida: 0
+    (la API no soporta max_tokens; no se inventa un coste total)."""
+    guard = _current.get()
+    if guard is None:
+        if guard_required:
+            raise LLMGuardAbort("guard_required_but_inactive")
+        return
+    parsed = urlparse(str(url))
+    if parsed.scheme != "https" or (parsed.hostname or "") not in guard.allowed_hosts:
+        raise LLMGuardAbort("destination_not_allowed")
+    if not guard.store.reserve(
+        guard.run_id,
+        posts=1,
+        tokens=0,
         max_posts=guard.max_posts,
         max_tokens=guard.max_total_output_tokens,
     ):
