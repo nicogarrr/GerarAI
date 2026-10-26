@@ -45,6 +45,16 @@ class DividendIngestionService(ProviderIngestionService):
                 return amount
         return None
 
+    @staticmethod
+    def _known_currency(*candidates: Any) -> str | None:
+        """Primera divisa presente, o None. Nunca se inventa USD: sin divisa el
+        dividendo no se ingiere (se reintenta cuando la empresa la tenga)."""
+        for value in candidates:
+            text = str(value or "").strip().upper()[:10]
+            if text:
+                return text
+        return None
+
     async def _fetch_rows(
         self, company: Company
     ) -> tuple[list[dict[str, Any]], str]:
@@ -65,7 +75,7 @@ class DividendIngestionService(ProviderIngestionService):
                     "ex_date": self._parse_date(row.get("date") or row.get("recordDate")),
                     "pay_date": self._parse_date(row.get("paymentDate") or row.get("payDate")),
                     "amount": self._parse_amount(row),
-                    "currency": str(row.get("currency") or "USD").upper()[:10],
+                    "currency": self._known_currency(row.get("currency"), company.currency),
                 }
                 for row in rows
                 if isinstance(row, dict)
@@ -75,7 +85,7 @@ class DividendIngestionService(ProviderIngestionService):
                 "ex_date": self._epoch_to_date(row.get("date")),
                 "pay_date": None,  # chart API no expone fecha de pago
                 "amount": self._parse_amount(row),
-                "currency": (company.currency or "USD").upper()[:10],
+                "currency": self._known_currency(None, company.currency),
             }
             for row in payload
             if isinstance(row, dict)
@@ -83,7 +93,11 @@ class DividendIngestionService(ProviderIngestionService):
 
     @staticmethod
     def _row_is_ingestible(row: dict[str, Any]) -> bool:
-        return row["ex_date"] is not None and row["amount"] is not None
+        return (
+            row["ex_date"] is not None
+            and row["amount"] is not None
+            and bool(row.get("currency"))
+        )
 
     @staticmethod
     def _existing_record(db: Session, company: Company, row: dict[str, Any]) -> Any:
