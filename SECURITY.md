@@ -4,7 +4,7 @@
 
 No abras un issue público para vulnerabilidades. Repórtalas por el canal
 privado de GitHub: **Security → Advisories → New draft advisory** en
-`nicogarrr/gerarai` (`https://github.com/nicogarrr/gerarai/security/advisories/new`).
+`nicogarrr/GerarAI` (`https://github.com/nicogarrr/GerarAI/security/advisories/new`).
 
 Incluye: descripción, pasos de reproducción, impacto estimado y, si aplica,
 rutas afectadas (`/api/*`, server actions, Telegram). Tiempo objetivo de
