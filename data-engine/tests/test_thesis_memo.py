@@ -332,3 +332,19 @@ def test_isolated_memo_is_labeled_not_persisted(db):
     normal = build_memo_markdown(db, company, thesis)
     assert "desde la versión persistida" in normal
     assert "Texto de la tesis persistida" in normal
+
+
+def test_fraction_row_to_percent_is_exact_and_conservative():
+    from app.services.thesis_memo import _fraction_row_to_percent as f
+
+    def row(v, u="fracción"):
+        return f"| Margen | {v} | {u} | 2025 | SEC |"
+
+    assert "| 23,45 % | porcentaje |" in f(row("0,2345"))
+    assert "| 8,25 % | porcentaje |" in f(row("0,0825"))
+    assert "| 23,456 % | porcentaje |" in f(row("0,23456"))
+    assert "| 23 % | porcentaje |" in f(row("0,23"))
+    assert "| 50 % | porcentaje |" in f(row("0,50"))
+    assert "| -5 % | porcentaje |" in f(row("-0,05"))
+    assert f(row("1")) == row("1")
+    assert f(row("0,23", "ratio")) == row("0,23", "ratio")

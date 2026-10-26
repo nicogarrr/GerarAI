@@ -9,6 +9,7 @@ financiero.
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -33,8 +34,9 @@ def _fraction_row_to_percent(line: str) -> str:
     raw = cells[2].strip()
     if not re.fullmatch(r"-?\d+,\d+", raw):
         return line
-    pct = float(raw.replace(",", ".")) * 100
-    text = f"{pct:.1f}".replace(".", ",").removesuffix(",0")
+    # Decimal exacto: sin redondeo (0,2345 -> 23,45 %; 0,23 -> 23 %).
+    pct = (Decimal(raw.replace(",", ".")) * 100).normalize()
+    text = format(pct, "f").replace(".", ",")
     cells[2] = f" {text} % "
     cells[3] = " porcentaje "
     return "|".join(cells)
