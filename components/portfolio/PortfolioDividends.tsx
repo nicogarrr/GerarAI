@@ -152,6 +152,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
     const fiscalYears = Object.entries(projection.fiscal_by_year);
     const coverageLists: Array<{ label: string; tickers: string[] }> = [
         { label: 'Sin dividendos declarados registrados', tickers: projection.coverage.sin_datos },
+        { label: 'Importe de dividendo incierto (excluidos del total)', tickers: projection.coverage.uncertain_dividends ?? [] },
         { label: 'Sin tipo de cambio', tickers: projection.coverage.fx_missing },
         { label: 'Retención de origen sin verificar', tickers: projection.coverage.unknown_source_withholding },
     ].filter((entry) => entry.tickers.length > 0);
@@ -169,7 +170,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
 
             {projection.gross_summary && projection.gross_summary.gross_total_base > 0 ? (
                 <p className="text-sm text-gray-200">
-                    Bruto proyectado a {projection.horizon_months} meses:{' '}
+                    {projection.gross_summary.complete === false ? 'Bruto parcial proyectado' : 'Bruto proyectado'} a {projection.horizon_months} meses:{' '}
                     <span className="font-semibold">{formatMoney(projection.gross_summary.gross_total_base, baseCurrency)}</span>
                     {projection.gross_summary.gross_unverified_base > 0 ? (
                         <span className="text-gray-400">
@@ -193,7 +194,9 @@ export default function PortfolioDividends({ projection, userId }: { projection:
             {projection.positions.length === 0 && projection.declared_future.length === 0 ? (
                 <Panel title="Proyección de dividendos">
                     <p className="text-sm text-gray-400">
-                        Sin datos: ninguna posición de la cartera tiene dividendos declarados registrados.
+                        {(projection.coverage.uncertain_dividends ?? []).length > 0
+                            ? 'Sin proyección: importe de dividendo incierto.'
+                            : 'Sin datos: ninguna posición de la cartera tiene dividendos declarados registrados.'}
                     </p>
                 </Panel>
             ) : (

@@ -73,3 +73,20 @@ def test_sync_status_reports_last_real_import_or_none(db):
     db.commit()
     status = sync_status(db=db)
     assert status["dividends_last_import"].startswith("2026-10-10") and status["splits_last_import"] is None
+
+
+def test_uncertain_yahoo_event_is_flagged_not_declared_and_not_zero(db):
+    from datetime import datetime
+
+    held = _company(db, "UNC")
+    today = date.today()
+    db.add(Position(tenant_id=1, company_id=held.id, quantity=Decimal("3"), average_cost=Decimal("10"), currency="USD", as_of=today, market_value=Decimal("30")))
+    ex = today - timedelta(days=10)
+    for amount, fetched in (("0.5", datetime(2026, 1, 1)), ("2.0", datetime(2026, 9, 1))):
+        db.add(DividendRecord(tenant_id=1, company_id=held.id, ex_date=ex, amount=Decimal(amount), currency="USD", source="yahoo_finance", fetched_at=fetched))
+    db.commit()
+    rows = list_actions(limit=200, db=db)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["declared"] is False and row["amount_per_share"] is None
+    assert "incierto" in row["description"].lower() and "0.5" in row["description"] and "2" in row["description"]

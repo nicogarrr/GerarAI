@@ -19,6 +19,7 @@ from app.services.async_bridge import run_from_any_context
 from app.services.corporate_actions_service import CorporateActionService
 from app.services.display_es import fecha_es as _fecha_es
 from app.services.display_es import source_label as _source_label
+from app.services.dividend_records import resolve_yahoo_events
 from app.services.split_ingestion_service import SplitIngestionService
 
 router = APIRouter()
@@ -75,6 +76,12 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
         )
         .order_by(DividendRecord.ex_date.desc(), Company.ticker)
     ).all()
+    kept, uncertain = resolve_yahoo_events(
+        [record for record, _ in rows]
+    )
+    kept_ids = {id(record) for record in kept}
+    tickers = {company.id: company.ticker for _, company in rows}
+    rows = [(record, company) for record, company in rows if id(record) in kept_ids]
     out = []
     for record, company in rows:
         pay = f" · pago {_fecha_es(record.pay_date)}" if record.pay_date else ""
@@ -88,6 +95,7 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
                 "description": (
                     f"Dividendo de {record.amount.normalize():f} {record.currency} por acción"
                     f"{pay} · fuente {_source_label(record.source)}"
+                    f"{' (importe ajustado por splits)' if record.source == 'yahoo_finance' else ''}"
                 ),
                 "applied": None,
                 "applied_at": None,
@@ -100,6 +108,30 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
                 "source": record.source,
             }
         )
+    for event in uncertain:
+        amounts = ", ".join(f"{a.normalize():f}" for a in event.amounts)
+        out.append(
+            {
+                "id": None,
+                "ticker": tickers.get(event.company_id, ""),
+                "action_type": "dividend",
+                "effective_date": event.ex_date.isoformat(),
+                "ratio": None,
+                "description": (
+                    f"Importe incierto: {amounts} {event.currency} en la misma fecha ex"
+                ),
+                "applied": None,
+                "applied_at": None,
+                "historical": False,
+                "no_position": False,
+                "declared": False,
+                "amount_per_share": None,
+                "currency": event.currency,
+                "pay_date": None,
+                "source": "yahoo_finance",
+            }
+        )
+    out.sort(key=lambda item: item["effective_date"], reverse=True)
     return out
 
 

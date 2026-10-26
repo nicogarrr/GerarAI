@@ -54,6 +54,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, DividendRecord, Position
+from app.services.dividend_records import resolve_yahoo_events
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.tax_irpf_filing import calculate_savings_tax
 
@@ -197,15 +198,14 @@ class DividendProjectionService:
             ).all()
         )
         company_ids = [company.id for _, company in rows]
-        all_records = (
-            list(
-                db.scalars(
-                    select(DividendRecord).where(DividendRecord.company_id.in_(company_ids))
-                ).all()
-            )
+        all_records, uncertain_events = resolve_yahoo_events(
+            db.scalars(
+                select(DividendRecord).where(DividendRecord.company_id.in_(company_ids))
+            ).all()
             if company_ids
-            else []
+            else [],
         )
+        uncertain_by_company = {event.company_id for event in uncertain_events}
         records_by_company: dict[int, list[DividendRecord]] = defaultdict(list)
         for record in all_records:
             records_by_company[record.company_id].append(record)
@@ -218,6 +218,7 @@ class DividendProjectionService:
 
         per_position: list[dict[str, Any]] = []
         sin_datos: list[str] = []
+        uncertain_dividends: list[str] = []
         fx_missing: list[str] = []
         unknown_country: list[str] = []
         unverified_reasons: dict[str, str] = {}
@@ -261,6 +262,13 @@ class DividendProjectionService:
                                 "(no verificado contra fuente primaria); no alimenta la réplica.",
                     }
                 )
+            if company.id in uncertain_by_company and any(
+                cutoff < e.ex_date <= today for e in uncertain_events if e.company_id == company.id
+            ):
+                # Evento Yahoo con importes distintos sin evidencia de split: NO es
+                # «sin dividendos», es dato incierto; se excluye y se senala aparte.
+                uncertain_dividends.append(company.ticker)
+                continue
             if not trailing:
                 sin_datos.append(company.ticker)
                 continue
@@ -533,12 +541,14 @@ class DividendProjectionService:
                 # posiciones sin dividendos conocidos: nunca es "la cartera".
                 "excluded_no_fx": sorted(set(fx_missing)),
                 "excluded_no_dividends": sorted(sin_datos),
-                "complete": not (set(fx_missing) or set(sin_datos)),
+                "excluded_uncertain_dividends": sorted(uncertain_dividends),
+                "complete": not (set(fx_missing) or set(sin_datos) or set(uncertain_dividends)),
             },
             "declared_future": declared_future,
             "coverage": {
                 "with_data": len(per_position),
                 "sin_datos": sorted(sin_datos),
+                "uncertain_dividends": sorted(uncertain_dividends),
                 "fx_missing": sorted(set(fx_missing)),
                 "unknown_source_withholding": sorted(set(unknown_country)),
                 "unverified_reasons": dict(sorted(unverified_reasons.items())),

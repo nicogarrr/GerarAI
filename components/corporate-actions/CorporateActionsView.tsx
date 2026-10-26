@@ -103,7 +103,7 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
                         : String(value ?? '—'),
                 effective_date: (value) => formatMarketDate(value as string | null),
                 description: (value, record) => record.action_type === 'dividend' && typeof record.amount_per_share === 'number' && typeof record.currency === 'string'
-                    ? `Dividendo de ${formatMoney(record.amount_per_share, record.currency)} por acción${record.pay_date ? ` · pago ${formatMarketDate(record.pay_date as string)}` : ''} · fuente ${record.source ?? 'N/D'}`
+                    ? `Dividendo de ${formatMoney(record.amount_per_share, record.currency)} por acción${record.pay_date ? ` · pago ${formatMarketDate(record.pay_date as string)}` : ''} · fuente ${record.source ?? 'N/D'}${record.source === 'yahoo_finance' ? ' (importe ajustado por splits)' : ''}`
                     : String(value ?? 'N/D'),
                 ratio: (value) => formatNumber(value as number | string | null, { maximumFractionDigits: 4 }),
             }}
@@ -114,7 +114,9 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
                 // Dividendo declarado del proveedor: solo informativo, el cobro
                 // se registra a mano en la cartera.
                 if (record.action_type === 'dividend') {
-                    return <span className="text-xs text-gray-500">Declarado</span>;
+                    return record.declared === false
+                        ? <span className="text-xs text-amber-400/90">Importe incierto</span>
+                        : <span className="text-xs text-gray-500">Del proveedor</span>;
                 }
                 if (isApplied(record)) {
                     return (
