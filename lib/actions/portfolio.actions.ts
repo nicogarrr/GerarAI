@@ -929,6 +929,10 @@ export type DividendProjectionPosition = {
   domicile_country: string | null;
   source_withholding_rate: number | null;
   source_withheld_base: number | null;
+  withholding_basis?: 'emisor_verificado' | 'domicilio_bd';
+  withholding_kind?: 'techo_convenio' | 'escenario_convenio' | 'sin_impuesto_origen_escenario' | null;
+  unverified_reason?: string | null;
+  scenario_conditions?: string | null;
   months: Record<string, number>;
 };
 
@@ -962,6 +966,7 @@ export type PortfolioDividendProjection = {
     sin_datos: string[];
     fx_missing: string[];
     unknown_source_withholding: string[];
+    unverified_reasons?: Record<string, string>;
   };
 };
 

@@ -426,3 +426,82 @@ def test_fiscal_year_with_only_excluded_positions_shows_row(db):
     assert row["irpf_scenario"] is None
     assert row["net_scenario"] is None
     assert "Sin datos" in row["note"]
+
+
+def _setup_payer(db, ticker, country):
+    company = _company(db, ticker=ticker, country=country)
+    _position(db, company, quantity="100")
+    _dividend(db, company, date.today() - timedelta(days=100), "1.00")
+    _fx(db)
+    return company
+
+
+def test_verified_canadian_payer_uses_treaty_ceiling_as_scenario(db):
+    _setup_payer(db, "BN", "CA")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    pos = out["positions"][0]
+    assert pos["source_withholding_rate"] == pytest.approx(0.15)
+    assert pos["withholding_basis"] == "emisor_verificado"
+    assert pos["withholding_kind"] == "techo_convenio"
+    assert pos["unverified_reason"] is None
+    assert out["coverage"]["unknown_source_withholding"] == []
+    assert any("25 %" in c for c in out["fiscal_conditions"])
+
+
+def test_canadian_domicile_without_verified_payer_stays_unverified(db):
+    _setup_payer(db, "XYZ", "CA")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    pos = out["positions"][0]
+    assert pos["source_withholding_rate"] is None
+    assert out["coverage"]["unknown_source_withholding"] == ["XYZ"]
+    assert "CA" in out["coverage"]["unverified_reasons"]["XYZ"]
+    assert out["gross_summary"]["gross_unverified_base"] > 0
+
+
+def test_baba_cayman_issuer_is_zero_scenario_with_visible_conditions(db):
+    _setup_payer(db, "BABA", "HK")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    pos = out["positions"][0]
+    assert pos["domicile_country"] == "KY"
+    assert pos["withholding_basis"] == "emisor_verificado"
+    assert pos["withholding_kind"] == "sin_impuesto_origen_escenario"
+    assert pos["source_withholding_rate"] == 0
+    assert pos["unverified_reason"] is None
+    cond = pos["scenario_conditions"]
+    assert "Item 10.E" in cond and "20 %" in cond and "NO verificada" in cond
+    assert "depositario" in cond
+    assert out["coverage"]["unknown_source_withholding"] == []
+
+
+def test_fiscal_conditions_do_not_contradict_the_ky_zero_scenario(db):
+    _setup_payer(db, "BABA", "HK")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    joined = " ".join(out["fiscal_conditions"])
+    assert "neto queda N/D" not in joined and "no se asume 0 %" not in joined
+    assert "Item 10.E" in joined and "NO es la retención efectiva del broker" in joined
+
+
+def test_non_baba_positions_have_no_scenario_conditions(db):
+    _setup_payer(db, "BN", "CA")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    assert out["positions"][0]["scenario_conditions"] is None
+
+
+def test_hk_domicile_without_verified_issuer_is_not_assumed_zero(db):
+    _setup_payer(db, "HKCO", "HK")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    pos = out["positions"][0]
+    assert pos["source_withholding_rate"] is None
+    assert out["coverage"]["unknown_source_withholding"] == ["HKCO"]

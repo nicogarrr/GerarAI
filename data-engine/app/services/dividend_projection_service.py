@@ -66,11 +66,64 @@ _SOURCE_WITHHOLDING: dict[str, Decimal] = {
     "US": Decimal("0.15"),
     "ES": Decimal("0.19"),
 }
-_FOREIGN_WITHHOLDING = {"US"}  # ES es pago a cuenta nacional, no deducible como impuesto extranjero
+
+# Tipos TECHO de convenio por jurisdiccion del EMISOR, usados SOLO cuando el
+# emisor esta verificado en ``_VERIFIED_PAYERS`` (no por el domicilio de la BD
+# ni por el mercado de cotizacion). Un techo de convenio no es la retencion
+# efectiva: sin NR301/declaracion al pagador Canada aplica 25 % (CRA, Part XIII).
+# CA 15 %: art. X.2.b del Convenio ES-CA (Protocolo 2014; 5 % solo sociedad con
+# >=10 % directo, no aplica a una persona fisica) y Anexo III AEAT.
+_TREATY_CEILING_WITHHOLDING: dict[str, Decimal] = {
+    "CA": Decimal("0.15"),
+}
+
+# Emisor verificado contra fuente primaria (consultado 2026-10-26). Clave: ticker.
+# ``jurisdiction`` = jurisdiccion de constitucion del pagador del dividendo.
+# Cualquier ticker ausente conserva el comportamiento anterior (domicilio BD,
+# solo US/ES con tipo; el resto "sin verificar").
+# Jurisdicciones del emisor con ESCENARIO "sin retencion en origen por ley del
+# emisor". KY: 20-F de Alibaba (FY2026) Item 10.E, asesor Maples: los pagos de
+# dividendos de ADS/acciones "will not be subject to taxation in the Cayman Islands
+# and no withholding will be required". Es la ley del pais del emisor: NO es la
+# retencion efectiva del broker ni cubre China (ver ``scenario_conditions``).
+_NO_SOURCE_TAX_SCENARIO: dict[str, Decimal] = {"KY": Decimal("0")}
+
+# Condiciones visibles junto al importe de cada escenario (misma fuente: 20-F).
+_SCENARIO_CONDITIONS: dict[str, str] = {
+    "KY": (
+        "Escenario 0 % = solo ley de Islas Caimán (20-F Item 10.E): sin retención en Caimán. "
+        "Condiciones: Alibaba no cree ser residente fiscal en China, pero si las autoridades "
+        "chinas la trataran como tal podría aplicarse 20 % de IIT a un tenedor persona física "
+        "no residente, con reducción por convenio incierta para ADS. Comisiones del depositario "
+        "aparte. Retención efectiva del broker: NO verificada."
+    ),
+}
+
+_VERIFIED_PAYERS: dict[str, dict[str, str]] = {
+    "BN": {
+        "jurisdiction": "CA",
+        "source": "sec_bn_40f",
+        "reason_if_unrated": "",
+    },
+    "BABA": {
+        "jurisdiction": "KY",
+        "source": "sec_baba_20f",
+        "reason_if_unrated": (
+            "Emisor constituido en Islas Caimán (ADS en NYSE; la sede en Hong Kong es la que "
+            "figura como domicilio en la base de datos). Sin tipo de retención verificado."
+        ),
+    },
+}
+
+_FOREIGN_WITHHOLDING = {"US", "CA", "KY"}  # ES es pago a cuenta nacional, no deducible como impuesto extranjero
 
 _SOURCE_URLS = {
     "aeat_convenios": "https://www3.agenciatributaria.gob.es/Sede/ayuda/manuales-videos-folletos/manuales-practicos/manual-tributacion-no-residentes/anexos/limites-imposicion-convenios.html",
     "aeat_doble_imposicion": "https://sede.agenciatributaria.gob.es/Sede/ayuda/manuales-videos-folletos/manuales-ayuda-presentacion/irpf-2025/8-cumplimentacion-irpf/8_7-cuota-liquida-cuota-resultante-autoliquidacion/8_7_3-cuota-resultante-autoliquidacion/8_7_3_1-deduccion-doble-imposicion-internacional.html",
+    "canada_part_xiii_rates": "https://www.canada.ca/en/revenue-agency/services/tax/international-non-residents/payments-non-residents/nr4-part-xiii-tax/part-xiii-withholding-tax/rates-part-xiii-tax.html",
+    "convenio_es_ca_protocolo_2014": "https://www.canada.ca/en/department-finance/programs/tax-policy/tax-treaties/country/spain-protocol-2014.html",
+    "sec_bn_40f": "https://www.sec.gov/Archives/edgar/data/1001085/000100108526000006/bn-20251231.htm",
+    "sec_baba_20f": "https://www.sec.gov/Archives/edgar/data/1577552/000119312526231755/baba-20260331.htm",
     "hmrc_property_income_distributions": "https://www.gov.uk/hmrc-internal-manuals/investment-funds/ifm28125",
 }
 
@@ -94,6 +147,9 @@ _FISCAL_CONDITIONS = [
     "Única renta del ahorro del año asumida; el IRPF real depende del resto de la base.",
     "Escala del ahorro de la Renta 2025 aplicada a años futuros (hipótesis, sujeta a cambio legislativo).",
     "La retención ES del 19 % es pago a cuenta, no impuesto extranjero ni deducción por doble imposición.",
+    "Canadá (p. ej. BN): se usa el techo del convenio ES-CA (15 %) como escenario; Canadá retiene 25 % si el broker no aplica el convenio (CRA, Part XIII), y la retención efectiva no está verificada.",
+    "Emisor en Islas Caimán (p. ej. BABA): escenario 0 % = solo ley de Caimán (20-F Item 10.E); NO es la retención efectiva del broker y no cubre una posible retención china (20 % IIT condicional, convenio incierto para ADS). Las condiciones se muestran junto al importe.",
+    "Emisor verificado por ticker (BN: Ontario; BABA: Islas Caimán). Domicilio de la base de datos o mercado de cotización no determinan la retención.",
     "Domicilios sin tipo verificado (p.ej. GB: HMRC IFM28125 distingue categorías) salen como sin datos.",
 ]
 
@@ -164,6 +220,7 @@ class DividendProjectionService:
         sin_datos: list[str] = []
         fx_missing: list[str] = []
         unknown_country: list[str] = []
+        unverified_reasons: dict[str, str] = {}
         declared_future: list[dict[str, Any]] = []
         # month -> agregado solo de posiciones fiscalmente cubiertas
         month_totals: dict[str, dict[str, Any]] = defaultdict(
@@ -219,9 +276,34 @@ class DividendProjectionService:
                 fx_missing.append(company.ticker)
 
             country = (company.domicile_country or "").upper() or None
-            source_rate = _SOURCE_WITHHOLDING.get(country) if country else None
-            if country not in _SOURCE_WITHHOLDING:
+            payer = _VERIFIED_PAYERS.get((company.ticker or "").upper())
+            basis = "domicilio_bd"
+            unverified_reason: str | None = None
+            if payer is not None:
+                # Emisor verificado: manda la jurisdiccion del pagador, no la BD.
+                country = payer["jurisdiction"]
+                basis = "emisor_verificado"
+                source_rate = _SOURCE_WITHHOLDING.get(country)
+                if source_rate is None:
+                    source_rate = _TREATY_CEILING_WITHHOLDING.get(country)
+                if source_rate is None:
+                    source_rate = _NO_SOURCE_TAX_SCENARIO.get(country)
+                if source_rate is None:
+                    unverified_reason = payer["reason_if_unrated"] or (
+                        f"Emisor en {country} sin tipo de retención verificado."
+                    )
+            else:
+                source_rate = _SOURCE_WITHHOLDING.get(country) if country else None
+                if source_rate is None:
+                    unverified_reason = (
+                        f"Domicilio en base de datos: {country}; sin tipo de retención verificado "
+                        "para ese país (no se deduce del mercado ni se asume 0 %)."
+                        if country
+                        else "Sin domicilio ni emisor verificado; retención no verificada."
+                    )
+            if source_rate is None:
                 unknown_country.append(company.ticker)
+                unverified_reasons[company.ticker] = unverified_reason or ""
             fiscally_covered = rate is not None and source_rate is not None
 
             month_entries: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
@@ -273,6 +355,22 @@ class DividendProjectionService:
                         float(gross_base_total) if gross_base_total is not None else None
                     ),
                     "domicile_country": country,
+                    "withholding_basis": basis,
+                    "withholding_kind": (
+                        None
+                        if source_rate is None
+                        else "sin_impuesto_origen_escenario" if basis == "emisor_verificado" and country in _NO_SOURCE_TAX_SCENARIO
+                        else "techo_convenio" if country in _TREATY_CEILING_WITHHOLDING and basis == "emisor_verificado"
+                        else "escenario_convenio"
+                    ),
+                    "unverified_reason": unverified_reason,
+                    "scenario_conditions": (
+                        _SCENARIO_CONDITIONS.get(country)
+                        if source_rate is not None
+                        and basis == "emisor_verificado"
+                        and country in _NO_SOURCE_TAX_SCENARIO
+                        else None
+                    ),
                     "source_withholding_rate": (
                         float(source_rate) if source_rate is not None else None
                     ),
@@ -370,7 +468,7 @@ class DividendProjectionService:
             # es un impuesto adicional: es anticipo de la cuota IRPF, asi que
             # el coste fiscal total es IRPF + extranjero - deduccion DI.
             net = year_gross - irpf_total - source_total + deduction_total
-            note = "Escenario condicionado (ver «Método y condiciones»); no es el neto final."
+            note = "Escenario condicionado (ver «Supuestos fiscales y fuentes»); no es el neto final."
             if excluded:
                 note = ("Subconjunto cubierto: hay posiciones excluidas sin tipo de cambio o sin "
                         "retención verificada (sin datos, no cero). " + note)
@@ -443,5 +541,6 @@ class DividendProjectionService:
                 "sin_datos": sorted(sin_datos),
                 "fx_missing": sorted(set(fx_missing)),
                 "unknown_source_withholding": sorted(set(unknown_country)),
+                "unverified_reasons": dict(sorted(unverified_reasons.items())),
             },
         }

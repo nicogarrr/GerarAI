@@ -68,9 +68,13 @@ describe('proyección de dividendos: ausente no es cero', () => {
     assert.ok(view.includes('sin datos, no cero'), 'la exclusión se explica como ausencia, no como cero');
   });
 
-  it('el método y las condiciones fiscales son accesibles desde la vista', () => {
+  it('el aviso INFERIDO y las condiciones fiscales son accesibles desde la vista', () => {
     const view = source('components/portfolio/PortfolioDividends.tsx');
-    assert.ok(view.includes('projection.method'), 'el método del cálculo es visible');
+    // La vista no pinta un bloque largo de método: la procedencia INFERIDO
+    // y el carácter de escenario van en un aviso breve junto al bruto.
+    assert.ok(view.includes('INFERIDO: réplica de los dividendos de los últimos 12 meses'), 'aviso INFERIDO visible junto al bruto');
+    assert.ok(view.includes('no el neto final'), 'el escenario fiscal se declara como no definitivo junto a las cifras');
+    assert.equal(view.includes('projection.method'), false, 'el párrafo largo de método ya no se pinta');
     assert.ok(view.includes('projection.fiscal_conditions'), 'las condiciones del escenario son visibles');
     assert.ok(view.includes('projection.sources'), 'las fuentes son enlazables');
   });

@@ -38,6 +38,32 @@ const monthLabel = (key: string): string => {
     return new Intl.DateTimeFormat('es-ES', { month: 'short', year: 'numeric' }).format(parsed);
 };
 
+type DividendPosition = PortfolioDividendProjection['positions'][number];
+
+/** Tasa de retención en origen con su país y las condiciones/motivo pegados a la cifra
+ *  (misma pieza en la tabla de escritorio y en la tarjeta móvil). */
+function WithholdingNote({ position }: { position: DividendPosition }) {
+    return (
+        <>
+            {position.source_withholding_rate === null
+                ? 'N/D'
+                : `${(position.source_withholding_rate * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 })}%`}
+            {position.domicile_country ? (
+                <span className="ml-1 text-xs text-gray-500">({position.domicile_country})</span>
+            ) : null}
+            {position.source_withholding_rate !== null && position.withholding_kind === 'techo_convenio' ? (
+                <span className="block text-xs text-gray-500">techo de convenio (escenario); la retención efectiva puede ser mayor</span>
+            ) : null}
+            {position.source_withholding_rate !== null && position.scenario_conditions ? (
+                <span className="block max-w-xs text-xs text-amber-300/80 max-md:max-w-none">{position.scenario_conditions}</span>
+            ) : null}
+            {position.source_withholding_rate === null && position.unverified_reason ? (
+                <span className="block max-w-xs text-xs text-amber-300/80 max-md:max-w-none">{position.unverified_reason}</span>
+            ) : null}
+        </>
+    );
+}
+
 function FiscalYearCard({ year, data, baseCurrency }: { year: string; data: PortfolioDividendProjection['fiscal_by_year'][string]; baseCurrency: string }) {
     const money = (value: number | null) => formatMoney(value, baseCurrency);
     const rows = fiscalCardRows(data);
@@ -133,8 +159,8 @@ export default function PortfolioDividends({ projection, userId }: { projection:
     return (
         <div className="space-y-6">
             {userId ? <div className="flex justify-end"><SyncDividendsButton userId={userId} /></div> : null}
-            {/* Sin badge INFERIDO/INGESTADO: lo inferido no se etiqueta (decisión de producto);
-                la procedencia se explica en «Método y condiciones». */}
+            {/* Sin badge INFERIDO/INGESTADO en cada tarjeta: la procedencia se explica
+                en «Supuestos fiscales y fuentes» y en el aviso junto al bruto. */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                 <span>
                     Proyección a {projection.horizon_months} meses · datos al {formatDate(projection.as_of)}
@@ -150,7 +176,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                             {' '}(de ellos {formatMoney(projection.gross_summary.gross_unverified_base, baseCurrency)} con retención en origen no verificada)
                         </span>
                     ) : null}
-                    . Neto e IRPF: N/D salvo posiciones con retención verificada.
+                    . INFERIDO: réplica de los dividendos de los últimos 12 meses, no pagos confirmados. Neto e IRPF: N/D salvo posiciones con retención verificada; donde hay cifra es un escenario (residencia fiscal ES, W-8BEN vigente para EE. UU., única renta del ahorro) y no el neto final.
                     {projection.coverage.fx_missing.length > 0 ? (
                         <span className="text-amber-400/90">
                             {' '}No incluye: {projection.coverage.fx_missing.length} {projection.coverage.fx_missing.length === 1 ? 'posición' : 'posiciones'} sin tipo de cambio ({projection.coverage.fx_missing.join(', ')}).
@@ -246,7 +272,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                     </Panel>
 
                     <Panel title="Por posición">
-                        <div className="overflow-x-auto" role="region" aria-label="Proyección por posición" tabIndex={0}>
+                        <div className="hidden overflow-x-auto md:block" role="region" aria-label="Proyección por posición" tabIndex={0}>
                             <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="border-b border-gray-800 text-xs uppercase tracking-wide text-gray-500">
@@ -275,12 +301,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                                             <td className="py-2 pr-4">{position.frequency_last_year}</td>
                                             <td className="py-2 pr-4">{formatMoney(position.gross_base, baseCurrency)}</td>
                                             <td className="py-2 pr-4">
-                                                {position.source_withholding_rate === null
-                                                    ? 'N/D'
-                                                    : `${(position.source_withholding_rate * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 })}%`}
-                                                {position.domicile_country ? (
-                                                    <span className="ml-1 text-xs text-gray-500">({position.domicile_country})</span>
-                                                ) : null}
+                                                <WithholdingNote position={position} />
                                             </td>
                                             <td className="py-2">{formatMoney(position.source_withheld_base, baseCurrency)}</td>
                                         </tr>
@@ -288,6 +309,33 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                                 </tbody>
                             </table>
                         </div>
+                        <ul className="space-y-3 md:hidden" aria-label="Proyección por posición (tarjetas)">
+                            {projection.positions.map((position) => (
+                                <li className="rounded-lg border border-gray-800 p-3 text-sm text-gray-300" key={position.ticker}>
+                                    <div className="flex items-baseline justify-between gap-3">
+                                        <Link
+                                            href={`/research/${encodeURIComponent(position.ticker)}`}
+                                            className="font-medium text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+                                        >
+                                            {position.ticker}
+                                        </Link>
+                                        <span className="text-xs text-gray-500">
+                                            {formatPositionQuantity(position.quantity)} títulos · pagos 12 m: {position.frequency_last_year}
+                                        </span>
+                                    </div>
+                                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                                        <dt className="text-xs text-gray-500">Bruto ({baseCurrency})</dt>
+                                        <dd className="text-right">{formatMoney(position.gross_base, baseCurrency)}</dd>
+                                        <dt className="text-xs text-gray-500">Retenido ({baseCurrency})</dt>
+                                        <dd className="text-right">{formatMoney(position.source_withheld_base, baseCurrency)}</dd>
+                                    </dl>
+                                    <div className="mt-2 border-t border-gray-900 pt-2">
+                                        <span className="text-xs text-gray-500">Retención origen: </span>
+                                        <WithholdingNote position={position} />
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
                     </Panel>
 
                     {projection.declared_future.length > 0 ? (
@@ -303,6 +351,15 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                         {coverageLists.map((entry) => (
                             <li key={entry.label}>
                                 {entry.label}: <TickerList tickers={entry.tickers} className="font-medium text-amber-300 underline-offset-2 hover:text-amber-200 hover:underline" />
+                                {entry.label === 'Retención de origen sin verificar' && projection.coverage.unverified_reasons ? (
+                                    <ul className="ml-4 mt-1 list-disc space-y-0.5 text-xs text-amber-100/70">
+                                        {entry.tickers.map((ticker) => (
+                                            <li key={ticker}>
+                                                {ticker}: {projection.coverage.unverified_reasons?.[ticker] ?? 'retención no verificada'}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : null}
                             </li>
                         ))}
                     </ul>
@@ -310,8 +367,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
             ) : null}
 
             <details className="rounded-lg border border-gray-800 p-3 text-xs text-gray-500">
-                <summary className="cursor-pointer select-none text-gray-400">Método y condiciones</summary>
-                <p className="mt-2 leading-5">{projection.method}</p>
+                <summary className="cursor-pointer select-none text-gray-400">Supuestos fiscales y fuentes</summary>
                 <ul className="mt-2 list-disc space-y-1 pl-5 leading-5">
                     {projection.fiscal_conditions.map((condition) => (
                         <li key={condition}>{condition}</li>
