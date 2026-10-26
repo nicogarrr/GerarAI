@@ -70,8 +70,8 @@ describe('proyección de dividendos: ausente no es cero', () => {
 
   it('el aviso INFERIDO y las condiciones fiscales son accesibles desde la vista', () => {
     const view = source('components/portfolio/PortfolioDividends.tsx');
-    // Decisión de Nico (26 oct 2026): sin bloque largo de método. La procedencia
-    // INFERIDO y el carácter de escenario van en un aviso breve junto al bruto.
+    // La vista no pinta un bloque largo de método: la procedencia INFERIDO
+    // y el carácter de escenario van en un aviso breve junto al bruto.
     assert.ok(view.includes('INFERIDO: réplica de los dividendos de los últimos 12 meses'), 'aviso INFERIDO visible junto al bruto');
     assert.ok(view.includes('no el neto final'), 'el escenario fiscal se declara como no definitivo junto a las cifras');
     assert.equal(view.includes('projection.method'), false, 'el párrafo largo de método ya no se pinta');
