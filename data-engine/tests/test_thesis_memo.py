@@ -348,3 +348,35 @@ def test_fraction_row_to_percent_is_exact_and_conservative():
     assert "| -5 % | porcentaje |" in f(row("-0,05"))
     assert f(row("1")) == row("1")
     assert f(row("0,23", "ratio")) == row("0,23", "ratio")
+
+
+def test_memo_money_uses_listing_currency_never_bare_dollar(db):
+    """Una acción en EUR no puede exportarse con «$»: la cifra sería inventada.
+
+    Regresión: el memo de SAN.MC (EUR) mostraba «Precio actual: $3.58» mientras
+    la ficha formatea con CompanyOut.currency. El memo usa la divisa del
+    listado, como la ficha (thesisMoney).
+    """
+    company = Company(
+        ticker="SAN.MC", name="Banco Santander", exchange="BME", currency="EUR",
+        sector="Finanzas", industry="Banca", company_type="bank",
+        valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    thesis = ThesisVersion(
+        company_id=company.id, version=1, status="published", rating="hold",
+        thesis_markdown="# t", executive_summary="Resumen.", hypothesis="Hipótesis.",
+        current_price=3.58, bear_value=2.9, base_value=3.6, bull_value=4.3,
+        expected_value=3.62, margin_of_safety=0.011,
+        scenario_probabilities={"bear": 0.2, "base": 0.6, "bull": 0.2},
+        catalysts=[], invalidation_criteria=[],
+    )
+    db.add(thesis)
+    db.commit()
+    memo = build_memo_markdown(db, company, thesis)
+
+    assert "| Bajista | 2,90 EUR | 20 % |" in memo
+    assert "| Base | 3,60 EUR | 60 % |" in memo
+    assert "Precio actual: 3,58 EUR · Valor esperado: 3,62 EUR · Margen de seguridad: 1,1 %" in memo
+    assert "$" not in memo
