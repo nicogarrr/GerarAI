@@ -7,7 +7,7 @@ append-only se garantiza en el ORM (eventos before_update/before_delete y DML
 masivo), no con triggers de base de datos.
 
 Adopcion no destructiva: en prod la tabla puede existir ya (el arranque del
-backend ejecuta `Base.metadata.create_all` en `init_db`, que crea las tablas
+backend ejecuta `create_all` del ORM en `init_db`, que crea las tablas
 del ORM aunque Alembic no haya llegado a esta revision). Si la tabla existe:
 
 - se valida el esquema completo reflejado (las 16 columnas con tipo y

@@ -4,7 +4,7 @@ Aditiva y reversible. No guarda email ni contenido: solo tipo de evento,
 identificadores externos y un detalle agregado.
 
 Misma situacion que 0079_fact_anchors: el arranque del backend ejecuta
-`Base.metadata.create_all` en `init_db`, asi que la tabla puede existir ya
+`create_all` del ORM en `init_db`, asi que la tabla puede existir ya
 en prod antes de que Alembic llegue a esta revision. Si existe, se valida el
 esquema completo contra la definicion congelada de esta migracion (columnas
 con tipo y nullability, PK, ausencia de FK/unique); cualquier divergencia
