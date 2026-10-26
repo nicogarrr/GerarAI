@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.entities import CalendarFeedToken
+from app.models.entities import CalendarFeedToken, Tenant
 from app.services.earnings_dates_service import followed_calendar
 
 SCOPES = ("followed", "watchlist")
@@ -154,6 +154,11 @@ def feed_for_token(db: Session, token: str, *, today: date | None = None) -> str
     row = db.scalar(select(CalendarFeedToken).where(CalendarFeedToken.token_hash == digest))
     # Comparacion en tiempo constante del hash (defensa en profundidad).
     if row is None or not hmac.compare_digest(row.token_hash, digest) or row.revoked_at is not None:
+        return None
+    # Public bearer feeds must enforce the same account status gate as get_db.
+    # Deny missing owners too, before recording use or loading any tenant data.
+    tenant = db.get(Tenant, row.tenant_id)
+    if tenant is None or tenant.status != "active":
         return None
     row.last_used_at = datetime.now(UTC)
     tenant_id, scope = row.tenant_id, row.scope
