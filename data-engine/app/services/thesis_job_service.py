@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import desc, select, text
+from sqlalchemy import and_, desc, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -216,27 +216,89 @@ def dispatch_generation(db: Session, run: WorkflowRun) -> bool:
     return True
 
 
+def _redeliver_interrupted(db: Session, run: WorkflowRun) -> bool:
+    """Re-envia el mensaje del actor para un run cuya unica entrega murio.
+
+    No reescribe status: run_thesis_job reclama el lease expirado (running ->
+    retrying con attempt+1) o continua el reintento perdido (retrying), y sus
+    guards de lease fresco/terminal descartan cualquier copia que choque con
+    un worker sano, asi que una re-entrega nunca duplica la generacion.
+    Tras un envio exitoso se sella la entrega (recovery_sent_at, que tambien
+    renueva updated_at) para que el tick siguiente del reconciler no
+    multiplique despachos; si esta entrega tambien se pierde, el run vuelve
+    a ser elegible pasado DISPATCH_RECHECK.
+    """
+    db.refresh(run, with_for_update=True)
+    now = datetime.now(UTC)
+    still_interrupted = run.status == "retrying" or (
+        run.status == "running"
+        and (run.started_at is None or _utc(run.started_at) < now - RUNNING_LEASE)
+    )
+    if not still_interrupted:
+        return True
+    try:
+        _dispatch_run(run)
+    except Exception:
+        return False
+    payload = dict(run.input_payload or {})
+    payload["recovery_sent_at"] = now.isoformat()
+    run.input_payload = payload
+    db.commit()
+    return True
+
+
 def reconcile_thesis_dispatches() -> dict:
     """Recover the durable outbox without a browser or another user POST.
 
     Queued rows are re-delivered after five minutes, including publish/commit
-    gaps and lost Redis messages. Running jobs are never restarted here.
-    Dramatiq handles worker retries; the running/terminal guard handles replay.
+    gaps and lost Redis messages. Runs whose only delivery was interrupted
+    (worker muerto a mitad de la generacion: status "running" con el lease
+    ya expirado; o "retrying" cuyo reintento de dramatiq se perdio con la
+    cola) get ONE fresh actor message through _redeliver_interrupted: the
+    worker-side lease/attempt guards own every status change, so a healthy
+    active run is never restarted and a terminal one never replays.
     """
     stats = {"redispatched": 0, "dispatch_failed": 0}
     with SessionLocal() as db:
+        now = datetime.now(UTC)
         runs = db.scalars(
             select(WorkflowRun)
             .where(
                 WorkflowRun.workflow_name == WORKFLOW_NAME,
                 WorkflowRun.status.in_(("queued", "dispatch_failed")),
-                WorkflowRun.updated_at < datetime.now(UTC) - DISPATCH_RECHECK,
+                WorkflowRun.updated_at < now - DISPATCH_RECHECK,
             )
             .order_by(WorkflowRun.id)
             .limit(100)
         ).all()
         for run in runs:
             success = dispatch_generation(db, run)
+            stats["redispatched" if success else "dispatch_failed"] += 1
+        # updated_at < DISPATCH_RECHECK en ambas ramas: tras una re-entrega
+        # sellada (o un worker que ya reclamo el run) el tick de 1 min no
+        # multiplica despachos; un run sano en "running" tiene started_at
+        # fresco y jamas entra aqui.
+        interrupted = db.scalars(
+            select(WorkflowRun)
+            .where(
+                WorkflowRun.workflow_name == WORKFLOW_NAME,
+                WorkflowRun.updated_at < now - DISPATCH_RECHECK,
+                or_(
+                    WorkflowRun.status == "retrying",
+                    and_(
+                        WorkflowRun.status == "running",
+                        or_(
+                            WorkflowRun.started_at.is_(None),
+                            WorkflowRun.started_at < now - RUNNING_LEASE,
+                        ),
+                    ),
+                ),
+            )
+            .order_by(WorkflowRun.id)
+            .limit(100)
+        ).all()
+        for run in interrupted:
+            success = _redeliver_interrupted(db, run)
             stats["redispatched" if success else "dispatch_failed"] += 1
     return stats
 
@@ -323,6 +385,19 @@ def run_thesis_job(run_id: int) -> None:
             started = _utc(run.started_at)
             if started is not None and now - started < RUNNING_LEASE:
                 return
+            # Lease expirado: el worker anterior murio a mitad del intento.
+            # Cada recuperacion consume un intento; sin tope, un ticker que
+            # tumba al worker (p. ej. OOM) re-botaria cada 6 h para siempre
+            # en vez de quedar en un fallo terminal honesto.
+            if int(run.attempt or 1) >= MAX_ATTEMPTS:
+                run.status = "failed"
+                run.error_class = "RecoverableRunningState"
+                run.error_message = (
+                    "Thesis generation failed after repeated interrupted deliveries"
+                )
+                run.finished_at = now
+                db.commit()
+                return
             run.status = "retrying"
             run.error_class = "RecoverableRunningState"
             run.error_message = "A previous worker lease expired; retrying"
@@ -365,7 +440,11 @@ def run_thesis_job(run_id: int) -> None:
         payload["attempt"] = run.attempt
         run.input_payload = payload
         run.status = "running"
-        run.started_at = run.started_at or now
+        # Cada intento arranca con su propio started_at: conservar el del
+        # intento muerto dejaba el lease YA expirado, y cualquier entrega
+        # duplicada (o la re-entrega del reconciler) re-disparaba la
+        # recuperacion a mitad de la generacion en curso.
+        run.started_at = now
         run.finished_at = None
         if tenant is not None:
             db.info["tenant_id"] = tenant.id
