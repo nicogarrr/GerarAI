@@ -399,7 +399,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                                                 <div className="search-item-name line-clamp-2 break-words" title={formatCompanyName(stock.name)}>{formatCompanyName(stock.name)}</div>
                                                 <div className="text-sm text-gray-500">{stock.symbol} | {stock.exchange} | {etiquetaTipoInstrumento(stock.type)}</div>
                                                 {stock.fichaCoverage === 'unknown' ? (
-                                                    <div className="mt-0.5 text-xs text-gray-600">Cobertura de ficha no comprobada</div>
+                                                    <div className="mt-0.5 text-xs text-gray-500">Cobertura de ficha no comprobada</div>
                                                 ) : null}
                                             </div>
                                         </CommandItem>
