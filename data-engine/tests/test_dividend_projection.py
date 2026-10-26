@@ -479,6 +479,16 @@ def test_baba_cayman_issuer_is_zero_scenario_with_visible_conditions(db):
     assert out["coverage"]["unknown_source_withholding"] == []
 
 
+def test_fiscal_conditions_do_not_contradict_the_ky_zero_scenario(db):
+    _setup_payer(db, "BABA", "HK")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    joined = " ".join(out["fiscal_conditions"])
+    assert "neto queda N/D" not in joined and "no se asume 0 %" not in joined
+    assert "Item 10.E" in joined and "NO es la retención efectiva del broker" in joined
+
+
 def test_non_baba_positions_have_no_scenario_conditions(db):
     _setup_payer(db, "BN", "CA")
 

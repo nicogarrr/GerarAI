@@ -110,7 +110,7 @@ _VERIFIED_PAYERS: dict[str, dict[str, str]] = {
         "source": "sec_baba_20f",
         "reason_if_unrated": (
             "Emisor constituido en Islas Caimán (ADS en NYSE; la sede en Hong Kong es la que "
-            "figura como domicilio en la base de datos). Sin retención verificada. No se asume 0 %."
+            "figura como domicilio en la base de datos). Sin tipo de retención verificado."
         ),
     },
 }
@@ -148,7 +148,7 @@ _FISCAL_CONDITIONS = [
     "Escala del ahorro de la Renta 2025 aplicada a años futuros (hipótesis, sujeta a cambio legislativo).",
     "La retención ES del 19 % es pago a cuenta, no impuesto extranjero ni deducción por doble imposición.",
     "Canadá (p. ej. BN): se usa el techo del convenio ES-CA (15 %) como escenario; Canadá retiene 25 % si el broker no aplica el convenio (CRA, Part XIII), y la retención efectiva no está verificada.",
-    "Emisor en Islas Caimán (p. ej. BABA): retención en origen sin verificar para titulares de ADS; se muestra el bruto y el neto queda N/D (no se asume 0 %).",
+    "Emisor en Islas Caimán (p. ej. BABA): escenario 0 % = solo ley de Caimán (20-F Item 10.E); NO es la retención efectiva del broker y no cubre una posible retención china (20 % IIT condicional, convenio incierto para ADS). Las condiciones se muestran junto al importe.",
     "Emisor verificado por ticker (BN: Ontario; BABA: Islas Caimán). Domicilio de la base de datos o mercado de cotización no determinan la retención.",
     "Domicilios sin tipo verificado (p.ej. GB: HMRC IFM28125 distingue categorías) salen como sin datos.",
 ]
