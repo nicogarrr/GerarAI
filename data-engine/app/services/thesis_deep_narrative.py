@@ -215,6 +215,32 @@ def _allowed_numbers(facts: list[dict]) -> set[str]:
     return allowed
 
 
+def _fact_id(n: int) -> str:
+    """Identificador de hecho SIN dígitos: fA, fB, ..., fZ, fAA, ...
+
+    El id viaja al prompt y el modelo lo copia a veces en la prosa; con
+    dígitos («f15») esa copia caía en cifra_no_anclada. Con letras no hay
+    token numérico que copiar y la validación no cambia.
+    """
+    letters = ""
+    while n > 0:
+        n, rem = divmod(n - 1, 26)
+        letters = chr(ord("A") + rem) + letters
+    return "f" + letters
+
+
+def _visible_fuente(fuente: str) -> str:
+    """Localizador visible para el modelo: NUNCA con URL/host.
+
+    El localizador real (con URL) lo conserva el código para las citas que
+    inserta; el modelo no necesita ver dominios y, si los ve, los copia a la
+    prosa (rechazo url_detectada medido 2026-10-26, host del paquete).
+    """
+    if _URL_RE.search(fuente):
+        return "Fuente verificada por el código (el localizador completo lo inserta la capa de citas)."
+    return fuente
+
+
 def fact_pack(
     company: Company,
     valuation: dict,
@@ -233,7 +259,7 @@ def fact_pack(
     facts: list[dict] = []
 
     def add(texto: str, fuente: str) -> None:
-        facts.append({"id": f"f{len(facts) + 1}", "texto": texto, "fuente": fuente})
+        facts.append({"id": _fact_id(len(facts) + 1), "texto": texto, "fuente": fuente})
 
     currency = company.currency or "USD"
     status = valuation.get("status")
@@ -424,9 +450,13 @@ _SYSTEM = (
     "periodo), qué supuestos la sostienen y de qué fuente sale. Copia las "
     "cifras EXACTAMENTE como aparecen en el hecho: no inventes, redondees, "
     "conviertas ni derives ninguna (ni porcentajes de cambio que no vengan "
-    "en un hecho), y no escribas ninguna URL. Escribe en TEXTO PLANO: sin "
-    "markdown (sin negritas con asteriscos, sin encabezados con #), sin "
-    "etiquetas HTML y sin bloques de codigo. No es una recomendación: "
+    "en un hecho), y no escribas ninguna URL ni dominio ni host: las fuentes "
+    "las cita el código fuera de tu texto. Los hechos se referencian SOLO "
+    "en el array fact_ids de cada sección: en la prosa no escribas "
+    "identificadores de hecho ni números de hecho; toda cifra de la prosa "
+    "debe aparecer literalmente en el texto de un hecho. Escribe en TEXTO "
+    "PLANO: sin markdown (sin negritas con asteriscos, sin encabezados con "
+    "#), sin etiquetas HTML y sin bloques de codigo. No es una recomendación: "
     "la valoración es provisional y explicativa; nunca uses lenguaje de "
     "veredicto (comprar, vender, recomendamos). La sección lo_que_no_sabemos "
     "es obligatoria y debe nombrar los huecos concretos (inputs ausentes, "
@@ -441,7 +471,11 @@ _SYSTEM = (
 
 
 def _build_request(facts: list[dict], extra_note: str | None = None) -> LLMRequest:
-    user: dict = {"hechos": facts}
+    visible = [
+        {"id": fact["id"], "texto": fact["texto"], "fuente": _visible_fuente(fact["fuente"])}
+        for fact in facts
+    ]
+    user: dict = {"hechos": visible}
     if extra_note:
         user["nota"] = extra_note
     return LLMRequest(
