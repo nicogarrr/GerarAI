@@ -533,3 +533,34 @@ def test_uncertain_yahoo_event_is_not_sin_datos_and_not_projected(db):
     assert out["gross_summary"]["excluded_uncertain_dividends"] == ["UNC"]
     assert out["gross_summary"]["complete"] is False
     assert out["positions"] == []
+
+
+def test_partial_total_when_one_position_uncertain_and_another_has_data(db):
+    from datetime import datetime
+
+    from app.models.entities import DividendRecord
+
+    good = _company(db, ticker="GOOD")
+    _position(db, good)
+    unc = _company(db, ticker="UNC")
+    position = Position(
+        portfolio_id=1, company_id=unc.id, quantity=Decimal("10"), average_cost=Decimal("150"),
+        market_price=Decimal("200"), market_value=Decimal("2000"), currency="USD",
+    )
+    db.add(position)
+    _fx(db)
+    today = date.today()
+    for q in (30, 120, 210, 300):
+        db.add(DividendRecord(company_id=good.id, ex_date=today - timedelta(days=q), amount=Decimal("0.5"), currency="USD", source="fmp"))
+    ex = today - timedelta(days=30)
+    for amount, fetched in (("0.2", datetime(2026, 1, 1)), ("0.8", datetime(2026, 9, 1))):
+        db.add(DividendRecord(company_id=unc.id, ex_date=ex, amount=Decimal(amount), currency="USD", source="yahoo_finance", fetched_at=fetched))
+    db.commit()
+
+    out = DividendProjectionService().project(db, months=12)
+
+    assert out["gross_summary"]["gross_total_base"] > 0
+    assert out["gross_summary"]["complete"] is False
+    assert out["gross_summary"]["excluded_uncertain_dividends"] == ["UNC"]
+    assert out["coverage"]["uncertain_dividends"] == ["UNC"] and out["coverage"]["sin_datos"] == []
+    assert [p["ticker"] for p in out["positions"]] == ["GOOD"]

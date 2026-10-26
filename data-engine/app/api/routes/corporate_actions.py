@@ -95,6 +95,7 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
                 "description": (
                     f"Dividendo de {record.amount.normalize():f} {record.currency} por acción"
                     f"{pay} · fuente {_source_label(record.source)}"
+                    f"{' (importe ajustado por splits)' if record.source == 'yahoo_finance' else ''}"
                 ),
                 "applied": None,
                 "applied_at": None,
@@ -117,8 +118,7 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
                 "effective_date": event.ex_date.isoformat(),
                 "ratio": None,
                 "description": (
-                    f"Dato incierto: importes distintos del proveedor ({amounts} {event.currency}) "
-                    "para la misma fecha ex; no se identifica si es un pago extra o un ajuste de split, no se muestra como declarado"
+                    f"Importe incierto: {amounts} {event.currency} en la misma fecha ex"
                 ),
                 "applied": None,
                 "applied_at": None,

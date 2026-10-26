@@ -98,4 +98,4 @@ def test_brain_year_total_excludes_uncertain_instead_of_picking_one(db):
     _row(db, company, ex, "0.77", "yahoo_finance", datetime(2026, 1, 1))
     _row(db, company, ex, "0.1925", "yahoo_finance", datetime(2026, 9, 1))
     answer = _dividend_answer(db, "cuanto voy a cobrar de mi cartera", tenant=1)
-    assert "dato incierto" in answer.answer and company.ticker in answer.answer
+    assert "incierto" in answer.answer and company.ticker in answer.answer
