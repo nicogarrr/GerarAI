@@ -43,11 +43,13 @@ def build_client():
     # import diferido para no penalizar arranque sin key
     from app.llm.jev import JevDecisionClient
 
-    return JevDecisionClient(
+    client = JevDecisionClient(
         api_key=settings.typesafe_api_key,
         base_url=settings.typesafe_base_url,
         default_model=settings.typesafe_model,
     )
+    client.guard_required = bool(settings.llm_run_guard_required)
+    return client
 
 
 CRITERIA = {

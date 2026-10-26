@@ -15,6 +15,7 @@ bloquear el loop en curso seria peor que el bug original.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import threading
 from collections.abc import Coroutine
 from concurrent.futures import ThreadPoolExecutor
@@ -62,7 +63,8 @@ def run_from_any_context(coro: Coroutine[Any, Any, T], timeout: float | None = N
             "run_from_any_context no puede anidarse desde un hilo puente: "
             "usa 'await' dentro de la cadena async o run_in_threadpool"
         )
-    future = _BRIDGE.submit(_run_in_bridge, coro)
+    # Propaga contextvars (p.ej. el guard LLM por corrida) al hilo puente.
+    future = _BRIDGE.submit(contextvars.copy_context().run, _run_in_bridge, coro)
     return future.result(
         timeout=timeout if timeout is not None else LOOP_WAIT_TIMEOUT_SECONDS
     )

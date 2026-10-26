@@ -360,6 +360,9 @@ class Settings(BaseSettings):
     # bridge global presentado como Go. Envs: THESIS_GO_ENABLED,
     # THESIS_GO_BASE_URL, THESIS_GO_API_KEY, THESIS_GO_MODEL.
     thesis_go_enabled: bool = False
+    #: Fail-closed: los providers Go no envian ninguna peticion sin un guard
+    #: de corrida activo (app/llm/run_guard.py). Defecto False = sin cambio.
+    llm_run_guard_required: bool = False
     thesis_go_base_url: str = "https://opencode.ai/zen/go/v1"
     thesis_go_api_key: str | None = Field(default=None, repr=False)
     thesis_go_model: str = "deepseek-v4.1-flash"

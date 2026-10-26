@@ -201,3 +201,119 @@ def test_redis_store_passes_atomic_script_args_and_denies_on_zero():
     assert RedisCounterStore(ok).reserve("r", posts=1, tokens=100, max_posts=8, max_tokens=22400)
     assert ok.args[2:] == ("llmguard:r", 1, 100, 8, 22400, 7 * 24 * 3600)
     assert not RedisCounterStore(Fake(0)).reserve("r", posts=1, tokens=100, max_posts=8, max_tokens=22400)
+
+
+# --- cableado: Jev, guard_required, hilos puente, TTL fijo ---
+
+def test_guard_required_blocks_go_provider_without_active_guard():
+    net = _Net()
+
+    async def scenario():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(net.handler)) as client:
+            provider = create_llm_provider(
+                Settings(
+                    _env_file=None,
+                    opencode_go_api_key="k",
+                    opencode_go_base_url=URL,
+                    opencode_go_model=MODEL,
+                    llm_run_guard_required=True,
+                ),
+                client=client,
+            )
+            return await provider.complete(
+                LLMRequest(messages=[Message("user", "x")], task="cheap_extraction", max_tokens=100)
+            )
+
+    with pytest.raises(LLMGuardAbort) as err:
+        asyncio.run(scenario())
+    assert err.value.reason == "guard_required_but_inactive"
+    assert net.calls == 0
+
+
+def test_jev_post_is_blocked_by_active_guard_and_when_required_without_guard():
+    from app.llm.jev import JevDecisionClient
+
+    net = _Net()
+
+    async def call(required):
+        async with httpx.AsyncClient(transport=httpx.MockTransport(net.handler)) as client:
+            jev = JevDecisionClient("k", client=client)
+            jev.guard_required = required
+            return await jev.systemone({"message": "x"}, {"q": {"type": "choice"}})
+
+    with activate(_guard(InMemoryCounterStore())):
+        with pytest.raises(LLMGuardAbort) as e1:
+            asyncio.run(call(False))
+    with pytest.raises(LLMGuardAbort) as e2:
+        asyncio.run(call(True))
+    assert e1.value.reason == "destination_not_allowed"
+    assert e2.value.reason == "guard_required_but_inactive"
+    assert net.calls == 0
+
+
+def test_guard_reaches_bridge_thread_via_run_from_any_context():
+    from app.services.async_bridge import run_from_any_context
+
+    net = _Net()
+    store = InMemoryCounterStore()
+
+    async def inner():
+        # Con loop activo en este hilo, run_from_any_context usa el hilo puente.
+        async def probe():
+            return current_guard() is not None
+
+        return run_from_any_context(probe())
+
+    with activate(_guard(store)):
+        assert asyncio.run(inner()) is True
+    assert net.calls == 0
+
+
+def test_redis_script_sets_ttl_once_not_sliding():
+    from app.llm import run_guard
+
+    assert "TTL" in run_guard._RESERVE_LUA
+    assert run_guard._RESERVE_LUA.count("EXPIRE") == 1
+    assert "< 0" in run_guard._RESERVE_LUA
+
+
+def _jev_call(net, store, *, max_posts, retries=2):
+    from app.llm.jev import JevDecisionClient
+
+    async def call():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(net.handler)) as client:
+            jev = JevDecisionClient(
+                "k", base_url=f"https://{HOST}", client=client, max_retries=retries
+            )
+            return await jev.systemone({"message": "x"}, {"q": {"type": "choice"}})
+
+    with activate(_guard(store, max_posts=max_posts)):
+        return asyncio.run(call())
+
+
+def test_jev_allowlisted_host_consumes_one_post_per_attempt_and_respects_cap():
+    store = InMemoryCounterStore()
+    net = _Net()
+    _jev_call(net, store, max_posts=3)
+    assert net.calls == 1
+    assert store.state["run-1"] == (1, 0)  # tokens de salida: 0, no se inventa coste
+
+
+def test_jev_retries_count_against_post_cap_and_deny_without_network():
+    store = InMemoryCounterStore()
+    net = _Net(statuses=(500,))
+    with pytest.raises(LLMGuardAbort) as err:
+        _jev_call(net, store, max_posts=2, retries=5)
+    assert err.value.reason == "run_budget_exhausted"
+    assert net.calls == 2  # el 3er intento se corta antes de la red
+    assert store.state["run-1"] == (2, 0)
+
+
+def test_jev_allowlisted_cap_exhausted_from_other_providers_blocks_jev():
+    store = InMemoryCounterStore()
+    store.state["run-1"] = (3, 0)
+    net = _Net()
+    with pytest.raises(LLMGuardAbort) as err:
+        _jev_call(net, store, max_posts=3)
+    assert err.value.reason == "run_budget_exhausted"
+    assert net.calls == 0

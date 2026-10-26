@@ -143,7 +143,7 @@ def _opencode_go(
         # operador elige un free (bridge), se fijan todas las rutas a ese
         # modelo para que ninguna llamada acabe pidiendo el Go al bridge.
         overrides = {**_pin_routes_to_model(settings.opencode_go_model), **overrides}
-    return OpenAICompatibleProvider(
+    provider = OpenAICompatibleProvider(
         api_key=settings.opencode_go_api_key,
         base_url=settings.opencode_go_base_url,
         default_model=settings.opencode_go_model,
@@ -193,6 +193,9 @@ def _opencode_go(
         hidden_reasoning_min_tokens=settings.llm_hidden_reasoning_min_tokens,
         max_output_tokens=settings.llm_max_output_tokens,
     )
+    # Fail-closed opcional: sin guard de corrida activo no sale ningun POST.
+    provider.guard_required = bool(settings.llm_run_guard_required)
+    return provider
 
 
 create_provider = create_llm_provider
