@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Company, DividendRecord, Position, WatchItem
-from app.services.dividend_records import collapse_yahoo_readjusted
+from app.services.dividend_records import resolve_yahoo_events, split_ratios_for
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.split_ingestion_service import ProviderIngestionService
 
@@ -219,13 +219,14 @@ class DividendIngestionService(ProviderIngestionService):
         total_value = 0.0
         missing_base_value: list[str] = []
         for position, company in rows:
-            records = collapse_yahoo_readjusted(
+            records, uncertain = resolve_yahoo_events(
                 db.scalars(
                     select(DividendRecord).where(
                         DividendRecord.company_id == company.id,
                         DividendRecord.ex_date >= cutoff,
                     )
-                ).all()
+                ).all(),
+                split_ratios_for(db, [company.id]),
             )
             price = float(position.market_price or 0)
             # Peso solo en divisa base: `market_value` esta en la divisa nativa
@@ -242,7 +243,9 @@ class DividendIngestionService(ProviderIngestionService):
             # Gate on the records actually USED, not on every record: with all
             # of them skipped for currency mismatch ttm is 0 and the old guard
             # published a 0.0% yield that looks like a verified fact.
-            dividend_yield = (ttm / price) if price > 0 and matching_currency else None
+            # Evento Yahoo con importes distintos sin evidencia de split: el
+            # total seria incierto -> sin yield (no se elige uno por defecto).
+            dividend_yield = (ttm / price) if price > 0 and matching_currency and not uncertain else None
             if matching_currency:
                 with_data += 1
                 if dividend_yield is not None and value is not None and value > 0:
@@ -251,7 +254,11 @@ class DividendIngestionService(ProviderIngestionService):
             positions.append(
                 {
                     "ticker": company.ticker,
-                    "ttm_dividend_per_share": ttm if matching_currency else None,
+                    "ttm_dividend_per_share": ttm if matching_currency and not uncertain else None,
+                    "uncertain_dividend_events": [
+                        {"ex_date": u.ex_date.isoformat(), "amounts": [str(a) for a in u.amounts]}
+                        for u in uncertain
+                    ],
                     "currency": position.currency,
                     "price": price or None,
                     "dividend_yield": dividend_yield,

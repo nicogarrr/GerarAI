@@ -54,7 +54,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, DividendRecord, Position
-from app.services.dividend_records import collapse_yahoo_readjusted
+from app.services.dividend_records import resolve_yahoo_events, split_ratios_for
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.tax_irpf_filing import calculate_savings_tax
 
@@ -198,13 +198,15 @@ class DividendProjectionService:
             ).all()
         )
         company_ids = [company.id for _, company in rows]
-        all_records = collapse_yahoo_readjusted(
+        all_records, uncertain_events = resolve_yahoo_events(
             db.scalars(
                 select(DividendRecord).where(DividendRecord.company_id.in_(company_ids))
             ).all()
             if company_ids
-            else []
+            else [],
+            split_ratios_for(db, company_ids),
         )
+        uncertain_by_company = {event.company_id for event in uncertain_events}
         records_by_company: dict[int, list[DividendRecord]] = defaultdict(list)
         for record in all_records:
             records_by_company[record.company_id].append(record)
@@ -260,7 +262,16 @@ class DividendProjectionService:
                                 "(no verificado contra fuente primaria); no alimenta la réplica.",
                     }
                 )
-            if not trailing:
+            if not trailing or (
+                company.id in uncertain_by_company
+                and any(
+                    cutoff < e.ex_date <= today
+                    for e in uncertain_events
+                    if e.company_id == company.id
+                )
+            ):
+                # Sin datos, o con evento Yahoo de importes distintos sin
+                # evidencia de split: no se proyecta (dato incierto).
                 sin_datos.append(company.ticker)
                 continue
 
