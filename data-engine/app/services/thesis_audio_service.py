@@ -19,6 +19,13 @@ MAX_CHARS = 60000
 _LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _FENCE = re.compile(r"```.*?```", re.S)
 
+# Aviso legal hablado: el memo lo cierra siempre y el audio no puede perderlo
+# por el corte de MAX_CHARS.
+_DISCLAIMER_SPOKEN = (
+    "Documento informativo de investigación. "
+    "No es asesoramiento financiero ni recomendación de compra o venta."
+)
+
 
 def memo_to_speech_text(markdown: str, *, ticker: str, version: int) -> str:
     """Markdown del memo -> parrafos hablables (sin sintaxis ni tablas)."""
@@ -36,10 +43,22 @@ def memo_to_speech_text(markdown: str, *, ticker: str, version: int) -> str:
         if len(line) >= 2:
             lines.append(line)
     head = f"Tesis de {ticker.upper()}, versión {version}."
-    return ("\n".join([head, *lines]))[:MAX_CHARS]
+    text = "\n".join([head, *lines])
+    if len(text) <= MAX_CHARS:
+        return text
+    # Corte en borde de palabra (no a media palabra) y el aviso legal siempre
+    # al final: un audio truncado sin él leería la tesis sin la advertencia.
+    cut = text[: MAX_CHARS - len(_DISCLAIMER_SPOKEN) - 1]
+    last_space = cut.rfind(" ")
+    if last_space > 0:
+        cut = cut[:last_space]
+    cut = cut.rstrip()
+    if "Documento informativo de investigación" in cut:
+        return cut
+    return f"{cut} {_DISCLAIMER_SPOKEN}"
 
 
-_FORMAT = "f2"  # subir al cambiar memo_to_speech_text para invalidar la cache
+_FORMAT = "f3"  # subir al cambiar memo_to_speech_text para invalidar la cache
 
 
 def audio_key(

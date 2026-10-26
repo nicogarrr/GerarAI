@@ -227,3 +227,27 @@ def test_audio_post_does_not_requeue_while_pending(monkeypatch):
         route.thesis_audio_service, "start", lambda k, t: (_ for _ in ()).throw(AssertionError("requeued"))
     )
     assert route.thesis_audio_generate("EXEL", None, None) == {"state": "pending", "key": "K"}
+
+
+def test_memo_to_speech_text_truncado_conserva_aviso_legal_y_palabras():
+    """Un memo > MAX_CHARS no puede leerse sin el aviso legal ni cortar a media palabra.
+
+    Regresión: el corte fijo [:MAX_CHARS] soltaba la síntesis a media palabra
+    y se tragaba el «NO es asesoramiento financiero» final del memo.
+    """
+    body = "\n".join(f"## Sección {i}\n\n" + ("Análisis extenso con cifras y matices. " * 40) for i in range(60))
+    md = body + "\n---\nDocumento informativo de investigación. NO es asesoramiento financiero ni recomendación de compra o venta.\n"
+    text = svc.memo_to_speech_text(md, ticker="SAN", version=3)
+
+    assert len(text) <= svc.MAX_CHARS
+    assert text.endswith("No es asesoramiento financiero ni recomendación de compra o venta.")
+    # Corte en borde de palabra: lo anterior al aviso acaba en palabra COMPLETA
+    # del fixture (nunca un fragmento como «Aná» o «matic»).
+    cuerpo = text[: -len(svc._DISCLAIMER_SPOKEN)].rstrip()
+    assert cuerpo.split()[-1] in ["Análisis", "extenso", "con", "cifras", "y", "matices."]
+
+
+def test_memo_to_speech_text_corto_no_duplica_aviso():
+    md = "**Resumen** breve.\n"
+    text = svc.memo_to_speech_text(md, ticker="SAN", version=3)
+    assert text.count("Documento informativo") == 0
