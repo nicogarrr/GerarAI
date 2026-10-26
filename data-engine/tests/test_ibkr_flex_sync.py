@@ -156,7 +156,7 @@ def _seeded(source: str = "ibkr_flex"):
     service = IBKRImportService()
     old = (
         '<OpenPosition symbol="NVDA" position="4" markPrice="190" positionValue="760" costBasisPrice="100" currency="USD" reportDate="20261001"/>'
-        '<CashReportCurrency currency="GBP" endingCash="50.00"/>'
+        '<CashReportCurrency currency="GBP" endingCash="50.00" reportDate="20261001"/>'
     )
     service.import_flex_xml(db, _xml(old + POSITION))
     for row in db.query(Position).all():

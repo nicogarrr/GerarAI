@@ -69,3 +69,41 @@ def test_flex_cash_row_without_amount_does_not_overwrite_balance():
     assert cash.balance == Decimal("100.00")
     assert str(cash.as_of) == "2026-09-25"
     db.close()
+
+
+def test_cash_row_without_valid_date_is_skipped_not_today():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    db = _tenant_session(engine)
+    svc = IBKRImportService()
+    svc.import_flex_xml(db, _flex('<CashReportCurrency currency="EUR" endingCash="100.00" reportDate="2026-09-25"/>'))
+    svc.import_flex_xml(db, _flex('<CashReportCurrency currency="EUR" endingCash="7.00"/>'))
+    svc.import_flex_xml(db, _flex('<CashReportCurrency currency="EUR" endingCash="7.00" reportDate="not-a-date"/>'))
+    cash = db.query(CashBalance).filter(CashBalance.currency == "EUR").one()
+    assert cash.balance == Decimal("100.00") and str(cash.as_of) == "2026-09-25"
+    db.close()
+
+
+def test_legacy_corrupted_row_blocks_reimport_instead_of_duplicating():
+    import hashlib
+    import json
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    db = _tenant_session(engine)
+    csv_text = "symbol,action,quantity,price,date,fees,currency\nQAZ1,buy,\"1,5\",\"12,50\",2026-01-05,\"0,35\",EUR\n"
+    # Row as the OLD importer stored it: 15 @ 1250, fees 35
+    legacy = ["QAZ1", "buy", str(Decimal("15").normalize()), str(Decimal("1250").normalize()), "2026-01-05", str(Decimal("35").normalize()), "EUR"]
+    fp = hashlib.sha256(json.dumps(legacy).encode()).hexdigest()
+    from app.services.portfolio_ledger_service import PortfolioLedgerService  # noqa: F401
+    from app.services.portfolio_ledger_service import PortfolioLedgerService as _L
+    t = _L().create_transaction(db, ticker="QAZ1", action="buy", quantity=Decimal("15"),
+                                      price=Decimal("1250"), trade_date=__import__("datetime").date(2026, 1, 5),
+                                      fees=Decimal("35"), currency="EUR")
+    t.external_id = f"ibkr-csv-{fp}-1"
+    db.flush()
+    result = IBKRImportService().import_ibkr_csv(db, csv_text)
+    assert result["trades_imported"] == 0 and result["legacy_reimport_blocked"] == 1
+    assert db.query(Transaction).count() == 1
+    assert any("decimales corruptos" in e for e in result["row_errors"])
+    db.close()

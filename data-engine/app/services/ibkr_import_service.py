@@ -345,6 +345,22 @@ def _csv_decimal(value: str) -> Decimal:
     return parsed[0]
 
 
+def _legacy_csv_values(symbol: str, action: str, cell) -> list[str] | None:
+    """Fingerprint values exactly as the pre-_csv_decimal importer built them."""
+    try:
+        return [
+            symbol,
+            action,
+            str(abs(Decimal(cell("quantity").replace(",", "")).normalize())),
+            str(Decimal(cell("price").replace(",", "")).normalize()),
+            _date(cell("date")).isoformat(),
+            str(abs(Decimal(cell("fees").replace(",", "")).normalize())) if cell("fees") else "0",
+            cell("currency").upper() or "USD",
+        ]
+    except Exception:  # noqa: BLE001 - unreadable legacy form: no legacy identity
+        return None
+
+
 def _missing_position_fields(element: ElementTree.Element) -> list[str]:
     """Economic fields an OpenPosition needs so nothing is invented (F377).
 
@@ -693,6 +709,13 @@ class IBKRImportService:
                 if raw_cash is None or not _is_number(raw_cash):
                     # A missing amount is not zero: it would overwrite a real
                     # CashBalance with 0 (same rule as OpenPosition, F377).
+                    rows_skipped += 1
+                    cash_rows_skipped += 1
+                    continue
+                raw_cash_date = _attr(element, "reportDate", "asOfDate", "toDate")
+                if raw_cash_date is None or not _is_date(raw_cash_date):
+                    # A missing/invalid date is never "today": the row is skipped
+                    # and the existing CashBalance (amount and as_of) is kept.
                     rows_skipped += 1
                     cash_rows_skipped += 1
                     continue
@@ -1047,6 +1070,8 @@ class IBKRImportService:
         trades_imported = 0
         duplicate_trades = 0
         occurrences: Counter[str] = Counter()
+        legacy_occurrences: Counter[str] = Counter()
+        legacy_reimport_blocked = 0
         has_rows_without_id = False
         rows_skipped = len(bad_lines)
         # Se reproduce de la fecha mas antigua a la mas nueva: un export con lo
@@ -1108,6 +1133,31 @@ class IBKRImportService:
             ) is not None:
                 duplicate_trades += 1
                 continue
+            if not _cell("external_id"):
+                # Before _csv_decimal, cells with a decimal comma were stored
+                # with corrupted values (12,50 -> 1250) under THAT fingerprint.
+                # Re-importing the same file would insert a corrected twin of a
+                # row already in the ledger. If the legacy identity exists, the
+                # row is blocked with an explanation and nothing is mutated.
+                legacy_values = _legacy_csv_values(symbol, action, _cell)
+                if legacy_values is not None and legacy_values != values:
+                    legacy_fp = hashlib.sha256(json.dumps(legacy_values).encode()).hexdigest()
+                    legacy_occurrences[legacy_fp] += 1
+                    legacy_id = f"ibkr-csv-{legacy_fp}-{legacy_occurrences[legacy_fp]}"
+                    if db.scalar(
+                        select(Transaction.id).where(
+                            Transaction.external_id == legacy_id,
+                            *tenant_filters(db, Transaction),
+                        )
+                    ) is not None:
+                        rows_skipped += 1
+                        legacy_reimport_blocked += 1
+                        row_errors.append(
+                            f"Fila {line_number} del CSV: ya existe una operacion importada antes con "
+                            "esta misma fila leida con decimales corruptos (coma decimal). No se "
+                            "duplica ni se modifica; revisa y corrige la operacion existente a mano."
+                        )
+                        continue
             try:
                 with db.begin_nested():
                     transaction = ledger.create_transaction(
@@ -1154,6 +1204,7 @@ class IBKRImportService:
             "status": "imported",
             "trades_imported": trades_imported,
             "duplicate_trades": duplicate_trades,
+            "legacy_reimport_blocked": legacy_reimport_blocked,
             "identity_warning": identity_warning,
             "rows_skipped": rows_skipped,
             "row_errors": row_errors,
