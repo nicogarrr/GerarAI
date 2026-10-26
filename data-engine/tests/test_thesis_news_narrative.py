@@ -505,3 +505,14 @@ def test_invalid_llm_output_stays_fail_closed_with_evidence(context):
     provider = Provider(text=json.dumps({"hipotesis": {"texto": "subirá un 400% seguro", "evidence_ids": ["news:17"]}}))
     assert call(context, provider) == svc.sin_datos()
     assert provider.calls == 1
+
+
+def test_news_narrative_request_carries_reasoning_effort_none(context):
+    _, _, _ = context
+    provider = Provider()
+    result = call(context, provider)
+    assert result is not None
+    # Override por request medido 2026-10-26: reasoning=0 y finish=stop en
+    # el endpoint real; el default del proveedor (chat, otros) no cambia.
+    assert provider.requests
+    assert provider.requests[0].reasoning_effort == "none"

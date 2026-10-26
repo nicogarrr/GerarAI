@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.llm import LLMRequest, Message, ResponseFormat, create_llm_provider, parse_json_response
 from app.llm.errors import ProviderDisabledError, ProviderHTTPError, ProviderTransportError
 from app.models.entities import Company, NewsEvent
@@ -175,6 +176,11 @@ def build_request(ticker: str, headlines: list[dict]) -> LLMRequest:
             {"ticker": ticker, "noticias": headlines}, ensure_ascii=False,
         ))],
         task="main_financial_analysis", temperature=0.2, max_tokens=1600,
+        # Medido 2026-10-26 (aislado, endpoint real): con effort alto/low el
+        # razonamiento oculto agotaba los 1600 tokens (finish=length); con
+        # "none" reasoning=0, finish=stop (798/1600). Override por request:
+        # el chat y el resto de consumidores no cambian.
+        reasoning_effort=get_settings().thesis_news_narrative_reasoning_effort,
         response_format=ResponseFormat.json_schema(_SCHEMA, name="thesis_news_narrative"),
     )
 

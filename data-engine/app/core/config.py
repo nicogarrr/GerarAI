@@ -393,6 +393,19 @@ class Settings(BaseSettings):
     # OPENCODE_GO_CHAT_REASONING_EFFORT.
     opencode_go_chat_reasoning_effort: str | None = "high"
 
+    # Effort para las narrativas largas de tesis (request-level, no toca chat
+    # ni otros consumidores). Medido 2026-10-26 en la imagen aislada contra el
+    # endpoint real con deepseek-v4.1-flash: con effort alto/low el
+    # razonamiento oculto consumia TODO max_tokens (finish=length, content
+    # vacio o truncado); con "none" reasoning=0, finish=stop y salida completa
+    # dentro de los topes actuales (798/1600 news, 1996-2299/4000 extensa).
+    # Reversible por env. Cadenas: "none" desactiva thinking en el endpoint.
+    # Env: THESIS_DEEP_NARRATIVE_REASONING_EFFORT.
+    thesis_deep_narrative_reasoning_effort: str | None = "none"
+    # Mismo criterio para la narrativa de noticias (max 1600): medida en la
+    # misma sesion aislada. Env: THESIS_NEWS_NARRATIVE_REASONING_EFFORT.
+    thesis_news_narrative_reasoning_effort: str | None = "none"
+
     # Cascada gratuita (LLM_PROVIDER=cascade): Gemini AI Studio -> OpenRouter :free
     # -> OpenCode, solo los que tengan clave. Env: GEMINI_API_KEY / OPENROUTER_API_KEY.
     # Modelos verificados en las paginas publicas del proveedor (2026-10-14):

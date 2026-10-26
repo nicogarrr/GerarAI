@@ -179,6 +179,11 @@ class LLMRequest:
     #: `False` marca la respuesta como NO cacheable (dato efimero).
     #: `None` =politica por defecto de la cache de respuestas.
     cache: bool | None = None
+    #: Override de effort por request (p. ej. "none" para rutas estructuradas
+    #: largas donde el razonamiento oculto consume el presupuesto de salida).
+    #: None = el default del proveedor. Solo lo reenvian los adaptadores con
+    #: capacidad `reasoning` y solo a los modelos de reasoning_effort_models.
+    reasoning_effort: str | None = None
 
     def __post_init__(self) -> None:
         messages = tuple(self.messages)
@@ -190,6 +195,11 @@ class LLMRequest:
             raise ValueError("temperature must be between 0 and 2")
         if self.max_tokens is not None and self.max_tokens <= 0:
             raise ValueError("max_tokens must be positive")
+        if self.reasoning_effort is not None:
+            if not isinstance(self.reasoning_effort, str):
+                raise TypeError("reasoning_effort must be a string")
+            if not self.reasoning_effort.strip():
+                raise ValueError("reasoning_effort must be non-empty")
         if not 0 <= self.materiality_score <= 10:
             raise ValueError("materiality_score must be between 0 and 10")
         if not 0 <= self.portfolio_weight <= 1:
@@ -247,6 +257,9 @@ class Usage:
     total_tokens: int = 0
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
+    #: Tokens de razonamiento oculto (completion_tokens_details.reasoning_tokens).
+    #: Diagnostico puro: OpenCode Go lo expone; 0 si el proveedor no lo informa.
+    reasoning_tokens: int = 0
 
     def __post_init__(self) -> None:
         if (
@@ -256,6 +269,7 @@ class Usage:
                 self.total_tokens,
                 self.cache_read_tokens,
                 self.cache_write_tokens,
+                self.reasoning_tokens,
             )
             < 0
         ):

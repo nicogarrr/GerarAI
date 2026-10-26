@@ -278,14 +278,64 @@ def test_retry_note_is_specific_to_the_rejected_rule(context):
     assert "hechos del paquete" in note
 
 
-def test_retry_note_for_format_and_parse_failures(context):
+def test_markup_emphasis_is_normalized_not_rejected(context):
     facts = _facts()
     marked = _model_output(facts)
-    marked["secciones"][1]["parrafos"] = ["**Negrita** con el escenario base de 800.00 USD y el precio actual de 640.00 USD anclados al paquete de hechos de esta tesis provisional."]
+    marked["secciones"][1]["parrafos"] = [
+        "**Negrita** con el escenario base de 800.00 USD y el precio actual "
+        "de 733.12 USD anclados al paquete de hechos de esta tesis provisional."
+    ]
+    marked["secciones"][2]["parrafos"] = [
+        "## Fuentes\nEl escenario base de 800.00 USD sale del motor interno "
+        "de valoracion registrado en la seccion 13 del memo de esta tesis."
+    ]
     provider = Provider(payload=marked)
+    result = _call(context, provider)
+    assert result is not None
+    published = json.dumps(result["sections"], ensure_ascii=False)
+    assert "**" not in published and "##" not in published
+    assert "Negrita" in published
+
+
+def test_url_and_verdict_are_rejected_even_inside_markup(context, caplog):
+    import logging
+
+    facts = _facts()
+    linked = _model_output(facts)
+    linked["secciones"][2]["parrafos"] = [
+        '<a href="https://evil.example.com">El escenario base</a> de 800.00 '
+        "USD queda registrado en el memo de esta tesis provisional explicativa."
+    ]
+    provider = Provider(payload=linked)
+    with caplog.at_level(logging.WARNING, logger="app.services.thesis_deep_narrative"):
+        assert _call(context, provider) is None
+    msgs = [r.getMessage() for r in caplog.records if "rechazada" in r.getMessage()]
+    assert any("url_detectada" in m for m in msgs)
+
+    caplog.clear()
+    verdict = _model_output(facts)
+    verdict["secciones"][0]["parrafos"] = [
+        "**Recomendamos comprar**: el escenario base de 800.00 USD supera al "
+        "precio actual de 733.12 USD registrado en el modelo de valoracion."
+    ]
+    provider2 = Provider(payload=verdict)
+    with caplog.at_level(logging.WARNING, logger="app.services.thesis_deep_narrative"):
+        assert _call(context, provider2) is None
+    msgs = [r.getMessage() for r in caplog.records if "rechazada" in r.getMessage()]
+    assert any("lenguaje_veredicto" in m for m in msgs)
+
+
+def test_retry_note_for_url_failure_and_parse_failures(context):
+    facts = _facts()
+    linked = _model_output(facts)
+    linked["secciones"][2]["parrafos"] = [
+        "Segun https://evil.example.com el escenario base de 800.00 USD queda "
+        "registrado en el memo de esta tesis provisional explicativa anclada."
+    ]
+    provider = Provider(payload=linked)
     assert _call(context, provider) is None
     note = json.loads(provider.requests[1].messages[-1].content).get("nota", "")
-    assert "markdown" in note
+    assert "URL" in note
 
     class BadJson(Provider):
         async def complete(self, request):
