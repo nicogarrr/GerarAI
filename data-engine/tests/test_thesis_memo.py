@@ -271,7 +271,9 @@ def test_memo_renders_narrative_sections_and_cleans_internal_marks(db):
         company_id=company.id, version=3, status="final", rating="watch",
         thesis_markdown=(
             "# t\n## Valoración\n- Estado: ok publicable=True\n"
-            "| x | derivado | 0,2 | m | 10 hechos citados (3766320, 3765864) |\n- Margen (12345) legítimo"
+            "| x | derivado | 0,2 | m | 10 hechos citados (3766320, 3765864) |\n- Margen (12345) legítimo\n"
+            "| Margen FCF | 0,23 | fracción | 2025 | SEC |\n| Ratio | 0,23 | ratio | 2025 | SEC |\n"
+            "| Ingresos | 200,97 mil M | USD | 2025 | SEC |"
         ),
         executive_summary="s",
         narrative_sections=[
@@ -294,6 +296,9 @@ def test_memo_renders_narrative_sections_and_cleans_internal_marks(db):
     assert "3766320" not in memo
     assert "10 hechos citados" in memo
     assert "(12345)" in memo
+    assert "| Margen FCF | 23 % | porcentaje |" in memo
+    assert "| Ratio | 0,23 | ratio |" in memo
+    assert "| Ingresos | 200,97 mil M | USD |" in memo
     assert "no publicada ni aprobada" in memo
 
 
@@ -314,12 +319,32 @@ def test_isolated_memo_is_labeled_not_persisted(db):
     company = _company(db)
     thesis = ThesisVersion(
         company_id=company.id, version=9, status="final", rating="watch",
-        thesis_markdown="# t", executive_summary="s",
+        thesis_markdown="# t\n## Resumen\ncuerpo", executive_summary="s",
     )
     db.add(thesis)
     db.commit()
     memo = build_memo_markdown(db, company, thesis, isolated=True)
+    assert "tesis de una ejecución aislada (no persistida)" in memo
     assert "ARTEFACTO DE PRUEBA AISLADA" in memo
     assert "no persistida" in memo
     assert "desde la versión persistida" not in memo
-    assert "desde la versión persistida" in build_memo_markdown(db, company, thesis)
+    assert "Texto de la tesis persistida" not in memo
+    normal = build_memo_markdown(db, company, thesis)
+    assert "desde la versión persistida" in normal
+    assert "Texto de la tesis persistida" in normal
+
+
+def test_fraction_row_to_percent_is_exact_and_conservative():
+    from app.services.thesis_memo import _fraction_row_to_percent as f
+
+    def row(v, u="fracción"):
+        return f"| Margen | {v} | {u} | 2025 | SEC |"
+
+    assert "| 23,45 % | porcentaje |" in f(row("0,2345"))
+    assert "| 8,25 % | porcentaje |" in f(row("0,0825"))
+    assert "| 23,456 % | porcentaje |" in f(row("0,23456"))
+    assert "| 23 % | porcentaje |" in f(row("0,23"))
+    assert "| 50 % | porcentaje |" in f(row("0,50"))
+    assert "| -5 % | porcentaje |" in f(row("-0,05"))
+    assert f(row("1")) == row("1")
+    assert f(row("0,23", "ratio")) == row("0,23", "ratio")

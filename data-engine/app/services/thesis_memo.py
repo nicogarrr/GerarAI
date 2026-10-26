@@ -9,6 +9,7 @@ financiero.
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -18,6 +19,27 @@ from app.core.tenancy import tenant_filters
 from app.models import Claim, ClaimEvidence, Company, SourceAudit, ThesisSection, ThesisVersion
 from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, percent_es
 from app.services.thesis_approval_service import APPROVAL_SECTION_TITLE
+
+
+def _fraction_row_to_percent(line: str) -> str:
+    """Fila de tabla con unidad EXPLÍCITA «fracción» y valor 0,xx -> «xx %».
+
+    Solo si la celda de unidad dice exactamente «fracción» y el valor es un
+    decimal simple; en cualquier otro caso la fila queda tal cual.
+    """
+    cells = line.split("|")
+    # cells[0] y cells[-1] son los bordes vacíos de la fila.
+    if len(cells) < 5 or cells[3].strip() != "fracción":
+        return line
+    raw = cells[2].strip()
+    if not re.fullmatch(r"-?\d+,\d+", raw):
+        return line
+    # Decimal exacto: sin redondeo (0,2345 -> 23,45 %; 0,23 -> 23 %).
+    pct = (Decimal(raw.replace(",", ".")) * 100).normalize()
+    text = format(pct, "f").replace(".", ",")
+    cells[2] = f" {text} % "
+    cells[3] = " porcentaje "
+    return "|".join(cells)
 
 
 def _full_analysis_lines(markdown: str) -> list[str]:
@@ -51,6 +73,7 @@ def _full_analysis_lines(markdown: str) -> list[str]:
             line = re.sub(r"\s+publicable=(?:True|False|None)\s*$", "", line)
         if line.startswith("|"):
             line = re.sub(r"(\d+ hechos? citados?) \(\d+(?:, \d+)*\)", r"\1", line)
+            line = _fraction_row_to_percent(line)
         if line.startswith("### "):
             out.append(f"**{line[4:]}**")
         elif line.startswith("## "):
@@ -261,9 +284,14 @@ def build_memo_markdown(
         analysis = _full_analysis_lines(thesis.thesis_markdown or "")
         if any(item.strip() for item in analysis):
             lines.append("## Análisis completo")
+            origin = (
+                "Texto de la tesis de una ejecución aislada (no persistida)"
+                if isolated
+                else "Texto de la tesis persistida (misma versión que la ficha)"
+            )
             lines.append(
-                "Texto de la tesis persistida (misma versión que la ficha). Descriptivo: no "
-                "garantiza que cifras, fuentes o inferencias estén validadas."
+                f"{origin}. Descriptivo: no garantiza que cifras, fuentes o inferencias "
+                "estén validadas."
             )
             lines.append("")
             lines.extend(analysis)

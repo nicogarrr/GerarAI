@@ -87,6 +87,27 @@ function tableRow(
   doc.x = x;
 }
 
+/** Anchos por contenido: cada columna recibe como mínimo lo que ocupa su
+ *  palabra más larga (nunca parte «derivado»), el resto se reparte según el
+ *  largo del texto. El texto no se recorta. */
+function columnWidths(rows: string[][], total: number): number[] {
+  const count = rows[0]?.length ?? 1;
+  const cols = Array.from({ length: count }, (_, c) => rows.map((r) => r[c] ?? ''));
+  const minW = cols.map((cells) => {
+    const longest = Math.max(
+      4,
+      ...cells.flatMap((cell) => cell.split(/\s+/).map((word) => word.length)),
+    );
+    return Math.min(longest * 5.6 + 12, total * 0.3);
+  });
+  const weight = cols.map((cells) => Math.min(60, Math.max(6, ...cells.map((cell) => cell.length))));
+  const free = Math.max(0, total - minW.reduce((a, b) => a + b, 0));
+  const wSum = weight.reduce((a, b) => a + b, 0);
+  const widths = minW.map((m, i) => m + (weight[i] / wSum) * free);
+  const sum = widths.reduce((a, b) => a + b, 0);
+  return widths.map((w) => (w / sum) * total);
+}
+
 /** Convierte el memo Markdown de la tesis en un PDF listo para descargar. */
 export async function buildMemoPdf(markdown: string): Promise<Buffer> {
   const doc = new PDFDocument({
@@ -129,7 +150,7 @@ export async function buildMemoPdf(markdown: string): Promise<Buffer> {
       const header = separatorIndex >= 0 && rows.length > 0 ? rows[0] : null;
       const body = header ? rows.slice(1) : rows;
       if (header) {
-        const widths = header.map(() => contentWidth / header.length);
+        const widths = columnWidths(rows, contentWidth);
         tableRow(doc, header, widths, left, true);
         doc.moveTo(left, doc.y - 3).lineTo(left + contentWidth, doc.y - 3).lineWidth(0.5).strokeColor(RULE).stroke();
         for (const row of body) tableRow(doc, row, widths, left, false);
