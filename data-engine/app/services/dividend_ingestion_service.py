@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Company, DividendRecord, Position, WatchItem
+from app.services.dividend_records import collapse_yahoo_readjusted
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.split_ingestion_service import ProviderIngestionService
 
@@ -217,7 +218,7 @@ class DividendIngestionService(ProviderIngestionService):
         total_value = 0.0
         missing_base_value: list[str] = []
         for position, company in rows:
-            records = list(
+            records = collapse_yahoo_readjusted(
                 db.scalars(
                     select(DividendRecord).where(
                         DividendRecord.company_id == company.id,

@@ -54,6 +54,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, DividendRecord, Position
+from app.services.dividend_records import collapse_yahoo_readjusted
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.tax_irpf_filing import calculate_savings_tax
 
@@ -197,12 +198,10 @@ class DividendProjectionService:
             ).all()
         )
         company_ids = [company.id for _, company in rows]
-        all_records = (
-            list(
-                db.scalars(
-                    select(DividendRecord).where(DividendRecord.company_id.in_(company_ids))
-                ).all()
-            )
+        all_records = collapse_yahoo_readjusted(
+            db.scalars(
+                select(DividendRecord).where(DividendRecord.company_id.in_(company_ids))
+            ).all()
             if company_ids
             else []
         )
