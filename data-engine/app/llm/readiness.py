@@ -35,6 +35,14 @@ def _valid_http_url(value: object) -> bool:
     return parts.scheme in {"http", "https"} and bool(parts.netloc)
 
 
+def _model_overrides_issue(settings: object) -> str | None:
+    overrides = getattr(settings, "llm_model_overrides", None) or {}
+    for value in overrides.values():
+        if not is_owner_approved_model(str(value or "").strip(), settings):
+            return "llm_model_override_not_owner_approved"
+    return None
+
+
 def llm_configuration_issue(settings: object) -> str | None:
     """Return a stable reason code when the LLM config is disabled/incoherent."""
     if not bool(getattr(settings, "llm_enabled", True)):
@@ -47,6 +55,9 @@ def llm_configuration_issue(settings: object) -> str | None:
             return "opencode_go_api_key_not_configured"
         if not _valid_http_url(getattr(settings, "opencode_go_base_url", "")):
             return "opencode_go_base_url_invalid"
+        override_issue = _model_overrides_issue(settings)
+        if override_issue:
+            return override_issue
         if not is_owner_approved_model(
             str(getattr(settings, "opencode_go_model", "") or "").strip(), settings
         ):
@@ -64,7 +75,29 @@ def llm_configuration_issue(settings: object) -> str | None:
             _has_key(getattr(settings, name, None))
             for name in ("gemini_api_key", "openrouter_api_key", "opencode_go_api_key")
         )
-        return None if has_member else "cascade_without_any_api_key"
+        if not has_member:
+            return "cascade_without_any_api_key"
+        override_issue = _model_overrides_issue(settings)
+        if override_issue:
+            return override_issue
+        if _has_key(getattr(settings, "gemini_api_key", None)) and not bool(
+            getattr(settings, "gemini_free_plan_confirmed", False)
+        ):
+            return "cascade_gemini_free_plan_not_confirmed"
+        openrouter_model = str(getattr(settings, "openrouter_model", "") or "").strip()
+        if _has_key(getattr(settings, "openrouter_api_key", None)) and not openrouter_model.endswith(
+            ":free"
+        ):
+            return "cascade_openrouter_model_not_free"
+        if _has_key(getattr(settings, "opencode_go_api_key", None)):
+            if not is_owner_approved_model(
+                str(getattr(settings, "opencode_go_model", "") or "").strip(), settings
+            ):
+                return "cascade_opencode_go_model_not_owner_approved"
+            fallback = str(getattr(settings, "opencode_go_fallback_model", "") or "").strip()
+            if fallback and not is_owner_approved_model(fallback, settings):
+                return "cascade_opencode_go_fallback_not_owner_approved"
+        return None
     return "unsupported_llm_provider"
 
 

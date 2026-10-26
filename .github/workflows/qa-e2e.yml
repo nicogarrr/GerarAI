@@ -37,18 +37,17 @@ jobs:
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
 
-      # POR QUE UN PRECHECK: el free tier de OpenCode Zen empezo a responder
-      # 403 ("free tier can only be used from within OpenCode") a cualquier
-      # cliente que no sea OpenCode, y este workflow se puso en rojo en TODOS
-      # los deploys (328 rojos seguidos desde el 2-oct). Un proveedor caido
-      # no es un bug del producto: con el precheck, la pasada de agente se
-      # salta con aviso grande en el summary y los tests DETERMINISTAS
-      # (Playwright puro, sin LLM) siguen gateando el producto. Cuando Zen
-      # vuelva, la pasada de agente se reanuda sola en el siguiente run.
+      # POR QUE UN PRECHECK: si el endpoint de OpenCode Go no responde con la
+      # clave del repo, este workflow se pone en rojo en TODOS los deploys. Un
+      # proveedor caido no es un bug del producto: con el precheck, la pasada
+      # de agente se salta con aviso grande en el summary y los tests
+      # DETERMINISTAS (Playwright puro, sin LLM) siguen gateando el producto.
+      # Cuando el proveedor vuelva, la pasada de agente se reanuda sola en el
+      # siguiente run.
       # La llamada replica exactamente el cliente de e2e.config.ts (misma
       # baseURL, cabecera de sesion, User-Agent y modelo), asi que un 200
       # aqui significa que los tests de agente pueden correr de verdad.
-      - name: Precheck del proveedor (Zen)
+      - name: Precheck del proveedor (OpenCode Go)
         id: zen
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
@@ -59,20 +58,20 @@ jobs:
             exit 0
           fi
           code=$(curl -sS -o /tmp/zen-precheck.json -w '%{http_code}' --max-time 30 \
-            -X POST "${ZEN_BASE_URL:-https://opencode.ai/zen/v1}/chat/completions" \
+            -X POST "${ZEN_BASE_URL:-https://opencode.ai/zen/go/v1}/chat/completions" \
             -H "Authorization: Bearer $OPENCODE_API_KEY" \
             -H "x-opencode-session: ${ZEN_SESSION_ID:-cavaai-e2e-readonly}" \
             -H "User-Agent: curl/8.5.0" \
             -H "Content-Type: application/json" \
-            -d '{"model":"'"${ZEN_MODEL:-space-bunny-free}"'","messages":[{"role":"user","content":"responde ok"}],"max_tokens":1}')
+            -d '{"model":"'"${ZEN_MODEL:-deepseek-v4.1-flash}"'","messages":[{"role":"user","content":"responde ok"}],"max_tokens":1}')
           echo "http=$code" >> "$GITHUB_OUTPUT"
           if [ "$code" = "200" ]; then
             echo "agent=1" >> "$GITHUB_OUTPUT"
             echo "reason=" >> "$GITHUB_OUTPUT"
           else
             echo "agent=0" >> "$GITHUB_OUTPUT"
-            echo "reason=El proveedor Zen respondio HTTP $code (free tier de OpenCode bloqueado o proveedor caido)" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Pasada de agente NO ejecutada::El proveedor Zen respondio HTTP $code; solo corren los tests deterministas."
+            echo "reason=El proveedor OpenCode Go respondio HTTP $code (clave sin suscripcion, modelo no disponible o proveedor caido)" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Pasada de agente NO ejecutada::El proveedor OpenCode Go respondio HTTP $code; solo corren los tests deterministas."
             # El cuerpo puede dar una pista (sin secretos: la clave viaja en
             # la cabecera de la peticion, no en la respuesta).
             head -c 300 /tmp/zen-precheck.json || true
@@ -112,7 +111,7 @@ jobs:
               echo
               echo "**Motivo: ${AGENT_REASON:-precheck del proveedor fallido}.**"
               echo
-              echo "Solo se ejecutaron los tests deterministas (Playwright, sin LLM). La auditoria de UI por agente queda pendiente de que el proveedor Zen vuelva a responder; este verde NO la cubre."
+              echo "Solo se ejecutaron los tests deterministas (Playwright, sin LLM). La auditoria de UI por agente queda pendiente de que el proveedor OpenCode Go vuelva a responder; este verde NO la cubre."
               echo
             fi
             if [ -z "$E2E_USER_EMAIL" ] || [ -z "$E2E_USER_PASSWORD" ]; then

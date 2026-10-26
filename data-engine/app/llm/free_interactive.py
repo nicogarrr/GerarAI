@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 class FreeLLMUnavailable(LLMError):
     def __init__(self, *, quota: bool = False):
         self.quota = quota
-        super().__init__("LLM gratuito agotado, vuelve más tarde" if quota else
-                         "LLM gratuito no disponible, vuelve más tarde")
+        super().__init__("El modelo configurado ha agotado su cuota, vuelve más tarde" if quota else
+                         "El modelo configurado no está disponible, vuelve más tarde")
 
 
 class FreeInteractiveProvider(CascadeProvider):

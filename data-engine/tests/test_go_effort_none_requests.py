@@ -6,9 +6,15 @@ import json
 from unittest import mock
 
 import httpx
+import pytest
 
 from app.core.config import Settings
 from app.llm.factory import create_llm_provider
+
+
+@pytest.fixture(autouse=True)
+def _no_llm_response_cache(monkeypatch):
+    monkeypatch.setenv("LLM_RESPONSE_CACHE_ENABLED", "false")
 
 
 def _go_provider(captured: list):

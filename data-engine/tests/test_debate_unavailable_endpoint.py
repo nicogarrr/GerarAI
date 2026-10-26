@@ -24,7 +24,9 @@ def test_quota_exhausted_is_503_not_200(monkeypatch):
     monkeypatch.setattr("app.services.thesis_debate_service.debate_thesis", unavailable)
     response = TestClient(app).post("/api/thesis/EXEL/debate")
     assert response.status_code == 503
-    assert response.json() == {"detail": "LLM gratuito agotado, vuelve más tarde"}
+    assert response.json() == {
+        "detail": "El modelo configurado ha agotado su cuota, vuelve más tarde"
+    }
     assert seen[0]["strict_provider"] is True
     assert seen[0]["use_jev"] is False
 

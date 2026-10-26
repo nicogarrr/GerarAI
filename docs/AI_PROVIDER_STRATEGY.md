@@ -33,13 +33,23 @@ guards accept `deepseek-v4.1-flash` only when the Go subscription is confirmed
 
 In production, startup fails with a clear error if `OPENCODE_GO_MODEL` (or a
 non-empty `OPENCODE_GO_FALLBACK_MODEL`) is neither a verified free model nor
-the approved Go model. The only escape hatch is the explicit, audited
-`OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=true`; it is never a silent override.
+the approved Go model. Every value in `LLM_MODEL_OVERRIDES` is checked too:
+for example `LLM_MODEL_OVERRIDES={"chat": "paid-model-unknown"}` aborts
+startup instead of bypassing the guard. The only escape hatch is the explicit,
+audited `OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=true`; it is never a silent
+override and it does not waive the Gemini/OpenRouter plan confirmations below.
 
-`/health/ready` applies the same check without generating anything or calling
-remote providers: disabled provider, missing key, invalid URL, or an
-unapproved model returns 503. Only a local bridge URL is probed (`/health`,
-short timeout); the official Go endpoint is never contacted by readiness.
+`/health/ready` applies the same checks without generating anything or calling
+remote providers: disabled provider, missing key, invalid URL, an unapproved
+main/fallback/override model, or an unsafe cascade member returns 503. Only a
+local bridge URL is probed (`/health`, short timeout); the official Go
+endpoint is never contacted by readiness.
+
+With `LLM_PROVIDER=cascade`, production startup and readiness also require
+that every configured member is free/approved: `GEMINI_FREE_PLAN_CONFIRMED=true`
+when `GEMINI_API_KEY` is set, an `OPENROUTER_MODEL` ending in `:free` when
+`OPENROUTER_API_KEY` is set, and an owner-approved Go model/fallback when
+`OPENCODE_GO_API_KEY` is set. At least one member key is required.
 
 ## Configuration
 
@@ -56,6 +66,7 @@ CHAT_TOTAL_TIMEOUT_SECONDS=45
 CHAT_GO_SUBSCRIPTION_ENABLED=true
 CHAT_GO_SUBSCRIPTION_BASE_URL=https://opencode.ai/zen/go/v1
 OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=false
+LLM_MODEL_OVERRIDES=
 ```
 
 Single source of truth: `app/core/config.py` defines the defaults (Go endpoint,
@@ -88,19 +99,29 @@ probes when the URL is local.
 ## Chat chain
 
 `create_chat_llm_provider` uses the Go subscription primary by default (model
-pinned to `deepseek-v4.1-flash`). A paid/unapproved primary or fallback is
-rejected before any network call; the default configuration never returns
-`chat_primary_not_verified_free`. Groq/Gemini/OpenRouter only join when their
-flags and confirmations are explicit; otherwise they are not built.
+pinned to `deepseek-v4.1-flash`). A paid/unapproved primary, fallback or
+override is rejected before any network call; the default configuration never
+returns `chat_primary_not_verified_free`. `LLM_PROVIDER=disabled` (or
+`LLM_ENABLED=false`) does not build the Go primary or any backup: chat returns
+`disabled_by_configuration` and readiness stays 503. Groq/Gemini/OpenRouter
+only join when their flags and confirmations are explicit; otherwise they are
+not built.
 
-If the resolved primary model fails after its own retries, the adapter can
-retry once with `OPENCODE_GO_FALLBACK_MODEL`. Empty means no implicit fallback.
+`OPENCODE_GO_FALLBACK_MODEL` is passed to the Go subscription primary. If the
+primary model fails, the adapter retries once with that model; the fallback
+must remain owner-approved and empty means no implicit fallback. Chat responses
+use the Redis response cache only inside the verified tenant scope; without a
+tenant the cache fails closed (no read/write), and responses obtained through a
+model fallback are never cached.
 
 ## Free cascade (optional provider)
 
 `LLM_PROVIDER=cascade` builds `CascadeProvider`: Gemini AI Studio
 (`gemini-3.8-flash`) -> OpenRouter `:free` -> OpenCode, using only members with
-a key. Per-member timeouts (~20 s) sit under a 60 s total cap. Privacy: with
+a key. In production each configured member must pass the guards above (Gemini
+free plan confirmed, OpenRouter model ending in `:free`, approved Go model),
+and `LLM_MODEL_OVERRIDES` cannot introduce a paid model. Per-member timeouts
+(~20 s) sit under a 60 s total cap. Privacy: with
 cascade, any prompt can reach the Gemini free tier (Google may use it to
 improve its products); cost-guarded flows (LLM proposals, bottleneck, news
 narrative) reject cascade outright. OpenRouter `:free` does not guarantee

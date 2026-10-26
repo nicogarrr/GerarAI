@@ -68,10 +68,10 @@ def test_all_exhausted_fail_fast_once_and_do_not_retry_bear_or_judge():
         async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
             provider = create_free_interactive_provider(settings(), client=client)
             started = time.monotonic()
-            with pytest.raises(FreeLLMUnavailable, match="LLM gratuito agotado"):
+            with pytest.raises(FreeLLMUnavailable, match="modelo configurado ha agotado su cuota"):
                 await debate_thesis("EXEL", "tesis", provider=provider, strict_provider=True, use_jev=False)
             assert time.monotonic() - started < 1
-            with pytest.raises(FreeLLMUnavailable, match="LLM gratuito agotado"):
+            with pytest.raises(FreeLLMUnavailable, match="modelo configurado ha agotado su cuota"):
                 await provider.complete(LLMRequest([Message("user", "otra")], task="red_team"))
     asyncio.run(run())
     assert calls == ["deepseek-v4.1-flash-free", "space-bunny-free"]

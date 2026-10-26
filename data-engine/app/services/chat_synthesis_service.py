@@ -982,7 +982,7 @@ class ChatSynthesisService:
         sugeriria un respaldo que no existe.
         """
         answer = (
-            "Los modelos gratuitos han llegado a su límite de uso y no puedo responderte con fuentes ahora mismo; "
+            "El modelo configurado ha llegado a su límite de uso y no puedo responderte con fuentes ahora mismo; "
             "prueba de nuevo en un par de minutos o dame un ticker para ir a datos concretos."
             if reason == "quota"
             else "No puedo responderte con fuentes ahora mismo; "

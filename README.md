@@ -32,6 +32,25 @@
 
 Si FMP no está configurado o el proveedor falla, esa cobertura se marca como no disponible en lugar de inventarse; no hay tickers ni nombres hardcodeados: todo nombre visible viene de una API real.
 
+## Cerebro LLM
+
+El primario es **OpenCode Go** (`https://opencode.ai/zen/go/v1`, modelo
+`deepseek-v4.1-flash`, cubierto por la suscripción del dueño). El detalle vive
+en [docs/AI_PROVIDER_STRATEGY.md](docs/AI_PROVIDER_STRATEGY.md):
+
+- `OPENCODE_GO_FALLBACK_MODEL` es opcional y se pasa al primario Go; si el
+  modelo principal falla, se reintenta una vez con él. Debe ser un modelo
+  aprobado (free verificado o el Go).
+- `LLM_MODEL_OVERRIDES` es un JSON de overrides por tarea. En producción cada
+  valor debe ser aprobado; `OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=true` es solo
+  para un piloto auditado.
+- `LLM_PROVIDER=cascade` es opcional: Gemini (con `GEMINI_FREE_PLAN_CONFIRMED=true`),
+  OpenRouter (`:free`) y el Go aprobado, solo miembros con clave.
+- `LLM_PROVIDER=disabled` (o `LLM_ENABLED=false`) no construye proveedor; el
+  chat queda deshabilitado y `/health/ready` devuelve 503.
+- Groq/Gemini/OpenRouter como respaldos del chat están apagados por defecto.
+  La caché de respuestas Go es por tenant y nunca cachea un fallback.
+
 ## Arranque rápido (< 30 min)
 
 **Opción rápida (Windows) — `arrancar_cavaai.bat`:**
