@@ -1,4 +1,6 @@
+import re
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 
 @dataclass(frozen=True)
@@ -112,32 +114,66 @@ SOURCE_TIER_BY_TYPE = {
 }
 
 
+def _host_matches(host: str, domain: str) -> bool:
+    """El host ES el dominio o un subdominio suyo; nunca un sufijo mas largo.
+
+    «sec.gov.evil.example» contiene la cadena «sec.gov» pero no es la SEC:
+    la confianza de tier_1 nunca puede venir de una coincidencia de subcadena.
+    """
+    return host == domain or host.endswith("." + domain)
+
+
+def _type_matches(key: str, compact_type: str, tokens: set[str]) -> bool:
+    """Clave de tipo contra el tipo declarado.
+
+    Claves de 4+ caracteres: subcadena (comportamiento historico, p. ej.
+    «sec_edgar» o «10-k»). Claves de 2-3 («ft», «amf», «sec»...): solo token
+    completo; como subcadena clasificarian «softbank» como Financial Times o
+    «amfi» (India) como AMF (Francia).
+    """
+    if len(key) >= 4:
+        return key in compact_type
+    return key in tokens
+
+
+_REGULATOR_DOMAINS = (
+    "sec.gov",
+    "cnmv.es",
+    "fca.org.uk",
+    "bafin.de",
+    "amf-france.org",
+    "consob.it",
+    "asic.gov.au",
+    "fsa.go.jp",
+    "sedar.com",
+)
+
+_MEDIA_DOMAINS = {
+    "reuters.com": "tier_4_reputable_media",
+    "bloomberg.com": "tier_4_reputable_media",
+    "wsj.com": "tier_4_reputable_media",
+    "ft.com": "tier_4_reputable_media",
+}
+
+
 def classify_source(source_type: str | None = None, url: str | None = None) -> SourceTier:
     compact_type = (source_type or "").lower().replace(" ", "_")
+    tokens = {token for token in re.split(r"[^a-z0-9]+", compact_type) if token}
     for key, tier_key in SOURCE_TIER_BY_TYPE.items():
-        if key in compact_type:
+        if _type_matches(key, compact_type, tokens):
             return SOURCE_TIERS[tier_key]
 
-    compact_url = (url or "").lower()
-    if "sec.gov" in compact_url or "edgar" in compact_url:
-        return SOURCE_TIERS["tier_1_regulatory"]
-    regulator_domains = (
-        "cnmv.es",
-        "fca.org.uk",
-        "bafin.de",
-        "amf-france.org",
-        "consob.it",
-        "asic.gov.au",
-        "fsa.go.jp",
-        "sedar.com",
-    )
-    if any(domain in compact_url for domain in regulator_domains):
-        return SOURCE_TIERS["tier_1_regulatory"]
-    if "/investor" in compact_url or "ir." in compact_url:
-        return SOURCE_TIERS["tier_2_company"]
-    for media_key in ("reuters", "bloomberg", "wsj", "ft.com"):
-        if media_key in compact_url:
-            return SOURCE_TIERS["tier_4_reputable_media"]
+    compact_url = (url or "").strip().lower()
+    if compact_url:
+        parsed = urlparse(compact_url)
+        host = parsed.hostname or ""
+        if any(_host_matches(host, domain) for domain in _REGULATOR_DOMAINS):
+            return SOURCE_TIERS["tier_1_regulatory"]
+        if host.startswith("ir.") or "/investor" in parsed.path:
+            return SOURCE_TIERS["tier_2_company"]
+        for domain, tier_key in _MEDIA_DOMAINS.items():
+            if _host_matches(host, domain):
+                return SOURCE_TIERS[tier_key]
 
     return SOURCE_TIERS["tier_unknown"]
 
