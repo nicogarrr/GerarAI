@@ -98,7 +98,7 @@ antes de subir su limite: el presupuesto global no debe pasar de 10 GiB.
    (cierra sesion y vuelve a entrar).
 6. **Clonar y configurar**:
    ```
-   git clone https://github.com/nicogarrr/gerarai.git && cd gerarai
+   git clone https://github.com/nicogarrr/GerarAI.git && cd GerarAI
    cp .env.production.example .env.production   # rellena los secretos
    # SEC_USER_AGENT debe llevar un contacto real (ejemplo.com/tu-email se rechazan)
    ./scripts/deploy.sh

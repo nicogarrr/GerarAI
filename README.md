@@ -1,11 +1,16 @@
 # GerarAI — Research OS de inversión personal
 
-![CI](https://github.com/nicogarrr/gerarai/actions/workflows/ci.yml/badge.svg)
-![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
+[![CI](https://github.com/nicogarrr/GerarAI/actions/workflows/ci.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/ci.yml)
+[![Coverage](https://github.com/nicogarrr/GerarAI/actions/workflows/coverage.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/coverage.yml)
+[![CodeQL](https://github.com/nicogarrr/GerarAI/actions/workflows/codeql.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/nicogarrr/GerarAI?include_prereleases&label=release&color=orange)](https://github.com/nicogarrr/GerarAI/releases)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 **GerarAI es tu memoria de inversor a largo plazo.** No es un terminal más ni una fábrica de DCF: es donde vive por qué sigues o posees cada empresa, qué evidencias sostienen tu tesis, qué la contradice y qué ha cambiado con el tiempo.
 
 > Esto no es asesoramiento financiero. Los datos pueden llegar con retraso o estar incompletos según el proveedor.
+
+**Estado:** v0.9.0 (pre-release). La 1.0 se publicará cuando cierre la auditoría.
 
 ## Qué hace
 
@@ -134,7 +139,7 @@ Genera secretos con `openssl rand -base64 32`. **Nunca commitees el `.env`** (es
 npm run lint
 npm run build
 
-# Backend (suite completa ~2 min)
+# Backend (suite completa; ~10 min en CI con -n 2)
 cd data-engine && ./.venv/Scripts/python.exe -m pytest tests/ -q
 
 # El cliente OpenAPI no debe derivar (regenerar si tocas rutas)
@@ -142,10 +147,11 @@ npm run generate:openapi
 git diff --exit-code -- data-engine/openapi.json lib/research/openapi.generated.ts
 ```
 
-El CI ejecuta 12 jobs: paridad de dependencias, calidad frontend, auth-store,
-calidad backend, evals de calidad (RAG, valoración, capas LLM e ingesta), drift
-OpenAPI, migraciones Postgres, smoke ARM64, auditoría supply-chain, e2e (API +
-navegador) y una puerta final agregada, más un workflow aparte de cobertura.
+El CI ejecuta 13 jobs: paridad de dependencias, calidad frontend, auth-store,
+lint backend (ruff + pyright), tests backend, evals de calidad (RAG, valoración,
+capas LLM e ingesta), drift OpenAPI, migraciones Postgres, smoke ARM64,
+auditoría supply-chain, e2e de API, e2e de navegador y la puerta final
+`CI gate (single required check)`, más un workflow aparte de cobertura.
 
 ### Evals de calidad (FASE C)
 
@@ -182,7 +188,8 @@ Todos aceptan `--json` para volcar el informe. El eval del RAG indexa en
 Next.js (App Router, server actions firmadas HMAC) habla con FastAPI
 (`/api/*`, firma X-CavaAI-*): Postgres como canónico, Qdrant como índice
 semántico reconstruible, MinIO para originales y Redis/Dramatiq para jobs.
-OpenCode Go es el único LLM y Jev hace las micro-decisiones.
+OpenCode Go es el LLM por defecto (la cascada opcional con Gemini/OpenRouter
+free aprobados se activa a mano) y Jev hace las micro-decisiones.
 
 Autenticación doble: sesiones Better Auth en MongoDB + firma HMAC con secreto
 de 32 mínimo en la research API (ventana 300 s, tenant = tu userId).
@@ -198,9 +205,9 @@ data-engine/
   app/api/routes/    51 routers bajo /api
   app/services/      ingesta, tesis, debate, insider, RAG, alertas…
   app/valuation/     motores + guardia point-in-time
-  app/llm/           factory OpenCode Go + cliente Jev
-  alembic/versions/  migraciones 0001→0060 (lineales, con downgrade)
-  tests/             4600+ tests herméticos (4681 funciones test a 2026-10-18) · evals/  evals financieras
+  app/llm/           factory de proveedores (OpenCode Go por defecto) + cliente Jev
+  alembic/versions/  migraciones 0001→0080 (lineales, con downgrade)
+  tests/             7.253 tests herméticos (7.243 pasan, 8 skip, 2 xpass; CI 2026-10-26) · evals/  evals financieras
 e2e/                 specs Playwright del flujo inversor
 docs/                PRODUCT_VISION, runbooks, privacidad
 ```
