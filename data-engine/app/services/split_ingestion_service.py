@@ -102,6 +102,11 @@ class ProviderIngestionService:
         raise NotImplementedError
 
     @staticmethod
+    def _skip_reason(row: dict[str, Any]) -> str | None:
+        """Motivo observable cuando una fila valida no se ingiere (None = no aplica)."""
+        return None
+
+    @staticmethod
     def _existing_record(db: Session, company: Company, row: dict[str, Any]) -> Any:
         raise NotImplementedError
 
@@ -137,8 +142,12 @@ class ProviderIngestionService:
         fetched_at = datetime.now(UTC)
         inserted = 0
         existing = 0
+        skipped: dict[str, int] = {}
         for row in rows:
             if not self._row_is_ingestible(row):
+                reason = self._skip_reason(row)
+                if reason:
+                    skipped[reason] = skipped.get(reason, 0) + 1
                 continue
             duplicate = self._existing_record(db, company, row)
             if duplicate is not None:
@@ -153,6 +162,7 @@ class ProviderIngestionService:
             "source": source,
             "inserted": inserted,
             "existing": existing,
+            "skipped": skipped,
             "fetched_at": fetched_at.isoformat(),
         }
 

@@ -335,3 +335,23 @@ def test_empty_currency_company_is_stopped_by_symbol_guard(db):
     service = DividendIngestionService(fmp=FakeFMP(payload=PAYLOAD), yahoo=FakeYahoo(payload=YAHOO_PAYLOAD))
     result = asyncio.run(service.sync_company(db, ticker="BWMX"))
     assert result["status"] == "no_safe_symbol" and result["inserted"] == 0
+
+
+def test_unknown_currency_is_observable_as_unknown_not_fresh_ok(db, monkeypatch):
+    _no_symbol_guard(monkeypatch)
+    _company(db, ticker="BWMX", currency="")
+    service = DividendIngestionService(fmp=FakeFMP(payload=[]), yahoo=FakeYahoo(payload=YAHOO_PAYLOAD, currency=None))
+    result = asyncio.run(service.sync_company(db, ticker="BWMX"))
+    assert result["status"] == "currency_unknown" and result["inserted"] == 0
+    assert result["skipped"] == {"unknown_currency": 2} and result["reason"]
+    assert db.scalars(select(DividendRecord)).all() == []
+
+
+def test_portfolio_sync_coverage_is_partial_with_unknown_currency(db, monkeypatch):
+    _no_symbol_guard(monkeypatch)
+    company = _company(db, ticker="BWMX", currency="")
+    _position(db, company)
+    service = DividendIngestionService(fmp=FakeFMP(payload=[]), yahoo=FakeYahoo(payload=YAHOO_PAYLOAD, currency=None))
+    out = asyncio.run(service.sync_portfolio(db))
+    assert out["currency_unknown"] == 1 and out["unavailable"] == 1
+    assert out["provenance"]["coverage"] != "ok"
