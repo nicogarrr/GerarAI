@@ -35,6 +35,8 @@ from io import BytesIO
 
 from ebooklib import epub
 
+from app.services.memo_text_es import RATING_ES, STATUS_ES, date_es, label_es
+
 # Identidad DC estable: NO sigue la marca (rebrand CavaAI -> GerarAI).
 # Cambiarla duplicaria las tesis ya descargadas en los lectores epub.
 EPUB_UID_TEMPLATE = "cavaai-thesis-{ticker}-v{version}"
@@ -280,12 +282,24 @@ def build_thesis_epub(data: ThesisEpubData) -> bytes:
         chapters.append(chapter)
         toc.append(epub.Link(file_name, heading, uid_))
 
+    # Mismo vocabulario que el memo y la ficha: enums traducidos (nunca el
+    # valor crudo en ingles) y fecha en espanol; el metadato DC conserva ISO.
+    rating_label = label_es(RATING_ES, rating)
+    status_label = label_es(STATUS_ES, status)
     meta_html = (
-        f'<p class="meta">Versión {data.version} · rating: {html.escape(rating)} · '
-        f"estado: {html.escape(status)}"
-        + (f" · generada el {html.escape(generated)}" if generated else "")
+        f'<p class="meta">Versión {data.version} · rating: {html.escape(rating_label)} · '
+        f"estado: {html.escape(status_label)}"
+        + (f" · generada el {html.escape(date_es(generated))}" if generated else "")
         + "</p>"
     )
+    if status != "published":
+        # Paridad con el memo: una versión no publicada declara su estado, no
+        # se presenta como veredicto.
+        meta_html += (
+            '<div class="disclaimer"><p>Estado: versión en estado '
+            f"«{html.escape(status_label)}», no publicada ni aprobada. Es una lectura de "
+            "seguimiento, no un veredicto ni una recomendación.</p></div>"
+        )
     _add_chapter("portada", "portada.xhtml", title, meta_html)
 
     summary = _as_text(data.executive_summary, name="executive_summary", default="")
