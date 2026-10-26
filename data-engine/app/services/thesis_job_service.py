@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, desc, or_, select, text
+from sqlalchemy import and_, desc, or_, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -332,12 +332,20 @@ def job_payload(run: WorkflowRun) -> dict:
     }
 
 
-def _is_retryable_error(exc: Exception) -> bool:
+def _is_retryable_error(exc: BaseException) -> bool:
     """Classify delivery failures without importing the worker module eagerly."""
     import httpx
     import redis.exceptions as redis_exc
+    from dramatiq.middleware.time_limit import TimeLimitExceeded
     from sqlalchemy import exc as sa_exc
 
+    if isinstance(exc, TimeLimitExceeded):
+        # El limite efectivo por entrega (TimeLimit del broker, 10 min por
+        # defecto en dramatiq 2.2.1; el actor no lo sobrescribe) corto la
+        # generacion: reintento acotado por MAX_ATTEMPTS, no fallo eterno ni
+        # run "running" hasta el lease de 6 h. Es BaseException: sin listarlo
+        # aqui no entraba jamas en el manejador de fallos.
+        return True
     if isinstance(
         exc,
         (
@@ -366,6 +374,8 @@ def _utc(value: datetime | None) -> datetime | None:
 
 def run_thesis_job(run_id: int) -> None:
     """Run a thesis delivery with tenant context and recoverable retries."""
+    from dramatiq.middleware.time_limit import TimeLimitExceeded
+
     db = SessionLocal()
     try:
         # Bootstrap cross-tenant: el worker recibe solo run_id y el tenant
@@ -450,6 +460,14 @@ def run_thesis_job(run_id: int) -> None:
             db.info["tenant_id"] = tenant.id
             db.info["user_id"] = str(user_id)
         db.commit()
+        # Fencing token del intento: si una entrega de recuperacion (lease
+        # expirado, reconciler) toma el run MIENTRAS este intento genera,
+        # intent +1 lo delata. Ni el commit de exito ni el manejador de
+        # fallos de un intento cercado pueden pisar el estado del nuevo
+        # dueno; el trabajo LLM duplicado en ese escenario patologico
+        # (thread vivo >lease pese al TimeLimit) queda descartado, no
+        # fusionado.
+        fence = int(run.attempt or 1)
 
         state: dict[str, object] = {"position": 0, "open_step": None}
 
@@ -520,7 +538,6 @@ def run_thesis_job(run_id: int) -> None:
             if open_step is not None:
                 open_step.status = "succeeded"
                 open_step.finished_at = datetime.now(UTC)
-            run.status = "succeeded"
             result_payload = {
                 "thesis_version_id": thesis.id,
                 "version": thesis.version,
@@ -528,12 +545,30 @@ def run_thesis_job(run_id: int) -> None:
             }
             if financial_refresh is not None:
                 result_payload["financial_refresh"] = financial_refresh
-            run.result_payload = result_payload
-            run.error_class = None
-            run.error_message = None
-            run.finished_at = datetime.now(UTC)
+            # Cierre atomico: el UPDATE condicional ES el fence. No hay
+            # lectura previa que pueda quedar obsoleta entre check y write:
+            # si otra entrega reclamo el run (attempt cambio) en cualquier
+            # momento anterior a esta sentencia, rowcount=0 y el rollback
+            # descarta la tesis y los pasos de este intento cercado; el
+            # nuevo dueno decide el estado final. (autoflush=False: los
+            # pasos pendientes se insertan en el commit, misma transaccion.)
+            claimed = db.execute(
+                update(WorkflowRun)
+                .where(WorkflowRun.id == run_id, WorkflowRun.attempt == fence)
+                .values(
+                    status="succeeded",
+                    result_payload=result_payload,
+                    error_class=None,
+                    error_message=None,
+                    finished_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
+                )
+            ).rowcount
+            if claimed != 1:
+                db.rollback()
+                return
             db.commit()
-        except Exception as exc:
+        except (Exception, TimeLimitExceeded) as exc:
             # The rollback discards the step rows flushed by on_phase, so the
             # in-memory `open_step` is expunged and its identity is gone. The
             # progress already flushed is intentionally lost with the failed
@@ -543,34 +578,45 @@ def run_thesis_job(run_id: int) -> None:
             # handler can re-create the step it was running.
             open_step_name = state["open_step_name"] if state.get("open_step") is not None else None
             db.rollback()
-            # Recuperacion por run_id tras el rollback: el run ya fue validado
-            # contra su tenant al arrancar; este GET no es una lectura expuesta.
-            run = db.get(WorkflowRun, run_id, execution_options={"include_all_tenants": True})
             retryable = _is_retryable_error(exc)
-            if run is not None:
-                if open_step_name is not None:
-                    step = WorkflowStepRun(
-                        run_id=run.id,
-                        step_name=open_step_name,
-                        position=int(state["position"]),
-                        attempt=int(run.attempt or 1),
-                        status="retrying" if retryable else "failed",
-                        started_at=now,
-                        finished_at=None if retryable else datetime.now(UTC),
-                        error_class=type(exc).__name__,
-                        tenant_id=tenant.id if tenant is not None else None,
-                    )
-                    db.add(step)
-                run.error_class = type(exc).__name__
-                run.error_message = (
-                    "Transient failure; delivery will be retried" if retryable else "Thesis generation failed"
+            terminal = not (retryable and fence < MAX_ATTEMPTS)
+            values: dict = {
+                "status": "failed" if terminal else "retrying",
+                "error_class": type(exc).__name__,
+                "error_message": (
+                    "Thesis generation failed" if terminal else "Transient failure; delivery will be retried"
+                ),
+                "updated_at": datetime.now(UTC),
+            }
+            if terminal:
+                values["finished_at"] = datetime.now(UTC)
+            # Cierre atomico, mismo patron que el camino de exito: el UPDATE
+            # condicional por attempt ES el fence (sin lectura previa que
+            # pueda quedar obsoleta entre check y write). rowcount=0 significa
+            # que otra entrega reclamo el run (o la fila ya no existe): este
+            # intento cercado no escribe nada y el nuevo dueno decide.
+            claimed = db.execute(
+                update(WorkflowRun)
+                .where(WorkflowRun.id == run_id, WorkflowRun.attempt == fence)
+                .values(**values)
+            ).rowcount
+            if claimed != 1:
+                db.rollback()
+                raise
+            if open_step_name is not None:
+                step = WorkflowStepRun(
+                    run_id=run_id,
+                    step_name=open_step_name,
+                    position=int(state["position"]),
+                    attempt=fence,
+                    status="failed" if terminal else "retrying",
+                    started_at=now,
+                    finished_at=datetime.now(UTC) if terminal else None,
+                    error_class=type(exc).__name__,
+                    tenant_id=tenant.id if tenant is not None else None,
                 )
-                if retryable and int(run.attempt or 1) < MAX_ATTEMPTS:
-                    run.status = "retrying"
-                else:
-                    run.status = "failed"
-                    run.finished_at = datetime.now(UTC)
-                db.commit()
+                db.add(step)
+            db.commit()
             raise
     finally:
         db.close()
