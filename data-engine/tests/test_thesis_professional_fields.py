@@ -227,20 +227,30 @@ def test_news_dedupe_collapses_same_headline_from_several_agencies() -> None:
 
 
 def test_invalidation_grounded_when_price_already_above_base() -> None:
-    # Observado 2026-10-26 (objeto real): mos +2,2 % con precio 642.62 sobre
-    # base 565.21. La plantilla «precio supera base» contradice al precio;
-    # el criterio grounded declara el estado actual, no un disparador ya cumplido.
+    # Observado 2026-10-26 (objeto real): precio 642.62, base 565.21,
+    # esperado 656.45, mos +2,2 % = respecto al ESPERADO, no al escenario
+    # base. El criterio grounded declara «sin margen respecto al escenario
+    # base» y mantiene el margen respecto al esperado como benchmark aparte.
     service = ThesisService()
     valuation = {
         "current_price": 642.62,
         "base_value": 565.21,
+        "expected_value": 656.45,
         "margin_of_safety": 0.0215,
     }
     criteria = service._invalidation_criteria(_company(), valuation)
     assert any(
-        "ya supera el valor base" in c and "642.62" in c and "565.21" in c
+        "ya supera el valor del escenario base" in c
+        and "sin margen respecto al escenario base" in c
+        and "642.62" in c and "565.21" in c
         for c in criteria
     )
+    assert any(
+        "valor esperado (656.45)" in c and "2,1 %" in c
+        and "no son el mismo margen" in c
+        for c in criteria
+    )
+    assert not any("no hay margen de seguridad" in c for c in criteria)
     assert not any("supera de forma sostenida" in c for c in criteria)
 
 

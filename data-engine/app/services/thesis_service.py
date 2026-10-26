@@ -1193,23 +1193,32 @@ class ThesisService:
         mos = valuation.get("margin_of_safety")
         base = valuation.get("base_value")
         price = valuation.get("current_price")
-        # Criterio grounded en la relación precio/base ACTUAL: el objeto puede
-        # traer un margin_of_safety calculado con otro precio (observado
-        # 2026-10-26: mos +2,2 % con precio ya por encima del valor base), y
-        # una plantilla que asume margen vivo contradice entonces al precio.
+        # Criterio grounded en la relación precio/base ACTUAL con benchmark
+        # EXPLÍCITO: margin_of_safety es respecto al valor ESPERADO
+        # (observado 2026-10-26: precio 642.62, base 565.21, esperado 656.45,
+        # mos = 656.45/642.62 - 1 = +2,2 %), no respecto al escenario base.
+        # Cada margen se declara con SU benchmark; ninguno se usa para
+        # re-etiquetar el intento del modelo.
         if base is not None and price is not None:
             if price < base:
                 criteria.append(
                     f"El precio supera de forma sostenida el valor base "
-                    f"({base:.2f}): el margen de seguridad desaparece."
+                    f"({base:.2f}): el margen de seguridad respecto al "
+                    "escenario base desaparece."
                 )
             else:
                 criteria.append(
-                    f"El precio actual ({price:.2f}) ya supera el valor base "
-                    f"({base:.2f}): a este precio no hay margen de seguridad; "
-                    "la tesis de compra queda invalidada salvo revisión del "
-                    "valor base."
+                    f"El precio actual ({price:.2f}) ya supera el valor del "
+                    f"escenario base ({base:.2f}): sin margen respecto al "
+                    "escenario base a este precio."
                 )
+                expected = valuation.get("expected_value")
+                if mos is not None and expected is not None:
+                    criteria.append(
+                        f"Margen respecto al valor esperado ({expected:.2f}): "
+                        f"{percent_es(mos)}; benchmark distinto del escenario "
+                        "base: no son el mismo margen."
+                    )
         elif mos is not None and base is not None and mos >= 0:
             criteria.append(
                 f"El precio supera de forma sostenida el valor base ({base:.2f}): "
