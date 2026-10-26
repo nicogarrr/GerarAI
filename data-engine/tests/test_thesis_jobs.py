@@ -430,20 +430,176 @@ def test_dispatch_failed_recovery_needs_no_browser(monkeypatch):
     assert jobs.reconcile_thesis_dispatches() == {"redispatched": 0, "dispatch_failed": 0}
 
 
-def test_reconciler_does_not_restart_running_or_terminal_runs(monkeypatch):
+def test_reconciler_does_not_restart_healthy_active_or_terminal_runs(monkeypatch):
+    """Un run SANO nunca se re-despacha: lease de ejecucion fresco (running),
+    reintento de dramatiq aun pendiente (retrying reciente) o estado terminal.
+    Los runs interrumpidos de verdad los cubren los tests stale_*."""
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
     sent = []
     for status in ("running", "succeeded", "failed", "retrying"):
         run, _ = _enqueue_without_dispatch(monkeypatch, ticker=status.upper())
         with SessionLocal() as db:
             stored = db.get(WorkflowRun, run.id)
             stored.status = status
-            stored.updated_at = stored.created_at - timedelta(days=1)
+            if status == "running":
+                # Lease fresco: un worker sano esta generando ahora mismo.
+                stored.started_at = _dt.now(_UTC)
+            else:
+                # retrying reciente: su reintento de dramatiq aun no vencio;
+                # terminales: updated_at reciente, sin nada que recuperar.
+                stored.updated_at = _dt.now(_UTC)
             db.commit()
     import app.workers.dramatiq_app as workers
 
     monkeypatch.setattr(workers.generate_thesis_job, "send", lambda run_id: sent.append(run_id))
     assert jobs.reconcile_thesis_dispatches() == {"redispatched": 0, "dispatch_failed": 0}
     assert sent == []
+
+
+def test_reconciler_redelivers_stale_running_run_once(monkeypatch):
+    """Worker muerto a mitad de la generacion: la entrega reencolada por el
+    broker fue descartada por el lease fresco y nadie volveria a llamar al
+    run. El reconciler re-entrega UNA vez y sella; el status lo mueve el
+    worker, nunca el reconciler."""
+    run, _ = _enqueue_without_dispatch(monkeypatch, ticker="STUCKRUN")
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        stored.status = "running"
+        stored.started_at = stored.created_at - jobs.RUNNING_LEASE - timedelta(minutes=1)
+        stored.updated_at = stored.created_at - jobs.DISPATCH_RECHECK - timedelta(minutes=1)
+        db.commit()
+    sent = []
+    import app.workers.dramatiq_app as workers
+
+    monkeypatch.setattr(workers.generate_thesis_job, "send", lambda run_id: sent.append(run_id))
+    assert jobs.reconcile_thesis_dispatches()["redispatched"] == 1
+    assert sent == [run.id]
+    # Sin multiplicar despachos: el sello de la re-entrega frena los ticks siguientes.
+    assert jobs.reconcile_thesis_dispatches()["redispatched"] == 0
+    assert sent == [run.id]
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        assert stored.status == "running"
+        assert stored.input_payload["recovery_sent_at"]
+
+
+def test_stale_running_redelivery_recovers_through_worker(monkeypatch):
+    """Cadena completa proceso muerto -> reconciler -> worker: el intento
+    recuperado termina y arranca con started_at FRESCO."""
+    monkeypatch.setattr(ThesisService, "generate", _fake_generate())
+    run, _ = _enqueue_without_dispatch(monkeypatch, ticker="STALEOK")
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        stale_started = stored.created_at - jobs.RUNNING_LEASE - timedelta(minutes=1)
+        stored.status = "running"
+        stored.started_at = stale_started
+        stored.updated_at = stored.created_at - jobs.DISPATCH_RECHECK - timedelta(minutes=1)
+        db.commit()
+    sent = []
+    import app.workers.dramatiq_app as workers
+
+    monkeypatch.setattr(workers.generate_thesis_job, "send", lambda run_id: sent.append(run_id))
+    assert jobs.reconcile_thesis_dispatches()["redispatched"] == 1
+    assert sent == [run.id]
+
+    jobs.run_thesis_job(run.id)
+
+    with SessionLocal() as db:
+        recovered = db.get(WorkflowRun, run.id)
+        assert recovered.status == "succeeded"
+        assert recovered.attempt >= 2
+        assert recovered.started_at is not None and recovered.started_at > stale_started
+
+
+def test_recovered_attempt_drops_duplicate_delivery(monkeypatch):
+    """Concurrencia: una entrega duplicada que llega MIENTRAS el intento
+    recuperado genera debe caer por lease fresco, no re-disparar la
+    recuperacion a mitad de la generacion (doble generacion concurrente)."""
+    run, _ = _enqueue_without_dispatch(monkeypatch, ticker="DUPDROP")
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        stored.status = "running"
+        stored.started_at = stored.created_at - jobs.RUNNING_LEASE - timedelta(minutes=1)
+        db.commit()
+
+    deliveries = {"generate": 0}
+    real_generate = _fake_generate()
+
+    def generate_and_duplicate(self, db, ticker, force_new_version=False, phase_callback=None):
+        deliveries["generate"] += 1
+        # Entrega duplicada a mitad de la generacion (proceso aparte).
+        jobs.run_thesis_job(run.id)
+        return real_generate(self, db, ticker, force_new_version, phase_callback)
+
+    monkeypatch.setattr(ThesisService, "generate", generate_and_duplicate)
+    jobs.run_thesis_job(run.id)
+
+    assert deliveries["generate"] == 1
+    with SessionLocal() as db:
+        recovered = db.get(WorkflowRun, run.id)
+        assert recovered.status == "succeeded"
+        assert recovered.attempt == 2
+
+
+def test_reconciler_redelivers_lost_retrying_run(monkeypatch):
+    """El reintento de dramatiq se perdio con la cola: un run "retrying" cuyo
+    updated_at supera DISPATCH_RECHECK recibe una entrega nueva, una sola vez."""
+    run, _ = _enqueue_without_dispatch(monkeypatch, ticker="LOSTRETRY")
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        stored.status = "retrying"
+        stored.updated_at = stored.created_at - jobs.DISPATCH_RECHECK - timedelta(minutes=1)
+        db.commit()
+    sent = []
+    import app.workers.dramatiq_app as workers
+
+    monkeypatch.setattr(workers.generate_thesis_job, "send", lambda run_id: sent.append(run_id))
+    assert jobs.reconcile_thesis_dispatches()["redispatched"] == 1
+    assert sent == [run.id]
+    assert jobs.reconcile_thesis_dispatches()["redispatched"] == 0
+    assert sent == [run.id]
+
+
+def test_interrupted_redelivery_send_failure_retries_next_tick(monkeypatch):
+    """Si el envio falla no se sella nada: el run sigue elegible de inmediato
+    y el fallo cuenta como dispatch_failed."""
+    run, _ = _enqueue_without_dispatch(monkeypatch, ticker="SENDFAIL")
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        stored.status = "running"
+        stored.started_at = stored.created_at - jobs.RUNNING_LEASE - timedelta(minutes=1)
+        stored.updated_at = stored.created_at - jobs.DISPATCH_RECHECK - timedelta(minutes=1)
+        db.commit()
+    import app.workers.dramatiq_app as workers
+
+    def fail_send(_run_id):
+        raise ConnectionError("redis unavailable")
+
+    monkeypatch.setattr(workers.generate_thesis_job, "send", fail_send)
+    assert jobs.reconcile_thesis_dispatches()["dispatch_failed"] == 1
+    assert jobs.reconcile_thesis_dispatches()["dispatch_failed"] == 1
+
+
+def test_recovery_caps_repeated_interrupted_deliveries(monkeypatch):
+    """Un ticker que tumba al worker en cada intento no re-bota cada 6 h para
+    siempre: al agotar MAX_ATTEMPTS el run queda en failed honesto."""
+    run, _ = _enqueue_without_dispatch(monkeypatch, ticker="CRASHLOOP")
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        stored.status = "running"
+        stored.attempt = jobs.MAX_ATTEMPTS
+        stored.started_at = stored.created_at - jobs.RUNNING_LEASE - timedelta(minutes=1)
+        db.commit()
+
+    jobs.run_thesis_job(run.id)
+
+    with SessionLocal() as db:
+        stored = db.get(WorkflowRun, run.id)
+        assert stored.status == "failed"
+        assert stored.error_class == "RecoverableRunningState"
+        assert stored.finished_at is not None
 
 
 def test_latest_generation_is_tenant_scoped(monkeypatch):
