@@ -332,12 +332,20 @@ def job_payload(run: WorkflowRun) -> dict:
     }
 
 
-def _is_retryable_error(exc: Exception) -> bool:
+def _is_retryable_error(exc: BaseException) -> bool:
     """Classify delivery failures without importing the worker module eagerly."""
     import httpx
     import redis.exceptions as redis_exc
+    from dramatiq.middleware.time_limit import TimeLimitExceeded
     from sqlalchemy import exc as sa_exc
 
+    if isinstance(exc, TimeLimitExceeded):
+        # El limite efectivo por entrega (TimeLimit del broker, 10 min por
+        # defecto en dramatiq 2.2.1; el actor no lo sobrescribe) corto la
+        # generacion: reintento acotado por MAX_ATTEMPTS, no fallo eterno ni
+        # run "running" hasta el lease de 6 h. Es BaseException: sin listarlo
+        # aqui no entraba jamas en el manejador de fallos.
+        return True
     if isinstance(
         exc,
         (
@@ -366,6 +374,8 @@ def _utc(value: datetime | None) -> datetime | None:
 
 def run_thesis_job(run_id: int) -> None:
     """Run a thesis delivery with tenant context and recoverable retries."""
+    from dramatiq.middleware.time_limit import TimeLimitExceeded
+
     db = SessionLocal()
     try:
         # Bootstrap cross-tenant: el worker recibe solo run_id y el tenant
@@ -450,6 +460,14 @@ def run_thesis_job(run_id: int) -> None:
             db.info["tenant_id"] = tenant.id
             db.info["user_id"] = str(user_id)
         db.commit()
+        # Fencing token del intento: si una entrega de recuperacion (lease
+        # expirado, reconciler) toma el run MIENTRAS este intento genera,
+        # intent +1 lo delata. Ni el commit de exito ni el manejador de
+        # fallos de un intento cercado pueden pisar el estado del nuevo
+        # dueno; el trabajo LLM duplicado en ese escenario patologico
+        # (thread vivo >lease pese al TimeLimit) queda descartado, no
+        # fusionado.
+        fence = int(run.attempt or 1)
 
         state: dict[str, object] = {"position": 0, "open_step": None}
 
@@ -516,6 +534,13 @@ def run_thesis_job(run_id: int) -> None:
                 phase_callback=on_phase,
                 **kwargs,
             )
+            db.refresh(run)
+            if int(run.attempt or 1) != fence:
+                # Recuperacion posterior tomo el run: este intento esta
+                # cercado. Rollback: la tesis generada queda descartada con
+                # la transaccion y el nuevo dueno decide el estado final.
+                db.rollback()
+                return
             open_step = state["open_step"]
             if open_step is not None:
                 open_step.status = "succeeded"
@@ -533,7 +558,7 @@ def run_thesis_job(run_id: int) -> None:
             run.error_message = None
             run.finished_at = datetime.now(UTC)
             db.commit()
-        except Exception as exc:
+        except (Exception, TimeLimitExceeded) as exc:
             # The rollback discards the step rows flushed by on_phase, so the
             # in-memory `open_step` is expunged and its identity is gone. The
             # progress already flushed is intentionally lost with the failed
@@ -544,9 +569,19 @@ def run_thesis_job(run_id: int) -> None:
             open_step_name = state["open_step_name"] if state.get("open_step") is not None else None
             db.rollback()
             # Recuperacion por run_id tras el rollback: el run ya fue validado
-            # contra su tenant al arrancar; este GET no es una lectura expuesta.
-            run = db.get(WorkflowRun, run_id, execution_options={"include_all_tenants": True})
+            # contra su tenant al arrancar; esta lectura no es expuesta.
+            # populate_existing es obligatorio: Session.get devuelve la instancia
+            # del identity map con atributos obsoletos (el intento robado por el
+            # reconciliador no se ve) y el fencing compararia un attempt viejo.
+            run = db.scalars(
+                select(WorkflowRun)
+                .where(WorkflowRun.id == run_id)
+                .execution_options(include_all_tenants=True, populate_existing=True)
+            ).first()
             retryable = _is_retryable_error(exc)
+            if run is not None and int(run.attempt or 1) != fence:
+                # Intento cercado: el nuevo dueno escribe su propio estado.
+                raise
             if run is not None:
                 if open_step_name is not None:
                     step = WorkflowStepRun(
