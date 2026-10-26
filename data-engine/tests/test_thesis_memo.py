@@ -205,3 +205,31 @@ def test_draft_memo_is_a_whitelist_without_verdict_or_figures(db):
     assert "## Criterios de invalidación" in memo
     assert "Confianza de datos 82/100" in memo
     assert memo.rstrip().endswith("ni recomendación de compra o venta.")
+
+
+def test_published_memo_includes_full_analysis_without_approval_section_or_duplicates(db):
+    company = _company(db)
+    thesis = ThesisVersion(
+        company_id=company.id, version=3, status="published", rating="seguimiento",
+        thesis_markdown=(
+            "# Tesis de AAPL — v3\n\n## 4. Últimos resultados\n| Métrica | Valor |\n| --- | --- |\n"
+            "| Ingresos | 200 mil M |\n\n### Contexto documental recuperado\nFragmento citado."
+        ),
+        hypothesis="Mismo texto.", executive_summary="Mismo texto.",
+    )
+    db.add(thesis)
+    db.flush()
+    db.add(ThesisSection(thesis_version_id=thesis.id, company_id=company.id, section_key="approval", title="Aprobación Telegram", body="approved", order_index=900))
+    db.commit()
+
+    memo = build_memo_markdown(db, company, thesis)
+
+    assert "## Análisis completo" in memo
+    assert "### 4. Últimos resultados" in memo
+    assert "| Ingresos | 200 mil M |" in memo
+    assert "**Contexto documental recuperado**" in memo
+    assert "# Tesis de AAPL" not in memo
+    assert memo.count("Mismo texto.") == 1
+    assert "## Hipótesis y resumen ejecutivo" in memo
+    assert "Aprobación Telegram" not in memo
+    assert "## Secciones" not in memo
