@@ -1,27 +1,21 @@
-// Guard: el buscador etiqueta la cobertura de ficha sin filtrar resultados.
-// Causa confirmada 26 oct 2026 contra API Finnhub del plan actual:
-// profile2 403 en SAF.PA y SAN.MC (no-US), 200 en META; /search cubre ambas.
+// Guard: el buscador etiqueta la cobertura de ficha sin filtrar resultados
+// y sin extrapolar causa/plan/bolsa: «covered» solo con cobertura local
+// verificada; el resto es «unknown» (incluido US no verificado).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 // @ts-expect-error TS5097: ruta explícita para node --experimental-strip-types.
-import { classifyFichaCoverage, EXCHANGE_LABEL_BY_SUFFIX } from '../lib/market/search-coverage.ts';
+import { classifyFichaCoverage } from '../lib/market/search-coverage.ts';
 
-test('clasifica cobertura con causa confirmada, sin adivinar sufijos desconocidos', () => {
-    // US sin sufijo: cubierto por profile2 en el plan actual (META 200).
-    assert.equal(classifyFichaCoverage('META', false), 'covered');
-    // Bolsa conocida no-US sin master local: plan-limited (SAF.PA 403).
-    assert.equal(classifyFichaCoverage('SAF.PA', false), 'plan-limited');
-    assert.equal(classifyFichaCoverage('AIR.PA', false), 'plan-limited');
-    // Solo sufijos con 403 confirmado: otras bolsas no se etiquetan por
-    // extrapolación (sin fuente autoritativa de cobertura).
-    assert.equal(classifyFichaCoverage('300183.SZ', false), 'unknown');
-    assert.equal(classifyFichaCoverage('TMAS.JK', false), 'unknown');
-    // En master local: cubierto aunque profile2 no lo cubra (SAN.MC carga).
+test('covered solo con evidencia individual; el resto unknown, sin adivinar', () => {
+    // En master local verificado: covered (SAN.MC carga su ficha).
     assert.equal(classifyFichaCoverage('SAN.MC', true), 'covered');
-    // Sufijo desconocido: no se adivina.
-    assert.equal(classifyFichaCoverage('FOO.ZZ', false), 'unknown');
-    assert.ok(EXCHANGE_LABEL_BY_SUFFIX.PA && EXCHANGE_LABEL_BY_SUFFIX.MC);
+    // Sin evidencia individual: unknown, incluso US o bolsas con 403 observado
+    // en otro instrumento (2 GETs no etiquetan una bolsa entera).
+    assert.equal(classifyFichaCoverage('META', false), 'unknown');
+    assert.equal(classifyFichaCoverage('SAF.PA', false), 'unknown');
+    assert.equal(classifyFichaCoverage('AIR.PA', false), 'unknown');
+    assert.equal(classifyFichaCoverage('300183.SZ', false), 'unknown');
 });
 
 test('la búsqueda anota cobertura en ambos caminos (remoto y fallback local)', () => {
@@ -32,10 +26,10 @@ test('la búsqueda anota cobertura en ambos caminos (remoto y fallback local)', 
     assert.ok(block.includes('withCoverage(local)'), 'fallback local anotado');
 });
 
-test('la paleta comunica la cobertura limitada sin filtrar el resultado', () => {
+test('la paleta comunica «no comprobada» sin atribuir plan/bolsa y sin filtrar', () => {
     const src = readFileSync('components/SearchCommand.tsx', 'utf8');
-    assert.ok(src.includes("fichaCoverage === 'plan-limited'"), 'la paleta muestra el aviso de cobertura');
-    assert.ok(src.includes('Puede que no tenga ficha'), 'copy hedged: posibilidad, no inservibilidad');
-    // Sin filtrado a ciegas: el item sigue seleccionable.
+    assert.ok(src.includes("fichaCoverage === 'unknown'"), 'la paleta muestra el aviso');
+    assert.ok(src.includes('Cobertura de ficha no comprobada'), 'copy sin atribución de causa');
+    assert.ok(!src.includes('plan de datos'), 'sin atribuir causa al plan');
     assert.ok(!src.includes('disabled'), 'los resultados no se deshabilitan');
 });

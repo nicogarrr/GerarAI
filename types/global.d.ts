@@ -80,7 +80,7 @@ declare global {
         isInWatchlist: boolean;
         // Cobertura de ficha según el plan de datos (lib/market/search-coverage):
         // solo la anota la búsqueda; ausente en otras fuentes.
-        fichaCoverage?: 'covered' | 'plan-limited' | 'unknown';
+        fichaCoverage?: 'covered' | 'unknown';
     };
 
     type FinnhubSearchResult = {
