@@ -43,12 +43,45 @@ def _full_analysis_lines(markdown: str) -> list[str]:
             line = f"- {ref} [texto del extracto omitido; consultar en la ficha]"
             out.append(line)
             continue
+        # Solo campos identificados del productor, nunca prosa libre:
+        # - "- Estado: `ok` publicable=True" (marca interna que contradice el estado);
+        # - celdas "N hechos citados (id, id, ...)" de la tabla de procedencia
+        #   (los ids siguen en la ficha).
+        if line.startswith("- Estado:"):
+            line = re.sub(r"\s+publicable=(?:True|False|None)\s*$", "", line)
+        if line.startswith("|"):
+            line = re.sub(r"(\d+ hechos? citados?) \(\d+(?:, \d+)*\)", r"\1", line)
         if line.startswith("### "):
             out.append(f"**{line[4:]}**")
         elif line.startswith("## "):
             out.append(f"### {line[3:]}")
         else:
             out.append(line)
+    return out
+
+
+def _narrative_lines(narrative: list | None) -> list[str]:
+    """Secciones narrativas persistidas (mismo texto que la ficha), sin reescribir."""
+    out: list[str] = []
+    for section in narrative or []:
+        if not isinstance(section, dict):
+            continue
+        # La marca técnica INFERIDO se sustituye, no se borra: la calificación
+        # (interpretación a partir de titulares, no confirmada) se conserva.
+        titulo = str(section.get("titulo") or "").strip()
+        if re.search(r"\s*-?\s*INFERIDO$", titulo):
+            titulo = re.sub(r"\s*-?\s*INFERIDO$", "", titulo).strip() + " (interpretación, no confirmado)"
+        parrafos = [
+            re.sub(r"^INFERIDO:\s*", "Interpretación a partir de titulares, no confirmada: ", str(p)).strip()
+            for p in (section.get("parrafos") or [])
+            if str(p).strip()
+        ]
+        if not titulo or not parrafos:
+            continue
+        out.append(f"### {titulo}")
+        for parrafo in parrafos:
+            out.append(f"- {parrafo}" if parrafo.startswith("Evidencia ") else parrafo)
+        out.append("")
     return out
 
 
@@ -64,6 +97,7 @@ def build_memo_markdown(
     stale: bool = False,
     latest_data_at: datetime | None = None,
     draft: bool = False,
+    isolated: bool = False,
 ) -> str:
     """``draft=True``: memo de un borrador sin publicar, por lista blanca.
 
@@ -127,6 +161,19 @@ def build_memo_markdown(
         elif audit is None:
             lines.append("> Sin auditoría de fuentes registrada para esta versión.")
             lines.append("")
+
+    if isolated:
+        lines.append(
+            "> ARTEFACTO DE PRUEBA AISLADA: generada en una transacción con rollback; NO está "
+            "persistida, ni publicada ni aprobada."
+        )
+        lines.append("")
+    if not draft and thesis.status != "published":
+        lines.append(
+            f"> ESTADO: versión en estado «{label_es(STATUS_ES, thesis.status)}», no publicada ni "
+            "aprobada. Es una lectura de seguimiento, no un veredicto ni una recomendación."
+        )
+        lines.append("")
 
     if draft:
         lines.append(
@@ -199,6 +246,11 @@ def build_memo_markdown(
     if not draft:
         # La aprobación por Telegram es un registro operativo, no análisis.
         sections = [sec for sec in sections if sec.title != APPROVAL_SECTION_TITLE]
+        narrative = _narrative_lines(thesis.narrative_sections)
+        if narrative:
+            lines.append("## Análisis narrativo")
+            lines.extend(narrative)
+
         if sections:
             lines.append("## Secciones")
             for section in sections:
@@ -225,10 +277,16 @@ def build_memo_markdown(
             lines.append("")
 
     lines.append("---")
-    lines.append(
-        f"Generado {datetime.now(UTC):%Y-%m-%d %H:%M} UTC desde la versión persistida "
-        f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'})."
-    )
+    if isolated:
+        lines.append(
+            f"Generado {datetime.now(UTC):%Y-%m-%d %H:%M} UTC desde una ejecución aislada "
+            "(rollback, no persistida; sin fingerprint persistido)."
+        )
+    else:
+        lines.append(
+            f"Generado {datetime.now(UTC):%Y-%m-%d %H:%M} UTC desde la versión persistida "
+            f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'})."
+        )
     lines.append(
         "Documento informativo de investigación. NO es asesoramiento financiero "
         "ni recomendación de compra o venta."

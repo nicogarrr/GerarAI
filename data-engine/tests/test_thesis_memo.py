@@ -263,3 +263,63 @@ def test_unpublishable_valuation_gets_visible_indicative_banner_and_rag_is_trimm
     assert "Doc. Fuente: URL no disponible." in memo
     assert "x" * 50 not in memo
     assert memo.count("Doc. Fuente") == 1
+
+
+def test_memo_renders_narrative_sections_and_cleans_internal_marks(db):
+    company = _company(db)
+    thesis = ThesisVersion(
+        company_id=company.id, version=3, status="final", rating="watch",
+        thesis_markdown=(
+            "# t\n## Valoración\n- Estado: ok publicable=True\n"
+            "| x | derivado | 0,2 | m | 10 hechos citados (3766320, 3765864) |\n- Margen (12345) legítimo"
+        ),
+        executive_summary="s",
+        narrative_sections=[
+            {"titulo": "Lo que cambió", "parrafos": ["Texto uno.", "Evidencia 1: Titular. Fuente: https://e.com/a"]},
+            {"titulo": "Vieja - INFERIDO", "parrafos": ["INFERIDO: algo"]},
+            {"titulo": "Vacía", "parrafos": []},
+        ],
+    )
+    db.add(thesis)
+    db.commit()
+    memo = build_memo_markdown(db, company, thesis)
+    assert "## Análisis narrativo" in memo
+    assert "### Lo que cambió" in memo
+    assert "Texto uno." in memo
+    assert "- Evidencia 1: Titular." in memo
+    assert "### Vacía" not in memo
+    assert "### Vieja (interpretación, no confirmado)" in memo
+    assert "Interpretación a partir de titulares, no confirmada: algo" in memo
+    assert "publicable=" not in memo
+    assert "3766320" not in memo
+    assert "10 hechos citados" in memo
+    assert "(12345)" in memo
+    assert "no publicada ni aprobada" in memo
+
+
+def test_published_memo_has_no_unapproved_banner(db):
+    company = _company(db)
+    thesis = ThesisVersion(
+        company_id=company.id, version=1, status="published", rating="watch",
+        thesis_markdown="# t", executive_summary="s",
+    )
+    db.add(thesis)
+    db.commit()
+    memo = build_memo_markdown(db, company, thesis)
+    assert "no publicada ni aprobada" not in memo
+    assert "## Análisis narrativo" not in memo
+
+
+def test_isolated_memo_is_labeled_not_persisted(db):
+    company = _company(db)
+    thesis = ThesisVersion(
+        company_id=company.id, version=9, status="final", rating="watch",
+        thesis_markdown="# t", executive_summary="s",
+    )
+    db.add(thesis)
+    db.commit()
+    memo = build_memo_markdown(db, company, thesis, isolated=True)
+    assert "ARTEFACTO DE PRUEBA AISLADA" in memo
+    assert "no persistida" in memo
+    assert "desde la versión persistida" not in memo
+    assert "desde la versión persistida" in build_memo_markdown(db, company, thesis)
