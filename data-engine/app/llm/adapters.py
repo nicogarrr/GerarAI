@@ -346,11 +346,15 @@ class OpenAICompatibleProvider(LLMProvider):
             "model": model,
             "messages": [message.to_openai() for message in request.messages],
         }
-        if self._reasoning_effort and (
+        # El override de la request gana al default del proveedor (p. ej. una
+        # ruta estructurada larga pide "none" sin tocar al chat). El filtro de
+        # modelos soportados se aplica igual en ambos casos.
+        effort = request.reasoning_effort or self._reasoning_effort
+        if effort and (
             self._reasoning_effort_models is None
             or model in self._reasoning_effort_models
         ):
-            payload["reasoning_effort"] = self._reasoning_effort
+            payload["reasoning_effort"] = effort
         if request.temperature is not None:
             payload["temperature"] = request.temperature
         if request.max_tokens is not None:
@@ -468,6 +472,7 @@ class OpenAICompatibleProvider(LLMProvider):
                 "output": response.usage.output_tokens,
                 "total": response.usage.total_tokens,
                 "cache_read": response.usage.cache_read_tokens,
+                "reasoning": response.usage.reasoning_tokens,
             },
         )
         return response
@@ -515,11 +520,16 @@ class OpenAICompatibleProvider(LLMProvider):
         output_tokens = raw_output_tokens
         prompt_details = usage_body.get("prompt_tokens_details") or {}
         prompt_details = prompt_details if isinstance(prompt_details, dict) else {}
+        completion_details = usage_body.get("completion_tokens_details") or {}
+        completion_details = (
+            completion_details if isinstance(completion_details, dict) else {}
+        )
         usage = Usage(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=_integer(usage_body.get("total_tokens")) or input_tokens + output_tokens,
             cache_read_tokens=_integer(prompt_details.get("cached_tokens")),
+            reasoning_tokens=_integer(completion_details.get("reasoning_tokens")),
         )
         finish_reason = choice.get("finish_reason") if isinstance(choice, dict) else None
         warnings = self._collect_warnings(body)

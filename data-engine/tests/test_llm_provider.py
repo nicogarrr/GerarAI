@@ -529,3 +529,111 @@ def test_settings_and_errors_never_include_api_keys():
 )
 def test_parse_json_response_handles_common_model_wrappers(text, expected):
     assert parse_json_response(text) == expected
+
+
+def test_request_reasoning_effort_overrides_provider_default():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return _ok_response("deepseek-v4.1-flash")
+
+    async def scenario():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            provider = create_llm_provider(
+                Settings(
+                    _env_file=None,
+                    opencode_go_api_key="test-secret",
+                    opencode_go_base_url="https://opencode.test/zen/go/v1",
+                ),
+                client=client,
+            )
+            return await provider.complete(
+                LLMRequest(
+                    messages=[Message("user", "Extract")],
+                    task="deep_thesis",
+                    reasoning_effort="none",
+                )
+            )
+
+    run(scenario())
+    # El override de la request gana al default "high" del proveedor.
+    assert seen[0]["reasoning_effort"] == "none"
+
+
+def test_request_reasoning_effort_respects_model_allowlist():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        seen.append(payload)
+        if payload["model"] == "deepseek-v4.1-flash":
+            return httpx.Response(500, json={"error": "boom"})
+        return _ok_response(payload["model"])
+
+    async def scenario():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            provider = create_llm_provider(
+                Settings(
+                    _env_file=None,
+                    opencode_go_api_key="test-secret",
+                    opencode_go_base_url="https://opencode.test/zen/go/v1",
+                    opencode_go_fallback_model="muse-spark-1.3-contributor-free",
+                ),
+                client=client,
+            )
+            return await provider.complete(
+                LLMRequest(
+                    messages=[Message("user", "Extract")],
+                    task="deep_thesis",
+                    reasoning_effort="none",
+                )
+            )
+
+    run(scenario())
+    assert seen[0]["reasoning_effort"] == "none"
+    # El fallback (fuera de la lista) no recibe el parametro ni por override.
+    assert "reasoning_effort" not in seen[-1]
+
+
+def test_reasoning_tokens_are_captured_from_completion_details():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "opencode-request",
+                "model": "deepseek-v4.1-flash",
+                "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 20,
+                    "total_tokens": 30,
+                    "completion_tokens_details": {"reasoning_tokens": 7},
+                },
+            },
+        )
+
+    async def scenario():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            provider = create_llm_provider(
+                Settings(
+                    _env_file=None,
+                    opencode_go_api_key="test-secret",
+                    opencode_go_base_url="https://opencode.test/zen/go/v1",
+                ),
+                client=client,
+            )
+            return await provider.complete(
+                LLMRequest(messages=[Message("user", "Extract")], task="chat")
+            )
+
+    response = run(scenario())
+    assert response.usage.reasoning_tokens == 7
+    assert response.usage.output_tokens == 20
+
+
+def test_reasoning_effort_request_validation():
+    import pytest
+
+    with pytest.raises(ValueError):
+        LLMRequest(messages=[Message("user", "x")], reasoning_effort="  ")
