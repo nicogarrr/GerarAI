@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error TS5097: ejecución directa con Node.
-import { collapseVersionHistory } from '../lib/research/version-history.ts';
+import { collapseVersionHistory, versionHistoryBadges } from '../lib/research/version-history.ts';
 
 const entry = (version: number, summary: string | null, status = 'published', rating = 'buy') => ({
   version,
@@ -34,4 +34,23 @@ test('no colapsa si cambia el estado o el rating aunque el resumen coincida', ()
 test('no colapsa entradas sin resumen', () => {
   const groups = collapseVersionHistory([entry(25, null), entry(24, null)]);
   assert.equal(groups.length, 2);
+});
+
+test('estado y rating con el mismo texto no duplican el badge', () => {
+  const translate = (value: string) => value === 'insufficient_data' ? 'datos insuficientes' : value;
+  const badges = versionHistoryBadges({ status: 'insufficient_data', rating: 'insufficient_data' }, translate);
+  assert.deepEqual(badges, [{ key: 'status', text: 'datos insuficientes' }]);
+});
+
+test('un rating distinto se rotula y rating_changed no se pierde', () => {
+  const translate = (value: string) => value === 'hold' ? 'mantener' : value === 'published' ? 'publicada' : value;
+  const badges = versionHistoryBadges(
+    { status: 'published', rating: 'hold', diff: { rating_changed: true } },
+    translate,
+  );
+  assert.deepEqual(badges, [
+    { key: 'status', text: 'publicada' },
+    { key: 'rating', text: 'rating: mantener' },
+    { key: 'rating-change', text: 'rating cambiado' },
+  ]);
 });

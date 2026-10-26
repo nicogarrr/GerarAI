@@ -7,7 +7,7 @@ import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import ThesisAudioPlayer from '@/components/research/ThesisAudioPlayer';
 import MobileCollapse from '@/components/ui/mobile-collapse';
 import CompanyActionsMenu from '@/components/research/CompanyActionsMenu';
-import { collapseVersionHistory } from '@/lib/research/version-history';
+import { collapseVersionHistory, versionHistoryBadges } from '@/lib/research/version-history';
 import { listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
 import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
@@ -73,6 +73,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Panel } from '@/components/ui/panel';
+import { PagedList } from '@/components/ui/pagination';
 import { Stat } from '@/components/ui/stat';
 import { getCompanyPer } from '@/lib/actions/company-per.actions';
 import { Textarea } from '@/components/ui/textarea';
@@ -1251,38 +1252,52 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           {data.historyDetail.history.length === 0 ? (
             <EmptyState title="Aún no hay historial de versiones." />
           ) : (
-            <div className="space-y-3">
-              {/* Versiones seguidas con el mismo resumen («Sin cambios
-                  materiales…» ×4) se colapsan en una tarjeta con el rango. */}
-              {collapseVersionHistory(data.historyDetail.history).map((group) => {
+            <PagedList
+              className="space-y-3"
+              items={collapseVersionHistory(data.historyDetail.history).map((group) => {
                 const entry = group[0];
-                return (
-                <div className="rounded-lg border border-gray-800 p-4" key={entry.id}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">v{entry.version}</Badge>
-                    {group.length > 1 ? (
-                      <Badge variant="outline">{group.length} versiones seguidas con el mismo resumen (v{entry.version}–v{group[group.length - 1].version})</Badge>
-                    ) : null}
-                    <Badge variant={entry.status === 'published' ? 'default' : 'outline'}>{label(entry.status)}</Badge>
-                    <Badge variant="outline">{label(entry.rating)}</Badge>
-                    {entry.diff?.rating_changed ? <Badge>rating cambiado</Badge> : null}
-                    <span className="ml-auto text-xs text-gray-500">
-                      {formatUserDateTime(entry.updated_at)}
-                    </span>
-                  </div>
-                  {entry.diff ? (
-                    <p className="mt-2 text-sm leading-6 text-gray-400">{entry.diff.change_summary}</p>
-                  ) : (
-                    <p className="mt-2 text-xs text-gray-500">Primera versión registrada o sin diff persistido.</p>
-                  )}
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                    <span>red-team {entry.red_team_score}/100</span>
-                    <span>confianza datos {entry.data_confidence_score}/100</span>
-                  </div>
-                </div>
-                );
+                return {
+                  key: `history-${entry.id}`,
+                  node: (
+                    <div className="rounded-lg border border-gray-800 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">v{entry.version}</Badge>
+                        {group.length > 1 ? (
+                          <Badge variant="outline">{group.length} versiones seguidas con el mismo resumen (v{entry.version}–v{group[group.length - 1].version})</Badge>
+                        ) : null}
+                        {versionHistoryBadges(entry, label).map((badge) => (
+                          <Badge
+                            key={badge.key}
+                            variant={
+                              badge.key === 'rating-change'
+                                || (badge.key === 'status' && entry.status === 'published')
+                                ? 'default'
+                                : 'outline'
+                            }
+                          >
+                            {badge.text}
+                          </Badge>
+                        ))}
+                        <span className="ml-auto text-xs text-gray-500">
+                          {formatUserDateTime(entry.updated_at)}
+                        </span>
+                      </div>
+                      {entry.diff ? (
+                        <p className="mt-2 text-sm leading-6 text-gray-400">{entry.diff.change_summary}</p>
+                      ) : (
+                        <p className="mt-2 text-xs text-gray-500">Primera versión registrada o sin diff persistido.</p>
+                      )}
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                        <span>red-team {entry.red_team_score}/100</span>
+                        <span>confianza datos {entry.data_confidence_score}/100</span>
+                      </div>
+                    </div>
+                  ),
+                };
               })}
-            </div>
+              label="Historial de versiones y aprobaciones"
+              pageSize={10}
+            />
           )}
           <p className="mt-3 text-xs text-gray-500">
             El historial muestra estado, fecha y resumen del cambio tal como están persistidos; el sistema no registra quién aprobó cada versión.
@@ -1324,12 +1339,20 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             {data.claims.length ? groupClaimsByVersion(data.claims, data.history).map((group) => (
               <details key={group.key} open={group.claims.some((claim) => claim.thesis_version_id === data.thesis?.id)} className="rounded-lg border border-gray-800 p-3">
                 <summary className="cursor-pointer text-sm font-semibold text-gray-300">{group.label} · {group.claims.length} afirmaciones</summary>
-                <div className="mt-3 space-y-3">{group.claims.map((claim) => (
-              <div className="rounded-lg border border-gray-800 p-4" key={claim.id}>
-                <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(claim.status)}</Badge><Badge variant="outline">materialidad {claim.materiality_score}</Badge><Badge variant="outline">{claim.evidence.length} pruebas</Badge></div>
-                <p className="mt-3 text-sm text-gray-300">{claim.statement}</p>
-              </div>
-                ))}</div>
+                <PagedList
+                  className="mt-3"
+                  items={group.claims.map((claim) => ({
+                    key: `claim-${claim.id}`,
+                    node: (
+                      <div className="rounded-lg border border-gray-800 p-4">
+                        <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(claim.status)}</Badge><Badge variant="outline">materialidad {claim.materiality_score}</Badge><Badge variant="outline">{claim.evidence.length} pruebas</Badge></div>
+                        <p className="mt-3 text-sm text-gray-300">{claim.statement}</p>
+                      </div>
+                    ),
+                  }))}
+                  label={`Afirmaciones de ${group.label}`}
+                  pageSize={10}
+                />
               </details>
             )) : (
               <EmptyState

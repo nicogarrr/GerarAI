@@ -245,6 +245,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
               action={latest ? <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink> : undefined}
               description={latest ? `La v${latest.version} está en estado «${statusLabel(latest.status)}»: solo se enseñan las cifras y el margen de una versión publicada.` : undefined}
               title={`Aún no hay ninguna tesis publicada de ${ticker}.`}
+              titleAs="h1"
             />
           </div>
         ) : (

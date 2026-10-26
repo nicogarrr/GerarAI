@@ -25,8 +25,13 @@ for (const page of pages) {
         // La captura no puede tragarse el resto: debe haber rethrow tras el if.
         assert.match(catchBlock, /throw error;/);
         assert.ok(catchBlock.indexOf('throw error;') > catchBlock.indexOf('<BackendOffline'));
-        // retryHref conserva la ruta y no deja un '?' vacio.
-        assert.match(src, /retryQuery \? `\/research\/(news|sources)\?\$\{retryQuery\}` : '\/research\/(news|sources)'/);
+        // retryHref conserva la ruta y no deja un '?' vacio. Sources usa el
+        // helper compartido para conservar tambien alcance/tipo/busqueda.
+        assert.ok(
+            /retryQuery \? `\/research\/(news|sources)\?\$\{retryQuery\}` : '\/research\/(news|sources)'/.test(src)
+            || /const retryHref = sourcesHref\(ticker, requestedPageNumber, filters\)/.test(src),
+            'retryHref conserva la ruta sin query vacia',
+        );
     });
 }
 
