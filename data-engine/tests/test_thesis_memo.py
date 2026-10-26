@@ -254,7 +254,7 @@ def test_unpublishable_valuation_gets_visible_indicative_banner_and_rag_is_trimm
 
     memo = build_memo_markdown(db, company, thesis)
 
-    assert "Valoración INDICATIVA" in memo
+    assert "valoración INDICATIVA" in memo
     assert "churn" in memo
     assert "extracto recortado" in memo
     assert "x" * 600 not in memo

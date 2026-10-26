@@ -103,7 +103,7 @@ def build_memo_markdown(
     )
     if stale:
         when = f"{latest_data_at:%Y-%m-%d}" if latest_data_at else "desconocida"
-        lines.append(f"\n> ⚠ Tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).")
+        lines.append(f"\n> AVISO: tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).")
     lines.append("")
 
     if not draft:
@@ -115,7 +115,7 @@ def build_memo_markdown(
         ).first()
         if audit is not None and not audit.passed:
             lines.append(
-                "> ⚠ Valoración INDICATIVA: la auditoría de fuentes de esta versión no la dio por "
+                "> AVISO: valoración INDICATIVA: la auditoría de fuentes de esta versión no la dio por "
                 "publicable. Las cifras son escenarios del modelo con los supuestos y datos "
                 "disponibles, no un veredicto de valoración."
             )
