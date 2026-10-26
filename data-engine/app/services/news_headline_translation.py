@@ -578,8 +578,21 @@ def _amounts(text: str, lang: str) -> tuple[list[tuple[str, int | float]], str] 
     return found, residual
 
 
+# Calificadores de divisa: «$»/«dólares» genericos no establecen USD. Si cualquiera
+# de los lados trae un calificador, no se acepta la equivalencia (no se pierde ni
+# se cambia CAD/AUD/USD/US$/C$/A$/canadiense/australiano).
+_CUR_QUALIFIER = re.compile(
+    r"(?i)(?<![\w])(?:US|U\.S\.|CA|AU|NZ|HK|MX|C|A)\s?\$|\b(?:USD|CAD|AUD|NZD|HKD|MXN)\b"
+    r"|\b(?:u\.?s\.?|canad\w*|austral\w*|estadounidens\w*|norteamerican\w*|american\w*|neozeland\w*|new zealand|hong kong|mexican\w*)\s+(?:dollars?|d[oó]lares)\b"
+    r"|\b(?:dollars?|d[oó]lares)\s+(?:u\.?s\.?|canad\w*|austral\w*|estadounidens\w*|norteamerican\w*|american\w*|neozeland\w*|mexican\w*)\b"
+    r"|\b(?:canadian|australian|canadiens\w*|australian\w*)\b"
+)
+
+
 def _scaled_amount_equivalent(original: str, translated: str) -> bool:
     try:
+        if _CUR_QUALIFIER.search(original) or _CUR_QUALIFIER.search(translated):
+            return False
         o = _amounts(original, "en")
         t = _amounts(translated, "es")
         if o is None or t is None or len(o[0]) != 1 or len(t[0]) != 1 or o[0] != t[0]:

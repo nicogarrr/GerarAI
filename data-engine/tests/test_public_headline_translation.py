@@ -292,3 +292,22 @@ def test_equivalencia_mil_millones_y_decimales():
     assert _hnm("Meta Raises Capex To $1.5 Billion", "Meta eleva el capex a 1.500 millones de dólares")
     assert _hnm("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72 mil millones de dólares")
     assert _hnm("Meta Raises Capex To $72 Million", "Meta eleva el capex a 72 millones de dólares")
+
+
+@_pytest.mark.parametrize("o,t", [
+    ("Meta Raises Capex To US$72 Billion", "Meta eleva el capex a 72.000 millones de dólares"),
+    ("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72.000 millones de dólares estadounidenses"),
+    ("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72.000 millones de dólares canadienses"),
+    ("Meta Raises Capex To C$72 Billion", "Meta eleva el capex a 72.000 millones de dólares"),
+    ("Meta Raises Capex To A$72 Billion", "Meta eleva el capex a 72.000 millones de dólares"),
+    ("Meta Raises Capex To $72 Billion USD", "Meta eleva el capex a 72.000 millones de dólares"),
+    ("Meta Raises Capex To $72 Billion CAD", "Meta eleva el capex a 72.000 millones de dólares"),
+    ("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72.000 millones de dólares australianos"),
+    ("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72.000 millones de USD"),
+])
+def test_equivalencia_rechaza_calificadores_de_divisa(o, t):
+    assert not _hnm(o, t)
+
+
+def test_equivalencia_genericos_ambos_lados_se_mantiene():
+    assert _hnm("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72.000 millones de dólares")
