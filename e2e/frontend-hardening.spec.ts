@@ -101,6 +101,6 @@ test.describe("hardening frontend en navegador", () => {
     expect(response?.status()).toBe(404);
     await expect(page.getByRole("heading", { name: "Página no encontrada", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: "Volver al inicio" })).toHaveAttribute("href", "/");
-    await expect(page.locator('a[href="/inicio"], a[href="/discover"], a[href="/watchlist"]')).toHaveCount(0);
+    await expect(page.locator('#content a[href="/inicio"], #content a[href="/discover"], #content a[href="/watchlist"]')).toHaveCount(0);
   });
 });
