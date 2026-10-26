@@ -1,8 +1,8 @@
 // Cobertura de FICHA de un resultado de búsqueda, sin extrapolar.
-// Regla (main, 26 oct 2026): «covered» solo con cobertura local verificada
-// (listado CNMV del master); todo lo demás es «unknown», incluido US no
-// verificado. Dos GET 403 a profile2 (SAF.PA, SAN.MC) no autorizan a
-// etiquetar una bolsa entera ni a atribuir la causa al plan.
+// «covered» solo con cobertura local verificada (listado CNMV del master);
+// todo lo demás es «unknown», incluido US no verificado. Un 403 de
+// profile2 en un símbolo no autoriza a etiquetar una bolsa entera ni a
+// atribuir la causa a ninguna fuente externa.
 
 // Mapa de sufijos usado por el buscador para ETIQUETAR la bolsa (display),
 // no para decidir cobertura.

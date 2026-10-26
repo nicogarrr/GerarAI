@@ -78,7 +78,7 @@ declare global {
 
     type StockWithWatchlistStatus = Stock & {
         isInWatchlist: boolean;
-        // Cobertura de ficha según el plan de datos (lib/market/search-coverage):
+        // Cobertura de ficha comprobada (lib/market/search-coverage):
         // solo la anota la búsqueda; ausente en otras fuentes.
         fichaCoverage?: 'covered' | 'unknown';
     };
