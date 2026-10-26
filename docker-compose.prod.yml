@@ -26,6 +26,11 @@ x-default-logging: &default-logging
 # (auth firmada, MinIO, pool de BD) se aplican en TODOS los procesos.
 x-app-env: &app-env
   APP_ENV: production
+  # APP_ENV=production hace que config.py exija el secret de identidad en TODO
+  # proceso (los workers importan database.py -> get_settings() al arrancar):
+  # sin esto crash-loop. Mismo valor obligatorio que el backend.
+  RESEARCH_AUTH_REQUIRED: "true"
+  RESEARCH_AUTH_SECRET: ${RESEARCH_AUTH_SECRET:?Obligatorio}
   PYTHONUNBUFFERED: "1"
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
   REDIS_URL: redis://redis:6379/0

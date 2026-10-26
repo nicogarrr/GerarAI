@@ -28,11 +28,11 @@ test('el carril de alertas va en cola dedicada consumida por un worker DEDICADO'
     // Servicio aparte con sus propios hilos (aislamiento = PROCESO dedicado).
     assert.match(compose, /worker-alerts:[\s\S]{0,900}"-Q", "alerts"/);
     const alertsBlock = compose.slice(compose.indexOf('worker-alerts:'));
-    assert.match(alertsBlock, /memory: 1G/);
+    assert.match(alertsBlock, /memory: 320M/);
     // evaluate_alert_rules clasifica urgencia (classify_urgency_sync,
     // best-effort): sin la key en el servicio nuevo la clasificacion pasaria
     // silenciosamente a None (regresion de metadatos, no de entrega).
-    assert.match(alertsBlock, /TYPESAFE_API_KEY=\$\{TYPESAFE_API_KEY:-\}/);
+    assert.match(alertsBlock, /TYPESAFE_API_KEY: \${TYPESAFE_API_KEY:-}/);
     const workerCmd = compose.match(/worker:\n[\s\S]{0,200}command: \[[^\]]*\]/)?.[0] ?? '';
     assert.ok(workerCmd && !workerCmd.includes('alerts'), 'el worker general NO consume alerts');
 });

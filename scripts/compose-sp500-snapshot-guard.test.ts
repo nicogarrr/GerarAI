@@ -7,7 +7,7 @@ const start = compose.indexOf('\n  worker:');
 const worker = compose.slice(start, compose.indexOf('\n  worker-thesis:', start));
 
 test('el worker default de prod monta el snapshot del factsheet S&P 500 en solo lectura (#726)', () => {
-  assert.match(worker, /SP500_FACTSHEET_SNAPSHOT_DIR=\$\{SP500_FACTSHEET_SNAPSHOT_DIR:-\/data\/sp500-factsheet-snapshots\}/);
+  assert.match(worker, /SP500_FACTSHEET_SNAPSHOT_DIR: \$\{SP500_FACTSHEET_SNAPSHOT_DIR:-\/data\/sp500-factsheet-snapshots\}/);
   assert.match(worker, /\.\/data-sp500-factsheet-snapshots:\/data\/sp500-factsheet-snapshots:ro/);
 });
 
