@@ -20,13 +20,20 @@ router = APIRouter()
 public_router = APIRouter()
 
 
+def _madrid_today(now: datetime | None = None) -> date:
+    """Dia actual de Madrid. ``date.today()`` usa el reloj del contenedor (UTC):
+    entre las 00:00 y las 02:00 de Madrid devolvia el dia anterior y los
+    rangos por defecto empezaban ayer. Mismo criterio que /materials y el feed ICS."""
+    return (now or datetime.now(ZoneInfo("Europe/Madrid"))).astimezone(ZoneInfo("Europe/Madrid")).date()
+
+
 async def _empty_connector() -> dict:
     """Conector no consultado: mismo contrato que uno que respondio vacio."""
     return {"status": "ok", "events": [], "errors": []}
 
 
 def _resolve_range(desde: date | None, hasta: date | None) -> tuple[date, date]:
-    start = desde or date.today()
+    start = desde or _madrid_today()
     end = hasta or (start + timedelta(days=7))
     if start > end:
         raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
@@ -82,7 +89,7 @@ def followed_earnings_calendar(
     """
     from app.services.earnings_dates_service import followed_calendar
 
-    start = desde or date.today()
+    start = desde or _madrid_today()
     end = hasta or (start + timedelta(days=60))
     if start > end:
         raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
@@ -130,7 +137,7 @@ async def catalysts_calendar(
     acciones corporativas propias se siguen mostrando; nunca devuelve 5xx
     por un fallo del proveedor.
     """
-    start = desde or date.today()
+    start = desde or _madrid_today()
     end = hasta or (start + timedelta(days=14))
     start, end = _resolve_range(start, end)
     # held_tickers y pending_actions son sqlalchemy sincrono: hilo del pool.
