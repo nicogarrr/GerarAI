@@ -92,6 +92,13 @@ class SafeFormula:
                 raise ValueError("Solo se admiten las funciones min, max y abs")
             if node.keywords:
                 raise ValueError("La fórmula no admite argumentos con nombre")
+            # Aridad validada al construir: antes min()/abs(1,2)/min(1) pasaban la
+            # validacion y fallaban al evaluar con TypeError, que los llamadores
+            # (solo capturan ValueError) no manejaban.
+            if node.func.id == "abs" and len(node.args) != 1:
+                raise ValueError("abs requiere exactamente 1 argumento")
+            if node.func.id in ("min", "max") and len(node.args) < 2:
+                raise ValueError(f"{node.func.id} requiere al menos 2 argumentos")
             for argument in node.args:
                 self._validate(argument)
         else:
