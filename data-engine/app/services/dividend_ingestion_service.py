@@ -45,6 +45,21 @@ class DividendIngestionService(ProviderIngestionService):
                 return amount
         return None
 
+    @staticmethod
+    def _known_currency(*candidates: Any) -> str | None:
+        """Primera divisa presente, o None. La divisa sale del dividendo/listado
+        (Yahoo meta.currency, fila FMP), NUNCA de company.currency (divisa de
+        reporte: Novartis SIX reporta en USD y paga en CHF) ni de USD por
+        omision: sin divisa el dividendo no se ingiere."""
+        for value in candidates:
+            raw = str(value or "").strip()
+            if raw == "GBp":  # peniques: no son libras
+                return "GBX"
+            text = raw.upper()[:10]
+            if text:
+                return text
+        return None
+
     async def _fetch_rows(
         self, company: Company
     ) -> tuple[list[dict[str, Any]], str]:
@@ -56,7 +71,9 @@ class DividendIngestionService(ProviderIngestionService):
         """
         symbol = self._provider_symbol(company)
         try:
-            payload = await self.yahoo.dividends(symbol)
+            events = await self.yahoo.dividend_events(symbol)
+            payload = events["rows"]
+            listing_currency = self._known_currency(events.get("currency"))
         except Exception:
             payload = await self.fmp.dividends(symbol)
             rows = payload if isinstance(payload, list) else payload.get("historical", [])
@@ -65,7 +82,7 @@ class DividendIngestionService(ProviderIngestionService):
                     "ex_date": self._parse_date(row.get("date") or row.get("recordDate")),
                     "pay_date": self._parse_date(row.get("paymentDate") or row.get("payDate")),
                     "amount": self._parse_amount(row),
-                    "currency": str(row.get("currency") or "USD").upper()[:10],
+                    "currency": self._known_currency(row.get("currency")),
                 }
                 for row in rows
                 if isinstance(row, dict)
@@ -75,7 +92,7 @@ class DividendIngestionService(ProviderIngestionService):
                 "ex_date": self._epoch_to_date(row.get("date")),
                 "pay_date": None,  # chart API no expone fecha de pago
                 "amount": self._parse_amount(row),
-                "currency": (company.currency or "USD").upper()[:10],
+                "currency": listing_currency,
             }
             for row in payload
             if isinstance(row, dict)
@@ -83,7 +100,32 @@ class DividendIngestionService(ProviderIngestionService):
 
     @staticmethod
     def _row_is_ingestible(row: dict[str, Any]) -> bool:
-        return row["ex_date"] is not None and row["amount"] is not None
+        return (
+            row["ex_date"] is not None
+            and row["amount"] is not None
+            and bool(row.get("currency"))
+        )
+
+    @staticmethod
+    def _skip_reason(row: dict[str, Any]) -> str | None:
+        if row["ex_date"] is not None and row["amount"] is not None and not row.get("currency"):
+            return "unknown_currency"
+        return None
+
+    async def sync_company(self, db: Session, *, ticker: str) -> dict[str, Any]:
+        """Como la base, pero «sin divisa, no ingerido» es DESCONOCIDO: no un
+        exito fresco con 0 filas."""
+        result = await super().sync_company(db, ticker=ticker)
+        unknown = (result.get("skipped") or {}).get("unknown_currency", 0)
+        if result.get("status") == "ok" and unknown:
+            result["currency_unknown_rows"] = unknown
+            if not (result["inserted"] or result["existing"]):
+                result["status"] = "currency_unknown"
+                result["reason"] = (
+                    "el proveedor no informo la divisa del dividendo; "
+                    "no se ingirio nada y el estado no esta actualizado"
+                )
+        return result
 
     @staticmethod
     def _existing_record(db: Session, company: Company, row: dict[str, Any]) -> Any:
@@ -134,8 +176,11 @@ class DividendIngestionService(ProviderIngestionService):
         results = [await self.sync_company(db, ticker=t) for t in tickers]
         ok = sum(1 for r in results if r["status"] == "ok")
         unavailable = sum(1 for r in results if r["status"] == "unavailable")
+        unknown = sum(1 for r in results if r["status"] == "currency_unknown" or r.get("currency_unknown_rows"))
+        unavailable += unknown  # desconocido/no actualizado: cobertura parcial, nunca OK
         return {
-            "companies": len(results), "synced": ok, "unavailable": unavailable, "results": results,
+            "companies": len(results), "synced": ok, "unavailable": unavailable,
+            "currency_unknown": unknown, "results": results,
             "provenance": provenance(
                 self._PROVENANCE_SOURCE, SourceKind.UNOFFICIAL,
                 coverage=(Coverage.OK if unavailable == 0 else Coverage.PARTIAL if ok else Coverage.UNAVAILABLE),

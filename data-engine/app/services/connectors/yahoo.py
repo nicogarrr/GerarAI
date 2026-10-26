@@ -94,6 +94,23 @@ class YahooFinanceClient:
         rows = list((events.get("dividends") or {}).values())
         return [row for row in rows if isinstance(row, dict)]
 
+    async def dividend_events(self, ticker: str) -> dict[str, Any]:
+        """Dividendos crudos + divisa de cotizacion del LISTADO consultado.
+
+        ``meta.currency`` es la divisa de cotizacion de ese simbolo (CHF para
+        NOVN.SW), que es la de los eventos de dividendo del chart. No es la
+        divisa de reporte de la empresa. ``currency`` es None si Yahoo no la
+        informa."""
+        node = await self._chart(ticker, events=True)
+        events = node.get("events") or {}
+        rows = list((events.get("dividends") or {}).values())
+        meta = node.get("meta") or {}
+        currency = meta.get("currency") if isinstance(meta, dict) else None
+        return {
+            "rows": [row for row in rows if isinstance(row, dict)],
+            "currency": currency if isinstance(currency, str) and currency.strip() else None,
+        }
+
     async def splits(self, ticker: str) -> list[dict[str, Any]]:
         """Eventos de split crudos ({date: epoch, numerator, denominator, splitRatio})."""
         node = await self._chart(ticker, events=True)
