@@ -130,12 +130,7 @@ class DocumentStore:
             client.remove_object(bucket, object_name)
             return True
 
-        root = self.local_root.resolve()
-        path = Path(storage_uri).resolve()
-        try:
-            path.relative_to(root)
-        except ValueError:
-            raise ValueError("Unsafe local document storage path") from None
+        path = self._local_deletion_path(Path(storage_uri))
         if not path.is_file():
             return False
         path.unlink()
@@ -155,14 +150,7 @@ class DocumentStore:
             self.settings.app_env == "test"
             or self.settings.document_storage_backend == "local"
         ):
-            root = self.local_root.resolve()
-            target = (self.local_root / prefix).resolve()
-            try:
-                target.relative_to(root)
-            except ValueError:
-                raise ValueError("Unsafe local document storage path") from None
-            if target.is_symlink():
-                raise ValueError("Unsafe local document storage path")
+            target = self._local_deletion_path(self.local_root / prefix)
             if not target.is_dir():
                 return 0
             shutil.rmtree(target)
@@ -177,6 +165,28 @@ class DocumentStore:
             client.remove_object(bucket, item.object_name)
             removed += 1
         return removed
+
+    def _local_deletion_path(self, path: Path) -> Path:
+        """Reject symlinks before resolve() can hide an in-root redirection."""
+        root = self.local_root.resolve()
+        candidate = path.absolute()
+        try:
+            relative = candidate.relative_to(self.local_root.absolute())
+        except ValueError:
+            try:
+                # put_bytes_local returns a canonical URI even when the
+                # configured root itself is an administrator-created symlink.
+                relative = candidate.relative_to(root)
+            except ValueError:
+                raise ValueError("Unsafe local document storage path") from None
+        if ".." in relative.parts:
+            raise ValueError("Unsafe local document storage path")
+        current = root
+        for part in relative.parts:
+            current = current / part
+            if current.is_symlink():
+                raise ValueError("Unsafe local document storage path")
+        return current
 
     def _directory(
         self, ticker: str, category: str, tenant_id: int | None
