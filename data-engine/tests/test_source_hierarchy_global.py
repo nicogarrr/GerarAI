@@ -60,3 +60,51 @@ def test_company_ir_and_media_unchanged() -> None:
     assert source_tier_key(source_type="reuters") == "tier_4_reputable_media"
     assert source_tier_key(source_type="yahoo") == "tier_5_data_provider"
     assert source_tier_key(source_type="something-else") == "tier_unknown"
+
+
+def test_domain_suffix_spoof_never_inherits_regulator_trust() -> None:
+    """«sec.gov.evil.example» contiene «sec.gov» como subcadena pero no es la SEC.
+
+    Antes de la coincidencia por host, esas URLs heredaban tier_1 (trust 1.0).
+    """
+    for url in (
+        "https://sec.gov.evil.example.com/Archives/x",
+        "https://cnmv.es.attacker.io/portal/x",
+        "https://reuters.com.evil.io/markets/x",
+        "https://notbloomberg.com.evil.example/x",
+    ):
+        assert classify_source(url=url).key == "tier_unknown", url
+
+
+def test_short_type_keys_match_full_tokens_only() -> None:
+    """«ft» como subcadena clasificaba SoftBank como Financial Times; «amf»
+    clasificaba AMFI (India) como AMF (Francia). Solo token completo."""
+    assert classify_source(source_type="softbank_holdings").key == "tier_unknown"
+    assert classify_source(source_type="amfi_feed").key == "tier_unknown"
+    assert classify_source(source_type="ft").key == "tier_4_reputable_media"
+    assert classify_source(source_type="amf").key == "tier_1_regulatory"
+
+
+def test_compound_and_lookalike_type_keys() -> None:
+    """Revisión auditor: «asic» por subcadena clasificaba «basic» como tier_1,
+    y la regla por longitud dejaba muerta la clave «8-k» (guion).
+
+    Las claves casan como tokens contiguos: «8-k» revive, «basic» y
+    «basic_materials» (sector) ya no heredan el tier de ASIC, y las claves
+    compuestas reales siguen clasificando igual.
+    """
+    assert classify_source(source_type="basic").key == "tier_unknown"
+    assert classify_source(source_type="basic_materials").key == "tier_unknown"
+    assert classify_source(source_type="asic").key == "tier_1_regulatory"
+    assert classify_source(source_type="8-k").key == "tier_1_regulatory"
+    assert classify_source(source_type="form 8-k/a").key == "tier_1_regulatory"
+    assert classify_source(source_type="10-k").key == "tier_1_regulatory"
+    assert classify_source(source_type="sec_edgar_daily").key == "tier_1_regulatory"
+    assert classify_source(source_type="manual_transcript").key == "tier_3_transcript"
+
+
+def test_ir_prefix_requires_host_not_substring() -> None:
+    """«ir.» como subcadena clasificaba «air.example.com» como fuente primaria."""
+    assert classify_source(url="https://air.example.com/news").key == "tier_unknown"
+    assert classify_source(url="https://ir.acme.com/investors").key == "tier_2_company"
+    assert classify_source(url="https://acme.com/investor-relations").key == "tier_2_company"
