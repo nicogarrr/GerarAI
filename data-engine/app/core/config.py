@@ -52,6 +52,28 @@ _WEAK_MINIO_SECRET_KEYS = {
     "secret",
 }
 _WEAK_MINIO_ACCESS_KEYS = {"minioadmin", "minio", "admin", "change-me", "portfolio"}
+# Plantillas del .env.production.example que NUNCA son un secreto real. El
+# arranque en produccion falla si alguna llega a un campo sensible.
+_PLACEHOLDER_TOKENS = (
+    "cambia-esto",
+    "cambia_esto",
+    "cambia esto",
+    "cambiame",
+    "genera-",
+    "genera_",
+    "generame",
+    "generar-",
+    "generar_",
+    "tu-correo",
+    "tu-email",
+    "tudominio",
+    "example.com",
+    "changeme",
+    "change-me",
+    "replace-me",
+    "your-secret",
+    "your-password",
+)
 
 
 def _url_credentials(url: str) -> tuple[str | None, str | None]:
@@ -73,6 +95,21 @@ def _assert_strong_credentials(url: str, *, label: str) -> None:
     pair = f"{user}:{password}".lower()
     if pair in _WEAK_CREDENTIAL_PAIRS or password.lower() in _WEAK_PASSWORDS:
         raise ValueError(f"{label} must not use default development credentials in production")
+    _assert_not_placeholder(password, label=label)
+
+
+def _assert_not_placeholder(value: str, *, label: str) -> None:
+    """Rechaza las plantillas copiadas del .env.production.example.
+
+    No imprime el valor (puede ser un secreto): solo la etiqueta del campo.
+    """
+    normalized = value.strip().lower()
+    for token in _PLACEHOLDER_TOKENS:
+        if token in normalized:
+            raise ValueError(
+                f"{label} still contains a placeholder ({token!r}); "
+                "set a real value in .env.production"
+            )
 
 
 class Settings(BaseSettings):
@@ -136,6 +173,13 @@ class Settings(BaseSettings):
     market_price_max_age_days: int = Field(default=3, ge=0, le=30)
 
     database_url: str = "sqlite:///./portfolio_research_os.db"
+    # Pool SQLAlchemy SOLO para Postgres (database.py ignora estos valores con
+    # sqlite). Backend: 20+10 conexiones; workers: 4+2 via compose. Juntos
+    # quedan muy por debajo de max_connections=200 del Postgres de prod.
+    db_pool_size: int = Field(default=20, ge=1, le=200)
+    db_max_overflow: int = Field(default=10, ge=0, le=200)
+    db_pool_timeout: float = Field(default=30.0, gt=0, le=300)
+    db_pool_recycle: int = Field(default=1800, ge=0)
     # Defensa de red tras los commits de #1657: una transaccion abierta y
     # olvidada en un worker no puede bloquear tablas mas de 2 minutos. Solo
     # Postgres (se pasa via connect_args options); 0 lo desactiva.
@@ -576,12 +620,15 @@ class Settings(BaseSettings):
             raise ValueError("CORS_ORIGINS must not contain '*' (CORS is mounted with allow_credentials)")
         if not self.research_auth_secret:
             raise ValueError("RESEARCH_AUTH_SECRET is required in production")
+        _assert_not_placeholder(self.research_auth_secret, label="RESEARCH_AUTH_SECRET")
         if self.document_storage_backend != "minio":
             raise ValueError("MinIO is required for production document originals")
         if self.minio_secret_key.lower() in _WEAK_MINIO_SECRET_KEYS:
             raise ValueError("MINIO_SECRET_KEY must not use a development default in production")
         if self.minio_access_key.lower() in _WEAK_MINIO_ACCESS_KEYS:
             raise ValueError("MINIO_ACCESS_KEY must not use a development default in production")
+        _assert_not_placeholder(self.minio_secret_key, label="MINIO_SECRET_KEY")
+        _assert_not_placeholder(self.minio_access_key, label="MINIO_ACCESS_KEY")
         # "postgresql+psycopg" (la URL real de la VM) tambien es postgres: antes
         # el sufijo del driver hacia saltarse la comprobacion de credenciales.
         database_scheme = (self.database_url.split(":", 1) or [""])[0].lower().split("+", 1)[0]
@@ -589,6 +636,19 @@ class Settings(BaseSettings):
             _assert_strong_credentials(self.database_url, label="DATABASE_URL")
         if self.mongodb_uri:
             _assert_strong_credentials(self.mongodb_uri, label="MONGODB_URI")
+        # La SEC bloquea UAs sin contacto real (403). El default .local es solo
+        # fallback local; en produccion el operador debe declarar un contacto.
+        if "example.com" in self.sec_user_agent.lower() or "tu-" in self.sec_user_agent.lower():
+            raise ValueError(
+                "SEC_USER_AGENT still contains a placeholder; declare a real "
+                "contact (e.g. 'GerarAI research ops@tudominio-real.es')"
+            )
+        for field_name, value in (
+            ("TELEGRAM_BOT_TOKEN", self.telegram_bot_token),
+            ("TELEGRAM_LINK_SECRET", self.telegram_link_secret),
+        ):
+            if value:
+                _assert_not_placeholder(value, label=field_name)
         # Ultimo, para no tapar los mensajes de las demas garantias.
         if database_scheme.startswith("sqlite"):
             raise ValueError("SQLite is not allowed as DATABASE_URL in production")

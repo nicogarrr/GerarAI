@@ -83,7 +83,7 @@ En la maquina donde esta el backup (o en la nueva, si es un DR completo):
 ```bash
 # 1.1 La app deja de escribir. Un backup con escrituras en curso puede tener
 #     conteos que no casan con el dump (el backup lo detecta y falla).
-docker compose -f docker-compose.prod.yml stop backend worker worker-thesis worker-kpis worker-alerts worker-gdelt scheduler
+docker compose -f docker-compose.prod.yml --env-file .env.production stop backend worker worker-thesis worker-kpis worker-alerts worker-gdelt worker-knowledge scheduler
 ```
 
 **DECISION HUMANA — antes de continuar**, decide y anota:
@@ -147,7 +147,7 @@ el punto de decision humana del paso 1.
 
 ```bash
 # 3.1 Solo Postgres: todavia no hay datos, nada que perder.
-docker compose -f docker-compose.prod.yml up -d postgres
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d postgres
 ```
 
 ```bash
@@ -155,7 +155,7 @@ docker compose -f docker-compose.prod.yml up -d postgres
 #     durante el initdb `pg_isready` da ok y despues el motor reinicia, que es
 #     como un restore falla con "the database system is shutting down".
 for i in $(seq 1 90); do
-  docker compose -f docker-compose.prod.yml exec -T postgres \
+  docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
     psql --username="${POSTGRES_USER:-portfolio}" --dbname=postgres -tAc 'SELECT 1' \
     | grep -q 1 && echo "Postgres operativo" && break
   sleep 2
@@ -238,7 +238,7 @@ python -m scripts.restore.verify_restore \
 
 ```bash
 # 6.2 Fase de APLICACION: arrancar contra la base restaurada y mirarla servir.
-docker compose -f docker-compose.prod.yml up -d backend
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d backend
 
 python -m scripts.restore.verify_restore \
   --manifest "$BACKUP" \
@@ -263,7 +263,7 @@ RAG de `ci.yml` ("RAG activation tests skipped -> exit 1"). Un informe con
 ## Paso 7 — Arrancar todo y validar en negocio (5 min)
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 ```
 
 El informe del paso 6 queda en `$BACKUP/verify_report_data.json` y

@@ -12,6 +12,9 @@
 # y borra los mas antiguos al final de cada ejecucion correcta. En R2, la
 # retencion la impone el lifecycle del bucket (ver docs/BACKUP_RESTORE.md).
 #
+# Mongo Atlas M0 NO incluye backups gestionados: los datos de auth se cubren
+# aparte con scripts/mongo-backup.sh (cron semanal, ver docs/BACKUP_RESTORE.md).
+#
 # Subida opcional a Cloudflare R2 (free tier 10 GB) con rclone:
 #   RCLONE_REMOTE=r2:cavaai-backups ./scripts/backup.sh
 #
@@ -64,8 +67,10 @@ else
 fi
 
 if [ "${STOP_STORAGE}" = "1" ]; then
-  echo "[backup] parando minio y backend para snapshot consistente de volumenes…"
-  ${COMPOSE} stop backend worker scheduler minio
+  echo "[backup] parando backend, TODOS los workers, scheduler y minio para snapshot consistente…"
+  # Lista completa: con un worker vivo (thesis/kpis/alerts/gdelt/knowledge)
+  # el tar de MinIO puede capturar un original a medio escribir.
+  ${COMPOSE} stop backend worker worker-thesis worker-kpis worker-alerts worker-gdelt worker-knowledge scheduler minio
 fi
 
 # 3) MinIO: tar del volumen (datos en reposo, consistencia garantizada si parado).
@@ -79,7 +84,7 @@ echo "[backup] duckdb…"
 docker run --rm -v "${DUCKDB_VOLUME}":/data:ro -v "$(pwd)/${DEST}":/out alpine sh -c 'cd /data && tar czf /out/duckdb.tar.gz . || true'
 
 if [ "${STOP_STORAGE}" = "1" ]; then
-  ${COMPOSE} start minio backend worker scheduler
+  ${COMPOSE} start minio backend worker worker-thesis worker-kpis worker-alerts worker-gdelt worker-knowledge scheduler
 fi
 
 # 5) Manifest verificable: conteos por tabla, puntos qdrant, checksums y
@@ -125,6 +130,19 @@ for TAR in minio.tar.gz duckdb.tar.gz qdrant-raw.tar.gz; do
     echo "file_count.${TAR}=$(tar tzf "${DEST}/${TAR}" | grep -cv '/$')" >> "${DEST}/manifest.txt"
   fi
 done
+
+# Verificacion inmediata: un backup no esta completado hasta que sus propios
+# checksums cuadran. Se recalcula contra el manifest (misma fuente que usara
+# restore.sh) y se aborta sin subir ni purgar si algo no cuadra.
+echo "[backup] verificando checksums del manifest…"
+(
+  cd "${DEST}"
+  while IFS='=' read -r KEY VALUE; do
+    case "${KEY}" in
+      sha256.*) printf '%s  %s\n' "${VALUE}" "${KEY#sha256.}" ;;
+    esac
+  done < manifest.txt | sha256sum -c -
+) || { echo "[backup] ERROR: los checksums del backup no cuadran; no se sube ni se purga"; exit 1; }
 
 echo "[backup] completado: ${DEST}"
 

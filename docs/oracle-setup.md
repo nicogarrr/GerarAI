@@ -10,11 +10,17 @@ externas de datos/LLM, como hoy.
 
 - `data-engine/Dockerfile.prod` - imagen ARM64 con torch CPU-only (sin los
   ~2-5 GB de wheels CUDA, inutiles en una VM sin GPU).
-- `docker-compose.prod.yml` - stack completo en una sola VM, limites de
-  memoria pensados para 12 GB, Caddy con TLS automatico.
+- `docker-compose.prod.yml` - stack completo en una sola VM, con un presupuesto
+  de memoria de ~9,94 GiB (limites `memory` sumados), limites `cpus` por
+  servicio, `APP_ENV=production` en backend/workers/scheduler y logs rotados.
+  El frontend NO va aqui: lo sirve Vercel.
 - `infra/caddy/Caddyfile` - reverse proxy + Let's Encrypt.
+- `scripts/deploy.sh` - despliegue idempotente con preflight (valida
+  `.env.production`, rechaza placeholders y compila el compose antes de tocar
+  nada).
 - `scripts/backup.sh` / `scripts/restore.sh` - backups de Postgres, Qdrant,
-  MinIO y DuckDB, con subida opcional a Cloudflare R2 (free tier 10 GB).
+  MinIO y DuckDB, con checksums verificados y subida opcional a Cloudflare R2
+  (free tier 10 GB).
 - CI ARM64 nativo (job `ARM64 compatibility smoke`) que ya prueba que el
   backend instala y arranca en aarch64.
 
@@ -37,6 +43,31 @@ externas de datos/LLM, como hoy.
   - Opcional pero recomendado: presupuesto con alerta a 1 EUR
     (Billing > Budgets) para enterarte si algo se sale.
 
+## Presupuesto de memoria (VM de 12 GB)
+
+El compose suma **10.176 MiB (~9,94 GiB)** de limites: backend 2G, worker
+1,25G, thesis/knowledge 1G, kpis/gdelt 640M, alerts 320M, scheduler 128M,
+Postgres 896M, Redis 896M (maxmemory 768 MB), Qdrant 768M, MinIO 256M, Garage
+192M y Caddy 64M. El resto de la VM (~2 GB) queda para kernel/page cache.
+
+Ademas de los limites, crea **2-4 GB de swap** (recomendado 4 GB) para que un
+pico puntual de un worker no dispare el OOM killer del kernel:
+
+```bash
+sudo fallocate -l 4G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+sudo sysctl vm.swappiness=10
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.d/99-cavaai.conf
+```
+
+Los `cpus` del compose son techos (no reservas): la VM tiene 2 OCPU y los
+servicios se turnan. Si un servicio empieza a reiniciarse por OOM, mira
+`docker stats` y `docker inspect --format '{{.State.OOMKilled}}' <container>`
+antes de subir su limite: el presupuesto global no debe pasar de 10 GiB.
+
 ## Pasos exactos (cuenta de Oracle)
 
 1. **Crear cuenta**: cloud.oracle.com > Sign Up. Pide tarjeta para
@@ -58,6 +89,10 @@ externas de datos/LLM, como hoy.
 4. **Dominio gratis para TLS**: DuckDNS (duckdns.org) > login > crea un
    subdominio (p.ej. `cavaai-api.duckdns.org`) apuntando a la IP publica de
    la VM. Es gratis y Caddy saca el certificado solo.
+   - Por defecto Caddy publica en `0.0.0.0:80/443`. Si `tailscaled` ya ocupa
+     el :443 en la IP tailnet (caso de la VM actual), define
+     `BIND_IP=<ip-privada-de-la-VM>` en `.env.production` para que Docker
+     bindee solo esa interfaz.
 5. **Instalar Docker** en la VM:
    `curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker ubuntu`
    (cierra sesion y vuelve a entrar).
@@ -65,8 +100,12 @@ externas de datos/LLM, como hoy.
    ```
    git clone https://github.com/nicogarrr/gerarai.git && cd gerarai
    cp .env.production.example .env.production   # rellena los secretos
-   docker compose -f docker-compose.prod.yml up -d --build
+   # SEC_USER_AGENT debe llevar un contacto real (ejemplo.com/tu-email se rechazan)
+   ./scripts/deploy.sh
    ```
+   `deploy.sh` usa siempre `docker compose -f docker-compose.prod.yml
+   --env-file .env.production`, rechaza placeholders y espera los
+   healthchecks. Para operar a mano, usa el mismo `--env-file`.
 7. **Apuntar Vercel al backend**: en el proyecto de Vercel define estas
    variables y redeploy (sin ellas el frontend prod no autentica ni firma
    contra el backend):
@@ -74,9 +113,15 @@ externas de datos/LLM, como hoy.
    `RESEARCH_AUTH_SECRET` (el mismo valor que en la VM),
    `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=https://<tu-app>.vercel.app`,
    `MONGODB_URI` (Atlas M0), `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`.
-8. **Backups**: `crontab -e` y anade
-   `17 4 * * * cd /home/ubuntu/GerarAI && RCLONE_REMOTE=r2:cavaai-backups ./scripts/backup.sh >> /var/log/cavaai-backup.log 2>&1`
-   (configura rclone una vez con las claves R2; ver abajo).
+8. **Backups**: `crontab -e` y anade (horas UTC, sin solapar con el deploy):
+   ```
+   17 4 * * * cd /home/ubuntu/GerarAI && RCLONE_REMOTE=r2:cavaai-backups ./scripts/backup.sh --stop-storage >> /var/log/cavaai-backup.log 2>&1
+   30 4 * * 0 cd /home/ubuntu/GerarAI && ./scripts/mongo-backup.sh >> /var/log/cavaai-mongo-backup.log 2>&1
+   ```
+   `--stop-storage` para backend, TODOS los workers, scheduler y MinIO durante
+   el tar; los snapshots de Qdrant se hacen antes por API. Mongo Atlas M0 no
+   tiene backups gestionados: `mongo-backup.sh` es la unica copia de la auth
+   (configura `AGE_RECIPIENT` y `MONGODB_URI`; ver docs/BACKUP_RESTORE.md).
 
 ## Cloudflare R2 para backups (gratis, 10 GB)
 
@@ -94,9 +139,16 @@ externas de datos/LLM, como hoy.
 ## Verificacion tras el despliegue
 
 - `curl -fsS https://cavaai-api.duckdns.org/health/ready` responde OK.
+- `docker compose -f docker-compose.prod.yml --env-file .env.production ps`
+  muestra todos los servicios `healthy` (incluido el scheduler).
 - En la app (Vercel): /portfolio, /research, /knowledge cargan datos en vez
   del panel "motor de analisis desconectado".
-- Un backup manual: `./scripts/backup.sh` y comprobar `backups/*/manifest.txt`.
+- Un backup manual: `./scripts/backup.sh --stop-storage` y comprobar
+  `backups/*/manifest.txt` (el script verifica sus checksums y aborta si no
+  cuadran).
+- Restore drill aislado: `./scripts/verify-backup-restore.sh`.
+- `docker stats --no-stream` debe quedar holgadamente por debajo del
+  presupuesto de 10 GiB.
 
 ## Coste total
 

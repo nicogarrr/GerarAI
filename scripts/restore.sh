@@ -34,8 +34,25 @@ MINIO_VOLUME="${MINIO_VOLUME:-cavaai-prod-minio}"
 DUCKDB_VOLUME="${DUCKDB_VOLUME:-cavaai-prod-duckdb}"
 
 echo "[restore] desde: ${BACKUP_PATH}"
+
+# Fail-closed: no se destruye nada hasta comprobar que los artefactos son los
+# que declara el manifest. Un dump truncado o un tar corrupto se detecta aqui,
+# no despues del dropdb.
+[ -f "${BACKUP_PATH}/manifest.txt" ] || { echo "[restore] ERROR: falta ${BACKUP_PATH}/manifest.txt"; exit 1; }
+echo "[restore] verificando checksums del manifest…"
+(
+  cd "${BACKUP_PATH}"
+  while IFS='=' read -r KEY VALUE; do
+    case "${KEY}" in
+      sha256.*) printf '%s  %s\n' "${VALUE}" "${KEY#sha256.}" ;;
+    esac
+  done < manifest.txt | sha256sum -c -
+) || { echo "[restore] ERROR: checksums invalidos; restore abortado antes de tocar datos"; exit 1; }
+
 echo "[restore] parando servicios…"
-${COMPOSE} stop backend worker scheduler minio
+# Todos los escritores, no solo backend/worker: un worker dedicado vivo podia
+# seguir escribiendo en Postgres/MinIO durante el restore.
+${COMPOSE} stop backend worker worker-thesis worker-kpis worker-alerts worker-gdelt worker-knowledge scheduler minio
 
 # 1) Postgres: drop + restore.
 echo "[restore] postgres…"
