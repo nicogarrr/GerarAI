@@ -353,6 +353,16 @@ class Settings(BaseSettings):
         "https://raw.githubusercontent.com/JerBouma/FinanceDatabase/main/database/equities"
     )
     instrument_snapshot_dir: str = "./data/instruments"
+    # Provider Go DEDICADO a las narrativas de tesis (extensa y noticias),
+    # por consumidor/endpoint/key/modelo. Disabled (defecto) = comportamiento
+    # global previo intacto. Enabled exige endpoint/key/modelo propios
+    # validados; config inválida = narrativa omitida (fail-closed), NUNCA el
+    # bridge global presentado como Go. Envs: THESIS_GO_ENABLED,
+    # THESIS_GO_BASE_URL, THESIS_GO_API_KEY, THESIS_GO_MODEL.
+    thesis_go_enabled: bool = False
+    thesis_go_base_url: str = "https://opencode.ai/zen/go/v1"
+    thesis_go_api_key: str | None = Field(default=None, repr=False)
+    thesis_go_model: str = "deepseek-v4.1-flash"
     opencode_go_api_key: str | None = Field(default=None, repr=False)
     # Decision del dueno (2026-10-25): el cerebro es OpenCode Go con el modelo
     # `deepseek-v4.1-flash`, cubierto por su suscripcion ya contratada. El

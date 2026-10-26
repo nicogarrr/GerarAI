@@ -36,9 +36,9 @@ from app.llm import (
     LLMRequest,
     Message,
     ResponseFormat,
-    create_llm_provider,
     parse_json_response,
 )
+from app.llm.thesis_go import create_thesis_narrative_provider
 from app.models.entities import Company, Document, FinancialFact
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
@@ -773,7 +773,7 @@ def maybe_deep_narrative(
         # Sin minimo de hechos anclados no hay explicacion honesta que redactar.
         return None
     try:
-        provider = provider or create_llm_provider()
+        provider = provider or create_thesis_narrative_provider()
         budget = BudgetController()
     except Exception:  # noqa: BLE001 - config rota: sin narrativa extensa
         return None
