@@ -363,6 +363,17 @@ class Settings(BaseSettings):
     #: Fail-closed: los providers Go no envian ninguna peticion sin un guard
     #: de corrida activo (app/llm/run_guard.py). Defecto False = sin cambio.
     llm_run_guard_required: bool = False
+    #: Guard por job de tesis (PR3). max_posts=0 => DESACTIVADO (defecto, sin
+    #: cambio). Con max_posts>0 el resto de limites/hosts/modelos son
+    #: obligatorios (si falta alguno el job falla cerrado antes de la red).
+    llm_run_guard_max_posts: int = 0
+    llm_run_guard_max_tokens_per_request: int = 0
+    llm_run_guard_max_total_output_tokens: int = 0
+    llm_run_guard_allowed_hosts: str = ""
+    llm_run_guard_allowed_models: str = ""
+    #: Ventana fija del run: el contador Redis expira a los N s del primer uso
+    #: y un run mas viejo que N s NO se reanuda (evita revivir contadores).
+    llm_run_guard_window_seconds: int = 7 * 24 * 3600
     thesis_go_base_url: str = "https://opencode.ai/zen/go/v1"
     thesis_go_api_key: str | None = Field(default=None, repr=False)
     thesis_go_model: str = "deepseek-v4.1-flash"
