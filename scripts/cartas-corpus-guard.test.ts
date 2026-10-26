@@ -11,7 +11,7 @@ test('cartas: biblioteca vacía ofrece descargar el corpus libre (actor, no rell
 
   const button = read('app/(root)/inversores/_components/IngestLettersButton.tsx');
   assert.ok(button.includes('Descargar cartas gratuitas'));
-  assert.ok(button.includes('bg-teal-600 text-white'), 'botón teal con texto blanco legible');
+  assert.ok(!button.includes('bg-teal-600'), 'sin override de primario: usa el Button por defecto');
   assert.ok(button.includes('Descarga en curso'), 'confirma que la descarga quedó encolada');
 
   assert.ok(read('lib/actions/research-tools.actions.ts').includes('/api/knowledge/corpus/ingest-async'));

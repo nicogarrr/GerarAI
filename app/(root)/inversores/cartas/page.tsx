@@ -95,7 +95,7 @@ export default async function LettersPage({ searchParams }: PageProps) {
                                                     PDF original
                                                 </a>
                                             ) : (
-                                                <span className="text-xs text-gray-600">Sin PDF original</span>
+                                                <span className="text-xs text-gray-500">Sin PDF original</span>
                                             )}
                                         </span>
                                         <span className="w-full text-xs text-gray-500">

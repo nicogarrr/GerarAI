@@ -128,9 +128,9 @@ export default function WorkProductButton() {
                     </div>
 
                     {/* QA /research: el texto no puede desaparecer mientras
-                        genera (quedaba una barra teal vacía): color explícito
-                        y etiqueta siempre presente junto al spinner. */}
-                    <Button onClick={handleGenerate} disabled={loading} aria-busy={loading} className="w-full gap-2 bg-teal-600 text-white hover:bg-teal-700">
+                        genera (quedaba una barra teal vacía): el primario y la
+                        etiqueta siempre presentes junto al spinner. */}
+                    <Button onClick={handleGenerate} disabled={loading} aria-busy={loading} className="w-full gap-2">
                         {loading && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
                         <span>{loading ? 'Generando...' : 'Generar documento'}</span>
                     </Button>

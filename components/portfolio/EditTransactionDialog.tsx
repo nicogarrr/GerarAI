@@ -223,7 +223,6 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                             type="submit"
                             disabled={loading}
                             aria-busy={loading}
-                            className="bg-teal-600 hover:bg-teal-700"
                         >
                             {loading ? 'Guardando...' : 'Guardar Cambios'}
                         </Button>

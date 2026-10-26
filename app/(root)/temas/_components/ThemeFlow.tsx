@@ -212,7 +212,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
                   <p className="text-[11px] text-gray-500">{supplier.name}</p>
                 ) : null}
                 <p className="mt-1 text-[11px] leading-4 text-gray-500">{supplier.reason}</p>
-                {supplier.note ? <p className="mt-0.5 text-[11px] text-gray-600">{supplier.note}</p> : null}
+                {supplier.note ? <p className="mt-0.5 text-[11px] text-gray-500">{supplier.note}</p> : null}
                 {supplier.source ? (
                   <p className="mt-0.5 text-[11px]">
                     <SourceLink source={supplier.source} />

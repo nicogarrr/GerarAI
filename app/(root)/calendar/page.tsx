@@ -4,6 +4,7 @@ import { CalendarDays } from 'lucide-react';
 import AlertsManager from '@/components/alerts/AlertsManager';
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getCatalystCalendar, type CatalystCalendar, type CatalystEvent } from '@/lib/actions/catalysts.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
@@ -64,10 +65,7 @@ export default async function CalendarPage({
         // /alerts sigue viva para enlaces existentes y apunta aquí.
         return (
             <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-                <header className="flex flex-col gap-3 border-b border-gray-800 pb-5">
-                    <h1 className="text-3xl font-bold text-gray-100">Calendario y alertas</h1>
-                    {tabs}
-                </header>
+                <PageHeader title="Calendario y alertas">{tabs}</PageHeader>
                 <AlertsManager />
             </main>
         );
@@ -88,23 +86,17 @@ export default async function CalendarPage({
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex max-w-4xl flex-col gap-6">
-            <header className="flex flex-col gap-3 border-b border-gray-800 pb-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p className="text-sm font-semibold uppercase text-teal-300">Cartera</p>
-                    <h1 className="mt-1 text-3xl font-bold text-gray-100">Calendario de resultados y alertas</h1>
-                    {tabs}
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                        Del {formatMarketDate(calendar.desde)} al {formatMarketDate(calendar.hasta)}. Los resultados
-                        cubren tus posiciones y tu watchlist cotizadas en EE. UU. (USD); ex-dividendos y plazos
-                        10-Q/10-K solo cubren posiciones, y las acciones corporativas registradas cubren todas tus
-                        posiciones abiertas.
-                    </p>
-                </div>
-                <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
+            <PageHeader
+                kicker="Cartera"
+                title="Calendario de resultados y alertas"
+                description={`Del ${formatMarketDate(calendar.desde)} al ${formatMarketDate(calendar.hasta)}. Los resultados cubren tus posiciones y tu watchlist cotizadas en EE. UU. (USD); ex-dividendos y plazos 10-Q/10-K solo cubren posiciones, y las acciones corporativas registradas cubren todas tus posiciones abiertas.`}
+                actions={<div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
                     <CalendarDays aria-hidden="true" className="h-4 w-4 text-teal-300" />
                     {formatNumber(calendar.count, { maximumFractionDigits: 0 })} {calendar.count === 1 ? 'evento' : 'eventos'}
-                </div>
-            </header>
+                </div>}
+            >
+                {tabs}
+            </PageHeader>
 
             {degraded ? (
                 <p role="status" className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-3 text-sm text-amber-200">

@@ -73,20 +73,27 @@
 }
 
 .dark {
-    --background: oklch(0.15 0.02 264.695);
-    --foreground: oklch(0.95 0.005 247.858);
-    --card: oklch(0.18 0.025 265.755);
-    --card-foreground: oklch(0.95 0.005 247.858);
-    --popover: oklch(0.18 0.025 265.755);
-    --popover-foreground: oklch(0.95 0.005 247.858);
-    --primary: oklch(0.92 0.015 255.508);
-    --primary-foreground: oklch(0.15 0.02 264.695);
-    --secondary: oklch(0.22 0.03 260.031);
-    --secondary-foreground: oklch(0.95 0.005 247.858);
-    --muted: oklch(0.22 0.03 260.031);
-    --muted-foreground: oklch(0.65 0.025 256.788);
-    --accent: oklch(0.22 0.03 260.031);
-    --accent-foreground: oklch(0.95 0.005 247.858);
+    /*
+     * Los tokens de shadcn apuntan a los grises REALES de la app: fondo
+     * #0a0a0b (gray-900/surface-0), panel #101010 (surface-1) y controles
+     * #18181b (surface-2). Antes eran oklch con tinte azulado y cualquier
+     * `bg-background`/`bg-card`/`bg-muted` caia en una familia distinta.
+     */
+    --background: #0a0a0b;
+    --foreground: #d4d4d8;
+    --card: #101010;
+    --card-foreground: #d4d4d8;
+    --popover: #101010;
+    --popover-foreground: #d4d4d8;
+    /* Un solo primario de marca: teal-400 con tinta gray-900 (AA). */
+    --primary: #14b8a6;
+    --primary-foreground: #0a0a0b;
+    --secondary: #18181b;
+    --secondary-foreground: #d4d4d8;
+    --muted: #18181b;
+    --muted-foreground: #a1a1aa;
+    --accent: #18181b;
+    --accent-foreground: #d4d4d8;
     --destructive: oklch(0.704 0.191 22.216);
     /* El Badge destructive lo usa (badge.tsx): sin este token la clase
        text-destructive-foreground no existia y el texto heredaba un color
@@ -94,14 +101,14 @@
     --destructive-foreground: oklch(0.95 0.005 247.858);
     --border: oklch(1 0 0 / 8%);
     --input: oklch(1 0 0 / 8%);
-    --ring: oklch(0.7 0.09 256.788);
+    --ring: #14b8a6;
     --chart-1: oklch(0.488 0.243 264.376);
     --chart-2: oklch(0.696 0.17 162.48);
     --chart-3: oklch(0.769 0.188 70.08);
     --chart-4: oklch(0.627 0.265 303.9);
     --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.18 0.025 265.755);
-    --sidebar-foreground: oklch(0.95 0.005 247.858);
+    --sidebar: #101010;
+    --sidebar-foreground: #d4d4d8;
     --sidebar-primary: oklch(0.488 0.243 264.376);
     --sidebar-primary-foreground: oklch(0.95 0.005 247.858);
     --sidebar-accent: oklch(0.22 0.03 260.031);
@@ -206,10 +213,11 @@
         @apply mx-auto w-full max-w-[1600px] px-4 md:px-6 lg:px-8;
     }
 
-    /* CTA de marca. Antes se llamaba `yellow-btn` pero pintaba teal: nombre
-     * heredado del template. Un solo nombre para la unica variante primaria. */
+    /* CTA de marca. Alias visual del primario de `Button` (mismos tokens y
+     * mismo hover): no es una segunda receta de color. Solo aporta la altura
+     * de CTA y el cursor. */
     .brand-btn {
-        @apply h-12 cursor-pointer bg-teal-400 hover:bg-teal-500 text-gray-900 font-semibold text-base rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+        @apply h-12 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-base rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
     }
 
     /* Alto unico del header = --header-h. El sidebar se apoya en la misma

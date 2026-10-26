@@ -40,8 +40,10 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
     // Finnhub/DB) aunque el usuario nunca abriese el buscador. SearchCommand
     // las carga perezosamente al abrirse por primera vez y las reutiliza el
     // resto de la sesion; el header se monta una sola vez igualmente.
+    // Primera visita (sin cookie) = menu expandido. Solo se pliega cuando el
+    // usuario lo eligio explicitamente ('1').
     const collapsed = await cookies().then(
-        (jar) => jar.get(SIDEBAR_COLLAPSED_COOKIE)?.value !== '0',
+        (jar) => jar.get(SIDEBAR_COLLAPSED_COOKIE)?.value === '1',
     );
 
     return (

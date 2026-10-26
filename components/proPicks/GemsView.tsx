@@ -59,7 +59,7 @@ export default function GemsView() {
                         {loading ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <RefreshCw aria-hidden="true" className="h-4 w-4" />}
                         Actualizar
                     </Button>
-                    <Button onClick={review} disabled={busy || !gems?.length} aria-busy={reviewing} className="h-11 gap-2 bg-teal-600 text-white hover:bg-teal-700">
+                    <Button onClick={review} disabled={busy || !gems?.length} aria-busy={reviewing} className="h-11 gap-2">
                         {reviewing ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Sparkles aria-hidden="true" className="h-4 w-4" />}
                         {reviewing ? 'Revisando...' : 'Revisar con IA'}
                     </Button>
@@ -80,7 +80,7 @@ export default function GemsView() {
                     <p className="mt-2 text-sm text-gray-500">
                         Ninguna empresa que supera el embudo reúne capitalización de 300 M$ a 10.000 M$, rentabilidad por FCF de al menos 5 % y precio de los últimos 7 días. No es un fallo: son criterios fijos y la lista cambia cuando llegan datos nuevos.
                     </p>
-                    <Button onClick={load} disabled={busy} className="mt-4 h-11 gap-2 bg-teal-600 text-white hover:bg-teal-700">
+                    <Button onClick={load} disabled={busy} className="mt-4 h-11 gap-2">
                         <RefreshCw aria-hidden="true" className="h-4 w-4" />
                         Actualizar
                     </Button>

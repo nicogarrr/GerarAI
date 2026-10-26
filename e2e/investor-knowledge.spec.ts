@@ -15,7 +15,7 @@ test.describe("investor knowledge flow", () => {
     await page.goto("/knowledge?tab=subir");
 
     await expect(
-      page.getByRole("heading", { name: "Biblioteca de conocimiento", level: 1 }),
+      page.getByRole("heading", { name: "Biblioteca", level: 1 }),
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Subir conocimiento" })).toBeVisible();
     await expect(page.getByPlaceholder("Título del documento")).toBeVisible();

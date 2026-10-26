@@ -13,7 +13,7 @@ test('inversores: cuenta nueva sin 13F ofrece la acción real de sincronizar', (
 
   const button = read('app/(root)/inversores/_components/SyncPortfoliosButton.tsx');
   assert.ok(button.includes('Sincronizar carteras ahora'));
-  assert.ok(button.includes('bg-teal-600 text-white'), 'botón teal con texto blanco legible');
+  assert.ok(!button.includes('bg-teal-600'), 'sin override de primario: usa el Button por defecto');
   assert.ok(button.includes('Sincronización en curso'), 'confirma que la sincronización quedó encolada');
 });
 

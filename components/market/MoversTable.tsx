@@ -56,7 +56,7 @@ export function MoversTable({ rows, caption, tickerSets, showVolume = false }: {
                   </div>
                 ) : null}
               </td>
-              <td className={`py-3 px-2 text-right whitespace-nowrap font-medium ${row.change_pct === null ? 'text-gray-500' : row.change_pct >= 0 ? 'text-teal-300' : 'text-red-400'}`}>
+              <td className={`py-3 px-2 text-right whitespace-nowrap font-medium ${row.change_pct === null ? 'text-gray-500' : row.change_pct >= 0 ? 'text-good' : 'text-bad'}`}>
                 {formatPct(row.change_pct)}
               </td>
               {showVolume ? <td className="hidden py-3 pl-2 text-right whitespace-nowrap text-gray-400 sm:table-cell">{row.volume == null ? NA : formatCompact(row.volume, { maximumFractionDigits: 1 })}</td> : null}

@@ -7,7 +7,8 @@ describe('navegación compacta', () => {
         const layout = readFileSync('app/(root)/layout.tsx', 'utf8');
         assert.match(layout, /import \{ SIDEBAR_COLLAPSED_COOKIE \} from [\"']@\/lib\/ui\/sidebar-preference[\"']/);
         assert.doesNotMatch(layout, /import Sidebar, \{/);
-        assert.match(readFileSync('app/(root)/layout.tsx', 'utf8'), /jar.get\(SIDEBAR_COLLAPSED_COOKIE\)\?\.value !== '0'/);
+        // Cookie ausente = expandido (primera visita). Solo '1' pliega.
+        assert.match(readFileSync('app/(root)/layout.tsx', 'utf8'), /jar.get\(SIDEBAR_COLLAPSED_COOKIE\)\?\.value === '1'/);
     });
     it('móvil mantiene Cartera activa en sus subrutas sin alterar desktop', () => {
         const src = readFileSync('components/layout/BottomNav.tsx', 'utf8');

@@ -112,7 +112,7 @@ export default function ExportView() {
                 <Button
                     onClick={handleExport}
                     disabled={loading}
-                    className="mt-6 gap-2 bg-teal-600 hover:bg-teal-700"
+                    className="mt-6 gap-2"
                 >
                     {loading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
