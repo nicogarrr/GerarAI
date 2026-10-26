@@ -161,3 +161,52 @@ def test_news_rule_does_not_fire_without_a_verifiable_headline(db):
     assert result["status"] == "evaluated"
     assert result["matched"] is False
     assert db.query(ResearchAlert).count() == 0
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"), "nan", "NaN", "Infinity", "-inf"])
+def test_create_rejects_non_finite_threshold(db, bad):
+    company = _company(db)
+    with pytest.raises(ValueError, match="finite"):
+        AlertRuleService().create(db, company, rule_type="price_above", operator=">", value=bad)
+    from app.models.entities import AlertRule
+
+    assert db.query(AlertRule).count() == 0
+
+
+@pytest.mark.parametrize("op", [">", "<", ">=", "<=", "==", "!="])
+@pytest.mark.parametrize("bad", ["nan", "NaN", "inf", "-Infinity"])
+def test_matches_non_finite_is_false_never_raises(op, bad):
+    assert AlertRuleService._matches(Decimal("210"), op, bad) is False
+    assert AlertRuleService._matches(Decimal("NaN"), op, 200) is False
+
+
+def test_legacy_nan_rule_does_not_abort_the_evaluation_pass(db):
+    from app.models.entities import AlertRule
+
+    company = _company(db)
+    _price(db, company, day=date.today(), close="210")
+    service = AlertRuleService()
+    good = service.create(db, company, rule_type="price_above", operator=">", value=200)
+    legacy = AlertRule(
+        company_id=company.id, name="AAPL: legacy nan", rule_type="price_above",
+        condition={"operator": ">", "value": "nan"}, target={"kind": "market_price"},
+        severity="medium", channels=["in_app"], active=True,
+    )
+    db.add(legacy)
+    db.commit()
+    results = service.evaluate_all(db)
+    by_id = {r["rule_id"]: r for r in results}
+    assert by_id[good.id]["status"] == "triggered"
+    assert by_id[legacy.id]["matched"] is False
+
+
+def test_manual_alert_payload_rejects_non_finite_value():
+    from pydantic import ValidationError
+
+    from app.api.routes.alerts import ManualAlertCreate
+
+    for bad in (float("nan"), float("inf"), "nan", "-Infinity"):
+        with pytest.raises(ValidationError):
+            ManualAlertCreate(ticker="AAPL", alert_type="price_above", operator=">", value=bad)
+    assert ManualAlertCreate(ticker="AAPL", alert_type="price_above", operator=">", value="1.5").value == "1.5"
+    assert ManualAlertCreate(ticker="AAPL", alert_type="price_above", operator=">", value=200).value == 200
