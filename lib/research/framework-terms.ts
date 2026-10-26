@@ -58,6 +58,13 @@ export const FRAMEWORK_TERMS: Record<string, string> = {
     monthly_arpu: 'ARPU mensual', revenue_share: 'reparto de ingresos', price_per_gb: 'precio por GB', price_per_launch_unit: 'precio por lanzamiento',
     normalized_margin: 'margen normalizado', revenue: 'ingresos', price: 'precio', satellites: 'satélites', utilization: 'utilización',
     monetization: 'monetización', '12': '12 meses',
+    // plataforma de publicidad (META): drivers desglosados por la empresa
+    ad_impressions: 'impresiones de anuncios', price_per_ad: 'precio por anuncio', average_price_per_ad: 'precio medio por anuncio',
+    daily_active_people: 'personas activas al día (DAP)', dap: 'personas activas al día (DAP)', family_arpu: 'ARPU de la familia de apps',
+    ad_impressions_yoy: 'variación interanual de impresiones de anuncios', price_per_ad_yoy: 'variación interanual del precio por anuncio',
+    reality_labs_operating_loss: 'pérdida operativa de Reality Labs', family_of_apps: 'familia de aplicaciones', reality_labs: 'Reality Labs',
+    engagement: 'interacción', ad_load_ceiling: 'techo de carga publicitaria', privacy_regulation: 'regulación de privacidad',
+    competition_attention: 'competencia por la atención', ai_capex: 'inversión de capital en IA',
     // restricciones vinculantes
     ai_disruption: 'disrupción por IA', capital: 'capital', capital_allocation: 'asignación de capital', capital_requirements: 'requisitos de capital',
     catastrophe_losses: 'pérdidas por catástrofes', competition: 'competencia', complexity: 'complejidad', contract_timing: 'calendario de contratos',
@@ -71,6 +78,7 @@ export const FRAMEWORK_LABELS: Record<string, string> = {
     'Space network / connectivity': 'Red espacial / conectividad',
     'Space and defense platform': 'Plataforma espacial y de defensa',
     'Platform / marketplace': 'Plataforma / marketplace',
+    'Advertising / attention platform': 'Plataforma de publicidad / atención',
     'Subscriber / recurring revenue': 'Suscriptores / ingresos recurrentes',
     'Software / AI platform': 'Software / plataforma de IA',
     'Capacity / infrastructure': 'Capacidad / infraestructura',
