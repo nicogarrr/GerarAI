@@ -81,12 +81,23 @@ _TREATY_CEILING_WITHHOLDING: dict[str, Decimal] = {
 # ``jurisdiction`` = jurisdiccion de constitucion del pagador del dividendo.
 # Cualquier ticker ausente conserva el comportamiento anterior (domicilio BD,
 # solo US/ES con tipo; el resto "sin verificar").
-# Jurisdicciones del emisor donde NO hay impuesto en origen sobre dividendos segun
-# fuente primaria (gov.ky: sin impuestos directos, ni sobre la renta ni de
-# sociedades). Es un ESCENARIO etiquetado, no la retencion efectiva del broker.
-# VACIO a proposito: Caimán (BABA) no se cubre hasta leer la seccion fiscal completa
-# del 20-F para titulares de ADS y resolver excepciones (residencia fiscal CN, etc.).
-_NO_SOURCE_TAX_SCENARIO: dict[str, Decimal] = {}
+# Jurisdicciones del emisor con ESCENARIO "sin retencion en origen por ley del
+# emisor". KY: 20-F de Alibaba (FY2026) Item 10.E, asesor Maples: los pagos de
+# dividendos de ADS/acciones "will not be subject to taxation in the Cayman Islands
+# and no withholding will be required". Es la ley del pais del emisor: NO es la
+# retencion efectiva del broker ni cubre China (ver ``scenario_conditions``).
+_NO_SOURCE_TAX_SCENARIO: dict[str, Decimal] = {"KY": Decimal("0")}
+
+# Condiciones visibles junto al importe de cada escenario (misma fuente: 20-F).
+_SCENARIO_CONDITIONS: dict[str, str] = {
+    "KY": (
+        "Escenario 0 % = solo ley de Islas Caimán (20-F Item 10.E): sin retención en Caimán. "
+        "Condiciones: Alibaba no cree ser residente fiscal en China, pero si las autoridades "
+        "chinas la trataran como tal podría aplicarse 20 % de IIT a un tenedor persona física "
+        "no residente, con reducción por convenio incierta para ADS. Comisiones del depositario "
+        "aparte. Retención efectiva del broker: NO verificada."
+    ),
+}
 
 _VERIFIED_PAYERS: dict[str, dict[str, str]] = {
     "BN": {
@@ -99,9 +110,7 @@ _VERIFIED_PAYERS: dict[str, dict[str, str]] = {
         "source": "sec_baba_20f",
         "reason_if_unrated": (
             "Emisor constituido en Islas Caimán (ADS en NYSE; la sede en Hong Kong es la que "
-            "figura como domicilio en la base de datos). Sin retención verificada para titulares "
-            "de ADS: falta leer la sección fiscal completa del 20-F y confirmar la retención "
-            "efectiva del broker. No se asume 0 %."
+            "figura como domicilio en la base de datos). Sin retención verificada. No se asume 0 %."
         ),
     },
 }
@@ -355,6 +364,13 @@ class DividendProjectionService:
                         else "escenario_convenio"
                     ),
                     "unverified_reason": unverified_reason,
+                    "scenario_conditions": (
+                        _SCENARIO_CONDITIONS.get(country)
+                        if source_rate is not None
+                        and basis == "emisor_verificado"
+                        and country in _NO_SOURCE_TAX_SCENARIO
+                        else None
+                    ),
                     "source_withholding_rate": (
                         float(source_rate) if source_rate is not None else None
                     ),

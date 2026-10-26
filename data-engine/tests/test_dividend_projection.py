@@ -462,7 +462,7 @@ def test_canadian_domicile_without_verified_payer_stays_unverified(db):
     assert out["gross_summary"]["gross_unverified_base"] > 0
 
 
-def test_baba_cayman_issuer_overrides_db_domicile_but_stays_nd(db):
+def test_baba_cayman_issuer_is_zero_scenario_with_visible_conditions(db):
     _setup_payer(db, "BABA", "HK")
 
     out = DividendProjectionService().project(db, months=12)
@@ -470,12 +470,21 @@ def test_baba_cayman_issuer_overrides_db_domicile_but_stays_nd(db):
     pos = out["positions"][0]
     assert pos["domicile_country"] == "KY"
     assert pos["withholding_basis"] == "emisor_verificado"
-    assert pos["source_withholding_rate"] is None
-    assert pos["source_withheld_base"] is None
-    assert "Caimán" in pos["unverified_reason"]
-    assert "No se asume 0 %" in out["coverage"]["unverified_reasons"]["BABA"]
-    assert out["coverage"]["unknown_source_withholding"] == ["BABA"]
-    assert out["gross_summary"]["gross_unverified_base"] > 0
+    assert pos["withholding_kind"] == "sin_impuesto_origen_escenario"
+    assert pos["source_withholding_rate"] == 0
+    assert pos["unverified_reason"] is None
+    cond = pos["scenario_conditions"]
+    assert "Item 10.E" in cond and "20 %" in cond and "NO verificada" in cond
+    assert "depositario" in cond
+    assert out["coverage"]["unknown_source_withholding"] == []
+
+
+def test_non_baba_positions_have_no_scenario_conditions(db):
+    _setup_payer(db, "BN", "CA")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    assert out["positions"][0]["scenario_conditions"] is None
 
 
 def test_hk_domicile_without_verified_issuer_is_not_assumed_zero(db):
