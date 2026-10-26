@@ -43,6 +43,7 @@ from app.services.source_auditor import SourceAuditor
 from app.services.source_hierarchy_service import classify_source
 from app.services.text_clip import clip_words
 from app.services.thesis_context import retrieve_thesis_context
+from app.services.thesis_deep_narrative import is_sin_datos, maybe_deep_narrative
 from app.services.thesis_narrative_llm import evidence_sections
 from app.services.thesis_news_narrative import prepare_news_narrative, sin_datos
 from app.services.thesis_provenance import (
@@ -836,6 +837,35 @@ class ThesisService:
         filing_items = ((evidence.get("sources") or {}).get("filings") or {}).get("items") or []
         rag_context = retrieve_thesis_context(db, company)
         narrative_sections = prepared_narrative or sin_datos()
+        # Capa de narrativa extensa: el modelo configurado (OpenCode Go en
+        # main, ruta deep_thesis) REDACTA la explicacion de cifras, supuestos
+        # y fuentes anclada al paquete de hechos; fail-closed a la narrativa
+        # de noticias/determinista. El modelo ejecutado queda en la traza de
+        # la version para verificar que la tesis usa el modelo Go real.
+        deep_narrative = maybe_deep_narrative(
+            db,
+            company,
+            valuation,
+            long_term_model,
+            hypothesis,
+            news_items,
+            filing_items=filing_items,
+            rag_context=rag_context,
+        )
+        narrative_model_trace = None
+        if deep_narrative:
+            base_sections = [] if is_sin_datos(narrative_sections) else list(narrative_sections)
+            narrative_sections = [*base_sections, *deep_narrative["sections"]]
+            narrative_model_trace = {
+                "workflow": "thesis_deep_narrative",
+                # Modelo EJECUTADO real (si el adaptador cayo a fallback, este
+                # lo delata) frente al pedido por la ruta: nunca se declara
+                # Go si ejecuto otro modelo.
+                "model": deep_narrative["model"],
+                "requested_model": deep_narrative.get("requested_model"),
+                "fallback_trail": deep_narrative.get("fallback_trail") or [],
+                "provider": deep_narrative["provider"],
+            }
         thesis_markdown = self._render_markdown(
             company,
             valuation,
@@ -871,6 +901,10 @@ class ThesisService:
             return None if value is None else Decimal(str(value))
 
         valuation_basis = self._valuation_basis(valuation)
+        if narrative_model_trace:
+            # Trazabilidad del modelo que redacto la narrativa (Go real vs
+            # fallback): se persiste con la version, fuera del fingerprint.
+            valuation_basis = {**(valuation_basis or {}), "narrative_model": narrative_model_trace}
         if valuation.get("status") == "insufficient_data":
             valuation_basis = {
                 **(valuation_basis or {}),

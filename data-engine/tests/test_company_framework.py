@@ -139,3 +139,32 @@ def test_driver_formula_rejects_an_incompatible_explicit_unit():
     assert result["status"] == "invalid_driver_dimensions"
     assert result["years"] == []
     assert result["dimension_errors"][0]["driver"] == "capacity_per_satellite"
+
+
+def test_meta_uses_advertising_platform_not_payment_platform():
+    """META es publicidad/atención, no pagos: nada de TPV/take_rate/churn.
+
+    Drivers anclados a lo que Meta desglosa en resultados (Q4/FY2025,
+    investor.atmeta.com): ad impressions y average price per ad (variaciones
+    interanuales), Family DAP y Family ARPU.
+    """
+    framework = resolve_company_framework(_company("META", "platform", ["platform"]))
+    assert framework.key == "advertising_platform"
+    flat = set(framework.revenue_drivers) | set(framework.kpis) | set(framework.required_fact_metrics)
+    assert "daily_active_people" in framework.revenue_drivers
+    assert "ad_impressions" in framework.revenue_drivers
+    assert "price_per_ad" in framework.revenue_drivers
+    assert "family_arpu" in framework.revenue_drivers
+    assert not {"tpv", "take_rate", "churn"} & flat
+    assert framework.segment_model[0] == "family_of_apps"
+
+
+def test_advertising_platform_formula_is_reported_revenue_not_invented_identity():
+    """Meta no desglosa impresiones/precio absolutos: la fórmula es el ingreso
+    reportado, no una identidad imposible que recrearía demandas inventadas."""
+    from app.services.driver_dimensions import FORMULA_TERMS
+    from app.services.driver_operating_model import FORMULAS
+
+    definition = FORMULAS["advertising_platform"]
+    assert definition.inputs == ("revenue",)
+    assert FORMULA_TERMS["advertising_platform"] == (("revenue",),)

@@ -94,6 +94,28 @@ FRAMEWORKS: dict[str, CompanyFramework] = {
         active_modules=COMMON_MODULES + ("market_opportunity", "unit_economics", "segment_model", "macro_sensitivity"),
         required_fact_metrics=("active_accounts", "tpv", "take_rate", "churn", "retention"),
     ),
+    "advertising_platform": CompanyFramework(
+        key="advertising_platform",
+        label="Advertising / attention platform",
+        primary_question="Can ad impressions, price per ad and daily engagement compound advertising revenue without eroding the user experience?",
+        market_opportunity_mode="required",
+        # Drivers que la propia empresa desglosa en resultados (Meta, Q4/FY2025,
+        # investor.atmeta.com): «Ad impressions delivered across our Family of
+        # Apps» (+18% Q4 / +12% FY2025 interanual), «Average price per ad»
+        # (+6% Q4 / +9% FY2025) y «Family daily active people (DAP)» (3,58 mil
+        # millones en dic-2025, +7%). Los valores absolutos de impresiones y
+        # precio por anuncio NO se desglosan (solo variaciones interanuales),
+        # así que ninguno es exigible como fact: exigirlos recrearía la demanda
+        # imposible que esta corrección elimina (TPV/take_rate/churn de un
+        # negocio de pagos aplicado a publicidad).
+        revenue_drivers=("ad_impressions", "price_per_ad", "daily_active_people", "family_arpu"),
+        kpis=("daily_active_people", "family_arpu", "ad_impressions_yoy", "price_per_ad_yoy", "operating_margin", "capex", "reality_labs_operating_loss"),
+        unit_economics=("ad impressions × average price per ad", "DAP × Family ARPU"),
+        segment_model=("family_of_apps", "reality_labs", "geography"),
+        binding_constraints=("engagement", "ad_load_ceiling", "privacy_regulation", "competition_attention", "ai_capex"),
+        active_modules=COMMON_MODULES + ("market_opportunity", "unit_economics", "segment_model", "macro_sensitivity"),
+        required_fact_metrics=(),
+    ),
     "subscriber": CompanyFramework(
         key="subscriber",
         label="Subscriber / recurring revenue",
@@ -235,6 +257,7 @@ def resolve_company_framework(company: Company) -> CompanyFramework:
     explicit_tickers = {
         "ASTS": "space_network",
         "RKLB": "space_defense",
+        "META": "advertising_platform",
         "PYPL": "platform",
         "UBER": "platform",
         "HIMS": "subscriber",

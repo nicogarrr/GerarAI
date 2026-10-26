@@ -111,6 +111,21 @@ TERMS_ES: dict[str, str] = {
     "no_revenue_reported": "ingresos reportados",
     "revenue_history_two_periods": "histórico de ingresos de dos períodos",
     "unknown": "desconocido",
+    # Marco advertising_platform (Meta y ads/social): drivers y KPIs reales
+    # que la empresa desglosa en resultados, en español para memo y UI.
+    "advertising_platform": "Plataforma publicitaria / de atención",
+    "daily_active_people": "personas activas al día (DAP)",
+    "family_arpu": "ingreso medio por persona (Family ARPU)",
+    "ad_impressions": "impresiones publicitarias",
+    "price_per_ad": "precio medio por anuncio",
+    "ad_impressions_yoy": "variación interanual de impresiones publicitarias",
+    "price_per_ad_yoy": "variación interanual del precio por anuncio",
+    "reality_labs_operating_loss": "pérdida operativa de Reality Labs",
+    "operating_margin": "margen operativo",
+    "ad_load_ceiling": "techo de carga publicitaria",
+    "competition_attention": "competencia por la atención",
+    "family_of_apps": "Family of Apps",
+    "reality_labs": "Reality Labs",
 }
 
 
@@ -304,6 +319,7 @@ PRIMARY_QUESTION_ES: dict[str, str] = {
     "what is the normalized cash return across price, volume, reserves and reinvestment cycles": "¿Cuál es el retorno de caja normalizado a lo largo de los ciclos de precio, volumen, reservas y reinversión?",
     "can the pipeline or platform reach durable revenue before the cash runway and dilution capacity run out": "¿Puede el pipeline o la plataforma alcanzar ingresos duraderos antes de que se agote la caja y la capacidad de dilución?",
     "can organic growth, margins and reinvestment compound owner earnings at attractive returns": "¿Pueden el crecimiento orgánico, los márgenes y la reinversión aumentar el beneficio del propietario con retornos atractivos?",
+    "can ad impressions, price per ad and daily engagement compound advertising revenue without eroding the user experience": "¿Pueden las impresiones publicitarias, el precio por anuncio y el engagement diario hacer crecer los ingresos publicitarios de forma compuesta sin erosionar la experiencia de usuario?",
 }
 
 
