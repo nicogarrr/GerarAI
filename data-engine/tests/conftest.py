@@ -62,6 +62,7 @@ def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001
 # Settings(_env_file=None) must observe no secrets.
 _TEST_ISOLATED_ENV_VARS = (
     "RESEARCH_AUTH_SECRET",
+    "LLM_SETTINGS_ENCRYPTION_KEY",
     "DOCUMENT_STORAGE_BACKEND",
     "FMP_API_KEY",
     "FINNHUB_API_KEY",

@@ -513,6 +513,10 @@ class Settings(BaseSettings):
     typesafe_model: str = "jev-latest"
     typesafe_fallback: str = Field(default="instructor", pattern="^(instructor|off)$")
     llm_enabled: bool = True
+    # Clave del cifrado en reposo de las API keys LLM por tenant. En
+    # produccion es obligatoria (>=32 bytes); en local/test se deriva de
+    # RESEARCH_AUTH_SECRET para no exigir otro secreto al desarrollador.
+    llm_settings_encryption_key: str | None = Field(default=None, repr=False)
     # GerarAI intentionally uses one provider for every task.
     llm_provider: str = "opencode-go"
     # Llamadas largas (extraccion de documentos/principios, tesis, KPIs): el

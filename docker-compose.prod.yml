@@ -70,6 +70,9 @@ x-worker-db-env: &worker-db-env
 x-llm-env: &llm-env
   LLM_ENABLED: ${LLM_ENABLED:-true}
   LLM_PROVIDER: ${LLM_PROVIDER:-opencode-go}
+  # Cifrado en reposo de las claves LLM por tenant (>=32 bytes). Sin ella la
+  # API rechaza guardar claves con 503 y la UI muestra "cifrado no disponible".
+  LLM_SETTINGS_ENCRYPTION_KEY: ${LLM_SETTINGS_ENCRYPTION_KEY:-}
   CHAT_TOTAL_TIMEOUT_SECONDS: ${CHAT_TOTAL_TIMEOUT_SECONDS:-45}
   GROQ_API_KEY: ${GROQ_API_KEY:-}
   GROQ_CHAT_FALLBACK_ENABLED: ${GROQ_CHAT_FALLBACK_ENABLED:-false}
