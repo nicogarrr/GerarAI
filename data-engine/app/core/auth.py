@@ -19,6 +19,7 @@ local/test callers keep working; production requires bound signatures.
 
 import hashlib
 import hmac
+import re
 import time
 from dataclasses import dataclass
 
@@ -140,6 +141,11 @@ async def get_research_principal(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Research authentication is not configured",
         )
+
+    # compare_digest(str, str) raises TypeError for non-ASCII input.
+    # Only lowercase hex SHA-256 signatures are emitted by the identity bridge.
+    if re.fullmatch(r"[0-9a-f]{64}", x_cavaai_signature or "") is None:
+        raise _unauthorized("Invalid Research OS identity signature")
 
     try:
         issued_at = int(x_cavaai_timestamp or "0")
