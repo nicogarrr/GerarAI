@@ -284,6 +284,9 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                                                 {position.source_withholding_rate !== null && position.withholding_kind === 'techo_convenio' ? (
                                                     <span className="block text-xs text-gray-500">techo de convenio (escenario); la retención efectiva puede ser mayor</span>
                                                 ) : null}
+                                                {position.source_withholding_rate !== null && position.scenario_conditions ? (
+                                                    <span className="block max-w-xs text-xs text-amber-300/80">{position.scenario_conditions}</span>
+                                                ) : null}
                                                 {position.source_withholding_rate === null && position.unverified_reason ? (
                                                     <span className="block max-w-xs text-xs text-amber-300/80">{position.unverified_reason}</span>
                                                 ) : null}
