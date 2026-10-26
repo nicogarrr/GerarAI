@@ -79,7 +79,7 @@ def test_engine_pool_kwargs_are_applied_only_to_postgres():
         "pool_timeout": 10,
         "pool_recycle": 900,
     }
-    assert _engine_pool_kwargs("postgres://u:p@db:5432/x", settings)["pool_size"] == 4
+    assert _engine_pool_kwargs("postgresql+psycopg://u:p@db:5432/x", settings)["pool_size"] == 4
     assert _engine_pool_kwargs("sqlite:///./test.db", settings) == {}
 
 
