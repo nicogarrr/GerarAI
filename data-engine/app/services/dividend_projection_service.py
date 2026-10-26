@@ -143,7 +143,7 @@ _FISCAL_CONDITIONS = [
     "Residencia fiscal en España asumida.",
     "W-8BEN vigente asumido para dividendos US (sin W-8BEN el tipo sería 30 %).",
     "Tipo de dividendo ordinario asumido: no se verifica la categoría (REIT, ADR, ETF, PID pueden tener tratamiento distinto) y no se deduce del domicilio.",
-    "Los tipos de retención son escenario (Anexo III AEAT: convenio US 0/15 segên condiciones), no verificación particular de cada pago.",
+    "Los tipos de retención son escenario (Anexo III AEAT: convenio US 0/15 según condiciones), no verificación particular de cada pago.",
     "Única renta del ahorro del año asumida; el IRPF real depende del resto de la base.",
     "Escala del ahorro de la Renta 2025 aplicada a años futuros (hipótesis, sujeta a cambio legislativo).",
     "La retención ES del 19 % es pago a cuenta, no impuesto extranjero ni deducción por doble imposición.",
