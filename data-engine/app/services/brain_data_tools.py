@@ -135,8 +135,8 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
         for event in uncertain:
             lines.append(
                 f"Dato incierto: {_fecha_es(event.ex_date)} tiene importes distintos del proveedor "
-                f"({', '.join(str(a.normalize()) for a in event.amounts)} {event.currency}) sin evidencia "
-                "de split; no los doy por válidos.")
+                f"({', '.join(str(a.normalize()) for a in event.amounts)} {event.currency}); no se identifica si es "
+                "un pago extra o un ajuste de split, no los doy por válidos.")
         return _response(lines, sources, "company_dividends")
     if not portfolio:
         return None
@@ -168,7 +168,7 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     total = "Total: " + " · ".join(f"{_money(v, cur)}" for cur, v in sorted(totals.items())) + "."
     tail = [f"Sin dividendos guardados: {', '.join(without)}."] if without else []
     if uncertain_tickers:
-        tail.append(f"Excluidos por dato incierto (importes distintos en la misma fecha ex sin evidencia de split): {', '.join(uncertain_tickers)}.")
+        tail.append(f"Excluidos por dato incierto (importes distintos en la misma fecha ex el proveedor no identifica el evento: pago extra o ajuste de split): {', '.join(uncertain_tickers)}.")
     return _response([head, *lines, total, *tail], sources, "portfolio_dividends")
 
 

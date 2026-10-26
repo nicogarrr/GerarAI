@@ -199,7 +199,9 @@ export default function PortfolioDividends({ projection, userId }: { projection:
             {projection.positions.length === 0 && projection.declared_future.length === 0 ? (
                 <Panel title="Proyección de dividendos">
                     <p className="text-sm text-gray-400">
-                        Sin datos: ninguna posición de la cartera tiene dividendos declarados registrados.
+                        {(projection.coverage.uncertain_dividends ?? []).length > 0
+                            ? 'Sin proyección: las posiciones con dividendos tienen importes inciertos (ver «Fuera de la proyección»); no significa que no paguen dividendos.'
+                            : 'Sin datos: ninguna posición de la cartera tiene dividendos declarados registrados.'}
                     </p>
                 </Panel>
             ) : (

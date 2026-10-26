@@ -118,7 +118,7 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
                 "ratio": None,
                 "description": (
                     f"Dato incierto: importes distintos del proveedor ({amounts} {event.currency}) "
-                    "para la misma fecha ex, sin evidencia de split; no se muestra como declarado"
+                    "para la misma fecha ex; no se identifica si es un pago extra o un ajuste de split, no se muestra como declarado"
                 ),
                 "applied": None,
                 "applied_at": None,
