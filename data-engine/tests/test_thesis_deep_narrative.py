@@ -239,3 +239,87 @@ def test_degraded_provider_response_is_rejected(context):
     provider = Provider(payload=_model_output(facts), degraded=True)
     assert _call(context, provider) is None
     assert provider.calls == 2
+
+
+def test_rejection_logs_exact_rule_executed_model_and_fallback_trail(context, caplog):
+    import logging
+
+    facts = _facts()
+    bad = _model_output(facts)
+    bad["secciones"][0]["parrafos"] = ["La empresa cotiza a 999.99 USD con un margen enorme para el escenario base registrado en esta tesis provisional."]
+    provider = Provider(payload=bad, executed_model="deepseek-v4.1-flash", fallback_trail=("modelo-previo",))
+    with caplog.at_level(logging.WARNING, logger="app.services.thesis_deep_narrative"):
+        assert _call(context, provider) is None
+    rejection_logs = [r.getMessage() for r in caplog.records if "rechazada" in r.getMessage()]
+    assert rejection_logs, "debe registrar el rechazo"
+    for msg in rejection_logs:
+        assert "cifra_no_anclada" in msg
+        assert "deepseek-v4.1-flash" in msg
+        assert "modelo-previo" in msg
+        # Nunca contenido: ni prosa del modelo ni hechos del paquete.
+        assert "999.99" not in msg
+        assert "margen enorme" not in msg
+        for fact in facts:
+            assert fact["texto"][:40] not in msg
+
+
+def test_retry_note_is_specific_to_the_rejected_rule(context):
+    facts = _facts()
+    bad = _model_output(facts)
+    bad["secciones"][0]["parrafos"] = ["La empresa cotiza a 999.99 USD con un margen enorme para el escenario base registrado en esta tesis provisional."]
+    provider = Provider(payload=bad)
+    assert _call(context, provider) is None
+    assert provider.calls == 2
+    second_request = provider.requests[1]
+    note = json.loads(second_request.messages[-1].content).get("nota", "")
+    assert "rechazada" in note
+    assert "redondeos" in note  # instruccion especifica de cifra_no_anclada
+    # El reintento nunca relaja: sigue exigiendo hechos del paquete.
+    assert "hechos del paquete" in note
+
+
+def test_retry_note_for_format_and_parse_failures(context):
+    facts = _facts()
+    marked = _model_output(facts)
+    marked["secciones"][1]["parrafos"] = ["**Negrita** con el escenario base de 800.00 USD y el precio actual de 640.00 USD anclados al paquete de hechos de esta tesis provisional."]
+    provider = Provider(payload=marked)
+    assert _call(context, provider) is None
+    note = json.loads(provider.requests[1].messages[-1].content).get("nota", "")
+    assert "markdown" in note
+
+    class BadJson(Provider):
+        async def complete(self, request):
+            self.calls += 1
+            self.requests.append(request)
+            return SimpleNamespace(
+                text="no-json", model="deepseek-v4.1-flash", provider="opencode-go",
+                degraded=False, fallback_trail=(),
+                usage=SimpleNamespace(input_tokens=100, output_tokens=50, total_tokens=150),
+            )
+
+    provider2 = BadJson(payload=None)
+    assert _call(context, provider2) is None
+    note2 = json.loads(provider2.requests[1].messages[-1].content).get("nota", "")
+    assert "JSON valido" in note2
+
+
+def test_validate_sections_reports_rule_codes():
+    facts = _facts()
+    ok = _model_output(facts)
+    sections, reason = svc._validate_sections(ok, facts)
+    assert sections is not None and reason is None
+
+    short = _model_output(facts)
+    short["secciones"][0]["parrafos"] = ["corto"]
+    _, reason = svc._validate_sections(short, facts)
+    assert reason == "parrafo_invalido"
+
+    missing = _model_output(facts)
+    missing["secciones"] = [s for s in missing["secciones"] if s["id"] != "fuentes_y_anclaje"]
+    _, reason = svc._validate_sections(missing, facts)
+    assert reason == "obligatorias_ausentes"
+
+    bad_ids = _model_output(facts)
+    bad_ids["secciones"][0]["fact_ids"] = ["f999"]
+    _, reason = svc._validate_sections(bad_ids, facts)
+    assert reason == "fact_ids_invalidos"
