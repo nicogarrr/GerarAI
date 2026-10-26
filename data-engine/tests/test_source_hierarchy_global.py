@@ -85,6 +85,24 @@ def test_short_type_keys_match_full_tokens_only() -> None:
     assert classify_source(source_type="amf").key == "tier_1_regulatory"
 
 
+def test_compound_and_lookalike_type_keys() -> None:
+    """Revisión auditor: «asic» por subcadena clasificaba «basic» como tier_1,
+    y la regla por longitud dejaba muerta la clave «8-k» (guion).
+
+    Las claves casan como tokens contiguos: «8-k» revive, «basic» y
+    «basic_materials» (sector) ya no heredan el tier de ASIC, y las claves
+    compuestas reales siguen clasificando igual.
+    """
+    assert classify_source(source_type="basic").key == "tier_unknown"
+    assert classify_source(source_type="basic_materials").key == "tier_unknown"
+    assert classify_source(source_type="asic").key == "tier_1_regulatory"
+    assert classify_source(source_type="8-k").key == "tier_1_regulatory"
+    assert classify_source(source_type="form 8-k/a").key == "tier_1_regulatory"
+    assert classify_source(source_type="10-k").key == "tier_1_regulatory"
+    assert classify_source(source_type="sec_edgar_daily").key == "tier_1_regulatory"
+    assert classify_source(source_type="manual_transcript").key == "tier_3_transcript"
+
+
 def test_ir_prefix_requires_host_not_substring() -> None:
     """«ir.» como subcadena clasificaba «air.example.com» como fuente primaria."""
     assert classify_source(url="https://air.example.com/news").key == "tier_unknown"

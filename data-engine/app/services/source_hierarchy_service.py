@@ -123,17 +123,19 @@ def _host_matches(host: str, domain: str) -> bool:
     return host == domain or host.endswith("." + domain)
 
 
-def _type_matches(key: str, compact_type: str, tokens: set[str]) -> bool:
-    """Clave de tipo contra el tipo declarado.
+def _type_matches(key: str, tokens: list[str]) -> bool:
+    """La clave casa como secuencia CONTIGUA de tokens del tipo declarado.
 
-    Claves de 4+ caracteres: subcadena (comportamiento historico, p. ej.
-    «sec_edgar» o «10-k»). Claves de 2-3 («ft», «amf», «sec»...): solo token
-    completo; como subcadena clasificarian «softbank» como Financial Times o
-    «amfi» (India) como AMF (Francia).
+    Nunca subcadena: «asic» no casa «basic», «ft» no casa «softbank», «amf»
+    no casa «amfi» (India). Las claves compuestas casan por sus propios
+    tokens: «sec_edgar» -> [sec, edgar], «8-k» -> [8, k] (el guion no mata
+    la clave), «manual_transcript» -> [manual, transcript].
     """
-    if len(key) >= 4:
-        return key in compact_type
-    return key in tokens
+    key_tokens = [token for token in re.split(r"[^a-z0-9]+", key) if token]
+    if not key_tokens:
+        return False
+    size = len(key_tokens)
+    return any(tokens[i : i + size] == key_tokens for i in range(len(tokens) - size + 1))
 
 
 _REGULATOR_DOMAINS = (
@@ -158,9 +160,9 @@ _MEDIA_DOMAINS = {
 
 def classify_source(source_type: str | None = None, url: str | None = None) -> SourceTier:
     compact_type = (source_type or "").lower().replace(" ", "_")
-    tokens = {token for token in re.split(r"[^a-z0-9]+", compact_type) if token}
+    tokens = [token for token in re.split(r"[^a-z0-9]+", compact_type) if token]
     for key, tier_key in SOURCE_TIER_BY_TYPE.items():
-        if _type_matches(key, compact_type, tokens):
+        if _type_matches(key, tokens):
             return SOURCE_TIERS[tier_key]
 
     compact_url = (url or "").strip().lower()
