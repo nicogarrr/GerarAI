@@ -14,6 +14,7 @@ import httpx
 from app.llm.contracts import LLMRequest, LLMResponse, ResponseFormat
 from app.llm.errors import LLMError, ProviderHTTPError, ProviderResponseError, ProviderTransportError
 from app.llm.json import parse_json_response
+from app.llm.run_guard import reserve_request
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +228,9 @@ class LLMProvider(ABC):
         headers: Mapping[str, str],
         payload: Mapping[str, Any],
     ) -> httpx.Response:
+        # Tope duro por corrida (inactivo salvo que haya un guard en el
+        # contexto): reserva cupo ANTES de la red; ver app/llm/run_guard.py.
+        reserve_request(url, payload, guard_required=bool(getattr(self, "guard_required", False)))
         if self._client is not None:
             return await self._client.post(
                 url,
