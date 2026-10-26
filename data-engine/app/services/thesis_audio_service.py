@@ -25,6 +25,13 @@ _DISCLAIMER_SPOKEN = (
     "Documento informativo de investigación. "
     "No es asesoramiento financiero ni recomendación de compra o venta."
 )
+# Linea EXACTA con la que build_memo_markdown cierra el memo. Acoplamiento
+# deliberado: si el memo cambia su redaccion, el audio simplemente anade el
+# aviso hablado propio (nunca se queda sin aviso).
+_DISCLAIMER_MEMO_LINE = (
+    "Documento informativo de investigación. "
+    "NO es asesoramiento financiero ni recomendación de compra o venta."
+)
 
 
 def memo_to_speech_text(markdown: str, *, ticker: str, version: int) -> str:
@@ -54,15 +61,22 @@ def memo_to_speech_text(markdown: str, *, ticker: str, version: int) -> str:
     if last_space > 0:
         cut = cut[:last_space]
     cut = cut.rstrip()
-    idx = cut.rfind("Documento informativo")
-    if idx != -1 and "asesoramiento financiero" in cut[idx:]:
-        # El aviso propio del memo sobrevivio entero al corte: no se duplica.
+    if cut.endswith(_DISCLAIMER_MEMO_LINE):
+        # El aviso propio del memo sobrevivio ENTERO como cierre: no se duplica.
         return cut
+    # Un aviso se reconoce como SUFIJO completo, nunca como dos subfrases en
+    # cualquier parte del cuerpo: una cita del cuerpo que las mencione no
+    # sustituye al aviso final.
+    idx = cut.rfind("Documento informativo")
     if idx != -1:
-        # Resto PARCIAL del aviso (p. ej. «...investigación. NO»): se retira
-        # y se sustituye por el aviso completo. «Documento» va tras un espacio,
-        # asi que el nuevo corte tambien queda en borde de palabra.
-        cut = cut[:idx].rstrip()
+        tail = cut[idx:]
+        if _DISCLAIMER_MEMO_LINE.startswith(tail):
+            # Resto PARCIAL del aviso real al final («...investigación. NO»
+            # suelto): es un prefijo de la linea del aviso. Fuera; «Documento»
+            # va tras un espacio, el nuevo corte tambien queda en borde de
+            # palabra. Una cita del cuerpo NO es prefijo de la linea y se
+            # conserva como contenido.
+            cut = cut[:idx].rstrip()
     return f"{cut} {_DISCLAIMER_SPOKEN}"
 
 

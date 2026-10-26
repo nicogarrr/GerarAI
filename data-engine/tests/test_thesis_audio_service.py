@@ -265,6 +265,29 @@ def test_memo_to_speech_text_truncado_aviso_completo_en_cualquier_offset(palabra
         assert cuerpo.split()[-1] in ["Análisis", "extenso", "Sección"]
 
 
+def test_memo_to_speech_text_cita_en_cuerpo_no_sustituye_aviso_final():
+    """Regresión auditor: el cuerpo CITA ambas subfrases y el aviso real queda fuera.
+
+    Dos subfrases («Documento informativo», «asesoramiento financiero») en prosa
+    del cuerpo no son el aviso terminal: el resultado debe cerrar con el aviso
+    hablado completo aunque el corte conserve la cita y pierda el aviso real.
+    """
+    cita = (
+        "El informe titulado Documento informativo de investigación advierte que "
+        "no constituye asesoramiento financiero según su autor. "
+    )
+    body = (cita + "Análisis " + "extenso " * 7510) 
+    md = f"## Sección\n\n{body}\n---\n{DISCLAIMER_MEMO}\n"
+    text = svc.memo_to_speech_text(md, ticker="SAN", version=3)
+
+    assert len(text) <= svc.MAX_CHARS
+    assert text.endswith(svc._DISCLAIMER_SPOKEN)
+    # La cita del cuerpo se conserva como contenido; el aviso final es el hablado.
+    assert text.count("Documento informativo de investigación") == 2
+    # Ninguna línea terminal parcial tipo «...investigación. NO» suelto.
+    assert not text.rstrip().endswith(" NO")
+
+
 def test_memo_to_speech_text_corto_no_duplica_aviso():
     md = "**Resumen** breve.\n"
     text = svc.memo_to_speech_text(md, ticker="SAN", version=3)
