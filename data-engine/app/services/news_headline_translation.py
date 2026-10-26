@@ -593,6 +593,9 @@ def _scaled_amount_equivalent(original: str, translated: str) -> bool:
     try:
         if _CUR_QUALIFIER.search(original) or _CUR_QUALIFIER.search(translated):
             return False
+        # Negacion en cualquier texto completo: falla cerrado antes de la equivalencia.
+        if _NEGATION.search(original) or _NEGATION.search(translated):
+            return False
         o = _amounts(original, "en")
         t = _amounts(translated, "es")
         if o is None or t is None or len(o[0]) != 1 or len(t[0]) != 1 or o[0] != t[0]:
