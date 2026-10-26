@@ -578,7 +578,7 @@ def test_ibkr_xml_import_endpoint_ingests_positions_cash_and_trades(monkeypatch)
         <OpenPosition accountId="U-HTTP-TEST" symbol="AAPL" position="2" markPrice="200" positionValue="400" costBasisPrice="150" currency="USD" reportDate="{day}" fifoPnlUnrealized="100" />
       </OpenPositions>
       <CashReports>
-        <CashReport accountId="U-HTTP-TEST" currency="USD" endingCash="1234.56" settledCash="1200" />
+        <CashReport accountId="U-HTTP-TEST" currency="USD" toDate="{day}" endingCash="1234.56" settledCash="1200" />
       </CashReports>
       <Trades>
         <Trade accountId="U-HTTP-TEST" tradeID="test-trade-1" symbol="AAPL" buySell="BUY" quantity="2" tradePrice="150" ibCommission="-1" currency="USD" tradeDate="{day}" />
