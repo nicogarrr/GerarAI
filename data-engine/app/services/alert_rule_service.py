@@ -33,6 +33,15 @@ _OPERATORS = frozenset({">", "<", ">=", "<=", "==", "!="})
 _OPERATORS = frozenset({">", "<", ">=", "<=", "==", "!="})
 
 
+def _is_non_finite(value: Any) -> bool:
+    """True for NaN/Infinity (float or its string form). Non-numeric text is not
+    judged here: equality on text keeps its existing meaning in ``_matches``."""
+    try:
+        return not Decimal(str(value).strip()).is_finite()
+    except (InvalidOperation, ValueError):
+        return False
+
+
 class AlertRuleService:
     def create(
         self,
@@ -54,6 +63,12 @@ class AlertRuleService:
                 f"Unsupported alert operator: {operator!r}. "
                 f"Expected one of {sorted(_OPERATORS)}."
             )
+        elif _is_non_finite(value):
+            # NaN/Infinity parse as Decimal but ordering comparisons with NaN raise
+            # InvalidOperation inside evaluate_all and one such rule would abort the
+            # whole evaluation pass; a threshold that is not a finite number is
+            # meaningless for every operator.
+            raise ValueError(f"Alert threshold must be a finite number: {value!r}")
         name = f"{company.ticker}: {rule_type} {operator} {value}"[:300]
         target = self._target(rule_type)
         rule = db.scalar(
@@ -380,6 +395,11 @@ class AlertRuleService:
                 return str(observed) == str(expected)
             if operator == "!=":
                 return str(observed) != str(expected)
+            return False
+        if not (left.is_finite() and right.is_finite()):
+            # Legacy rows (created before the threshold was validated) or a
+            # non-finite observation: ordering with NaN raises InvalidOperation.
+            # Not comparable -> no match, never an exception for the whole pass.
             return False
         operations = {
             ">": lambda: left > right,

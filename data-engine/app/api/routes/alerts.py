@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,15 @@ class ManualAlertCreate(BaseModel):
     alert_type: Literal["price_above", "price_below", "price_change", "news", "earnings"]
     operator: Literal[">", "<", ">=", "<=", "=="]
     value: float | str
+
+    @field_validator("value")
+    @classmethod
+    def _finite_value(cls, value: float | str) -> float | str:
+        from app.services.alert_rule_service import _is_non_finite
+
+        if _is_non_finite(value):
+            raise ValueError("value must be a finite number")
+        return value
 
 
 def _is_unverified_stub(company: Company) -> bool:
