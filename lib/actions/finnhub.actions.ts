@@ -1,6 +1,7 @@
 'use server';
 
 import { mergeSpanishListings, searchSpanishListings } from '@/lib/market/spanish-search';
+import { classifyFichaCoverage, EXCHANGE_LABEL_BY_SUFFIX } from '@/lib/market/search-coverage';
 import { withFetchDeadline } from '@/lib/upstream/fetch-deadline';
 import { isFinanciallyRelevant } from '@/lib/newsRelevance';
 
@@ -247,39 +248,6 @@ export async function getStockFinancialDataLight(symbol: string): Promise<{
 }
 
 
-// Finnhub /search no devuelve la bolsa; el displaySymbol lleva el sufijo de
-// mercado (SAN.MC, IBE.MC, AIR.PA...). Mapa de sufijos frecuentes; si el
-// sufijo es desconocido se muestra tal cual (mas honesto que asumir 'US').
-const EXCHANGE_LABEL_BY_SUFFIX: Record<string, string> = {
-    MC: 'BME', // Bolsa de Madrid
-    L: 'LSE',
-    PA: 'Euronext Paris',
-    AS: 'Euronext Amsterdam',
-    BR: 'Euronext Brussels',
-    LS: 'Euronext Lisbon',
-    DE: 'XETRA',
-    F: 'Frankfurt',
-    MI: 'Borsa Italiana',
-    SW: 'SIX',
-    VI: 'Wiener Borse',
-    HE: 'Nasdaq Helsinki',
-    ST: 'Nasdaq Stockholm',
-    CO: 'Nasdaq Copenhagen',
-    OL: 'Oslo Bors',
-    HK: 'HKEX',
-    T: 'TSE',
-    AX: 'ASX',
-    TO: 'TSX',
-    V: 'TSXV',
-    MX: 'BMV',
-    SA: 'B3',
-    SS: 'Shanghai',
-    SZ: 'Shenzhen',
-    JK: 'IDX',
-    HM: 'Hamburg',
-    SN: 'Santiago',
-};
-
 function exchangeFromDisplaySymbol(displaySymbol?: string): string | undefined {
     if (!displaySymbol) return undefined;
     const idx = displaySymbol.lastIndexOf('.');
@@ -432,12 +400,18 @@ export const searchStocksWithStatus = cache(async (query?: string): Promise<Sear
         return { status: 'ok', stocks: [] };
     }
     const local = searchSpanishListings(query ?? '');
+    const coveredSymbols = new Set(local.map((row) => row.symbol.toUpperCase()));
+    const withCoverage = (stocks: StockWithWatchlistStatus[]): StockWithWatchlistStatus[] =>
+        stocks.map((stock) => ({
+            ...stock,
+            fichaCoverage: classifyFichaCoverage(stock.symbol, coveredSymbols.has(stock.symbol.toUpperCase())),
+        }));
     try {
         const remote = await withFetchDeadline(() => searchStocksOrThrow(query), 4500);
-        return { status: 'ok', stocks: mergeSpanishListings(query ?? '', local, remote) };
+        return { status: 'ok', stocks: withCoverage(mergeSpanishListings(query ?? '', local, remote)) };
     } catch (err) {
         console.error('Error in stock search:', err);
-        if (local.length) return { status: 'ok', stocks: local };
+        if (local.length) return { status: 'ok', stocks: withCoverage(local) };
         return { status: 'error', stocks: [] };
     }
 });
