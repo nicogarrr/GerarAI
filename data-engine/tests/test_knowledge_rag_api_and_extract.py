@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import zipfile
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -79,6 +80,49 @@ def test_create_source_validates_path_and_dedupes(db, monkeypatch, tmp_path) -> 
     second = client.post("/api/knowledge-rag/sources", json=PAYLOAD)
     assert second.json()["deduplicated"] is True and len(sent) == 1
     assert client.get(f"/api/knowledge-rag/sources/{first.json()['id']}").json()["status"] == "queued"
+
+
+def _repost_with_status(db, monkeypatch, client, tmp_path, status, age) -> tuple[dict, list[int]]:
+    import app.workers.knowledge_rag_actors as actors
+    from app.models.knowledge_rag import KnowledgeRagSource
+
+    sent: list[int] = []
+    monkeypatch.setattr(actors.ingest_knowledge_source, "send", lambda sid, **_k: sent.append(sid))
+    (tmp_path / "carta.txt").write_text("Texto de la carta sobre margen de seguridad.")
+    first = client.post("/api/knowledge-rag/sources", json=PAYLOAD)
+    source_id = first.json()["id"]
+    row = db.get(KnowledgeRagSource, source_id)
+    row.status = status
+    row.updated_at = datetime.now(UTC) - age
+    db.commit()
+    sent.clear()
+    return client.post("/api/knowledge-rag/sources", json=PAYLOAD).json(), sent
+
+
+def test_stuck_queued_source_is_requeued_on_repost(db, monkeypatch, tmp_path) -> None:
+    """Mensaje perdido antes de la recogida (Redis flush): el re-POST de los
+    mismos bytes re-encola en vez de ser un no-op silencioso."""
+    client = _client(db, monkeypatch, tmp_path)
+    body, sent = _repost_with_status(db, monkeypatch, client, tmp_path, "queued", timedelta(hours=1))
+    assert body["requeued"] is True and len(sent) == 1
+    assert body["status"] == "queued"
+
+
+def test_stuck_processing_source_is_requeued_on_repost(db, monkeypatch, tmp_path) -> None:
+    """Worker muerto Y entrega perdida (por encima del time_limit del actor):
+    el re-POST re-encola; la re-indexacion es idempotente."""
+    client = _client(db, monkeypatch, tmp_path)
+    body, sent = _repost_with_status(db, monkeypatch, client, tmp_path, "processing", timedelta(hours=3))
+    assert body["requeued"] is True and len(sent) == 1
+    assert body["status"] == "queued"
+
+
+def test_fresh_queued_or_processing_source_is_not_requeued(db, monkeypatch, tmp_path) -> None:
+    """Un estado activo sano nunca se duplica: dedupe normal sin re-envio."""
+    client = _client(db, monkeypatch, tmp_path)
+    for status in ("queued", "processing"):
+        body, sent = _repost_with_status(db, monkeypatch, client, tmp_path, status, timedelta(minutes=1))
+        assert body["deduplicated"] is True and body["requeued"] is False and sent == []
 
 
 def test_dated_source_without_as_of_is_rejected(db, monkeypatch, tmp_path) -> None:
