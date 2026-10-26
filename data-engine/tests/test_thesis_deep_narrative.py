@@ -80,11 +80,15 @@ def _model_output(facts, **overrides):
 class Provider:
     name = "fake"
 
-    def __init__(self, payload=None, error=None):
+    def __init__(self, payload=None, error=None, degraded=False, executed_model="deepseek-v4.1-flash", fallback_trail=()):
         self.payload = payload
         self.error = error
+        self.degraded = degraded
+        self.executed_model = executed_model
+        self.fallback_trail = tuple(fallback_trail)
         self.calls = 0
         self.requests = []
+        self.model_router = SimpleNamespace(resolve=lambda request: "deepseek-v4.1-flash")
 
     async def complete(self, request):
         self.calls += 1
@@ -93,7 +97,10 @@ class Provider:
             raise self.error
         return SimpleNamespace(
             text=json.dumps(self.payload, ensure_ascii=False),
-            model="deepseek-v4.1-flash",
+            model=self.executed_model,
+            provider="opencode-go",
+            degraded=self.degraded,
+            fallback_trail=self.fallback_trail,
             usage=SimpleNamespace(input_tokens=100, output_tokens=50, total_tokens=150),
         )
 
@@ -133,7 +140,9 @@ def test_deep_narrative_returns_sections_with_code_owned_citations_and_model_tra
     result = _call(context, provider)
     assert result is not None
     assert result["model"] == "deepseek-v4.1-flash"
-    assert result["provider"] == "fake"
+    assert result["requested_model"] == "deepseek-v4.1-flash"
+    assert result["fallback_trail"] == []
+    assert result["provider"] == "opencode-go"
     titles = [s["titulo"] for s in result["sections"]]
     assert titles[:4] == ["Lo que sabemos", "Como se construye la valoracion", "Fuentes y anclaje", "Lo que aun no sabemos"]
     assert titles[-1] == "Salvedad"
@@ -211,3 +220,22 @@ def test_is_sin_datos_marker():
     assert svc.is_sin_datos([{"titulo": "Análisis narrativo", "parrafos": ["Sin datos"]}])
     assert not svc.is_sin_datos([{"titulo": "X", "parrafos": ["Contenido real de la narrativa."]}])
     assert not svc.is_sin_datos(None)
+
+def test_trace_never_declares_go_when_fallback_executed(context):
+    """Si el adaptador cayó al fallback, la traza dice el modelo que ejecutó
+    de verdad y la cadena de fallos: jamás se declara Go habiendo usado otro."""
+    facts = _facts()
+    provider = Provider(payload=_model_output(facts), executed_model="space-bunny-free",
+                        fallback_trail=("opencode-go:deepseek-v4.1-flash:ProviderHTTPError",))
+    result = _call(context, provider)
+    assert result is not None
+    assert result["model"] == "space-bunny-free"
+    assert result["requested_model"] == "deepseek-v4.1-flash"
+    assert result["fallback_trail"] == ["opencode-go:deepseek-v4.1-flash:ProviderHTTPError"]
+
+
+def test_degraded_provider_response_is_rejected(context):
+    facts = _facts()
+    provider = Provider(payload=_model_output(facts), degraded=True)
+    assert _call(context, provider) is None
+    assert provider.calls == 2

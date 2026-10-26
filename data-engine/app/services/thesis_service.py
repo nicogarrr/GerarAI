@@ -858,7 +858,12 @@ class ThesisService:
             narrative_sections = [*base_sections, *deep_narrative["sections"]]
             narrative_model_trace = {
                 "workflow": "thesis_deep_narrative",
+                # Modelo EJECUTADO real (si el adaptador cayo a fallback, este
+                # lo delata) frente al pedido por la ruta: nunca se declara
+                # Go si ejecuto otro modelo.
                 "model": deep_narrative["model"],
+                "requested_model": deep_narrative.get("requested_model"),
+                "fallback_trail": deep_narrative.get("fallback_trail") or [],
                 "provider": deep_narrative["provider"],
             }
         thesis_markdown = self._render_markdown(

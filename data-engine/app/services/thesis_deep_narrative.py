@@ -360,11 +360,11 @@ _SYSTEM = (
 )
 
 
-async def _complete_deep(provider, facts: list[dict], extra_note: str | None = None):
+def _build_request(facts: list[dict], extra_note: str | None = None) -> LLMRequest:
     user: dict = {"hechos": facts}
     if extra_note:
         user["nota"] = extra_note
-    request = LLMRequest(
+    return LLMRequest(
         messages=[
             Message("system", _SYSTEM),
             Message("user", json.dumps(user, ensure_ascii=False)),
@@ -376,7 +376,6 @@ async def _complete_deep(provider, facts: list[dict], extra_note: str | None = N
             _OUTPUT_SCHEMA, name="thesis_deep_narrative"
         ),
     )
-    return await provider.complete(request)
 
 
 def maybe_deep_narrative(
@@ -446,15 +445,16 @@ def maybe_deep_narrative(
 
     response = None
     for attempt in range(2):
+        note = None
+        if attempt == 1:
+            note = (
+                "Tu respuesta anterior fue rechazada por validación "
+                "(cifra no anclada, sección obligatoria ausente, URL o "
+                "formato indebido). Responde solo con hechos del paquete."
+            )
+        request = _build_request(facts, note)
         try:
-            note = None
-            if attempt == 1:
-                note = (
-                    "Tu respuesta anterior fue rechazada por validación "
-                    "(cifra no anclada, sección obligatoria ausente, URL o "
-                    "formato indebido). Responde solo con hechos del paquete."
-                )
-            response = run_from_any_context(_complete_deep(provider, facts, note))
+            response = run_from_any_context(provider.complete(request))
         except Exception as exc:  # noqa: BLE001 - el fallo del proveedor no degrada la tesis
             logger.warning(
                 "narrativa extensa: fallo del proveedor (%s), sin narrativa",
@@ -462,6 +462,11 @@ def maybe_deep_narrative(
             )
             return None
         _record(response)
+        if getattr(response, "degraded", False):
+            # Respuesta degradada del proveedor (warning, truncado, filtro):
+            # no se publica como narrativa de tesis; un reintento y fuera.
+            logger.warning("narrativa extensa: respuesta degradada (intento %s)", attempt + 1)
+            continue
         try:
             parsed = parse_json_response(response.text)
         except Exception:  # noqa: BLE001 - JSON invalido: un reintento y fuera
@@ -471,10 +476,20 @@ def maybe_deep_narrative(
         if sections is None:
             logger.warning("narrativa extensa: salida rechazada por validación (intento %s)", attempt + 1)
             continue
+        requested_model = None
+        try:
+            requested_model = provider.model_router.resolve(request)
+        except Exception:  # noqa: BLE001 - la traza nunca rompe la narrativa
+            requested_model = None
+        # Traza honesta: modelo PEDIDO por la ruta vs modelo EJECUTADO real
+        # (si el adaptador cayo a su fallback, response.model lo delata) y
+        # cadena de fallos previos. Nunca se declara Go si ejecuto otro.
         return {
             "sections": sections,
             "model": response.model,
-            "provider": getattr(provider, "name", "unknown"),
+            "requested_model": requested_model,
+            "fallback_trail": list(getattr(response, "fallback_trail", ()) or ()),
+            "provider": getattr(response, "provider", None) or getattr(provider, "name", "unknown"),
         }
     return None
 
