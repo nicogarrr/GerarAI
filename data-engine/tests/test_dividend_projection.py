@@ -505,3 +505,9 @@ def test_hk_domicile_without_verified_issuer_is_not_assumed_zero(db):
     pos = out["positions"][0]
     assert pos["source_withholding_rate"] is None
     assert out["coverage"]["unknown_source_withholding"] == ["HKCO"]
+
+
+def test_fiscal_conditions_have_no_garbled_characters():
+    from app.services import dividend_projection_service as svc
+
+    assert "segên" not in " ".join(svc._FISCAL_CONDITIONS)  # noqa: SLF001
