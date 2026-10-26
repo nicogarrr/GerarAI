@@ -157,7 +157,7 @@ def headline_numbers_match(original: str, translated: str) -> bool:
         and not _CONNECTOR.search(translated)
     ):
         return True
-    return numeric_signature(original) == numeric_signature(translated)
+    return numeric_signature(original) == numeric_signature(translated) or _scaled_amount_equivalent(original, translated)
 
 
 _SCALE_ALIASES = {"millón": "million", "millones": "million"}
@@ -541,3 +541,71 @@ async def translate_summary(db, event_id: int, *, provider=None) -> dict:
     finally:
         _inflight.discard(key)
 
+
+
+# Equivalencia numerica segura de UNA cantidad con escala y divisa explicitas
+# («$72 Billion» <-> «72.000 millones de dólares»). Falla cerrado: formato de
+# numero ambiguo, «billón/billones» (1e12 en español), divisa no soportada o
+# mas de una cantidad => no equivalente (se mantiene el rechazo).
+_EN_SCALE = {"million": 10**6, "billion": 10**9, "trillion": 10**12}
+_EN_AMOUNT = re.compile(
+    r"(?i)(?<![\w.,])([$€£])\s?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s?(million|billion|trillion)\b"
+)
+_ES_CUR = {"dólares": "$", "dolares": "$", "euros": "€", "libras": "£"}
+_ES_AMOUNT = re.compile(
+    r"(?i)(?<![\w.,])(\d{1,3}(?:\.\d{3})+|\d+(?:,\d+)?)\s+(mil millones|millones|millón)\s+de\s+(dólares|dolares|euros|libras)\b"
+)
+
+
+def _amounts(text: str, lang: str) -> tuple[list[tuple[str, int | float]], str] | None:
+    from decimal import Decimal
+
+    found: list[tuple[str, Decimal]] = []
+
+    def take(sym: str, num: str, mult: int, decimal_comma: bool) -> str:
+        n = num.replace(".", "").replace(",", ".") if decimal_comma else num.replace(",", "")
+        found.append((sym, Decimal(n) * mult))
+        return " "
+
+    if lang == "en":
+        residual = _EN_AMOUNT.sub(lambda m: take(m.group(1), m.group(2), _EN_SCALE[m.group(3).lower()], False), text)
+    else:
+        def es(m):
+            scale = m.group(2).lower()
+            return take(_ES_CUR[m.group(3).lower()], m.group(1), 10**9 if scale == "mil millones" else 10**6, True)
+
+        residual = _ES_AMOUNT.sub(es, text)
+    return found, residual
+
+
+# Calificadores de divisa: «$»/«dólares» genericos no establecen USD. Si cualquiera
+# de los lados trae un calificador, no se acepta la equivalencia (no se pierde ni
+# se cambia CAD/AUD/USD/US$/C$/A$/canadiense/australiano).
+_CUR_QUALIFIER = re.compile(
+    r"(?i)(?<![\w])(?:US|U\.S\.|CA|AU|NZ|HK|MX|C|A)\s?\$|\b(?:USD|CAD|AUD|NZD|HKD|MXN)\b"
+    r"|\b(?:u\.?s\.?|canad\w*|austral\w*|estadounidens\w*|norteamerican\w*|american\w*|neozeland\w*|new zealand|hong kong|mexican\w*)\s+(?:dollars?|d[oó]lares)\b"
+    r"|\b(?:dollars?|d[oó]lares)\s+(?:u\.?s\.?|canad\w*|austral\w*|estadounidens\w*|norteamerican\w*|american\w*|neozeland\w*|mexican\w*)\b"
+    r"|\b(?:canadian|australian|canadiens\w*|australian\w*)\b"
+)
+
+
+def _scaled_amount_equivalent(original: str, translated: str) -> bool:
+    try:
+        if _CUR_QUALIFIER.search(original) or _CUR_QUALIFIER.search(translated):
+            return False
+        # Negacion en cualquier texto completo: falla cerrado antes de la equivalencia.
+        if _NEGATION.search(original) or _NEGATION.search(translated):
+            return False
+        o = _amounts(original, "en")
+        t = _amounts(translated, "es")
+        if o is None or t is None or len(o[0]) != 1 or len(t[0]) != 1 or o[0] != t[0]:
+            return False
+        # Lo que queda fuera de la cantidad debe coincidir exacto y sin magnitudes/divisas sueltas.
+        if _has_dimension_marks(o[1]) or _has_dimension_marks(t[1]):
+            return False
+        so, st = numeric_signature(o[1]), numeric_signature(t[1])
+        if any(tok == "ambiguous" for tok, _, _ in so + st):
+            return False
+        return so == st
+    except Exception:  # noqa: BLE001 - falla cerrado
+        return False
