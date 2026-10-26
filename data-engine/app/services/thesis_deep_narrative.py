@@ -188,18 +188,7 @@ def _norm_number(token: str) -> str | None:
     Acepta formato es-ES (1.234,56) y en-US (1234.56): el modelo copia la
     cifra tal cual aparece en el hecho y ambas superficies deben casar.
     """
-    t = token.strip()
-    if t.endswith("%"):
-        # El % cierra el token: la puntuación natural de la prosa queda fuera
-        # («22,9%.» tokeniza «22,9%»). Un separador antes del % («22,9.%») es
-        # token malformado, no puntuación de cierre: no se arregla el interior.
-        t = t[:-1].strip()
-    elif len(t) >= 2 and t[-1] in ".," and t[-2].isdigit():
-        # Una UNICA puntuación de cierre arrastrada por la tokenización
-        # («642.62,» al final de una enumeración) nunca es parte de la cifra.
-        # «642.62,,» o «642.62.,» son basura tipográfica y siguen rechazándose;
-        # los separadores internos (miles/decimales es-ES) no se tocan nunca.
-        t = t[:-1]
+    t = _surface_key(token)
     if not t:
         return None
     neg = t.startswith("-")
@@ -215,17 +204,54 @@ def _norm_number(token: str) -> str | None:
     return ("-" if neg else "") + format(d, "f")
 
 
-def _allowed_numbers(facts: list[dict]) -> set[str]:
+def _surface_key(token: str) -> str | None:
+    """Superficie limpia de un token: sin % ni UNA puntuación de cierre.
+
+    El % cierra el token: la puntuación natural de la prosa queda fuera
+    («22,9%.» tokeniza «22,9%»). Un separador antes del % («22,9.%») es token
+    malformado, no puntuación de cierre: no se arregla el interior. Fuera del
+    %, una única puntuación de cierre («642.62,» al final de una enumeración)
+    nunca es parte de la cifra; «642.62,,» o «642.62.,» son basura tipográfica
+    y se conservan para que el normalizador las rechace.
+    """
+    t = token.strip()
+    if t.endswith("%"):
+        t = t[:-1].strip()
+    elif len(t) >= 2 and t[-1] in ".," and t[-2].isdigit():
+        t = t[:-1]
+    return t or None
+
+
+# Un solo punto seguido de exactamente 3 dígitos, sin coma: «0.021», «1.250».
+# Es la única superficie con doble lectura (miles es-ES vs decimal de 3
+# cifras); «1.234.567» o «1.234,56» no la tienen.
+_AMBIGUOUS_SURFACE_RE = re.compile(r"^-?\d{1,3}\.\d{3}$")
+
+
+def _allowed_numbers(facts: list[dict]) -> tuple[set[str], set[str]]:
+    """(canónicas no ambiguas, superficies ambiguas literales del pack).
+
+    Una superficie ambigua nunca aporta su canónica: «0.021» en el pack no
+    ancla «21» en la prosa ni al revés. Solo ancla por igualdad literal de
+    superficie, que prueba COPIA de la superficie, no equivalencia de
+    magnitud. Las formas explícitas («21») siguen aportando su canónica aun
+    cuando coexistan con una ambigua.
+    """
     allowed = set(_TRIVIAL_INTS)
+    surfaces: set[str] = set()
     for fact in facts:
         # Texto y fuente: el modelo ve ambos en el paquete y puede citar los
         # dos («sección 13 del memo»), asi que ambos anclan cifras permitidas.
         for field in (fact["texto"], fact["fuente"]):
             for match in _NUMBER_RE.findall(field):
+                surface = _surface_key(match)
+                if surface and _AMBIGUOUS_SURFACE_RE.match(surface):
+                    surfaces.add(surface)
+                    continue
                 norm = _norm_number(match)
                 if norm is not None:
                     allowed.add(norm)
-    return allowed
+    return allowed, surfaces
 
 
 def _fact_id(n: int) -> str:
@@ -657,7 +683,7 @@ def _validate_sections(
     if not isinstance(raw, list) or not raw:
         return None, "sin_secciones"
     fact_ids = {fact["id"] for fact in facts}
-    allowed = _allowed_numbers(facts)
+    allowed, ambiguas = _allowed_numbers(facts)
     seen: set[str] = set()
     validated: list[dict] = []
     total_chars = 0
@@ -694,6 +720,13 @@ def _validate_sections(
             if _MARKUP_RE.search(text):
                 return None, "markup_detectado"
             for match in _NUMBER_RE.findall(text):
+                surface = _surface_key(match)
+                if surface and _AMBIGUOUS_SURFACE_RE.match(surface):
+                    # Superficie ambigua: solo ancla su copia literal en el
+                    # pack; jamás por equivalencia canónica cruzada.
+                    if surface not in ambiguas:
+                        return None, "cifra_no_anclada"
+                    continue
                 norm = _norm_number(match)
                 if norm is None or norm not in allowed:
                     # Cifra no anclada al paquete: posible alucinacion.

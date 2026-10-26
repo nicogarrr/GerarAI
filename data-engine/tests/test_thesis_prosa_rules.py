@@ -246,3 +246,62 @@ def test_news_prompt_guia_ordinales() -> None:
     prompt = req.messages[0].content
     assert "efectos indirectos" in prompt
     assert "un riesgo adicional" in prompt
+
+
+def _pack_con(*textos: str) -> list[dict]:
+    """Pack sintético con fA..fC garantizados (citados por _parsed)."""
+    base = list(textos) + ["Hecho sintético de relleno."] * (3 - len(textos))
+    ids = ["fA", "fB", "fC", "fD"]
+    return [{"id": ids[i], "texto": t, "fuente": "generica://registro"} for i, t in enumerate(base)]
+
+
+def test_ambigua_copia_literal_ancla() -> None:
+    """«0.021»↔«0.021» ancla: prueba copia de superficie, NO equivalencia de magnitud."""
+    sections, rule = _validate_sections(
+        _parsed("La ratio registrada fue 0.021 en el periodo."), _pack_con("Ratio: 0.021."))
+    assert rule is None
+
+
+def test_ambigua_con_puntuacion_de_cierre_ancla() -> None:
+    sections, rule = _validate_sections(
+        _parsed("Las ratios fueron 0.021, según el registro."), _pack_con("Ratio: 0.021."))
+    assert rule is None
+
+
+def test_ambigua_no_ancla_entero_canonico() -> None:
+    """«0.021» del pack no ancla «21» de la prosa: equivalencia cruzada prohibida."""
+    sections, rule = _validate_sections(
+        _parsed("El conteo registrado fue 21 en el periodo."), _pack_con("Ratio: 0.021."))
+    assert rule == "cifra_no_anclada"
+
+
+def test_entero_no_ancla_superficie_ambigua() -> None:
+    """«21» del pack no ancla «0.021» de la prosa (dirección inversa)."""
+    sections, rule = _validate_sections(
+        _parsed("La ratio registrada fue 0.021 en el periodo."), _pack_con("Conteo: 21."))
+    assert rule == "cifra_no_anclada"
+
+
+def test_explicito_coexistente_con_ambigua_sigue_anclando() -> None:
+    """Pack con «0.021» Y «21»: el «21» explícito ancla por su hecho explícito."""
+    sections, rule = _validate_sections(
+        _parsed("El conteo registrado fue 21 en el periodo."), _pack_con("Ratio: 0.021.", "Conteo: 21."))
+    assert rule is None
+
+
+def test_ambigua_signo_y_porcentaje() -> None:
+    pack = _pack_con("Variación: -0.021.", "Ratio: 0.021.")
+    sections, rule = _validate_sections(_parsed("La variación fue -0.021 en el periodo."), pack)
+    assert rule is None
+    sections, rule = _validate_sections(_parsed("La variación fue 0.021 en el periodo."), _pack_con("Variación: -0.021."))
+    assert rule == "cifra_no_anclada"
+    sections, rule = _validate_sections(_parsed("El ratio fue 0.021% en el periodo."), _pack_con("Ratio: 0.021."))
+    assert rule is None
+    sections, rule = _validate_sections(_parsed("El ratio fue 0.021% en el periodo."), _pack_con("Conteo: 21 %."))
+    assert rule == "cifra_no_anclada"
+
+
+def test_ambigua_doble_separador_rechazada() -> None:
+    sections, rule = _validate_sections(
+        _parsed("La ratio fue 0.021,, en el periodo."), _pack_con("Ratio: 0.021."))
+    assert rule == "cifra_no_anclada"

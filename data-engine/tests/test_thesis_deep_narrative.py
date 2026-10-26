@@ -492,7 +492,7 @@ def test_pack_includes_fundamentals_with_period_unit_and_source():
     assert any("Ingresos de META: 100 mil M USD (periodo 2025-12-31:FY; dato reportado (fuente sec_companyfacts; la fuente acredita publicación, no veracidad))" in t for t in textos)
     assert any("Margen de FCF de META: 25,0 % (periodo 2025-12-31:FY; cifra derivada de partidas sec_companyfacts; no es un dato reportado)" in t for t in textos)
     # Cada cifra nueva queda anclada por construcción: el validador las admite.
-    allowed = svc._allowed_numbers(facts)
+    allowed, _ambiguas = svc._allowed_numbers(facts)
     assert "100" in allowed and "25" in allowed
 
 
