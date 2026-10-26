@@ -38,6 +38,32 @@ const monthLabel = (key: string): string => {
     return new Intl.DateTimeFormat('es-ES', { month: 'short', year: 'numeric' }).format(parsed);
 };
 
+type DividendPosition = PortfolioDividendProjection['positions'][number];
+
+/** Tasa de retención en origen con su país y las condiciones/motivo pegados a la cifra
+ *  (misma pieza en la tabla de escritorio y en la tarjeta móvil). */
+function WithholdingNote({ position }: { position: DividendPosition }) {
+    return (
+        <>
+            {position.source_withholding_rate === null
+                ? 'N/D'
+                : `${(position.source_withholding_rate * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 })}%`}
+            {position.domicile_country ? (
+                <span className="ml-1 text-xs text-gray-500">({position.domicile_country})</span>
+            ) : null}
+            {position.source_withholding_rate !== null && position.withholding_kind === 'techo_convenio' ? (
+                <span className="block text-xs text-gray-500">techo de convenio (escenario); la retención efectiva puede ser mayor</span>
+            ) : null}
+            {position.source_withholding_rate !== null && position.scenario_conditions ? (
+                <span className="block max-w-xs text-xs text-amber-300/80 max-md:max-w-none">{position.scenario_conditions}</span>
+            ) : null}
+            {position.source_withholding_rate === null && position.unverified_reason ? (
+                <span className="block max-w-xs text-xs text-amber-300/80 max-md:max-w-none">{position.unverified_reason}</span>
+            ) : null}
+        </>
+    );
+}
+
 function FiscalYearCard({ year, data, baseCurrency }: { year: string; data: PortfolioDividendProjection['fiscal_by_year'][string]; baseCurrency: string }) {
     const money = (value: number | null) => formatMoney(value, baseCurrency);
     const rows = fiscalCardRows(data);
@@ -246,7 +272,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                     </Panel>
 
                     <Panel title="Por posición">
-                        <div className="overflow-x-auto" role="region" aria-label="Proyección por posición" tabIndex={0}>
+                        <div className="hidden overflow-x-auto md:block" role="region" aria-label="Proyección por posición" tabIndex={0}>
                             <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="border-b border-gray-800 text-xs uppercase tracking-wide text-gray-500">
@@ -275,21 +301,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                                             <td className="py-2 pr-4">{position.frequency_last_year}</td>
                                             <td className="py-2 pr-4">{formatMoney(position.gross_base, baseCurrency)}</td>
                                             <td className="py-2 pr-4">
-                                                {position.source_withholding_rate === null
-                                                    ? 'N/D'
-                                                    : `${(position.source_withholding_rate * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 })}%`}
-                                                {position.domicile_country ? (
-                                                    <span className="ml-1 text-xs text-gray-500">({position.domicile_country})</span>
-                                                ) : null}
-                                                {position.source_withholding_rate !== null && position.withholding_kind === 'techo_convenio' ? (
-                                                    <span className="block text-xs text-gray-500">techo de convenio (escenario); la retención efectiva puede ser mayor</span>
-                                                ) : null}
-                                                {position.source_withholding_rate !== null && position.scenario_conditions ? (
-                                                    <span className="block max-w-xs text-xs text-amber-300/80">{position.scenario_conditions}</span>
-                                                ) : null}
-                                                {position.source_withholding_rate === null && position.unverified_reason ? (
-                                                    <span className="block max-w-xs text-xs text-amber-300/80">{position.unverified_reason}</span>
-                                                ) : null}
+                                                <WithholdingNote position={position} />
                                             </td>
                                             <td className="py-2">{formatMoney(position.source_withheld_base, baseCurrency)}</td>
                                         </tr>
@@ -297,6 +309,33 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                                 </tbody>
                             </table>
                         </div>
+                        <ul className="space-y-3 md:hidden" aria-label="Proyección por posición (tarjetas)">
+                            {projection.positions.map((position) => (
+                                <li className="rounded-lg border border-gray-800 p-3 text-sm text-gray-300" key={position.ticker}>
+                                    <div className="flex items-baseline justify-between gap-3">
+                                        <Link
+                                            href={`/research/${encodeURIComponent(position.ticker)}`}
+                                            className="font-medium text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+                                        >
+                                            {position.ticker}
+                                        </Link>
+                                        <span className="text-xs text-gray-500">
+                                            {formatPositionQuantity(position.quantity)} títulos · pagos 12 m: {position.frequency_last_year}
+                                        </span>
+                                    </div>
+                                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                                        <dt className="text-xs text-gray-500">Bruto ({baseCurrency})</dt>
+                                        <dd className="text-right">{formatMoney(position.gross_base, baseCurrency)}</dd>
+                                        <dt className="text-xs text-gray-500">Retenido ({baseCurrency})</dt>
+                                        <dd className="text-right">{formatMoney(position.source_withheld_base, baseCurrency)}</dd>
+                                    </dl>
+                                    <div className="mt-2 border-t border-gray-900 pt-2">
+                                        <span className="text-xs text-gray-500">Retención origen: </span>
+                                        <WithholdingNote position={position} />
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
                     </Panel>
 
                     {projection.declared_future.length > 0 ? (
