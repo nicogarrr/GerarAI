@@ -260,3 +260,35 @@ def test_negation_does_not_block_headlines_the_strict_route_already_accepted():
     assert ok("Ford says no layoffs planned", "Ford dice que no hay despidos previstos")
     assert ok("stocks rise without Fed help", "las acciones suben sin ayuda de la Fed")
     assert ok("Dividend does not rise on Oct 28", "El dividendo no aumenta el 28 de octubre")
+
+
+import pytest as _pytest
+from app.services.news_headline_translation import headline_numbers_match as _hnm
+
+
+
+
+def test_equivalencia_billion_millones_caso_real_capturado():
+    o = "Meta Raises 2026 Capex Guidance To $72 Billion Amid AI Push"
+    t = "Meta eleva su previsión de capex para 2026 a 72.000 millones de dólares en medio de su impulso en IA"
+    assert _hnm(o, t)
+
+
+@_pytest.mark.parametrize("o,t", [
+    ("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 27.000 millones de dólares"),
+    ("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72.000 millones de euros"),
+    ("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72 millones de dólares"),
+    ("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72 billones de dólares"),
+    ("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72.5 millones de dólares"),
+    ("Meta Raises Capex To $72 Billion", "Meta recorta el capex a 72.000 millones de dólares"),
+    ("Meta Raises Capex To $72 Billion, Apple $3 Billion", "Meta eleva el capex a 3.000 millones de dólares, Apple 72.000 millones de dólares"),
+    ("Meta Raises 2026 Capex To $72 Billion", "Meta eleva el capex de 2027 a 72.000 millones de dólares"),
+])
+def test_equivalencia_billion_millones_rechaza_no_equivalentes(o, t):
+    assert not _hnm(o, t)
+
+
+def test_equivalencia_mil_millones_y_decimales():
+    assert _hnm("Meta Raises Capex To $1.5 Billion", "Meta eleva el capex a 1.500 millones de dólares")
+    assert _hnm("Meta Raises Capex To $72 Billion", "Meta eleva el capex a 72 mil millones de dólares")
+    assert _hnm("Meta Raises Capex To $72 Million", "Meta eleva el capex a 72 millones de dólares")
