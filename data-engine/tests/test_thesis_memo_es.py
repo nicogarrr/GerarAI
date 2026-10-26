@@ -73,7 +73,7 @@ def test_render_markdown_en_espanol_sin_ingles_ni_claves_crudas():
         assert english not in markdown
     assert "Trazabilidad de los claims y cálculos de ESTA corrida" in markdown
     assert "no verifica la veracidad de las fuentes): superada" in markdown
-    assert "Aprobación para publicación" in markdown
+    assert "Elegibilidad técnica para publicación" in markdown
     assert "Versión persistida del modelo fundamental" in markdown
     assert "independiente del número de versión de esta tesis" in markdown
     assert "Semilla maestra de la empresa" in markdown
@@ -205,7 +205,7 @@ def test_marcos_sector_y_unidades_en_espanol_sin_perder_datos():
     assert term_es("cash_and_equivalents") == "Caja y equivalentes"
 
 
-def test_aprobacion_publicacion_distinguida_de_trazabilidad():
+def test_elegibilidad_tecnica_distinguida_de_trazabilidad():
     audit = {"passed": True, "source_coverage_score": 80, "unsupported_claims": 0}
     base = dict(
         long_term_model={}, version=3, hypothesis="H.", catalysts=[],
@@ -215,7 +215,7 @@ def test_aprobacion_publicacion_distinguida_de_trazabilidad():
         _company(), {"publishable": True}, audit, {}, **base)
     md_nopub = ThesisService()._render_markdown(
         _company(), {"publishable": False}, audit, {}, **base)
-    assert "publicable; no es intercambiable con la trazabilidad): sí" in md_pub
-    assert "publicable; no es intercambiable con la trazabilidad): no" in md_nopub
+    assert "sigue en borrador hasta el gate humano): sí" in md_pub
+    assert "sigue en borrador hasta el gate humano): no" in md_nopub
     # La trazabilidad de la corrida es la misma en ambos: no van juntas.
     assert "ESTA corrida" in md_pub and "ESTA corrida" in md_nopub

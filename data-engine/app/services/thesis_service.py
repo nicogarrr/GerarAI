@@ -2104,7 +2104,7 @@ Invalidadores estructurales: afirmaciones sin respaldo, trazas de cálculo ausen
 
 ## 19. Auditoría de fuentes
 Trazabilidad de los claims y cálculos de ESTA corrida (cada afirmación material con su fuente registrada; no verifica la veracidad de las fuentes): {"superada" if audit["passed"] else "no superada"}.
-Aprobación para publicación (trazabilidad superada y valoración publicable; no es intercambiable con la trazabilidad): {"sí" if audit["passed"] and valuation.get("publishable") else "no"}.
+Elegibilidad técnica para publicación (trazabilidad superada y valoración publicable; NO es la aprobación humana ni la publicación: la tesis sigue en borrador hasta el gate humano): {"sí" if audit["passed"] and valuation.get("publishable") else "no"}.
 Cobertura de fuentes: {audit["source_coverage_score"]} %
 Afirmaciones sin respaldo: {len(audit["unsupported_claims"] or [])}
 
