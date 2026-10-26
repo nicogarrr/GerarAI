@@ -30,7 +30,7 @@ const POLL_MS = 3000;
 // maximo el estado es DESCONOCIDO y se dice, no se sigue fingiendo progreso.
 const MAX_POLLS = 600;
 
-export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }: { ticker: string; label?: string }) {
+export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', emptyCopy }: { ticker: string; label?: string; emptyCopy?: string }) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [job, setJob] = useState<ThesisJobStatus | null>(null);
@@ -149,12 +149,19 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
         }
     };
 
+    // Generación lanzada aquí y terminada: el copy de vacío («Sin tesis
+    // todavía.») y el botón «primera tesis» ya no son ciertos; el estado de
+    // éxito (abajo) es la única verdad en la tarjeta. Sin router.refresh():
+    // re-renderizaba la ruta entera y el lector perdía su sitio.
+    const succeededHere = startedHere && job?.status === 'succeeded';
     const phaseLabel = job?.current_phase ? PHASE_LABELS[job.current_phase] ?? 'Análisis en curso' : null;
     const doneCount = job?.phases.filter((p) => p.status === 'succeeded').length ?? 0;
 
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-3">
+                {emptyCopy && !succeededHere ? <span className="text-sm text-gray-400">{emptyCopy}</span> : null}
+                {succeededHere && emptyCopy ? null : (
                 <Button type="button" onClick={start} disabled={busy} aria-busy={busy}>
                     {busy ? (
                         <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />
@@ -163,6 +170,7 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis' }
                     )}
                     {recovering ? 'Recuperando generación…' : starting ? 'Encolando…' : active ? 'Generando…' : label}
                 </Button>
+                )}
                 {active ? (
                     <span className="text-sm text-gray-400">
                         {pollExhausted

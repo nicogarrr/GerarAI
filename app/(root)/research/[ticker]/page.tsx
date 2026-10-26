@@ -1033,10 +1033,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 </div>
               </>
             ) : (
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm text-gray-400">Sin tesis todavía.</span>
-                <ThesisGenerateButton ticker={ticker} label="Genera la primera tesis" />
-              </div>
+              <ThesisGenerateButton ticker={ticker} label="Genera la primera tesis" emptyCopy="Sin tesis todavía." />
             )}
           <dl className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
             <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
