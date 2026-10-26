@@ -156,6 +156,14 @@ def _opencode_go(
         },
         model_overrides=overrides,
         fallback_model=settings.opencode_go_fallback_model,
+        # El endpoint /zen/go/v1 rechaza `response_format` con HTTP 400
+        # (verificado en vivo por el piloto el 2026-10-26 con
+        # deepseek-v4.1-flash: json_schema estricto -> 400; json_object/plain
+        # -> 200). Sin este ajuste TODA salida estructurada (narrativa de
+        # tesis, KPI, ASTS, second-order) falla contra Go directo. El
+        # contrato viaja en el prompt y la validacion local fail-closed de
+        # cada llamador sigue siendo la puerta, como en el chat.
+        strip_response_format=True,
         reasoning_effort=(
             settings.opencode_go_reasoning_effort
             if reasoning_effort is None
