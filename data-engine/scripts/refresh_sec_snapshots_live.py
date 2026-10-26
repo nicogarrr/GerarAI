@@ -13,7 +13,7 @@ Uso (dentro del contenedor backend o con httpx disponible):
 
 Tras completar, persistir en el host (la imagen hornea ese directorio):
     docker cp cavaai-backend:/app/data/sec_snapshots/companyfacts/. \\
-        ~/CavaAI/data-engine/data/sec_snapshots/companyfacts/
+        ~/GerarAI/data-engine/data/sec_snapshots/companyfacts/
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def _user_agent() -> str:
 
         return Settings().sec_user_agent
     except Exception:
-        return os.environ.get("SEC_USER_AGENT", "CavaAI research contact@cavaai.local")
+        return os.environ.get("SEC_USER_AGENT", "GerarAI research contact@gerarai.local")
 
 
 async def _fetch_one(

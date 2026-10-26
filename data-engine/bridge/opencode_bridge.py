@@ -4,7 +4,7 @@ Por que existe: el free tier de Zen solo responde desde un cliente OpenCode
 real. Este puente recibe POST /v1/chat/completions (OpenAI shape) del
 data-engine y lo traduce al flujo de sesiones del serve enjaulado
 (oc-serve2), de modo que los modelos free (deepseek-v4.1-flash-free,
-space-bunny-free) funcionan a coste 0 desde CavaAI.
+space-bunny-free) funcionan a coste 0 desde GerarAI.
 
 Limites declarados:
 - Sin streaming (devuelve la respuesta completa; ignora "stream").
@@ -108,7 +108,7 @@ def complete(model: str, messages, response_format=None, reasoning_effort=None) 
             prompt += ("\n\nResponde SOLO con JSON valido que cumpla este "
                        "esquema, sin texto extra ni markdown:\n"
                        + json.dumps(schema, ensure_ascii=False))
-    sid = serve_req("POST", "/session", {"title": "CavaAI chat"})["id"]
+    sid = serve_req("POST", "/session", {"title": "GerarAI chat"})["id"]
     t0 = time.monotonic()
     probe = _StatusProbe(sid)
     try:

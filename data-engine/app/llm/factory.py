@@ -151,7 +151,7 @@ def _opencode_go(
         extra_headers={
             # OpenCode Go documenta: user agent propio (no el generico de la
             # libreria HTTP) + session id estable. https://opencode.ai/docs/go/
-            "User-Agent": "cavaai/1.0",
+            "User-Agent": "gerarai/1.0",
             "x-opencode-session": settings.opencode_go_session,
         },
         model_overrides=overrides,

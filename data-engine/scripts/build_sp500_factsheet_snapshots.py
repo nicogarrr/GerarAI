@@ -282,7 +282,7 @@ def main() -> int:
         # spglobal.com responde 403 a clientes automaticos: la descarga se hace
         # a mano (el factsheet es publico) y se pasa el fichero. Si aun asi se
         # intenta por red, el error lo dice claro en vez de escribir un snapshot.
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; CavaAI/0.1) Research snapshot builder"}
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; GerarAI/0.1) Research snapshot builder"}
         response = httpx.get(args.source_url, timeout=60, follow_redirects=True, headers=headers)
         response.raise_for_status()
         raw = response.content

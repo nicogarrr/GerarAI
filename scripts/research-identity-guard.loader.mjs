@@ -30,7 +30,7 @@ export async function load(url, context, nextLoad) {
       format: 'module',
       source: [
         'export async function requireAuthenticatedUser() {',
-        "  return { id: 'guard-test-user', email: 'guard@cavaai.test', name: 'Guard' };",
+        "  return { id: 'guard-test-user', email: 'guard@gerarai.test', name: 'Guard' };",
         '}',
       ].join('\n'),
       shortCircuit: true,

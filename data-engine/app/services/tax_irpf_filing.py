@@ -23,7 +23,7 @@ Alcance deliberado (honesto, sin verde falso):
 - Todas las ventas del ledger son acciones/ETF cotizados (el importador IBKR
   solo crea operaciones de acciones), así que todo va al bloque de "acciones
   negociadas" (pág. 14 III, art. 37.1.a LIRPF). Opciones/cripto no entran en
-  CavaAI; si algún día se importan, hay que enrutarlas a "otros elementos"
+  GerarAI; si algún día se importan, hay que enrutarlas a "otros elementos"
   (pág. 17 I, casillas 1626/1633/1637/1640) antes de usar esto.
 - El país de retención se aproxima con ``Company.domicile_country`` (el
   ledger no guarda país de retención por pago). Si falta, el país es
@@ -251,7 +251,7 @@ def build_double_taxation(
           expresado con dos decimales (Manual Renta 2025, cap. 18).
 
     El TME exige la declaración entera (bases general y del ahorro, cuotas),
-    que CavaAI no tiene: sin ``tme`` la deducción queda
+    que GerarAI no tiene: sin ``tme`` la deducción queda
     ``status="pendiente_tme"`` con ``deduction_base=None`` y se muestra solo
     el TOPE POR CONVENIO (límite superior), nunca una deducción final
     aparentemente verificada. Con ``tme`` (introducido por el usuario desde

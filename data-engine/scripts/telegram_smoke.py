@@ -16,7 +16,7 @@ r = httpx.post(
     f"{base}/bot{s.telegram_bot_token}/sendMessage",
     json={
         "chat_id": s.telegram_chat_id,
-        "text": "CavaAI: prueba de canal Telegram OK - stack completo operativo.",
+        "text": "GerarAI: prueba de canal Telegram OK - stack completo operativo.",
     },
     timeout=15,
 )

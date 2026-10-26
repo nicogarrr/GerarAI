@@ -349,7 +349,7 @@ def test_route_includes_filing_deadlines_sorted_and_status(engine, db, monkeypat
 
 
 def test_calendar_corporate_action_source_uses_current_visible_brand():
-    assert svc.SOURCE_CAVAAI == 'Acción corporativa registrada en GerarAI'
+    assert svc.SOURCE_GERARAI == 'Acción corporativa registrada en GerarAI'
 
 
 def test_watchlist_us_tickers_excludes_held_and_non_us(db):

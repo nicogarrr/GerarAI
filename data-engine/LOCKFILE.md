@@ -108,7 +108,7 @@ mismo fallo (desfase) sin depender de Python.
    no registra la constraint que lo protege.
 
 Además **avisa** (sin fallar) si el intérprete que ejecuta el verificador no es
-el fijado: el `.venv` local de `CavaAI` es 3.11.16 y el runtime declarado es 3.12,
+el fijado: el `.venv` local del repo es 3.11.16 y el runtime declarado es 3.12,
 y un rojo ahí sería ruido en lugar de señal. El aviso dice explícitamente que la
 suite no puede considerarse verde en 3.11.
 

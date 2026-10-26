@@ -1,4 +1,4 @@
-"""Mapeo concepto-edgartools -> metrica canonica de CavaAI.
+"""Mapeo concepto-edgartools -> metrica canonica de GerarAI.
 
 Fuente unica de verdad: ``SEC_METRIC_MAP`` de
 ``financial_ingestion_service`` (se importa, no se copia). Este modulo solo

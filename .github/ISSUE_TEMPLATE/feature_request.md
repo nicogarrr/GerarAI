@@ -1,6 +1,6 @@
 ---
 name: "Petición de funcionalidad"
-about: "Propón una mejora o funcionalidad para CavaAI"
+about: "Propón una mejora o funcionalidad para GerarAI"
 title: "[feat] "
 labels: ["enhancement"]
 ---

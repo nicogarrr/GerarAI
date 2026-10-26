@@ -36,7 +36,7 @@ import httpx
 MAX_REDIRECTS = 3
 DEFAULT_MAX_BYTES = 15 * 1024 * 1024
 DEFAULT_TIMEOUT_SECONDS = 30.0
-USER_AGENT = "CavaAI Public Document Fetcher/1.0"
+USER_AGENT = "GerarAI Public Document Fetcher/1.0"
 
 
 def _parse_content_length(value: object) -> int | None:

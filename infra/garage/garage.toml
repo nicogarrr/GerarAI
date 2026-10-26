@@ -1,4 +1,4 @@
-# Garage de nodo unico para CavaAI (v2.4.x). Los secretos NO van aqui:
+# Garage de nodo unico para GerarAI (v2.4.x). Los secretos NO van aqui:
 # GARAGE_RPC_SECRET y las claves por defecto llegan por entorno (compose).
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"

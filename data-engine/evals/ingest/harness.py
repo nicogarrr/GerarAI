@@ -372,7 +372,7 @@ def _observe(db, company, *, extra: dict | None = None) -> dict:
 class _OfflineSEC:
     """SECClient real sobre MockTransport, sin el throttle de peticiones."""
 
-    def __new__(cls, handler, *, user_agent="CavaAI ingest eval contact@example.com"):
+    def __new__(cls, handler, *, user_agent="GerarAI ingest eval contact@example.com"):
         from app.services.connectors.sec import SECClient
 
         class _Client(SECClient):

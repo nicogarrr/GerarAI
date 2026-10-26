@@ -17,7 +17,7 @@ test.describe("public authentication shell", () => {
     await expect(page.getByText("El email es obligatorio")).toBeVisible();
     await expect(page.getByText("La contraseña es obligatoria")).toBeVisible();
 
-    await page.screenshot({ path: "test-results/cavaai-sign-in-validation.png", fullPage: true });
+    await page.screenshot({ path: "test-results/gerarai-sign-in-validation.png", fullPage: true });
     await page.getByRole("link", { name: "Crear cuenta" }).click();
     await expect(page).toHaveURL(/\/sign-up$/);
     await expect(page.getByRole("heading", { name: "Crea tu cuenta" })).toBeVisible();
@@ -64,7 +64,7 @@ test.describe("mobile authentication layout", () => {
       innerHeight: window.innerHeight,
     }));
     expect(metrics.scrollHeight).toBeGreaterThan(metrics.innerHeight);
-    await page.screenshot({ path: "test-results/cavaai-sign-in-mobile.png", fullPage: true });
+    await page.screenshot({ path: "test-results/gerarai-sign-in-mobile.png", fullPage: true });
   });
 });
 
@@ -96,6 +96,6 @@ test.describe("company research workspace", () => {
     await expect(page).toHaveURL(/view=changes/);
     await expect(page.getByRole("heading", { name: "Diario de decisiones" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Expectativa vs realidad" })).toBeVisible();
-    await page.screenshot({ path: "test-results/cavaai-company-workspace.png", fullPage: true });
+    await page.screenshot({ path: "test-results/gerarai-company-workspace.png", fullPage: true });
   });
 });

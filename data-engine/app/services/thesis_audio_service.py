@@ -1,7 +1,8 @@
 """Audio de la tesis: texto plano del memo -> sidecar TTS local (Piper, EUR 0).
 
-El sidecar (`cavaai-tts`) sintetiza una tesis a la vez y cachea el mp3 por
-clave. La clave lleva ticker, version, estado y el dia del ultimo dato: si cambian
+El sidecar TTS desplegado (`cavaai-tts`, nombre historico de servicio)
+sintetiza una tesis a la vez y cachea el mp3 por clave. La clave lleva ticker,
+version, estado y el dia del ultimo dato: si cambian
 los datos (otro dia) el audio se regenera; ademas el sidecar caduca el mp3 a las 24 h. Aqui solo se prepara el texto y se habla con el sidecar; no
 hay LLM ni proveedores de pago.
 """

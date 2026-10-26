@@ -79,7 +79,7 @@
   "documents": [
     {
       "id": "doc-universe-master",
-      "title": "Universo de research CavaAI (COMPANY_MASTER, 23 emisores)",
+      "title": "Universo de research GerarAI (COMPANY_MASTER, 23 emisores)",
       "ticker": "RAGEVAL",
       "source_type": "company_master",
       "source_ref": "data-engine/app/data/company_master.py",
@@ -129,7 +129,7 @@
     },
     {
       "id": "doc-rag-architecture",
-      "title": "Arquitectura del RAG de CavaAI (clase RAGIndex)",
+      "title": "Arquitectura del RAG de GerarAI (clase RAGIndex)",
       "ticker": "RAGEVAL",
       "source_type": "code",
       "source_ref": "data-engine/app/services/rag.py",

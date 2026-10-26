@@ -23,7 +23,7 @@ from typing import Any, TypeVar
 
 T = TypeVar("T")
 
-_BRIDGE = ThreadPoolExecutor(max_workers=4, thread_name_prefix="cavaai-jev-bridge")
+_BRIDGE = ThreadPoolExecutor(max_workers=4, thread_name_prefix="gerarai-jev-bridge")
 _BRIDGE_LOCAL = threading.local()
 # Espera maxima cuando el llamador esta en el hilo de un loop activo: sin tope,
 # un proveedor colgado dejaria el loop entero bloqueado para siempre.

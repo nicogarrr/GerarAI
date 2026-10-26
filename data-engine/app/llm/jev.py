@@ -1,7 +1,7 @@
 """Cliente de decisiones TypeSafe Jev (SystemOne API).
 
 Jev no genera texto: responde preguntas tipadas sobre un `state` con
-probabilidades calibradas. Uso en CavaAI: capa barata de micro-decisiones
+probabilidades calibradas. Uso en GerarAI: capa barata de micro-decisiones
 (triage de alertas, clasificación en ingesta) delante del LLM principal.
 Referencia: https://docs.typesafe.ai (OpenAPI en api.typesafe.ai/openapi.json).
 

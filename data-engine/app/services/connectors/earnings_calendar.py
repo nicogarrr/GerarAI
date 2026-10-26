@@ -3,7 +3,7 @@
 Idea originada en ``s-kerin/finance_calendars`` (licencia permisiva MIT):
 leer el calendario publico de NASDAQ (``api.nasdaq.com/api/calendar/...``)
 dia a dia con ``httpx`` y tolerancia a fallos. Diseno inspirado en el,
-implementacion propia para CavaAI: cliente asincrono inyectable en tests,
+implementacion propia para GerarAI: cliente asincrono inyectable en tests,
 normalizacion minima de filas, fallo por dia registrado en ``errors`` sin
 abortar el rango, y degradacion a ``None`` cuando un dia (o el servicio)
 no responde: el llamante recibe ``status="unavailable"`` en lugar de una
@@ -66,7 +66,7 @@ def _pooled_client() -> httpx.AsyncClient:
 
 
 BROWSER_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; CavaAI/0.1) CavaAI Research",
+    "User-Agent": "Mozilla/5.0 (compatible; GerarAI/0.1) GerarAI Research",
     "Accept": "application/json",
 }
 

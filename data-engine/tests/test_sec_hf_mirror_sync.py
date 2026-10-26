@@ -115,7 +115,7 @@ def test_sync_sube_layout_oficial_y_manifest(tmp_path, monkeypatch, fake_hf):
     _tickers_file(tmp_path, monkeypatch)
     monkeypatch.setenv("HF_TOKEN", "t")
     monkeypatch.setenv("HF_DATASET", "owner/cavaai-sec-mirror")
-    monkeypatch.setenv("SEC_USER_AGENT", "CavaAI research nicoiglesiasgarcia10@gmail.com")
+    monkeypatch.setenv("SEC_USER_AGENT", "GerarAI research nicoiglesiasgarcia10@gmail.com")
     assert sync.main() == 0
     esperado = {
         "company_tickers.json",
@@ -138,7 +138,7 @@ def test_sync_no_resube_lo_que_no_cambio(tmp_path, monkeypatch, fake_hf):
     _tickers_file(tmp_path, monkeypatch)
     monkeypatch.setenv("HF_TOKEN", "t")
     monkeypatch.setenv("HF_DATASET", "d")
-    monkeypatch.setenv("SEC_USER_AGENT", "CavaAI research nicoiglesiasgarcia10@gmail.com")
+    monkeypatch.setenv("SEC_USER_AGENT", "GerarAI research nicoiglesiasgarcia10@gmail.com")
     assert sync.main() == 0
     assert len(fake_hf.commits) == 1  # publicacion atomica: un solo commit
     # Segunda corrida: el manifest remoto declara los sha1 ya publicados.
@@ -167,8 +167,8 @@ def test_sync_ua_placeholder_falla_cerrado(tmp_path, monkeypatch, fake_hf):
     _tickers_file(tmp_path, monkeypatch)
     monkeypatch.setenv("HF_TOKEN", "t")
     monkeypatch.setenv("HF_DATASET", "d")
-    for ua_malo in ("", "CavaAI/0.1 contact@example.com",
-                    "CavaAI research contact@cavaai.local",
+    for ua_malo in ("", "GerarAI/0.1 contact@example.com",
+                    "GerarAI research contact@gerarai.local",
                     "sin-arroba"):
         monkeypatch.setenv("SEC_USER_AGENT", ua_malo)
         assert sync.main() == 2
@@ -206,7 +206,7 @@ def test_sync_alias_brk_punto_resuelve_cik_de_brk_guion(tmp_path, monkeypatch, f
     monkeypatch.setattr(sync.httpx, "Client", _FakeSECClientBRK)
     monkeypatch.setenv("HF_TOKEN", "t")
     monkeypatch.setenv("HF_DATASET", "owner/cavaai-sec-mirror")
-    monkeypatch.setenv("SEC_USER_AGENT", "CavaAI research nicoiglesiasgarcia10@gmail.com")
+    monkeypatch.setenv("SEC_USER_AGENT", "GerarAI research nicoiglesiasgarcia10@gmail.com")
     assert sync.main() == 0
     manifest = json.loads(fake_hf.uploads["manifest.json"])
     # identidad local conservada; CIK de BRK-B

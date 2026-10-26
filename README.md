@@ -53,9 +53,9 @@ en [docs/AI_PROVIDER_STRATEGY.md](docs/AI_PROVIDER_STRATEGY.md):
 
 ## Arranque rápido (< 30 min)
 
-**Opción rápida (Windows) — `arrancar_cavaai.bat`:**
+**Opción rápida (Windows) — `arrancar_gerarai.bat`:**
 
-Doble clic (o `arrancar_cavaai.bat /prod` para validar el build de producción).
+Doble clic (o `arrancar_gerarai.bat /prod` para validar el build de producción).
 El script levanta **solo la infraestructura** con Docker (PostgreSQL, MongoDB,
 Redis, Qdrant, MinIO), libera los puertos 8000/3000 de procesos huérfanos de
 sesiones anteriores, aplica las migraciones de Alembic (se detiene si fallan)

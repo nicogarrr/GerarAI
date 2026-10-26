@@ -3,7 +3,7 @@
 Idea originada en TauricResearch/TradingAgents
 ``tradingagents/dataflows/sec_edgar.py`` (Apache-2.0): EDGAR no pide clave,
 pero la SEC exige un User-Agent que identifique al llamante con un contacto y
-rechaza las peticiones sin el. Implementacion propia para CavaAI: cliente
+rechaza las peticiones sin el. Implementacion propia para GerarAI: cliente
 ``httpx`` asincrono (inyectable en tests), tolerante a 429 con backoff
 exponencial y respeto a ``Retry-After``, y normalizacion minima de conceptos
 us-gaap de 10-K (anual) y 10-Q (trimestral).
@@ -33,7 +33,7 @@ ARCHIVES_URL = "https://www.sec.gov/Archives/edgar/data"
 DEFAULT_CONTACT = "contact@example.com"
 # Cabecera tipo navegador + contacto: la SEC bloquea User-Agents sin contacto.
 BROWSER_USER_AGENT = (
-    "Mozilla/5.0 (compatible; CavaAI/0.1; +mailto:{contact}) CavaAI Research"
+    "Mozilla/5.0 (compatible; GerarAI/0.1; +mailto:{contact}) GerarAI Research"
 )
 
 ANNUAL_FORMS = {"10-K", "20-F"}
@@ -60,7 +60,7 @@ def resolve_user_agent() -> str:
     candidate = configured or get_settings().sec_user_agent.strip() or ""
     if "@" not in candidate:
         candidate = BROWSER_USER_AGENT.format(contact=DEFAULT_CONTACT)
-    elif candidate.startswith("CavaAI/") and "Mozilla" not in candidate:
+    elif candidate.startswith(("CavaAI/", "GerarAI/")) and "Mozilla" not in candidate:
         candidate = BROWSER_USER_AGENT.format(contact=candidate.split()[-1].strip("()"))
     return candidate
 

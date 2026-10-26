@@ -567,7 +567,7 @@ class NewsFeedItem(BaseModel):
     url: str | None = None
     source: str = "feed"
     published_at: datetime | None = None
-    # False = `title` es texto de display generado por CavaAI, no un titular
+    # False = `title` es texto de display generado por GerarAI, no un titular
     # verbatim de la fuente: no se guarda como source_headline (procedencia).
     headline_from_source: bool = True
 

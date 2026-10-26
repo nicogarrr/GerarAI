@@ -14,7 +14,7 @@ import re
 import traceback
 import uuid
 
-logger = logging.getLogger("cavaai.request_errors")
+logger = logging.getLogger("gerarai.request_errors")
 
 _STATUS_DEFAULTS: dict[int, str] = {
     400: "Invalid request",

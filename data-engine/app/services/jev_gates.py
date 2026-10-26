@@ -30,7 +30,7 @@ from app.services.jev_availability import credit_status, mark_credit_exhausted
 from app.services.jev_fallback import classify_free
 from app.services.jev_triage_service import build_client
 
-logger = logging.getLogger("cavaai.jev_gates")
+logger = logging.getLogger("gerarai.jev_gates")
 
 # Umbrales de confianza calibrada para actuar sobre el veredicto de Jev.
 DEBATE_WORTHWHILE_THRESHOLD = 0.8

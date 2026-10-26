@@ -26,7 +26,7 @@ from lxml import html as lxml_html
 OIR_RESULTS_URL = "https://www.cnmv.es/portal/otra-informacion-relevante/resultado-oir"
 ENTITY_PAGE_URL = "https://www.cnmv.es/portal/consultas/datosentidad.aspx"
 MADRID = ZoneInfo("Europe/Madrid")
-_USER_AGENT = "CavaAI/1.0 (research; contact: single-user app)"
+_USER_AGENT = "GerarAI/1.0 (research; contact: single-user app)"
 _MIN_INTERVAL_S = 1.0
 _last_request_at = 0.0
 

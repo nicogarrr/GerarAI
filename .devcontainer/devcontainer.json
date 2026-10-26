@@ -1,5 +1,5 @@
 {
-  "name": "CavaAI (full stack)",
+  "name": "GerarAI (full stack)",
   "dockerComposeFile": [
     "../docker-compose.yml",
     "docker-compose.devcontainer.yml"

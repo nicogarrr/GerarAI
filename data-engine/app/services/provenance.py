@@ -21,7 +21,7 @@ class SourceKind(StrEnum):
     ISSUER = "issuer"
     EXCHANGE = "exchange"
     UNOFFICIAL = "unofficial"
-    # computed from CavaAI-persisted data whose upstream rows carry their own
+    # computed from GerarAI-persisted data whose upstream rows carry their own
     # provenance; used for derived views (risk, summaries, histories)
     INTERNAL = "internal"
 

@@ -35,7 +35,7 @@ AZVALOR_INDEX = "https://www.azvalor.com/categorias_anuncios/cartas-a-inversores
 MAGALLANES_AUTHOR = "Magallanes Value Investors"
 MAGALLANES_NOTICIAS = "https://magallanesvalue.com/noticias/"
 
-USER_AGENT = "CavaAI research corpus ingest (contact: owner-configured)"
+USER_AGENT = "GerarAI research corpus ingest (contact: owner-configured)"
 MAX_LETTER_PAGES_PER_SOURCE = 40
 
 

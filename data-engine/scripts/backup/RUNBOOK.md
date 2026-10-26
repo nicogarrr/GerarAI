@@ -1,4 +1,4 @@
-# Runbook de recuperacion (disaster recovery) — CavaAI
+# Runbook de recuperacion (disaster recovery) — GerarAI
 
 Este runbook esta escrito para **quien no conoce el sistema**. Si estas leyendo
 esto en mitad de un incidente, no necesitas contexto previo: los comandos estan
@@ -7,7 +7,7 @@ completos, en orden y con el tiempo esperado de cada uno.
 Todo se ejecuta desde `data-engine/` (el directorio con `alembic.ini`).
 
 ```
-cd /ruta/a/CavaAI/data-engine
+cd /ruta/a/GerarAI/data-engine
 ```
 
 Que se recupera:

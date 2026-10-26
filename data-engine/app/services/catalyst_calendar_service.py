@@ -38,7 +38,7 @@ from app.models.entities import Company, CorporateAction, Position
 from app.services.market_refresh_service import _us_listed
 
 SOURCE_NASDAQ = "Calendario público de NASDAQ"
-SOURCE_CAVAAI = "Acción corporativa registrada en GerarAI"
+SOURCE_GERARAI = "Acción corporativa registrada en GerarAI"
 
 SOURCE_SEC_RULE = "Regla SEC (Form 10-Q/10-K) aplicada al último informe en EDGAR"
 
@@ -368,7 +368,7 @@ def build_catalysts(
                 "type": "corporate_action",
                 "title": label,
                 "detail": f"ratio {_es_number(float(ratio), 4).rstrip('0').rstrip(',')}" if isinstance(ratio, (int, float)) else None,
-                "source": SOURCE_CAVAAI,
+                "source": SOURCE_GERARAI,
             }
         )
     events.sort(key=lambda e: (e["date"], _TYPE_ORDER[e["type"]], e["ticker"]))

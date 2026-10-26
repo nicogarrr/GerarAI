@@ -48,7 +48,7 @@ def test_async_empty_response_and_latest_poll_only():
     calls, request = run_with_responses({"messages": [pending, done]})
     with patch.object(bridge, "serve_req", request), patch.object(bridge.time, "sleep"):
         assert bridge.complete("fixture-free", [{"role": "user", "content": "test"}]) == "whole"
-    assert calls[0][2] == {"title": "CavaAI chat"}
+    assert calls[0][2] == {"title": "GerarAI chat"}
     assert any(path.endswith("prompt_async") for _, path, _, _ in calls)
     assert calls[-2][1].endswith("abort") and calls[-1][0] == "DELETE"
 

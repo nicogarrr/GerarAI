@@ -491,7 +491,7 @@ def test_error_details_are_sanitized_and_logged_with_correlation_ref(
     tenant = f"sanitize-{suffix}"
     user = f"user-{suffix}"
     client = TestClient(main.app)
-    with caplog.at_level(logging.ERROR, logger="cavaai.request_errors"):
+    with caplog.at_level(logging.ERROR, logger="gerarai.request_errors"):
         response = client.post(
             "/api/knowledge-graph/sync",
             headers=_bound_headers(
@@ -514,7 +514,7 @@ def test_error_details_are_sanitized_and_logged_with_correlation_ref(
 
 def test_safe_detail_never_returns_exception_text(caplog):
     exc = RuntimeError("connection to db-primary.internal failed: password=hunter2")
-    with caplog.at_level(logging.ERROR, logger="cavaai.request_errors"):
+    with caplog.at_level(logging.ERROR, logger="gerarai.request_errors"):
         detail = safe_detail(exc, 500)
     assert "hunter2" not in detail
     assert "db-primary" not in detail
@@ -527,7 +527,7 @@ def test_safe_detail_redacts_vendor_keys_in_server_log(caplog):
     # httpx mete la URL completa (con la key del servidor) en el texto de la
     # excepcion: el log tampoco puede guardarla.
     exc = RuntimeError("GET https://finnhub.io/api/v1/quote?symbol=AAPL&token=secrettoken123 failed")
-    with caplog.at_level(logging.ERROR, logger="cavaai.request_errors"):
+    with caplog.at_level(logging.ERROR, logger="gerarai.request_errors"):
         detail = safe_detail(exc, 500)
     assert "secrettoken123" not in detail
     assert "secrettoken123" not in caplog.text

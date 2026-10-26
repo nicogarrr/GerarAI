@@ -80,7 +80,7 @@ def _compact(value: str) -> str:
     return " ".join(value.lower().split())
 
 
-logger = logging.getLogger("cavaai.knowledge_library")
+logger = logging.getLogger("gerarai.knowledge_library")
 
 
 def extraction_error_message(exc: Exception) -> str:
@@ -113,7 +113,7 @@ class KnowledgeLibraryService:
                 collection = KnowledgeCollection(
                     name=name,
                     slug=slug,
-                    description=f"Canonical CavaAI collection for {name}.",
+                    description=f"Canonical GerarAI collection for {name}.",
                     collection_type="system",
                     metadata_={"default": True},
                 )

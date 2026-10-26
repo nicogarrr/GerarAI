@@ -97,7 +97,7 @@ def test_knowledge_library_ingestion_deduplication_and_principle_approval():
             filename="reinvestment-note.txt",
             document_type="personal_note",
             collection_id=capital_allocation.id,
-            author="CavaAI test",
+            author="GerarAI test",
             language="en",
             content_type="text/plain",
         )

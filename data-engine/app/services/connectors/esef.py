@@ -36,7 +36,7 @@ import httpx
 ESEF_BASE_URL = "https://filings.xbrl.org"
 FILINGS_API = "/api/filings"
 ENTITIES_API = "/api/entities"
-USER_AGENT = "CavaAI/1.0 (research; contact: single-user app)"
+USER_AGENT = "GerarAI/1.0 (research; contact: single-user app)"
 DEFAULT_PAGE_SIZE = 100
 _MIN_INTERVAL_S = 1.0  # undocumented rate limits -> conservative polling
 _last_request_at = 0.0

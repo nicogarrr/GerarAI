@@ -31,7 +31,7 @@ def normalize_supgp(payload: object, *, fetched_at: datetime, gp_catalog: list[d
 async def fetch_supgp(gp_catalog: list[dict] | None = None, client: httpx.AsyncClient | None = None, *, fetched_at: datetime) -> list[dict]:
     if client is None:
         async with httpx.AsyncClient(timeout=20, follow_redirects=False) as own:
-            response = await own.get(SUPGP_URL, headers={"User-Agent": "CavaAI/1.0 (AST catalog research)"})
+            response = await own.get(SUPGP_URL, headers={"User-Agent": "GerarAI/1.0 (AST catalog research)"})
     else:
         response = await client.get(SUPGP_URL)
     response.raise_for_status()

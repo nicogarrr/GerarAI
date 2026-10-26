@@ -1,6 +1,6 @@
 ---
 name: "Informe de error"
-about: "Describe un fallo reproducible en CavaAI"
+about: "Describe un fallo reproducible en GerarAI"
 title: "[bug] "
 labels: ["bug"]
 ---

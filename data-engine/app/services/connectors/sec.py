@@ -467,7 +467,7 @@ class SECClient:
                 # queda vacío: la frase ES ya es el titular; un resumen
                 # adicional duplicaría el texto en la ingesta de noticias.
                 # headline_from_source=False: la SEC no publica un titular
-                # para el filing, este texto ES de display creado por CavaAI
+                # para el filing, este texto ES de display creado por GerarAI
                 # y NO debe persistir como source_headline (procedencia).
                 title = f"{form or 'filing'} presentado ante la SEC"
                 items.append(

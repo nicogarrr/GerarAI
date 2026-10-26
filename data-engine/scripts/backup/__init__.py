@@ -1,4 +1,4 @@
-"""Backup verificado de los tres pilares de CavaAI (Postgres, MinIO, Qdrant).
+"""Backup verificado de los tres pilares de GerarAI (Postgres, MinIO, Qdrant).
 
 Modulos:
   * `_kit`         primitivas fail-closed, manifiesto y pins de herramientas.

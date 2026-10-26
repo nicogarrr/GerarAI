@@ -1,4 +1,4 @@
-' CavaAI Backend — arranca el FastAPI (uvicorn) oculto, sin ventana.
+' GerarAI Backend — arranca el FastAPI (uvicorn) oculto, sin ventana.
 ' Registrado como Scheduled Task (ONLOGON) para que el scheduler de workers
 ' corra 24/7 mientras el PC este encendido (patron identico al Gateway).
 Set sh = CreateObject("WScript.Shell")

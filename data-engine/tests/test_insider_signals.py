@@ -423,7 +423,7 @@ def test_big_buy_ignores_malformed_value():
 def test_sec_user_agent_wraps_product_style(monkeypatch):
     """Regresion F11: UA de producto con contacto -> 403 en SEC. Se envuelve
     en UA tipo navegador extrayendo el email, aunque venga mal concatenado."""
-    monkeypatch.setenv("SEC_USER_AGENT", "CavaAI/0.1nicogarrr@users.noreply.github.com")
+    monkeypatch.setenv("SEC_USER_AGENT", "GerarAI/0.1nicogarrr@users.noreply.github.com")
     ua = form4_connector.resolve_user_agent()
     assert ua.startswith("Mozilla/5.0")
     assert "+mailto:nicogarrr@users.noreply.github.com" in ua

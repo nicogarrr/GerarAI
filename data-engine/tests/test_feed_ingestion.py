@@ -113,7 +113,7 @@ def test_sec_recent_filings_uses_identity_and_builds_archive_urls():
         ) as client:
             sec = SECClient(
                 client,
-                user_agent="CavaAI tests engineering@example.com",
+                user_agent="GerarAI tests engineering@example.com",
                 requests_per_second=10,
             )
             return await sec.recent_filings(
@@ -124,7 +124,7 @@ def test_sec_recent_filings_uses_identity_and_builds_archive_urls():
 
     result = run_async(poll())
 
-    assert seen_requests[0].headers["user-agent"] == "CavaAI tests engineering@example.com"
+    assert seen_requests[0].headers["user-agent"] == "GerarAI tests engineering@example.com"
     assert result.status == "ok"
     assert len(result.items) == 1
     assert result.items[0].metadata["form"] == "10-Q"
