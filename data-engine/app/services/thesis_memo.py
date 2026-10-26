@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Claim, ClaimEvidence, Company, SourceAudit, ThesisSection, ThesisVersion
-from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, percent_es
+from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, money_thesis, percent_es
 from app.services.thesis_approval_service import APPROVAL_SECTION_TITLE
 
 
@@ -108,8 +108,13 @@ def _narrative_lines(narrative: list | None) -> list[str]:
     return out
 
 
-def _money(value) -> str:
-    return f"${float(value):,.2f}" if value is not None else "pendiente"
+def _money(value, currency: str | None) -> str:
+    """Valor por acción en la divisa del listado, como la ficha (thesisMoney).
+
+    Nunca el símbolo $ a secas: para una acción en EUR seria una cifra
+    inventada. Sin cifra, «pendiente».
+    """
+    return money_thesis(float(value), currency) if value is not None else "pendiente"
 
 
 def build_memo_markdown(
@@ -225,12 +230,12 @@ def build_memo_markdown(
         lines.append("## Valoración y escenarios")
         lines.append("| Escenario | Valor | Probabilidad |")
         lines.append("|---|---|---|")
-        lines.append(f"| Bajista | {_money(thesis.bear_value)} | {_prob('bear')} |")
-        lines.append(f"| Base | {_money(thesis.base_value)} | {_prob('base')} |")
-        lines.append(f"| Alcista | {_money(thesis.bull_value)} | {_prob('bull')} |")
+        lines.append(f"| Bajista | {_money(thesis.bear_value, company.currency)} | {_prob('bear')} |")
+        lines.append(f"| Base | {_money(thesis.base_value, company.currency)} | {_prob('base')} |")
+        lines.append(f"| Alcista | {_money(thesis.bull_value, company.currency)} | {_prob('bull')} |")
         lines.append(
-            f"\nPrecio actual: {_money(thesis.current_price)} · Valor esperado: "
-            f"{_money(thesis.expected_value)} · Margen de seguridad: "
+            f"\nPrecio actual: {_money(thesis.current_price, company.currency)} · Valor esperado: "
+            f"{_money(thesis.expected_value, company.currency)} · Margen de seguridad: "
             + (percent_es(float(thesis.margin_of_safety)) if thesis.margin_of_safety is not None else "pendiente")
         )
         lines.append("")
