@@ -135,7 +135,21 @@ def _scope_tenant_dml(execute_state, tenant_id) -> None:
         return
     if execute_state.is_update:
         values = getattr(statement, "_values", None) or {}
-        if any(getattr(column, "key", "") == "tenant_id" for column in values):
+        ordered_values = getattr(statement, "_ordered_values", None) or ()
+        keys = [*values, *(column for column, _ in ordered_values)]
+        # Core updates retain string keys, while ORM updates use Columns.
+        # ordered_values() and execute(update(table), parameters) are also
+        # SET assignments; neither is guaranteed to populate _values.
+        parameters = execute_state.parameters
+        batches = parameters if isinstance(parameters, (list, tuple)) else [parameters]
+        keys.extend(
+            key for batch in batches if isinstance(batch, dict) for key in batch
+        )
+        if any(
+            (column if isinstance(column, str) else getattr(column, "key", ""))
+            == "tenant_id"
+            for column in keys
+        ):
             raise RuntimeError(
                 "Changing tenant_id through bulk updates is not allowed"
             )
