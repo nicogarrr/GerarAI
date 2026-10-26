@@ -309,6 +309,23 @@ def _assumption_basis_text(entry: dict) -> str:
     return basis or "política del motor"
 
 
+def _visible_medio(source: str) -> str:
+    """Nombre del medio sin forma de localizador, solo para el prompt.
+
+    Representación legible y reversible: se retira el esquema y el
+    prefijo "www." y cada punto se separa con un espacio, conservando
+    TODOS los componentes del nombre en orden (sin inferir marca ni
+    recortar sufijos): "waterford-news.ie" -> "waterford-news ie",
+    "finance.yahoo.com" -> "finance yahoo com". La prohibición de
+    host/URL en prosa se mantiene absoluta y la fuente real no cambia:
+    las citas del resultado las inserta el código desde fact["fuente"].
+    """
+    visible = source.strip()
+    visible = re.sub(r"^[a-z][a-z0-9+.-]*://", "", visible, flags=re.IGNORECASE)
+    visible = re.sub(r"^www\.", "", visible, flags=re.IGNORECASE)
+    return visible.replace(".", " ")
+
+
 def fact_pack(
     company: Company,
     valuation: dict,
@@ -537,7 +554,7 @@ def fact_pack(
         )
     for item in list(news_items or [])[:5]:
         headline = str(item.get("source_headline") or "").strip()
-        source = str(item.get("source") or "").strip()
+        source = _visible_medio(str(item.get("source") or "").strip())
         if not headline or not source:
             continue
         day = date_es(str(item.get("date") or "")[:10])
@@ -571,6 +588,7 @@ def fact_pack(
         url_locator = _source_locator(item)
         add(texto, url_locator if url_locator != "URL no disponible" else locator)
     return facts
+
 
 
 def _validate_sections(
