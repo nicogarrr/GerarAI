@@ -9,8 +9,8 @@ financiero.
 from __future__ import annotations
 
 import re
-from decimal import Decimal
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
