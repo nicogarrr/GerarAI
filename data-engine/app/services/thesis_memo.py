@@ -43,10 +43,14 @@ def _full_analysis_lines(markdown: str) -> list[str]:
             line = f"- {ref} [texto del extracto omitido; consultar en la ficha]"
             out.append(line)
             continue
-        # Marca interna ("publicable=True") que contradice el estado del memo y
-        # listas largas de ids de hechos: siguen en la ficha, no en el documento.
-        line = re.sub(r"\s+publicable=(?:True|False|None)", "", line)
-        line = re.sub(r"\s*\(\d{5,}(?:, \d{5,})*\)", "", line)
+        # Solo campos identificados del productor, nunca prosa libre:
+        # - "- Estado: `ok` publicable=True" (marca interna que contradice el estado);
+        # - celdas "N hechos citados (id, id, ...)" de la tabla de procedencia
+        #   (los ids siguen en la ficha).
+        if line.startswith("- Estado:"):
+            line = re.sub(r"\s+publicable=(?:True|False|None)\s*$", "", line)
+        if line.startswith("|"):
+            line = re.sub(r"(\d+ hechos? citados?) \(\d+(?:, \d+)*\)", r"\1", line)
         if line.startswith("### "):
             out.append(f"**{line[4:]}**")
         elif line.startswith("## "):
@@ -62,9 +66,13 @@ def _narrative_lines(narrative: list | None) -> list[str]:
     for section in narrative or []:
         if not isinstance(section, dict):
             continue
-        titulo = re.sub(r"\s*-?\s*INFERIDO$", "", str(section.get("titulo") or "")).strip()
+        # La marca técnica INFERIDO se sustituye, no se borra: la calificación
+        # (interpretación a partir de titulares, no confirmada) se conserva.
+        titulo = str(section.get("titulo") or "").strip()
+        if re.search(r"\s*-?\s*INFERIDO$", titulo):
+            titulo = re.sub(r"\s*-?\s*INFERIDO$", "", titulo).strip() + " (interpretación, no confirmado)"
         parrafos = [
-            re.sub(r"^INFERIDO:\s*", "", str(p)).strip()
+            re.sub(r"^INFERIDO:\s*", "Interpretación a partir de titulares, no confirmada: ", str(p)).strip()
             for p in (section.get("parrafos") or [])
             if str(p).strip()
         ]
@@ -89,6 +97,7 @@ def build_memo_markdown(
     stale: bool = False,
     latest_data_at: datetime | None = None,
     draft: bool = False,
+    isolated: bool = False,
 ) -> str:
     """``draft=True``: memo de un borrador sin publicar, por lista blanca.
 
@@ -153,6 +162,12 @@ def build_memo_markdown(
             lines.append("> Sin auditoría de fuentes registrada para esta versión.")
             lines.append("")
 
+    if isolated:
+        lines.append(
+            "> ARTEFACTO DE PRUEBA AISLADA: generada en una transacción con rollback; NO está "
+            "persistida, ni publicada ni aprobada."
+        )
+        lines.append("")
     if not draft and thesis.status != "published":
         lines.append(
             f"> ESTADO: versión en estado «{label_es(STATUS_ES, thesis.status)}», no publicada ni "
@@ -262,10 +277,16 @@ def build_memo_markdown(
             lines.append("")
 
     lines.append("---")
-    lines.append(
-        f"Generado {datetime.now(UTC):%Y-%m-%d %H:%M} UTC desde la versión persistida "
-        f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'})."
-    )
+    if isolated:
+        lines.append(
+            f"Generado {datetime.now(UTC):%Y-%m-%d %H:%M} UTC desde una ejecución aislada "
+            "(rollback, no persistida; sin fingerprint persistido)."
+        )
+    else:
+        lines.append(
+            f"Generado {datetime.now(UTC):%Y-%m-%d %H:%M} UTC desde la versión persistida "
+            f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'})."
+        )
     lines.append(
         "Documento informativo de investigación. NO es asesoramiento financiero "
         "ni recomendación de compra o venta."
