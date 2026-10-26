@@ -13,6 +13,10 @@ const InputField = ({name, label, placeholder, type ="text", register, error, va
         return undefined;
     };
 
+    // Teclado móvil con @ sin activar la validación nativa del navegador
+    // (seguimos mostrando solo los mensajes ES de react-hook-form).
+    const inputMode = (type === 'email' || name.toLowerCase() === 'email') ? 'email' as const : undefined;
+
     const errorId = `${name}-error`;
 
     return (
@@ -27,6 +31,7 @@ const InputField = ({name, label, placeholder, type ="text", register, error, va
                 disabled={disabled}
                 value={value}
                 autoComplete={getAutoComplete()}
+                inputMode={inputMode}
                 aria-invalid={!!error}
                 aria-describedby={error ? errorId : undefined}
                 className={cn('form-input', {'opacity-50 cursor-not-allowed': disabled})}
