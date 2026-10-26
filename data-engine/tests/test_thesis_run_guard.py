@@ -1,12 +1,12 @@
 """PR3: guard LLM por job de tesis. Solo fixtures: sin red, sin Redis, sin LLM real."""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+import time
 from types import SimpleNamespace
 
 import pytest
 
-from app.llm.run_guard import InMemoryCounterStore, LLMGuardAbort, current_guard
+from app.llm.run_guard import InMemoryCounterStore, LLMGuardAbort, activate, current_guard
 from app.models.entities import WorkflowRun
 from app.services import thesis_job_service as jobs
 from app.services.thesis_service import ThesisService
@@ -27,33 +27,80 @@ def _settings(**kw):
     return SimpleNamespace(**base)
 
 
-def _run(age=timedelta(0)):
-    return SimpleNamespace(id=41, created_at=datetime.now(UTC) - age)
+class _DB:
+    def __init__(self):
+        self.commits = 0
+
+    def commit(self):
+        self.commits += 1
+
+
+def _run(marker=None):
+    payload = {} if marker is None else {"llm_guard": marker}
+    return SimpleNamespace(id=41, input_payload=payload)
 
 
 def test_disabled_by_default_returns_none():
     assert jobs.build_run_guard(_run(), _settings(llm_run_guard_max_posts=0)) is None
 
 
-def test_run_id_has_no_attempt_and_is_stable_across_retries():
+def test_first_claim_inits_counter_then_persists_marker_and_retry_reuses_it():
     store = InMemoryCounterStore()
-    g1 = jobs.build_run_guard(_run(), _settings(), store=store)
-    g2 = jobs.build_run_guard(_run(), _settings(), store=store)
-    assert g1.run_id == g2.run_id == "thesis:41"
-    assert g1.store is g2.store
+    run, db = _run(), _DB()
+    g1 = jobs.build_run_guard(run, _settings(), store=store, db=db)
+    assert g1.run_id == "thesis:41" and "thesis:41" in store.state
+    assert db.commits == 1 and run.input_payload["llm_guard"]["deadline_ts"] == g1.deadline_ts
+    g2 = jobs.build_run_guard(run, _settings(), store=store, db=db)  # reintento/redelivery
+    assert g2.deadline_ts == g1.deadline_ts and db.commits == 1
 
 
-def test_run_older_than_window_fails_closed():
+def test_marker_past_deadline_fails_closed():
+    marker = {"deadline_ts": time.time() - 1}
     with pytest.raises(LLMGuardAbort) as e:
-        jobs.build_run_guard(_run(timedelta(days=7, seconds=1)), _settings(), store=InMemoryCounterStore())
+        jobs.build_run_guard(_run(marker), _settings(), store=InMemoryCounterStore(), db=_DB())
     assert e.value.reason == "run_guard_window_expired"
+
+
+def test_evicted_counter_after_init_is_not_recreated():
+    store = InMemoryCounterStore()
+    run, db = _run(), _DB()
+    g = jobs.build_run_guard(run, _settings(), store=store, db=db)
+    store.state.clear()  # desalojo/flush
+    g2 = jobs.build_run_guard(run, _settings(), store=store, db=db)  # retry: marcador existe
+    with pytest.raises(LLMGuardAbort) as e:
+        activate_and_post(g2)
+    assert e.value.reason == "counter_missing"
+    assert "thesis:41" not in store.state and g.run_id == g2.run_id
+
+
+def test_deadline_crossing_during_generate_blocks_late_post(monkeypatch):
+    store = InMemoryCounterStore()
+    g = jobs.build_run_guard(_run(), _settings(), store=store, db=_DB())
+    activate_and_post(g)  # dentro de plazo
+    monkeypatch.setattr(time, "time", lambda: g.deadline_ts + 1)
+    with pytest.raises(LLMGuardAbort) as e:
+        activate_and_post(g)
+    assert e.value.reason == "run_deadline_exceeded"
+    assert store.state["thesis:41"] == (1, 0)
+
+
+def test_marker_missing_without_db_fails_closed():
+    with pytest.raises(LLMGuardAbort):
+        jobs.build_run_guard(_run(), _settings(), store=InMemoryCounterStore())
+
+
+def activate_and_post(g):
+    from app.llm.run_guard import reserve_post_without_tokens
+
+    with activate(g):
+        reserve_post_without_tokens("https://opencode.ai/x")
 
 
 def test_misconfigured_limits_or_missing_hosts_fail_closed():
     for kw in ({"llm_run_guard_allowed_hosts": ""}, {"llm_run_guard_allowed_models": ""},
                {"llm_run_guard_max_tokens_per_request": 0}, {"llm_run_guard_max_total_output_tokens": 0}):
         with pytest.raises(LLMGuardAbort) as e:
-            jobs.build_run_guard(_run(), _settings(**kw), store=InMemoryCounterStore())
+            jobs.build_run_guard(_run(), _settings(**kw), store=InMemoryCounterStore(), db=_DB())
         assert e.value.reason == "guard_misconfigured"
 
 
@@ -104,7 +151,7 @@ def test_job_activates_guard_when_enabled_and_resets_after(monkeypatch):
     monkeypatch.setattr(ThesisService, "generate", generate)
     _patch_guard_settings(monkeypatch)
     orig = jobs.build_run_guard
-    monkeypatch.setattr(jobs, "build_run_guard", lambda r, s: orig(r, s, store=store))
+    monkeypatch.setattr(jobs, "build_run_guard", lambda r, s, db=None: orig(r, s, store=store, db=db))
     run, _ = _enqueue_without_dispatch(monkeypatch)
     jobs.run_thesis_job(run.id)
     assert seen[0] is not None and seen[0].run_id == f"thesis:{run.id}"
