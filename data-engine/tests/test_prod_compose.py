@@ -121,6 +121,16 @@ def test_every_app_process_runs_with_app_env_production():
         assert env.get("APP_ENV") == "production", service
 
 
+def test_every_app_process_receives_the_required_auth_secret():
+    """APP_ENV=production exige RESEARCH_AUTH_SECRET: sin el, el worker no arranca."""
+    compose = _load_compose()
+    for service in APP_SERVICES:
+        env = _service_env(compose, service)
+        assert env.get("RESEARCH_AUTH_REQUIRED") == "true", service
+        assert "RESEARCH_AUTH_SECRET" in env, service
+        assert ":?" in env["RESEARCH_AUTH_SECRET"], service
+
+
 def test_scheduler_receives_retention_and_storage_configuration():
     """El job privacy_retention borra originales/chunks/vectores: sin MinIO,
     Qdrant y RETENTION_* arrancaba degradado y no purgaba nada."""
