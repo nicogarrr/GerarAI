@@ -261,9 +261,14 @@ def build_memo_markdown(
         analysis = _full_analysis_lines(thesis.thesis_markdown or "")
         if any(item.strip() for item in analysis):
             lines.append("## Análisis completo")
+            origin = (
+                "Texto de la tesis de una ejecución aislada (no persistida)"
+                if isolated
+                else "Texto de la tesis persistida (misma versión que la ficha)"
+            )
             lines.append(
-                "Texto de la tesis persistida (misma versión que la ficha). Descriptivo: no "
-                "garantiza que cifras, fuentes o inferencias estén validadas."
+                f"{origin}. Descriptivo: no garantiza que cifras, fuentes o inferencias "
+                "estén validadas."
             )
             lines.append("")
             lines.extend(analysis)

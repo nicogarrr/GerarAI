@@ -314,12 +314,16 @@ def test_isolated_memo_is_labeled_not_persisted(db):
     company = _company(db)
     thesis = ThesisVersion(
         company_id=company.id, version=9, status="final", rating="watch",
-        thesis_markdown="# t", executive_summary="s",
+        thesis_markdown="# t\n## Resumen\ncuerpo", executive_summary="s",
     )
     db.add(thesis)
     db.commit()
     memo = build_memo_markdown(db, company, thesis, isolated=True)
+    assert "tesis de una ejecución aislada (no persistida)" in memo
     assert "ARTEFACTO DE PRUEBA AISLADA" in memo
     assert "no persistida" in memo
     assert "desde la versión persistida" not in memo
-    assert "desde la versión persistida" in build_memo_markdown(db, company, thesis)
+    assert "Texto de la tesis persistida" not in memo
+    normal = build_memo_markdown(db, company, thesis)
+    assert "desde la versión persistida" in normal
+    assert "Texto de la tesis persistida" in normal
