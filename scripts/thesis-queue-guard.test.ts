@@ -18,7 +18,7 @@ test('F359: la tesis va en cola dedicada consumida por un worker DEDICADO', () =
   // worker general en prod es ~620MiB; 2G da >3x de margen y mantiene la suma
   // de limites por debajo de un OOM con tesis + ingesta + KPI simultaneos.
   const thesisBlock = compose.slice(compose.indexOf("worker-thesis:"));
-  assert.match(thesisBlock, /memory: 2G/);
+  assert.match(thesisBlock, /memory: 1024M/);
     const workerCmd = compose.match(/worker:\n[\s\S]{0,200}command: \[[^\]]*\]/)?.[0] ?? '';
     assert.ok(workerCmd && !workerCmd.includes('thesis'), 'el worker general NO consume thesis');
 });

@@ -28,7 +28,7 @@ test('la cola gdelt la consume EXACTAMENTE UN proceso dedicado (pacing por IP in
     // pacerian por su cuenta y la tasa combinada romperia el limite por IP.
     assert.match(compose, /worker-gdelt:[\s\S]{0,900}"--processes", "1", "--threads", "2", "-Q", "gdelt"/);
     const gdeltBlock = compose.slice(compose.indexOf('worker-gdelt:'));
-    assert.match(gdeltBlock, /memory: 2G/);
+    assert.match(gdeltBlock, /memory: 640M/);
     const workerCmd = compose.match(/worker:\n[\s\S]{0,200}command: \[[^\]]*\]/)?.[0] ?? '';
     assert.ok(workerCmd && !workerCmd.includes('gdelt'), 'el worker general NO consume gdelt');
 });
