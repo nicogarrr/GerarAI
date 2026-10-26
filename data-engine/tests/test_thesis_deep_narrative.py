@@ -473,9 +473,10 @@ def _ltm_full():
     }
 
 
-def _ff(metric, value, unit, period, source_id=None):
+def _ff(metric, value, unit, period, source_id=None, is_reported=True):
     return FinancialFact(metric=metric, value=Decimal(str(value)), unit=unit,
-                         period=period, source_type="sec_companyfacts", source_id=source_id)
+                         period=period, source_type="sec_companyfacts", source_id=source_id,
+                         is_reported=is_reported)
 
 
 def test_pack_includes_fundamentals_with_period_unit_and_source():
@@ -483,13 +484,13 @@ def test_pack_includes_fundamentals_with_period_unit_and_source():
         _company(), _valuation(), _long_term_model(), None, [], None, None,
         financial_facts=[
             _ff("revenue", 100000000000, "USD", "2025-12-31:FY"),
-            _ff("fcf_margin", "0.25", "decimal", "2025-12-31:FY"),
+            _ff("fcf_margin", "0.25", "decimal", "2025-12-31:FY", is_reported=False),
         ],
     )
     textos = [f["texto"] for f in facts]
     assert any("periodos distintos NO son comparables" in t for t in textos)
-    assert any("Ingresos de META: 100 mil M USD (periodo 2025-12-31:FY; fuente sec_companyfacts)" in t for t in textos)
-    assert any("Margen de FCF de META: 25,0 % (periodo 2025-12-31:FY" in t for t in textos)
+    assert any("Ingresos de META: 100 mil M USD (periodo 2025-12-31:FY; dato reportado (fuente sec_companyfacts; la fuente acredita publicación, no veracidad))" in t for t in textos)
+    assert any("Margen de FCF de META: 25,0 % (periodo 2025-12-31:FY; cifra derivada de partidas sec_companyfacts; no es un dato reportado)" in t for t in textos)
     # Cada cifra nueva queda anclada por construcción: el validador las admite.
     allowed = svc._allowed_numbers(facts)
     assert "100" in allowed and "25" in allowed

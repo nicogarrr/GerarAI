@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.orm import Session
@@ -354,6 +355,24 @@ def fact_pack(
     base = valuation.get("base_value")
     mos = valuation.get("margin_of_safety")
     internal = "Motor de valoración interno (sección 13 del memo)."
+    # Referencia honesta del precio: con fecha de cierre si el paquete la
+    # trae; sin ella no se afirma actualidad («precio actual» sería falso).
+    raw_as_of = str(((long_term_model or {}).get("trace") or {}).get("market_as_of") or "")[:10]
+    # Solo una fecha ISO valida referencia el cierre; una malformada equivale
+    # a ausente (nunca se inventa ni se asume el dia de hoy).
+    try:
+        _parsed_as_of = datetime.fromisoformat(raw_as_of).date() if raw_as_of else None
+    except ValueError:
+        _parsed_as_of = None
+    if _parsed_as_of is not None:
+        price_ref = (
+            f"último precio registrado de {company.ticker} al {date_es(raw_as_of)}"
+        )
+    else:
+        price_ref = (
+            f"último precio registrado de {company.ticker} "
+            "(fecha de cierre no disponible en este paquete)"
+        )
 
     if status:
         add(
@@ -362,7 +381,7 @@ def fact_pack(
             internal,
         )
     if price is not None:
-        add(f"Precio actual de {company.ticker}: {price:.2f} {currency}.", internal)
+        add(f"{price_ref[0].upper() + price_ref[1:]}: {price:.2f} {currency}.", internal)
     if base is not None:
         add(f"Escenario base del modelo: {base:.2f} {currency} por acción.", internal)
     bear = valuation.get("bear_value")
@@ -384,7 +403,7 @@ def fact_pack(
     growth = (valuation.get("reverse_dcf") or {}).get("required_revenue_growth")
     if growth is not None:
         add(
-            "Con los supuestos de este DCF inverso, el precio actual exigiría "
+            "Con los supuestos de este DCF inverso, ese precio registrado exigiría "
             f"un crecimiento de ingresos del {percent_es(growth)} anual.",
             internal,
         )
@@ -419,9 +438,9 @@ def fact_pack(
     ]
     if present:
         add(
-            "Bloque de fundamentales reportados: cada cifra declara su "
-            "métrica, unidad, periodo y fuente; cifras de periodos distintos "
-            "NO son comparables entre sí.",
+            "Bloque de fundamentales: cada cifra declara su métrica, unidad, "
+            "periodo y si es dato reportado o cifra derivada; cifras de "
+            "periodos distintos NO son comparables entre sí.",
             "Registro interno de datos financieros.",
         )
         for fact in present:
@@ -438,9 +457,31 @@ def fact_pack(
                     if fact.unit and len(fact.unit) == 3 and fact.unit.isupper()
                     else compact
                 )
+            reported = getattr(fact, "is_reported", None)
+            if reported is True:
+                # Reportado != contenido verificado: la fuente acredita
+                # publicacion/registro, nunca veracidad.
+                origen = (
+                    f"dato reportado (fuente {fact.source_type}; "
+                    "la fuente acredita publicación, no veracidad)"
+                )
+            elif reported is False:
+                # Derivada por ingesta de partidas reportadas: no es un dato
+                # reportado y no se presenta con la misma etiqueta de fuente.
+                origen = (
+                    f"cifra derivada de partidas {fact.source_type}; "
+                    "no es un dato reportado"
+                )
+            else:
+                # Estado desconocido: no se convierte ni en reportado ni en
+                # derivado.
+                origen = (
+                    f"estado de reporte no disponible "
+                    f"(fuente registrada: {fact.source_type})"
+                )
             add(
                 f"{label} de {company.ticker}: {valor} "
-                f"(periodo {fact.period}; fuente {fact.source_type}).",
+                f"(periodo {fact.period}; {origen}).",
                 _fact_source_locator(fact),
             )
 
@@ -468,7 +509,7 @@ def fact_pack(
                 + percent_es(assumptions["fcf_margin"]["value"])
                 + " (base: "
                 + _assumption_basis_text(assumptions["fcf_margin"])
-                + "; otra base y otro periodo que el margen FCF reportado de "
+                + "; otra base y otro periodo que el margen FCF registrado de "
                 "un año concreto: no son la misma cifra)"
             )
         if (assumptions.get("wacc") or {}).get("value") is not None:
@@ -517,7 +558,7 @@ def fact_pack(
     solved = reverse.get("solved_value_per_share")
     if solved is not None:
         add(
-            f"Al precio actual, el DCF inverso resuelve un valor de {solved:.2f} "
+            f"A ese precio registrado, el DCF inverso resuelve un valor de {solved:.2f} "
             f"{currency} por acción (salida del motor con sus supuestos).",
             internal,
         )
@@ -685,7 +726,8 @@ _SYSTEM = (
     "debe aparecer literalmente en el texto de un hecho. Escribe en TEXTO "
     "PLANO: sin markdown (sin negritas con asteriscos, sin encabezados con "
     "#), sin etiquetas HTML y sin bloques de codigo. El paquete incluye los "
-    "fundamentales reportados y los supuestos del motor: EXPLÍCALOS (qué "
+    "fundamentales (cada hecho declara si es reportado o derivado) y los "
+    "supuestos del motor: EXPLÍCALOS (qué "
     "mide cada cifra, de qué periodo y fuente sale y cómo sostiene la "
     "valoración). Los supuestos del motor no son datos realizados: "
     "preséntalos siempre como supuestos. Explica cada cifra en la sección "
