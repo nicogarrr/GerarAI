@@ -13,7 +13,10 @@ test('clasifica cobertura con causa confirmada, sin adivinar sufijos desconocido
     // Bolsa conocida no-US sin master local: plan-limited (SAF.PA 403).
     assert.equal(classifyFichaCoverage('SAF.PA', false), 'plan-limited');
     assert.equal(classifyFichaCoverage('AIR.PA', false), 'plan-limited');
-    assert.equal(classifyFichaCoverage('300183.SZ', false), 'plan-limited');
+    // Solo sufijos con 403 confirmado: otras bolsas no se etiquetan por
+    // extrapolación (sin fuente autoritativa de cobertura).
+    assert.equal(classifyFichaCoverage('300183.SZ', false), 'unknown');
+    assert.equal(classifyFichaCoverage('TMAS.JK', false), 'unknown');
     // En master local: cubierto aunque profile2 no lo cubra (SAN.MC carga).
     assert.equal(classifyFichaCoverage('SAN.MC', true), 'covered');
     // Sufijo desconocido: no se adivina.
@@ -32,7 +35,7 @@ test('la búsqueda anota cobertura en ambos caminos (remoto y fallback local)', 
 test('la paleta comunica la cobertura limitada sin filtrar el resultado', () => {
     const src = readFileSync('components/SearchCommand.tsx', 'utf8');
     assert.ok(src.includes("fichaCoverage === 'plan-limited'"), 'la paleta muestra el aviso de cobertura');
-    assert.ok(src.includes('plan de datos actual no cubre esta bolsa'), 'copy honesto de plan');
+    assert.ok(src.includes('Puede que no tenga ficha'), 'copy hedged: posibilidad, no inservibilidad');
     // Sin filtrado a ciegas: el item sigue seleccionable.
     assert.ok(!src.includes('disabled'), 'los resultados no se deshabilitan');
 });

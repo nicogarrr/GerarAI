@@ -41,10 +41,16 @@ export const EXCHANGE_LABEL_BY_SUFFIX: Record<string, string> = {
 
 export type FichaCoverage = 'covered' | 'plan-limited' | 'unknown';
 
+// Sufijos con 403 de profile2 CONFIRMADO contra la API (26 oct 2026).
+// No se extrapola a otras bolsas: cada sufijo nuevo necesita su evidencia.
+export const PROFILE2_FORBIDDEN_SUFFIXES = new Set(['PA', 'MC']);
+
 /**
  * Clasifica si la ficha de un resultado de búsqueda es servible.
  * `locallyCovered` = el símbolo está en el listado local verificado (master
- * CNMV .MC); esos cargan aunque profile2 no los cubra.
+ * CNMV .MC); esos cargan aunque profile2 no los cubra. Un no-US fuera del
+ * master puede existir en el master del backend: por eso el aviso es de
+ * posibilidad («puede que no tenga ficha»), nunca de inservibilidad segura.
  */
 export function classifyFichaCoverage(symbol: string, locallyCovered: boolean): FichaCoverage {
     if (locallyCovered) return 'covered';
@@ -52,8 +58,8 @@ export function classifyFichaCoverage(symbol: string, locallyCovered: boolean): 
     // Sin sufijo: mercado US, cubierto por profile2 en el plan actual.
     if (idx < 0) return 'covered';
     const suffix = symbol.slice(idx + 1).toUpperCase();
-    // Bolsa conocida no-US: profile2 responde 403 (confirmado arriba).
-    if (EXCHANGE_LABEL_BY_SUFFIX[suffix]) return 'plan-limited';
-    // Sufijo desconocido: no se adivina cobertura.
+    // Solo sufijos con 403 confirmado (PROFILE2_FORBIDDEN_SUFFIXES).
+    if (PROFILE2_FORBIDDEN_SUFFIXES.has(suffix)) return 'plan-limited';
+    // Resto (conocidos sin evidencia propia o desconocidos): no se adivina.
     return 'unknown';
 }
