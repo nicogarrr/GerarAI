@@ -40,7 +40,10 @@ test.describe("frontend audit closure", () => {
     await expect(page.getByRole("link", { name: "Volver al inicio" })).toHaveAttribute("href", "/");
     await expect(page.getByRole("link", { name: "Ver la metodología" })).toHaveAttribute("href", "/metodologia");
     await expect(page.getByRole("link", { name: "Centro de ayuda" })).toHaveAttribute("href", "/help");
-    await expect(page.locator('a[href="/inicio"], a[href="/discover"], a[href="/watchlist"]')).toHaveCount(0);
+    // Con E2E_AUTH_BYPASS el 404 se renderiza con el shell autenticado (sidebar con
+    // /inicio, /discover, /watchlist por diseno, ver canonical-404-shell.test.ts).
+    // La garantia es sobre el contenido del 404, no sobre el shell.
+    await expect(page.locator('#content a[href="/inicio"], #content a[href="/discover"], #content a[href="/watchlist"]')).toHaveCount(0);
   });
 
   test("sin SMTP, recuperación de contraseña no promete un envío", async ({ page }) => {
