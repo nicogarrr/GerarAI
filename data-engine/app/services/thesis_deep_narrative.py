@@ -39,10 +39,11 @@ from app.llm import (
     create_llm_provider,
     parse_json_response,
 )
-from app.models.entities import Company
+from app.models.entities import Company, Document, FinancialFact
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
 from app.services.memo_text_es import date_es, percent_es
+from app.services.number_format import format_compact_es
 from app.services.text_clip import clip_words
 from app.services.thesis_narrative_llm import _source_locator
 from app.valuation.engines.base import margin_of_safety_reference
@@ -237,8 +238,75 @@ def _visible_fuente(fuente: str) -> str:
     prosa (rechazo url_detectada medido 2026-10-26, host del paquete).
     """
     if _URL_RE.search(fuente):
-        return "Fuente verificada por el código (el localizador completo lo inserta la capa de citas)."
+        # Un titular o una URL acreditan publicación/registro, NO veracidad:
+        # la palabra "verificada" aquí se coló a la narrativa como claim falso.
+        return (
+            "Fuente registrada por el código (el localizador completo lo "
+            "inserta la capa de citas); acredita publicación, no veracidad."
+        )
     return fuente
+
+
+#: Conjunto cerrado de métricas de fundamentales que entran en el paquete,
+#: con su etiqueta (misma tabla que thesis_service._METRIC_LABELS_ES; se
+#: duplica aquí para no crear un ciclo de importación tesis<->narrativa).
+_FUNDAMENTAL_LABELS: dict[str, str] = {
+    "revenue": "Ingresos",
+    "free_cash_flow": "Flujo de caja libre",
+    "fcf_margin": "Margen de FCF",
+    "revenue_growth": "Crecimiento de ingresos",
+    "operating_cash_flow": "Flujo de caja operativo",
+    "capital_expenditure": "Gasto de capital (CapEx)",
+    "net_debt": "Deuda neta",
+    "shares_diluted": "Acciones diluidas",
+    "cash_and_equivalents": "Efectivo y equivalentes",
+    "total_debt": "Deuda total",
+}
+
+#: Etiquetas de drivers del marco con dato (claves conocidas; el resto se
+#: muestra como clave entre comillas, nunca traducida a una frase inventada).
+_DRIVER_LABELS_ES: dict[str, str] = {
+    "ad_impressions": "impresiones publicitarias",
+    "price_per_ad": "precio por anuncio",
+    "daily_active_people": "personas activas al día",
+    "family_arpu": "ingreso medio por usuario de la familia de apps",
+    "operating_margin": "margen operativo",
+    "capex": "gasto de capital",
+}
+
+
+def _fact_source_locator(fact: FinancialFact) -> str:
+    """Localizador real del hecho financiero: URL del documento fuente si el
+    registro la tiene (un id de fact NO sustituye la URL), si no, etiqueta."""
+    try:
+        from sqlalchemy.orm import object_session
+
+        session = object_session(fact)
+        if session is not None and fact.source_id is not None:
+            document = session.get(Document, fact.source_id)
+            if document is not None and document.source_url:
+                return document.source_url
+    except Exception:  # noqa: BLE001 - el localizador nunca rompe el paquete
+        pass
+    return f"Registro interno de datos financieros ({fact.source_type})."
+
+
+_METRIC_RECORD_RE = re.compile(r"^[A-Za-z_]*Metric #\d+:\s*")
+_DEFINITION_SUFFIX_RE = re.compile(r";\s*definition=\S+\s*$")
+
+
+def _assumption_basis_text(entry: dict) -> str:
+    """Base legible del supuesto: la fórmula registrada SIN identificadores
+    técnicos internos (clase del cálculo, nº de registro), y la marca
+    explícita «sin base documentada externa» cuando el supuesto es política
+    del modelo (distinto de «no existe el parámetro»: el valor sí existe)."""
+    basis = str((entry or {}).get("basis") or "").strip()
+    basis = _METRIC_RECORD_RE.sub("", basis)
+    basis = _DEFINITION_SUFFIX_RE.sub("", basis).strip()
+    if (entry or {}).get("source_type") == "model_policy":
+        suffix = "política del modelo, sin base documentada externa"
+        return f"{basis} ({suffix})" if basis else suffix
+    return basis or "política del motor"
 
 
 def fact_pack(
@@ -249,6 +317,8 @@ def fact_pack(
     news_items: list[dict],
     filing_items: list[dict] | None = None,
     rag_context: list[dict] | None = None,
+    financial_facts: list[FinancialFact] | None = None,
+    fact_locators: dict[int, str] | None = None,
 ) -> list[dict]:
     """Paquete deterministico de hechos citables: la unica materia del modelo.
 
@@ -319,6 +389,146 @@ def fact_pack(
         add(
             "Drivers obligatorios del marco sin dato: " + ", ".join(mandatory_missing) + ".",
             "Motor fundamental de largo plazo.",
+        )
+
+    # Fundamentales reportados (snapshot): existen en el punto de llamada y
+    # sin ellos la narrativa declara huecos FALSOS (medido 2026-10-26: la
+    # tesis dijo "no se detallan flujos, tasa, terminal" existiendo).
+    present = [
+        fact
+        for metric in _FUNDAMENTAL_LABELS
+        for fact in (financial_facts or [])
+        if fact.metric == metric
+    ]
+    if present:
+        add(
+            "Bloque de fundamentales reportados: cada cifra declara su "
+            "métrica, unidad, periodo y fuente; cifras de periodos distintos "
+            "NO son comparables entre sí.",
+            "Registro interno de datos financieros.",
+        )
+        for fact in present:
+            label = _FUNDAMENTAL_LABELS[fact.metric]
+            if fact.metric in {"fcf_margin", "revenue_growth"} and fact.unit in {
+                "decimal",
+                "ratio",
+            }:
+                valor = percent_es(float(fact.value))
+            else:
+                compact = format_compact_es(fact.value) or str(fact.value)
+                valor = (
+                    f"{compact} {fact.unit}"
+                    if fact.unit and len(fact.unit) == 3 and fact.unit.isupper()
+                    else compact
+                )
+            add(
+                f"{label} de {company.ticker}: {valor} "
+                f"(periodo {fact.period}; fuente {fact.source_type}).",
+                _fact_source_locator(fact),
+            )
+
+
+
+    # Supuestos del motor (bloque "assumptions" del modelo fundamental): NO
+    # son datos realizados ni fuentes externas; el texto lo dice explícito.
+    # Forma real verificada contra el objeto persistido (2026-10-26):
+    # long_term_model["assumptions"][key] = {value, unit, source_type, basis,
+    # source_fact_ids, confidence}; horizon_years y as_of_period al mismo nivel.
+    assumptions = (long_term_model or {}).get("assumptions") or {}
+    if assumptions:
+        parts = []
+        if (assumptions.get("revenue_growth") or {}).get("value") is not None:
+            parts.append(
+                "crecimiento de ingresos del "
+                + percent_es(assumptions["revenue_growth"]["value"])
+                + " anual (base: "
+                + _assumption_basis_text(assumptions["revenue_growth"])
+                + ")"
+            )
+        if (assumptions.get("fcf_margin") or {}).get("value") is not None:
+            parts.append(
+                "margen FCF del "
+                + percent_es(assumptions["fcf_margin"]["value"])
+                + " (base: "
+                + _assumption_basis_text(assumptions["fcf_margin"])
+                + "; otra base y otro periodo que el margen FCF reportado de "
+                "un año concreto: no son la misma cifra)"
+            )
+        if (assumptions.get("wacc") or {}).get("value") is not None:
+            parts.append(
+                "tasa de descuento (WACC) del "
+                + percent_es(assumptions["wacc"]["value"])
+                + " (base: "
+                + _assumption_basis_text(assumptions["wacc"])
+                + ")"
+            )
+        if (assumptions.get("terminal_growth") or {}).get("value") is not None:
+            parts.append(
+                "crecimiento terminal del "
+                + percent_es(assumptions["terminal_growth"]["value"])
+                + " ("
+                + _assumption_basis_text(assumptions["terminal_growth"])
+                + ")"
+            )
+        horizon = (long_term_model or {}).get("horizon_years")
+        if horizon:
+            parts.append(f"horizonte de proyección de {int(horizon)} años")
+        as_of = (long_term_model or {}).get("as_of_period")
+        if as_of:
+            parts.append(f"datos de corte {as_of}")
+        if parts:
+            add(
+                "Supuestos del motor de valoración (supuestos del modelo, no "
+                "datos realizados ni fuentes externas): " + ", ".join(parts) + ".",
+                "Motor fundamental de largo plazo.",
+            )
+        # URLs reales de los supuestos (wacc/terminal) van SOLO al localizador
+        # (cita del código): nunca al texto que ve el modelo.
+        for key in ("wacc", "terminal_growth"):
+            urls = (assumptions.get(key) or {}).get("source_urls") or []
+            if urls:
+                add(
+                    f"El motor registró una fuente externa para el supuesto "
+                    f"«{key}»; su registro no implica verificación de su contenido.",
+                    urls[0],
+                )
+
+    # Reverse DCF: valor resuelto y estado (supuestos del motor). Forma real:
+    # {required_revenue_growth, market_price, solved_value_per_share,
+    # out_of_bounds, status, trace} — sin fcf_margin a primer nivel.
+    reverse = valuation.get("reverse_dcf") or {}
+    solved = reverse.get("solved_value_per_share")
+    if solved is not None:
+        add(
+            f"Al precio actual, el DCF inverso resuelve un valor de {solved:.2f} "
+            f"{currency} por acción (salida del motor con sus supuestos).",
+            internal,
+        )
+    if reverse.get("out_of_bounds"):
+        add(
+            "El DCF inverso quedó fuera de rango con los supuestos actuales: "
+            "el crecimiento exigido no es resoluble dentro de los límites del motor.",
+            internal,
+        )
+
+    # Drivers del marco CON dato (los sin dato ya se declaran como huecos).
+    sourced = [
+        driver
+        for driver in (long_term_model or {}).get("driver_model") or []
+        if driver.get("status") == "sourced" and driver.get("value") is not None
+    ][:4]
+    for driver in sourced:
+        label = _DRIVER_LABELS_ES.get(driver.get("key") or "", f'driver "{driver.get("key")}"')
+        ids = driver.get("source_fact_ids") or []
+        locator = (fact_locators or {}).get(ids[0]) if ids else None
+        valor = format_compact_es(driver["value"]) or str(driver["value"])
+        unit = driver.get("unit") or ""
+        period = driver.get("period") or "periodo no disponible"
+        add(
+            f"Driver del marco con dato registrado — {label}: {valor}"
+            + (f" {unit}" if unit and unit != "unknown" else "")
+            + f" (periodo {period}).",
+            locator or "Registro interno de datos financieros.",
         )
     if hypothesis:
         add(
@@ -456,7 +666,15 @@ _SYSTEM = (
     "identificadores de hecho ni números de hecho; toda cifra de la prosa "
     "debe aparecer literalmente en el texto de un hecho. Escribe en TEXTO "
     "PLANO: sin markdown (sin negritas con asteriscos, sin encabezados con "
-    "#), sin etiquetas HTML y sin bloques de codigo. No es una recomendación: "
+    "#), sin etiquetas HTML y sin bloques de codigo. El paquete incluye los "
+    "fundamentales reportados y los supuestos del motor: EXPLÍCALOS (qué "
+    "mide cada cifra, de qué periodo y fuente sale y cómo sostiene la "
+    "valoración). Los supuestos del motor no son datos realizados: "
+    "preséntalos siempre como supuestos. Explica cada cifra en la sección "
+    "que le corresponde: no repitas el mismo dato en varias secciones salvo "
+    "referencia breve. No atribuyas movimientos del precio a causas: "
+    "cualquier mecanismo es interpretación condicionada por los hechos "
+    "(«si... podría...»), nunca un motivo del mercado afirmado. No es una recomendación: "
     "la valoración es provisional y explicativa; nunca uses lenguaje de "
     "veredicto (comprar, vender, recomendamos). La sección lo_que_no_sabemos "
     "es obligatoria y debe nombrar los huecos concretos (inputs ausentes, "
@@ -497,6 +715,29 @@ def _build_request(facts: list[dict], extra_note: str | None = None) -> LLMReque
     )
 
 
+def _resolve_fact_locators(db: Session, long_term_model: dict) -> dict[int, str]:
+    """fact_id -> URL real del documento fuente (o etiqueta interna).
+
+    Un id de financial_fact NO sustituye la URL recuperada del registro.
+    """
+    ids: list[int] = []
+    for driver in (long_term_model or {}).get("driver_model") or []:
+        ids.extend(driver.get("source_fact_ids") or [])
+    if not ids:
+        return {}
+    locators: dict[int, str] = {}
+    try:
+        for fact in db.query(FinancialFact).filter(FinancialFact.id.in_(ids)).all():
+            url = None
+            if fact.source_id is not None:
+                document = db.get(Document, fact.source_id)
+                url = document.source_url if document is not None else None
+            locators[fact.id] = url or f"Registro interno de datos financieros ({fact.source_type})."
+    except Exception:  # noqa: BLE001 - sin localizador real, etiqueta interna
+        return {}
+    return locators
+
+
 def maybe_deep_narrative(
     db: Session,
     company: Company,
@@ -508,6 +749,7 @@ def maybe_deep_narrative(
     provider=None,
     filing_items: list[dict] | None = None,
     rag_context: list[dict] | None = None,
+    financial_facts: list[FinancialFact] | None = None,
 ) -> dict | None:
     """Narrativa extensa redactada por el modelo configurado, o None.
 
@@ -524,6 +766,8 @@ def maybe_deep_narrative(
     facts = fact_pack(
         company, valuation, long_term_model, hypothesis,
         list(news_items or []), filing_items, rag_context,
+        financial_facts=financial_facts,
+        fact_locators=_resolve_fact_locators(db, long_term_model),
     )
     if len(facts) < 3:
         # Sin minimo de hechos anclados no hay explicacion honesta que redactar.

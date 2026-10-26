@@ -851,6 +851,7 @@ class ThesisService:
             news_items,
             filing_items=filing_items,
             rag_context=rag_context,
+            financial_facts=list(snapshot.facts.values()),
         )
         narrative_model_trace = None
         if deep_narrative:
@@ -1191,7 +1192,25 @@ class ThesisService:
         criteria: list[str] = []
         mos = valuation.get("margin_of_safety")
         base = valuation.get("base_value")
-        if mos is not None and base is not None and mos >= 0:
+        price = valuation.get("current_price")
+        # Criterio grounded en la relación precio/base ACTUAL: el objeto puede
+        # traer un margin_of_safety calculado con otro precio (observado
+        # 2026-10-26: mos +2,2 % con precio ya por encima del valor base), y
+        # una plantilla que asume margen vivo contradice entonces al precio.
+        if base is not None and price is not None:
+            if price < base:
+                criteria.append(
+                    f"El precio supera de forma sostenida el valor base "
+                    f"({base:.2f}): el margen de seguridad desaparece."
+                )
+            else:
+                criteria.append(
+                    f"El precio actual ({price:.2f}) ya supera el valor base "
+                    f"({base:.2f}): a este precio no hay margen de seguridad; "
+                    "la tesis de compra queda invalidada salvo revisión del "
+                    "valor base."
+                )
+        elif mos is not None and base is not None and mos >= 0:
             criteria.append(
                 f"El precio supera de forma sostenida el valor base ({base:.2f}): "
                 "el margen de seguridad desaparece."

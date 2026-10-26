@@ -69,6 +69,8 @@ _SYSTEM = (
     "Relaciona los acontecimientos con la tesis, explica mecanismos económicos y riesgos, "
     "sin afirmar previsiones como hechos ni inventar consenso o hechos externos. "
     "Todo tu análisis es INFERIDO de titulares: un titular prueba su publicación, no su verdad. "
+    "Nunca atribuyas un movimiento del precio a una causa: cualquier mecanismo es "
+    "interpretación condicionada («si... podría...»), nunca un motivo del mercado afirmado. "
     "Devuelve JSON con cambio, implicaciones y riesgos; cada objeto contiene texto y evidence_ids. "
     "Cada texto debe ser un párrafo en español con sus ids de noticias relevantes. "
     "NO escribas ninguna cifra, fecha numérica, cálculo, porcentaje, cantidad en palabras ni URL. "
