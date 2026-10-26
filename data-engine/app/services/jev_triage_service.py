@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from app.core.config import get_settings
 from app.services.async_bridge import run_from_any_context
 
-logger = logging.getLogger("cavaai.jev_triage")
+logger = logging.getLogger("gerarai.jev_triage")
 
 # Umbral de confianza de Jev para degradar a "routine".
 ROUTINE_CONFIDENCE_THRESHOLD = 0.85

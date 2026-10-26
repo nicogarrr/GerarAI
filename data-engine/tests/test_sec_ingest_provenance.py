@@ -73,7 +73,7 @@ def test_display_title_sec_no_se_persiste_como_source_headline(db):
     events = db.scalars(select(NewsEvent)).all()
     assert len(events) == 1
     event = events[0]
-    # El texto display generado por CavaAI vive en title (con el prefijo de
+    # El texto display generado por GerarAI vive en title (con el prefijo de
     # ticker de F175 que la UI ya oculta/usa en su columna propia)...
     assert event.title == "AAPL 8-K presentado ante la SEC"
     # ...y NUNCA en source_headline: no es el titular original de la fuente.

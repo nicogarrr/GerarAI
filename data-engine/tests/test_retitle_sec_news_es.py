@@ -67,7 +67,7 @@ def test_plan_row_solo_texto_compuesto():
     }
     # Procedencia histórica: el plan RETIRA el titular sintético atribuido a
     # la SEC (guardado en expected para rollback) y marca el display como
-    # generado por CavaAI.
+    # generado por GerarAI.
     assert plan["expected"]["source_headline"] == "COST 8-K (2026-09-24)"
     assert plan["new"]["source_headline"] is None
     assert plan["new"]["headline_from_source"] is False

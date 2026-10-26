@@ -62,7 +62,7 @@ async def fetch_catalog(client: httpx.AsyncClient | None = None, *, fetched_at: 
     now = fetched_at or datetime.now(UTC)
     if client is None:
         async with httpx.AsyncClient(timeout=20, follow_redirects=False) as own_client:
-            response = await own_client.get(SOURCE_URL, headers={"User-Agent": "CavaAI/1.0 (AST catalog research)"})
+            response = await own_client.get(SOURCE_URL, headers={"User-Agent": "GerarAI/1.0 (AST catalog research)"})
     else:
         response = await client.get(SOURCE_URL)
     response.raise_for_status()

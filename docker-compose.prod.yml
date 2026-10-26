@@ -259,7 +259,7 @@ services:
       - KNOWLEDGE_RAG_RERANKER_MODEL=${KNOWLEDGE_RAG_RERANKER_MODEL:-}
       - FASTEMBED_CACHE_PATH=/data/fastembed-cache
       - LANGFUSE_ENABLED=false
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-CavaAI research contact@cavaai.local}
+      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
       - SEC_SNAPSHOT_DIR=${SEC_SNAPSHOT_DIR:-}
       - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
       - ESEF_SNAPSHOT_DIR=${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
@@ -364,7 +364,7 @@ services:
       - MINIO_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
       - MINIO_REGION=${OBJECT_STORAGE_REGION:-}
       - MINIO_BUCKET=research
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-CavaAI research contact@cavaai.local}
+      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
       - SEC_SNAPSHOT_DIR=${SEC_SNAPSHOT_DIR:-}
       - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
       - ESEF_SNAPSHOT_DIR=${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
@@ -452,7 +452,7 @@ services:
       - MINIO_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
       - MINIO_REGION=${OBJECT_STORAGE_REGION:-}
       - MINIO_BUCKET=research
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-CavaAI research contact@cavaai.local}
+      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
       - SEC_SNAPSHOT_DIR=${SEC_SNAPSHOT_DIR:-}
       - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
       - ESEF_SNAPSHOT_DIR=${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
@@ -547,7 +547,7 @@ services:
       - MINIO_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
       - MINIO_REGION=${OBJECT_STORAGE_REGION:-}
       - MINIO_BUCKET=research
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-CavaAI research contact@cavaai.local}
+      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
       - SEC_SNAPSHOT_DIR=${SEC_SNAPSHOT_DIR:-}
       - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
       - ESEF_SNAPSHOT_DIR=${ESEF_SNAPSHOT_DIR:-/data/esef-snapshots}
@@ -668,7 +668,7 @@ services:
       - MINIO_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
       - MINIO_REGION=${OBJECT_STORAGE_REGION:-}
       - MINIO_BUCKET=research
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-CavaAI research contact@cavaai.local}
+      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
       - SEC_HF_MIRROR_DATASET=${SEC_HF_MIRROR_DATASET:-}
     volumes:
       - ./data-engine:/app
@@ -714,7 +714,7 @@ services:
       # Pesos Docling/HF fuera de la imagen, en el volumen con espacio.
       - DOCLING_ARTIFACTS_PATH=/data/docling-artifacts
       - HF_HOME=/data/hf-home
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-CavaAI research contact@cavaai.local}
+      - SEC_USER_AGENT=${SEC_USER_AGENT:-GerarAI research contact@gerarai.local}
       # Con el flag a 0 el actor rechaza el trabajo (apagado por defecto).
       - KNOWLEDGE_RAG_ENABLED=${KNOWLEDGE_RAG_ENABLED:-0}
       - KNOWLEDGE_RAG_COLLECTION=${KNOWLEDGE_RAG_COLLECTION:-knowledge_rag_v1}

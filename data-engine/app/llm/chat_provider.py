@@ -430,7 +430,7 @@ def _groq_backup(
         base_url="https://api.groq.com/openai/v1",
         default_model=GROQ_MODEL,
         provider_name="groq",
-        extra_headers={"User-Agent": "cavaai/1.0"},
+        extra_headers={"User-Agent": "gerarai/1.0"},
         reasoning_effort="low",
         timeout_seconds=timeout_seconds,
         total_timeout_seconds=total_timeout_seconds,

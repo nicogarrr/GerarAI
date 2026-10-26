@@ -116,7 +116,7 @@ async def test_real_adapter_envelope_is_groq_not_deepseek():
         seen.append(body)
         if req.url.host == "primary.invalid": return httpx.Response(429)
         assert req.url.host == "api.groq.com"
-        assert req.headers["user-agent"] == "cavaai/1.0"
+        assert req.headers["user-agent"] == "gerarai/1.0"
         assert body["model"] == GROQ_MODEL and body["reasoning_effort"] == "low"
         return httpx.Response(200, json={"model": GROQ_MODEL, "choices": [{"message": {"role": "assistant", "content": "Respuesta factual"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:

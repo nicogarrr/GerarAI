@@ -7,7 +7,7 @@ Referencias MIT consultadas (solo lectura, implementacion propia):
 - MunehisaWada/edgar-form345: Forms 3/4/5 a CSV + agregacion por
   transaction code y master.idx trimestral.
 
-Diseno propio para CavaAI (cero dependencias nuevas, solo stdlib + httpx):
+Diseno propio para GerarAI (cero dependencias nuevas, solo stdlib + httpx):
 - submissions JSON de data.sec.gov para listar filings Form 4 por CIK.
 - parse del XML del documento primario con xml.etree (tolerante a
   campos ausentes, como los filings reales).
@@ -49,7 +49,7 @@ _throttle = sec_throttle
 
 
 BROWSER_USER_AGENT = (
-    "Mozilla/5.0 (compatible; CavaAI/0.1; +mailto:{contact}) CavaAI Research"
+    "Mozilla/5.0 (compatible; GerarAI/0.1; +mailto:{contact}) GerarAI Research"
 )
 DEFAULT_CONTACT = "contact@example.com"
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
@@ -59,7 +59,7 @@ def resolve_user_agent() -> str:
     """User-Agent tipo navegador con contacto.
 
     La SEC bloquea con 403 los User-Agent de producto aunque lleven contacto
-    (verificado en prod: ``CavaAI/0.1 <email>`` -> 403; UA tipo navegador ->
+    (verificado en prod: ``<producto>/0.1 <email>`` -> 403; UA tipo navegador ->
     200). Misma politica que ``connectors/sec_edgar.py``: se envuelve el
     contacto en un UA tipo navegador, salvo que el operador ya configure uno.
     """
@@ -68,7 +68,7 @@ def resolve_user_agent() -> str:
         return candidate
     match = _EMAIL_RE.search(candidate)
     contact = match.group(0) if match else DEFAULT_CONTACT
-    # Env historico sin espacio ("CavaAI/0.1email@..."): la version queda
+    # Env historico sin espacio ("<producto>/0.1email@..."): la version queda
     # pegada al local-part del email; se retira un prefijo de version.
     contact = re.sub(r"^\d+(\.\d+)+(?=\D)", "", contact)
     return BROWSER_USER_AGENT.format(contact=contact)

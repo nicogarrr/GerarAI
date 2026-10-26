@@ -102,7 +102,7 @@ MODEL_MAP = {
     },
 }
 
-UA = {"User-Agent": "cavaai-opencode-model-rotator/1.0"}
+UA = {"User-Agent": "gerarai-opencode-model-rotator/1.0"}
 
 
 def fetch_json(url):

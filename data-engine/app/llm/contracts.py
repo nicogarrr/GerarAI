@@ -64,7 +64,7 @@ class ToolDefinition:
     """Una funcion que el modelo puede pedir.
 
     Solo describe el contrato (nombre, descripcion y JSON Schema de
-    parametros): el adaptador la traduce al sobre OpenAI. CavaAI no registra
+    parametros): el adaptador la traduce al sobre OpenAI. GerarAI no registra
     ninguna tool con efectos laterales; este dataclass es el mecanismo
     generico para que un caller registre una lectura acotada cuando lo necesite.
     """

@@ -1,7 +1,7 @@
 # C1 — Golden set del RAG y 4 numeros gateables en CI
 
 Esto responde a una pregunta que hasta ahora no tenia respuesta: **¿el RAG de
-CavaAI es bueno?** "Bueno" no es un numero, asi que aqui son seis, medidos sobre
+GerarAI es bueno?** "Bueno" no es un numero, asi que aqui son seis, medidos sobre
 55 casos de un golden set construido con la biblioteca propia del repo, y
 verificados por 5 puertas deterministas que no se pueden silenciar por omision.
 
@@ -259,7 +259,7 @@ emisor con FCC" no necesita una frase que hable de emisores con riesgo dilution
 aunque comparta cuatro palabras.
 
 Esto significa que **estos numeros miden la recuperacion y la extraccion del
-pipeline real de CavaAI, no la capacidad de un LLM**. Es la parte del RAG que es
+pipeline real de GerarAI, no la capacidad de un LLM**. Es la parte del RAG que es
 determinista y por tanto gateable; la parte generativa se mide de otra manera
 (seccion siguiente).
 
@@ -291,7 +291,7 @@ numero que depende de la sampling de un modelo no puede hacer fallar un build.
 
 - **El generador no es el LLM de produccion.** Los numeros de la seccion 5
   acotan la calidad de la recuperacion y de la extraccion. Un cambio en el
-  prompt del generador de CavaAI no se vera aqui; se vera en el reporte con
+  prompt del generador de GerarAI no se vera aqui; se vera en el reporte con
   LLM de la seccion 8.
 - **Vocabulario cerrado.** Ver seccion 3.
 - **`top_k=8` y no 5.** Con 17 documentos, el `limit=5` por defecto de

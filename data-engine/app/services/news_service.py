@@ -222,7 +222,7 @@ class NewsService:
             if duplicate_url:
                 return True
         if not title_is_identity:
-            # Título de display generado por CavaAI (p.ej. «8-K presentado
+            # Título de display generado por GerarAI (p.ej. «8-K presentado
             # ante la SEC»): no identifica el evento — dos filings distintos
             # del mismo form comparten título canónico. La identidad es la
             # URL (o no hay dedup posible); casar por título aquí descartaría
@@ -373,7 +373,7 @@ class NewsService:
         if source_headline:
             news_metadata["source_headline"] = source_headline
         # Procedencia del display: False = el título es texto generado por
-        # CavaAI (p.ej. «8-K presentado ante la SEC»), no verbatim de la
+        # GerarAI (p.ej. «8-K presentado ante la SEC»), no verbatim de la
         # fuente. La UI lo usa para no repetir el ticker (ya en su columna)
         # al pintar el título.
         if not headline_from_source:

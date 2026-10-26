@@ -304,7 +304,7 @@ def _drill_app_env(drill: DrillEnvironment) -> dict[str, str]:
             "REDIS_URL": "redis://127.0.0.1:6379/15",
             "DUCKDB_PATH": str(drill.workdir / "analytics.duckdb"),
             "LANGFUSE_ENABLED": "false",
-            "SEC_USER_AGENT": "CavaAI-drill contact@example.com",
+            "SEC_USER_AGENT": "GerarAI-drill contact@example.com",
         }
     )
     return env

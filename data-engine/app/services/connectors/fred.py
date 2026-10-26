@@ -3,7 +3,7 @@
 Idea originada en TauricResearch/TradingAgents
 ``tradingagents/dataflows/fred.py`` (Apache-2.0): la clave gratuita se lee de
 ``FRED_API_KEY`` y, si falta, el conector se degrada a "no disponible" en vez
-de romper el flujo. Implementacion propia para CavaAI: ``httpx`` asincrono con
+de romper el flujo. Implementacion propia para GerarAI: ``httpx`` asincrono con
 User-Agent de navegador, alias legibles -> series FRED, y funciones de modulo
 que devuelven ``None`` sin clave.
 """
@@ -20,7 +20,7 @@ from app.services.connectors.base import get_with_retry
 
 _BROWSER_HEADERS: dict[str, str] = {
     "User-Agent": (
-        "Mozilla/5.0 (compatible; CavaAI/0.1; +mailto:contact@example.com)"
+        "Mozilla/5.0 (compatible; GerarAI/0.1; +mailto:contact@example.com)"
     ),
     "Accept": "application/json",
 }

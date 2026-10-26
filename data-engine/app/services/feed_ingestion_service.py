@@ -68,7 +68,7 @@ def configured_rss_feeds(value: str | None = None) -> list[RSSFeed]:
 # Notas de prensa de agencia (RSS público, gratis). Atribución: el <title>
 # del canal se guarda como `source` del evento (p. ej. «Business Wire
 # Communications News»), visible en la ficha. Verificados el 19-oct-2026 con
-# el UA del poller («CavaAI Feed Poller/1.0»):
+# el UA del poller («GerarAI Feed Poller/1.0»):
 # - Business Wire no publica un feed «todo» gratuito; hay feeds por industria.
 #   Se incluyen Communications y Technology: Telecommunications (ambos
 #   trajeron la nota AST SpaceMobile del 19-oct-2026). Más temas vía RSS_FEEDS.

@@ -26,7 +26,7 @@ from app.services.knowledge_library_service import (
 )
 from app.services.thesis_memo import build_memo_markdown
 
-logger = logging.getLogger("cavaai.thesis_knowledge_sync")
+logger = logging.getLogger("gerarai.thesis_knowledge_sync")
 
 AUTO_FLAG = "thesis"
 COLLECTION_NAME = "Tesis publicadas"

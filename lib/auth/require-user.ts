@@ -48,7 +48,7 @@ export async function requireAuthenticatedUser(): Promise<AuthenticatedUser> {
     process.env.NODE_ENV !== 'production' &&
     process.env.APP_ENV === 'test'
   ) {
-    return { id: 'e2e-browser-user', email: 'browser@cavaai.test', name: 'Browser Analyst' };
+    return { id: 'e2e-browser-user', email: 'browser@gerarai.test', name: 'Browser Analyst' };
   }
   return resolveSessionUser();
 }

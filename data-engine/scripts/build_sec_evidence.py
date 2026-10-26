@@ -20,7 +20,7 @@ from pathlib import Path
 
 import httpx
 
-USER_AGENT = os.environ.get("SEC_USER_AGENT", "CavaAI research evidence (contact: owner-configured)")
+USER_AGENT = os.environ.get("SEC_USER_AGENT", "GerarAI research evidence (contact: owner-configured)")
 
 
 def main() -> int:

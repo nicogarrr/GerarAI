@@ -10,7 +10,7 @@ if (-not $ConfirmRestore) {
 $workspace = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $backup = [System.IO.Path]::GetFullPath($BackupPath)
 if (-not $backup.StartsWith($workspace, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "BackupPath must be inside the CavaAI workspace."
+    throw "BackupPath must be inside the GerarAI workspace."
 }
 if (-not (Test-Path -LiteralPath (Join-Path $backup "manifest.json"))) {
     throw "manifest.json was not found in the backup directory."

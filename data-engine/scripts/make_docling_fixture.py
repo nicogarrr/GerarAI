@@ -10,8 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 
 PAGE_TEXTS = (
-    "CavaAI two lane fixture page one. Revenue grew twelve percent with margin discipline.",
-    "CavaAI two lane fixture page two. Risks include cyclicality and customer concentration.",
+    "GerarAI two lane fixture page one. Revenue grew twelve percent with margin discipline.",
+    "GerarAI two lane fixture page two. Risks include cyclicality and customer concentration.",
 )
 
 

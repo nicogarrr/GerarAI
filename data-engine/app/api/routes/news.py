@@ -264,7 +264,7 @@ def news_events(
                 "impact_direction": event.impact_direction,
                 "requires_update": False if solicitation else event.requires_update,
                 "date_source": (event.metadata_ or {}).get("date_source"),
-                # False solo en titulares de display generados por CavaAI
+                # False solo en titulares de display generados por GerarAI
                 # (ausente en filas legacy = titular real de la fuente).
                 "headline_from_source": (
                     False

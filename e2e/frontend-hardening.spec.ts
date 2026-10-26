@@ -97,7 +97,7 @@ test.describe("hardening frontend en navegador", () => {
   });
 
   test("la ruta inexistente ofrece una recuperación accesible", async ({ page }) => {
-    const response = await page.goto("/ruta-inexistente-cavaai");
+    const response = await page.goto("/ruta-inexistente-gerarai");
     expect(response?.status()).toBe(404);
     await expect(page.getByRole("heading", { name: "Página no encontrada", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: "Volver al inicio" })).toHaveAttribute("href", "/");

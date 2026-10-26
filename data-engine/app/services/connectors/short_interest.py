@@ -1,6 +1,6 @@
 """Senales de posicion corta (FINRA) y volatilidad (VIX, CBOE via Yahoo).
 
-Dos vendors gratuitos y sin clave que faltaban en CavaAI:
+Dos vendors gratuitos y sin clave que faltaban en GerarAI:
 
 * **FINRA — volumen corto diario (RegSHO)**: ficheros de texto publicados en
   ``cdn.finra.org/equity/regsho/daily/CNMSshvol{AAAAMMDD}.txt`` con columnas
@@ -18,7 +18,7 @@ Dos vendors gratuitos y sin clave que faltaban en CavaAI:
   autoritativa.
 
 Idea de estructura inspirada en los conectores gratuitos de
-TauricResearch/TradingAgents (Apache-2.0); implementacion propia para CavaAI
+TauricResearch/TradingAgents (Apache-2.0); implementacion propia para GerarAI
 con ``httpx`` inyectable (tests hermeticos con ``MockTransport``). Ninguna
 funcion de red lanza excepciones: degradan a ``None``.
 """

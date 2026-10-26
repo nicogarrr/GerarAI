@@ -4,15 +4,15 @@ Contexto: la ingesta es insert-only con dedup por URL antes que por título,
 así que un deploy del conector NO reescribe las filas ya persistidas. Este
 script retitula SOLO esas filas históricas al formato español actual.
 
-Campos que muta (SOLO texto compuesto por CavaAI y procedencia mal marcada):
+Campos que muta (SOLO texto compuesto por GerarAI y procedencia mal marcada):
 - NewsEvent.title (visible en /research/news y tarjetas),
 - NewsEvent.summary (del que deriva el título y alimenta otras superficies),
 - metadata: RETIRA source_headline y marca headline_from_source=false.
   El source_headline de estas filas NO es un titular publicado por la SEC
   (el conector viejo lo construía, p.ej. «COST 8-K (fecha)»): conservarlo
   haría que los lectores de #574 siguieran atribuyendo a la fuente un texto
-  creado por CavaAI. No se sustituye por nada: se retira y queda en el
-  backup. El flag marca el título de display como generado por CavaAI (la
+  creado por GerarAI. No se sustituye por nada: se retira y queda en el
+  backup. El flag marca el título de display como generado por GerarAI (la
   UI omite entonces el prefijo de ticker duplicado).
 Títulos, resúmenes y AMBOS valores de metadata originales quedan en el
 backup JSON: el rollback restaura el estado previo exacto, no una
@@ -323,7 +323,7 @@ def _apply_plan(db, planned: list[dict]) -> tuple[int, list[int]]:
         row.title = new_title
         row.summary = item["new"]["summary"]
         # Procedencia: se retira el titular sintético atribuido a la SEC y
-        # se marca el display como generado por CavaAI. Nueva asignación del
+        # se marca el display como generado por GerarAI. Nueva asignación del
         # dict (no mutación in place) para que el cambio se registre.
         new_metadata = dict(row.metadata_ or {})
         new_metadata.pop("source_headline", None)

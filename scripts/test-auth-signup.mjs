@@ -35,7 +35,7 @@ try {
             maxPasswordLength: 128,
             autoSignIn: true,
         },
-        plugins: [twoFactor({ issuer: "CavaAI" })],
+        plugins: [twoFactor({ issuer: "GerarAI" })],
         // Mantener sincronizado con lib/better-auth/auth.ts (perfil inversor).
         user: {
             additionalFields: {

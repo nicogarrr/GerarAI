@@ -1,4 +1,4 @@
-"""FastAPI bootstrap for the CavaAI data engine."""
+"""FastAPI bootstrap for the GerarAI data engine."""
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -118,7 +118,7 @@ _EXPOSE_SCHEMA = _app_env in {"local", "test", "ci", "dev", "development"}
 # exponen en entornos locales; data-engine/scripts/export_openapi.py sigue
 # generando el JSON via app.openapi() sin necesidad de HTTP.
 app = FastAPI(
-    title="CavaAI Research Engine",
+    title="GerarAI Research Engine",
     version="0.9.0",
     lifespan=lifespan,
     docs_url="/docs" if _EXPOSE_SCHEMA else None,
@@ -213,7 +213,7 @@ app.include_router(
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "CavaAI Research Engine"}
+    return {"status": "ok", "service": "GerarAI Research Engine"}
 
 
 @app.get("/health")
@@ -231,19 +231,19 @@ HEALTH_READY_TIMEOUT_SECONDS = 1.0
 # permanente con la base de datos perfectamente sana, y sin reaper que lo
 # desbloquee. asyncio.wait_for cancela la espera, no el hilo.
 _HEALTH_REQUIRED_EXECUTOR = ThreadPoolExecutor(
-    max_workers=2, thread_name_prefix="cavaai-health-required"
+    max_workers=2, thread_name_prefix="gerarai-health-required"
 )
 # Un executor dedicado evita que ``asyncio.run``/el cierre de un test espere a
 # los hilos de sondas que vencieron su timeout. Las sondas conservan su propio
 # timeout de red y los hilos remanentes terminan solos al concluir.
 _HEALTH_PROBE_EXECUTOR = ThreadPoolExecutor(
-    max_workers=4, thread_name_prefix="cavaai-health-probe"
+    max_workers=4, thread_name_prefix="gerarai-health-probe"
 )
 # La sonda LLM es barata (config + bridge local) pero hard-required: un pool
 # propio evita que sondas opcionales colgadas la dejen sin hilo y conviertan
 # un backend sano en 503.
 _HEALTH_LLM_EXECUTOR = ThreadPoolExecutor(
-    max_workers=1, thread_name_prefix="cavaai-health-llm"
+    max_workers=1, thread_name_prefix="gerarai-health-llm"
 )
 
 

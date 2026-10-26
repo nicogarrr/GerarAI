@@ -130,7 +130,7 @@ def test_redact_secrets_is_case_insensitive():
 
 def test_safe_detail_never_returns_the_exception_text(caplog):
     exc = RuntimeError("upstream failed: https://fmp?apikey=SECRETVALUE")
-    with caplog.at_level("ERROR", logger="cavaai.request_errors"):
+    with caplog.at_level("ERROR", logger="gerarai.request_errors"):
         detail = safe_detail(exc, 424)
     assert "SECRETVALUE" not in detail
     assert "ref:" in detail
@@ -189,7 +189,7 @@ def test_safe_detail_redacts_the_userinfo_password_in_the_log(caplog):
     # DSN con la password.
     import logging
 
-    with caplog.at_level(logging.ERROR, logger="cavaai.request_errors"):
+    with caplog.at_level(logging.ERROR, logger="gerarai.request_errors"):
         try:
             raise ConnectionError(
                 "Error -5 connecting to redis://worker:VERYSECRET@cache:6379/0. Name or service not known."

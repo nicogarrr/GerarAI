@@ -53,7 +53,7 @@ class RSSConnector:
         client: httpx.AsyncClient | None = None,
         *,
         timeout: float = 20,
-        user_agent: str = "CavaAI Feed Poller/1.0",
+        user_agent: str = "GerarAI Feed Poller/1.0",
     ) -> None:
         self.client = client
         self.timeout = timeout

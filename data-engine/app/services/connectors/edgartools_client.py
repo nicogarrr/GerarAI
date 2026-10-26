@@ -50,7 +50,7 @@ BREAKER_WINDOW_S = 600.0
 BREAKER_STREAK_LIMIT = 5
 BREAKER_COOLDOWN_S = 3600.0
 
-DEFAULT_CONTACT = "contact@cavaai.local"
+DEFAULT_CONTACT = "contact@gerarai.local"
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 _STATUS_RE = re.compile(r"\b(4\d\d|5\d\d)\b")
 
@@ -81,9 +81,9 @@ def resolve_identity() -> str:
     )
     match = _EMAIL_RE.search(candidate)
     contact = match.group(0) if match else DEFAULT_CONTACT
-    if "CavaAI" in candidate:
-        return f"CavaAI research {contact}"
-    return candidate if "@" in candidate else f"CavaAI research {contact}"
+    if any(brand in candidate for brand in ("CavaAI", "GerarAI")):
+        return f"GerarAI research {contact}"
+    return candidate if "@" in candidate else f"GerarAI research {contact}"
 
 
 def ensure_identity() -> str | None:

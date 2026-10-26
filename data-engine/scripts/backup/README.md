@@ -1,4 +1,4 @@
-# Backup y restore verificados de CavaAI
+# Backup y restore verificados de GerarAI
 
 Backup y restore **verificados** de los tres pilares (Postgres, MinIO,
 Qdrant), con manifiesto comun, verificacion fail-closed, drill de desastre

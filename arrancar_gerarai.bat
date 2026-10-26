@@ -1,10 +1,10 @@
 @echo off
 REM =====================================================================
-REM CavaAI - arranque en 1 click: infra + backend + frontend + navegador
+REM GerarAI - arranque en 1 click: infra + backend + frontend + navegador
 REM =====================================================================
 REM MODOS (primer parametro):
-REM   arrancar_cavaai.bat          DEV por defecto:  `next dev -p 3000`
-REM   arrancar_cavaai.bat /prod    PROD: `next build` una vez + `next start -p 3000`
+REM   arrancar_gerarai.bat          DEV por defecto:  `next dev -p 3000`
+REM   arrancar_gerarai.bat /prod    PROD: `next build` una vez + `next start -p 3000`
 REM   (tambien valen: prod, --prod, -prod)
 REM ---------------------------------------------------------------------
 REM QUE MODO USAR:
@@ -35,7 +35,7 @@ if /i "%~1"=="/prod" set "FRONT_MODE=PROD"
 if /i "%~1"=="prod" set "FRONT_MODE=PROD"
 if /i "%~1"=="--prod" set "FRONT_MODE=PROD"
 if /i "%~1"=="-prod" set "FRONT_MODE=PROD"
-echo CavaAI - modo %FRONT_MODE%
+echo GerarAI - modo %FRONT_MODE%
 
 echo [1/5] Levantando Docker (solo infra: postgres, mongodb, redis, qdrant, minio)...
 docker compose up -d postgres mongodb redis qdrant minio
@@ -62,7 +62,7 @@ for /L %%i in (1,1,30) do (
 echo AVISO: Qdrant no responde; sigo sin busqueda semantica.
 :qdrant_ok
 
-echo [3/5] Liberando puertos 8000 y 3000 (solo node.exe y python.exe huerfanos de CavaAI)...
+echo [3/5] Liberando puertos 8000 y 3000 (solo node.exe y python.exe huerfanos de GerarAI)...
 call :free_port 8000
 call :free_port 3000
 
@@ -76,13 +76,13 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-start "CavaAI backend" .\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
+start "GerarAI backend" .\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
 cd ..
 
 if /i "%FRONT_MODE%"=="PROD" goto frontend_prod
 :frontend_dev
 echo [5/5] Frontend DEV (next dev)...
-start "CavaAI frontend" node_modules\.bin\next dev -p 3000
+start "GerarAI frontend" node_modules\.bin\next dev -p 3000
 echo Esperando al frontend (primera vez compila ~1 min)...
 goto wait_web
 :frontend_prod
@@ -93,7 +93,7 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-start "CavaAI frontend (prod)" node_modules\.bin\next start -p 3000
+start "GerarAI frontend (prod)" node_modules\.bin\next start -p 3000
 echo Esperando al frontend prod (arranca en ~2 s tras el build)...
 :wait_web
 for /L %%i in (1,1,30) do (

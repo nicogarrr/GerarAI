@@ -1,4 +1,4 @@
-"""Restore verificado de los tres pilares de CavaAI, a destino limpio.
+"""Restore verificado de los tres pilares de GerarAI, a destino limpio.
 
 Modulos:
   * `restore_postgres`  recrea la base y aplica `pg_restore --exit-on-error`.

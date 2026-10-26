@@ -211,7 +211,7 @@
     },
     {
       "id": "rag-num-011",
-      "question": "¿Cuantos emisores tiene el COMPANY_MASTER del universo de research de CavaAI y cuantos son sin CIK?",
+      "question": "¿Cuantos emisores tiene el COMPANY_MASTER del universo de research de GerarAI y cuantos son sin CIK?",
       "expected_answer": "COMPANY_MASTER tiene 23 emisores, de los cuales 2 son sin CIK: NBIS y KRKNF.",
       "expected_facts": [
         {"metric": "universe_size", "value": 23},
@@ -888,7 +888,7 @@
     {
       "id": "rag-oos-005",
       "question": "¿Cuantos empleados tiene la cafeteria de la oficina?",
-      "expected_answer": "No consta: la biblioteca no contiene informacion de la organizacion interna de CavaAI ni de proveedores.",
+      "expected_answer": "No consta: la biblioteca no contiene informacion de la organizacion interna de GerarAI ni de proveedores.",
       "expected_facts": [],
       "expected_sources": [],
       "must_refuse": true,
@@ -991,7 +991,7 @@
     },
     {
       "id": "rag-neg-003",
-      "question": "¿Cual es el vector size del RAG de CavaAI?",
+      "question": "¿Cual es el vector size del RAG de GerarAI?",
       "category": "negative_control",
       "expected_answer": "El vector size es 384 con distancia COSINE.",
       "expected_facts": [{"metric": "vector_size", "value": 384}],

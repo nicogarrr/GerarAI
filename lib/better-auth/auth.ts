@@ -131,7 +131,7 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
     // two_factor (ni el borrado de sesion), y el paso TOTP no puede completarse.
     plugins: [
         twoFactor({
-            issuer: "CavaAI",
+            issuer: "GerarAI",
         }),
         nextCookies(),
     ],

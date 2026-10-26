@@ -46,6 +46,6 @@ def test_titular_sec_en_espanol_sin_ticker_ni_fecha():
     assert item.metadata["filing_date"] == "2026-09-24"
     assert item.metadata["report_date"] == "2026-09-20"
     assert item.ticker == "AAPL"
-    # La SEC no publica titular del filing: el texto ES es display de CavaAI
+    # La SEC no publica titular del filing: el texto ES es display de GerarAI
     # y no debe persistirse como source_headline (ver test_sec_ingest_provenance).
     assert item.headline_from_source is False

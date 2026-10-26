@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     eia_api_key: str | None = None
 
     app_env: str = "local"
-    app_name: str = "CavaAI Research Engine"
+    app_name: str = "GerarAI Research Engine"
     api_prefix: str = "/api"
     cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
@@ -245,7 +245,7 @@ class Settings(BaseSettings):
     # OJO: este default es un fallback LOCAL no contactable (el dominio .local
     # no existe). En produccion manda SEC_USER_AGENT del .env con un contacto
     # real; la SEC puede bloquear UAs sin contacto verdadero.
-    sec_user_agent: str = "CavaAI research contact@cavaai.local"
+    sec_user_agent: str = "GerarAI research contact@gerarai.local"
     # Directorio con snapshots EDGAR (manifest.json ticker->CIK,
     # companyfacts/CIK##########.json, submissions/CIK##########.json).
     # La SEC bloquea las IPs de datacenter; los snapshots se generan fuera
@@ -469,7 +469,7 @@ class Settings(BaseSettings):
     typesafe_model: str = "jev-latest"
     typesafe_fallback: str = Field(default="instructor", pattern="^(instructor|off)$")
     llm_enabled: bool = True
-    # CavaAI intentionally uses one provider for every task.
+    # GerarAI intentionally uses one provider for every task.
     llm_provider: str = "opencode-go"
     # Llamadas largas (extraccion de documentos/principios, tesis, KPIs): el
     # bridge OpenCode con reasoning=max tarda ~26 s o mas por lote; con 30 s

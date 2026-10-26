@@ -1,6 +1,6 @@
 """Conversión de tesis de inversión a EPUB con EbookLib.
 
-EbookLib (AGPL-3.0, literalmente la licencia de CavaAI) construye el EPUB
+EbookLib (AGPL-3.0, literalmente la licencia de GerarAI) construye el EPUB
 100 % en Python: sin pandoc, sin binario externo y sin `subprocess`. Este
 módulo solo usa la API pública de EbookLib (`EpubBook`, `EpubHtml`,
 `EpubItem`, `EpubNcx`, `EpubNav`, `Link`, `write_epub`); `lxml`/`six` ya

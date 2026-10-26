@@ -318,7 +318,7 @@ _real_refresh_futures: dict[int | None, object] = {}
 _real_refresh_generations: dict[int | None, int] = {}
 _real_refresh_last_attempt: dict[int | None, float] = {}
 _real_refresh_executor = ThreadPoolExecutor(
-    max_workers=1, thread_name_prefix="cavaai-screener-refresh"
+    max_workers=1, thread_name_prefix="gerarai-screener-refresh"
 )
 
 
@@ -971,7 +971,7 @@ def _refetch_real_items(
     active = resolve_screener_vendor(
         vendor if vendor is not None else settings.screener_quote_vendor
     )
-    headers = {"User-Agent": "CavaAI/0.1"}
+    headers = {"User-Agent": "GerarAI/0.1"}
 
     quotes: dict[str, dict] = {}
     with httpx.Client(headers=headers, timeout=15) as client:

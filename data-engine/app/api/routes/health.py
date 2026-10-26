@@ -1,4 +1,4 @@
-"""Public health endpoint for the CavaAI data engine.
+"""Public health endpoint for the GerarAI data engine.
 
 GET /api/health — sin firma (público): reporta estado de la BD, del
 scheduler de workers y la versión del código. Pensado para orquestación
@@ -29,7 +29,7 @@ from app.core.database import SessionLocal, schema_migration_issues
 
 router = APIRouter(tags=["health"])
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]  # CavaAI/ (raíz del repo)
+_REPO_ROOT = Path(__file__).resolve().parents[4]  # raíz del repo
 
 
 @lru_cache(maxsize=1)

@@ -206,7 +206,7 @@ class ConnectorItem:
     item_type: str = "news"
     external_id: str | None = None
     # False = el conector no recibio un titular real del medio: `title` es
-    # texto de display generado por CavaAI y NO debe guardarse como
+    # texto de display generado por GerarAI y NO debe guardarse como
     # source_headline (ese campo promete el titular verbatim de la fuente).
     headline_from_source: bool = True
     metadata: dict[str, Any] = field(default_factory=dict)

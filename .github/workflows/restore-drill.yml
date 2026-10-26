@@ -123,7 +123,7 @@ jobs:
       DRILL_COLLECTION: portfolio_research_documents
       DUCKDB_PATH: /tmp/analytics.duckdb
       LANGFUSE_ENABLED: "false"
-      SEC_USER_AGENT: CavaAI-drill contact@example.com
+      SEC_USER_AGENT: GerarAI-drill contact@example.com
       BACKUP_DIR: /tmp/cavaai-drill-backup
       # Postgres en modo contenedor: usa el pg_dump 17.x del propio contenedor,
       # en vez del cliente del runner (que seria 16 y abortaria contra el 17).

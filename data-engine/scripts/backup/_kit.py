@@ -1,4 +1,4 @@
-"""Primitivas fail-closed compartidas por el backup y el restore de CavaAI.
+"""Primitivas fail-closed compartidas por el backup y el restore de GerarAI.
 
 Este modulo es la unica fuente de verdad del formato del manifiesto, de los
 pins de herramientas y del contrato "fail-closed": una comprobacion que no se
