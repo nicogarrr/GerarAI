@@ -15,3 +15,12 @@ test('404 has authenticated full shell and public fallback without redirect',()=
  assert.ok(s.includes('requireAuthenticatedUser()'));
  assert.ok(s.includes('Public 404 stays public'));
 });
+test('404 never links to private workspace routes',()=>{
+ const s=readFileSync('app/not-found.tsx','utf8');
+ for(const privateRoute of ['/inicio','/discover','/watchlist']) {
+   assert.ok(!s.includes(`href="${privateRoute}"`), `404 no puede enlazar ${privateRoute}`);
+ }
+ assert.ok(s.includes('href="/"'));
+ assert.ok(s.includes('href="/metodologia"'));
+ assert.ok(s.includes('href="/help"'));
+});

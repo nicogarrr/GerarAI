@@ -71,9 +71,11 @@ export default function PrivacySettings({ email }: { email: string }) {
             <section className="min-w-0 rounded-lg border border-gray-800 p-5">
                 <h2 className="break-words text-xl font-semibold text-white">Exportar mis datos</h2>
                 <p className="mt-1 text-sm text-gray-400">
-                    Descarga un JSON con tu perfil, cartera, tesis, claims y evidencia,
-                    watchlist, alertas, conocimiento y ajustes. Los originales de los
-                    documentos no se incrustan; solo su metadata.
+                    Descarga un JSON con tus datos estructurados y metadatos: perfil,
+                    cartera, tesis, claims y evidencia, watchlist, alertas, conocimiento,
+                    planes y ajustes. Los archivos originales de los documentos no se
+                    incluyen; de cada documento solo viajan sus metadatos y el recuento
+                    de fragmentos.
                 </p>
                 <Button
                     className="mt-4 w-full min-w-0 whitespace-normal text-left sm:w-auto"
