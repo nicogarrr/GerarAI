@@ -2083,7 +2083,7 @@ Recompras, dilución y dividendos se consultan en las pestañas «Dilución y re
 {self._valuation_markdown(valuation, excluded_present=excluded_present)}
 
 ### Motor fundamental de largo plazo
-Versión persistida del modelo fundamental: `{(long_term_model.get("persistence") or {}).get("version")}` (versionado propio del motor, independiente del número de versión de esta tesis).
+Versión del modelo fundamental usada en esta corrida: `{(long_term_model.get("persistence") or {}).get("version")}` (versionado propio del motor, independiente del número de versión de esta tesis; que esta corrida lo muestre NO acredita persistencia duradera: en una corrida aislada con rollback el objeto existe solo en transacción, y la persistencia real la acredita el registro del motor).
 Estado del modelo: `{long_term_model.get("status")}`. Veredicto de oportunidad de mercado: `{(market_opportunity.get("verdict") or {}).get("label", "unknown")}`.
 
 ## 14. DCF inverso

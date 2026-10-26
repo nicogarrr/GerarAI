@@ -74,8 +74,9 @@ def test_render_markdown_en_espanol_sin_ingles_ni_claves_crudas():
     assert "Trazabilidad de los claims y cálculos de ESTA corrida" in markdown
     assert "no verifica la veracidad de las fuentes): superada" in markdown
     assert "Elegibilidad técnica para publicación" in markdown
-    assert "Versión persistida del modelo fundamental" in markdown
+    assert "Versión del modelo fundamental usada en esta corrida" in markdown
     assert "independiente del número de versión de esta tesis" in markdown
+    assert "NO acredita persistencia duradera" in markdown
     assert "Semilla maestra de la empresa" in markdown
     assert "Probabilidades: pendiente" in markdown
 
