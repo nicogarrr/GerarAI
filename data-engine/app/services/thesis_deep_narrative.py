@@ -57,6 +57,47 @@ SECTION_IDS = (
 )
 _MANDATORY_IDS = frozenset({"que_sabemos", "fuentes_y_anclaje", "lo_que_no_sabemos"})
 
+# Nota de reintento por regla rechazada: acota la correccion pedida al
+# modelo SIN relajar ninguna validacion. Nunca incluye salidas del modelo,
+# hechos del paquete ni datos del tenant.
+_RETRY_NOTES = {
+    "sin_secciones": "Devuelve un objeto JSON con la clave secciones.",
+    "seccion_invalida": (
+        "Usa solo ids de seccion del contrato, sin repetir, con titulo breve "
+        "y entre 1 y 6 parrafos por seccion."
+    ),
+    "fact_ids_invalidos": (
+        "Cada seccion debe declarar fact_ids no vacios que existan en el "
+        "paquete de hechos."
+    ),
+    "parrafo_invalido": "Cada parrafo debe tener entre 40 y 2000 caracteres.",
+    "formato_indebido": (
+        "No uses markdown (ni negritas ni encabezados), ni URLs, ni lenguaje "
+        "de veredicto (comprar, vender, recomendar)."
+    ),
+    "cifra_no_anclada": (
+        "No escribas ninguna cifra que no aparezca exactamente en un hecho "
+        "del paquete: ni redondeos, ni derivadas, ni ordinales."
+    ),
+    "obligatorias_ausentes": (
+        "Incluye todas las secciones obligatorias del contrato."
+    ),
+    "orden_indebido": (
+        "Respeta el orden del contrato: que_sabemos primero y "
+        "lo_que_no_sabemos la ultima."
+    ),
+    "longitud_total": (
+        "La explicacion completa debe tener entre 800 y 20000 caracteres: "
+        "desarrolla cada seccion con mas detalle anclado."
+    ),
+    "anclaje_insuficiente": (
+        "Cita en conjunto al menos 3 hechos distintos del paquete."
+    ),
+    "json_no_parseable": "Responde solo con JSON valido, sin texto adicional.",
+    "respuesta_degradada": "Responde completo, sin cortar la salida.",
+}
+
+
 _OUTPUT_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -273,13 +314,19 @@ def fact_pack(
     return facts
 
 
-def _validate_sections(parsed, facts: list[dict]) -> list[dict] | None:
-    """Fail-closed: secciones ordenadas con citas del codigo, o None."""
+def _validate_sections(
+    parsed, facts: list[dict]
+) -> tuple[list[dict] | None, str | None]:
+    """Fail-closed: (secciones con citas del codigo, None) o (None, regla).
+
+    La regla devuelta es un codigo corto sin contenido del modelo ni del
+    paquete de hechos: sirve para log y para la nota de reintento.
+    """
     if not isinstance(parsed, dict):
-        return None
+        return None, "sin_secciones"
     raw = parsed.get("secciones")
     if not isinstance(raw, list) or not raw:
-        return None
+        return None, "sin_secciones"
     fact_ids = {fact["id"] for fact in facts}
     allowed = _allowed_numbers(facts)
     seen: set[str] = set()
@@ -287,49 +334,49 @@ def _validate_sections(parsed, facts: list[dict]) -> list[dict] | None:
     total_chars = 0
     for item in raw:
         if not isinstance(item, dict):
-            return None
+            return None, "seccion_invalida"
         sid = item.get("id")
         titulo = item.get("titulo")
         parrafos = item.get("parrafos")
         cited = item.get("fact_ids")
         if sid not in SECTION_IDS or sid in seen:
-            return None
+            return None, "seccion_invalida"
         seen.add(sid)
         if not isinstance(titulo, str) or not titulo.strip() or len(titulo) > 120:
-            return None
+            return None, "seccion_invalida"
         if not isinstance(parrafos, list) or not 1 <= len(parrafos) <= 6:
-            return None
+            return None, "seccion_invalida"
         if not isinstance(cited, list) or not cited or any(c not in fact_ids for c in cited):
-            return None
+            return None, "fact_ids_invalidos"
         clean: list[str] = []
         for parrafo in parrafos:
             if not isinstance(parrafo, str):
-                return None
+                return None, "parrafo_invalido"
             text = parrafo.strip()
             if not 40 <= len(text) <= 2000:
-                return None
+                return None, "parrafo_invalido"
             if _URL_RE.search(text) or _MARKUP_RE.search(text) or _VERDICT_RE.search(text):
-                return None
+                return None, "formato_indebido"
             for match in _NUMBER_RE.findall(text):
                 norm = _norm_number(match)
                 if norm is None or norm not in allowed:
                     # Cifra no anclada al paquete: posible alucinacion.
-                    return None
+                    return None, "cifra_no_anclada"
             clean.append(text)
             total_chars += len(text)
         validated.append({"id": sid, "titulo": titulo.strip(), "parrafos": clean, "fact_ids": cited})
     if not _MANDATORY_IDS.issubset(seen):
-        return None
+        return None, "obligatorias_ausentes"
     ids_order = [s["id"] for s in validated]
     if ids_order[0] != "que_sabemos" or ids_order[-1] != "lo_que_no_sabemos":
-        return None
+        return None, "orden_indebido"
     # Narrativa extensa de verdad: un selector de plantillas no llega a esto.
     if not 800 <= total_chars <= 20000:
-        return None
+        return None, "longitud_total"
     # Al menos 3 hechos distintos citados en total: explicacion anclada, no prosa libre.
     cited_all = {c for s in validated for c in s["fact_ids"]}
     if len(cited_all) < 3:
-        return None
+        return None, "anclaje_insuficiente"
     # Las citas las pone el codigo (localizadores verificables), nunca el modelo.
     locators = {fact["id"]: fact["fuente"] for fact in facts}
     for section in validated:
@@ -337,7 +384,7 @@ def _validate_sections(parsed, facts: list[dict]) -> list[dict] | None:
         section["parrafos"].append("Fuentes citadas: " + " · ".join(seen_locators[:6]))
         del section["id"]
         del section["fact_ids"]
-    return [*validated, dict(_DISCLAIMER_SECTION)]
+    return [*validated, dict(_DISCLAIMER_SECTION)], None
 
 
 _SYSTEM = (
@@ -444,13 +491,15 @@ def maybe_deep_narrative(
             pass
 
     response = None
+    last_reason: str | None = None
     for attempt in range(2):
         note = None
         if attempt == 1:
+            specific = _RETRY_NOTES.get(last_reason or "")
             note = (
-                "Tu respuesta anterior fue rechazada por validación "
-                "(cifra no anclada, sección obligatoria ausente, URL o "
-                "formato indebido). Responde solo con hechos del paquete."
+                "Tu respuesta anterior fue rechazada por validación. "
+                + (specific + " " if specific else "")
+                + "Responde solo con hechos del paquete."
             )
         request = _build_request(facts, note)
         try:
@@ -465,16 +514,37 @@ def maybe_deep_narrative(
         if getattr(response, "degraded", False):
             # Respuesta degradada del proveedor (warning, truncado, filtro):
             # no se publica como narrativa de tesis; un reintento y fuera.
-            logger.warning("narrativa extensa: respuesta degradada (intento %s)", attempt + 1)
+            last_reason = "respuesta_degradada"
+            logger.warning(
+                "narrativa extensa: rechazada (%s) intento %s modelo=%s fallbacks=%s",
+                last_reason,
+                attempt + 1,
+                response.model,
+                list(getattr(response, "fallback_trail", ()) or ()),
+            )
             continue
         try:
             parsed = parse_json_response(response.text)
         except Exception:  # noqa: BLE001 - JSON invalido: un reintento y fuera
-            logger.warning("narrativa extensa: respuesta no parseable (intento %s)", attempt + 1)
+            last_reason = "json_no_parseable"
+            logger.warning(
+                "narrativa extensa: rechazada (%s) intento %s modelo=%s fallbacks=%s",
+                last_reason,
+                attempt + 1,
+                response.model,
+                list(getattr(response, "fallback_trail", ()) or ()),
+            )
             continue
-        sections = _validate_sections(parsed, facts)
+        sections, reason = _validate_sections(parsed, facts)
         if sections is None:
-            logger.warning("narrativa extensa: salida rechazada por validación (intento %s)", attempt + 1)
+            last_reason = reason
+            logger.warning(
+                "narrativa extensa: rechazada (%s) intento %s modelo=%s fallbacks=%s",
+                reason,
+                attempt + 1,
+                response.model,
+                list(getattr(response, "fallback_trail", ()) or ()),
+            )
             continue
         requested_model = None
         try:
