@@ -69,7 +69,7 @@ def test_debate_all_429_error_and_cooldown_covers_gemini():
         async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
             provider = create_free_interactive_provider(cfg(), client=client)
             for _ in range(2):
-                with pytest.raises(FreeLLMUnavailable, match="LLM gratuito agotado"):
+                with pytest.raises(FreeLLMUnavailable, match="modelo configurado ha agotado su cuota"):
                     await provider.complete(LLMRequest([Message("user", "tesis")], task="red_team"))
     asyncio.run(run())
     assert seen == ["deepseek-v4.1-flash-free", "space-bunny-free", GEMINI_MODEL, GEMINI_MODEL_2]

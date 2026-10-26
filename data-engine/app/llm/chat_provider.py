@@ -1,4 +1,4 @@
-"""Cadena gratuita de respaldo verificada (OpenCode -> Groq -> Gemini).
+"""Cadena de chat y respaldo (OpenCode Go -> Groq -> Gemini).
 
 Chat: carrera acotada (ChatFallbackProvider). Trabajos en segundo plano
 (extracción de principios): secuencial con UN reintento transitorio
@@ -29,6 +29,7 @@ from app.llm.errors import (
 from app.llm.factory import _pin_to_model, create_llm_provider
 from app.llm.interactive_deadline import remaining_seconds
 from app.llm.model_aliases import is_owner_approved_model
+from app.llm.response_cache import build_response_cache
 
 logger = logging.getLogger(__name__)
 
@@ -375,28 +376,39 @@ class GoSubscriptionChatProvider(OpenAICompatibleProvider):
 
 def _go_subscription_primary(settings: Settings, client: httpx.AsyncClient | None) -> OpenAICompatibleProvider | None:
     """Primario por la suscripcion Go; None si el interruptor esta apagado."""
+    if not settings.llm_enabled or (settings.llm_provider or "").strip().lower() == "disabled":
+        return None
     if not settings.chat_go_subscription_enabled:
         return None
     if not (settings.opencode_go_api_key and settings.opencode_go_api_key.strip()):
         return None
+    fallback = (settings.opencode_go_fallback_model or "").strip()
+    models = {GO_SUBSCRIPTION_MODEL}
+    if fallback:
+        models.add(fallback)
+    overrides = _pin_to_model(GO_SUBSCRIPTION_MODEL)
+    if fallback:
+        overrides.pop(fallback, None)
     return GoSubscriptionChatProvider(
         api_key=settings.opencode_go_api_key,
         base_url=settings.chat_go_subscription_base_url,
         default_model=GO_SUBSCRIPTION_MODEL,
         provider_name=GO_SUBSCRIPTION_PROVIDER,
-        model_overrides=_pin_to_model(GO_SUBSCRIPTION_MODEL),
+        model_overrides=overrides,
+        fallback_model=fallback or None,
         extra_headers={
             "User-Agent": "GerarAI-chat/1.0",
             "x-opencode-session": settings.opencode_go_session,
         },
         reasoning_effort=settings.opencode_go_chat_reasoning_effort,
-        reasoning_effort_models={GO_SUBSCRIPTION_MODEL},
-        hidden_reasoning_models={GO_SUBSCRIPTION_MODEL},
+        reasoning_effort_models=models,
+        hidden_reasoning_models=models,
         hidden_reasoning_min_tokens=max(settings.llm_hidden_reasoning_min_tokens, settings.chat_go_min_output_tokens),
         max_output_tokens=settings.llm_max_output_tokens,
         max_retries=0,
         timeout_seconds=min(settings.llm_timeout_seconds, settings.chat_total_timeout_seconds),
         total_timeout_seconds=settings.chat_total_timeout_seconds,
+        response_cache=build_response_cache(settings),
         client=client,
     )
 
@@ -476,19 +488,19 @@ def _openrouter_backup(settings: Settings, client: httpx.AsyncClient | None) -> 
 
 def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
     settings = settings or get_settings()
+    if not settings.llm_enabled or (settings.llm_provider or "").strip().lower() == "disabled":
+        return DisabledProvider("disabled_by_configuration")
     # Chat interactivo: presupuesto corto propio (chat_total_timeout_seconds,
     # no el tope de llamadas largas) y primario con reasoning reducido para
     # que compita en la carrera en vez de perderla siempre y quedar cancelado
     # a medias en el bridge (BrokenPipe).
-    go_subscription = _go_subscription_primary(settings, client) if settings.llm_enabled else None
+    go_subscription = _go_subscription_primary(settings, client)
     if (
         go_subscription is None
-        and settings.llm_enabled
-        and settings.llm_provider != "disabled"
         and not is_owner_approved_model(settings.opencode_go_model, settings)
     ):
         return DisabledProvider("chat_primary_not_verified_free")
-    fallback = settings.opencode_go_fallback_model
+    fallback = settings.opencode_go_fallback_model.strip()
     if fallback and not is_owner_approved_model(fallback, settings):
         return DisabledProvider("chat_fallback_not_verified_free")
     # Sin fallback implicito: la cadena Go/Groq/Gemini ya es el respaldo.

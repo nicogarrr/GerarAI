@@ -170,4 +170,6 @@ def test_thesis_debate_without_free_provider_returns_honest_503(monkeypatch):
     monkeypatch.setattr("app.services.thesis_debate_service.debate_thesis", unexpected_debate)
     response = client.post("/api/thesis/PROBE/debate")
     assert response.status_code == 503
-    assert response.json() == {"detail": "LLM gratuito no disponible, vuelve más tarde"}
+    assert response.json() == {
+        "detail": "El modelo configurado no está disponible, vuelve más tarde"
+    }

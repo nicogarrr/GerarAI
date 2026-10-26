@@ -38,10 +38,10 @@ const envSchema = z.object({
   NEWSAPI_KEY: z.string().optional(),
   MARKETAUX_API_KEY: z.string().optional(),
 
-  // Proveedor LLM principal (OpenCode Zen); el chat admite fallback Groq en el backend
+  // Proveedor LLM principal (OpenCode Go); el chat admite fallback Groq en el backend
   OPENCODE_GO_API_KEY: z.string().optional(),
-  OPENCODE_GO_BASE_URL: z.string().url().default('https://opencode.ai/zen/v1'),
-  OPENCODE_GO_MODEL: z.string().default("deepseek-v4.1-flash-free"),
+  OPENCODE_GO_BASE_URL: z.string().url().default('https://opencode.ai/zen/go/v1'),
+  OPENCODE_GO_MODEL: z.string().default("deepseek-v4.1-flash"),
 
   // Vercel
   VERCEL_URL: z.string().optional(),

@@ -115,7 +115,7 @@ The long-term engine is therefore the quantitative spine of the thesis, not a se
 
 ## LLM Routing
 
-GerarAI uses a single LLM provider: OpenCode Go (see docs/AI_PROVIDER_STRATEGY.md). The default model is deepseek-v4.1-flash-free (opencode_go_model en data-engine/app/core/config.py); task-level model overrides go through OPENCODE_GO_MODEL or the task override map and never select another provider. There is no OpenRouter/OpenAI/Anthropic/Gemini adapter in the application configuration.
+GerarAI uses OpenCode Go as its primary LLM provider (see docs/AI_PROVIDER_STRATEGY.md). The default model is deepseek-v4.1-flash, covered by the owner's subscription (opencode_go_model in data-engine/app/core/config.py). OPENCODE_GO_FALLBACK_MODEL and task-level LLM_MODEL_OVERRIDES are validated against the owner-approved models in production; the optional LLM_PROVIDER=cascade path (Gemini free plan confirmed, OpenRouter :free, approved Go) and the opt-in Groq/Gemini/OpenRouter chat backups are documented there.
 
 Company chat keeps the deterministic context contract, then performs source-aware JSON synthesis, verifies citation IDs, calculates confidence / insufficient-data state and falls back safely when validation fails.
 

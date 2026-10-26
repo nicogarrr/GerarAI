@@ -600,29 +600,80 @@ class Settings(BaseSettings):
 
         Aprobados: los free verificados reales o el modelo de la suscripcion
         OpenCode Go del dueno (``deepseek-v4.1-flash``), y solo este ultimo si
-        la suscripcion esta confirmada. Un override silencioso a un modelo de
-        pago desconocido rompe el arranque; la unica salida es el flag
-        explicito ``OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=true``.
+        la suscripcion esta confirmada. Se revisan el modelo principal, el
+        fallback, cada valor de ``LLM_MODEL_OVERRIDES`` y los miembros de la
+        cascada. Un override silencioso a un modelo de pago desconocido rompe
+        el arranque; la unica salida es el flag explicito
+        ``OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=true`` (nunca exime de las
+        confirmaciones de plan gratuito de Gemini/OpenRouter).
         """
         if not self.is_production or not self.llm_enabled:
             return self
         requested = (self.llm_provider or "").strip().lower()
         if requested in {"auto", "opencode", "opencode_go"}:
             requested = "opencode-go"
-        if requested != "opencode-go":
-            return self
-        if self.opencode_go_allow_unverified_model:
+        if requested not in {"opencode-go", "cascade"}:
             return self
         # Import perezoso: app.llm.__init__ importa factory -> config, y un
         # import de nivel de modulo crearia un ciclo.
-        from app.llm.model_aliases import GO_SUBSCRIPTION_MODELS, VERIFIED_FREE_MODELS
+        from app.llm.model_aliases import (
+            GO_SUBSCRIPTION_MODELS,
+            VERIFIED_FREE_MODELS,
+            is_owner_approved_model,
+        )
 
         def _approved(model: str) -> bool:
-            return model in VERIFIED_FREE_MODELS or (
-                self.chat_go_subscription_enabled and model in GO_SUBSCRIPTION_MODELS
-            )
+            return is_owner_approved_model(model.strip(), self)
 
-        if not _approved(self.opencode_go_model.strip()):
+        for key, value in self.llm_model_overrides.items():
+            if not _approved(str(value or "")):
+                raise ValueError(
+                    "LLM_MODEL_OVERRIDES is not an owner-approved model map in "
+                    f"production: {key!r} -> {value!r}. Use a verified free model "
+                    f"({', '.join(sorted(VERIFIED_FREE_MODELS))}) or the Go subscription "
+                    f"model ({', '.join(sorted(GO_SUBSCRIPTION_MODELS))}); set "
+                    "OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=true only for an audited pilot."
+                )
+
+        if requested == "cascade":
+            if not any(
+                (value or "").strip()
+                for value in (
+                    self.gemini_api_key,
+                    self.openrouter_api_key,
+                    self.opencode_go_api_key,
+                )
+            ):
+                raise ValueError(
+                    "LLM_PROVIDER=cascade requires at least one provider key in production"
+                )
+            if (self.gemini_api_key or "").strip() and not self.gemini_free_plan_confirmed:
+                raise ValueError(
+                    "LLM_PROVIDER=cascade requires GEMINI_FREE_PLAN_CONFIRMED=true "
+                    "when GEMINI_API_KEY is set"
+                )
+            if (self.openrouter_api_key or "").strip() and not (
+                self.openrouter_model.strip().endswith(":free")
+            ):
+                raise ValueError(
+                    "LLM_PROVIDER=cascade requires an OpenRouter :free model in "
+                    f"production, got {self.openrouter_model!r}"
+                )
+            if (self.opencode_go_api_key or "").strip():
+                if not _approved(self.opencode_go_model):
+                    raise ValueError(
+                        "LLM_PROVIDER=cascade requires an owner-approved OpenCode Go "
+                        f"model in production, got {self.opencode_go_model!r}"
+                    )
+                fallback = self.opencode_go_fallback_model.strip()
+                if fallback and not _approved(fallback):
+                    raise ValueError(
+                        "LLM_PROVIDER=cascade requires an owner-approved "
+                        f"OPENCODE_GO_FALLBACK_MODEL in production, got {fallback!r}"
+                    )
+            return self
+
+        if not _approved(self.opencode_go_model):
             raise ValueError(
                 "OPENCODE_GO_MODEL is not an owner-approved model in production: "
                 f"{self.opencode_go_model!r}. Use a verified free model "
