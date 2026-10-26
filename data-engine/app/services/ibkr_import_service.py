@@ -323,6 +323,44 @@ def _decimal(value: str | None, default: str = "0") -> Decimal:
     return parsed[0]
 
 
+def _csv_decimal(value: str) -> Decimal:
+    """Number from an IBKR CSV cell (en-US or es-ES notation).
+
+    The old code stripped every comma, so "12,50" became 1250 and "1.234,56"
+    became 1.23456. A cell without a comma that is a plain machine decimal
+    ("100.25", "32.725") keeps the previous reading, so already imported rows
+    keep their identity. A cell with a comma goes through the shared
+    localized parser (same one the validation uses); "1,234" still reads as
+    1234 and "1,5"/"12,50" as decimals. Not interpretable -> error, never 0.
+    """
+    plain = str(value).strip()
+    if "," not in plain and _MACHINE_DECIMAL.match(plain):
+        return Decimal(plain)
+    parsed = parse_localized_number(plain)
+    if parsed is None:
+        raise IBKRImportError(
+            f"Importe no interpretable: {value!r}. Usa notacion en-US (1,234.56) "
+            "o es-ES (1.234,56)."
+        )
+    return parsed[0]
+
+
+def _legacy_csv_values(symbol: str, action: str, cell) -> list[str] | None:
+    """Fingerprint values exactly as the pre-_csv_decimal importer built them."""
+    try:
+        return [
+            symbol,
+            action,
+            str(abs(Decimal(cell("quantity").replace(",", "")).normalize())),
+            str(Decimal(cell("price").replace(",", "")).normalize()),
+            _date(cell("date")).isoformat(),
+            str(abs(Decimal(cell("fees").replace(",", "")).normalize())) if cell("fees") else "0",
+            cell("currency").upper() or "USD",
+        ]
+    except Exception:  # noqa: BLE001 - unreadable legacy form: no legacy identity
+        return None
+
+
 def _missing_position_fields(element: ElementTree.Element) -> list[str]:
     """Economic fields an OpenPosition needs so nothing is invented (F377).
 
@@ -668,7 +706,16 @@ class IBKRImportService:
                     cash_rows_skipped += 1
                     continue
                 raw_cash = _attr(element, "endingCash", "cash", "balance")
-                if raw_cash is not None and not _is_number(raw_cash):
+                if raw_cash is None or not _is_number(raw_cash):
+                    # A missing amount is not zero: it would overwrite a real
+                    # CashBalance with 0 (same rule as OpenPosition, F377).
+                    rows_skipped += 1
+                    cash_rows_skipped += 1
+                    continue
+                raw_cash_date = _attr(element, "reportDate", "asOfDate", "toDate")
+                if raw_cash_date is None or not _is_date(raw_cash_date):
+                    # A missing/invalid date is never "today": the row is skipped
+                    # and the existing CashBalance (amount and as_of) is kept.
                     rows_skipped += 1
                     cash_rows_skipped += 1
                     continue
@@ -1023,6 +1070,8 @@ class IBKRImportService:
         trades_imported = 0
         duplicate_trades = 0
         occurrences: Counter[str] = Counter()
+        legacy_occurrences: Counter[str] = Counter()
+        legacy_reimport_blocked = 0
         has_rows_without_id = False
         rows_skipped = len(bad_lines)
         # Se reproduce de la fecha mas antigua a la mas nueva: un export con lo
@@ -1063,10 +1112,10 @@ class IBKRImportService:
             # Provider IDs share identity with Flex XML. Without one, use the
             # canonical economic row plus occurrence count, preserving two
             # identical fills in one file while making replay/reordering safe.
-            values = [symbol, action, str(abs(Decimal(_cell("quantity").replace(",", "")).normalize())),
-                      str(Decimal(_cell("price").replace(",", "")).normalize()),
+            values = [symbol, action, str(abs(_csv_decimal(_cell("quantity")).normalize())),
+                      str(_csv_decimal(_cell("price")).normalize()),
                       _date(_cell("date")).isoformat(),
-                      str(abs(Decimal(_cell("fees").replace(",", "")).normalize())) if _cell("fees") else "0",
+                      str(abs(_csv_decimal(_cell("fees")).normalize())) if _cell("fees") else "0",
                       _cell("currency").upper() or "USD"]
             fingerprint = hashlib.sha256(json.dumps(values).encode()).hexdigest()
             occurrences[fingerprint] += 1
@@ -1084,16 +1133,41 @@ class IBKRImportService:
             ) is not None:
                 duplicate_trades += 1
                 continue
+            if not _cell("external_id"):
+                # Before _csv_decimal, cells with a decimal comma were stored
+                # with corrupted values (12,50 -> 1250) under THAT fingerprint.
+                # Re-importing the same file would insert a corrected twin of a
+                # row already in the ledger. If the legacy identity exists, the
+                # row is blocked with an explanation and nothing is mutated.
+                legacy_values = _legacy_csv_values(symbol, action, _cell)
+                if legacy_values is not None and legacy_values != values:
+                    legacy_fp = hashlib.sha256(json.dumps(legacy_values).encode()).hexdigest()
+                    legacy_occurrences[legacy_fp] += 1
+                    legacy_id = f"ibkr-csv-{legacy_fp}-{legacy_occurrences[legacy_fp]}"
+                    if db.scalar(
+                        select(Transaction.id).where(
+                            Transaction.external_id == legacy_id,
+                            *tenant_filters(db, Transaction),
+                        )
+                    ) is not None:
+                        rows_skipped += 1
+                        legacy_reimport_blocked += 1
+                        row_errors.append(
+                            f"Fila {line_number} del CSV: ya existe una operacion importada antes con "
+                            "esta misma fila leida con decimales corruptos (coma decimal). No se "
+                            "duplica ni se modifica; revisa y corrige la operacion existente a mano."
+                        )
+                        continue
             try:
                 with db.begin_nested():
                     transaction = ledger.create_transaction(
                         db,
                         ticker=symbol,
                         action=action,
-                        quantity=abs(Decimal(_cell("quantity").replace(",", ""))),
-                        price=Decimal(_cell("price").replace(",", "")),
+                        quantity=abs(_csv_decimal(_cell("quantity"))),
+                        price=_csv_decimal(_cell("price")),
                         trade_date=_date(_cell("date")),
-                        fees=abs(Decimal(_cell("fees").replace(",", ""))) if _cell("fees") else Decimal("0"),
+                        fees=abs(_csv_decimal(_cell("fees"))) if _cell("fees") else Decimal("0"),
                         currency=_cell("currency").upper() or "USD",
                     )
                     transaction.external_id = external_id
@@ -1130,6 +1204,7 @@ class IBKRImportService:
             "status": "imported",
             "trades_imported": trades_imported,
             "duplicate_trades": duplicate_trades,
+            "legacy_reimport_blocked": legacy_reimport_blocked,
             "identity_warning": identity_warning,
             "rows_skipped": rows_skipped,
             "row_errors": row_errors,
