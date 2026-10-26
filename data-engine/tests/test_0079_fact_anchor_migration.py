@@ -91,9 +91,12 @@ def _adoption_rows(engine: Engine) -> list[tuple[str, str, str]]:
     if "migration_adoption_log" not in inspector.get_table_names():
         return []
     with engine.connect() as conn:
-        return list(
-            conn.exec_driver_sql("SELECT revision, table_name, created_indexes FROM migration_adoption_log")
-        )
+        return [
+            (str(revision), str(table_name), str(created_indexes))
+            for revision, table_name, created_indexes in conn.exec_driver_sql(
+                "SELECT revision, table_name, created_indexes FROM migration_adoption_log"
+            )
+        ]
 
 
 @pytest.fixture()

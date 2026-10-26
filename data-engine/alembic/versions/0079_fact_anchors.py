@@ -251,7 +251,7 @@ def _drop_fact_anchors() -> None:
         inspector = sa.inspect(op.get_bind())
         if not inspector.has_table(_TABLE):
             return
-        existing = {ix["name"] for ix in inspector.get_indexes(_TABLE)}
+        existing = {ix["name"] for ix in inspector.get_indexes(_TABLE) if ix["name"] is not None}
     for name in _INDEXES:
         if _is_offline() or name in existing:
             op.drop_index(name, table_name=_TABLE)
