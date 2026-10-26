@@ -124,6 +124,9 @@ def build_memo_markdown(
             for fix in (audit.required_fixes or [])[:5]:
                 lines.append(f"> - {fix}")
             lines.append("")
+        elif audit is None:
+            lines.append("> Sin auditoría de fuentes registrada para esta versión.")
+            lines.append("")
 
     if draft:
         lines.append(
@@ -207,9 +210,8 @@ def build_memo_markdown(
         if any(item.strip() for item in analysis):
             lines.append("## Análisis completo")
             lines.append(
-                "Texto íntegro de la tesis persistida, con las cifras de entrada, su fuente y "
-                "periodo, supuestos, datos pendientes y procedencia. Lo que falta aparece "
-                "marcado como pendiente."
+                "Texto de la tesis persistida (misma versión que la ficha). Descriptivo: no "
+                "garantiza que cifras, fuentes o inferencias estén validadas."
             )
             lines.append("")
             lines.extend(analysis)
