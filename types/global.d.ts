@@ -78,6 +78,9 @@ declare global {
 
     type StockWithWatchlistStatus = Stock & {
         isInWatchlist: boolean;
+        // Cobertura de ficha comprobada (lib/market/search-coverage):
+        // solo la anota la búsqueda; ausente en otras fuentes.
+        fichaCoverage?: 'covered' | 'unknown';
     };
 
     type FinnhubSearchResult = {
