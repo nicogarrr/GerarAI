@@ -431,3 +431,170 @@ def test_fact_id_digits_in_prose_are_rejected_as_unanchored(context, caplog):
         assert _call(context, provider) is None
     msgs = [r.getMessage() for r in caplog.records if "rechazada" in r.getMessage()]
     assert any("cifra_no_anclada" in m for m in msgs)
+
+
+# --- Suministro de datos del paquete (fixtures offline con la forma real del
+# --- objeto verificada 2026-10-26; valores sintéticos, nunca datos de tenant).
+
+from decimal import Decimal
+
+from app.models.entities import FinancialFact
+
+
+def _ltm_full():
+    return {
+        "framework": {
+            "key": "advertising_platform",
+            "label": "Advertising / attention platform",
+            "primary_question": "Can ad impressions compound advertising revenue?",
+        },
+        "missing_mandatory_drivers": [],
+        "horizon_years": 5,
+        "as_of_period": "2025-12-31:FY",
+        "assumptions": {
+            "revenue_growth": {"value": 0.12, "unit": "decimal", "source_type": "financial_facts",
+                               "basis": "annual revenue CAGR across available history",
+                               "source_fact_ids": [101, 102], "confidence": 0.9},
+            "fcf_margin": {"value": 0.25, "unit": "decimal", "source_type": "financial_facts",
+                           "basis": "median of latest annual FCF margins",
+                           "source_fact_ids": [103], "confidence": 0.9},
+            "wacc": {"value": 0.10, "unit": "decimal", "source_type": "calculated_metric",
+                     "basis": "WACC_STANDARD_V1", "source_fact_ids": [104],
+                     "source_urls": ["https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=META"]},
+            "terminal_growth": {"value": 0.03, "unit": "decimal", "source_type": "model_policy",
+                                "basis": "terminal growth policy", "source_fact_ids": []},
+        },
+        "driver_model": [
+            {"key": "daily_active_people", "status": "sourced", "value": 2.1e9, "unit": "people",
+             "period": "2025-12", "source_fact_ids": [777]},
+            {"key": "ad_impressions", "status": "missing", "value": None, "unit": "unknown",
+             "period": "unknown", "source_fact_ids": []},
+        ],
+    }
+
+
+def _ff(metric, value, unit, period, source_id=None):
+    return FinancialFact(metric=metric, value=Decimal(str(value)), unit=unit,
+                         period=period, source_type="sec_companyfacts", source_id=source_id)
+
+
+def test_pack_includes_fundamentals_with_period_unit_and_source():
+    facts = svc.fact_pack(
+        _company(), _valuation(), _long_term_model(), None, [], None, None,
+        financial_facts=[
+            _ff("revenue", 100000000000, "USD", "2025-12-31:FY"),
+            _ff("fcf_margin", "0.25", "decimal", "2025-12-31:FY"),
+        ],
+    )
+    textos = [f["texto"] for f in facts]
+    assert any("periodos distintos NO son comparables" in t for t in textos)
+    assert any("Ingresos de META: 100 mil M USD (periodo 2025-12-31:FY; fuente sec_companyfacts)" in t for t in textos)
+    assert any("Margen de FCF de META: 25,0 % (periodo 2025-12-31:FY" in t for t in textos)
+    # Cada cifra nueva queda anclada por construcción: el validador las admite.
+    allowed = svc._allowed_numbers(facts)
+    assert "100" in allowed and "25" in allowed
+
+
+def test_dcf_assumptions_are_labeled_model_assumptions_not_data():
+    facts = svc.fact_pack(_company(), _valuation(), _ltm_full(), None, [])
+    sup = next(f["texto"] for f in facts if f["texto"].startswith("Supuestos del motor"))
+    assert "supuestos del modelo, no datos realizados ni fuentes externas" in sup
+    assert "12,0 % anual" in sup and "25,0 %" in sup and "10,0 %" in sup and "3,0 %" in sup
+    assert "horizonte de proyección de 5 años" in sup and "datos de corte 2025-12-31:FY" in sup
+
+
+def test_assumption_source_urls_stay_in_locator_never_visible(context):
+    # El paquete interno de la llamada usa el objeto completo: la URL de un
+    # supuesto va al localizador (cita del código), nunca al prompt visible.
+    facts = svc.fact_pack(_company(), _valuation(), _ltm_full(),
+                          "La publicidad sigue monetizando.", NEWS)
+    url_fact = next(f for f in facts if "sec.gov" in f["fuente"])
+    assert "no implica verificación de su contenido" in url_fact["texto"]
+    payload = _model_output(facts)
+    payload["secciones"][2]["fact_ids"].append(url_fact["id"])
+    provider = Provider(payload=payload)
+    db, _ = context
+    result = svc.maybe_deep_narrative(
+        db, _company(), _valuation(), _ltm_full(),
+        "La publicidad sigue monetizando.", NEWS, provider=provider)
+    assert result is not None
+    prompt_json = provider.requests[0].messages[-1].content
+    assert "sec.gov" not in prompt_json
+    # La cita insertada por el código conserva la URL real del supuesto.
+    published = json.dumps(result["sections"], ensure_ascii=False)
+    assert "sec.gov" in published
+
+
+def test_sourced_driver_uses_resolved_real_url_locator():
+    facts = svc.fact_pack(
+        _company(), _valuation(), _ltm_full(), None, [], None, None,
+        fact_locators={777: "https://www.sec.gov/Archives/edgar/data/1326801/x/meta-20261231.htm"},
+    )
+    driver_fact = next(f for f in facts if "personas activas al día" in f["texto"])
+    assert "2,1 mil M" in driver_fact["texto"] and "periodo 2025-12" in driver_fact["texto"]
+    assert driver_fact["fuente"] == "https://www.sec.gov/Archives/edgar/data/1326801/x/meta-20261231.htm"
+    # El driver sin dato NO genera hecho: el hueco honesto se mantiene.
+    assert not any("impresiones publicitarias:" in f["texto"] for f in facts)
+
+
+def test_reverse_dcf_solved_value_is_model_output():
+    valuation = _valuation()
+    valuation["reverse_dcf"] = {"required_revenue_growth": 0.1, "market_price": 640.0,
+                                 "solved_value_per_share": 640.0, "out_of_bounds": False, "status": "ok"}
+    facts = svc.fact_pack(_company(), valuation, _long_term_model(), None, [])
+    assert any("el DCF inverso resuelve un valor de 640.00 USD" in f["texto"] for f in facts)
+
+
+def test_no_supply_facts_when_objects_absent_and_gaps_stay_honest():
+    ltm = _long_term_model()
+    ltm["missing_mandatory_drivers"] = ["daily_active_people"]
+    facts = svc.fact_pack(_company(), _valuation(), ltm, None, [], None, None)
+    textos = [f["texto"] for f in facts]
+    assert not any(t.startswith("Supuestos del motor") for t in textos)
+    assert not any("periodos distintos NO son comparables" in t for t in textos)
+    assert not any("Driver del marco con dato" in t for t in textos)
+    assert any("Drivers obligatorios del marco sin dato: daily_active_people" in t for t in textos)
+
+
+def test_visible_fuente_label_avoids_false_verification_claim():
+    label = svc._visible_fuente("https://www.sec.gov/Archives/x.htm")
+    assert "verificada" not in label
+    assert "registrada" in label and "no veracidad" in label
+
+
+def test_wacc_formula_without_technical_class_tokens():
+    # Forma real observada 2026-10-26: la base del WACC trae la fórmula Y
+    # clases técnicas («CalculatedMetric #66426:», «; definition=...»).
+    # La explicación ancha explicita la fórmula, nunca las clases.
+    ltm = _ltm_full()
+    ltm["assumptions"]["wacc"] = {
+        "value": 0.0995, "unit": "decimal", "source_type": "calculated_metric",
+        "basis": ("CalculatedMetric #66426: equity_weight * (risk_free_rate + "
+                  "beta * equity_risk_premium) + debt_weight * cost_of_debt * "
+                  "(1 - tax_rate); definition=WACC_STANDARD_V1"),
+        "source_fact_ids": [1], "confidence": 0.7,
+    }
+    facts = svc.fact_pack(_company(), _valuation(), ltm, None, [])
+    sup = next(f["texto"] for f in facts if f["texto"].startswith("Supuestos del motor"))
+    assert "equity_weight * (risk_free_rate + beta * equity_risk_premium)" in sup
+    assert "CalculatedMetric" not in sup and "WACC_STANDARD_V1" not in sup
+
+
+def test_model_policy_assumption_marked_without_external_basis():
+    # terminal_growth existe como parámetro (0,03) pero es política del
+    # modelo: «sin base documentada externa», distinto de «no existe».
+    facts = svc.fact_pack(_company(), _valuation(), _ltm_full(), None, [])
+    sup = next(f["texto"] for f in facts if f["texto"].startswith("Supuestos del motor"))
+    assert "crecimiento terminal del 3,0 %" in sup
+    assert "sin base documentada externa" in sup
+
+
+def test_assumption_fcf_margin_not_equated_with_reported_period_margin():
+    facts = svc.fact_pack(
+        _company(), _valuation(), _ltm_full(), None, [], None, None,
+        financial_facts=[_ff("fcf_margin", "0.23", "decimal", "2025-12-31:FY")],
+    )
+    sup = next(f["texto"] for f in facts if f["texto"].startswith("Supuestos del motor"))
+    assert "no son la misma cifra" in sup
+    rep = next(f["texto"] for f in facts if "Margen de FCF de META" in f["texto"])
+    assert "23,0 %" in rep and "2025-12-31:FY" in rep

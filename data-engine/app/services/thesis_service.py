@@ -851,6 +851,7 @@ class ThesisService:
             news_items,
             filing_items=filing_items,
             rag_context=rag_context,
+            financial_facts=list(snapshot.facts.values()),
         )
         narrative_model_trace = None
         if deep_narrative:
@@ -1191,7 +1192,34 @@ class ThesisService:
         criteria: list[str] = []
         mos = valuation.get("margin_of_safety")
         base = valuation.get("base_value")
-        if mos is not None and base is not None and mos >= 0:
+        price = valuation.get("current_price")
+        # Criterio grounded en la relación precio/base ACTUAL con benchmark
+        # EXPLÍCITO: margin_of_safety es respecto al valor ESPERADO
+        # (observado 2026-10-26: precio 642.62, base 565.21, esperado 656.45,
+        # mos = 656.45/642.62 - 1 = +2,2 %), no respecto al escenario base.
+        # Cada margen se declara con SU benchmark; ninguno se usa para
+        # re-etiquetar el intento del modelo.
+        if base is not None and price is not None:
+            if price < base:
+                criteria.append(
+                    f"El precio supera de forma sostenida el valor base "
+                    f"({base:.2f}): el margen de seguridad respecto al "
+                    "escenario base desaparece."
+                )
+            else:
+                criteria.append(
+                    f"El precio actual ({price:.2f}) ya supera el valor del "
+                    f"escenario base ({base:.2f}): sin margen respecto al "
+                    "escenario base a este precio."
+                )
+                expected = valuation.get("expected_value")
+                if mos is not None and expected is not None:
+                    criteria.append(
+                        f"Margen respecto al valor esperado ({expected:.2f}): "
+                        f"{percent_es(mos)}; benchmark distinto del escenario "
+                        "base: no son el mismo margen."
+                    )
+        elif mos is not None and base is not None and mos >= 0:
             criteria.append(
                 f"El precio supera de forma sostenida el valor base ({base:.2f}): "
                 "el margen de seguridad desaparece."
