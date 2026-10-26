@@ -2084,7 +2084,7 @@ Recompras, dilución y dividendos se consultan en las pestañas «Dilución y re
 
 ### Motor fundamental de largo plazo
 Versión del modelo fundamental usada en esta corrida: `{(long_term_model.get("persistence") or {}).get("version")}` (versionado propio del motor, independiente del número de versión de esta tesis; que esta corrida lo muestre NO acredita persistencia duradera: en una corrida aislada con rollback el objeto existe solo en transacción, y la persistencia real la acredita el registro del motor).
-Estado del modelo: `{long_term_model.get("status")}`. Veredicto de oportunidad de mercado: `{(market_opportunity.get("verdict") or {}).get("label", "unknown")}`.
+Estado del análisis del modelo fundamental (no es el estado de esta tesis): `{long_term_model.get("status")}`. Veredicto de oportunidad de mercado: `{(market_opportunity.get("verdict") or {}).get("label", "unknown")}`.
 
 ## 14. DCF inverso
 {reverse_line}
@@ -2104,7 +2104,7 @@ Invalidadores estructurales: afirmaciones sin respaldo, trazas de cálculo ausen
 
 ## 19. Auditoría de fuentes
 Trazabilidad de los claims y cálculos de ESTA corrida (cada afirmación material con su fuente registrada; no verifica la veracidad de las fuentes): {"superada" if audit["passed"] else "no superada"}.
-Elegibilidad técnica para publicación (trazabilidad superada y valoración publicable; NO es la aprobación humana ni la publicación: la tesis sigue en borrador hasta el gate humano): {"sí" if audit["passed"] and valuation.get("publishable") else "no"}.
+Elegibilidad técnica para publicación (trazabilidad superada y valoración publicable; NO es la aprobación humana ni la publicación): {"sí" if audit["passed"] and valuation.get("publishable") else "no"}.
 Cobertura de fuentes: {audit["source_coverage_score"]} %
 Afirmaciones sin respaldo: {len(audit["unsupported_claims"] or [])}
 

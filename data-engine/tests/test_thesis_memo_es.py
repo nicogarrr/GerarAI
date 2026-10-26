@@ -216,7 +216,41 @@ def test_elegibilidad_tecnica_distinguida_de_trazabilidad():
         _company(), {"publishable": True}, audit, {}, **base)
     md_nopub = ThesisService()._render_markdown(
         _company(), {"publishable": False}, audit, {}, **base)
-    assert "sigue en borrador hasta el gate humano): sí" in md_pub
-    assert "sigue en borrador hasta el gate humano): no" in md_nopub
+    assert "NO es la aprobación humana ni la publicación): sí" in md_pub
+    assert "NO es la aprobación humana ni la publicación): no" in md_nopub
     # La trazabilidad de la corrida es la misma en ambos: no van juntas.
     assert "ESTA corrida" in md_pub and "ESTA corrida" in md_nopub
+
+
+def _render(valuation, audit, ltm):
+    return ThesisService()._render_markdown(
+        _company(), valuation, audit, {},
+        long_term_model=ltm, version=3, hypothesis="H.", catalysts=[],
+        invalidation_criteria=["Un criterio."], scenario_probabilities=None,
+    )
+
+
+def test_matriz_estados_copy_no_inventa_estado_tesis():
+    # Matriz de fixtures: audit passed x publishable x persistence/status del
+    # motor. El markdown NUNCA debe afirmar un estado de la tesis (borrador,
+    # publicada, aprobada) ni durabilidad del modelo: eso vive en registros.
+    audit_ok = {"passed": True, "source_coverage_score": 95, "unsupported_claims": 0}
+    audit_fail = {"passed": False, "source_coverage_score": 60, "unsupported_claims": ["claim x"]}
+    ltm_aislado = {"persistence": {"version": 7, "status": "persisted"},
+                   "status": "complete"}
+    for valuation in ({"publishable": True}, {"publishable": False}, {}):
+        for audit in (audit_ok, audit_fail):
+            for ltm in ({}, ltm_aislado):
+                md = _render(valuation, audit, ltm)
+                assert "borrador" not in md
+                assert "tesis publicada" not in md and "tesis aprobada" not in md
+                assert "Versión persistida del modelo" not in md
+    md = _render({"publishable": True}, audit_ok, ltm_aislado)
+    assert "Elegibilidad técnica para publicación" in md
+    assert "NO es la aprobación humana ni la publicación): sí" in md
+    assert "Versión del modelo fundamental usada en esta corrida: `7`" in md
+    assert "NO acredita persistencia duradera" in md
+    assert "Estado del análisis del modelo fundamental (no es el estado de esta tesis): `complete`" in md
+    md_fail = _render({"publishable": True}, audit_fail, {})
+    assert "ESTA corrida" in md_fail and "no superada" in md_fail
+    assert "NO es la aprobación humana ni la publicación): no" in md_fail
