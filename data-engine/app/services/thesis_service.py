@@ -2083,7 +2083,7 @@ Recompras, dilución y dividendos se consultan en las pestañas «Dilución y re
 {self._valuation_markdown(valuation, excluded_present=excluded_present)}
 
 ### Motor fundamental de largo plazo
-Versión persistida del modelo: `{(long_term_model.get("persistence") or {}).get("version")}`.
+Versión persistida del modelo fundamental: `{(long_term_model.get("persistence") or {}).get("version")}` (versionado propio del motor, independiente del número de versión de esta tesis).
 Estado del modelo: `{long_term_model.get("status")}`. Veredicto de oportunidad de mercado: `{(market_opportunity.get("verdict") or {}).get("label", "unknown")}`.
 
 ## 14. DCF inverso
@@ -2103,7 +2103,8 @@ Invalidadores estructurales: afirmaciones sin respaldo, trazas de cálculo ausen
 {", ".join(company.special_sources) or "Sin fuentes específicas registradas para esta empresa; ver la sección 20."}
 
 ## 19. Auditoría de fuentes
-Superada: {"sí" if audit["passed"] else "no"}
+Trazabilidad de los claims y cálculos de ESTA corrida (cada afirmación material con su fuente registrada; no verifica la veracidad de las fuentes): {"superada" if audit["passed"] else "no superada"}.
+Aprobación para publicación (trazabilidad superada y valoración publicable; no es intercambiable con la trazabilidad): {"sí" if audit["passed"] and valuation.get("publishable") else "no"}.
 Cobertura de fuentes: {audit["source_coverage_score"]} %
 Afirmaciones sin respaldo: {len(audit["unsupported_claims"] or [])}
 
