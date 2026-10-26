@@ -19,6 +19,20 @@ MAX_CHARS = 60000
 _LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _FENCE = re.compile(r"```.*?```", re.S)
 
+# Aviso legal hablado: el memo lo cierra siempre y el audio no puede perderlo
+# por el corte de MAX_CHARS.
+_DISCLAIMER_SPOKEN = (
+    "Documento informativo de investigación. "
+    "No es asesoramiento financiero ni recomendación de compra o venta."
+)
+# Linea EXACTA con la que build_memo_markdown cierra el memo. Acoplamiento
+# deliberado: si el memo cambia su redaccion, el audio simplemente anade el
+# aviso hablado propio (nunca se queda sin aviso).
+_DISCLAIMER_MEMO_LINE = (
+    "Documento informativo de investigación. "
+    "NO es asesoramiento financiero ni recomendación de compra o venta."
+)
+
 
 def memo_to_speech_text(markdown: str, *, ticker: str, version: int) -> str:
     """Markdown del memo -> parrafos hablables (sin sintaxis ni tablas)."""
@@ -36,10 +50,37 @@ def memo_to_speech_text(markdown: str, *, ticker: str, version: int) -> str:
         if len(line) >= 2:
             lines.append(line)
     head = f"Tesis de {ticker.upper()}, versión {version}."
-    return ("\n".join([head, *lines]))[:MAX_CHARS]
+    text = "\n".join([head, *lines])
+    if len(text) <= MAX_CHARS:
+        return text
+    # Corte en borde de palabra (no a media palabra) y el aviso legal siempre
+    # al final: un audio truncado sin él leería la tesis sin la advertencia.
+    budget = MAX_CHARS - len(_DISCLAIMER_SPOKEN) - 1
+    cut = text[:budget]
+    last_space = cut.rfind(" ")
+    if last_space > 0:
+        cut = cut[:last_space]
+    cut = cut.rstrip()
+    if cut.endswith(_DISCLAIMER_MEMO_LINE):
+        # El aviso propio del memo sobrevivio ENTERO como cierre: no se duplica.
+        return cut
+    # Un aviso se reconoce como SUFIJO completo, nunca como dos subfrases en
+    # cualquier parte del cuerpo: una cita del cuerpo que las mencione no
+    # sustituye al aviso final.
+    idx = cut.rfind("Documento informativo")
+    if idx != -1:
+        tail = cut[idx:]
+        if _DISCLAIMER_MEMO_LINE.startswith(tail):
+            # Resto PARCIAL del aviso real al final («...investigación. NO»
+            # suelto): es un prefijo de la linea del aviso. Fuera; «Documento»
+            # va tras un espacio, el nuevo corte tambien queda en borde de
+            # palabra. Una cita del cuerpo NO es prefijo de la linea y se
+            # conserva como contenido.
+            cut = cut[:idx].rstrip()
+    return f"{cut} {_DISCLAIMER_SPOKEN}"
 
 
-_FORMAT = "f2"  # subir al cambiar memo_to_speech_text para invalidar la cache
+_FORMAT = "f3"  # subir al cambiar memo_to_speech_text para invalidar la cache
 
 
 def audio_key(
