@@ -16,6 +16,7 @@ from app.models.entities import (
     Claim,
     ClaimEvidence,
     Company,
+    SourceAudit,
     ThesisSection,
     ThesisVersion,
 )
@@ -205,3 +206,60 @@ def test_draft_memo_is_a_whitelist_without_verdict_or_figures(db):
     assert "## Criterios de invalidación" in memo
     assert "Confianza de datos 82/100" in memo
     assert memo.rstrip().endswith("ni recomendación de compra o venta.")
+
+
+def test_published_memo_includes_full_analysis_without_approval_section_or_duplicates(db):
+    company = _company(db)
+    thesis = ThesisVersion(
+        company_id=company.id, version=3, status="published", rating="seguimiento",
+        thesis_markdown=(
+            "# Tesis de AAPL — v3\n\n## 4. Últimos resultados\n| Métrica | Valor |\n| --- | --- |\n"
+            "| Ingresos | 200 mil M |\n\n### Contexto documental recuperado\nFragmento citado."
+        ),
+        hypothesis="Mismo texto.", executive_summary="Mismo texto.",
+    )
+    db.add(thesis)
+    db.flush()
+    db.add(ThesisSection(thesis_version_id=thesis.id, company_id=company.id, section_key="approval", title="Aprobación Telegram", body="approved", order_index=900))
+    db.commit()
+
+    memo = build_memo_markdown(db, company, thesis)
+
+    assert "## Análisis completo" in memo
+    assert "### 4. Últimos resultados" in memo
+    assert "| Ingresos | 200 mil M |" in memo
+    assert "**Contexto documental recuperado**" in memo
+    assert "# Tesis de AAPL" not in memo
+    assert memo.count("Mismo texto.") == 1
+    assert "## Hipótesis y resumen ejecutivo" in memo
+    assert "Aprobación Telegram" not in memo
+    assert "## Secciones" not in memo
+
+
+def test_unpublishable_valuation_gets_visible_indicative_banner_and_rag_is_trimmed(db):
+    company = _company(db)
+    long_extract = (
+        "Extracto documental (no verificado): Doc. Fuente: URL no disponible. Documento 1: " + "x" * 900
+        + "\nExtracto documental (no verificado): Doc. Fuente: URL no disponible. Documento 2: " + "y" * 900
+    )
+    thesis = ThesisVersion(
+        company_id=company.id, version=4, status="published", rating="seguimiento",
+        thesis_markdown="# t\n\n## 23. Contexto\n" + long_extract,
+        hypothesis="H.", executive_summary="S.",
+    )
+    db.add(thesis)
+    db.flush()
+    db.add(SourceAudit(
+        thesis_version_id=thesis.id, passed=False,
+        required_fixes=["Faltan entradas de valoración (variables del modelo): churn"],
+    ))
+    db.commit()
+
+    memo = build_memo_markdown(db, company, thesis)
+
+    assert "auditoría de fuentes de esta versión NO pasó" in memo
+    assert "churn" in memo
+    assert "texto del extracto omitido" in memo
+    assert "Doc. Fuente: URL no disponible." in memo
+    assert "x" * 50 not in memo
+    assert memo.count("Doc. Fuente") == 1

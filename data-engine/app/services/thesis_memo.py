@@ -8,14 +8,48 @@ financiero.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
-from app.models import Claim, ClaimEvidence, Company, ThesisSection, ThesisVersion
+from app.models import Claim, ClaimEvidence, Company, SourceAudit, ThesisSection, ThesisVersion
 from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, percent_es
+from app.services.thesis_approval_service import APPROVAL_SECTION_TITLE
+
+
+def _full_analysis_lines(markdown: str) -> list[str]:
+    """Cuerpo del análisis persistido (thesis_markdown) listo para el memo.
+
+    Se quita el título propio y se baja un nivel cada encabezado para que cuelgue
+    de «Análisis completo». Es el mismo texto que ve la ficha: no se reescribe ni
+    se rellena nada.
+    """
+    out: list[str] = []
+    seen_refs: set[str] = set()
+    for raw in markdown.splitlines():
+        line = raw.rstrip()
+        if line.startswith("# "):
+            continue
+        if line.startswith("Doctrina de inversión") or line.startswith("Extracto documental"):
+            # Contexto recuperado (biblioteca o documentos): solo la referencia
+            # (título y fuente), nunca el texto del fragmento en un documento exportable.
+            ref = re.split(r"\s(?:Biblioteca|Documento)\s\d+:", line, maxsplit=1)[0].rstrip()
+            if ref in seen_refs:
+                continue
+            seen_refs.add(ref)
+            line = f"- {ref} [texto del extracto omitido; consultar en la ficha]"
+            out.append(line)
+            continue
+        if line.startswith("### "):
+            out.append(f"**{line[4:]}**")
+        elif line.startswith("## "):
+            out.append(f"### {line[3:]}")
+        else:
+            out.append(line)
+    return out
 
 
 def _money(value) -> str:
@@ -72,8 +106,27 @@ def build_memo_markdown(
     )
     if stale:
         when = f"{latest_data_at:%Y-%m-%d}" if latest_data_at else "desconocida"
-        lines.append(f"\n> ⚠ Tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).")
+        lines.append(f"\n> AVISO: tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).")
     lines.append("")
+
+    if not draft:
+        audit = db.scalars(
+            select(SourceAudit)
+            .where(SourceAudit.thesis_version_id == thesis.id, *tenant_filters(db, SourceAudit))
+            .order_by(SourceAudit.id.desc())
+            .limit(1)
+        ).first()
+        if audit is not None and not audit.passed:
+            lines.append(
+                "> AVISO: la auditoría de fuentes de esta versión NO pasó. La valoración puede estar "
+                "incompleta y es solo indicativa, no un veredicto. Correcciones pendientes de la auditoría:"
+            )
+            for fix in (audit.required_fixes or [])[:5]:
+                lines.append(f"> - {fix}")
+            lines.append("")
+        elif audit is None:
+            lines.append("> Sin auditoría de fuentes registrada para esta versión.")
+            lines.append("")
 
     if draft:
         lines.append(
@@ -82,13 +135,22 @@ def build_memo_markdown(
         )
         lines.append("")
     else:
-        lines.append("## Hipótesis")
-        lines.append(thesis.hypothesis or "_Pendiente._")
-        lines.append("")
+        same_text = bool(thesis.hypothesis) and (thesis.hypothesis or "").strip() == (
+            thesis.executive_summary or ""
+        ).strip()
+        if same_text:
+            # Hipótesis y resumen idénticos: se dice una vez, no dos.
+            lines.append("## Hipótesis y resumen ejecutivo")
+            lines.append(thesis.executive_summary or "_Pendiente._")
+            lines.append("")
+        else:
+            lines.append("## Hipótesis")
+            lines.append(thesis.hypothesis or "_Pendiente._")
+            lines.append("")
 
-        lines.append("## Resumen ejecutivo")
-        lines.append(thesis.executive_summary or "_Pendiente._")
-        lines.append("")
+            lines.append("## Resumen ejecutivo")
+            lines.append(thesis.executive_summary or "_Pendiente._")
+            lines.append("")
 
         lines.append("## Valoración y escenarios")
         lines.append("| Escenario | Valor | Probabilidad |")
@@ -135,12 +197,25 @@ def build_memo_markdown(
     lines.append("")
 
     if not draft:
+        # La aprobación por Telegram es un registro operativo, no análisis.
+        sections = [sec for sec in sections if sec.title != APPROVAL_SECTION_TITLE]
         if sections:
             lines.append("## Secciones")
             for section in sections:
                 lines.append(f"### {section.title}")
                 lines.append(section.body or "_Pendiente._")
                 lines.append("")
+
+        analysis = _full_analysis_lines(thesis.thesis_markdown or "")
+        if any(item.strip() for item in analysis):
+            lines.append("## Análisis completo")
+            lines.append(
+                "Texto de la tesis persistida (misma versión que la ficha). Descriptivo: no "
+                "garantiza que cifras, fuentes o inferencias estén validadas."
+            )
+            lines.append("")
+            lines.extend(analysis)
+            lines.append("")
 
         if evidence_rows:
             lines.append("## Fuentes")
