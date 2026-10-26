@@ -64,7 +64,7 @@ def test_documents_ordered_by_publication_date_nulls_last():
         db.commit()
 
         rows = documents(
-            ticker=None, include_chunks=False, page=1, page_size=50,
+            ticker=None, scope="all", include_chunks=False, page=1, page_size=50,
             chunk_limit=1000, chunk_text_limit=1500, db=db,
         )
 

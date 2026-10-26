@@ -937,8 +937,10 @@ export async function getResearchDocumentsWorkspace(
   includeChunks = false,
 ) {
   const encoded = encodeURIComponent(ticker.toUpperCase());
+  // La ficha de una empresa debe listar SUS documentos aunque no este en
+  // cartera/watchlist: el default `followed` es solo para el inventario global.
   return getJson<ResearchSourceDocument[]>(
-    `/api/sources/documents?ticker=${encoded}&include_chunks=${includeChunks ? 'true' : 'false'}`,
+    `/api/sources/documents?ticker=${encoded}&scope=all&include_chunks=${includeChunks ? 'true' : 'false'}`,
     [],
   );
 }
@@ -1045,23 +1047,43 @@ export async function askResearchCompanyChat(
   );
 }
 
-export async function getResearchSources(options: { ticker?: string; page?: number } = {}) {
+export type ResearchSourcesScope = 'followed' | 'all';
+
+export type ResearchSourcesOptions = {
+  ticker?: string;
+  page?: number;
+  /** `followed` (default del backend) = cartera + watchlist del tenant. */
+  scope?: ResearchSourcesScope;
+  /** Valor exacto del catalogo de tipos (`sec`, `manual_upload`, ...). */
+  sourceType?: string;
+  /** Busqueda ILIKE en el titulo; el backend la acota a 120 caracteres. */
+  q?: string;
+};
+
+export async function getResearchSources(options: ResearchSourcesOptions = {}) {
   // La lista de documentos pagina (50): el total real viene de /count para
   // no presentar el tamano de pagina como si fuera el inventario (F131).
   // Si /count no responde (backend antiguo), el total es DESCONOCIDO (null):
   // mostrar 0 con la tabla poblada seria falso (F154).
-  // El filtro por ticker se pasa a AMBOS endpoints: el total y la pagina
-  // deben hablar del mismo subconjunto. La pagina se acota con el total:
-  // una pagina fuera de rango cae en la ultima, nunca en una vacia (F131).
-  const countQuery = options.ticker ? `?ticker=${encodeURIComponent(options.ticker)}` : '';
+  // Los filtros (ticker, alcance, tipo, busqueda) se pasan a AMBOS endpoints:
+  // el total y la pagina deben hablar del mismo subconjunto. La pagina se
+  // acota con el total: una fuera de rango cae en la ultima, nunca en vacia.
+  const filters = new URLSearchParams();
+  const ticker = options.ticker?.trim().toUpperCase();
+  if (ticker) filters.set('ticker', ticker);
+  if (options.scope) filters.set('scope', options.scope);
+  const sourceType = options.sourceType?.trim();
+  if (sourceType) filters.set('source_type', sourceType);
+  const q = options.q?.trim().slice(0, 120);
+  if (q) filters.set('q', q);
+  const countQuery = filters.size ? `?${filters.toString()}` : '';
   const documentsCount = await getJson<{ total: number } | null>(`/api/sources/documents/count${countQuery}`, null);
   const documentsTotal = documentsCount?.total ?? null;
   const requested = options.page && options.page > 0 ? Math.floor(options.page) : 1;
   // Sin total no hay forma honesta de acotar: se pide la pagina tal cual.
   const pageInfo = documentsTotal === null ? null : sourcesPageInfo(documentsTotal, requested);
   const effectivePage = pageInfo?.page ?? requested;
-  const params = new URLSearchParams();
-  if (options.ticker) params.set('ticker', options.ticker);
+  const params = new URLSearchParams(filters);
   if (effectivePage > 1) params.set('page', String(effectivePage));
   const documentsQuery = params.size ? `?${params.toString()}` : '';
   const [documents, audits] = await Promise.all([

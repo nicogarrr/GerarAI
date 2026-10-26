@@ -40,14 +40,14 @@ def test_documents_resolves_european_alias(db: Session):
     db.add(Document(company_id=company.id, title="10-K", source_type="sec"))
     db.commit()
 
-    rows = documents(ticker="SAN.MC", include_chunks=False, page=1, page_size=50,
+    rows = documents(ticker="SAN.MC", scope="all", include_chunks=False, page=1, page_size=50,
                      chunk_limit=1000, chunk_text_limit=1500, db=db)
     assert rows != []
-    assert documents_count(ticker="SAN.MC", db=db)["total"] == 1
+    assert documents_count(ticker="SAN.MC", scope="all", db=db)["total"] == 1
     # Ticker realmente desconocido: vacío, nunca un error.
-    assert documents(ticker="ZZZZ.MC", include_chunks=False, page=1, page_size=50,
+    assert documents(ticker="ZZZZ.MC", scope="all", include_chunks=False, page=1, page_size=50,
                      chunk_limit=1000, chunk_text_limit=1500, db=db) == []
-    assert documents_count(ticker="ZZZZ.MC", db=db)["total"] == 0
+    assert documents_count(ticker="ZZZZ.MC", scope="all", db=db)["total"] == 0
 
 
 def test_audits_resolves_european_alias(db: Session):

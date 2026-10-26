@@ -1,19 +1,24 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, select, union
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.core.errors import safe_detail
+from app.core.tenancy import tenant_filters
 from app.llm.errors import LLMError
 from app.models import (
     Company,
     Document,
     DocumentChunk,
     KPIExtractionCandidate,
+    Position,
     SourceAudit,
     ThesisVersion,
+    WatchItem,
 )
 from app.schemas import (
     KPIExtractionAction,
@@ -58,9 +63,54 @@ def rebuild_document_index(db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=502, detail=safe_detail(exc, 502)) from exc
 
 
+def _followed_company_ids(db: Session):
+    """Empresas del universo seguido del tenant: cartera + watchlist.
+
+    `Company` es global (no tenant-owned); la pertenencia se decide por las
+    filas `Position`/`WatchItem` del tenant. Un documento sin empresa no entra
+    en `followed`: no se puede afirmar que sea de una empresa seguida.
+    """
+    held = select(Position.company_id).where(*tenant_filters(db, Position))
+    watched = (
+        select(Company.id)
+        .join(WatchItem, WatchItem.symbol == Company.ticker)
+        .where(*tenant_filters(db, WatchItem))
+    )
+    return union(held, watched)
+
+
+def _document_filters(
+    db: Session,
+    *,
+    company: Company | None,
+    scope: str,
+    source_type: str | None,
+    q: str | None,
+) -> list:
+    """Filtros compartidos por listado y recuento: mismo subconjunto exacto."""
+    filters = []
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id is not None:
+        filters.append(Document.tenant_id == tenant_id)
+    if company is not None:
+        filters.append(Document.company_id == company.id)
+    if scope == "followed":
+        filters.append(Document.company_id.in_(_followed_company_ids(db)))
+    if source_type:
+        filters.append(Document.source_type == source_type)
+    search = (q or "").strip()
+    if search:
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        filters.append(Document.title.ilike(f"%{escaped}%", escape="\\"))
+    return filters
+
+
 @router.get("/documents")
 def documents(
     ticker: str | None = None,
+    scope: Annotated[str, Query(pattern="^(followed|all)$")] = "followed",
+    source_type: Annotated[str | None, Query(max_length=80)] = None,
+    q: Annotated[str | None, Query(max_length=120)] = None,
     include_chunks: bool = False,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
@@ -68,7 +118,7 @@ def documents(
     chunk_text_limit: int = Query(default=1500, ge=120, le=10000),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    statement = select(Document, Company).outerjoin(Company, Document.company_id == Company.id)
+    company = None
     if ticker:
         # F313: mismo criterio de identidad que /api/companies/{ticker}: el
         # alias europeo (SAN.MC -> SAN) resuelve a la empresa base; el match
@@ -76,7 +126,15 @@ def documents(
         company = resolve_company(db, ticker)
         if company is None:
             return []
-        statement = statement.where(Document.company_id == company.id)
+    statement = (
+        select(Document, Company)
+        .outerjoin(Company, Document.company_id == Company.id)
+        .where(
+            *_document_filters(
+                db, company=company, scope=scope, source_type=source_type, q=q
+            )
+        )
+    )
     statement = without_archive_duplicates(statement)
 
     # «Mas recientes» = por fecha de PUBLICACION global, no por ingesta:
@@ -135,9 +193,12 @@ def documents(
 @router.get("/documents/count")
 def documents_count(
     ticker: str | None = None,
+    scope: Annotated[str, Query(pattern="^(followed|all)$")] = "followed",
+    source_type: Annotated[str | None, Query(max_length=80)] = None,
+    q: Annotated[str | None, Query(max_length=120)] = None,
     db: Session = Depends(get_db),
 ) -> dict:
-    """Total real de documentos del tenant.
+    """Total real de documentos que cumplen los MISMOS filtros que /documents.
 
     La lista /documents pagina (50 por defecto): sin este total, la UI
     presentaba el tamano de pagina como si fuera el inventario completo
@@ -145,18 +206,22 @@ def documents_count(
     """
     # with_loader_criteria no alcanza un SELECT de agregado: el tenant se
     # filtra explicito para no contar documentos de otros tenants.
-    tenant_id = db.info.get("tenant_id")
-    statement = select(func.count()).select_from(Document).outerjoin(
-        Company, Document.company_id == Company.id
-    )
-    if tenant_id is not None:
-        statement = statement.where(Document.tenant_id == tenant_id)
+    company = None
     if ticker:
         # F313: alias europeo resuelto con la misma política que la ficha.
         company = resolve_company(db, ticker)
         if company is None:
             return {"total": 0}
-        statement = statement.where(Document.company_id == company.id)
+    statement = (
+        select(func.count())
+        .select_from(Document)
+        .outerjoin(Company, Document.company_id == Company.id)
+        .where(
+            *_document_filters(
+                db, company=company, scope=scope, source_type=source_type, q=q
+            )
+        )
+    )
     statement = without_archive_duplicates(statement)
     return {"total": int(db.execute(statement).scalar_one())}
 

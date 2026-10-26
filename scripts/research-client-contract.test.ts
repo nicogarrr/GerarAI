@@ -53,6 +53,8 @@ describe('researchRequest: timeout configurable', () => {
     assert.ok(seenSignal, 'debe enviar AbortSignal');
     assert.equal(RESEARCH_TIMEOUTS.GLOBAL_MS, 15_000);
     assert.equal(RESEARCH_TIMEOUTS.GET_FAST_MS, 8_000);
+    assert.equal(RESEARCH_TIMEOUTS.INSIDER_SCAN_MS, 30_000);
+    assert.equal(researchTimeoutFor('/api/insider/signals?ticker=MSFT', 'GET', { fast: true }), 30_000);
   });
 
   it('respeta timeout explícito y el signal externo', async () => {
