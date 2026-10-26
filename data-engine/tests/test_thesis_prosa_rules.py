@@ -10,6 +10,7 @@ import pytest
 
 from app.services.thesis_deep_narrative import (
     _URL_RE,
+    _norm_number,
     _validate_sections,
     _visible_medio,
     fact_pack,
@@ -158,3 +159,90 @@ def test_cifra_no_anclada_y_veredicto_rechazados():
     _, rule = _validate_sections(
         _parsed("Recomendamos comprar la accion en estos niveles de precio registrados."), _facts())
     assert rule == "lenguaje_veredicto"
+
+
+def test_deep_cifra_con_puntuacion_final_se_ancla() -> None:
+    """La puntuación final arrastrada por la tokenización no rompe el anclaje.
+
+    Caso run2 real: el modelo cerró una enumeración con «642.62,» y el
+    validador rechazó la narrativa pese a que 642.62 era cifra del pack.
+    """
+    pack = _facts() + [{"id": "fD", "texto": "Precio: 642.62 USD. Escenario base: 567.34 USD.",
+                        "fuente": "generica://mercado/precio"}]
+    sections, rule = _validate_sections(
+        _parsed("Base 567.34 USD; precio de referencia 642.62, según el pack."), pack)
+    assert rule is None
+
+
+def test_deep_cifra_no_anclada_con_puntuacion_final_sigue_rechazada() -> None:
+    sections, rule = _validate_sections(
+        _parsed("El precio era 999.99, cifra inventada."), _facts())
+    assert rule == "cifra_no_anclada"
+
+
+@pytest.mark.parametrize("token,esperado", [
+    # aceptadas: cifra limpia o con UNA puntuación de cierre inequívoca
+    ("642.62", "642.62"), ("642.62,", "642.62"), ("642.62.", "642.62"),
+    ("-642.62,", "-642.62"), ("22,9%", "22.9"),
+    ("1.234,56", "1234.56"), ("1.234", "1234"), ("22,9", "22.9"),
+    ("-69,69", "-69.69"), ("2,1", "2.1"), ("642", "642"), ("642.", "642"),
+    # rechazadas: separadores múltiples, % con separador interior o forma
+    # malformada (basura no se normaliza; el % cierra el token y la
+    # puntuación natural de la prosa queda fuera de él)
+    ("642.62,,", None), ("642.62.,", None), ("642,,", None),
+    ("22,9.%", None), ("22,9,%", None), ("642.62,%", None),
+    ("642.62.5", None), ("1,234.56", None), ("1,234.56,", None),
+    ("12.34.56", None), ("6.42.62", None), ("1.2.3", None),
+])
+def test_deep_normalizacion_matriz(token, esperado) -> None:
+    """Matriz completa del normalizador: signos, %, puntuación simple vs
+    múltiple y formas malformadas. «1,234.56» (en-US completo) se rechaza
+    desde antes de run2; comportamiento preexistente fuera de alcance."""
+    assert _norm_number(token) == esperado
+
+
+def test_deep_porcentaje_con_puntuacion_natural_ancla() -> None:
+    """«22,9%,» y «22,9 %.» tokenizan sin puntuación dentro del token."""
+    pack = _facts() + [{"id": "fD", "texto": "Margen FCF: 22,9 %.",
+                        "fuente": "generica://finanzas/margen"}]
+    sections, rule = _validate_sections(_parsed("El margen fue 22,9%, según el pack."), pack)
+    assert rule is None
+    sections, rule = _validate_sections(_parsed("El margen fue 22,9 %. Luego sigue."), pack)
+    assert rule is None
+
+
+def test_deep_token_malformado_no_ancla_por_prefijo() -> None:
+    """«642.62.5» tokeniza como UNA cifra malformada: no ancla aunque el pack
+    contenga 642.62 (no hay aceptación por prefijo)."""
+    pack = _facts() + [{"id": "fD", "texto": "Precio: 642.62 USD.",
+                        "fuente": "generica://mercado/precio"}]
+    sections, rule = _validate_sections(_parsed("El valor 642.62.5 puntos."), pack)
+    assert rule == "cifra_no_anclada"
+
+
+def test_news_ordinales_retoricos_siguen_rechazados_por_diseno() -> None:
+    """Run2: «efectos de segundo orden» / «Un segundo riesgo» dispararon
+    cantidad_en_prosa_llm. No es falso positivo léxico (como «un tercero»
+    sustantivo): la prohibición ordinal es regla de diseño. El validador se
+    mantiene; la composición se guía desde el prompt.
+    """
+    raw = _news_raw(PROSA)
+    raw["implicaciones"] = {
+        "texto": "El desplome en otro valor sugiere efectos de segundo orden.",
+        "evidence_ids": ["news:1"],
+    }
+    raw["riesgos"] = {
+        "texto": "Un segundo riesgo es la lectura editorial de los titulares.",
+        "evidence_ids": ["news:2"],
+    }
+    with pytest.raises(ValueError, match="cantidad_en_prosa_llm"):
+        validate_output(raw, _headlines())
+
+
+def test_news_prompt_guia_ordinales() -> None:
+    from app.services.thesis_news_narrative import build_request
+    req = build_request("META", [{"id": "n1", "headline": "H", "source": "S", "url": "https://x", "snippet": None}])
+    assert req.messages[0].role == "system"
+    prompt = req.messages[0].content
+    assert "efectos indirectos" in prompt
+    assert "un riesgo adicional" in prompt
