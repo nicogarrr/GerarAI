@@ -42,10 +42,14 @@ _WORD_NUMBER = re.compile(
     r"sesenta|setenta|ochenta|noventa|cien|ciento|\w+cient[oa]s|mil|millar(?:es)?|millones?|billones?|"
     r"trillones?|mitad|doble|triple|cuádruple|cuatrocient[oa]s?|quinient[oa]s?|"
     r"seiscient[oa]s?|setecient[oa]s?|ochocient[oa]s?|novecient[oa]s?|por ciento|"
-    r"primero|segundo|tercero|cuarto|quinto|sexto|séptimo|octavo|noveno|décimo|"
+    r"primero|segundo|tercero|tercer|cuarto|quinto|sexto|séptimo|octavo|noveno|décimo|"
     r"centésimo|mitades|tercios|cuartos|cientos|miles|decenas?|docenas?|"
     r"centenas?|centenares|centenar|millares|billón|millón|trillón)\b", re.IGNORECASE,
 )
+# «un tercero» como sustantivo (un tercero ajeno), sin complemento partitivo,
+# no expresa cantidad. «un tercero de los ingresos» (partitivo), «el tercero»
+# o «del segundo al tercero» (orden) siguen rechazándose.
+_TERCERO_NOMINAL_RE = re.compile(r"\bun\s+(tercero)\b(?!\s+de[l]?\b)", re.IGNORECASE)
 _URL = re.compile(
     r"(?:[a-z][a-z0-9+.-]*://|www\.)[^\s<>\"'\[\]()]+|"
     r"\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:/[^\s<>\"'\[\]()]*)?", re.IGNORECASE,
@@ -220,7 +224,15 @@ def validate_output(raw: dict, headlines: list[dict]) -> list[dict]:
             raise ValueError("url_en_prosa_llm")
         # Artículos 'un/una/uno' no expresan por sí solos una cifra. El resto
         # de cantidades reconocibles se rechaza aunque exista en el titular.
-        quantities = {word.lower() for word in _WORD_NUMBER.findall(text)} - {"un", "una", "uno"}
+        nominal_spans = [m.span(1) for m in _TERCERO_NOMINAL_RE.finditer(text)]
+        quantities = set()
+        for match in _WORD_NUMBER.finditer(text):
+            word = match.group(0).lower()
+            if word in {"un", "una", "uno"}:
+                continue
+            if word == "tercero" and any(match.span() == span for span in nominal_spans):
+                continue
+            quantities.add(word)
         if quantities:
             raise ValueError("cantidad_en_prosa_llm")
         citations = [
