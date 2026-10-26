@@ -159,8 +159,8 @@ export default function PortfolioDividends({ projection, userId }: { projection:
     return (
         <div className="space-y-6">
             {userId ? <div className="flex justify-end"><SyncDividendsButton userId={userId} /></div> : null}
-            {/* Sin badge INFERIDO/INGESTADO: lo inferido no se etiqueta (decisión de producto);
-                la procedencia se explica en «Supuestos fiscales y fuentes» y en el aviso junto al bruto. */}
+            {/* Sin badge INFERIDO/INGESTADO en cada tarjeta: la procedencia se explica
+                en «Supuestos fiscales y fuentes» y en el aviso junto al bruto. */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                 <span>
                     Proyección a {projection.horizon_months} meses · datos al {formatDate(projection.as_of)}
