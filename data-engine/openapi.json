@@ -2703,6 +2703,47 @@
         "title": "DeleteAccountRequest",
         "type": "object"
       },
+      "DeleteAccountResponse": {
+        "properties": {
+          "already_deleted": {
+            "title": "Already Deleted",
+            "type": "boolean"
+          },
+          "external_objects_removed": {
+            "default": 0,
+            "title": "External Objects Removed",
+            "type": "integer"
+          },
+          "knowledge_vector_collections_cleared": {
+            "default": 0,
+            "title": "Knowledge Vector Collections Cleared",
+            "type": "integer"
+          },
+          "llm_cache_entries_purged": {
+            "default": 0,
+            "title": "Llm Cache Entries Purged",
+            "type": "integer"
+          },
+          "status": {
+            "const": "deleted",
+            "title": "Status",
+            "type": "string"
+          },
+          "tables": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Tables",
+            "type": "object"
+          }
+        },
+        "required": [
+          "status",
+          "already_deleted"
+        ],
+        "title": "DeleteAccountResponse",
+        "type": "object"
+      },
       "DiscoveriesOut": {
         "properties": {
           "has_more": {
@@ -6212,6 +6253,50 @@
           }
         },
         "title": "PrincipleRevision",
+        "type": "object"
+      },
+      "PrivacyErrorResponse": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "PrivacyErrorResponse",
+        "type": "object"
+      },
+      "PrivacyExportResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "profile": {
+            "additionalProperties": true,
+            "title": "Profile",
+            "type": "object"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "title": "Settings",
+            "type": "object"
+          }
+        },
+        "required": [
+          "schema_version",
+          "generated_at",
+          "profile",
+          "settings"
+        ],
+        "title": "PrivacyExportResponse",
         "type": "object"
       },
       "ProPickCandidateOut": {
@@ -46583,7 +46668,7 @@
     },
     "/api/privacy/account": {
       "delete": {
-        "description": "Borra todos los datos del tenant firmado.\n\nEl 200 solo se devuelve despues de limpiar Postgres y el almacen/indice\nexterno. Un fallo externo devuelve 502 y no elimina filas: se puede\nreintentar.",
+        "description": "Borra todos los datos del tenant firmado.\n\nEl 200 solo se devuelve despues de limpiar Postgres y el almacen/indice\nexterno. Un fallo externo devuelve 502 y no elimina filas: se puede\nreintentar. La fila del tenant queda como tombstone ``deleted``.",
         "operationId": "delete_account_api_privacy_account_delete",
         "parameters": [
           {
@@ -46730,13 +46815,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Account Api Privacy Account Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DeleteAccountResponse"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponse"
+                }
+              }
+            },
+            "description": "Confirmaci\u00f3n no v\u00e1lida"
           },
           "422": {
             "content": {
@@ -46747,6 +46840,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponse"
+                }
+              }
+            },
+            "description": "Borrado incompleto o no confirmado"
           }
         },
         "summary": "Delete Account",
@@ -46757,7 +46860,7 @@
     },
     "/api/privacy/export": {
       "get": {
-        "description": "JSON completo del tenant firmado: perfil, cartera, tesis, alertas y\nconocimiento. No incluye secretos ni identificadores de otros tenants.",
+        "description": "JSON completo del tenant firmado: perfil, cartera, tesis, alertas,\nconocimiento, paper trading y telemetr\u00eda del tenant. No incluye secretos\nni identificadores de otros tenants.",
         "operationId": "export_account_api_privacy_export_get",
         "parameters": [
           {
@@ -46894,9 +46997,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Export Account Api Privacy Export Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PrivacyExportResponse"
                 }
               }
             },
@@ -46911,6 +47012,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponse"
+                }
+              }
+            },
+            "description": "Exportaci\u00f3n no disponible"
           }
         },
         "summary": "Export Account",

@@ -621,6 +621,69 @@ class LLMResponseCache:
             logger.debug("llm response cache close failed", exc_info=True)
 
 
+def _deployment_id(settings: Settings) -> str:
+    # Namespace por despliegue: mismo host + mismo proveedor, misma cache;
+    # cualquier otra combinacion, namespace distinto.
+    return hashlib.sha256(
+        f"{settings.opencode_go_base_url}|opencode-go".encode()
+    ).hexdigest()[:8]
+
+
+def _cache_namespace(settings: Settings) -> str:
+    return f"{KEY_PREFIX}:{_deployment_id(settings)}"
+
+
+def purge_llm_response_cache(
+    settings: Settings | None = None,
+    *,
+    tenant_id: str | None = None,
+    redis_factory=None,
+) -> int:
+    """Invalida la cache de respuestas LLM tras borrar una cuenta.
+
+    La clave es un hash del sobre con el tenant dentro: el valor no guarda el
+    tenant y dos tenants pueden compartir namespace. Por eso no se puede
+    atribuir una entrada a un tenant sin cambiar el formato de clave. Un
+    borrado de cuenta es infrecuente y la cache es solo aceleracion, asi que
+    se invalida el namespace completo (nunca sirve datos de la cuenta borrada)
+    en lugar de dejar residuo no atribuible.
+    """
+    resolved = settings or get_settings()
+    config = load_cache_settings(resolved)
+    if not config.enabled:
+        return 0
+    namespace = _cache_namespace(resolved)
+    import redis as redis_sync
+
+    from app.core.redis_retry import no_retry
+
+    client = (
+        redis_factory()
+        if redis_factory is not None
+        else redis_sync.from_url(
+            resolved.redis_url,
+            socket_connect_timeout=config.redis_connect_timeout,
+            socket_timeout=config.redis_socket_timeout,
+            retry=no_retry(),
+        )
+    )
+    try:
+        keys = list(client.scan_iter(match=f"{namespace}:e:*", count=500))
+        deleted = int(client.delete(*keys)) if keys else 0
+        client.delete(f"{namespace}:index")
+        logger.info(
+            "llm response cache purged tenant=%s entries=%s", tenant_id, deleted
+        )
+        return deleted
+    finally:
+        closer = getattr(client, "close", None)
+        if closer is not None:
+            try:
+                closer()
+            except Exception:  # noqa: BLE001 - cerrar nunca rompe el borrado
+                logger.debug("llm response cache purge close failed", exc_info=True)
+
+
 def build_response_cache(
     settings: Settings | None = None, *, redis_factory=None
 ) -> LLMResponseCache | None:
@@ -629,11 +692,7 @@ def build_response_cache(
     config = load_cache_settings(resolved)
     if not config.enabled:
         return None
-    # Namespace por despliegue: mismo host + mismo proveedor, misma cache;
-    # cualquier otra combinacion, namespace distinto.
-    deployment = hashlib.sha256(
-        f"{resolved.opencode_go_base_url}|opencode-go".encode()
-    ).hexdigest()[:8]
+    deployment = _deployment_id(resolved)
     return LLMResponseCache(
         ttl_seconds=config.ttl_seconds,
         max_entries=config.max_entries,

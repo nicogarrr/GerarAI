@@ -8,6 +8,7 @@ import logging
 import re
 import time
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import select
 
@@ -557,9 +558,7 @@ _ES_AMOUNT = re.compile(
 )
 
 
-def _amounts(text: str, lang: str) -> tuple[list[tuple[str, int | float]], str] | None:
-    from decimal import Decimal
-
+def _amounts(text: str, lang: str) -> tuple[list[tuple[str, Decimal]], str] | None:
     found: list[tuple[str, Decimal]] = []
 
     def take(sym: str, num: str, mult: int, decimal_comma: bool) -> str:

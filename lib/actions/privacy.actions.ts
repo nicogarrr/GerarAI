@@ -3,9 +3,16 @@
 import { headers } from 'next/headers';
 
 import { getAuth } from '@/lib/better-auth/auth';
+import { callAuthEndpoint } from '@/lib/auth/endpoint';
+import {
+    DELETE_REAUTH_HEADER,
+    createDeleteReauthToken,
+} from '@/lib/auth/delete-reauth';
+import { deleteAuthAccountResidue } from '@/lib/better-auth/account-residue';
 import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { connectToDatabase } from '@/database/mongoose';
+import { env } from '@/lib/env';
 import { AccessRequest } from '@/database/models/access-request.model';
 import {
     ManualDemoAccount,
@@ -144,12 +151,8 @@ export async function deleteAccount(input: {
         return { success: false, message: 'Introduce tu contraseña para reautenticarte.' };
     }
 
-    const auth = await getAuth();
     try {
-        await auth.api.verifyPassword({
-            body: { password: input.password },
-            headers: await headers(),
-        });
+        await callAuthEndpoint('/verify-password', { password: input.password });
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('Account deletion reauth failed:', appError.code);
@@ -157,7 +160,7 @@ export async function deleteAccount(input: {
             success: false,
             message: appError.statusCode === 429
                 ? 'Demasiados intentos. Espera un momento antes de volver a intentarlo.'
-                : appError.statusCode === 400
+                : appError.statusCode === 400 || appError.statusCode === 401
                     ? 'Contraseña incorrecta. No se ha borrado nada.'
                     : 'No se pudo verificar la sesión. No se ha borrado nada; inténtalo de nuevo.',
         };
@@ -222,10 +225,15 @@ export async function deleteAccount(input: {
     }
 
     try {
-        await auth.api.deleteUser({
-            body: { password: input.password },
-            headers: await headers(),
-        });
+        const reauthToken = createDeleteReauthToken(
+            user.id,
+            env.BETTER_AUTH_SECRET,
+        );
+        await callAuthEndpoint(
+            '/delete-user',
+            { password: input.password },
+            { [DELETE_REAUTH_HEADER]: reauthToken },
+        );
     } catch (error: unknown) {
         console.error('Better Auth user deletion failed:', toAppError(error).code);
         return {
@@ -233,6 +241,23 @@ export async function deleteAccount(input: {
             message:
                 'Tus datos de investigación se han borrado, pero la cuenta de acceso sigue '
                 + 'activa. Vuelve a intentarlo para cerrarla definitivamente.',
+        };
+    }
+
+    try {
+        const mongoose = await connectToDatabase();
+        const db = mongoose?.connection?.db;
+        if (!db) {
+            throw new Error('MongoDB is required to clean account residue');
+        }
+        await deleteAuthAccountResidue(db, user);
+    } catch (error: unknown) {
+        console.error('Mongo auth residue cleanup failed:', toAppError(error).code);
+        return {
+            success: false,
+            message:
+                'La cuenta de acceso se ha cerrado, pero no se pudieron borrar todos '
+                + 'los datos de doble factor. Contacta con soporte para completar la limpieza.',
         };
     }
 

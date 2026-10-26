@@ -3630,7 +3630,7 @@ export interface paths {
          *
          *     El 200 solo se devuelve despues de limpiar Postgres y el almacen/indice
          *     externo. Un fallo externo devuelve 502 y no elimina filas: se puede
-         *     reintentar.
+         *     reintentar. La fila del tenant queda como tombstone ``deleted``.
          */
         delete: operations["delete_account_api_privacy_account_delete"];
         options?: never;
@@ -3647,8 +3647,9 @@ export interface paths {
         };
         /**
          * Export Account
-         * @description JSON completo del tenant firmado: perfil, cartera, tesis, alertas y
-         *     conocimiento. No incluye secretos ni identificadores de otros tenants.
+         * @description JSON completo del tenant firmado: perfil, cartera, tesis, alertas,
+         *     conocimiento, paper trading y telemetría del tenant. No incluye secretos
+         *     ni identificadores de otros tenants.
          */
         get: operations["export_account_api_privacy_export_get"];
         put?: never;
@@ -6052,6 +6053,35 @@ export interface components {
             /** Confirmation */
             confirmation: string;
         };
+        /** DeleteAccountResponse */
+        DeleteAccountResponse: {
+            /** Already Deleted */
+            already_deleted: boolean;
+            /**
+             * External Objects Removed
+             * @default 0
+             */
+            external_objects_removed: number;
+            /**
+             * Knowledge Vector Collections Cleared
+             * @default 0
+             */
+            knowledge_vector_collections_cleared: number;
+            /**
+             * Llm Cache Entries Purged
+             * @default 0
+             */
+            llm_cache_entries_purged: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "deleted";
+            /** Tables */
+            tables?: {
+                [key: string]: number;
+            };
+        };
         /** DiscoveriesOut */
         DiscoveriesOut: {
             /** Has More */
@@ -7202,6 +7232,28 @@ export interface components {
             page_number?: number | null;
             /** Principle */
             principle?: string | null;
+        };
+        /** PrivacyErrorResponse */
+        PrivacyErrorResponse: {
+            /** Detail */
+            detail: string;
+        };
+        /** PrivacyExportResponse */
+        PrivacyExportResponse: {
+            /** Generated At */
+            generated_at: string;
+            /** Profile */
+            profile: {
+                [key: string]: unknown;
+            };
+            /** Schema Version */
+            schema_version: number;
+            /** Settings */
+            settings: {
+                [key: string]: unknown;
+            };
+        } & {
+            [key: string]: unknown;
         };
         /** ProPickCandidateOut */
         ProPickCandidateOut: {
@@ -17233,9 +17285,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DeleteAccountResponse"];
+                };
+            };
+            /** @description Confirmación no válida */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -17245,6 +17304,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Borrado incompleto o no confirmado */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyErrorResponse"];
                 };
             };
         };
@@ -17273,9 +17341,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PrivacyExportResponse"];
                 };
             };
             /** @description Validation Error */
@@ -17285,6 +17351,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Exportación no disponible */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyErrorResponse"];
                 };
             };
         };

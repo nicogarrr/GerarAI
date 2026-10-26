@@ -4,7 +4,15 @@ import { parseSetCookieHeader, toCookieOptions } from 'better-auth/cookies';
 import { getAuth } from '@/lib/better-auth/auth';
 import { AppError } from '@/lib/types/errors';
 
-type AuthEndpoint = '/sign-in/email' | '/sign-up/email' | '/two-factor/verify-totp';
+type AuthEndpoint =
+    | '/sign-in/email'
+    | '/sign-up/email'
+    | '/two-factor/verify-totp'
+    | '/request-password-reset'
+    | '/reset-password'
+    | '/change-password'
+    | '/verify-password'
+    | '/delete-user';
 
 /** Use the official HTTP pipeline, including its existing rate limits/CSRF.
  * Unlike direct auth.api calls, router calls do not run nextCookies' bridge,
@@ -12,7 +20,11 @@ type AuthEndpoint = '/sign-in/email' | '/sign-up/email' | '/two-factor/verify-to
  * No custom IP trust, rate policy or persistent storage is introduced here.
  * Existing memory rate limits remain per process, not global across replicas.
  */
-export async function callAuthEndpoint(path: AuthEndpoint, body: unknown): Promise<{ twoFactorRedirect?: boolean }> {
+export async function callAuthEndpoint(
+    path: AuthEndpoint,
+    body: unknown,
+    extraHeaders: Record<string, string> = {},
+): Promise<{ twoFactorRedirect?: boolean }> {
     const auth = await getAuth();
     const context = await auth.$context;
     const incoming = await headers();
@@ -25,6 +37,9 @@ export async function callAuthEndpoint(path: AuthEndpoint, body: unknown): Promi
         if (value !== null) forwarded.set(name, value);
     }
     forwarded.set('content-type', 'application/json');
+    for (const [name, value] of Object.entries(extraHeaders)) {
+        forwarded.set(name, value);
+    }
     let response: Response;
     try {
         response = await auth.handler(new Request(`${context.baseURL.replace(/\/$/, '')}${path}`, {
