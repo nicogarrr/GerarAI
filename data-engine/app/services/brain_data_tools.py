@@ -41,7 +41,7 @@ def _money(value, currency) -> str:
 
 from app.services.display_es import fecha_es as _fecha_es
 from app.services.display_es import source_label as _source_label
-from app.services.dividend_records import resolve_yahoo_events, split_ratios_for
+from app.services.dividend_records import resolve_yahoo_events
 
 
 def _link(company: Company, view: str = "financials") -> str:
@@ -116,7 +116,7 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     if company is not None:
         kept, uncertain = resolve_yahoo_events(db.scalars(select(DividendRecord).where(
             DividendRecord.company_id == company.id, DividendRecord.tenant_id == tenant,
-        ).order_by(DividendRecord.ex_date.desc()).limit(40)).all(), split_ratios_for(db, [company.id]))
+        ).order_by(DividendRecord.ex_date.desc()).limit(40)).all())
         records = sorted(kept, key=lambda r: r.ex_date, reverse=True)
         sources = [_source("dividend_record", r.id, f"Dividendo {company.ticker} · {r.ex_date}", _link(company)) for r in records[:1]]
         upcoming = sorted((r for r in records if r.ex_date >= today), key=lambda r: r.ex_date)
@@ -149,7 +149,7 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
         kept, uncertain = resolve_yahoo_events(db.scalars(select(DividendRecord).where(
             DividendRecord.company_id == comp.id, DividendRecord.tenant_id == tenant,
             DividendRecord.ex_date >= date(today.year, 1, 1), DividendRecord.ex_date <= date(today.year, 12, 31),
-        ).order_by(DividendRecord.ex_date)).all(), split_ratios_for(db, [comp.id]))
+        ).order_by(DividendRecord.ex_date)).all())
         if uncertain:
             uncertain_tickers.append(comp.ticker)
             continue

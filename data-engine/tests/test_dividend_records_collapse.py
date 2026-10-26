@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.models.entities import CorporateAction, DividendRecord
 from app.services.dividend_ingestion_service import DividendIngestionService
-from app.services.dividend_records import resolve_yahoo_events, split_ratios_for
+from app.services.dividend_records import resolve_yahoo_events
 from tests.test_dividend_ingestion import FakeFMP, FakeYahoo, _company, _position, db  # noqa: F401
 
 
@@ -33,16 +33,32 @@ def _yields(db):
     return DividendIngestionService(fmp=FakeFMP(), yahoo=FakeYahoo()).portfolio_yields(db)["positions"][0]
 
 
-def test_split_readjustment_with_split_evidence_keeps_latest_only(db):
+def test_split_ratio_coincidence_is_not_event_identity_stays_uncertain(db):
+    """0.77 -> 0.1925 coincide con un 4:1, pero tambien podria ser ordinario + especial
+    (o subcuenta): sin timestamp/version del proveedor no se consolida."""
     company = _company(db)
     _position(db, company, price=100.0)
     ex = date.today() - timedelta(days=60)
-    _split(db, company, ex + timedelta(days=10), "4")  # 4:1 posterior a la ex_date
+    _split(db, company, ex + timedelta(days=10), "4")
     _row(db, company, ex, "0.77", "yahoo_finance", datetime(2026, 1, 1))
     _row(db, company, ex, "0.1925", "yahoo_finance", datetime(2026, 9, 1))
     pos = _yields(db)
-    assert pos["ttm_dividend_per_share"] == 0.1925 and pos["uncertain_dividend_events"] == []
+    assert pos["dividend_yield"] is None and pos["ttm_dividend_per_share"] is None
+    assert len(pos["uncertain_dividend_events"]) == 1
     assert len(db.scalars(select(DividendRecord)).all()) == 2  # nada borrado
+
+
+def test_ordinary_plus_special_whose_ratio_equals_a_split_is_not_merged(db):
+    """Caso reproducido por el auditor: ordinario 0.20 + especial 0.80 (ratio 4) con un 4:1."""
+    company = _company(db)
+    ex = date.today() - timedelta(days=30)
+    _split(db, company, ex + timedelta(days=5), "4")
+    rows = [
+        _row(db, company, ex, "0.80", "yahoo_finance", datetime(2026, 1, 1)),
+        _row(db, company, ex, "0.20", "yahoo_finance", datetime(2026, 1, 1)),
+    ]
+    kept, uncertain = resolve_yahoo_events(rows)
+    assert kept == [] and len(uncertain) == 1
 
 
 def test_different_amounts_without_split_evidence_are_uncertain_not_last_wins(db):
@@ -57,30 +73,6 @@ def test_different_amounts_without_split_evidence_are_uncertain_not_last_wins(db
     assert pos["uncertain_dividend_events"] == [{"ex_date": ex.isoformat(), "amounts": ["0.5000000000", "2.0000000000"]}]
 
 
-def test_split_that_does_not_explain_the_ratio_is_uncertain(db):
-    company = _company(db)
-    ex = date.today() - timedelta(days=30)
-    _split(db, company, ex + timedelta(days=5), "2")  # 2:1 no explica 0.77/0.1925 (=4)
-    rows = [
-        _row(db, company, ex, "0.77", "yahoo_finance", datetime(2026, 1, 1)),
-        _row(db, company, ex, "0.1925", "yahoo_finance", datetime(2026, 9, 1)),
-    ]
-    kept, uncertain = resolve_yahoo_events(rows, split_ratios_for(db, [company.id]))
-    assert kept == [] and len(uncertain) == 1
-
-
-def test_split_before_ex_date_is_not_evidence(db):
-    company = _company(db)
-    ex = date.today() - timedelta(days=30)
-    _split(db, company, ex - timedelta(days=5), "4")
-    rows = [
-        _row(db, company, ex, "0.77", "yahoo_finance", datetime(2026, 1, 1)),
-        _row(db, company, ex, "0.1925", "yahoo_finance", datetime(2026, 9, 1)),
-    ]
-    kept, uncertain = resolve_yahoo_events(rows, split_ratios_for(db, [company.id]))
-    assert kept == [] and len(uncertain) == 1
-
-
 def test_other_sources_currencies_and_dates_are_untouched(db):
     company = _company(db)
     ex = date.today() - timedelta(days=30)
@@ -91,11 +83,11 @@ def test_other_sources_currencies_and_dates_are_untouched(db):
         _row(db, company, ex, "1", "yahoo_finance", datetime(2026, 9, 1), "CHF"),
         _row(db, company, ex - timedelta(days=90), "1", "yahoo_finance", datetime(2026, 9, 1)),
     ]
-    kept, uncertain = resolve_yahoo_events(rows, {})
+    kept, uncertain = resolve_yahoo_events(rows)
     assert len(kept) == 5 and uncertain == []
 
 
-def test_brain_year_total_uses_evidence_and_flags_uncertain(db):
+def test_brain_year_total_excludes_uncertain_instead_of_picking_one(db):
     from app.services.brain_data_tools import _dividend_answer
 
     db.info["tenant_id"] = 1
@@ -105,11 +97,5 @@ def test_brain_year_total_uses_evidence_and_flags_uncertain(db):
     _split(db, company, ex + timedelta(days=1), "4")
     _row(db, company, ex, "0.77", "yahoo_finance", datetime(2026, 1, 1))
     _row(db, company, ex, "0.1925", "yahoo_finance", datetime(2026, 9, 1))
-    answer = _dividend_answer(db, "cuanto voy a cobrar de mi cartera", tenant=1)
-    assert "1 pago(s)" in answer.answer and "$1.93" in answer.answer
-    assert "ajustados por splits" in answer.answer
-    # sin evidencia de split: excluido y señalado
-    db.query(CorporateAction).delete()
-    db.commit()
     answer = _dividend_answer(db, "cuanto voy a cobrar de mi cartera", tenant=1)
     assert "dato incierto" in answer.answer and company.ticker in answer.answer

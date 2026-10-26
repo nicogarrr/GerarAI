@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Company, DividendRecord, Position, WatchItem
-from app.services.dividend_records import resolve_yahoo_events, split_ratios_for
+from app.services.dividend_records import resolve_yahoo_events
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.split_ingestion_service import ProviderIngestionService
 
@@ -225,8 +225,7 @@ class DividendIngestionService(ProviderIngestionService):
                         DividendRecord.company_id == company.id,
                         DividendRecord.ex_date >= cutoff,
                     )
-                ).all(),
-                split_ratios_for(db, [company.id]),
+                ).all()
             )
             price = float(position.market_price or 0)
             # Peso solo en divisa base: `market_value` esta en la divisa nativa

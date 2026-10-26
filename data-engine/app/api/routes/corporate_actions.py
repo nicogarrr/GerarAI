@@ -19,7 +19,7 @@ from app.services.async_bridge import run_from_any_context
 from app.services.corporate_actions_service import CorporateActionService
 from app.services.display_es import fecha_es as _fecha_es
 from app.services.display_es import source_label as _source_label
-from app.services.dividend_records import resolve_yahoo_events, split_ratios_for
+from app.services.dividend_records import resolve_yahoo_events
 from app.services.split_ingestion_service import SplitIngestionService
 
 router = APIRouter()
@@ -77,7 +77,7 @@ def _declared_dividends(db: Session, *, days: int = 120) -> list[dict]:
         .order_by(DividendRecord.ex_date.desc(), Company.ticker)
     ).all()
     kept, uncertain = resolve_yahoo_events(
-        [record for record, _ in rows], split_ratios_for(db, {company.id for _, company in rows})
+        [record for record, _ in rows]
     )
     kept_ids = {id(record) for record in kept}
     tickers = {company.id: company.ticker for _, company in rows}

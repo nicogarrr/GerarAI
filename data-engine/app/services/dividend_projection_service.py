@@ -54,7 +54,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, DividendRecord, Position
-from app.services.dividend_records import resolve_yahoo_events, split_ratios_for
+from app.services.dividend_records import resolve_yahoo_events
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.tax_irpf_filing import calculate_savings_tax
 
@@ -204,7 +204,6 @@ class DividendProjectionService:
             ).all()
             if company_ids
             else [],
-            split_ratios_for(db, company_ids),
         )
         uncertain_by_company = {event.company_id for event in uncertain_events}
         records_by_company: dict[int, list[DividendRecord]] = defaultdict(list)
