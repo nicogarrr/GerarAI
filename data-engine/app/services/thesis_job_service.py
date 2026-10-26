@@ -372,10 +372,94 @@ def _utc(value: datetime | None) -> datetime | None:
     return value.astimezone(UTC)
 
 
+def build_run_guard(run: WorkflowRun, settings, store=None, db: Session | None = None):
+    """Guard LLM por job de tesis, o None si esta desactivado (max_posts=0).
+
+    run_id = ``thesis:<run.id>`` (sin intento): reintentos y re-entregas
+    comparten contador. Inicializacion DURABLE fuera de Redis: el marcador
+    ``input_payload["llm_guard"]`` (BD) guarda el deadline absoluto. Solo el
+    primer claim sin marcador crea el contador (idempotente, nunca resetea uno
+    vivo) y luego persiste el marcador. Con marcador, un contador ausente
+    (expirado/desalojado/flush) NO se recrea: el guard aborta (counter_missing).
+    El deadline se comprueba antes de CADA reserva, tambien en mitad de generate.
+    Fail closed si el store no se puede construir. TTS/Telegram no son LLM y no
+    pasan por este guard: un run aislado debe bloquearlos por configuracion.
+    """
+    import math
+    import time
+
+    from app.llm.run_guard import LLMGuardAbort, LLMRunGuard, RedisCounterStore
+
+    max_posts = int(getattr(settings, "llm_run_guard_max_posts", 0) or 0)
+    if max_posts <= 0:
+        return None
+    window = int(settings.llm_run_guard_window_seconds)
+    if window <= 0:
+        raise LLMGuardAbort("run_guard_window_expired")
+    if store is None:
+        try:
+            import redis
+
+            from app.core.redis_retry import no_retry
+
+            client = redis.Redis.from_url(
+                settings.redis_url, socket_connect_timeout=0.25, socket_timeout=0.5, retry=no_retry()
+            )
+            store = RedisCounterStore(client, ttl_seconds=window)
+        except Exception:
+            raise LLMGuardAbort("store_unavailable") from None
+    hosts = frozenset(h.strip() for h in settings.llm_run_guard_allowed_hosts.split(",") if h.strip())
+    models = frozenset(m.strip() for m in settings.llm_run_guard_allowed_models.split(",") if m.strip())
+    run_key = f"thesis:{run.id}"
+    payload_now = run.input_payload or {}
+    now_ts = time.time()
+    if "llm_guard" in payload_now:
+        # Marcador PRESENTE: jamas se trata como ausente ni se reinicializa.
+        marker = payload_now["llm_guard"]
+        deadline = marker.get("deadline_ts") if isinstance(marker, dict) else None
+        if (
+            not isinstance(marker, dict)
+            or isinstance(deadline, bool)
+            or not isinstance(deadline, (int, float))
+            or not math.isfinite(deadline)
+            or deadline <= 0
+            or deadline > now_ts + window + 86400
+        ):
+            raise LLMGuardAbort("guard_marker_invalid")
+        deadline_ts = float(deadline)
+        if now_ts >= deadline_ts:
+            raise LLMGuardAbort("run_guard_window_expired")
+    else:
+        if db is None:
+            raise LLMGuardAbort("guard_marker_unavailable")
+        deadline_ts = now_ts + window
+        store.init(run_key, deadline_ts=deadline_ts)  # primero el contador...
+        run.input_payload = {**payload_now, "llm_guard": {"deadline_ts": deadline_ts}}
+        db.commit()  # ...despues el marcador durable; ninguna reserva antes
+    try:
+        return LLMRunGuard(
+            run_id=run_key,
+            allowed_hosts=hosts,
+            allowed_models=models,
+            max_posts=max_posts,
+            max_tokens_per_request=int(settings.llm_run_guard_max_tokens_per_request),
+            max_total_output_tokens=int(settings.llm_run_guard_max_total_output_tokens),
+            store=store,
+            deadline_ts=deadline_ts,
+        )
+    except ValueError:
+        raise LLMGuardAbort("guard_misconfigured") from None
+
+
 def run_thesis_job(run_id: int) -> None:
     """Run a thesis delivery with tenant context and recoverable retries."""
+    import contextlib
+
     from dramatiq.middleware.time_limit import TimeLimitExceeded
 
+    from app.llm.run_guard import activate
+
+    guard_stack = contextlib.ExitStack()
     db = SessionLocal()
     try:
         # Bootstrap cross-tenant: el worker recibe solo run_id y el tenant
@@ -499,6 +583,11 @@ def run_thesis_job(run_id: int) -> None:
             state["open_step_name"] = name
 
         try:
+            # Guard por job (inactivo con max_posts=0). Dentro del try: un
+            # fallo cerrado se registra como fallo del run, antes de la red.
+            _guard = build_run_guard(run, settings, db=db)
+            if _guard is not None:
+                guard_stack.enter_context(activate(_guard))
             from app.services.company_enrichment_service import ensure_company_stub
             from app.services.thesis_service import ThesisService
 
@@ -619,4 +708,5 @@ def run_thesis_job(run_id: int) -> None:
             db.commit()
             raise
     finally:
+        guard_stack.close()
         db.close()

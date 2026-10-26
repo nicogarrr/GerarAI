@@ -317,3 +317,25 @@ def test_jev_allowlisted_cap_exhausted_from_other_providers_blocks_jev():
         _jev_call(net, store, max_posts=3)
     assert err.value.reason == "run_budget_exhausted"
     assert net.calls == 0
+
+
+def test_redis_strict_mode_args_and_error_codes():
+    class Fake:
+        def __init__(self, result):
+            self.result = result
+            self.calls = []
+
+        def eval(self, *args):
+            self.calls.append(args)
+            return self.result
+
+    f = Fake(1)
+    st = RedisCounterStore(f)
+    assert st.reserve("r", posts=1, tokens=0, max_posts=8, max_tokens=22400, deadline_ts=2000.5)
+    assert f.calls[0][-1] == 2000500  # deadline absoluto en ms, evaluado con TIME de Redis
+    for code, reason in ((-2, "run_deadline_exceeded"), (-1, "counter_missing")):
+        with pytest.raises(LLMGuardAbort) as e:
+            RedisCounterStore(Fake(code)).reserve("r", posts=1, tokens=0, max_posts=8, max_tokens=1, deadline_ts=1.0)
+        assert e.value.reason == reason
+    st.init("r", deadline_ts=10.0)
+    assert f.calls[-1][2:] == ("llmguard:r", 10000)
