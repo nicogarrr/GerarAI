@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import redact_secrets
-from app.models import Company, MarketPrice, Position, SavedScreen
+from app.models import Company, FinancialFact, MarketPrice, Position, SavedScreen
 from app.services.alert_rule_service import AlertRuleService
 from app.services.connectors.base import UpstreamRateLimited
 from app.services.connectors.ecb import ECBClient, ECBRates
@@ -26,6 +26,7 @@ from app.services.portfolio_ledger_service import PortfolioLedgerService
 from app.services.propicks_price_service import yahoo_symbol
 from app.services.risk_service import RiskService
 from app.services.screener_service import ScreenerService
+from app.valuation.currency import normalize_currency, reporting_currencies
 
 _US_EXCHANGE_TOKENS = ("NYSE", "NEW YORK", "NASDAQ", "AMEX", "OTC", "BATS", "ARCA")
 
@@ -466,6 +467,20 @@ class MarketRefreshService:
         fx = PortfolioFXService()
         base_currency = fx.base_currency(db)
         quote_currencies = {position.currency.upper() for position, _ in rows}
+        # La valoracion convierte la divisa de REPORTE de los hechos (BABA: CNY)
+        # a la del listado: esas divisas tambien necesitan su tipo BCE del dia,
+        # aunque ninguna posicion cotice en ellas. Subunidades (GBX) -> GBP.
+        held_ids = {company.id for _, company in rows}
+        if held_ids:
+            fact_units = db.scalars(
+                select(FinancialFact.unit)
+                .where(FinancialFact.company_id.in_(held_ids))
+                .distinct()
+            ).all()
+            quote_currencies |= reporting_currencies(fact_units)
+            quote_currencies = {
+                normalize_currency(code)[0] or code for code in quote_currencies
+            }
         fx_errors: list[dict] = []
         fx_updated = 0
         try:

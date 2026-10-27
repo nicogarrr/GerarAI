@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, MutableMapping
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
@@ -11,8 +12,22 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
 from app.models import Company, MarketPrice, Position, ValuationModel, ValuationOutput
+from app.valuation.currency import (
+    listing_currency,
+    listing_quote_unit,
+    reporting_currencies,
+    resolve_fx,
+    scale_per_share_outputs,
+    to_major_units,
+)
 from app.valuation.engines import resolve, resolve_engine_key
-from app.valuation.engines.base import MODEL_VERSION, apply_publication_blockers
+from app.valuation.engines.base import (
+    MODEL_VERSION,
+    ValuationContext,
+    ValuationEngine,
+    apply_publication_blockers,
+    insufficient_result,
+)
 from app.valuation.point_in_time import (
     PRECISION_UNKNOWN,
     assert_period_no_lookahead,
@@ -29,11 +44,7 @@ def _free_data_trace(db: Session, company: Company) -> dict | None:
     try:
         from app.models import Document
 
-        docs = list(
-            db.scalars(
-                select(Document).where(Document.company_id == company.id).limit(20)
-            ).all()
-        )
+        docs = list(db.scalars(select(Document).where(Document.company_id == company.id).limit(20)).all())
         for doc in docs:
             meta = getattr(doc, "metadata_", None) or {}
             free_data = meta.get("free_data") or {}
@@ -84,9 +95,7 @@ def _assert_no_lookahead_guard(valuation: dict, *, as_of: date | None = None) ->
     by_precision: dict[str, int] = {}
     opaque_periods: list[str] = []
     for label, raw_period in periods.items():
-        bounds = assert_period_no_lookahead(
-            as_of=cutoff, period=raw_period, label=f"valuation {label}"
-        )
+        bounds = assert_period_no_lookahead(as_of=cutoff, period=raw_period, label=f"valuation {label}")
         by_precision[bounds.precision] = by_precision.get(bounds.precision, 0) + 1
         if bounds.precision == PRECISION_UNKNOWN:
             opaque_periods.append(f"valuation {label} {raw_period}")
@@ -101,66 +110,242 @@ def _assert_no_lookahead_guard(valuation: dict, *, as_of: date | None = None) ->
     }
 
 
-def _position_price(
-    db: Session, company_id: int, as_of: date | None = None
-) -> float | None:
-    """Return a real market price or None. Never invent a placeholder price."""
-    # Con cutoff, el mark de la posicion es el precio de HOY (sin fecha): no se
-    # usa, y el cierre se acota a date <= as_of.
-    position = (
-        None
-        if as_of is not None
-        else db.scalar(select(Position).where(Position.company_id == company_id).limit(1))
-    )
-    if position and position.market_price and float(position.market_price) > 0:
-        return float(position.market_price)
+@dataclass(frozen=True)
+class ModelPrice:
+    """Precio del modelo en la divisa PRINCIPAL del listado, con su fecha."""
+
+    value: float
+    currency: str
+    as_of: date | None
+    source: str  # "market_close" | "position_mark"
+
+
+def resolve_model_price(db: Session, company_id: int, as_of: date | None = None) -> ModelPrice | None:
+    """El precio real mas FRESCO del valor, en unidad principal; None si no hay.
+
+    Candidatos: el ultimo cierre de ``MarketPrice`` (``date <= as_of`` con
+    cutoff) y el mark de una posicion ABIERTA (``quantity > 0``), con la fecha
+    ``Position.as_of`` que escriben la reconstruccion, IBKR y el refresco de
+    mercado. Gana el mas reciente; a igual fecha, el cierre oficial. Un mark
+    sin fecha fiable (fila manual) solo sirve si no hay ningun cierre. Antes se
+    preferia el mark de cualquier fila de posicion (incluida una cerrada,
+    elegida con ``limit(1)`` sin orden) aunque hubiera un cierre mas nuevo.
+
+    Unidades: el cierre se guarda como lo da el proveedor (Londres en
+    peniques); aqui se pasa a la divisa principal del listado (GBX/100 ->
+    GBP), igual que el mark (``Position.currency``). Con cutoff el mark no se
+    usa: es el precio de la posicion HOY, no a esa fecha.
+    """
+    company = db.get(Company, company_id)
+    ticker = getattr(company, "ticker", None)
+    company_currency = getattr(company, "currency", None)
+    quote_unit = listing_quote_unit(ticker, company_currency)
+
+    close: ModelPrice | None = None
     price_query = select(MarketPrice).where(MarketPrice.company_id == company_id)
     if as_of is not None:
         price_query = price_query.where(MarketPrice.date <= as_of)
     market_price = db.scalar(price_query.order_by(desc(MarketPrice.date)).limit(1))
     if market_price and market_price.close and float(market_price.close) > 0:
-        return float(market_price.close)
-    return None
+        converted = to_major_units(market_price.close, quote_unit)
+        if converted is not None:
+            close = ModelPrice(
+                value=converted.value,
+                currency=converted.currency,
+                as_of=market_price.date,
+                source="market_close",
+            )
+
+    mark: ModelPrice | None = None
+    if as_of is None:
+        position = db.scalar(
+            select(Position)
+            .where(
+                Position.company_id == company_id,
+                Position.quantity > 0,
+                Position.market_price > 0,
+            )
+            .order_by(desc(Position.as_of), desc(Position.id))
+            .limit(1)
+        )
+        if position is not None:
+            converted = to_major_units(position.market_price, position.currency or quote_unit)
+            if converted is not None and converted.value > 0:
+                # Una fila "manual" toma ``as_of`` del default de la columna
+                # (hoy al insertarla): no es la fecha del precio (F348). Solo
+                # los marks del libro, IBKR o el refresco declaran fecha.
+                dated = (position.source or "manual") != "manual"
+                mark = ModelPrice(
+                    value=converted.value,
+                    currency=converted.currency,
+                    as_of=position.as_of if dated else None,
+                    source="position_mark",
+                )
+
+    if close is None:
+        return mark
+    if mark is None:
+        return close
+    if mark.as_of is not None and close.as_of is not None and mark.as_of > close.as_of:
+        return mark
+    return close
 
 
-def _position_price_as_of(
-    db: Session, company_id: int, as_of: date | None = None
-) -> str | None:
+def _position_price(db: Session, company_id: int, as_of: date | None = None) -> float | None:
+    """Return a real market price or None. Never invent a placeholder price.
+
+    Ver :func:`resolve_model_price`: el mas fresco, en unidad principal."""
+    resolved = resolve_model_price(db, company_id, as_of)
+    return resolved.value if resolved is not None else None
+
+
+def _position_price_as_of(db: Session, company_id: int, as_of: date | None = None) -> str | None:
     """Fecha (ISO) del precio que ``_position_price`` resuelve, con la misma
-    precedencia (posicion primero, ultimo cierre despues). None si no hay
-    precio o la fuente no declara fecha. La ficha lo usa para rotular el
-    precio del modelo con su fecha, nunca como precio actual."""
-    position = (
-        None
-        if as_of is not None
-        else db.scalar(select(Position).where(Position.company_id == company_id).limit(1))
-    )
-    if position and position.market_price and float(position.market_price) > 0:
-        # Sin procedencia real del mark: updated_at es la ultima modificacion
-        # de la fila (una reconstruccion mueve la fecha SIN refrescar el
-        # precio), nunca la fecha del precio. None honesto.
+    precedencia. None si no hay precio o la fuente no declara fecha. La ficha
+    lo usa para rotular el precio del modelo con su fecha, nunca como precio
+    actual."""
+    resolved = resolve_model_price(db, company_id, as_of)
+    if resolved is None or resolved.as_of is None:
         return None
-    price_query = select(MarketPrice).where(MarketPrice.company_id == company_id)
-    if as_of is not None:
-        price_query = price_query.where(MarketPrice.date <= as_of)
-    market_price = db.scalar(price_query.order_by(desc(MarketPrice.date)).limit(1))
-    if market_price and market_price.close and float(market_price.close) > 0:
-        return market_price.date.isoformat()
-    return None
+    return resolved.as_of.isoformat()
+
+
+def _reconcile_currency(
+    db: Session,
+    context: ValuationContext,
+    *,
+    price_currency: str,
+    on: date,
+) -> dict:
+    """Comprueba que hechos y precio estan en la misma divisa o se pueden convertir.
+
+    Devuelve ``status``:
+    - ``"same"``: hechos y precio en la misma divisa;
+    - ``"converted"``: distinta divisa con un tipo point-in-time valido
+      (``price_to_reporting`` / ``reporting_to_listing`` son los factores);
+    - ``"unknown"``: no hay hechos monetarios en el snapshot (no hay nada que
+      comparar; el motor dira que le faltan entradas);
+    - ``"blocked"``: hechos en varias divisas entre si, o sin tipo de cambio
+      valido (``missing_inputs`` dice cual).
+    """
+    facts = getattr(getattr(context, "snapshot", None), "facts", None) or {}
+    units = [getattr(fact, "unit", None) for fact in facts.values()]
+    found = reporting_currencies(units)
+    base: dict = {
+        "price_currency": price_currency,
+        "reporting_currency": None,
+        "fx": None,
+        "fx_date": on.isoformat(),
+    }
+    if not found:
+        return {**base, "status": "unknown"}
+    if len(found) > 1:
+        return {
+            **base,
+            "status": "blocked",
+            "reason": "currency_mismatch_in_facts",
+            "reporting_currencies": sorted(found),
+            "missing_inputs": ["single_reporting_currency"],
+        }
+    reporting = next(iter(found))
+    base["reporting_currency"] = reporting
+    if reporting == price_currency.upper():
+        return {**base, "status": "same"}
+    to_reporting = resolve_fx(db, price_currency, reporting, on)
+    if to_reporting is None:
+        return {
+            **base,
+            "status": "blocked",
+            "reason": "currency_mismatch_no_fx",
+            "missing_inputs": [f"fx_rate:{reporting}/{price_currency.upper()}"],
+        }
+    return {
+        **base,
+        "status": "converted",
+        "fx": to_reporting.as_trace(),
+        "price_to_reporting": to_reporting.rate,
+        "reporting_to_listing": 1.0 / to_reporting.rate,
+    }
+
+
+def _currency_blocked_result(engine: ValuationEngine, context: ValuationContext, gate: dict) -> dict:
+    """Resultado bloqueado: sin valores ni margen de seguridad, con el motivo."""
+    company = context.company
+    if gate.get("reason") == "currency_mismatch_in_facts":
+        reason = (
+            "Los datos financieros estan en varias divisas "
+            f"({', '.join(gate.get('reporting_currencies') or [])}): no se mezclan."
+        )
+    else:
+        reason = (
+            f"Los datos estan en {gate.get('reporting_currency')} y el precio en "
+            f"{gate.get('price_currency')}, y no hay tipo de cambio a "
+            f"{gate.get('fx_date')} (tabla BCE): no se compara un valor y un "
+            "precio en divisas distintas."
+        )
+    return insufficient_result(
+        ticker=company.ticker,
+        model_type=company.valuation_model,
+        engine_key=engine.key,
+        current_price=context.current_price,
+        missing_inputs=list(gate.get("missing_inputs") or []),
+        reason=reason,
+        snapshot=context.snapshot,
+        extra_trace={"currency_gate": {k: v for k, v in gate.items()}},
+    )
 
 
 class ValuationService:
-    def value_company(
-        self, db: Session, company: Company, *, as_of: date | None = None
-    ) -> dict:
-        current_price = _position_price(db, company.id, as_of)
+    def value_company(self, db: Session, company: Company, *, as_of: date | None = None) -> dict:
+        try:
+            resolved_price = resolve_model_price(db, company.id, as_of)
+        except Exception:  # noqa: BLE001 - sin precio, la valoracion sigue sin MOS
+            resolved_price = None
+        current_price = resolved_price.value if resolved_price is not None else None
+        price_currency = (
+            resolved_price.currency
+            if resolved_price is not None
+            else listing_currency(getattr(company, "ticker", None), getattr(company, "currency", None))
+        )
         engine = resolve(company)
         context = engine.build_context(db, company, current_price, as_of)
-        # Blocker enforcement lives here as well as in the engines: this is the
-        # function every consumer goes through (thesis, red team, snapshot,
-        # persistence), and a result that carries publication blockers must
-        # never reach them labelled as a final valuation.
-        result = apply_publication_blockers(engine.value(context))
+
+        # Divisas: el motor trabaja en la divisa de REPORTE de los hechos (BABA:
+        # CNY) y el precio esta en la del LISTADO (ADR en USD). Comparar ambos
+        # sin convertir era el error ~7x. Se convierte con el tipo de cambio de
+        # la fecha del precio (point-in-time) y, si no se puede reconciliar, se
+        # bloquea la valoracion en vez de publicar un margen de seguridad falso.
+        fx_date = (
+            resolved_price.as_of
+            if resolved_price is not None and resolved_price.as_of is not None
+            else (as_of or date.today())
+        )
+        currency_gate = _reconcile_currency(db, context, price_currency=price_currency, on=fx_date)
+        if currency_gate["status"] == "blocked":
+            result = _currency_blocked_result(engine, context, currency_gate)
+        else:
+            to_reporting = currency_gate.get("price_to_reporting")
+            if to_reporting is not None and current_price is not None:
+                # Precio traducido a la divisa de los hechos: el DCF, el margen
+                # de seguridad y el DCF inverso se calculan en UNA sola divisa.
+                context.current_price = current_price * to_reporting
+            # Blocker enforcement lives here as well as in the engines: this is the
+            # function every consumer goes through (thesis, red team, snapshot,
+            # persistence), and a result that carries publication blockers must
+            # never reach them labelled as a final valuation.
+            result = apply_publication_blockers(engine.value(context))
+            to_listing = currency_gate.get("reporting_to_listing")
+            if to_listing is not None:
+                # Valores por accion de vuelta a la divisa del listado (misma
+                # tasa, invertida): MOS y crecimientos son invariantes.
+                scale_per_share_outputs(result, to_listing)
+                result["current_price"] = current_price
+        result["value_currency"] = price_currency if currency_gate["status"] != "blocked" else None
+        result["currency"] = {
+            key: value
+            for key, value in currency_gate.items()
+            if key not in {"price_to_reporting", "reporting_to_listing"}
+        }
 
         # Ensure contract fields always present for API / thesis consumers.
         result.setdefault("status", "ok")
@@ -172,9 +357,7 @@ class ValuationService:
         try:
             from app.services.moat_service import MoatService
 
-            result["moat"] = MoatService().assess(
-                db, company, persist=False
-            )
+            result["moat"] = MoatService().assess(db, company, persist=False)
         except Exception as exc:
             result["moat"] = {
                 "status": "unavailable",
@@ -207,10 +390,16 @@ class ValuationService:
         # El precio del modelo es un snapshot (posicion o ultimo cierre en
         # DB), no la cotizacion en vivo: la ficha lo rotula con esta fecha.
         # La fecha es best-effort: sin ella, None honesto (el precio ya esta).
-        try:
-            result["trace"]["price_as_of"] = _position_price_as_of(db, company.id, as_of)
-        except Exception:  # noqa: BLE001 - la fecha nunca rompe la valoracion
-            result["trace"]["price_as_of"] = None
+        result["trace"]["currency"] = result["currency"]
+        result["trace"]["price_as_of"] = (
+            resolved_price.as_of.isoformat()
+            if resolved_price is not None and resolved_price.as_of is not None
+            else None
+        )
+        # Divisa PRINCIPAL del precio (CGEO.L: GBP, ya dividido entre 100) y
+        # de donde sale: el cierre o el mark de la posicion, el mas fresco.
+        result["trace"]["price_currency"] = resolved_price.currency if resolved_price is not None else None
+        result["trace"]["price_source"] = resolved_price.source if resolved_price is not None else None
 
         return result
 

@@ -106,7 +106,11 @@ def test_versions_increment_per_company(db):
     assert (first.version, second.version) == (1, 2)
 
 
-def test_position_price_wins_over_stale_market_close(db):
+def test_undated_manual_mark_never_beats_a_dated_close(db):
+    """Auditoria de divisas (27-oct-2026): antes ganaba SIEMPRE el mark de la
+    posicion. Un mark manual no tiene fecha de precio (F348): un cierre
+    fechado le gana. Un mark fechado mas reciente si gana (ver
+    test_valuation_model_price.py)."""
     company = _company(db)
     db.add_all([
         Position(company_id=company.id, quantity=Decimal("1"), market_price=Decimal("150")),
@@ -117,7 +121,7 @@ def test_position_price_wins_over_stale_market_close(db):
         ),
     ])
     db.commit()
-    assert _position_price(db, company.id) == 150.0
+    assert _position_price(db, company.id) == 100.0
 
 
 def test_falls_back_to_latest_close_then_none(db):
@@ -199,8 +203,8 @@ def test_position_price_respects_as_of_cutoff(db):
     db.add(Position(company_id=company.id, quantity=Decimal("1"), market_price=Decimal("99")))
     db.commit()
 
-    # Sin cutoff se mantiene la precedencia vigente (posicion primero).
-    assert _position_price(db, company.id) == 99.0
+    # Sin cutoff: el mark manual no tiene fecha, gana el ultimo cierre.
+    assert _position_price(db, company.id) == 20.0
     # Con cutoff: ni el mark de la posicion (precio de hoy) ni cierres posteriores.
     assert _position_price(db, company.id, date(2025, 3, 1)) == 10.0
     assert _position_price(db, company.id, date(2025, 6, 10)) == 20.0

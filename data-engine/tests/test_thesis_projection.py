@@ -319,8 +319,10 @@ def test_blocked_engine_is_never_rescaled_to_final(db, monkeypatch):
 
 
 def test_mos_requires_dated_price(db, valued):
-    # Un mark de Position no tiene fecha de precio: MOS queda N/D y la
-    # comparacion no se persiste como final.
+    # Un mark de Position manual no tiene fecha de precio: MOS queda N/D y la
+    # comparacion no se persiste como final. Sin cierres en DB (un cierre
+    # fechado ganaria al mark sin fecha: el precio mas fresco manda).
+    db.query(MarketPrice).delete()
     db.add(
         Position(
             company_id=1,
