@@ -583,6 +583,10 @@ def create_transaction(
         db.refresh(transaction)
         company = db.get(Company, transaction.company_id)
         assert company is not None
+        if payload.action in {"buy", "sell"}:
+            from app.services.journal_trade_link import auto_link_journal_trades_best_effort
+
+            auto_link_journal_trades_best_effort(db, {company.id})
         if payload.action == "buy":
             try:
                 enqueue_tracked_analysis(db, company.ticker)

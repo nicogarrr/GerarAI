@@ -11,7 +11,8 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+import logging
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -27,7 +28,15 @@ from app.models import (
     ValuationOutput,
 )
 
+logger = logging.getLogger(__name__)
+
 TRADE_ACTIONS = ("buy", "sell")
+# Decision del diario -> accion de la operacion que la ejecutaria. «hold»,
+# «watch» y «avoid» no tienen operacion: nunca se enlazan.
+DECISION_TRADE_ACTION = {"buy": "buy", "sell": "sell", "trim": "sell"}
+# Ventana (dias) entre la fecha de la decision y la de la operacion para
+# considerar una correspondencia. Conservadora: fuera de ella no se enlaza.
+AUTO_LINK_WINDOW_DAYS = 3
 THESIS_MAX_AGE_DAYS = 180
 _ACTION_LABELS = {"buy": "Compra", "sell": "Venta"}
 
@@ -216,3 +225,120 @@ def journal_trades(db: Session, company: Company, *, limit: int = 100) -> list[d
             if entry.transaction_id is not None:
                 linked.setdefault(entry.transaction_id, []).append(entry.id)
     return [{**trade_summary(t), "linked_entry_ids": sorted(linked.get(t.id, []))} for t in trades]
+
+
+def auto_link_journal_trades(
+    db: Session, company_ids: set[int] | None = None
+) -> dict[str, int]:
+    """Enlaza decisiones del diario con su operacion SOLO si la correspondencia es inequivoca.
+
+    Una decision sin operacion (``transaction_id`` nulo) de compra/venta/reduccion
+    se enlaza a una compra/venta de la misma empresa cuando:
+    - la accion coincide (buy->buy, sell/trim->sell),
+    - la fecha de la operacion esta a <= ``AUTO_LINK_WINDOW_DAYS`` de la decision,
+    - la operacion no esta ya enlazada a otra entrada,
+    - y la relacion es uno a uno: esa entrada tiene UNA sola candidata y esa
+      operacion tiene UNA sola entrada candidata.
+    Si hay varias posibles (p. ej. ejecuciones parciales o dos decisiones el
+    mismo dia) no se asigna nada: la entrada queda marcada
+    ``metadata.auto_link = {"status": "ambiguous", "candidate_transaction_ids": [...]}``
+    para que el usuario elija. No toca la fecha ni el precio de la decision ni
+    crea ni envia ordenes. Una entrada que el usuario desenlazo a mano
+    (``metadata.auto_link.status == "user_unlinked"``) no se vuelve a enlazar.
+    Idempotente.
+    """
+    summary = {"linked": 0, "ambiguous": 0}
+    query = select(DecisionJournalEntry).where(
+        DecisionJournalEntry.transaction_id.is_(None),
+        DecisionJournalEntry.decision.in_(list(DECISION_TRADE_ACTION)),
+    )
+    if company_ids is not None:
+        if not company_ids:
+            return summary
+        query = query.where(DecisionJournalEntry.company_id.in_(company_ids))
+    entries = [
+        entry
+        for entry in db.scalars(query).all()
+        if (entry.metadata_ or {}).get("auto_link", {}).get("status") != "user_unlinked"
+    ]
+    if not entries:
+        return summary
+    company_set = {entry.company_id for entry in entries}
+    trades = list(
+        db.scalars(
+            select(Transaction).where(
+                Transaction.company_id.in_(company_set),
+                Transaction.action.in_(TRADE_ACTIONS),
+            )
+        ).all()
+    )
+    already_linked = {
+        tid
+        for tid in db.scalars(
+            select(DecisionJournalEntry.transaction_id).where(
+                DecisionJournalEntry.transaction_id.is_not(None)
+            )
+        ).all()
+    }
+    window = AUTO_LINK_WINDOW_DAYS
+    candidates: dict[int, list[Transaction]] = {}
+    for entry in entries:
+        wanted = DECISION_TRADE_ACTION[entry.decision]
+        decided = _as_date(entry.decision_date)
+        candidates[entry.id] = (
+            []
+            if decided is None
+            else [
+                trade
+                for trade in trades
+                if trade.company_id == entry.company_id
+                and str(trade.action).lower() == wanted
+                and trade.id not in already_linked
+                and abs((trade.trade_date - decided).days) <= window
+            ]
+        )
+    entries_by_trade: dict[int, int] = {}
+    for found in candidates.values():
+        for trade in found:
+            entries_by_trade[trade.id] = entries_by_trade.get(trade.id, 0) + 1
+    now = datetime.now(UTC).isoformat()
+    for entry in entries:
+        found = candidates[entry.id]
+        meta = dict(entry.metadata_ or {})
+        if len(found) == 1 and entries_by_trade[found[0].id] == 1:
+            trade = found[0]
+            entry.transaction_id = trade.id
+            meta["auto_link"] = {
+                "status": "linked",
+                "method": f"unique_match_{window}d",
+                "at": now,
+                "transaction_id": trade.id,
+            }
+            entry.metadata_ = meta
+            summary["linked"] += 1
+        elif len(found) > 1 or (found and entries_by_trade[found[0].id] > 1):
+            ids = sorted(trade.id for trade in found)
+            previous = meta.get("auto_link") or {}
+            if previous.get("status") != "ambiguous" or previous.get("candidate_transaction_ids") != ids:
+                meta["auto_link"] = {
+                    "status": "ambiguous",
+                    "candidate_transaction_ids": ids,
+                    "at": now,
+                }
+                entry.metadata_ = meta
+            summary["ambiguous"] += 1
+    return summary
+
+
+def auto_link_journal_trades_best_effort(
+    db: Session, company_ids: set[int] | None = None
+) -> dict[str, int] | None:
+    """Tras una importacion/operacion ya confirmada: nunca la rompe ni la revierte."""
+    try:
+        summary = auto_link_journal_trades(db, company_ids)
+        db.commit()
+        return summary
+    except Exception:  # noqa: BLE001 - el enlace es accesorio; el commit previo ya esta hecho
+        db.rollback()
+        logger.warning("auto_link_journal_trades failed", exc_info=True)
+        return None
