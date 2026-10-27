@@ -4883,6 +4883,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/valuation/fair-value": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fair Values
+         * @description Valor justo único por ticker (tesis o motor), con su procedencia.
+         *
+         *     Por lotes no se recalcula el motor: se usa su última valoración persistida.
+         */
+        get: operations["fair_values_api_valuation_fair_value_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/valuation/{ticker}": {
         parameters: {
             query?: never;
@@ -4892,6 +4914,26 @@ export interface paths {
         };
         /** Valuation */
         get: operations["valuation_api_valuation__ticker__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/valuation/{ticker}/fair-value": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fair Value
+         * @description Valor justo único de un ticker; recalcula el motor si la tesis no basta.
+         */
+        get: operations["fair_value_api_valuation__ticker__fair_value_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4982,7 +5024,8 @@ export interface paths {
          *     Solo datos propios o de fuentes publicas con trazabilidad: minimo de 52
          *     semanas desde ``market_prices`` (ingesta propia), proximo resultado desde
          *     el conector publico de NASDAQ (misma fuente que /api/calendar/earnings) y
-         *     comparacion con la ultima tesis PUBLICADA de K (``expected_value``).
+         *     comparacion con el valor justo UNICO (``fair_value_service``: tesis
+         *     publicada o motor, con su procedencia en ``fair_value_source``/``_label``).
          *     Cualquier pieza sin dato va a ``None``; nunca se inventa.
          */
         get: operations["watchlist_monitor_api_watchlist_monitor_get"];
@@ -20497,6 +20540,49 @@ export interface operations {
             };
         };
     };
+    fair_values_api_valuation_fair_value_get: {
+        parameters: {
+            query: {
+                /** @description CSV de tickers, máx. 60 */
+                tickers: string;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     valuation_api_valuation__ticker__get: {
         parameters: {
             query?: never;
@@ -20524,6 +20610,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ValuationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fair_value_api_valuation__ticker__fair_value_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

@@ -327,32 +327,54 @@ export const getScreenerStocksRealWithStatus = cache(
 );
 
 
+/** Procedencia del valor justo ÚNICO (backend fair_value_service). */
+export type FairValueSource = 'tesis' | 'motor' | 'motor_orientativo';
+
 export type FairValueReading = {
   value: number;
-  /** true = valoracion final publicable; false = orientacion del motor: el
-   *  numero existe pero algun input no es trazable a fuente datada (el
-   *  backend devuelve publishable=false y los publication_blockers). */
+  /** true = valoracion final (tesis publicada o motor publicable); false =
+   *  orientacion del motor: el numero existe pero algun input no es trazable
+   *  a fuente datada. */
   publishable: boolean;
+  /** De donde sale el numero: misma precedencia en watchlist, inicio y screener. */
+  source: FairValueSource;
+  /** Etiqueta lista para pintar, p. ej. «Tesis publicada v3» o «Motor de valoración». */
+  label: string;
+  /** Fecha (ISO) de la tesis o del calculo del motor; null si no consta. */
+  asOf: string | null;
 };
 
-/** Lectura del valor del motor (backend /api/valuation/{ticker}).
- *  Devuelve el valor esperado/base aunque no sea publicable, CON su etiqueta:
- *  una valoracion no publicable es una orientacion valida si se declara, y
- *  descartarla dejaba la tarjeta DCF del inicio siempre vacia (los megacaps
- *  llevan publication_blockers por inputs sin trazabilidad datada).
- *  null solo cuando no hay ningun valor computado o la peticion falla. */
+const FAIR_VALUE_SOURCES: readonly FairValueSource[] = ['tesis', 'motor', 'motor_orientativo'];
+
+/** Lectura del valor justo ÚNICO (backend /api/valuation/{ticker}/fair-value).
+ *  Antes el inicio y el screener leian el motor y la watchlist la tesis, y el
+ *  mismo ticker podia salir infravalorado en una pagina y sobrevalorado en
+ *  otra. Ahora todos leen la misma cifra con la misma precedencia (tesis
+ *  publicada reciente > motor publicable > tesis antigua > motor orientativo)
+ *  y su etiqueta de procedencia. Un valor no publicable sigue siendo una
+ *  orientacion valida si se declara (publishable=false).
+ *  null solo cuando no hay ningun valor o la peticion falla. */
 export const getFairValueReading = cache(
   async (symbol: string): Promise<FairValueReading | null> => {
     await requireAuthenticatedUser();
     try {
       const data = await researchRequest<{
-        expected_value?: number | null;
-        base_value?: number | null;
+        value?: number | null;
+        source?: string | null;
+        label?: string | null;
         publishable?: boolean;
-      }>(`/api/valuation/${encodeURIComponent(symbol)}`, { cache: 'no-store' });
-      const value = data?.expected_value ?? data?.base_value ?? null;
-      if (value == null || !(value > 0)) return null;
-      return { value, publishable: data?.publishable === true };
+        as_of?: string | null;
+      }>(`/api/valuation/${encodeURIComponent(symbol)}/fair-value`, { cache: 'no-store' });
+      const value = data?.value ?? null;
+      const source = FAIR_VALUE_SOURCES.find((s) => s === data?.source);
+      if (value == null || !(value > 0) || !source) return null;
+      return {
+        value,
+        publishable: data?.publishable === true,
+        source,
+        label: data?.label || 'Valor justo',
+        asOf: data?.as_of ?? null,
+      };
     } catch {
       return null;
     }
