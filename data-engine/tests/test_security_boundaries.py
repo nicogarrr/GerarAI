@@ -217,7 +217,7 @@ def test_private_routers_reject_missing_and_invalid_signed_identity(required_aut
 
     unsigned = client.get("/api/news")
     assert unsigned.status_code == 401
-    assert unsigned.json()["detail"] == "A signed Research OS identity is required"
+    assert unsigned.json()["detail"] == "Tu sesión no es válida o ha caducado. Vuelve a iniciar sesión."
 
     invalid_headers = bound_headers(
         SECRET, "tenant-security", "user-security",
@@ -226,7 +226,7 @@ def test_private_routers_reject_missing_and_invalid_signed_identity(required_aut
     invalid_headers["X-CavaAI-Signature"] = "0" * 64
     invalid = client.get("/api/companies", headers=invalid_headers)
     assert invalid.status_code == 401
-    assert invalid.json()["detail"] == "Invalid Research OS identity signature"
+    assert invalid.json()["detail"] == "La firma de tu sesión no es válida. Vuelve a iniciar sesión."
 
     assert client.get("/health/live").status_code == 200
 

@@ -42,7 +42,7 @@ def test_malformed_signature_returns_401_without_consuming_nonce(client, signatu
     bad[b"X-CavaAI-Signature"] = signature
     response = client.get("/probe", headers=bad)
     assert response.status_code == 401
-    assert response.json()["detail"] == "Invalid Research OS identity signature"
+    assert response.json()["detail"] == "La firma de tu sesión no es válida. Vuelve a iniciar sesión."
     # A forged request cannot consume the authentic request's one-use nonce.
     assert client.get("/probe", headers=headers).status_code == 200
     assert client.get("/probe", headers=headers).status_code == 401

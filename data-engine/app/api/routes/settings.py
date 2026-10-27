@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from app.core.auth import MSG_IDENTITY_REQUIRED
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.llm_settings_crypto import (
@@ -95,7 +96,7 @@ def _require_tenant(db: Session) -> int:
     tenant_id = db.info.get("tenant_id")
     if tenant_id is None:
         raise HTTPException(
-            status_code=401, detail="A signed Research OS identity is required"
+            status_code=401, detail=MSG_IDENTITY_REQUIRED
         )
     return tenant_id
 

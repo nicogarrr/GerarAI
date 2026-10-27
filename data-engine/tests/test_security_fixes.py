@@ -170,7 +170,7 @@ def test_replayed_signed_request_is_rejected(auth_env):
 
     assert first.status_code == 200
     assert second.status_code == 401
-    assert second.json()["detail"] == "Replayed Research OS identity"
+    assert second.json()["detail"] == "Esta petición ya se había usado. Vuelve a intentarlo."
     _cleanup_claims_and_tenants([statement], [tenant])
     db = SessionLocal()
     db.execute(delete(Company).where(Company.ticker == "MSFT"))
@@ -234,7 +234,7 @@ def test_future_timestamp_is_rejected_even_with_a_valid_signature(auth_env):
     for headers in (bound, legacy):
         response = client.get("/api/memory/claims", headers=headers)
         assert response.status_code == 401
-        assert response.json()["detail"] == "Invalid Research OS identity timestamp"
+        assert response.json()["detail"] == "La hora de la firma de tu sesión no es válida. Vuelve a iniciar sesión."
     _cleanup_claims_and_tenants([], [tenant])
 
 
@@ -250,13 +250,13 @@ def test_signature_is_bound_to_method_path_and_body(auth_env):
     )
     response = client.get("/api/memory/claims", headers=wrong_method)
     assert response.status_code == 401
-    assert response.json()["detail"] == "Research OS identity does not match the request"
+    assert response.json()["detail"] == "La firma de tu sesión no corresponde a esta petición."
 
     # 2) Firma de otra ruta.
     wrong_path = _bound_headers(tenant, user, method="GET", path="/api/news")
     response = client.get("/api/memory/claims", headers=wrong_path)
     assert response.status_code == 401
-    assert response.json()["detail"] == "Research OS identity does not match the request"
+    assert response.json()["detail"] == "La firma de tu sesión no corresponde a esta petición."
 
     # 3) Body manipulado respecto al hash firmado.
     signed_body = json.dumps({"ticker": "MSFT", "statement": "signed"}).encode()
@@ -267,7 +267,7 @@ def test_signature_is_bound_to_method_path_and_body(auth_env):
     headers["Content-Type"] = "application/json"
     response = client.post("/api/memory/claims", content=tampered_body, headers=headers)
     assert response.status_code == 401
-    assert response.json()["detail"] == "Research OS identity does not match the request"
+    assert response.json()["detail"] == "La firma de tu sesión no corresponde a esta petición."
     _cleanup_claims_and_tenants([], [tenant])
 
 
@@ -282,7 +282,7 @@ def test_strict_mode_rejects_unbound_legacy_signatures(strict_auth_env):
     )
     assert legacy.status_code == 401
     assert legacy.json()["detail"] == (
-        "A request-bound Research OS identity signature is required"
+        "Falta la firma de la petición. Vuelve a iniciar sesión."
     )
 
     bound = client.get(
