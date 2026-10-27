@@ -8,9 +8,9 @@
 export const SOURCES_PAGE_SIZE = 50;
 
 /** Alcance del inventario: el universo seguido por el usuario o todo. */
-export type SourcesScope = 'universe' | 'all';
+export type SourcesScope = 'followed' | 'all';
 
-export const DEFAULT_SOURCES_SCOPE: SourcesScope = 'universe';
+export const DEFAULT_SOURCES_SCOPE: SourcesScope = 'followed';
 
 export type SourcesFilters = {
     scope?: SourcesScope;

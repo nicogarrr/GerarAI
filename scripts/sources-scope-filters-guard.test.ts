@@ -20,9 +20,9 @@ const PAGE = 'app/(root)/research/sources/page.tsx';
 const ACTIONS = 'lib/actions/research.actions.ts';
 
 test('«Mi universo» es el alcance por defecto y «Todas» una elección explícita', () => {
-  assert.equal(DEFAULT_SOURCES_SCOPE, 'universe');
-  assert.equal(normalizeSourcesScope(''), 'universe');
-  assert.equal(normalizeSourcesScope('universe'), 'universe');
+  assert.equal(DEFAULT_SOURCES_SCOPE, 'followed');
+  assert.equal(normalizeSourcesScope(''), 'followed');
+  assert.equal(normalizeSourcesScope('followed'), 'followed');
   assert.equal(normalizeSourcesScope('ALL'), 'all');
   assert.equal(normalizeSourcesType(' SEC '), 'sec');
   assert.equal(normalizeSourcesType('<script>'), 'script');
@@ -35,15 +35,15 @@ test('los enlaces conservan alcance, tipo, búsqueda y ticker al paginar', () =>
     '/research/sources?ticker=AAPL&scope=all&source_type=sec&q=10-K&page=2',
   );
   assert.equal(
-    sourcesHref('', 1, { scope: 'universe' }),
-    '/research/sources?scope=universe',
+    sourcesHref('', 1, { scope: 'followed' }),
+    '/research/sources?scope=followed',
   );
 });
 
 test('la página expone los tres controles y un vacío honesto que lleva a «Todas»', () => {
   const page = readFileSync(PAGE, 'utf8');
   assert.match(page, /name="scope"/);
-  assert.match(page, /<option value="universe">Mi universo<\/option>/);
+  assert.match(page, /<option value="followed">Mi universo<\/option>/);
   assert.match(page, /<option value="all">Todas<\/option>/);
   assert.match(page, /name="source_type"/);
   assert.match(page, /name="q"/);
@@ -55,8 +55,8 @@ test('la página expone los tres controles y un vacío honesto que lleva a «Tod
 test('la acción envía scope, source_type y q a ambos endpoints', () => {
   const actions = readFileSync(ACTIONS, 'utf8');
   assert.match(actions, /filters\.set\('scope', options\.scope\)/);
-  assert.match(actions, /filters\.set\('source_type', options\.sourceType\)/);
-  assert.match(actions, /filters\.set\('q', query\)/);
+  assert.match(actions, /filters\.set\('source_type', sourceType\)/);
+  assert.match(actions, /filters\.set\('q', q\)/);
   assert.match(actions, /const countQuery = filters\.size \? `\?\$\{filters\.toString\(\)\}` : ''/);
   assert.match(actions, /const params = new URLSearchParams\(filters\)/);
 });

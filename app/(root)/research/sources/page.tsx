@@ -67,7 +67,7 @@ function sourceTierLabel(value: string): string {
 }
 
 const SOURCE_SCOPE_LABELS = {
-  universe: 'Mi universo',
+  followed: 'Mi universo',
   all: 'Todas',
 } as const;
 
@@ -165,7 +165,7 @@ export default async function ResearchSourcesPage({
               id="sources-scope"
               name="scope"
             >
-              <option value="universe">Mi universo</option>
+              <option value="followed">Mi universo</option>
               <option value="all">Todas</option>
             </select>
           </label>
@@ -256,12 +256,12 @@ export default async function ResearchSourcesPage({
                           Quitar el filtro de ticker
                         </Link>
                       </p>
-                    ) : scope === 'universe' ? (
+                    ) : scope === 'followed' ? (
                       <p>Sin documentos en tu universo.</p>
                     ) : (
                       <p>Sin documentos importados.</p>
                     )}
-                    {scope === 'universe' ? (
+                    {scope === 'followed' ? (
                       <div className="mx-auto mt-3 max-w-xl">
                         <p className="text-xs text-gray-500">
                           Esto no significa que no haya fuentes: tu universo puede no tener documentos con estos filtros.

@@ -55,12 +55,12 @@ void test('la acción pasa filtros y página a listado y cuenta del mismo subcon
 
 void test('la página declara el subconjunto filtrado y pagina con enlaces', () => {
     const page = readFileSync(PAGE, 'utf8');
-    assert.match(page, /searchParams\?: Promise<\{ ticker\?: string \| string\[\]; page\?: string \| string\[\] \}>/, 'searchParams tipado con arrays');
+    assert.match(page, /searchParams\?: Promise<\{[\s\S]*ticker\?: string \| string\[\];[\s\S]*page\?: string \| string\[\];[\s\S]*scope\?: string \| string\[\];[\s\S]*source_type\?: string \| string\[\];[\s\S]*q\?: string \| string\[\];/, 'searchParams tipado con arrays y filtros');
     assert.match(page, /firstSearchParam\(params\.ticker\)/, 'ticker normalizado');
     assert.match(page, /<form action="\/research\/sources"[^>]*method="get">/, 'filtro por GET');
     assert.match(page, /htmlFor="sources-ticker"/, 'label accesible');
     assert.match(page, /documentos de \$\{ticker\}/, 'el contador nombra el filtro');
-    assert.match(page, /sourcesHref\(ticker, pageInfo\.page [+-] 1\)/, 'paginación conserva el filtro');
+    assert.match(page, /sourcesHref\(ticker, pageInfo\.page [+-] 1, filters\)/, 'paginación conserva todos los filtros');
     assert.match(page, /Sin documentos de \{ticker\}\./, 'filtro sin resultados lo dice y no finge inventario vacío');
     assert.match(page, /Quitar (el )?filtro/, 'salida explícita del filtro');
     assert.match(page, /auditorías\{ticker \? ' \(global\)' : ''\}/, 'el contador de auditorías declara que es global bajo filtro');
