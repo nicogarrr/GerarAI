@@ -62,20 +62,20 @@ export interface AdvancedScoreData {
     sectorComparison: {
         sector: string;
         sectorAverage: {
-            value: number;
-            growth: number;
-            profitability: number;
-            cashFlow: number;
-            momentum: number;
-            debtLiquidity: number;
+            value: number | null;
+            growth: number | null;
+            profitability: number | null;
+            cashFlow: number | null;
+            momentum: number | null;
+            debtLiquidity: number | null;
         };
         vsSector: {
-            value: number;      // + si está mejor, - si está peor
-            growth: number;
-            profitability: number;
-            cashFlow: number;
-            momentum: number;
-            debtLiquidity: number;
+            value: number | null;      // + si está mejor, - si está peor
+            growth: number | null;
+            profitability: number | null;
+            cashFlow: number | null;
+            momentum: number | null;
+            debtLiquidity: number | null;
         };
     } | null;
     reasons: {
@@ -231,10 +231,10 @@ export async function calculateAdvancedStockScore(
         const growth = percentToRatio(revenueGrowth);
 
         // Comparar con sector (crecimiento típico del sector)
-        const sectorGrowth = (sectorMetrics?.avgRevenueGrowth ?? 0.15);
+        const sectorGrowth = (sectorMetrics?.avgRevenueGrowth ?? null);
         categoryScores.growth += revenueGrowthPoints(revenueGrowth, sectorGrowth);
 
-        if (growth > sectorGrowth * 1.3) {
+        if (sectorGrowth !== null && growth > sectorGrowth * 1.3) {
             strengths.push(`Crecimiento superior al sector (${formatPercent(growth, { digits: 1 })} vs ${formatPercent(sectorGrowth, { digits: 1 })})`);
         }
     }
@@ -255,10 +255,10 @@ export async function calculateAdvancedStockScore(
     if (netMargin !== null) {
         // Conserva el signo: un margen negativo es una pérdida, no rentabilidad.
         const margin = percentToRatio(netMargin);
-        const sectorMargin = sectorMetrics?.avgNetMargin ?? 0.15; // Margen promedio del sector real
+        const sectorMargin = sectorMetrics?.avgNetMargin ?? null; // Margen promedio del sector real
         categoryScores.profitability += netMarginPoints(netMargin, sectorMargin);
 
-        if (margin > sectorMargin * 1.2) {
+        if (sectorMargin !== null && margin > sectorMargin * 1.2) {
             strengths.push(`Margen neto superior al sector (${formatPercent(margin, { digits: 1 })} vs ${formatPercent(sectorMargin, { digits: 1 })})`);
         }
     }
@@ -462,12 +462,12 @@ export async function calculateAdvancedStockScore(
 
     // Comparar con promedios del sector (solo si hay datos reales)
     const vsSector = sectorData ? {
-        value: categoryScores.value - sectorAverages.value,
-        growth: categoryScores.growth - sectorAverages.growth,
-        profitability: categoryScores.profitability - sectorAverages.profitability,
-        cashFlow: categoryScores.cashFlow - sectorAverages.cashFlow,
-        momentum: categoryScores.momentum - sectorAverages.momentum,
-        debtLiquidity: categoryScores.debtLiquidity - sectorAverages.debtLiquidity,
+        value: sectorAverages.value === null ? null : categoryScores.value - sectorAverages.value,
+        growth: sectorAverages.growth === null ? null : categoryScores.growth - sectorAverages.growth,
+        profitability: sectorAverages.profitability === null ? null : categoryScores.profitability - sectorAverages.profitability,
+        cashFlow: sectorAverages.cashFlow === null ? null : categoryScores.cashFlow - sectorAverages.cashFlow,
+        momentum: sectorAverages.momentum === null ? null : categoryScores.momentum - sectorAverages.momentum,
+        debtLiquidity: sectorAverages.debtLiquidity === null ? null : categoryScores.debtLiquidity - sectorAverages.debtLiquidity,
     } : {
         value: 0, // Sin comparación disponible
         growth: 0,

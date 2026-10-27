@@ -14,12 +14,12 @@ const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 export interface SectorAverages {
     sector: string;
     averages: {
-        value: number;          // 0-100
-        growth: number;         // 0-100
-        profitability: number; // 0-100
-        cashFlow: number;       // 0-100
-        momentum: number;       // 0-100
-        debtLiquidity: number; // 0-100
+        value: number | null;          // 0-100
+        growth: number | null;         // 0-100
+        profitability: number | null; // 0-100
+        cashFlow: number | null;       // 0-100
+        momentum: number | null;       // 0-100
+        debtLiquidity: number | null; // 0-100
     };
     sampleSize: number;
     unitTrace: {
@@ -117,12 +117,12 @@ export const getSectorAverages = cache(async (sector: string): Promise<SectorAve
 
         // Normalizar promedios a 0-100 para cada categoría
         const averages = {
-            value: normalizeValueScore(avgPE || 25, avgPB || 3, avgPS || 5),
-            growth: normalizeGrowthScore(avgRevenueGrowth || 0),
-            profitability: normalizeProfitabilityScore(avgNetMargin ?? 0.15, avgROE ?? 0.15, avgROA ?? 0.08),
-            cashFlow: 50, // Por defecto, necesitaríamos FCF que no está siempre disponible
-            momentum: 50, // Por defecto, necesitaríamos datos históricos
-            debtLiquidity: normalizeDebtScore(avgDebtToEquity || 1.5, avgCurrentRatio || 1.5),
+            value: avgPE === null || avgPB === null || avgPS === null ? null : normalizeValueScore(avgPE, avgPB, avgPS),
+            growth: avgRevenueGrowth === null ? null : normalizeGrowthScore(avgRevenueGrowth),
+            profitability: avgNetMargin === null || avgROE === null || avgROA === null ? null : normalizeProfitabilityScore(avgNetMargin, avgROE, avgROA),
+            cashFlow: null, // Sin datos sectoriales de FCF
+            momentum: null, // Sin datos historicos sectoriales
+            debtLiquidity: avgDebtToEquity === null || avgCurrentRatio === null ? null : normalizeDebtScore(avgDebtToEquity, avgCurrentRatio),
         };
 
         return {

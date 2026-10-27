@@ -33,3 +33,31 @@ describe('sector: contrato porcentual explicito, salidas en fraccion', () => {
     assert.equal(normalizeProfitabilityScore(0, 0, 0), 0);
   });
 });
+
+// @ts-expect-error TS5097 node strip-types
+import { netMarginPoints, revenueGrowthPoints } from '../lib/utils/profitabilityPoints.ts';
+
+describe('sector faltante no concede bonus relativo', () => {
+  it('crecimiento positivo sin sector usa solo criterio absoluto', () => {
+    assert.equal(revenueGrowthPoints(150, null), 25);
+    assert.equal(revenueGrowthPoints(150, 0), 40);
+  });
+  it('margen sin sector no usa media imaginaria 15%', () => {
+    assert.equal(netMarginPoints(150, null), 25);
+    assert.equal(netMarginPoints(150, 0), 35);
+    assert.equal(netMarginPoints(-0.8, null), 0);
+  });
+});
+
+import { readFileSync } from 'node:fs';
+it('contrato de salida: nueve medias no sustituyen missing por 0 ni scores por defaults', () => {
+  const source = readFileSync('lib/actions/sectorData.actions.ts', 'utf8');
+  for (const field of ['avgPE', 'avgPB', 'avgPS', 'avgROE', 'avgROA', 'avgNetMargin', 'avgRevenueGrowth', 'avgDebtToEquity', 'avgCurrentRatio']) {
+    assert.match(source, new RegExp(`${field}: ${field}\\b`));
+    assert.doesNotMatch(source, new RegExp(`${field} \\|\\|`));
+  }
+  const scoring = readFileSync('lib/utils/advancedStockScoring.ts', 'utf8');
+  assert.match(scoring, /sectorGrowth !== null && growth/);
+  assert.match(scoring, /sectorMargin !== null && margin/);
+  assert.doesNotMatch(scoring, /avg(?:RevenueGrowth|NetMargin)\s*(?:\?\?|\|\|)\s*0\.15/);
+});
