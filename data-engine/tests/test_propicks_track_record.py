@@ -186,3 +186,39 @@ def test_ingest_spy_prices_upserts_bars():
         ingest_spy_prices(db, fetcher=lambda symbols, period="1y": {"SPY": bars2})
         stored = db.query(BenchmarkPrice).filter_by(symbol="SPY", date=date(2026, 10, 17)).all()
         assert len(stored) == 1 and float(stored[0].close) == 513.0
+
+
+def test_split_between_entry_and_now_is_not_a_crash():
+    """Split 4:1 tras la entrada: el cierre sin ajustar cae de 400 a 110.
+
+    Entrada congelada 400 (2026-09-30); tras el split Yahoo reescribe el
+    adj_close de esa fecha a 100. Hoy cierra 110 (adj 110). Rentabilidad real
+    = 110/100 - 1 = +10 %; con cierres sin ajustar salia 110/400 - 1 = -72,5 %.
+    """
+    with _db() as db:
+        split = _company("SPLT")
+        db.add(split)
+        db.flush()
+        _snapshot(
+            db,
+            "2026-10",
+            datetime(2026, 10, 1, tzinfo=UTC),
+            [{"ticker": "SPLT", "name": "Split Co", "currency": "USD", "score": 75, "price": 400.0, "price_date": "2026-09-30"}],
+        )
+        for day, close, adj in [(date(2026, 9, 30), "400", "100"), (date(2026, 10, 16), "110", "110")]:
+            db.add(
+                MarketPrice(
+                    company_id=split.id, date=day, open=Decimal(close), high=Decimal(close),
+                    low=Decimal(close), close=Decimal(close), adj_close=Decimal(adj),
+                    volume=100, source="yfinance",
+                )
+            )
+        for d, c in [(date(2026, 9, 30), "500"), (date(2026, 10, 16), "510")]:
+            _spy(db, d, c)
+        db.commit()
+        out = build_track_record(db, today=TODAY)
+        pick = next(p for p in out["picks"] if p["ticker"] == "SPLT")
+        assert pick["status"] == "activo"
+        assert pick["current_price"] == 110.0
+        assert abs(pick["pct_since_entry"] - 0.10) < 1e-9
+        assert abs(pick["spy_pct_since_entry"] - 0.02) < 1e-9
