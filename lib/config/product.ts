@@ -1,4 +1,5 @@
 import { Database, FileSearch, GitBranch, type LucideIcon } from 'lucide-react';
+import { resolveSignupPolicy } from '@/lib/auth/signup-policy';
 
 export type ProductModule = {
     icon: LucideIcon;
@@ -27,19 +28,18 @@ export const productModules: ProductModule[] = [
 export const productChain = 'Evidencia → Modelo → Tesis';
 
 /**
- * Si el alta de cuentas esta abierta.
+ * Si el alta de cuentas esta abierta A CUALQUIERA.
  *
- * Refleja EXACTAMENTE la regla de `lib/better-auth/auth.ts`:
- *   signup cerrado = NODE_ENV === 'production' && ALLOW_PUBLIC_SIGNUP !== 'true'
- * (ver `signUpDisabled`). No se inventa una regla nueva: el servidor rechaza
- * el alta con esa misma condicion, asi que la landing y los formularios de
- * acceso pueden anticiparlo en lugar de dejar que el usuario descubra el
- * bloqueo al enviar el formulario.
+ * Usa la misma politica que `lib/better-auth/auth.ts`
+ * (`lib/auth/signup-policy.ts`): cerrada en produccion salvo
+ * ALLOW_PUBLIC_SIGNUP=true. Con solo SIGNUP_ALLOWLIST sigue "cerrada" para el
+ * publico: la landing no invita a registrarse y /sign-up ofrece la solicitud
+ * de acceso, con un enlace al alta para invitados.
  *
  * OJO: `ALLOW_PUBLIC_SIGNUP` no es `NEXT_PUBLIC_*`, asi que solo se puede
  * llamar desde un SERVER component. En cliente daria siempre `undefined`.
  * Si un cliente necesita el dato, que lo pase el layout como prop.
  */
 export function isPublicSignUpOpen(): boolean {
-    return process.env.NODE_ENV !== 'production' || process.env.ALLOW_PUBLIC_SIGNUP === 'true';
+    return resolveSignupPolicy(process.env).publicOpen;
 }

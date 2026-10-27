@@ -14,20 +14,23 @@ import {
     verifyDeleteReauthToken,
 } from "@/lib/auth/delete-reauth";
 import {deleteAuthAccountResidue} from "@/lib/better-auth/account-residue";
+import {createAuthMiddleware} from "better-auth/api";
+import {
+    isEmailAllowedToSignUp,
+    resolveSignupPolicy,
+    SIGNUP_NOT_INVITED_CODE,
+    SIGNUP_NOT_INVITED_MESSAGE,
+} from "@/lib/auth/signup-policy";
 
 
-const signUpDisabled =
-    process.env.NODE_ENV === 'production' && process.env.ALLOW_PUBLIC_SIGNUP !== 'true';
-const requireEmailVerification =
-    !signUpDisabled &&
-    (process.env.NODE_ENV === 'production' || process.env.REQUIRE_EMAIL_VERIFICATION === 'true');
-
-if (!signUpDisabled && requireEmailVerification) {
-    throw new Error(
-        'Registro abierto con verificación de email obligatoria, pero auth.ts no tiene sendVerificationEmail ' +
-        'configurado: el email de verificación nunca se enviaría y el alta quedaría bloqueada. ' +
-        'Implementa el envío de email antes de abrir el registro, o desactiva REQUIRE_EMAIL_VERIFICATION en dev.'
-    );
+// Politica de alta compartida con las paginas de acceso (ver
+// `lib/auth/signup-policy.ts`): alta cerrada en produccion salvo
+// ALLOW_PUBLIC_SIGNUP=true, o abierta solo a los emails de SIGNUP_ALLOWLIST.
+// No hay envio de verificacion de email, asi que no se exige (antes, abrir el
+// registro en produccion hacia que la app fallara al arrancar).
+const signupPolicy = resolveSignupPolicy(process.env);
+for (const warning of signupPolicy.warnings) {
+    console.warn(`[auth] ${warning}`);
 }
 
 const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => betterAuth({
@@ -37,19 +40,16 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
     emailAndPassword: {
         enabled: true,
         // P0: en producción el signup queda cerrado por defecto para evitar
-        // creación masiva de cuentas por bots. Para abrirlo de forma
-        // controlada usa ALLOW_PUBLIC_SIGNUP=true.
-        // En dev/test se mantiene abierto para no friccionar el desarrollo.
-        disableSignUp: signUpDisabled,
-        // auth.ts no tiene sendVerificationEmail configurado: si el registro
-        // está abierto y la verificación es obligatoria, el alta queda
-        // bloqueada para siempre (el email de verificación nunca sale). Por
-        // eso esa combinación falla al arrancar con un error claro (ver
-        // arriba) en lugar de romper el signup en silencio.
-        requireEmailVerification: requireEmailVerification,
+        // creación masiva de cuentas por bots. Se abre a todos con
+        // ALLOW_PUBLIC_SIGNUP=true o solo a los emails de SIGNUP_ALLOWLIST
+        // (filtrados en `hooks.before`). En dev/test sigue abierto.
+        disableSignUp: !signupPolicy.signUpEnabled,
+        // Sin envío de verificación configurado: exigirla dejaría el alta
+        // bloqueada para siempre (ver `lib/auth/signup-policy.ts`).
+        requireEmailVerification: signupPolicy.requireEmailVerification,
         minPasswordLength: 8,
         maxPasswordLength: 128,
-        autoSignIn: !signUpDisabled && !requireEmailVerification,
+        autoSignIn: signupPolicy.signUpEnabled && !signupPolicy.requireEmailVerification,
         // Un reset invalida las sesiones existentes: si alguien habia robado
         // una cookie, deja de servir en cuanto se cambia la contrasena.
         revokeSessionsOnPasswordReset: true,
@@ -64,6 +64,21 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
                 });
             }
             : undefined,
+    },
+    // Con el registro cerrado y lista de invitados, el servidor solo acepta el
+    // alta de esos emails: la página puede enseñar el formulario, pero quien
+    // decide es este filtro.
+    hooks: {
+        before: createAuthMiddleware(async (ctx) => {
+            if (ctx.path !== '/sign-up/email') return;
+            const email: unknown = (ctx.body as { email?: unknown } | undefined)?.email;
+            if (!isEmailAllowedToSignUp(email, signupPolicy)) {
+                throw new APIError(403, {
+                    message: SIGNUP_NOT_INVITED_MESSAGE,
+                    code: SIGNUP_NOT_INVITED_CODE,
+                });
+            }
+        }),
     },
     rateLimit: {
         enabled: env.NODE_ENV === 'production'

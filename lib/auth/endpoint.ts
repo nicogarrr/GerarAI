@@ -3,6 +3,7 @@ import type { BetterAuthOptions } from 'better-auth';
 import { parseSetCookieHeader, toCookieOptions } from 'better-auth/cookies';
 import { getAuth } from '@/lib/better-auth/auth';
 import { AppError } from '@/lib/types/errors';
+import { SIGNUP_NOT_INVITED_CODE, SIGNUP_NOT_INVITED_MESSAGE } from '@/lib/auth/signup-policy';
 
 type AuthEndpoint =
     | '/sign-in/email'
@@ -73,6 +74,10 @@ export async function callAuthEndpoint(
         const signupMessage = path === '/sign-up/email' && (response.status === 400 || response.status === 422)
             ? signupMessages[code] : undefined;
         if (signupMessage) throw new AppError(signupMessage, `AUTH_ENDPOINT_${code}`, response.status);
+        // Registro cerrado con lista de invitados: email fuera de SIGNUP_ALLOWLIST.
+        if (path === '/sign-up/email' && response.status === 403 && code === SIGNUP_NOT_INVITED_CODE) {
+            throw new AppError(SIGNUP_NOT_INVITED_MESSAGE, `AUTH_ENDPOINT_${code}`, response.status);
+        }
         const message = response.status === 429
             ? 'Demasiados intentos. Espera un momento antes de volver a intentarlo.'
             : response.status === 401
