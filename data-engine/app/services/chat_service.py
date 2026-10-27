@@ -568,10 +568,25 @@ _CAPABILITIES_ANSWER = (
 )
 
 _DOCTRINE_CUE_RE = re.compile(
-    r"(?i)\b(?:doctrina|cartas?|biblioteca|principios|filosof[ií]a|"
+    r"(?i)\b(?:doctrina|biblioteca|"
     r"buffett|munger|howard\s+marks|fundsmith|smithson|numantia|azvalor|magallanes|"
     r"value\s+investing|inversi[oó]n\s+en\s+valor)\b"
 )
+
+
+# Palabras comunes no prueban que el usuario consulte una fuente: "a
+# principios de año" o "una carta a mi banco" siguen siendo preguntas
+# personales. Solo los términos cualificados indican doctrina de inversión.
+_DOCTRINE_QUALIFIED_RE = re.compile(
+    r"(?i)\b(?:cartas?\s+(?:a\s+(?:los\s+)?)?(?:accionistas|inversores)|"
+    r"cartas?\s+de\s+(?:inversi[oó]n|fondos?|gestores?)|"
+    r"(?:principios|filosof[ií]a)\s+de\s+(?:la\s+)?inversi[oó]n)\b"
+)
+
+
+def _is_doctrine_question(question: str) -> bool:
+    return bool(_DOCTRINE_CUE_RE.search(question) or _DOCTRINE_QUALIFIED_RE.search(question))
+
 
 _PORTFOLIO_SELF_RE = re.compile(
     r"(?i)\b(?:mi|mis)\s+(?:cartera|posici[oó]n(?:es)?|inversi[oó]n(?:es)?|acciones|holdings)\b"
@@ -1080,7 +1095,7 @@ class ChatService:
         # Una pregunta a la biblioteca («¿qué opina la carta de Numantia
         # sobre …?») va a la recuperación aunque nombre algo con forma de
         # ticker: la respuesta está en la carta, no en el maestro.
-        doctrine_question = bool(_DOCTRINE_CUE_RE.search(question or ""))
+        doctrine_question = _is_doctrine_question(question or "")
         if company is None and not ticker:
             from app.services.chat_unknown_ticker import (
                 unknown_ticker_answer,
@@ -2182,7 +2197,7 @@ class ChatService:
         # traer fragmentos a un "hola".
         library_context = (
             retrieve_library_context(db, question, vector=vector_chat)
-            if company is None or _DOCTRINE_CUE_RE.search(question or "")
+            if company is None or _is_doctrine_question(question or "")
             else []
         )
         library_lines = [

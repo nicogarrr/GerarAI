@@ -174,3 +174,35 @@ def test_el_reparto_de_numantia_recupera_el_pasaje(db, library_calls):
 def test_preguntas_personales_siguen_en_el_contexto_personal(db, question):
     path, _ = _route(db, question)
     assert path == "personal_context"
+
+
+@pytest.mark.parametrize("question", [
+    "¿Qué riesgo tengo en mi cartera a principios de año?",
+    "Para una carta a mi banco, ¿qué riesgo tengo en mi cartera?",
+    "Mi filosofía es ahorrar: ¿qué riesgo tengo en mi cartera?",
+])
+def test_palabras_comunes_no_desvian_la_pregunta_personal(db, library_calls, question):
+    path, _ = _route(db, question)
+    assert path == "personal_context"
+    assert not library_calls
+
+
+@pytest.mark.parametrize("question", [
+    "¿Qué principios aplica la carta de Numantia a mi cartera?",
+    "¿Qué dicen las cartas a los accionistas sobre diversificar mi cartera?",
+    "¿Qué principios de inversión explican el riesgo de mi cartera?",
+    "¿Qué filosofía de inversión explica el riesgo de mi cartera?",
+])
+def test_doctrina_explicita_aun_consulta_biblioteca(db, library_calls, question):
+    path, _ = _route(db, question)
+    assert path != "personal_context"
+    assert library_calls
+
+
+@pytest.mark.parametrize("question", [
+    "¿Qué opinas de TSLAA a principios de año?",
+    "En mi carta al banco, ¿qué opinas de TSLAA?",
+])
+def test_palabras_comunes_no_ocultan_ticker_desconocido(db, question):
+    path, _ = _route(db, question)
+    assert path == "unknown_ticker"
