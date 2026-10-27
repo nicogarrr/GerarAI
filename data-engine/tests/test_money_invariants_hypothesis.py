@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from hypothesis import assume, given, settings
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from app.services.fx_attribution import split_unrealized_pnl
@@ -136,32 +136,26 @@ def test_fifo_conservation_native(ops):
 
 @given(ops=covered_sequences())
 @SLOW
-def test_fifo_conservation_base(ops):
-    """La misma ley en divisa base: cada tramo convertido a su tipo de fecha."""
+def test_fifo_base_uses_native_gain_at_sale_fx(ops):
+    """DGT: every sale converts its native cost and gain at its sale-date FX.
+
+    Historical purchase-date EUR cost is not conserved across FX movements;
+    native FIFO conservation is tested separately. Native deferred losses are
+    part of native cost and must be converted at the later sale date as well.
+    """
     events = sorted(
         (_tx(a, q, p, f, d, i, c) for i, (a, q, p, f, d, c) in enumerate(ops)),
         key=_fifo_sort_key,
     )
-    lots, year_sales = replay_tax_fifo(events, _rate_fn, date(2000, 1, 1), date(2099, 1, 1))
-    buy_cost = sum(
-        ((q * p + f) * _rate_fn(c, d) for a, q, p, f, d, c in ops if a == "buy"), C("0")
-    )
-    blocked_created = sum(
-        (
-            e["sale"]["blocked_qty"] * e["sale"]["loss_per_share_base"]
-            for e in year_sales
-            if e["sale"] and e["sale"]["loss_per_share_base"] is not None
-        ),
-        C("0"),
-    )
-    consumed = sum((e["cost_base"] for e in year_sales if e["cost_base"] is not None), C("0"))
-    assert all(e["cost_base"] is not None for e in year_sales)
-    remaining = sum(
-        (lot["qty"] * lot["unit_base"] + lot["deferred_base"] for lot in lots), C("0")
-    )
-    assert all(lot["unit_base"] is not None and lot["deferred_base"] is not None for lot in lots)
-    tol = C("1e-9") + buy_cost * C("1e-12")
-    assert abs(buy_cost + blocked_created - consumed - remaining) <= tol
+    _, sales = replay_tax_fifo(events, _rate_fn, date(2000, 1, 1), date(2099, 1, 1))
+    for entry in sales:
+        tx = entry["transaction"]
+        rate = _rate_fn(tx.currency, tx.trade_date)
+        expected_cost = entry["cost_native"] * rate
+        expected_gain = entry["gain_native"] * rate
+        tol = C("1e-9") + abs(expected_cost) * C("1e-12")
+        assert abs(entry["cost_base"] - expected_cost) <= tol
+        assert abs(entry["gain_base_raw"] - expected_gain) <= tol
 
 
 @given(ops=covered_sequences())
@@ -419,11 +413,12 @@ def test_dca_rsi_bounded(closes, period):
         assert value is None or 0.0 <= value <= 100.0
 
 
-@given(closes=_closes, i=st.integers(0, 79), months=st.integers(1, 30))
+@given(data=st.data(), months=st.integers(1, 30))
 @FAST
-def test_dca_sma_within_window(closes, i, months):
+def test_dca_sma_within_window(data, months):
     """La media simple cae dentro del rango de su ventana (indice valido)."""
-    assume(i < len(closes))
+    closes = data.draw(st.lists(st.floats(min_value=0.01, max_value=10000, allow_nan=False, allow_infinity=False), min_size=1, max_size=80), label="nonempty closes")
+    i = data.draw(st.integers(0, len(closes) - 1), label="valid index")
     value = _sma(closes, i, months)
     if value is None:
         return
