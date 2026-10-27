@@ -3,10 +3,10 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const src = readFileSync(new URL('../components/portfolio/PortfolioValueBreakdown.tsx', import.meta.url), 'utf8');
-test('Inicio hides the exchange-rate explanation without removing date or incomplete-FX warnings', () => {
+test('Inicio hides the exchange-rate explanation and mixed-date note without changing valuation or incomplete-FX warning', () => {
     assert.doesNotMatch(src, /Tipos de cambio usados\./);
-    assert.match(src, /summary\.valuationDatesDiffer/);
-    assert.match(src, /el total combina fechas distintas/);
+    assert.doesNotMatch(src, /summary\.valuationDatesDiffer/);
+    assert.doesNotMatch(src, /el total combina fechas distintas/);
     assert.match(src, /Faltan tipos de cambio\. El desglose excluye esos saldos y posiciones\./);
     assert.match(src, /formatMoney\(totalValue, baseCurrency\)/);
 });
