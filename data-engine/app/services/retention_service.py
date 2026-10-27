@@ -21,12 +21,21 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.core.tenancy import tenant_filters
-from app.models import ChatTelemetryEvent, Document, DocumentChunk, Tenant
+from app.models import (
+    ChatTelemetryEvent,
+    ClaimEvidence,
+    Document,
+    DocumentChunk,
+    EvidenceSuggestion,
+    KPIExtractionCandidate,
+    Tenant,
+)
 from app.services.document_store import DocumentStore
 from app.services.rag import RAGIndex
 
@@ -77,6 +86,8 @@ class RetentionService:
             "chunks_deleted": 0,
             "telemetry_deleted": 0,
             "external_failures": 0,
+            "documents_deferred_evidence": 0,
+            "database_failures": 0,
             "access_requests": {
                 "engine": "mongodb_ttl",
                 "note": "Las solicitudes de acceso no viven en Postgres; Mongo las expira por TTL.",
@@ -100,6 +111,8 @@ class RetentionService:
                 "chunks_deleted",
                 "telemetry_deleted",
                 "external_failures",
+                "documents_deferred_evidence",
+                "database_failures",
             ):
                 totals[key] += result[key]
             logger.info(
@@ -138,6 +151,8 @@ class RetentionService:
             "chunks_deleted": 0,
             "telemetry_deleted": 0,
             "external_failures": 0,
+            "documents_deferred_evidence": 0,
+            "database_failures": 0,
         }
 
         documents = db.scalars(
@@ -159,41 +174,55 @@ class RetentionService:
         for document in documents:
             metadata = dict(document.metadata_ or {})
             result["documents_examined"] += 1
+            # Retener las pruebas de claims y candidatos: ni cascada ni
+            # eliminar almacenamiento antes de descubrir un FK restrictivo.
+            chunk_ids = select(DocumentChunk.id).where(
+                *tenant_filters(db, DocumentChunk), DocumentChunk.document_id == document.id,
+            )
+            referenced = any(
+                db.scalar(select(model.id).where(
+                    *tenant_filters(db, model), model.document_chunk_id.in_(chunk_ids),
+                ).limit(1)) is not None
+                for model in (ClaimEvidence, EvidenceSuggestion, KPIExtractionCandidate)
+            )
+            if referenced:
+                result["documents_deferred_evidence"] += 1
+                continue
             if dry_run:
                 result["documents_tombstoned"] += 1
                 continue
             try:
-                if document.storage_uri:
-                    self.store.delete(document.storage_uri)
-                self.index.delete_document_points(tenant_id, document.id)
-            except Exception:  # noqa: BLE001 - se reintenta en la proxima corrida
-                result["external_failures"] += 1
-                logger.warning(
-                    "retention external cleanup failed document=%s tenant=%s",
-                    document.id,
-                    tenant_id,
-                    exc_info=True,
-                )
-                continue
-            result["chunks_deleted"] += int(
-                db.execute(
-                    delete(DocumentChunk).where(
+                with db.begin_nested():
+                    deleted = int(db.execute(delete(DocumentChunk).where(
                         *tenant_filters(db, DocumentChunk),
                         DocumentChunk.document_id == document.id,
-                    )
-                ).rowcount
-            )
-            document.storage_uri = None
-            document.retention_tombstoned_at = now
-            document.metadata_ = {
-                **metadata,
-                "retention_tombstone": {
-                    "tombstoned_at": now.isoformat(),
-                    "policy_days": retention_days,
-                    "reason": "financial_document_retention",
-                },
-            }
-            db.add(document)
+                    )).rowcount)
+                    document.storage_uri, uri = None, document.storage_uri
+                    document.retention_tombstoned_at = now
+                    document.metadata_ = {
+                        **metadata,
+                        "retention_tombstone": {
+                            "tombstoned_at": now.isoformat(),
+                            "policy_days": retention_days,
+                            "reason": "financial_document_retention",
+                        },
+                    }
+                    # Validar las restricciones antes de efectos externos.
+                    db.flush()
+                    if uri:
+                        self.store.delete(uri)
+                    self.index.delete_document_points(tenant_id, document.id)
+            except SQLAlchemyError:
+                result["database_failures"] += 1
+                logger.warning("retention database cleanup deferred document=%s tenant=%s",
+                               document.id, tenant_id, exc_info=True)
+                continue
+            except Exception:  # noqa: BLE001 - rollback del savepoint, se reintenta
+                result["external_failures"] += 1
+                logger.warning("retention external cleanup failed document=%s tenant=%s",
+                               document.id, tenant_id, exc_info=True)
+                continue
+            result["chunks_deleted"] += deleted
             result["documents_tombstoned"] += 1
 
         telemetry_filter = and_(
