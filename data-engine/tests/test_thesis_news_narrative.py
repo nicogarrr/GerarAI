@@ -507,15 +507,16 @@ def test_invalid_llm_output_stays_fail_closed_with_evidence(context):
     assert provider.calls == 1
 
 
-def test_news_narrative_request_carries_reasoning_effort_none(context):
+def test_news_narrative_request_carries_section_reasoning_effort(context):
     _, _, _ = context
     provider = Provider()
     result = call(context, provider)
     assert result is not None
-    # Override por request medido 2026-10-26: reasoning=0 y finish=stop en
-    # el endpoint real; el default del proveedor (chat, otros) no cambia.
+    # Esfuerzo de la tabla por seccion (tesis_noticias = low, eval 2026-10-27)
+    # con un tope que deja sitio al razonamiento.
     assert provider.requests
-    assert provider.requests[0].reasoning_effort == "none"
+    assert provider.requests[0].reasoning_effort == "low"
+    assert provider.requests[0].max_tokens == 6000
 
 
 def test_wiring_usa_factoria_tesis_go_y_compendio_si_disabled(context, monkeypatch):

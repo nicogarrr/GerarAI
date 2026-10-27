@@ -169,6 +169,13 @@ _MD_HEADER_RE = re.compile(r"^#{1,6}\s+", re.MULTILINE)
 _HTML_TAG_RE = re.compile(r"<[a-zA-Z/][^>]*>")
 
 
+def _effort(section: str, explicit: str | None) -> str | None:
+    """Valor explicito del env si existe; si no, la tabla por seccion."""
+    if explicit is not None and explicit.strip():
+        return explicit.strip()
+    return get_settings().reasoning_effort_for(section)
+
+
 def _strip_markup(text: str) -> str:
     """Quita marcadores de presentacion dejando el texto interior intacto.
 
@@ -822,12 +829,13 @@ def _build_request(facts: list[dict], extra_note: str | None = None) -> LLMReque
         ],
         task="deep_thesis",
         temperature=0.2,
-        max_tokens=4000,
-        # Medido 2026-10-26 (imagen aislada, endpoint real): con effort
-        # alto/low el razonamiento oculto agotaba max_tokens; con "none"
-        # reasoning=0, finish=stop y salida completa bajo el tope. El
-        # override es por request: chat y demas consumidores no cambian.
-        reasoning_effort=get_settings().thesis_deep_narrative_reasoning_effort,
+        # Con 4000 el razonamiento agotaba el tope (por eso iba en "none").
+        # Medido 2026-10-27 con el modelo real: low usa 2-5,6k tokens de
+        # salida (razonamiento incluido), high hasta 12,8k. 16000 deja sitio.
+        max_tokens=16000,
+        # Esfuerzo de la tabla por seccion (tesis_profunda); un valor
+        # explicito en THESIS_DEEP_NARRATIVE_REASONING_EFFORT sigue ganando.
+        reasoning_effort=_effort("tesis_profunda", get_settings().thesis_deep_narrative_reasoning_effort),
         response_format=ResponseFormat.json_schema(
             _OUTPUT_SCHEMA, name="thesis_deep_narrative"
         ),
