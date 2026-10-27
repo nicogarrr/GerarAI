@@ -122,8 +122,8 @@ export default function PrivacyPage() {
                         <li>
                             Documentos financieros: por defecto 2.555 días (7 años),
                             configurable con <code>FINANCIAL_DOCUMENT_RETENTION_DAYS</code>. La purga
-                            requiere activar la tarea de conservación y desactivar el modo de simulación.
-                            Por defecto está apagada y en simulación; esos plazos no garantizan un borrado automático.
+                            requiere activar la tarea de conservación y desactivar el modo de prueba sin borrado.
+                            Por defecto está apagada y en modo de prueba sin borrado; esos plazos no garantizan un borrado automático.
                             Cuando se ejecuta la purga, se borran el original, los fragmentos y los vectores, y se
                             conserva una referencia tombstone sin contenido para que las
                             decisiones históricas sigan siendo auditables.
