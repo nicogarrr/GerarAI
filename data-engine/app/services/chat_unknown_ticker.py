@@ -23,19 +23,26 @@ _ACRONYMS = frozenset(
 _TICKER_TOKEN_RE = re.compile(r"(?<![\w.])([A-Z][A-Z0-9]{1,5}(?:\.[A-Z]{1,3})?)(?![\w])")
 
 
-def unknown_ticker_mentions(question: str, known_tickers: Iterable[str]) -> list[str]:
+def unknown_ticker_mentions(
+    question: str, known_tickers: Iterable[str], *, ignore_spans: Iterable[tuple[int, int]] = ()
+) -> list[str]:
     """Tickers en mayúsculas de la pregunta que no están en el maestro.
 
     Una pregunta escrita entera en mayúsculas no cuenta (no hay forma de
     distinguir un ticker de una palabra). Se respeta el orden de aparición.
+    ``ignore_spans`` son tramos ocupados por el nombre de una empresa
+    conocida: su primera palabra en mayúsculas no es un ticker.
     """
     text = question or ""
     if not any(ch.islower() for ch in text):
         return []
     known = {t.upper() for t in known_tickers}
+    spans = list(ignore_spans)
     out: list[str] = []
     for match in _TICKER_TOKEN_RE.finditer(text):
         token = match.group(1)
+        if any(s <= match.start(1) and match.end(1) <= e for s, e in spans):
+            continue  # parte del nombre de una empresa conocida («AST SpaceMobile»)
         base = token.split(".")[0]
         if token in known or base in _ACRONYMS or token in _ACRONYMS:
             continue

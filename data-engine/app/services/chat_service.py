@@ -776,6 +776,14 @@ class ChatService:
                 ok = len(token) >= 3
             if ok:
                 found[token] = company
+        if not found:
+            # Nombre en texto llano («AST SpaceMobile», «Apple»): antes la
+            # primera palabra en mayúsculas pasaba por ticker desconocido.
+            from app.services.company_names import companies_named_in
+
+            named = companies_named_in(question, companies)
+            if len(named.companies) == 1 and not named.ambiguous:
+                return named.companies[0]
         return next(iter(found.values())) if len(found) == 1 else None
 
     def _latest_thesis(self, db: Session, company: Company) -> ThesisVersion | None:
@@ -1069,14 +1077,37 @@ class ChatService:
             company = page_context.company
         # Ticker nombrado que GerarAI no tiene («¿qué opinas de TSLAA?»): se dice,
         # sin pasar por el generador libre, que inventaba sobre él.
+        # Una pregunta a la biblioteca («¿qué opina la carta de Numantia
+        # sobre …?») va a la recuperación aunque nombre algo con forma de
+        # ticker: la respuesta está en la carta, no en el maestro.
+        doctrine_question = bool(_DOCTRINE_CUE_RE.search(question or ""))
         if company is None and not ticker:
             from app.services.chat_unknown_ticker import (
                 unknown_ticker_answer,
                 unknown_ticker_mentions,
             )
+            from app.services.company_names import ambiguous_name_answer, companies_named_in
 
+            named = companies_named_in(question, db.scalars(select(Company)).all())
+            if named.ambiguous and not named.companies and not doctrine_question:
+                word, candidates = named.ambiguous[0]
+                return ChatResponse(
+                    answer=ambiguous_name_answer(word, candidates),
+                    sources=[],
+                    model="deterministic",
+                    prompt_version="company-ambiguous-v1",
+                    confidence=0.9,
+                    llm_trace={
+                        "path": "company_ambiguous", "generated": False, "provider_calls": 0,
+                        "candidates": [c.ticker for c in candidates],
+                    },
+                    context=context_echo,
+                )
             known_tickers = list(db.scalars(select(Company.ticker)).all())
-            unknown = unknown_ticker_mentions(question, known_tickers)
+            unknown = (
+                [] if doctrine_question
+                else unknown_ticker_mentions(question, known_tickers, ignore_spans=named.spans)
+            )
             if unknown:
                 return ChatResponse(
                     answer=unknown_ticker_answer(unknown, known_tickers),
@@ -1225,7 +1256,7 @@ class ChatService:
         # la abstención «Selecciona la empresa» o en el LLM sin contexto
         # («no tengo acceso a tu watchlist»). Se responden con el contexto
         # personal y comprobación de cifras (personal_answer).
-        if company is None and not ticker:
+        if company is None and not ticker and not doctrine_question:
             from app.services.personal_answer import (
                 answer_personal_question,
                 detect_personal_intent,
