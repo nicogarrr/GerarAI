@@ -441,6 +441,14 @@ class PortfolioIntelligenceService:
                 )
                 + (
                     [
+                        f"Benchmark annualized return and alpha not shown: only {benchmark['observations']} overlapping daily observation(s) (minimum {MIN_ANNUALIZATION_SESSIONS}); benchmark TWR and tracking error are unaffected."
+                    ]
+                    if benchmark.get("status") == "calculated"
+                    and benchmark["observations"] < MIN_ANNUALIZATION_SESSIONS
+                    else []
+                )
+                + (
+                    [
                         f"{len(missing_fx)} position(s) excluded from totals, weights and exposures: no base-currency value (missing FX)."
                     ]
                     if missing_fx
@@ -1141,12 +1149,20 @@ class PortfolioIntelligenceService:
         port = [portfolio_returns[day] for day in dates]
         bench = [benchmark_returns[day] for day in dates]
         bench_twr = self._compound(bench)
+        # Las cifras anualizadas del benchmark se guian por SUS observaciones
+        # solapadas (no por las del portfolio global): con menos de 60 sesiones
+        # compartidas, extrapolar a un ano no es informativo.
+        annualize = len(dates) >= MIN_ANNUALIZATION_SESSIONS
         bench_annualized = (
-            (1 + bench_twr) ** (252 / len(bench)) - 1 if bench_twr > -1 else None
+            (1 + bench_twr) ** (252 / len(bench)) - 1
+            if annualize and bench_twr > -1
+            else None
         )
         port_twr = self._compound(port)
         port_annualized = (
-            (1 + port_twr) ** (252 / len(port)) - 1 if port_twr > -1 else None
+            (1 + port_twr) ** (252 / len(port)) - 1
+            if annualize and port_twr > -1
+            else None
         )
         active = [p - b for p, b in zip(port, bench)]
         tracking_error = pstdev(active) * math.sqrt(252) if len(active) >= 2 else None
