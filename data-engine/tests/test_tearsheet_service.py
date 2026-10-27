@@ -249,3 +249,19 @@ def test_explicit_gross_weights_use_absolute_values_for_long_short_positions():
     assert result["top_1_weight"] == pytest.approx(1.8)  # legacy NAV, unchanged
     assert result["top_5_weight"] == pytest.approx(0.6)
     assert all(row.weight == Decimal("0.123") for row in rows)
+
+
+@pytest.mark.parametrize("unknown", [None, Decimal("NaN"), Decimal("Infinity")])
+def test_gross_fields_are_unknown_if_any_position_valuation_is_missing_or_nonfinite(unknown):
+    from types import SimpleNamespace
+
+    snapshot = PortfolioDailySnapshot(
+        portfolio_id=1, snapshot_date=date(2026, 9, 18), base_currency="EUR",
+        positions_value_base=Decimal("9000"), cash_value_base=Decimal("1000"), total_value_base=Decimal("10000"),
+    )
+    rows = [SimpleNamespace(market_value_base=Decimal("9000")), SimpleNamespace(market_value_base=unknown)]
+    result = exposure_from_snapshot(snapshot, rows)
+    assert result["gross_positions_value_base"] is None
+    assert result["top_1_gross_positions_weight"] is None
+    assert result["top_5_gross_positions_weight"] is None
+    assert result["top_1_weight"] == pytest.approx(0.9)  # NAV contract unchanged

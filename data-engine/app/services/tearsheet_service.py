@@ -144,15 +144,17 @@ def exposure_from_snapshot(
     cash_value = _safe_float(snapshot.cash_value_base) or 0.0
     weights: list[float] = []
     gross_values: list[float] = []
+    gross_complete = True
     for row in position_rows:
         value = _safe_float(row.market_value_base)
         if value is None:
+            gross_complete = False
             continue
         if total > 0:
             weights.append(value / total)
         gross_values.append(abs(value))
     weights.sort(reverse=True)
-    gross_value = sum(gross_values) if gross_values else None
+    gross_value = sum(gross_values) if gross_complete and gross_values else None
     gross_weights = sorted((value / gross_value for value in gross_values), reverse=True) if gross_value else []
     equity_weight = positions_value / total if total > 0 else None
     return {
