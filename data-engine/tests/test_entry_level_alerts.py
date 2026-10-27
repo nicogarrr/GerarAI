@@ -7,8 +7,8 @@ from app.services import entry_level_alerts as ela
 D = date(2026, 10, 26)
 
 
-def r(t, lvl, d=D, close=66.13):
-    return ela.LevelReading(t, lvl, d, close, "regla-de-prueba")
+def r(t, lvl, d=D, close=66.13, status="confirmed", model="m-test-1"):
+    return ela.LevelReading(t, lvl, d, close, "regla-de-prueba", model, "fuente-de-prueba", d, status)
 
 
 def test_no_provider_means_no_alerts_never_a_default_rule():
@@ -59,5 +59,23 @@ def test_email_is_informative_with_source_and_no_trade_instruction():
     assert subject == "UBER entra en nivel 4"
     assert "2026-10-26" in body and "66.13" in body and "regla-de-prueba" in body
     assert "no una recomendacion ni una orden" in body
-    ev_none, _ = ela.plan_events(1, [ela.LevelReading("X", 1, D, None, "s")], {})
+    ev_none, _ = ela.plan_events(1, [r("X", 1, close=None)], {})
     assert "Cierre: sin dato" in ela.render_email(ev_none[0])[1]
+
+
+def test_status_must_be_provisional_or_confirmed_and_is_shown():
+    with pytest.raises(ValueError):
+        ela.plan_events(1, [r("UBER", 3, status="maybe")], {})
+    ev, _ = ela.plan_events(1, [r("UBER", 3, status="provisional")], {})
+    body = ela.render_email(ev[0])[1]
+    assert (
+        "Estado: provisional" in body
+        and "modelo m-test-1" in body
+        and "fuente-de-prueba, hasta 2026-10-26" in body
+    )
+
+
+def test_fingerprint_changes_with_model_version_and_status():
+    a = ela.fingerprint(1, r("UBER", 4))
+    assert a != ela.fingerprint(1, r("UBER", 4, model="m-test-2"))
+    assert a != ela.fingerprint(1, r("UBER", 4, status="provisional"))

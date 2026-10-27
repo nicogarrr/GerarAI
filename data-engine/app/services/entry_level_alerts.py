@@ -7,6 +7,9 @@ ni periodicidad, ni mapeo a zonas de ningun producto externo.
 
 Garantias que si fija este modulo, con independencia de la regla:
 - Solo niveles enteros 1..4; cualquier otro valor se rechaza (no se redondea).
+- Cada lectura declara modelo (version), fuente y fecha de datos y estado
+  (provisional o confirmed); el criterio de esos estados lo fija el modelo
+  validado, no este modulo. Un estado fuera de esos dos valores se rechaza.
 - Un aviso solo sale al ENTRAR en un nivel distinto del ultimo avisado de ese
   ticker. Repetir la misma lectura es idempotente: no genera nada.
 - Sin lectura (None) no se inventa estado: ni aviso ni cambio del ultimo nivel.
@@ -18,13 +21,16 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from typing import Protocol
 
 VERSION = "entry-level-alert-v1"
 MIN_LEVEL = 1
 MAX_LEVEL = 4
+
+
+STATUSES = ("provisional", "confirmed")
 
 
 class LevelRuleNotConfigured(RuntimeError):
@@ -39,7 +45,11 @@ class LevelReading:
     level: int
     signal_date: date
     close: float | None
-    rule_source: str  # nombre/version de la regla que la produjo, visible al usuario
+    rule_source: str  # nombre de la regla que la produjo, visible al usuario
+    model_version: str = "sin-version"  # version exacta del modelo; sin ella no hay trazabilidad
+    data_source: str = "sin-fuente"  # origen de los datos de precio usados
+    data_as_of: date | None = None  # fecha de los ultimos datos usados
+    status: str = "sin-estado"  # "provisional" | "confirmed"; el criterio lo define el modelo validado
 
 
 @dataclass(frozen=True)
@@ -61,8 +71,11 @@ def validate_level(level: object) -> int:
 
 
 def fingerprint(tenant_id: int, reading: LevelReading) -> str:
-    """Clave de idempotencia: tenant, ticker, nivel y fecha de senal de la lectura."""
-    raw = f"{VERSION}:{tenant_id}:{reading.ticker.upper()}:{reading.level}:{reading.signal_date.isoformat()}"
+    """Clave de idempotencia: tenant, ticker, nivel, fecha de senal, version y estado."""
+    raw = (
+        f"{VERSION}:{tenant_id}:{reading.ticker.upper()}:{reading.level}:"
+        f"{reading.signal_date.isoformat()}:{reading.model_version}:{reading.status}"
+    )
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -86,16 +99,17 @@ def plan_events(
             continue
         seen.add(ticker)
         level = validate_level(reading.level)
+        if reading.status not in STATUSES:
+            raise ValueError(f"estado invalido (provisional|confirmed): {reading.status!r}")
         previous = state.get(ticker)
         if previous == level:
             continue
+        normalized = replace(reading, ticker=ticker, level=level)
         events.append(
             EntryEvent(
-                reading=LevelReading(ticker, level, reading.signal_date, reading.close, reading.rule_source),
+                reading=normalized,
                 previous_level=previous,
-                fingerprint=fingerprint(
-                    tenant_id, LevelReading(ticker, level, reading.signal_date, None, "")
-                ),
+                fingerprint=fingerprint(tenant_id, normalized),
             )
         )
         state[ticker] = level
@@ -117,10 +131,13 @@ def render_email(event: EntryEvent) -> tuple[str, str]:
     body = "\n".join(
         [
             f"{r.ticker} ha entrado en el nivel {r.level} (de {MIN_LEVEL} a {MAX_LEVEL}; {MAX_LEVEL} es el mas alto).",
-            f"Estado: {prev}.",
+            f"Historial: {prev}.",
             f"Fecha de senal: {r.signal_date.isoformat()}",
             f"Cierre: {close}",
-            f"Regla: {r.rule_source}",
+            f"Estado: {r.status}",
+            f"Regla: {r.rule_source} (modelo {r.model_version})",
+            f"Datos: {r.data_source}"
+            + ("" if r.data_as_of is None else f", hasta {r.data_as_of.isoformat()}"),
             "",
             "Es un aviso informativo de tu watchlist, no una recomendacion ni una orden de compra o venta.",
         ]
