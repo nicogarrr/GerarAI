@@ -42,7 +42,8 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
     const startingRef = useRef(false);
     const [pollExhausted, setPollExhausted] = useState(false);
     const pollCountRef = useRef(0);
-    // Hora del último sondeo: los segundos transcurridos avanzan con cada poll (3 s).
+    // Reloj local: se fija en cada sondeo y avanza cada 1 s mientras el job
+    // corre, para que los segundos no salten de 3 en 3 con el polling.
     const [polledAt, setPolledAt] = useState(0);
     // El resultado solo se anuncia para el trabajo lanzado en esta sesión: el
     // último job guardado puede ser de una versión anterior a la vigente.
@@ -127,6 +128,13 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
             clearTimeout(timer);
         };
     }, [active, jobId, router, pollExhausted]);
+
+    const running = job?.status === 'running';
+    useEffect(() => {
+        if (!running) return;
+        const clock = setInterval(() => setPolledAt(Date.now()), 1000);
+        return () => clearInterval(clock);
+    }, [running]);
 
     const start = async () => {
         if (busy || startingRef.current) return;
