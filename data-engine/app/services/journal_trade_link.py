@@ -27,6 +27,7 @@ from app.models import (
     ValuationModel,
     ValuationOutput,
 )
+from app.schemas.api import valuation_uses_inferred_inputs
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,17 @@ def _as_date(value: object) -> date | None:
     if isinstance(value, date):
         return value
     return None
+
+
+def _known_on(row: ThesisVersion | ValuationModel, day: date) -> bool:
+    """The current mutable revision must already have existed on the trade day.
+
+    A draft can be published or recalculated in place after creation. Without
+    revision history we cannot reconstruct its old value, so omit that row.
+    """
+    created = _as_date(row.created_at)
+    updated = _as_date(row.updated_at)
+    return created is not None and created <= day and (updated is None or updated <= day)
 
 
 def _positive(raw: object) -> float | None:
@@ -112,7 +124,9 @@ def fair_value_on(
             .where(ThesisVersion.company_id == company.id, ThesisVersion.status == "published")
             .order_by(desc(ThesisVersion.version))
         ).all()
-        if (_as_date(row.created_at) or date.max) <= day and _positive(row.expected_value)
+        if _known_on(row, day)
+        and _positive(row.expected_value)
+        and not valuation_uses_inferred_inputs(row.valuation_basis)
     ]
     thesis = theses[0] if theses else None
     engine_row: tuple[ValuationModel, float] | None = None
@@ -121,7 +135,7 @@ def fair_value_on(
         .where(ValuationModel.company_id == company.id)
         .order_by(desc(ValuationModel.version))
     ).all():
-        if (_as_date(model.created_at) or date.max) > day or model.status == "insufficient_data":
+        if not _known_on(model, day) or model.status not in ("final", "draft"):
             continue
         output = db.scalar(
             select(ValuationOutput).where(ValuationOutput.valuation_model_id == model.id).limit(1)
@@ -172,7 +186,9 @@ def fair_value_on(
     trade_price = _positive(price)
     if trade_price is None:
         note = "Sin precio de ejecución: no se calcula el margen."
-    elif currency and company.currency and currency.upper() != company.currency.upper():
+    elif not currency or not company.currency:
+        note = "Divisa desconocida: no se calcula el margen."
+    elif currency.upper() != company.currency.upper():
         note = (
             f"Operación en {currency.upper()} y valoración en {company.currency.upper()}: "
             "divisa distinta, no se calcula el margen."

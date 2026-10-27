@@ -292,3 +292,71 @@ def test_routes_validate_and_link(db):
     )
     assert unlinked["transaction"] is None
     assert decision_journal("UBER", db)[0]["transaction_id"] is None
+
+
+def test_inferred_thesis_is_not_used_as_historical_fair_value(db):
+    company = _company(db)
+    _thesis(db, company, version=1, created=datetime(2026, 1, 10, tzinfo=UTC), expected="900")
+    thesis = db.query(ThesisVersion).one()
+    thesis.valuation_basis = {"inferred_inputs_used": ["revenue_growth"]}
+    db.commit()
+    # Updating the basis also changes updated_at; keep this fixture before the trade.
+    thesis.updated_at = datetime(2026, 1, 10, tzinfo=UTC)
+    db.commit()
+    day = date(2026, 3, 12)
+    assert fair_value_on(db, company, day, price=Decimal("72"), currency="USD") is None
+    _engine(db, company, version=1, created=datetime(2026, 2, 1, tzinfo=UTC), expected=80.0)
+    reading = fair_value_on(db, company, day, price=Decimal("64"), currency="USD")
+    assert reading is not None
+    assert reading["source"] == "motor"
+    assert reading["value"] == 80.0
+
+
+def test_thesis_updated_after_trade_cannot_leak_its_new_value_into_history(db):
+    company = _company(db)
+    _thesis(db, company, version=1, created=datetime(2026, 1, 10, tzinfo=UTC), expected="90")
+    _thesis(db, company, version=2, created=datetime(2026, 2, 1, tzinfo=UTC), expected="900")
+    thesis = db.query(ThesisVersion).filter_by(version=2).one()
+    # A draft existed in February, but the current published revision is from April.
+    thesis.updated_at = datetime(2026, 4, 1, tzinfo=UTC)
+    db.commit()
+    reading = fair_value_on(db, company, date(2026, 3, 12), price=Decimal("72"), currency="USD")
+    assert reading is not None
+    assert reading["version"] == 1
+    assert reading["value"] == 90.0
+
+
+def test_failed_engine_is_not_a_historical_valuation_candidate(db):
+    company = _company(db)
+    _engine(db, company, version=1, created=datetime(2026, 2, 1, tzinfo=UTC), expected=80.0)
+    _engine(db, company, version=2, created=datetime(2026, 3, 1, tzinfo=UTC), expected=800.0, status="failed")
+    reading = fair_value_on(db, company, date(2026, 3, 12), price=Decimal("64"), currency="USD")
+    assert reading is not None
+    assert reading["version"] == 1
+    assert reading["value"] == 80.0
+
+
+@pytest.mark.parametrize("trade_currency,company_currency", [(None, "USD"), ("USD", ""), ("", "USD")])
+def test_unknown_currency_does_not_imply_comparable_prices(db, trade_currency, company_currency):
+    company = _company(db)
+    company.currency = company_currency
+    # Empty legacy company metadata and an omitted execution currency are unknown.
+    _engine(db, company, version=1, created=datetime(2026, 2, 1, tzinfo=UTC), expected=80.0)
+    reading = fair_value_on(db, company, date(2026, 3, 12), price=Decimal("64"), currency=trade_currency)
+    assert reading is not None
+    assert reading["margin_vs_trade_price"] is None
+    assert reading["note"]
+
+
+def test_engine_updated_after_trade_does_not_leak_recalculated_value(db):
+    company = _company(db)
+    _engine(db, company, version=1, created=datetime(2026, 2, 1, tzinfo=UTC), expected=80.0)
+    _engine(db, company, version=2, created=datetime(2026, 3, 1, tzinfo=UTC), expected=800.0)
+    model = db.query(ValuationModel).filter_by(version=2).one()
+    model.updated_at = datetime(2026, 4, 1, tzinfo=UTC)
+    db.commit()
+    reading = fair_value_on(db, company, date(2026, 3, 12), price=Decimal("64"), currency="USD")
+    assert reading is not None
+    assert reading["version"] == 1
+    assert reading["value"] == 80.0
+
