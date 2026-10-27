@@ -296,6 +296,8 @@ def test_valuation_question_uses_published_thesis_figures_and_flags_newer_draft(
     r = AssistantResponse.model_validate(answer(db, AssistantRequest(
         mode="explore", ticker="ASTS", question="¿Cómo va la valoración y la tesis?")))
     assert "base $120.50" in r.answer and "12,3 %" in r.answer and "v10 publicada" in r.answer
+    assert "fórmula no verificada" in r.answer
+    assert "no es un margen comparable" in r.answer
     assert "borrador sin publicar" in r.answer
     assert "999" not in r.answer and "50,0" not in r.answer
 

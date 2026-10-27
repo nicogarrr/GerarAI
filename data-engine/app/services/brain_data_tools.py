@@ -26,6 +26,7 @@ from app.schemas import ChatResponse
 from app.services.investment_plan_service import InvestmentPlanService
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.screener_fundamentals import load_screener_ratios
+from app.valuation.margin_convention import historical_margin_note
 
 
 def _number(value) -> str:
@@ -284,7 +285,8 @@ def _thesis_valuation_answer(db: Session, question: str, tenant: int) -> ChatRes
     if published.margin_of_safety is None:
         lines.append("Margen de seguridad: pendiente en la tesis.")
     else:
-        lines.append(f"Margen de seguridad de la tesis: {_pct(published.margin_of_safety)}.")
+        lines.append(f"Margen de seguridad archivado de la tesis: {_pct(published.margin_of_safety)}. "
+                     + historical_margin_note(published.valuation_basis))
     parts = [f"{label} {_money(value, ccy)}" for label, value in (
         ("bajista", published.bear_value), ("base", published.base_value), ("alcista", published.bull_value),
         ("esperado", published.expected_value)) if value is not None]

@@ -34,13 +34,13 @@ def _company(db: Session, ticker: str) -> Company:
     return company
 
 
-def _valuation(db: Session, company: Company, *, version: int, status: str, mos) -> None:
+def _valuation(db: Session, company: Company, *, version: int, status: str, mos, convention="discount_to_value_v1") -> None:
     model = ValuationModel(company_id=company.id, model_type="standard_dcf", version=version,
                            status=status, calculation_trace={})
     db.add(model)
     db.flush()
     db.add(ValuationOutput(valuation_model_id=model.id, scenario="base", value_per_share=Decimal("100"),
-                           output_payload={"margin_of_safety": mos, "status": status}))
+                           output_payload={"margin_of_safety": mos, "status": status, "trace": {"margin_of_safety_convention": convention}}))
     db.commit()
 
 
@@ -149,3 +149,14 @@ def test_metric_coverage_lists_context_metrics_with_data(db):
     assert "tiene_tesis" in coverage
     assert "nivel_dca" not in coverage  # sin tabla DCA, no se ofrece
     assert set(CONTEXT_METRICS) >= {"margen_seguridad", "tiene_tesis", "tesis_publicada", "nivel_dca"}
+
+
+@pytest.mark.parametrize("convention", [None, "valuation-engines-v2", "future_formula"])
+def test_unknown_margin_cannot_pass_screener_as_current(db, convention):
+    company = _company(db, "UNKNOWN")
+    _valuation(db, company, version=1, status="final", mos=0.3)
+    _valuation(db, company, version=2, status="final", mos=0.8, convention=convention)
+    assert company.id not in context_observations(db, {"margen_seguridad"})
+    # History remains untouched, and no fallback to the older verified version.
+    latest = db.scalar(sa.select(ValuationOutput).order_by(ValuationOutput.id.desc()))
+    assert latest.output_payload["margin_of_safety"] == 0.8
