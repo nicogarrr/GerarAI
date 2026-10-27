@@ -213,7 +213,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
         ) : null}
       </div>
 
-      <div aria-label="Filtros de mercado" className="flex min-w-0 flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/30 p-2 sm:flex-row sm:items-center sm:justify-between">
+      <div aria-label="Filtros de mercado" className="flex min-w-0 flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/30 p-2 xl:flex-row xl:items-center xl:justify-between">
         <VistaTabs vista={vista} />
         <SectorSelect
           options={SECTORES.map((s) => ({ value: s.en, label: etiquetaSector(s.en) }))}
