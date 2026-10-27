@@ -13,7 +13,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, MarketPrice
-from app.services.price_units import price_in_currency
+from app.services.price_units import listing_price
 from app.valuation.currency import listing_currency
 
 # Unica fuente que cuenta como cierre oficial: barras diarias reales (job
@@ -140,11 +140,13 @@ def compute_session_changes(
     def _entry(day, close, volume, registered, ticker, name, sector, currency, quote_currency) -> dict:
         company = SimpleNamespace(ticker=ticker, currency=currency)
         currency = listing_currency(ticker, currency)
-        normalized = (
-            price_in_currency(close, quote_currency=quote_currency, target_currency=currency, company=company)
-            if close is not None
-            else None
-        )
+        normalized = None
+        if close is not None:
+            # Divisa de la cotizacion que declara Yahoo (SHEL.L en GBp aunque
+            # las cuentas sean USD): el precio se muestra en ESA divisa.
+            listed = listing_price(close, quote_currency=quote_currency, company=company)
+            if listed is not None:
+                normalized, currency = listed
         return {
             "ticker": ticker,
             "name": name,
@@ -203,6 +205,17 @@ def compute_session_changes(
     stale_excluded = 0
     for company_id, last in latest.items():
         prev = previous.get(company_id)
+        if (
+            prev is not None
+            and prev["price"] is not None
+            and last["price"] is not None
+            and prev["currency"] != last["currency"]
+        ):
+            # La divisa de la cotizacion cambia entre las dos sesiones (GBX y
+            # luego USD en la misma linea): dato ambiguo del proveedor, ni
+            # precio ni ranking. Una divisa estable distinta de la de las
+            # cuentas (SHEL.L en GBp, cuentas USD) si se muestra.
+            last = {**last, "price": None}
         base = float(prev["price"]) if prev and prev["price"] is not None else 0.0
         current = session_day is not None and last["date"] == session_day.isoformat()
         comparable = (
@@ -210,6 +223,8 @@ def compute_session_changes(
             and prev is not None
             and last["price"] is not None
             and prev["date"] == (prev_session_day.isoformat() if prev_session_day else None)
+            # Misma divisa de cotizacion en las dos sesiones (sin mezclar).
+            and prev["currency"] == last["currency"]
         )
         # Sin cierre anterior no hay cambio medible: None (la UI muestra "—"),
         # nunca un 0.0% que aparenta un dato que no existe.
@@ -251,12 +266,16 @@ def ticker_close_change(db: Session, company_id: int) -> dict | None:
     company = db.get(Company, company_id)
     if company is None:
         return None
-    currency = listing_currency(company.ticker, company.currency)
-    last = price_in_currency(last_close, quote_currency=last_unit, target_currency=currency, company=company)
-    prev = price_in_currency(prev_close, quote_currency=prev_unit, target_currency=currency, company=company)
-    if last is None or prev is None:
+    last_listed = listing_price(last_close, quote_currency=last_unit, company=company)
+    prev_listed = listing_price(prev_close, quote_currency=prev_unit, company=company)
+    if last_listed is None or prev_listed is None:
         return None
-    last, prev = float(last), float(prev)
+    # Ambos cierres en la divisa de su cotizacion; distinta divisa entre las
+    # dos sesiones no da una variacion honesta.
+    if last_listed[1] != prev_listed[1]:
+        return None
+    currency = last_listed[1]
+    last, prev = float(last_listed[0]), float(prev_listed[0])
     if last <= 0 or prev <= 0:
         return None
     return {

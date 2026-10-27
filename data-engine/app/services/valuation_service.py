@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
 from app.models import Company, MarketPrice, Position, ValuationModel, ValuationOutput
-from app.services.price_units import price_in_currency
+from app.services.price_units import listing_price, price_in_currency
 from app.valuation.currency import (
     listing_currency,
     listing_quote_unit,
@@ -155,10 +155,26 @@ def resolve_model_price(db: Session, company_id: int, as_of: date | None = None)
             market_price.close, quote_currency=market_price.quote_currency,
             target_currency=major, company=company,
         )
+        price_currency = major
+        if (
+            converted is None
+            and market_price.quote_currency
+            and (market_price.source or "").lower() == "yfinance"
+        ):
+            # La divisa del precio es la de la COTIZACION que declara Yahoo
+            # (SHEL.L: GBp), no la de las cuentas (USD). Se expresa en su
+            # divisa principal y _reconcile_currency la pasa a la de las
+            # cuentas con FX. Solo filas yfinance: las FMP/Finnhub antiguas
+            # de emisores no-US llevan USD del gemelo americano (F159).
+            listed = listing_price(
+                market_price.close, quote_currency=market_price.quote_currency, company=company,
+            )
+            if listed is not None:
+                converted, price_currency = listed
         if converted is not None:
             close = ModelPrice(
                 value=float(converted),
-                currency=major,
+                currency=price_currency,
                 as_of=market_price.date,
                 source="market_close",
             )

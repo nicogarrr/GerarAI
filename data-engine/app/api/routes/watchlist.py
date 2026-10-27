@@ -329,7 +329,24 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
             split_events_by_company(db, [company.id]).get(company.id, []),
             period_end_date(eps_row.period),
         )
-        per = float(price_row.close) / (float(eps_row.value) / float(split_factor))
+        # Cierre cotizado en otra divisa que las cuentas (SHEL.L en GBp con
+        # EPS en USD): FX point-in-time a la divisa de la compania; sin tipo,
+        # PER N/D (nunca peniques divididos por un EPS en dolares).
+        from decimal import Decimal
+
+        from app.services.price_units import close_in_company_currency
+
+        close = close_in_company_currency(
+            db, Decimal(str(price_row.close)), quote_currency=price_row.quote_currency,
+            company=company, on=price_row.date,
+        )
+        if close is None:
+            sources.append(
+                f"PER: N/D: cierre en {price_row.quote_currency} sin tipo de cambio "
+                f"a {company.currency} para {price_row.date.isoformat()}")
+            return {"market_cap": market_cap, "per": None,
+                    "currency": company.currency, "sources": sources}
+        per = float(close) / (float(eps_row.value) / float(split_factor))
         source = (f"PER: cierre {price_row.date.isoformat()} / "
                   f"{eps_row.metric} FY{eps_row.fiscal_year} ({eps_row.source_type})")
         if split_factor != 1:
