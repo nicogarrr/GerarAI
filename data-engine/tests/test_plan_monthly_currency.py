@@ -166,12 +166,13 @@ def test_monthly_anniversary_clamps_to_month_end():
     assert clamp(date(2026, 1, 15), 1) == date(2026, 2, 15)
 
 
-def test_same_currency_uses_calendar_month_count_even_if_not_due(db):
+def test_same_currency_counts_only_due_installments(db):
     service = InvestmentPlanService()
     _plan(service, db, start_date=date(2026, 1, 25), monthly_contribution_currency="EUR")
     m = service.plan_metrics(db, today=TODAY)  # 25-mar aun no vencida
     assert m["months_elapsed"] == 2
-    assert m["expected_contributions_base"] == pytest.approx(1000)  # compat
+    # La cuota del 25-mar aun no vence: solo 1 cuota exigible (igual que la via FX).
+    assert m["expected_contributions_base"] == pytest.approx(500)
 
 
 def test_drift_exposes_next_contribution_currency(db):
