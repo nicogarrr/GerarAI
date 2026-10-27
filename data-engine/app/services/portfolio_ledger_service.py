@@ -178,6 +178,16 @@ class PortfolioLedgerService:
             raise ValueError("Transaction trade_date cannot be in the future")
         company = self.ensure_company(db, ticker)
         portfolio = self.fx.ensure_portfolio(db)
+        if normalized_action in {"buy", "sell"}:
+            snapshot_position = db.scalar(select(Position).where(
+                Position.company_id == company.id, *tenant_filters(db, Position),
+                Position.source == "screenshot_confirmed",
+            ))
+            if snapshot_position is not None:
+                raise ValueError(
+                    "Esta posición procede de una captura sin historial. "
+                    "Importa primero el fichero del bróker para conciliar antes de añadir compras o ventas"
+                )
 
         if normalized_action == "sell":
             # Validate BEFORE writing anything. The oversell was previously
@@ -255,6 +265,31 @@ class PortfolioLedgerService:
                 .order_by(Transaction.trade_date, Transaction.created_at, Transaction.id)
             ).all()
         )
+        snapshot = db.scalar(select(Position).where(
+                Position.company_id == company_id, *tenant_filters(db, Position),
+                Position.source == "screenshot_confirmed",
+        ))
+        if snapshot is not None:
+            if transactions:
+                # Covers edits/reassignments and every rebuild caller, not only
+                # create_transaction: no ledger can replace an opening snapshot
+                # until a broker import has explicitly reconciled its source.
+                raise ValueError(
+                    "Esta posición procede de una captura sin historial. "
+                    "Importa el fichero del bróker para conciliar antes de modificar operaciones"
+                )
+            if not transactions:
+                # No opening trades were invented for this snapshot. A rebuild
+                # has nothing to replay and must not delete it or fabricate cost.
+                snapshot.base_currency = self.fx.base_currency(db)
+                self.update_market_price(
+                    db, company_id=company_id, position=snapshot,
+                    price=snapshot.market_price, as_of=snapshot.as_of,
+                )
+                snapshot.cost_basis_native = None
+                snapshot.cost_basis_base = None
+                snapshot.realized_pnl_base = None
+                return snapshot
         currencies = {transaction.currency.upper() for transaction in transactions}
         if len(currencies) > 1:
             raise PortfolioMixedCurrencyError(

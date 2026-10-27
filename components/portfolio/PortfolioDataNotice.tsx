@@ -15,6 +15,11 @@ export default function PortfolioDataNotice({ quality }: { quality?: PortfolioDa
             {quality.reasons.includes('mixed_valuation_dates') && <p className="mt-2 text-amber-300">
                 Posiciones y caja tienen fechas distintas: el valor mostrado no es una foto conciliada del mismo día.
             </p>}
+            {quality.position_sources.includes('screenshot_confirmed') && <p className="mt-2 text-amber-300">
+                Hay posiciones importadas desde una captura sin historial de compras. El coste y la rentabilidad no están determinados.
+                {' '}La captura no acredita caja, deuda de margen ni que la cartera esté completa: el valor y los pesos mostrados solo cubren las posiciones registradas.
+                {' '}Importa el fichero del bróker para conciliar antes de añadir compras o ventas de esas posiciones.
+            </p>}
             <details className="mt-2">
                 <summary className="cursor-pointer">Caja por divisa e historial disponible</summary>
                 <p className="mt-2">{Object.entries(quality.cash_native).map(([currency, balance]) => formatMoney(balance, currency)).join(' · ') || 'Sin saldos registrados'}.
