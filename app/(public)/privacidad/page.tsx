@@ -91,7 +91,7 @@ export default function PrivacyPage() {
                         <li>
                             <strong>Hosting y bases de datos</strong>: Vercel (frontend, con las
                             funciones en la región de Fráncfort, fra1), Oracle Cloud (servidor
-                            del motor de datos), MongoDB Atlas (cuentas y datos auxiliares) y
+                            del motor de datos en la región eu-madrid-1, Madrid, España), MongoDB Atlas (cuentas y datos auxiliares) y
                             PostgreSQL en el propio servidor.
                         </li>
                         <li>
