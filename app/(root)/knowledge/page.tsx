@@ -46,6 +46,8 @@ export const metadata: Metadata = {
     'Libros, cartas y casos de estudio separados de la evidencia de empresas, con principios de inversión aprobados por humanos y trazables.',
 };
 
+const KNOWLEDGE_PAGE_SIZE = 50;
+
 type PageProps = { searchParams: Promise<{ document?: string; status?: string; tab?: string; documentOffset?: string; principleOffset?: string }> };
 
 /** Pestañas de la página. El estado vive en la URL (?tab=): los disparadores
@@ -328,6 +330,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
 
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
         <div className="mb-4 flex items-center gap-2">            <BookOpen aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="text-lg font-semibold text-gray-100">{t('knowledge.documents')}</h2></div>
+        <PageNavigation offset={documentOffset} count={documents.length} total={library.documentTotal} parameter="documentOffset" tab="biblioteca" />
         {!documents.length ? <div className="py-2 text-sm text-gray-500"><p>No hay documentos en esta página.</p><Link className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href="/knowledge?tab=subir">Sube tu primer libro, carta o caso de estudio</Link></div> : null}
         <div aria-label="Documentos de conocimiento" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -521,6 +524,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
             )
           ) : null}
         </div>
+        <PageNavigation offset={principleOffset} count={principles.length} total={library.principleTotal} parameter="principleOffset" tab="principios" status={query.status} />
       </section>
         </TabsContent>
       </Tabs>
@@ -532,9 +536,10 @@ function PageNavigation({ offset, count, total, parameter, tab, status }: {
   offset: number; count: number; total: number; parameter: string; tab: string; status?: string;
 }) {
   const href = (next: number) => `/knowledge?${new URLSearchParams({ tab, [parameter]: String(next), ...(status ? { status } : {}) })}`;
+  if (offset === 0 && offset + count >= total) return null;
   return <nav aria-label={tab === 'principios' ? 'Páginas de principios' : 'Páginas de documentos'} className="my-4 flex flex-wrap items-center gap-3 text-sm text-gray-400">
     <span>{count ? `${offset + 1}-${offset + count} de ${total}` : `0 de ${total}`}</span>
-    {offset > 0 ? <Button asChild variant="outline" className="min-h-11"><Link href={href(Math.max(0, offset - 50))}>Anteriores</Link></Button> : null}
-    {offset + count < total ? <Button asChild variant="outline" className="min-h-11"><Link href={href(offset + 50)}>Siguientes</Link></Button> : null}
+    {offset > 0 ? <Button asChild variant="outline" className="min-h-11"><Link href={href(Math.max(0, offset - KNOWLEDGE_PAGE_SIZE))}>Anteriores</Link></Button> : null}
+    {offset + count < total ? <Button asChild variant="outline" className="min-h-11"><Link href={href(offset + KNOWLEDGE_PAGE_SIZE)}>Siguientes</Link></Button> : null}
   </nav>;
 }
