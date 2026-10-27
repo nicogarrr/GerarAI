@@ -410,11 +410,11 @@ export function DecisionAndRealityPanel({
                 <div className="mt-2 rounded border border-teal-900/50 bg-teal-950/10 p-2 text-xs leading-5 text-gray-300">
                   <p><span className="text-teal-300">Operación:</span> {describeTrade(entry.transaction)}</p>
                   {isAutoLinked(entry.metadata) ? (
-                    <p className="text-amber-200" data-testid="journal-auto-link-badge">
+                    <div className="text-amber-200" data-testid="journal-auto-link-badge">
                       <Badge variant="outline">Enlace detectado automáticamente</Badge>{' '}
                       Coincide en empresa, sentido y fecha (hasta 3 días después), sin otra candidata. No confirma cantidad ni cuenta: corrígelo si no es esa operación.
-                    </p>
-                  ) : null}
+                    </div>
+                  ) : <p className="text-teal-300" data-testid="journal-confirmed-link">Enlace confirmado manualmente</p>}
                   <p className="text-gray-400" title="Margen = valor justo / precio de ejecución − 1">{describeFairValue(entry.fair_value_on_day)}</p>
                   <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage="Operación desenlazada">
                     <input name="transaction_id" type="hidden" value="" />
@@ -423,7 +423,11 @@ export function DecisionAndRealityPanel({
                 </div>
               ) : trades.length > 0 ? (
                 <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-2 flex flex-wrap items-center gap-2" successMessage="Decisión enlazada a la operación">
-                  {ambiguousCandidateIds(entry.metadata) ? (
+                  {isSuggested(entry.metadata) ? (
+                    <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-suggested-link" role="status">
+                      Sugerencia sin confirmar: una operación coincide en empresa, sentido y fecha (hasta 3 días después). No se conoce cantidad ni cuenta, así que no se ha enlazado. Confírmala o deja la decisión sin operación.
+                    </p>
+                  ) : ambiguousCandidateIds(entry.metadata) ? (
                     <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-ambiguous-link" role="status">
                       Hay varias operaciones posibles para esta decisión y no se ha enlazado ninguna sola. Elige cuál la ejecutó, o deja la decisión sin operación.
                     </p>
@@ -436,10 +440,13 @@ export function DecisionAndRealityPanel({
                       <option key={trade.id} value={trade.id}>{describeTrade(trade)}</option>
                     ))}
                   </select>
-                  <Button size="sm" type="submit" variant="outline">Enlazar</Button>
+                  <Button size="sm" type="submit" variant="outline">{isSuggested(entry.metadata) ? 'Confirmar enlace' : 'Enlazar'}</Button>
                     </>
                   ) : null}
                 </MutationForm>
+              ) : null}
+              {!entry.transaction && (entry.metadata?.auto_link as { status?: unknown } | undefined)?.status === 'user_unlinked' ? (
+                <p className="mt-2 text-xs text-gray-400" data-testid="journal-no-operation">Sin operación por elección del usuario. No se enlazará automáticamente.</p>
               ) : null}
               {!entry.transaction && ambiguousCandidateIds(entry.metadata) ? (
                 <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage="Decisión marcada sin operación">
@@ -533,12 +540,14 @@ function AssumptionSources({ fuentes }: { fuentes?: Array<{ fact_id: number; tit
 }
 
 
-/** Candidatas que dejó la importación cuando NO pudo enlazar sola (varias posibles). */
+/** Candidatas detectadas, sin confirmación del usuario. */
 function ambiguousCandidateIds(metadata: Record<string, unknown> | undefined): number[] | null {
   const link = metadata?.auto_link as { status?: unknown; candidate_transaction_ids?: unknown } | undefined;
+  const sug = metadata?.auto_link as { status?: unknown; candidate_transaction_id?: unknown } | undefined;
+  if (sug?.status === 'suggested' && typeof sug.candidate_transaction_id === 'number') return [sug.candidate_transaction_id];
   if (!link || link.status !== 'ambiguous' || !Array.isArray(link.candidate_transaction_ids)) return null;
   const ids = link.candidate_transaction_ids.filter((id): id is number => typeof id === 'number');
-  return ids.length > 0 ? ids : null;
+  return ids;
 }
 
 /** Con ambigüedad, el selector ofrece SOLO las candidatas que siguen existiendo (puede quedar vacío); nunca todas. */
@@ -552,4 +561,8 @@ function tradesForEntry(trades: JournalTrade[], metadata: Record<string, unknown
 function isAutoLinked(metadata: Record<string, unknown> | undefined): boolean {
   const link = metadata?.auto_link as { status?: unknown } | undefined;
   return link?.status === 'linked';
+}
+
+function isSuggested(metadata: Record<string, unknown> | undefined): boolean {
+  return (metadata?.auto_link as { status?: unknown } | undefined)?.status === 'suggested';
 }

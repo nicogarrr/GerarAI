@@ -38,6 +38,8 @@ DECISION_TRADE_ACTION = {"buy": "buy", "sell": "sell", "trim": "sell"}
 # considera candidata. HIPOTESIS de producto sin confirmar: la operacion debe
 # ser del mismo dia o posterior (la decision precede a la ejecucion; una compra
 # anterior pudo responder a otro razonamiento) y a <= 3 dias.
+# Conservador por defecto: un candidato unico se SUGIERE (status "suggested") y el usuario lo
+# confirma; fecha/lado/moneda/precio no bastan para fijar el vinculo (faltan cantidad/cuenta/hora).
 AUTO_LINK_WINDOW_DAYS = 3
 # Veto por precio: si la entrada guarda un precio y esta en la misma divisa que
 # la operacion, una diferencia relativa mayor que esta no es candidata. El
@@ -249,10 +251,10 @@ def _price_compatible(
 def auto_link_journal_trades(
     db: Session, company_ids: set[int] | None = None
 ) -> dict[str, int]:
-    """Enlaza decisiones del diario con su operacion SOLO si la correspondencia es inequivoca.
+    """Detecta candidatas; nunca confirma por heuristica una asociacion historica.
 
     Una decision sin operacion (``transaction_id`` nulo) de compra/venta/reduccion
-    se enlaza a una compra/venta de la misma empresa cuando:
+    recibe una sugerencia de compra/venta de la misma empresa cuando:
     - la accion coincide (buy->buy, sell/trim->sell),
     - la operacion es del mismo dia que la decision o hasta ``AUTO_LINK_WINDOW_DAYS``
       despues (una operacion anterior pudo responder a otro razonamiento),
@@ -268,7 +270,7 @@ def auto_link_journal_trades(
     (``metadata.auto_link.status == "user_unlinked"``) no se vuelve a enlazar.
     Idempotente.
     """
-    summary = {"linked": 0, "ambiguous": 0, "unlinked": 0}
+    summary = {"linked": 0, "ambiguous": 0, "unlinked": 0, "suggested": 0}
     query = select(DecisionJournalEntry).where(
         DecisionJournalEntry.decision.in_(list(DECISION_TRADE_ACTION)),
     )
@@ -359,33 +361,15 @@ def auto_link_journal_trades(
         unique = len(found) == 1 and entries_by_trade[found[0].id] == 1
         ambiguous = len(found) > 1 or (bool(found) and entries_by_trade[found[0].id] > 1)
         if _is_auto(entry):
-            if unique and found[0].id == entry.transaction_id:
-                continue  # sigue siendo inequivoca: sin cambios
-            # Ya no es inequivoca (nueva ejecucion, otra decision...): se deshace
-            # el enlace AUTOMATICO y se pide eleccion. Nunca toca enlaces manuales.
+            # Un enlace heuristico anterior tampoco equivale a confirmacion del usuario.
             entry.transaction_id = None
             summary["unlinked"] += 1
-            if found:
-                meta["auto_link"] = {
-                    "status": "ambiguous",
-                    "candidate_transaction_ids": sorted(trade.id for trade in found),
-                    "at": now,
-                }
-                summary["ambiguous"] += 1
-            else:
-                meta.pop("auto_link", None)
-            entry.metadata_ = meta
-        elif unique:
-            trade = found[0]
-            entry.transaction_id = trade.id
-            meta["auto_link"] = {
-                "status": "linked",
-                "method": f"unique_match_{window}d",
-                "at": now,
-                "transaction_id": trade.id,
-            }
-            entry.metadata_ = meta
-            summary["linked"] += 1
+        if unique:
+            previous = meta.get("auto_link") or {}
+            if previous.get("status") != "suggested" or previous.get("candidate_transaction_id") != found[0].id:
+                meta["auto_link"] = {"status": "suggested", "candidate_transaction_id": found[0].id, "at": now}
+                entry.metadata_ = meta
+            summary["suggested"] += 1
         elif ambiguous:
             ids = sorted(trade.id for trade in found)
             previous = meta.get("auto_link") or {}
@@ -393,7 +377,7 @@ def auto_link_journal_trades(
                 meta["auto_link"] = {"status": "ambiguous", "candidate_transaction_ids": ids, "at": now}
                 entry.metadata_ = meta
             summary["ambiguous"] += 1
-        elif (meta.get("auto_link") or {}).get("status") == "ambiguous":
+        elif (meta.get("auto_link") or {}).get("status") in ("ambiguous", "suggested", "linked"):
             # Ya no hay candidatas (fechas editadas, importacion corregida...): se limpia
             # la marca para no ofrecer candidatas obsoletas.
             meta.pop("auto_link", None)

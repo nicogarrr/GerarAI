@@ -95,3 +95,27 @@ describe('Diario: sin candidatas vigentes no se ofrecen todas las operaciones', 
         expect(screen.getByRole('button', { name: 'No enlazar (sin operación)' })).toBeTruthy();
     });
 });
+
+describe('Diario: sugerencia sin confirmar', () => {
+    it('ofrece solo la candidata y no la presenta como vínculo', () => {
+        render(
+            <DecisionAndRealityPanel
+                ticker="UBER"
+                decisions={[{ ...base, metadata: { auto_link: { status: 'suggested', candidate_transaction_id: 11 } } } as never]}
+                reviews={[]}
+                trades={[trade(11), trade(99)]}
+            />,
+        );
+        expect(screen.getByTestId('journal-suggested-link')).toHaveTextContent('Sugerencia sin confirmar');
+        expect(screen.getByRole('button', { name: 'Confirmar enlace' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'No enlazar (sin operación)' })).toBeTruthy();
+    });
+});
+
+describe('Diario: sin operación explícita', () => {
+    it('distingue la decisión de no enlazar', () => {
+        renderPanel({ auto_link: { status: 'user_unlinked' } });
+        expect(screen.getByTestId('journal-no-operation')).toHaveTextContent('Sin operación por elección del usuario');
+        expect(screen.queryByTestId('journal-suggested-link')).toBeNull();
+    });
+});
