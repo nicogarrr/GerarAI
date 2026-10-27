@@ -16,7 +16,16 @@ const API = join(root, 'app', 'api');
 // - auth catch-all: es quien abre la sesión.
 // - calendar-feed: feed ICS público por token opaco (las apps de calendario
 //   no tienen sesión); sus propiedades se auditan en el describe de abajo.
-const PUBLIC_ROUTES = new Set(['app/api/auth/[...all]/route.ts', 'app/api/calendar-feed/[token]/route.ts']);
+// - health: sonda de vida pública a propósito (balanceador y monitorización);
+//   respuesta constante sin sesión, DB, secretos ni llamadas a terceros.
+// - [...rest]: 404 de rutas de API inexistentes; respuesta constante que no
+//   revela nada, y exigir sesión diría 401 de algo que ni existe.
+const PUBLIC_ROUTES = new Set([
+    'app/api/auth/[...all]/route.ts',
+    'app/api/calendar-feed/[token]/route.ts',
+    'app/api/health/route.ts',
+    'app/api/[...rest]/route.ts',
+]);
 
 function routes(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
