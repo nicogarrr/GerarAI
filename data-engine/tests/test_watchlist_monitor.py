@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 import main
 from app.core.database import SessionLocal, init_db
-from app.models import Company, MarketPrice, Tenant, ThesisVersion
+from app.models import Company, FundamentalModelVersion, MarketPrice, Tenant, ThesisVersion
 
 
 def _seed_monitor_fixtures() -> int:
@@ -37,6 +37,17 @@ def _seed_monitor_fixtures() -> int:
                 company_id=company.id, version=3, status="published",
                 thesis_markdown="t", executive_summary="s",
                 expected_value=150.0))
+        model = db.query(FundamentalModelVersion).filter(
+            FundamentalModelVersion.company_id == company.id,
+            FundamentalModelVersion.version == 1).first()
+        if model is None:
+            db.add(FundamentalModelVersion(
+                tenant_id=tenant.id if tenant else 1,
+                company_id=company.id, version=1, engine_version="test", algorithm_version="test",
+                framework_key="dcf", horizon_years=10, status="ok", publishable=True,
+                input_fingerprint="input", forecast_fingerprint="forecast",
+                market_snapshot_fingerprint="market", valuation_snapshot_fingerprint="valuation",
+            ))
         db.commit()
         return company.id
     finally:
