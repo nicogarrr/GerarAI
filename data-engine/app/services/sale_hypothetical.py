@@ -53,7 +53,7 @@ _BOUGHT_AT_RE = re.compile(
     rf"(?i)\bcompr\w*\s+(?:(?:las|los|todas|todo|todos)\s+)?(?:a|por)\s+(?:(?P<pre>{_CUR})\s*)?"
     rf"(?P<price>{_NUM})\s*(?P<cur>{_CUR})?"
 )
-_SALE_QTY_RE = re.compile(rf"(?i)\bvend\w*\s+(?:solo\s+|s[oó]lo\s+)?(?P<qty>{_NUM})\b")
+_SALE_QTY_RE = re.compile(rf"(?i)\bvend\w*\s+(?:solo\s+|s[oó]lo\s+)?(?P<qty>-?(?:{_NUM}))\b")
 _SALE_HALF_RE = re.compile(r"(?i)\bvend\w*\s+(?:la\s+)?mitad\b")
 
 _MONTHS = {

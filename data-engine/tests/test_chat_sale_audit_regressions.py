@@ -152,7 +152,7 @@ def test_explicit_foreign_price_needs_today_fx_not_position_value(ledger):
     assert "ganancia de 80,00 €" in resp.answer
 
 
-@pytest.mark.parametrize("qty", ["150", "0"])
+@pytest.mark.parametrize("qty", ["150", "0", "-5"])
 def test_saved_oversell_or_zero_never_silently_clamps(ledger, qty):
     db, company = ledger
     buy_sell(db, company, "2026-01-01", "buy", "100", "10")
@@ -165,6 +165,7 @@ def test_saved_oversell_or_zero_never_silently_clamps(ledger, qty):
 @pytest.mark.parametrize("suffix,expected", [
     ("vendo 15 a 20 euros", "no superar"),
     ("vendo 0 a 20 euros", "positiva"),
+    ("vendo -5 a 20 euros", "positiva"),
     ("vendo todas a 20 euros con 50 euros de comisiones", "comisiones"),
 ])
 def test_hypothetical_invalid_parameters_not_priced(ledger, suffix, expected):
