@@ -306,18 +306,6 @@ def reconcile_thesis_dispatches() -> dict:
     return stats
 
 
-# Fases reales de una generacion, en orden (refresh_sec solo con «tracked»).
-THESIS_PHASES = (
-    "collect_evidence",
-    "build_fundamental_model",
-    "run_valuation",
-    "persist_valuation_snapshot",
-    "source_audit",
-    "compose_thesis",
-    "persist_thesis",
-)
-
-
 def _live_phases(run: WorkflowRun) -> list[dict] | None:
     """Progreso en vivo publicado por el worker mientras genera (realqa-21).
 
@@ -326,18 +314,42 @@ def _live_phases(run: WorkflowRun) -> list[dict] | None:
     sondeo no veia ninguna fase y la UI decia «En cola». El worker publica
     aparte, en result_payload["progress"], la fase en curso y las ya hechas.
     """
-    if run.status not in {"running", "retrying"}:
+    if run.status != "running":
         return None
     progress = (run.result_payload or {}).get("progress") if isinstance(run.result_payload, dict) else None
     if not isinstance(progress, dict) or not isinstance(progress.get("phases"), list):
+        return None
+    # Un intento recuperado no puede reutilizar la fase del worker anterior.
+    # La identidad incluye el inicio, no solo el contador (compatibilidad con
+    # registros viejos). Sin metadatos verificables no anunciamos progreso.
+    try:
+        started = _utc(run.started_at)
+        progress_started = _utc(datetime.fromisoformat(progress["started_at"]))
+        published = _utc(datetime.fromisoformat(progress["published_at"]))
+        if (
+            progress.get("attempt") != run.attempt
+            or started is None
+            or progress_started != started
+            or published is None
+            or published < started
+            or published > datetime.now(UTC)
+        ):
+            return None
+    except (KeyError, TypeError, ValueError):
         return None
     return [p for p in progress["phases"] if isinstance(p, dict) and p.get("name")]
 
 
 def job_payload(run: WorkflowRun) -> dict:
     """Honest status payload: real phases and timestamps, never an ETA."""
-    steps = sorted(run.steps or [], key=lambda s: s.position)
-    live = None if steps else _live_phases(run)
+    steps = sorted(
+        (s for s in (run.steps or []) if s.attempt == run.attempt),
+        key=lambda s: s.position,
+    )
+    # Una fila confirmada (refresh_sec) puede convivir con fases nuevas aun
+    # dentro del SAVEPOINT. Solo el progreso del intento activo tiene prioridad;
+    # los estados terminales siempre usan los pasos confirmados.
+    live = _live_phases(run)
     if live is not None:
         phases = [
             {
@@ -502,7 +514,7 @@ def build_run_guard(run: WorkflowRun, settings, store=None, db: Session | None =
         raise LLMGuardAbort("guard_misconfigured") from None
 
 
-def _publish_live_progress(run_id: int, fence: int, phases: list[dict]) -> None:
+def _publish_live_progress(run_id: int, fence: int, started_at: datetime, phases: list[dict]) -> None:
     """Confirma el progreso en una sesion propia y corta, fuera del SAVEPOINT.
 
     Mejor esfuerzo: un fallo aqui nunca toca la generacion. Solo escribe si
@@ -518,8 +530,14 @@ def _publish_live_progress(run_id: int, fence: int, phases: list[dict]) -> None:
                     WorkflowRun.id == run_id,
                     WorkflowRun.attempt == fence,
                     WorkflowRun.status == "running",
+                    WorkflowRun.started_at == started_at,
                 )
-                .values(result_payload={"progress": {"phases": phases}})
+                .values(result_payload={"progress": {
+                    "attempt": fence,
+                    "started_at": started_at.isoformat(),
+                    "published_at": datetime.now(UTC).isoformat(),
+                    "phases": phases,
+                }})
             )
             progress_db.commit()
     except Exception:  # noqa: BLE001 - el progreso es informativo
@@ -624,6 +642,7 @@ def run_thesis_job(run_id: int) -> None:
         # recuperacion a mitad de la generacion en curso.
         run.started_at = now
         run.finished_at = None
+        run.result_payload = None  # Nunca reciclar progreso de un intento anterior.
         if tenant is not None:
             db.info["tenant_id"] = tenant.id
             db.info["user_id"] = str(user_id)
@@ -673,7 +692,7 @@ def run_thesis_job(run_id: int) -> None:
                     live[-1]["finished_at"] = now.isoformat()
                 live.append({"name": name, "status": "running", "started_at": now.isoformat(), "finished_at": None})
                 if publish_progress:
-                    _publish_live_progress(run_id, fence, [dict(p) for p in live])
+                    _publish_live_progress(run_id, fence, run.started_at, [dict(p) for p in live])
 
         try:
             # Guard por job (inactivo con max_posts=0). Dentro del try: un
