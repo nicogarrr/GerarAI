@@ -463,7 +463,7 @@ def test_utilities_engine_publishes_the_whole_arithmetic(db):
     assert result["status"] == "ok"
     assert result["base_value"] == pytest.approx(12.50, abs=1e-9)
     assert result["bear_value"] <= result["base_value"] <= result["bull_value"]
-    assert result["margin_of_safety"] == pytest.approx(result["expected_value"] / 12.0 - 1)
+    assert result["margin_of_safety"] == pytest.approx((result["expected_value"] - 12.0) / result["expected_value"])
     assert result["trace"]["no_net_debt_subtracted"] is True
     assert result["trace"]["engine_precedence_note"] == ENGINE_PRECEDENCE_NOTE
     assert result["dasr"]["enterprise_value"] == pytest.approx(1000.0 / 0.45)
@@ -554,7 +554,7 @@ def test_utilities_engine_converts_to_the_listed_share_for_an_adr_with_a_ratio(d
     assert result["value_per_share_basis"] == "ordinary_share"
     assert result["listed_share_values"]["base"] == pytest.approx(25.0)
     assert result["margin_of_safety"] == pytest.approx(
-        result["expected_value"] / 12.50 - 1
+        (result["expected_value"] - 12.50) / result["expected_value"]
     )
 
 
