@@ -180,3 +180,45 @@ def test_guarded_client_never_follows_redirects_or_reads_proxy_env() -> None:
         assert client.trust_env is False
     finally:
         asyncio.run(client.aclose())
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "224.0.0.1",
+        "239.255.255.250",
+        "255.255.255.255",
+        "0.0.0.0",
+        "ff02::1",
+        "fec0::1",
+        "::127.0.0.1",
+        "::8.8.8.8",
+        "::ffff:0:127.0.0.1",
+        "::ffff:0:8.8.8.8",
+        "64:ff9b:1::1",
+        "::",
+        "::1",
+        "fe80::1",
+        "fc00::1",
+        "2001:db8::1",
+    ],
+)
+def test_is_public_ip_rejects_special_prefixes(address) -> None:
+    assert egress_guard.is_public_ip(address) is False
+
+
+@pytest.mark.parametrize(
+    "address",
+    ["8.8.8.8", "93.184.216.34", "::ffff:8.8.8.8", "2001:4860:4860::8888"],
+)
+def test_is_public_ip_keeps_public_addresses(address) -> None:
+    assert egress_guard.is_public_ip(address) is True
+
+
+def test_public_literal_validator_and_backend_still_pass_public_host(net) -> None:
+    table, connects = net
+    table["llm.example.com"] = ["2001:4860:4860::8888"]
+    assert validate_base_url("custom", "https://llm.example.com/v1")
+    with pytest.raises(httpcore.ConnectError):
+        asyncio.run(egress_guard.PublicOnlyBackend().connect_tcp("llm.example.com", 443))
+    assert connects == [("2001:4860:4860::8888", 443)]

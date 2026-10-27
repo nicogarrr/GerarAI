@@ -40,21 +40,41 @@ async def _default_resolver(host: str, port: int) -> Iterable[Any]:
 _resolver: Resolver = _default_resolver
 
 
+_BLOCKED_V6 = tuple(
+    ipaddress.ip_network(n)
+    for n in (
+        "::/96",  # IPv4-compatible (obsoleto) y ::, ::1
+        "::ffff:0:0:0/96",  # SIIT
+        "64:ff9b:1::/48",  # NAT64 de uso local
+        "100::/64",  # discard-only
+        "fec0::/10",  # site-local (obsoleto)
+        "ff00::/8",  # multicast
+    )
+)
+
+
 def is_public_ip(value: str | ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    """True solo para direcciones globales; mira tambien IPv4 embebida en IPv6."""
+    """True solo para unicast global; mira tambien IPv4 embebida en IPv6."""
     try:
         ip = ipaddress.ip_address(value) if isinstance(value, str) else value
     except ValueError:
         return False
-    if isinstance(ip, ipaddress.IPv6Address):
-        embedded = ip.ipv4_mapped or ip.sixtofour
-        if embedded is None and ip.teredo is not None:
-            embedded = ip.teredo[1]
-        if embedded is None and ip in ipaddress.ip_network("64:ff9b::/96"):
-            embedded = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
-        if embedded is not None and not embedded.is_global:
-            return False
-    return ip.is_global
+    if ip.is_multicast or ip.is_unspecified or ip.is_loopback or ip.is_link_local:
+        return False
+    if ip.is_private or ip.is_reserved or not ip.is_global:
+        return False
+    if isinstance(ip, ipaddress.IPv4Address):
+        return ip != ipaddress.IPv4Address("255.255.255.255")
+    if any(ip in net for net in _BLOCKED_V6):
+        return False
+    embedded = ip.ipv4_mapped or ip.sixtofour
+    if embedded is None and ip.teredo is not None:
+        embedded = ip.teredo[1]
+    if embedded is None and ip in ipaddress.ip_network("64:ff9b::/96"):
+        embedded = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+    if embedded is not None and not is_public_ip(embedded):
+        return False
+    return True
 
 
 def validated_addresses(infos: Iterable[Any]) -> list[str]:
