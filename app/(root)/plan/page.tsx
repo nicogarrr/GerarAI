@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import PlanView from '@/components/plan/PlanView';
 import BackendOffline from '@/components/system/BackendOffline';
-import { getPlan, getPlanContributions, getPlanDrift } from '@/lib/actions/plan.actions';
+import { getPlan, getPlanContributionSplit, getPlanContributions, getPlanDrift } from '@/lib/actions/plan.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { t } from '@/lib/i18n/t';
 
@@ -18,8 +18,14 @@ export default async function PlanPage() {
     let plan: Awaited<ReturnType<typeof getPlan>>;
     let contributions: Awaited<ReturnType<typeof getPlanContributions>>;
     let drift: Awaited<ReturnType<typeof getPlanDrift>>;
+    let split: Awaited<ReturnType<typeof getPlanContributionSplit>>;
     try {
-        [plan, contributions, drift] = await Promise.all([getPlan(), getPlanContributions(), getPlanDrift()]);
+        [plan, contributions, drift, split] = await Promise.all([
+            getPlan(),
+            getPlanContributions(),
+            getPlanDrift(),
+            getPlanContributionSplit(),
+        ]);
     } catch (error) {
         // Sin este catch, un backend apagado llegaba al ErrorBoundary global y
         // un fallo parcial se traducía en un `null`/`[]` indistinguible de
@@ -45,6 +51,7 @@ export default async function PlanPage() {
                 initialPlan={plan}
                 initialContributions={contributions}
                 initialDrift={drift}
+                initialSplit={split}
             />
         </main>
     );
