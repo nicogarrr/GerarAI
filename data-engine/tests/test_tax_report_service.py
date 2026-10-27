@@ -123,10 +123,12 @@ def test_foreign_dividend_converted_at_payment_date_rate(db):
     _eur_portfolio(db)
     c = _company(db, "DDD")
     db.add(FXRate(base_currency="EUR", quote_currency="USD",
-                  rate_date=date(2026, 3, 1), rate=Decimal("0.90"), source="test"))
+                  rate_date=date(2026, 4, 13), rate=Decimal("0.90"), source="test"))
     db.add(FXRate(base_currency="EUR", quote_currency="USD",
-                  rate_date=date(2026, 5, 1), rate=Decimal("0.95"), source="test"))
+                  rate_date=date(2026, 4, 16), rate=Decimal("0.95"), source="test"))
     db.commit()
+    # Tipo del 13/04 (2 días antes): el último publicado en o antes del pago;
+    # nunca el del 16/04 (futuro). Un tipo de >7 días ya no se acepta.
     _tx(db, c, date(2026, 4, 15), "dividend", 1, 100, currency="USD")
     report = TaxReportService().compute_report(db, 2026)
     row = next(d for d in report["dividends"] if d["ticker"] == "DDD")
