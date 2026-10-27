@@ -85,6 +85,17 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+    // Directivas reales que faltaban en la lista (QA 27-oct, fallo #20):
+    'components/forms/InputField.tsx':
+        'campo de formulario con useState (mostrar/ocultar contraseña), onClick y spread de props de react-hook-form',
+    'components/portfolio/ImportImageButton.tsx':
+        'diálogo de importación por captura: useState, useRef, FileReader del navegador, useRouter y toasts de sonner',
+    'components/settings/IBKRConnectionForm.tsx':
+        'formulario controlado de la conexión IBKR (useState, onSubmit, onChange)',
+    'components/settings/SettingsSection.tsx':
+        'useEffect con window/document para desplazar a la sección del ancla',
+    'components/watchlist/WatchlistMembership.tsx':
+        'contexto de pertenencia a la watchlist (createContext, useState, useContext) compartido por la página y los botones',
     'components/paper-trading/ManualDemoPanel.tsx':
         'tabs interactivas de la cuenta demo (estado de pestana en cliente)',
     'components/paper-trading/OrderTicket.tsx':
