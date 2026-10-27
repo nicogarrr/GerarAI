@@ -979,6 +979,26 @@ class ChatService:
             or re.search(r"(?i)\b(?:evidencia|fuentes?|documentos?|riesgos?)\b", question or "")
         ):
             company = page_context.company
+        # Ticker nombrado que GerarAI no tiene («¿qué opinas de TSLAA?»): se dice,
+        # sin pasar por el generador libre, que inventaba sobre él.
+        if company is None and not ticker:
+            from app.services.chat_unknown_ticker import (
+                unknown_ticker_answer,
+                unknown_ticker_mentions,
+            )
+
+            known_tickers = list(db.scalars(select(Company.ticker)).all())
+            unknown = unknown_ticker_mentions(question, known_tickers)
+            if unknown:
+                return ChatResponse(
+                    answer=unknown_ticker_answer(unknown, known_tickers),
+                    sources=[],
+                    model="deterministic",
+                    prompt_version="unknown-ticker-v1",
+                    confidence=0.9,
+                    llm_trace={"path": "unknown_ticker", "generated": False, "provider_calls": 0, "tickers": unknown},
+                    context=context_echo,
+                )
         # Pregunta sobre el contenido de la página sin empresa: el cerebro solo
         # recibe el nombre de la sección, no sus datos. Lo dice, sin inventar
         # cifras ni citar fuentes ajenas.
