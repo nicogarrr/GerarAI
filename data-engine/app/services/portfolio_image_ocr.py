@@ -75,8 +75,6 @@ def extract_image(data: bytes) -> dict:
 
     if not data or len(data) > MAX_IMAGE_BYTES:
         raise ValueError("La imagen debe ocupar como máximo 2 MB")
-    if not shutil.which("tesseract"):
-        raise RuntimeError("No se pudo iniciar la lectura local. Usa un fichero o la entrada manual")
     try:
         with Image.open(io.BytesIO(data)) as source:
             if source.format not in {"PNG", "JPEG", "WEBP"} or getattr(source, "n_frames", 1) != 1:
@@ -93,6 +91,10 @@ def extract_image(data: bytes) -> dict:
             image.save(output, format="PNG")
     except (UnidentifiedImageError, Image.DecompressionBombError, OSError) as exc:
         raise ValueError("No se puede leer esta imagen; prueba con otra captura") from exc
+    # El formato se valida antes: sin tesseract, un fichero que no es imagen
+    # debe dar el error de formato, no el de lectura local.
+    if not shutil.which("tesseract"):
+        raise RuntimeError("No se pudo iniciar la lectura local. Usa un fichero o la entrada manual")
     # No shell, no filename supplied by user, no temporary image, bounded time/thread count.
     if not _OCR_SLOT.acquire(blocking=False):
         raise RuntimeError("Hay otra captura en lectura. Vuelve a intentarlo en unos segundos")
