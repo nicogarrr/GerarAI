@@ -1,3 +1,4 @@
+import { canShowThesisText, WithheldThesisText } from '@/components/research/ThesisSummary';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, FileDown, FileText } from 'lucide-react';
@@ -105,6 +106,22 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   const hasScenarioValues = published
     ? [published.bear_value, published.base_value, published.bull_value].some((v) => v !== null)
     : false;
+
+  // Retain all persisted free text and numeric values together. A missing
+  // snapshot is not evidence of publishability, even for a published archive.
+  const displayedVersion = published ?? latest;
+  if (displayedVersion && !canShowThesisText(displayedVersion, snapshot?.model_summary)) {
+    return (
+      <main id="content" className={`print-document min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8 ${publicEditorial.variable}`}>
+        <div className="mx-auto max-w-3xl">
+          <Link href={`/research/${encoded}?view=thesis`} className="text-sm text-teal-300 underline">Ficha de {ticker}</Link>
+          <h1 className="mt-8 text-3xl text-gray-50">{ticker} · {name}</h1>
+          <WithheldThesisText thesis={displayedVersion} model={snapshot?.model_summary} />
+          <p className="mt-4 text-sm leading-6 text-gray-400">Sin valoración ni texto de inversión verificables para esta vista. Revisa las fuentes y los datos pendientes en la ficha antes de publicar una nueva versión.</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main id="content" className={`print-document min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8 ${publicEditorial.variable}`}>
