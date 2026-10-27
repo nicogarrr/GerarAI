@@ -41,7 +41,13 @@ class ReviewAlertService:
         claim_id: int | None = None,
         news_event_id: int | None = None,
         metadata: dict | None = None,
+        emit: bool = True,
     ) -> ResearchReview:
+        """Abre una revisión en la bandeja y, si ``emit``, un aviso al usuario.
+
+        ``emit=False`` deja la revisión solo en la bandeja de revisión: es lo
+        que hace el red team automático, que el usuario no ha configurado.
+        """
         filters = [
             ResearchReview.status.in_(["open", "in_progress"]),
             ResearchReview.company_id == company_id,
@@ -80,6 +86,8 @@ class ReviewAlertService:
         )
         db.add(review)
         db.flush()
+        if not emit:
+            return review
         if self._news_already_alerted(db, review_type, company_id, news_event_id):
             # La revision de tesis se crea igual; solo se evita un segundo aviso de la misma noticia.
             return review
