@@ -129,10 +129,12 @@ def parse_ixbrl_facts(source: str | BinaryIO) -> dict[str, Any]:
                     end = (child.text or "").strip() or None
                 elif child.tag == _XBRLI + "instant":
                     instant = (child.text or "").strip() or None
-                elif child.tag == _XBRDI + "explicitMember":
+                elif child.tag in {_XBRDI + "explicitMember", _XBRDI + "typedMember"}:
                     axis = (child.get("dimension") or "").strip()
-                    if axis:
-                        dims.append(axis)
+                    # Typed dimensions carry scope too, even though their
+                    # member value is XML rather than a QName. A malformed
+                    # missing axis must never look consolidated either.
+                    dims.append(axis or "__unknown_dimension__")
             contexts[elem.get("id")] = _Context(
                 start=start, end=end, instant=instant, lei=lei, dims=tuple(sorted(dims))
             )

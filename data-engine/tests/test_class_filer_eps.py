@@ -291,3 +291,45 @@ def test_read_response_decompresses_gzip():
     payload = b'{"ok": true}'
     assert _read_response(_Resp(_gzip.compress(payload), "gzip")) == payload
     assert _read_response(_Resp(payload, None)) == payload
+
+
+def _with_extra_scope(xml, scope):
+    return xml.replace(
+        '<explicitMember dimension="v:CommonClassAxis">us-gaap:CommonClassAMember</explicitMember>',
+        '<explicitMember dimension="v:CommonClassAxis">us-gaap:CommonClassAMember</explicitMember>' + scope,
+    )
+
+
+@pytest.mark.parametrize('scope', [
+    '<explicitMember dimension="us-gaap:StatementBusinessSegmentsAxis">v:DomesticMember</explicitMember>',
+    '<explicitMember dimension="v:GeographyAxis">v:EuropeMember</explicitMember>',
+    '<typedMember dimension="v:BusinessAxis"><v:Business>Example</v:Business></typedMember>',
+    '<explicitMember dimension="v:OtherClassAxis">v:CommonClassBMember</explicitMember>',
+])
+def test_backfill_class_plus_extra_scope_cannot_shadow_total(db, scope):
+    # Actual service, synthetic filing. Bad scoped facts deliberately come first.
+    scoped = _with_extra_scope(INSTANCE_XML, scope).replace('10.20', '1.25')
+    # Change scoped IDs so their contexts cannot replace the true class totals.
+    for context in ('c1', 'c2', 'c3', 'c4', 'c5'):
+        scoped = scoped.replace('"' + context + '"', '"scoped-' + context + '"')
+    # Keep a single root and insert the scoped contents before the original.
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(INSTANCE_XML)
+    extra = ET.fromstring(scoped)
+    for child in reversed(list(extra)):
+        root.insert(0, child)
+    fetch_json, fetch_bytes = _fake_fetchers(ET.tostring(root).decode())
+    result = backfill_class_based_eps(db, _company(db), cik='1', fetch_json=fetch_json, fetch_bytes=fetch_bytes)
+    assert result.facts_written == 4
+    rows = db.scalars(select(FinancialFact)).all()
+    assert next(r.value for r in rows if r.metric == 'eps_diluted' and r.fiscal_year == 2025) == Decimal('10.20')
+
+
+def test_backfill_class_plus_segment_only_writes_nothing(db):
+    xml = _with_extra_scope(INSTANCE_XML, '<explicitMember dimension="v:SegmentAxis">v:DomesticMember</explicitMember>')
+    # Remove class B so no eligible fallback class remains.
+    xml = xml.replace('v:CommonClassBMember', 'v:NotAClassMember')
+    fetch_json, fetch_bytes = _fake_fetchers(xml)
+    result = backfill_class_based_eps(db, _company(db), cik='1', fetch_json=fetch_json, fetch_bytes=fetch_bytes)
+    assert result.facts_written == 0
+    assert db.scalars(select(FinancialFact)).all() == []
