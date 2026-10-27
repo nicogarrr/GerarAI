@@ -1,6 +1,6 @@
 # GerarAI
 
-**A self-hosted investment research OS for long-term investors: company research, versioned theses, deterministic valuation, portfolio tracking and a cited AI copilot in one place.**
+**Investment research that keeps company evidence, valuation, versioned theses and portfolio decisions together.**
 
 [![CI](https://github.com/nicogarrr/GerarAI/actions/workflows/ci.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/ci.yml)
 [![Coverage](https://github.com/nicogarrr/GerarAI/actions/workflows/coverage.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/coverage.yml)
@@ -14,8 +14,21 @@
 > The user interface is in Spanish (es-ES); code, APIs and this document are in English.
 > **Not financial advice.** See the [disclaimer](#disclaimer).
 
+## The research loop
+
+1. Open a company workspace and inspect its data coverage and sources.
+2. Run the available valuation and thesis workflow. Follow the backend job phases rather than an estimated completion percentage.
+3. Review the thesis, its audit results and unresolved risks. Generation success is not publication.
+4. Publish an eligible version through the manual approval flow, then check whether the knowledge-library sync succeeded.
+5. Revisit the evidence alongside your watchlist, portfolio and decision journal.
+
+**Scope:** Interactive Brokers Flex is an import and reconciliation path, not an order-entry interface. Paper trades are not live broker orders. Tax outputs are drafts, not submitted returns. Provider availability, completeness and cost depend on your configuration and service plans.
+
+**Start here:** [Local setup](#quick-start) · [Architecture](docs/ARCHITECTURE.md) · [Release checklist](docs/RELEASE_1_0.md) · [Security](SECURITY.md)
+
 ## Contents
 
+- [The research loop](#the-research-loop)
 - [What it is](#what-it-is)
 - [Key features](#key-features)
 - [Architecture](#architecture)
@@ -34,9 +47,9 @@ GerarAI is a long-term investor's memory. It is not another market terminal or a
 
 Three principles shape the codebase:
 
-- **No invented data.** Every figure comes from a real source and carries a provenance label (`OFICIAL`, `INFERIDO`, `SIN_DATOS`). When a provider is missing or fails, the coverage is shown as unavailable instead of being filled in.
-- **Deterministic numbers, generative prose.** Valuation, signals and tax figures are computed in code with a calculation trace. The LLM writes analysis text and never produces figures.
-- **Zero-cost by default.** Free data sources and free-tier or already-paid LLM access only; paid services are opt-in.
+- **No invented data.** The product aims to keep source-backed figures distinct from inferred or unavailable data (`OFICIAL`, `INFERIDO`, `SIN_DATOS`). When a provider is missing or fails, the coverage is shown as unavailable instead of being filled in.
+- **Deterministic numbers, generative prose.** Valuation, signals and tax figures are computed in code with a calculation trace. Deterministic calculations are kept separate from LLM-written prose, which still needs source and claim checks.
+- **Cost-aware configuration.** Prefer free data and approved provider access. Free tiers, existing subscriptions and self-hosting are different cost models; no preset guarantees a zero bill.
 
 The full product rationale is in [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md).
 
@@ -54,7 +67,7 @@ The full product rationale is in [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md
 - **Versioned investment theses** with an audit trail, claims linked to supporting and contradicting evidence, and invalidation rules.
 - **Devil's advocate debate**: an automated bull/bear debate whose verdict is persisted on the thesis.
 - **Scenarios and projections** per thesis, plus EPUB export for e-readers.
-- **Approval workflow**, including approve/review actions from Telegram.
+- **Manual publication workflow** in the app, with audit-status checks and explicit risk confirmation when required. Telegram alerts do not imply a working thesis-approval interface.
 
 ### Cerebro (AI copilot)
 
@@ -66,7 +79,7 @@ The full product rationale is in [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md
 - Positions and transactions with **XIRR** and portfolio intelligence (concentration, risk, stress scenarios).
 - **Interactive Brokers** import via Flex Query, with reconciliation ([docs/PORTFOLIO_IBKR_RECONCILIATION.md](docs/PORTFOLIO_IBKR_RECONCILIATION.md)).
 - Multi-currency positions with FX attribution.
-- **Decision journal** linked to the real executed trade.
+- **Decision journal** with trade-linking workflows. Review ambiguous or incomplete matches rather than treating date proximity as proof of a trade association.
 - **Paper trading** ([docs/paper-trading.md](docs/paper-trading.md)).
 
 ### DCA entry signals and alerts
@@ -88,7 +101,7 @@ The full product rationale is in [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md
 ### Knowledge library (RAG)
 
 - Upload PDF and Markdown documents, extract principles, approve them and query them with hybrid semantic search (Qdrant plus local embedding models; no paid embedding API).
-- Optional Obsidian vault and knowledge graph integration.
+- Optional Obsidian integration and a knowledge graph with search, selected-node context, keyboard controls and export. This is a graph of evidence and concepts, not a project-task scheduler.
 
 ## Architecture
 
@@ -124,7 +137,7 @@ flowchart LR
 
 - **Frontend** (repository root): Next.js 16, React 19, TypeScript, Tailwind CSS 4, Radix UI / shadcn, Recharts and Lightweight Charts. Authentication uses Better Auth with MongoDB.
 - **Backend** (`data-engine/`): FastAPI, SQLAlchemy 2 and Alembic on Python 3.12, with Dramatiq workers and a scheduler on Redis.
-- **Storage**: PostgreSQL is the source of truth; Qdrant is a rebuildable semantic index; MinIO stores original documents.
+- **Storage**: PostgreSQL is the source of truth; Qdrant is a semantic index; S3-compatible object storage holds original documents. The production Compose file also includes an optional Garage profile; changing the object store requires the documented migration, not just a diagram edit.
 - **Trust boundary**: the frontend calls the research API with HMAC-signed requests (300-second window; the tenant is the authenticated user ID).
 
 Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -246,7 +259,7 @@ The complete list, including LLM fallbacks, observability and data-retention set
 
 ## Data sources
 
-GerarAI uses free or free-tier sources only. Each provider has its own terms; you are responsible for complying with them.
+The source integrations below have different access conditions and limits. Verify the current operator terms and your plan before enabling a provider; this table is not a pricing guarantee.
 
 | Source | Used for | Access | Licensing notes |
 | --- | --- | --- | --- |
@@ -261,9 +274,11 @@ GerarAI uses free or free-tier sources only. Each provider has its own terms; yo
 | Damodaran Online | Equity risk premium and WACC inputs | Free | Public academic datasets. |
 | Nasdaq calendar | Earnings and dividend dates | Free, no key | Unofficial public endpoint. |
 
-LLM providers only generate analysis text and never supply figures.
+LLM-written text can still contain incorrect claims. Use the stored evidence, audit results and deterministic calculation traces when reviewing an analysis.
 
 ## Testing and quality gates
+
+Commands below describe checks to run, not a current pass count. Local unit tests, browser tests, deployed smoke tests and provider checks cover different boundaries. A green subset does not certify the full app.
 
 The same gates run locally and in CI ([AGENTS.md](AGENTS.md), [docs/QUALITY_GATES.md](docs/QUALITY_GATES.md)).
 
@@ -297,7 +312,7 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) also checks dependen
 
 ## Deployment
 
-The supported production topology is:
+The repository includes the following deployment topology. It is not a statement that a particular installation is configured or healthy:
 
 - **Frontend on Vercel** ([`vercel.json`](vercel.json)): Next.js build in the `fra1` region. Only `main` deploys automatically. Recovery runbook: [docs/RUNBOOK_VERCEL_DEPLOY_RECOVERY.md](docs/RUNBOOK_VERCEL_DEPLOY_RECOVERY.md).
 - **Backend on Oracle Cloud** (Always Free, Ampere ARM VM) with [`docker-compose.prod.yml`](docker-compose.prod.yml): Caddy, PostgreSQL, Redis, Qdrant, MinIO, API, worker and scheduler, with health checks and automatic restarts. Setup: [docs/oracle-setup.md](docs/oracle-setup.md).
@@ -330,7 +345,7 @@ Operational notes:
 
 ## Roadmap
 
-- **1.0 release**: green CI, a single Alembic head, end-to-end smoke tests and per-deployment environment checklists ([docs/RELEASE_1_0.md](docs/RELEASE_1_0.md)).
+- **1.0 release target, not a completion claim**: green CI, a single Alembic head, end-to-end smoke tests and per-deployment environment checklists ([docs/RELEASE_1_0.md](docs/RELEASE_1_0.md)).
 - Broader non-US coverage (ESEF and IFRS filers).
 - Better retrieval quality for Cerebro on the knowledge library and filings.
 
@@ -348,7 +363,7 @@ Please do not open public issues for vulnerabilities. Report them privately as d
 
 Copyright © 2025 Nicolás Iglesias García. Licensed under the [GNU Affero General Public License v3.0](LICENSE). If you run a modified version as a network service, the AGPL requires you to make its source available to its users.
 
-A Spanish version of the previous README is kept in [docs/README.es.md](docs/README.es.md).
+A historical Spanish README is kept in [docs/README.es.md](docs/README.es.md); it is not the current setup or capability reference.
 
 ## Disclaimer
 
