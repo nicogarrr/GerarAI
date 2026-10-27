@@ -592,11 +592,20 @@ class TaxReportService:
                 # compra única del Manual, y omitir las ventas rentables lo
                 # infla (bloquearía pérdidas que AEAT permite computar).
                 prior_sells.append((transaction.trade_date, transaction.quantity))
-                if gain_native < 0:
+                # Art. 33.5.f LIRPF: la pérdida que se difiere es la del IRPF,
+                # en EUROS (cada tramo a su tipo, art. 34-35). Una ganancia en
+                # divisa puede ser pérdida en euros (y al revés): se decide con
+                # el resultado en base; solo sin FX se recurre al de divisa.
+                is_loss = (
+                    gain_base_raw < 0 if gain_base_raw is not None else gain_native < 0
+                )
+                if is_loss:
                     sale = {
                         "date": transaction.trade_date,
                         "qty_unblocked": transaction.quantity,
-                        "loss_per_share": -gain_native / transaction.quantity,
+                        # Pérdida por acción en divisa; 0 si en divisa hubo
+                        # ganancia (la pérdida existe solo en euros).
+                        "loss_per_share": max(-gain_native, Decimal("0")) / transaction.quantity,
                         # Pérdida por acción en base (tramos a su tipo); 0 si
                         # en base no hay pérdida que diferir.
                         "loss_per_share_base": (
@@ -748,7 +757,7 @@ class TaxReportService:
                         "raw_gain_native": _money(entry["gain_native"]),
                         "blocked_loss_native": _money(blocked_native),
                         "blocked_loss_base": _money(blocked_base) if blocked_base is not None else None,
-                        "wash_sale_blocked": blocked_native > 0,
+                        "wash_sale_blocked": blocked_native > 0 or (blocked_base is not None and blocked_base > 0),
                         "wash_sale_window_open": window_open,
                         "over_sell": bool(entry["over_sell"]),
                         "over_sell_quantity": float(entry["over_sell_quantity"]),
