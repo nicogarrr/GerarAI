@@ -47,9 +47,14 @@ export function showErrorToast(error: unknown, options: ErrorToastOptions = {}):
       ? {
           label: 'Reintentar',
           onClick: () => {
-            void Promise.resolve(options.onRetry?.()).then(() => {
-              if (options.successMessage) toast.success(options.successMessage);
-            });
+            void Promise.resolve()
+              .then(() => options.onRetry?.())
+              .then(() => {
+                if (options.successMessage) toast.success(options.successMessage);
+              })
+              .catch((error: unknown) => {
+                showErrorToast(error, options);
+              });
           },
         }
       : undefined;
