@@ -21,8 +21,9 @@ Reglas de aviso (deduplicacion):
 
 Datos: Yahoo Finance (yfinance, historia completa) con la linea real del
 listado (``yahoo_symbol``); si falla, los cierres de ``market_prices``. Se usa
-el cierre ajustado solo si TODA la serie lo trae (nunca se mezcla); el cierre
-mostrado y los precios de nivel se expresan en precio real de cotizacion.
+el cierre ajustado cuando existe (una fila suelta sin ajuste no pasa la serie
+entera a cierres brutos); el cierre mostrado y los precios de nivel se
+expresan en precio real de cotizacion.
 Sin historia suficiente el ticker se omite con motivo: nunca se inventa.
 """
 
@@ -251,14 +252,29 @@ def _fresh_rows(rows: Sequence[PriceRow], today: date, max_age_days: int) -> lis
 
 
 def build_bars(rows: Sequence[PriceRow]) -> tuple[list[DailyBar], float]:
-    """Serie para el motor y factor serie->precio real del ultimo cierre."""
+    """Serie para el motor y factor serie->precio real del ultimo cierre.
+
+    Con cierre ajustado se usa el ajustado. Una fila suelta sin ``adj_close``
+    no pasa toda la serie a cierres brutos (un split se leeria como desplome):
+    las filas sin ajuste dentro de la historia ajustada se omiten, y las
+    posteriores al ultimo ajuste usan el ultimo factor conocido. Solo si
+    ninguna fila trae ajuste se usan los cierres brutos.
+    """
     ordered = sorted(rows, key=lambda r: r.day)
     if not ordered:
         return [], 1.0
-    use_adj = all(row.adj_close for row in ordered)
-    bars = [DailyBar(day=row.day, close=float(row.adj_close if use_adj else row.close)) for row in ordered]
-    last = ordered[-1]
-    factor = (last.close / last.adj_close) if use_adj and last.adj_close else 1.0
+    adjusted = [i for i, row in enumerate(ordered) if row.adj_close and row.close]
+    if not adjusted:
+        return [DailyBar(day=row.day, close=float(row.close)) for row in ordered], 1.0
+    last_adj = adjusted[-1]
+    ratio = float(ordered[last_adj].adj_close or 0.0) / float(ordered[last_adj].close)
+    bars: list[DailyBar] = []
+    for i, row in enumerate(ordered):
+        if row.adj_close and row.close:
+            bars.append(DailyBar(day=row.day, close=float(row.adj_close)))
+        elif i > last_adj:
+            bars.append(DailyBar(day=row.day, close=float(row.close) * ratio))
+    factor = 1.0 / ratio if ratio > 0 else 1.0
     return bars, factor
 
 
