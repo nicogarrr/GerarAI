@@ -181,3 +181,12 @@ def test_j4_timelimit_marks_failed_and_stale_processing_is_requeueable():
         assert _processing_abandoned(src)
         src.updated_at = datetime.now(UTC) - timedelta(minutes=5)
         assert not _processing_abandoned(src)
+
+
+def test_j4_abandoned_threshold_is_tied_to_actor_time_limit():
+    from app.api.routes.knowledge_rag import PROCESSING_ABANDONED_AFTER
+    from app.services.knowledge_rag.runtime import INGEST_TIME_LIMIT_MS
+    from app.workers.knowledge_rag_actors import ingest_knowledge_source
+
+    assert ingest_knowledge_source.options["time_limit"] == INGEST_TIME_LIMIT_MS
+    assert timedelta(milliseconds=2 * INGEST_TIME_LIMIT_MS) == PROCESSING_ABANDONED_AFTER

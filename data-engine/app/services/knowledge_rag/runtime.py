@@ -69,3 +69,9 @@ def make_postprocessors(s: Settings, top_n: int) -> list[RerankPostprocessor]:
 @lru_cache(maxsize=2)
 def _reranker(model: str) -> FastembedReranker:
     return FastembedReranker(model)
+
+
+# Limite por entrega del actor de ingesta (ms). Unica fuente: el actor lo usa
+# como time_limit y la API deriva de el cuando una fuente en ``processing`` se
+# considera abandonada (2 x este limite).
+INGEST_TIME_LIMIT_MS = 3_600_000

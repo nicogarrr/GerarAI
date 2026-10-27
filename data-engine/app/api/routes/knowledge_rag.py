@@ -144,9 +144,9 @@ def create_source(payload: SourceCreate, db: Session = Depends(get_db)) -> dict:
     return {**_source(_dispatch(db, source)), "deduplicated": not result.created, "requeued": not result.created}
 
 
-# El actor corta cada entrega a 1 h (time_limit); pasado el doble, un
+# El actor corta cada entrega a INGEST_TIME_LIMIT_MS (1 h); pasado el doble, un
 # ``processing`` sin actividad es un proceso muerto (SIGKILL/OOM), no trabajo vivo.
-PROCESSING_ABANDONED_AFTER = timedelta(hours=2)
+PROCESSING_ABANDONED_AFTER = timedelta(milliseconds=2 * runtime.INGEST_TIME_LIMIT_MS)
 
 
 def _processing_abandoned(source: KnowledgeRagSource, now: datetime | None = None) -> bool:
