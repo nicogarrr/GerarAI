@@ -328,6 +328,17 @@ _CODE_ES = {
 }
 
 
+def _ltm_version_es(version: object) -> str:
+    """Versión del motor de largo plazo para el memo: nunca el `None` de Python."""
+    return f"`{version}`" if version not in (None, "") else "sin versión persistida"
+
+
+def _question_sentence_es(question: str) -> str:
+    """Cierra una pregunta en español: «¿...?», no «¿....»."""
+    text = question.rstrip(" .?!")
+    return f"{text}?" if text.startswith("¿") else f"{text}."
+
+
 def _code_es(code) -> str:
     """Código técnico -> texto en español; si no hay traducción, se muestra legible sin guiones bajos."""
     text = str(code if code is not None else "N/D")
@@ -1755,7 +1766,7 @@ class ThesisService:
             )
         else:
             lines.append(
-                f"Transcripción: {transcript.get('detail', 'pendiente transcripción')}."
+                f"Transcripción: {str(transcript.get('detail', 'pendiente transcripción')).rstrip('. ')}."
             )
             if transcript.get("action"):
                 lines.append(f"Acción: {transcript['action']}")
@@ -2095,7 +2106,7 @@ La pregunta invertible es si la evidencia respalda los supuestos detrás del mod
 
 ## 3. Modelo de negocio
 Sector: {sector_es(company.sector)}. Industria: {industry_es(company.industry)}.
-Marco específico de la empresa: {term_es(framework.get("key", "unknown"))}. Pregunta primaria: {primary_question_es(framework.get("primary_question"))}.
+Marco específico de la empresa: {term_es(framework.get("key", "unknown"))}. Pregunta primaria: {_question_sentence_es(primary_question_es(framework.get("primary_question")))}
 Drivers obligatorios ausentes: {", ".join(term_es(m) for m in mandatory_missing) if mandatory_missing else "ninguno"}.
 
 ## 4. Últimos resultados
@@ -2121,7 +2132,7 @@ Recompras, dilución y dividendos se consultan en las pestañas «Dilución y re
 {self._news_markdown(sources)}
 
 ## 11. Riesgos
-{", ".join(company.special_risks) or "Sin riesgos específicos registrados para esta empresa."}
+{", ".join(term_es(risk) for risk in company.special_risks) or "Sin riesgos específicos registrados para esta empresa."}
 
 ## 12. Competencia y foso
 {self._moat_markdown(company, valuation)}
@@ -2130,7 +2141,7 @@ Recompras, dilución y dividendos se consultan en las pestañas «Dilución y re
 {self._valuation_markdown(valuation, excluded_present=excluded_present)}
 
 ### Motor fundamental de largo plazo
-Versión del modelo fundamental usada en esta corrida: `{(long_term_model.get("persistence") or {}).get("version")}` (versionado propio del motor, independiente del número de versión de esta tesis; que esta corrida lo muestre NO acredita persistencia duradera: en una corrida aislada con rollback el objeto existe solo en transacción, y la persistencia real la acredita el registro del motor).
+Versión del modelo fundamental usada en esta corrida: {_ltm_version_es((long_term_model.get("persistence") or {}).get("version"))} (versionado propio del motor, independiente del número de versión de esta tesis; que esta corrida lo muestre NO acredita persistencia duradera: en una corrida aislada con rollback el objeto existe solo en transacción, y la persistencia real la acredita el registro del motor).
 Estado del análisis del modelo fundamental (no es el estado de esta tesis): `{long_term_model.get("status")}`. Veredicto de oportunidad de mercado: `{(market_opportunity.get("verdict") or {}).get("label", "unknown")}`.
 
 ## 14. DCF inverso
