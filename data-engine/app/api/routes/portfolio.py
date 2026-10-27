@@ -650,8 +650,17 @@ def update_transaction(
     transaction.currency = payload.currency.upper()
     transaction.raw_payload = {"notes": payload.notes} if payload.notes else {}
     try:
+        # La sesion va con autoflush=False: sin volcar el cambio, la consulta
+        # de rebuild_position leeria de la BD el ticker y la fecha ANTIGUOS
+        # (posicion fantasma del ticker viejo, venta anterior a su compra
+        # aceptada) mientras las cantidades salen del objeto ya editado.
+        db.flush()
         if original_company_id is not None:
-            service.rebuild_position(db, original_company_id)
+            service.rebuild_position(
+                db,
+                original_company_id,
+                drop_when_empty=company.id != original_company_id,
+            )
         if company.id != original_company_id:
             service.rebuild_position(db, company.id)
         db.commit()
@@ -672,7 +681,7 @@ def delete_transaction(transaction_id: int, db: Session = Depends(get_db)) -> No
         db.delete(transaction)
         db.flush()
         if company_id is not None:
-            PortfolioLedgerService().rebuild_position(db, company_id)
+            PortfolioLedgerService().rebuild_position(db, company_id, drop_when_empty=True)
         db.commit()
     except PortfolioOversellError as exc:
         db.rollback()
