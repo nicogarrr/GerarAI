@@ -113,19 +113,21 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-[1600px] flex-col overflow-x-clip p-4 pb-24 sm:p-4 sm:pb-24 lg:p-6 lg:pb-24">
                 {/* Header */}
                 <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex w-full flex-wrap items-center gap-3">
-                        <div className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 flex items-center justify-center">
-                            <Wallet aria-hidden="true" className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Resumen</h1>
+                    <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                        <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+                            <div className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 flex items-center justify-center">
+                                <Wallet aria-hidden="true" className="h-5 w-5 text-white" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Resumen</h1>
 
-                            <p className="mt-0.5 text-xs text-gray-500">Precios con ~15 min de retardo durante el horario de mercado (Yahoo Finance)</p>
+                                <p className="mt-0.5 text-xs text-gray-500">Precios con ~15 min de retardo durante el horario de mercado (Yahoo Finance)</p>
+                            </div>
                         </div>
                         {/* Acción principal de la página: antes solo existía dentro de la
                             pestaña «Posiciones», y con la cartera vacía el «Resumen» era un
                             callejón sin salida (auditoría UX 2026-10-27). */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-2">
                             <AddTransactionButton userId={userId} />
                             <RefreshPortfolioButton userId={userId} />
                         </div>
