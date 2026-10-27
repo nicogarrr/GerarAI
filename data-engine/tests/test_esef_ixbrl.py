@@ -152,6 +152,7 @@ def test_build_package_payloads_happy_path(monkeypatch):
 
 def test_package_presentations_keep_represented_and_original_scopes(monkeypatch):
     import build_esef_snapshots as builder
+
     from app.services.esef_package_sources import EsefPackageSource
 
     lei = '635400TLVVBNXLFHWC59'
