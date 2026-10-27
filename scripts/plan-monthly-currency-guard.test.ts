@@ -40,4 +40,10 @@ describe('aportación mensual visible sin cartera', () => {
         assert.match(group[1], /expected_contributions_base/);
         assert.match(group[1], /gap_base/);
     });
+    it('plan legacy con divisa NULL no se pinta en EUR aunque el contrato este apagado', () => {
+        const formatter = view.match(/const planMonthly[\s\S]*?\n};/);
+        assert.ok(formatter, 'planMonthly no encontrado');
+        assert.match(formatter[0], /monthly_currency_recorded === false/);
+        assert.match(formatter[0], /divisa no registrada/);
+    });
 });
