@@ -136,6 +136,11 @@ def _member_pairs(context: ET.Element) -> tuple[tuple[str, str], ...]:
     """
     pairs: list[tuple[str, str]] = []
     for node in context.iter():
+        if _local(node.tag) == "typedMember":
+            # Preserve otherwise invisible extra scope for class-total guards.
+            # A typed value is not a class QName and must not be a candidate.
+            pairs.append(((node.get("dimension") or "").strip(), "__typed_member__"))
+            continue
         if _local(node.tag) != "explicitMember" or not node.text:
             continue
         axis = (node.get("dimension") or "").strip()

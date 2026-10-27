@@ -80,6 +80,11 @@ def _is_class_member(axis: str, member: str, preferred: str | None) -> bool:
     return bool(CLASS_MEMBER_RE.search(member))
 
 
+def _class_only(fact: DimensionedFact, preferred: str | None) -> bool:
+    """A class total has exactly one class axis and no other scope."""
+    return len(fact.members) == 1 and _is_class_member(*fact.members[0], preferred)
+
+
 def pick_member(facts: list[DimensionedFact], preferred: str | None) -> str | None:
     """Miembro dimensional a usar: el preferido si esta; si hay uno solo, ese.
 
@@ -92,6 +97,7 @@ def pick_member(facts: list[DimensionedFact], preferred: str | None) -> str | No
     members = {
         member
         for fact in facts
+        if _class_only(fact, preferred)
         for axis, member in fact.members
         if _is_class_member(axis, member, preferred)
     }
@@ -183,6 +189,10 @@ def backfill_class_based_eps(
     facts = parse_instance_dimensioned_facts(io.BytesIO(fetch_bytes(url)))
     if not facts:
         return ClassEpsResult(company.ticker, 0, None, (), skipped_reason="sin hechos dimensionados")
+    # A preferred class inside a segment/geography is not the class total.
+    # Filter before member selection and tag priority, not only before writes.
+    preferred = CLASS_MEMBER_PREFERENCE.get(company.ticker.upper())
+    facts = [fact for fact in facts if _class_only(fact, preferred)]
     member = pick_member(facts, CLASS_MEMBER_PREFERENCE.get(company.ticker.upper()))
     if member is None:
         any_class = any(
