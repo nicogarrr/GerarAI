@@ -259,3 +259,13 @@ def test_contribution_conflict_handler_is_409_and_same_retry_still_succeeds(db):
         add_contribution(original.model_copy(update={"amount": 999}), db)
     assert caught.value.status_code == 409
     assert len(service.list_contributions(db)) == 1
+
+
+@pytest.mark.parametrize("raw,expected", [("1.015", "1.02"), ("2.675", "2.68"), ("1.005", "1.01"), ("0.0149", "0.01")])
+def test_contribution_half_cent_retry_has_same_explicit_precision_as_first_write(db, raw, expected):
+    service = InvestmentPlanService()
+    _plan(service, db)
+    args = dict(date_=date(2026, 9, 1), amount=Decimal(raw), currency="EUR", external_id="half-cent")
+    first = service.add_contribution(db, **args)
+    assert first.amount == Decimal(expected)
+    assert service.add_contribution(db, **args).id == first.id

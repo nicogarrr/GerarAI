@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from calendar import monthrange
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from sqlalchemy import select
@@ -114,6 +114,9 @@ class InvestmentPlanService:
         external_id: str | None = None,
         note: str = "",
     ) -> PlanContribution:
+        # Normalize before BOTH persistence and retry comparison. Letting the
+        # DB/driver round a float first differs at half cents across backends.
+        amount = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         plan = self.get_plan(db)
         if plan is None:
             raise ValueError("Investment plan does not exist yet; create it first")
@@ -129,7 +132,7 @@ class InvestmentPlanService:
                 # historical rows or reinterpret currency units/case.
                 if (
                     existing.date != date_
-                    or existing.amount != amount.quantize(Decimal("0.01"))
+                    or existing.amount != amount
                     or existing.currency != currency
                 ):
                     raise ContributionConflict(
