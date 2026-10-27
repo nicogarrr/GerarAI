@@ -1062,27 +1062,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             )}
           <dl className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
             <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
-            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100">{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</dd></div> : null}
+            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100"><Link className="underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=model`}>{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Link></dd></div> : null}
           </dl>
           {per.note ? <p className="mt-1 text-xs text-gray-500">{per.note}</p> : null}
           </Panel>
-          {snapshot.model_summary ? <Panel collapsible="mobile" title="Modelo fundamental a largo plazo">
-            {snapshot.model_summary ? (
-              <div className="space-y-3 text-sm text-gray-300">
-                <div className="flex flex-wrap gap-2">
-                  <Badge>{termLabel(snapshot.model_summary.framework_key)}</Badge>
-                  <Badge variant="outline">v{snapshot.model_summary.version}</Badge>
-                  <Badge variant="outline">{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Badge>
-                </div>
-                <p>{snapshot.model_summary.engine_version} · {snapshot.model_summary.horizon_years} años</p>
-              </div>
-            ) : (
-              <EmptyState
-                action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=model`}>Generar el modelo</EmptyLink>}
-                title="Sin modelo persistido. Genéralo de forma explícita desde el grupo Modelo."
-              />
-            )}
-          </Panel> : null}
+          {/* La tarjeta compacta «Modelo fundamental a largo plazo» solo
+              mostraba metadatos internos (framework, versión, motor) y el
+              estado, ya presente en el chip «Modelo» de la cabecera (enlazado
+              a la vista Modelo con el contenido completo). Redundante: se
+              retira del overview; motor, datos y vista Modelo intactos. */}
         </div>
         <Panel collapsible="mobile"
           actions={
