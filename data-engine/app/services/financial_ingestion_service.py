@@ -1627,6 +1627,14 @@ class FinancialIngestionService:
                 annual_by_metric[metric] = capped
                 restated_fy_keys.extend((metric, f"{end}:FY") for end in capped)
 
+        # Historia trimestral: el import solo re-inserta los 12 trimestres mas
+        # recientes por metrica, y _replace_sec_data borra todos los trimestres
+        # del documento. Sin esta foto, cada refresh perdia en silencio los
+        # trimestres que salen de la ventana (los FY ya se preservan, F353).
+        prior_quarters = self._snapshot_sec_quarters(db, company, document)
+        quarter_ends_by_metric: dict[str, set[str]] = {}
+        quarter_unit_by_metric: dict[str, str] = {}
+
         self._replace_sec_data(
             db, company, document, restated_fy_keys=restated_fy_keys
         )
@@ -1744,6 +1752,10 @@ class FinancialIngestionService:
                             "filed": entry.get("filed"), "concept": entry.get("_concept"),
                         }
                     facts_imported += 1
+                    quarter_ends_by_metric.setdefault(metric, set()).add(
+                        str(entry["end"])
+                    )
+                    quarter_unit_by_metric[metric] = unit
             # Los alias se FUSIONAN, no "gana el primero que informe": muchos
             # filers migraron de tag (Revenues -> SalesRevenueNet ->
             # RevenueFromContractWithCustomer...) y el tag antiguo queda
@@ -1806,6 +1818,15 @@ class FinancialIngestionService:
                             "filed": entry.get("filed"), "concept": entry.get("_concept"),
                         }
                     facts_imported += 1
+
+        facts_imported += self._restore_sec_quarters(
+            db,
+            company,
+            document,
+            prior_quarters,
+            quarter_ends_by_metric,
+            quarter_unit_by_metric,
+        )
 
         # --- dei:EntityCommonStockSharesOutstanding (portada 10-K/10-Q) ---
         # El saldo de acciones en circulacion lo reporta todo emisor SEC en la
@@ -2687,6 +2708,87 @@ class FinancialIngestionService:
             FinancialFact.source_id == document.id,
             tenant_filter,
         )
+
+    def _snapshot_sec_quarters(
+        self, db: Session, company: Company, document: Document
+    ) -> list[dict[str, Any]]:
+        """Foto de los trimestres SEC ya verificados que escribio ESTE documento.
+
+        Solo filas ancladas a un filing (``accession_number``): las derivadas
+        (FCF, margenes...) no la llevan y se recalculan en cada import.
+        """
+        tenant_id = db.info.get("tenant_id")
+        tenant_filter = (
+            FinancialFact.tenant_id == tenant_id
+            if tenant_id is not None
+            else FinancialFact.tenant_id.is_(None)
+        )
+        rows = db.scalars(
+            select(FinancialFact).where(
+                FinancialFact.company_id == company.id,
+                FinancialFact.source_id == document.id,
+                tenant_filter,
+                FinancialFact.fiscal_quarter.in_(("Q1", "Q2", "Q3", "Q4")),
+                FinancialFact.accession_number.is_not(None),
+            )
+        ).all()
+        return [
+            {
+                "metric": r.metric,
+                "value": r.value,
+                "unit": r.unit,
+                "period": r.period,
+                "fiscal_year": r.fiscal_year,
+                "fiscal_quarter": r.fiscal_quarter,
+                "is_reported": r.is_reported,
+                "is_adjusted": r.is_adjusted,
+                "confidence": r.confidence,
+                "accession_number": r.accession_number,
+                "filed": r.filed,
+            }
+            for r in rows
+        ]
+
+    def _restore_sec_quarters(
+        self,
+        db: Session,
+        company: Company,
+        document: Document,
+        prior: list[dict[str, Any]],
+        new_ends_by_metric: dict[str, set[str]],
+        new_unit_by_metric: dict[str, str],
+    ) -> int:
+        """Re-inserta trimestres verificados que quedaron FUERA de la ventana.
+
+        Solo se restauran filas mas antiguas que el trimestre mas antiguo que
+        el import actual re-escribio para esa metrica: lo que cae DENTRO de la
+        ventana y el import no devolvio (p.ej. SEC lo retiro o lo corrigio)
+        no resucita, y una fila nunca pisa a la nueva. Si la unidad cambio
+        (otra moneda de reporte) no se mezcla con la serie nueva. Se conservan
+        valor, accession y fecha de filing originales.
+        """
+        restored = 0
+        for row in prior:
+            new_ends = new_ends_by_metric.get(row["metric"])
+            if not new_ends:
+                continue
+            if new_unit_by_metric.get(row["metric"]) != row["unit"]:
+                continue
+            end = str(row["period"]).split(":", 1)[0]
+            if end >= min(new_ends):
+                continue
+            db.add(
+                FinancialFact(
+                    company_id=company.id,
+                    source_id=document.id,
+                    source_type="SEC",
+                    **row,
+                )
+            )
+            restored += 1
+        if restored:
+            db.flush()
+        return restored
 
     def _replace_sec_data(
         self,

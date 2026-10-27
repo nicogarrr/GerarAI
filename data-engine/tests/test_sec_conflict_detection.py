@@ -101,7 +101,8 @@ def test_conflicts_flagged_with_one_fmp_query(db, monkeypatch):
         s for s in statements
         if s.lstrip().upper().startswith("SELECT") and "financial_facts" in s
     ]
-    assert len(fact_selects) == 4  # batch conflictos + lectura de derivadas + sync de chunks RAG (1 query batched, sin N+1)
+    # batch conflictos + foto de trimestres previos (1 query, preservar historia) + lectura de derivadas + sync de chunks RAG (1 query batched, sin N+1)
+    assert len(fact_selects) == 5
 
 
 def test_refresh_sec_endpoint_encaja_con_response_model(db, monkeypatch):
