@@ -104,8 +104,8 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                 const gross = tx.quantity * tx.price;
                 return (
                   <div key={tx._id} className="p-4 hover:bg-gray-800/30 transition-colors group">
-                    <div className="flex items-start justify-between mb-1">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-2 mb-1 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
                         <div className={`h-8 w-8 rounded-full flex items-center justify-center ${tx.type === 'buy' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-500'
                           }`}>
                           {tx.type === 'buy' ? '+' : '-'}
@@ -129,7 +129,7 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="pl-11 sm:pl-0 sm:text-right">
                         <p className="font-medium text-gray-200">
                           {currency ? formatMoney(gross, currency) : NA}
                           <span className="ml-1.5 text-[10px] uppercase tracking-wide text-gray-500">bruto</span>
