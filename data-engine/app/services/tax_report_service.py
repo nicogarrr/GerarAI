@@ -163,6 +163,13 @@ def _defer_base(lot: dict, take: Decimal, sale: dict) -> None:
     si no se conoce (falta FX), el diferido en base del lote queda
     desconocido (None) y su futura venta se declara sin importe en base.
     """
+    if sale.get("loss_unknown"):
+        # Pérdida de una venta descubierta: se calculó con coste cero en el
+        # exceso, así que no es una cifra. El lote que la absorbe queda con
+        # base (y diferido) desconocidos, nunca con un importe inventado.
+        lot["deferred_unknown"] = True
+        lot["deferred_base"] = None
+        return
     if lot["deferred_base"] is None:
         return
     if sale["loss_per_share_base"] is None:
@@ -398,9 +405,14 @@ def replay_tax_fifo(events, resolve_rate, start, end):
         cost_native = Decimal("0")
         # Coste en base = suma de cada lote a SU tipo de compra.
         cost_base: Decimal | None = Decimal("0")
+        # Coste desconocido aunque la venta esté cubierta: algún lote consumido
+        # arrastra una pérdida diferida de una venta descubierta.
+        cost_unknown = False
         while remaining > Decimal("0") and lots:
             lot = lots[0]
             take = min(lot["qty"], remaining)
+            if lot.get("deferred_unknown"):
+                cost_unknown = True
             cost_native += take * lot["unit"]
             if cost_base is not None and lot["unit_base"] is not None:
                 cost_base += take * lot["unit_base"]
@@ -426,6 +438,8 @@ def replay_tax_fifo(events, resolve_rate, start, end):
         # vez de registrar una ganancia silenciosa.
         over_sell_quantity = remaining if remaining > Decimal("0") else Decimal("0")
         over_sell = over_sell_quantity > 0
+        if cost_unknown:
+            cost_base = None
 
         gain_native = proceeds_native - cost_native
         # Valor de transmisión al tipo de la FECHA DE VENTA; la
@@ -465,6 +479,10 @@ def replay_tax_fifo(events, resolve_rate, start, end):
                     else None
                 ),
                 "blocked_qty": Decimal("0"),
+                # Con exceso a coste cero la pérdida no es una cifra; si
+                # además arrastra un diferido desconocido, tampoco. Lo que
+                # se difiera de ella deja el lote con base desconocida.
+                "loss_unknown": over_sell or cost_unknown,
             }
             # Backward window (Manual Renta 2025, apdo. E.1): prior-window
             # buys block only for the shares still held, proportionally:
@@ -508,6 +526,7 @@ def replay_tax_fifo(events, resolve_rate, start, end):
                     "sale": sale,
                     "over_sell": over_sell,
                     "over_sell_quantity": over_sell_quantity,
+                    "cost_unknown": cost_unknown,
                 }
             )
     return lots, year_sales
@@ -844,6 +863,7 @@ class TaxReportService:
                     "sale_count": 0,
                     "over_sell_count": 0,
                     "over_sell": False,
+                    "cost_unknown": False,
                     "sales": [],
                 },
             )
@@ -878,11 +898,17 @@ class TaxReportService:
                 bucket["cost_native"] += entry["cost_native"]
                 bucket["gain_native"] += computable_native
                 bucket["blocked_loss_native"] += blocked_native
+                sale_cost_unknown = bool(entry.get("cost_unknown"))
                 if computable_base is not None:
                     bucket["gain_base"] += computable_base
                     bucket["blocked_loss_base"] += blocked_base
-                else:
+                elif not sale_cost_unknown or entry["proceeds_base"] is None:
+                    # Sin base por falta de tipo de cambio. Un coste
+                    # desconocido por un diferido de venta descubierta no es
+                    # un problema de FX y lleva su propia marca.
                     bucket["missing_fx"] = True
+                if sale_cost_unknown:
+                    bucket["cost_unknown"] = True
                 bucket["wash_sale_window_open"] = bucket["wash_sale_window_open"] or window_open
                 bucket["sale_count"] += 1
                 if entry["over_sell"]:
@@ -895,32 +921,41 @@ class TaxReportService:
                 # conserva (misma regla que los totales: nunca una cifra
                 # parcial con pinta de exacta).
                 sale_over_sell = bool(entry["over_sell"])
+                # Mismo N/D si el lote vendido arrastra la pérdida diferida
+                # de una venta descubierta (coste inventado heredado).
+                nd = sale_over_sell or sale_cost_unknown
                 bucket["sales"].append(
                     {
                         "date": transaction.trade_date.isoformat(),
                         "quantity": float(transaction.quantity),
                         "proceeds_native": _money(entry["proceeds_native"]),
-                        "cost_native": None if sale_over_sell else _money(entry["cost_native"]),
+                        "cost_native": None if nd else _money(entry["cost_native"]),
                         "proceeds_base": _money(entry["proceeds_base"]),
-                        "cost_base": None if sale_over_sell else _money(entry["cost_base"]),
-                        "gain_native": None if sale_over_sell else _money(computable_native),
+                        "cost_base": None if nd else _money(entry["cost_base"]),
+                        "gain_native": None if nd else _money(computable_native),
                         "gain_base": (
                             None
-                            if sale_over_sell or computable_base is None
+                            if nd or computable_base is None
                             else _money(computable_base)
                         ),
-                        "raw_gain_native": None if sale_over_sell else _money(entry["gain_native"]),
+                        "raw_gain_native": None if nd else _money(entry["gain_native"]),
                         "blocked_loss_native": _money(blocked_native),
                         "blocked_loss_base": _money(blocked_base) if blocked_base is not None else None,
                         "wash_sale_blocked": blocked_native > 0 or (blocked_base is not None and blocked_base > 0),
                         "wash_sale_window_open": window_open,
                         "over_sell": sale_over_sell,
                         "over_sell_quantity": float(entry["over_sell_quantity"]),
+                        "cost_unknown": sale_cost_unknown,
                         "warning": (
                             "over_sell: sold more shares than the recorded lots; "
                             "excess valued at zero cost, verify the ledger"
                             if sale_over_sell
-                            else None
+                            else (
+                                "cost_unknown: the lot sold carries a loss deferred "
+                                "from an over_sell sale; acquisition cost unknown"
+                                if sale_cost_unknown
+                                else None
+                            )
                         ),
                     }
                 )
@@ -954,11 +989,11 @@ class TaxReportService:
                     # del ticker mezclan una base desconocida (el exceso se
                     # valoro a coste cero): N/D, nunca la suma parcial. La
                     # transmision si es un dato observado y se conserva.
-                    "cost_native": None if bucket["over_sell"] else _money(bucket["cost_native"]),
-                    "gain_native": None if bucket["over_sell"] else _money(bucket["gain_native"]),
+                    "cost_native": None if bucket["over_sell"] or bucket["cost_unknown"] else _money(bucket["cost_native"]),
+                    "gain_native": None if bucket["over_sell"] or bucket["cost_unknown"] else _money(bucket["gain_native"]),
                     "gain_base": (
                         None
-                        if bucket["missing_fx"] or bucket["over_sell"]
+                        if bucket["missing_fx"] or bucket["over_sell"] or bucket["cost_unknown"]
                         else _money(bucket["gain_base"])
                     ),
                     "blocked_loss_native": _money(bucket["blocked_loss_native"]),
@@ -968,6 +1003,7 @@ class TaxReportService:
                     "sale_count": bucket["sale_count"],
                     "over_sell": bucket["over_sell"],
                     "over_sell_count": bucket["over_sell_count"],
+                    "cost_unknown": bucket["cost_unknown"],
                     "sales": bucket["sales"],
                 }
             )
@@ -979,7 +1015,9 @@ class TaxReportService:
         # Ventas sin compras que las cubran: el remanente se valora a coste
         # cero, así que la plusvalía total no es fiable. None, nunca una
         # cifra parcial con pinta de exacta (misma regla que los demás totales).
-        realized_unreliable = realized_incomplete or any(b.get("over_sell") for b in realized)
+        realized_unreliable = realized_incomplete or any(
+            b.get("over_sell") or b.get("cost_unknown") for b in realized
+        )
 
         total_dividends = sum(
             (Decimal(str(b["dividends_base"] or 0)) for b in dividends), Decimal("0")
@@ -1038,6 +1076,9 @@ class TaxReportService:
             "sell_count": sum(b["sale_count"] for b in realized),
             "over_sell": sorted(
                 b["ticker"] for b in realized if b.get("over_sell")
+            ),
+            "cost_unknown": sorted(
+                b["ticker"] for b in realized if b.get("cost_unknown")
             ),
             "method": FIFO_METHOD,
             "incomplete_fx": incomplete_fx,

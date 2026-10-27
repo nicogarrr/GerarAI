@@ -65,6 +65,7 @@ const TAX_LABELS: Record<string, string> = {
     dividend_count: 'Dividendos (nº)',
     sell_count: 'Ventas (nº)',
     over_sell: 'Ventas sin compras que las cubran',
+    cost_unknown: 'Ventas con coste heredado desconocido',
     method: 'Método de valoración',
     incomplete_fx: 'Tipos de cambio incompletos',
     missing_fx: 'Sin tipo de cambio para',
@@ -143,7 +144,7 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
         'net_taxable_base',
         'unattributed_dividends_base',
     ]);
-    const listKeys = new Set(['wash_sale_window_open', 'over_sell', 'missing_fx', 'unattributed_tickers', 'ambiguous_cash']);
+    const listKeys = new Set(['wash_sale_window_open', 'over_sell', 'cost_unknown', 'missing_fx', 'unattributed_tickers', 'ambiguous_cash']);
     // La causa del null importa: con FX presente pero una fila de caja
     // ambigua sin resolver, decir "faltan tipos de cambio" miente. Se
     // declaran ambas causas si coexisten.
@@ -151,8 +152,12 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
     const ambiguousCash = summary.manual_review === true
         || (Array.isArray(summary.ambiguous_cash) && summary.ambiguous_cash.length > 0);
     const overSold = Array.isArray(summary.over_sell) ? summary.over_sell.map(String) : [];
+    const costUnknown = Array.isArray(summary.cost_unknown) ? summary.cost_unknown.map(String) : [];
     const nullReason = [
         overSold.length > 0 ? `ventas sin compras que las cubran: ${overSold.join(', ')}` : null,
+        costUnknown.length > 0
+            ? `coste heredado de una venta descubierta: ${costUnknown.join(', ')}`
+            : null,
         ambiguousCash ? 'revisión manual: fila de caja ambigua' : null,
         missingFx ? 'faltan tipos de cambio' : null,
     ].filter(Boolean).join(' y ');
