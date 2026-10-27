@@ -168,6 +168,13 @@ class ReviewAlertService:
             metadata={"news_event_id": news.id},
         )
 
+    @staticmethod
+    def fingerprint_for(db: Session, fingerprint_parts: list[str]) -> str:
+        """Huella de deduplicacion de emit_alert (por tenant de la sesion)."""
+        tenant_id = db.info.get("tenant_id")
+        raw = ":".join([str(tenant_id or "legacy"), *fingerprint_parts])
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:160]
+
     def emit_alert(
         self,
         db: Session,
@@ -182,9 +189,7 @@ class ReviewAlertService:
         channels: list[str] | None = None,
         metadata: dict | None = None,
     ) -> ResearchAlert:
-        tenant_id = db.info.get("tenant_id")
-        raw = ":".join([str(tenant_id or "legacy"), *fingerprint_parts])
-        fingerprint = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:160]
+        fingerprint = self.fingerprint_for(db, fingerprint_parts)
         existing = db.scalar(
             select(ResearchAlert).where(ResearchAlert.fingerprint == fingerprint)
         )

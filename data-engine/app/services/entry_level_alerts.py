@@ -10,8 +10,12 @@ Garantias que si fija este modulo, con independencia de la regla:
 - Cada lectura declara modelo (version), fuente y fecha de datos y estado
   (provisional o confirmed); el criterio de esos estados lo fija el modelo
   validado, no este modulo. Un estado fuera de esos dos valores se rechaza.
-- Un aviso solo sale al ENTRAR en un nivel distinto del ultimo avisado de ese
-  ticker. Repetir la misma lectura es idempotente: no genera nada.
+- Un aviso solo sale al SUBIR a un nivel >= ``min_level`` (por defecto 2) desde
+  el nivel actual guardado del ticker. Bajar de nivel (incluido salir de la
+  zona a 1) actualiza el estado SIN avisar, asi que volver a subir avisa de
+  nuevo. Repetir la misma lectura es idempotente: no genera nada.
+- La huella es por MES de senal: el mismo nivel en el mismo mes no se repite
+  aunque la lectura provisional cambie de dia.
 - Sin lectura (None) no se inventa estado: ni aviso ni cambio del ultimo nivel.
 - El texto es un aviso informativo con su fuente de regla; nunca una orden.
 - No envia nada: devuelve eventos y texto; el envio vive en otra capa.
@@ -25,9 +29,10 @@ from dataclasses import dataclass, replace
 from datetime import date
 from typing import Protocol
 
-VERSION = "entry-level-alert-v1"
+VERSION = "entry-level-alert-v2"
 MIN_LEVEL = 1
 MAX_LEVEL = 4
+DEFAULT_MIN_LEVEL = 2  # 1 = nivel normal: por si solo no merece aviso
 
 
 STATUSES = ("provisional", "confirmed")
@@ -70,11 +75,15 @@ def validate_level(level: object) -> int:
     return level
 
 
+def signal_period(day: date) -> str:
+    return f"{day.year:04d}-{day.month:02d}"
+
+
 def fingerprint(tenant_id: int, reading: LevelReading) -> str:
-    """Clave de idempotencia: tenant, ticker, nivel, fecha de senal, version y estado."""
+    """Clave de idempotencia: tenant, ticker, nivel, MES de senal, version y estado."""
     raw = (
         f"{VERSION}:{tenant_id}:{reading.ticker.upper()}:{reading.level}:"
-        f"{reading.signal_date.isoformat()}:{reading.model_version}:{reading.status}"
+        f"{signal_period(reading.signal_date)}:{reading.model_version}:{reading.status}"
     )
     return hashlib.sha256(raw.encode()).hexdigest()
 
@@ -82,13 +91,19 @@ def fingerprint(tenant_id: int, reading: LevelReading) -> str:
 def plan_events(
     tenant_id: int,
     readings: list[LevelReading | None],
-    last_notified: Mapping[str, int],
+    last_levels: Mapping[str, int],
+    *,
+    min_level: int = DEFAULT_MIN_LEVEL,
 ) -> tuple[list[EntryEvent], dict[str, int]]:
-    """Eventos por entrada en un nivel nuevo y el estado actualizado.
+    """Eventos por subida de nivel y el estado actualizado.
 
-    `last_notified` es el ultimo nivel avisado por ticker. No se muta.
+    `last_levels` es el ultimo nivel LEIDO por ticker (no solo el avisado), asi
+    el estado sabe cuando un ticker salio de su zona. No se muta.
+    Avisa solo si el nivel nuevo es >= `min_level` y mayor que el guardado (o
+    no habia estado). Las bajadas solo actualizan el estado.
     """
-    state = dict(last_notified)
+    min_level = validate_level(min_level)
+    state = dict(last_levels)
     events: list[EntryEvent] = []
     seen: set[str] = set()
     for reading in readings:
@@ -102,8 +117,11 @@ def plan_events(
         if reading.status not in STATUSES:
             raise ValueError(f"estado invalido (provisional|confirmed): {reading.status!r}")
         previous = state.get(ticker)
+        state[ticker] = level
         if previous == level:
             continue
+        if level < min_level or (previous is not None and level < previous):
+            continue  # bajada o nivel bajo el minimo: estado al dia, sin aviso
         normalized = replace(reading, ticker=ticker, level=level)
         events.append(
             EntryEvent(
@@ -112,7 +130,6 @@ def plan_events(
                 fingerprint=fingerprint(tenant_id, normalized),
             )
         )
-        state[ticker] = level
     return events, state
 
 

@@ -560,15 +560,18 @@ def test_owner_earnings_declared_maintenance_capex_rule():
         add_fact(db, company, "net_income", "200")
         add_fact(db, company, "depreciation_amortization", "80")
         add_fact(db, company, "capital_expenditure", "-120")
+        # signo de flujo de caja: -30 = el circulante absorbio 30 de caja
+        add_fact(db, company, "change_in_working_capital", "-30")
         db.commit()
 
         service = MetricCalculationService()
         result = service.calculate(db, company, "owner_earnings", persist=True)
         db.commit()
         assert result.status == "ok"
-        assert result.definition_version == "OWNER_EARNINGS_V1"
-        # maintenance = min(120, 80) = 80 -> 200 + 80 - 80
-        assert result.value == Decimal("200.00000000")
+        assert result.definition_version == "OWNER_EARNINGS_V2"
+        # maintenance = min(120, 80) = 80 -> 200 + 80 + (-30) - 80 = 170
+        assert result.value == Decimal("170.00000000")
+        assert result.calculation_trace["change_in_working_capital"] == "-30.00000000"
         assert result.calculation_trace["maintenance_capex"] == "80.00000000"
         assert result.calculation_trace["estimated_growth_capex"] == "40.00000000"
 
@@ -582,8 +585,23 @@ def test_owner_earnings_declared_maintenance_capex_rule():
         add_fact(db, company, "capital_expenditure", "-50")
         db.commit()
         result2 = service.calculate(db, company, "owner_earnings", persist=False)
-        assert result2.value == Decimal("230.00000000")
+        # 200 + 80 + (-30) - 50 = 200
+        assert result2.value == Decimal("200.00000000")
         assert result2.calculation_trace["maintenance_capex"] == "50.00000000"
+
+        # sin variacion del circulante: unavailable, nunca se toma como 0
+        db.execute(
+            delete(FinancialFact).where(
+                FinancialFact.company_id == company.id,
+                FinancialFact.metric == "change_in_working_capital",
+            )
+        )
+        db.commit()
+        no_wc = service.calculate(db, company, "owner_earnings", persist=False)
+        assert no_wc.status == "unavailable"
+        assert "change_in_working_capital" in no_wc.calculation_trace["missing_inputs"]
+        add_fact(db, company, "change_in_working_capital", "-30")
+        db.commit()
 
         # sin D&A: unavailable honesto, nunca estimado
         db.execute(
@@ -636,6 +654,8 @@ def add_owner_year_facts(db, company: Company, years: list[int], capex: str = "-
         period = f"FY{year}"
         add_fact(db, company, "depreciation_amortization", "100", period, year)
         add_fact(db, company, "capital_expenditure", capex, period, year)
+        # signo de flujo de caja: -20 = el circulante absorbio 20 de caja
+        add_fact(db, company, "change_in_working_capital", "-20", period, year)
 
 
 def add_wacc_facts(db, company: Company) -> None:
@@ -659,9 +679,9 @@ def test_owner_earnings_5y_mean_of_annual_values():
 
         result = MetricCalculationService().calculate(db, company, "owner_earnings_5y", persist=True)
         assert result.status == "ok"
-        assert result.definition_version == "OWNER_EARNINGS_5Y_V1"
-        # 200 NI + 100 D&A - min(80, 100) = 220 cada ano
-        assert result.value == Decimal("220.00000000")
+        assert result.definition_version == "OWNER_EARNINGS_5Y_V2"
+        # 200 NI + 100 D&A + (-20) dCC - min(80, 100) = 200 cada ano
+        assert result.value == Decimal("200.00000000")
         assert result.period == "FY2021-FY2025"
         assert result.calculation_trace["coverage"] == "5/5"
     finally:
@@ -840,7 +860,7 @@ def test_quality_moat_score_v2_capex_intensity_fails_when_heavy():
         checks = {c["check"]: c for c in result.calculation_trace["checks"]}
         # |capex|/D&A = 3.0 > 1.5: el check de disciplina de capital falla
         assert checks["capex_to_da_5y_le_150pct"]["passed"] is False
-        # owner earnings: 200 + 100 - min(300, 100) = 200 > 0, sigue pasando
+        # owner earnings: 200 + 100 - 20 - min(300, 100) = 180 > 0, sigue pasando
         assert checks["owner_earnings_5y_positive"]["passed"] is True
     finally:
         db.close()
@@ -1139,7 +1159,7 @@ def test_owner_earnings_unit_follows_input_currency():
     db = SessionLocal()
     try:
         company = create_test_company(db)
-        for metric, val in (("net_income", "200"), ("depreciation_amortization", "80"), ("capital_expenditure", "-120")):
+        for metric, val in (("net_income", "200"), ("depreciation_amortization", "80"), ("capital_expenditure", "-120"), ("change_in_working_capital", "-30")):
             fact = add_fact(db, company, metric, val)
             fact.unit = "CAD"
         db.commit()
@@ -1156,7 +1176,7 @@ def test_owner_earnings_mixed_currency_is_unavailable():
     db = SessionLocal()
     try:
         company = create_test_company(db)
-        for metric, val, unit in (("net_income", "200", "CAD"), ("depreciation_amortization", "80", "USD"), ("capital_expenditure", "-120", "USD")):
+        for metric, val, unit in (("net_income", "200", "CAD"), ("depreciation_amortization", "80", "USD"), ("capital_expenditure", "-120", "USD"), ("change_in_working_capital", "-30", "USD")):
             add_fact(db, company, metric, val).unit = unit
         db.commit()
         result = MetricCalculationService().calculate(db, company, "owner_earnings", persist=False)

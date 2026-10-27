@@ -405,6 +405,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
                     "planned_capex": funding.planned_capex,
                     "burn_proxy": funding.burn_proxy,
                     "min_cash_buffer": funding.min_cash_buffer,
+                    "min_cash_buffer_basis": funding.min_cash_buffer_basis,
                     "missing_inputs": funding.missing_inputs,
                     "dilution": funding.dilution,
                 },

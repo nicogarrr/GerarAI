@@ -10,6 +10,10 @@ import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
 import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
+import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
+import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
+import { getDcaSignals } from '@/lib/actions/dca-signals.actions';
+import type { DcaSignalItem } from '@/lib/dca/types';
 import ExtendedHoursLine from '@/components/common/ExtendedHoursLine';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 import { Badge } from '@/components/ui/badge';
@@ -64,6 +68,8 @@ export default async function WatchlistPage({
 }: {
     searchParams: Promise<{ page?: string; sort?: string; dir?: string }>;
 }) {
+    // Señales DCA (watchlist + cartera) en paralelo con el resto de la página.
+    const dcaPromise = getDcaSignals();
     const [{ items: watchlistItems, unavailable }, query] = await Promise.all([getWatchlistState(), searchParams]);
     const requestedPage = /^\d+$/.test(query.page ?? '') ? Number(query.page) : 1;
     const totalPages = Math.max(1, Math.ceil(watchlistItems.length / PAGE_SIZE));
@@ -268,10 +274,17 @@ export default async function WatchlistPage({
         sort === key ? (dir === 'asc' ? 'ascending' : 'descending') : undefined;
     const sortIndicator = (key: SortKey) =>
         sort === key ? <span aria-hidden="true" className="text-teal-400">{dir === 'asc' ? '▲' : '▼'}</span> : null;
-    // Solo cuentan tickers con tesis PUBLICADA de K (expected_value real);
-    // sin valoracion no se juzga caro/barato.
+    // Solo cuentan tickers con valor justo ÚNICO (tesis publicada de K o motor,
+    // misma cifra que inicio y screener); sin valoración no se juzga caro/barato.
     const undervaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'infravalorada').length;
     const overvaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'sobrevalorada').length;
+    const judged = watchlistStocks.filter((stock) => stock.monitor?.valuation_side);
+    const byThesis = judged.filter((stock) => stock.monitor?.fair_value_source === 'tesis').length;
+    const byEngine = judged.length - byThesis;
+    const fairValueSourceNote = [
+        byThesis > 0 ? `${byThesis} por tesis publicada de K` : null,
+        byEngine > 0 ? `${byEngine} por el motor de valoración` : null,
+    ].filter(Boolean).join(', ');
 
     // Un único formateador para móvil y desktop: sin dato -> NA ('N/D'),
     // nunca un número interpolado sin guarda.
@@ -299,6 +312,10 @@ export default async function WatchlistPage({
     const formatPriceCell = (price: number | null, currency: string | null) =>
         price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
 
+    const dca = await dcaPromise;
+    const dcaBySymbol = new Map<string, DcaSignalItem>((dca.data?.items ?? []).map((item) => [item.symbol.toUpperCase(), item]));
+    const dcaSignalMonths = dca.data?.signal_months ?? null;
+
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip p-4 sm:p-6">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
@@ -309,7 +326,7 @@ export default async function WatchlistPage({
                     </h1>
                     {undervaluedCount + overvaluedCount > 0 ? (
                         <p className="text-xs text-gray-500">
-                            Según la tesis publicada de K: {undervaluedCount} infravaloradas · {overvaluedCount} sobrevaloradas
+                            Según el valor justo ({fairValueSourceNote}): {undervaluedCount} infravaloradas · {overvaluedCount} sobrevaloradas
                         </p>
                     ) : null}
                 </div>
@@ -388,7 +405,7 @@ export default async function WatchlistPage({
                                         >
                                             {stock.symbol}
                                         </Link>
-                                        {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} />
+                                        {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />
                                         {stock.price === null ? (
                                             <Badge variant="outline" className="mt-1 border-gray-700 text-gray-400">
                                                 {stock.timedOut ? 'sin datos: la lectura tardó más de 3 s, recarga' : 'sin datos'}
@@ -495,7 +512,7 @@ export default async function WatchlistPage({
                                                             </Badge>
                                                         ) : null}
                                                     </div>
-                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} />
+                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />
                                                 </div>
                                             </Link>
                                             <div className="ml-2 flex items-center gap-1">
@@ -559,6 +576,8 @@ export default async function WatchlistPage({
                     </div>
                 </>
             )}
+
+            <DcaSignalsPanel data={dca.data} unavailable={dca.unavailable} />
         </main>
     );
 }

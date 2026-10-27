@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.tenancy import tenant_filters
 from app.models import AlertDelivery, Company, NewsEvent, ResearchAlert
+from app.services.email_delivery import generic_alert_content, send_email, smtp_configured
 
 # Un claim 'sending' mas viejo que esto se considera abandonado (worker muerto
 # entre el envio y el commit del resultado) y vuelve a ser reclamable. Es el
@@ -117,6 +118,8 @@ class NotificationService:
                     result = self._result("delivered")
                 elif channel == "telegram":
                     result = self._dispatch_telegram(settings, {**payload, **({"chat_id": subscription.chat_id} if subscription else {})})
+                elif channel == "email" and smtp_configured(settings):
+                    result = self._dispatch_email(settings, alert, payload)
                 else:
                     result = self._dispatch_webhook(settings, payload, channel)
             except Exception:
@@ -287,6 +290,18 @@ class NotificationService:
                 retry_after=self._extract_retry_after(exc),
             )
 
+    def _dispatch_email(self, settings, alert: ResearchAlert, payload: dict) -> dict:
+        """Correo por SMTP. Las alertas DCA usan su plantilla; el resto, la generica."""
+        dca = (alert.metadata_ or {}).get("dca")
+        if alert.alert_type == "dca_level" and isinstance(dca, dict):
+            from app.services.dca_alert_copy import email_content
+
+            content = email_content(dca)
+        else:
+            content = generic_alert_content(payload)
+        outcome = send_email(settings, content)
+        return self._result(outcome["status"], error=outcome.get("error"))
+
     def _ensure_delivery_row(self, db: Session, alert: ResearchAlert, channel: str) -> None:
         if self._get_delivery(db, alert, channel) is not None:
             return
@@ -454,6 +469,9 @@ class NotificationService:
                 text += f"\nAbrir documento: {url}"
             # Plain-text delivery has no expandable detail; omit machine traces.
             return text[:4090]
+        if payload.get("type") == "dca_level":
+            # El mensaje DCA ya va redactado en espanol con titular y metricas.
+            return str(payload.get("message") or payload.get("title") or "")[:4090]
         # Non-filing/non-news alerts retain their established delivery format.
         text = (
             f"[{payload['severity'].upper()}] {payload['title']}\n"

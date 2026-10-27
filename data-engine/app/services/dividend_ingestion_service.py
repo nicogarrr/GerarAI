@@ -221,6 +221,22 @@ class DividendIngestionService(ProviderIngestionService):
                 select(Position, Company).join(Company, Position.company_id == Company.id)
             ).all()
         )
+        # Una sola consulta para los dividendos TTM de todas las empresas en
+        # cartera (antes, una por posicion: N+1). Se agrupan por empresa en
+        # memoria; resolve_yahoo_events recibe exactamente las mismas filas.
+        company_ids = sorted({company.id for _position, company in rows})
+        records_by_company: dict[int, list[DividendRecord]] = {}
+        if company_ids:
+            for record in db.scalars(
+                select(DividendRecord)
+                .where(
+                    DividendRecord.company_id.in_(company_ids),
+                    DividendRecord.ex_date > cutoff,
+                    DividendRecord.ex_date <= today,
+                )
+                .order_by(DividendRecord.company_id, DividendRecord.ex_date, DividendRecord.id)
+            ).all():
+                records_by_company.setdefault(record.company_id, []).append(record)
         positions = []
         with_data = 0
         weighted_yield = 0.0
@@ -228,15 +244,7 @@ class DividendIngestionService(ProviderIngestionService):
         total_value = 0.0
         missing_base_value: list[str] = []
         for position, company in rows:
-            records, uncertain = resolve_yahoo_events(
-                db.scalars(
-                    select(DividendRecord).where(
-                        DividendRecord.company_id == company.id,
-                        DividendRecord.ex_date > cutoff,
-                        DividendRecord.ex_date <= today,
-                    )
-                ).all()
-            )
+            records, uncertain = resolve_yahoo_events(records_by_company.get(company.id, []))
             price = float(position.market_price or 0)
             # Peso solo en divisa base: `market_value` esta en la divisa nativa
             # y sumarlo mezclaria monedas distintas en el mismo total.

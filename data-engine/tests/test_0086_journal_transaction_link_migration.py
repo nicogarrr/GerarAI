@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, inspect
 
 DATA_ENGINE_DIR = Path(__file__).resolve().parents[1]
 REVISION = "0086_journal_transaction_link"
-DOWN_REVISION = "0084_knowledge_document_ticker"
+DOWN_REVISION = "0083_dca_signal_states"
 TABLE = "decision_journal_entries"
 
 

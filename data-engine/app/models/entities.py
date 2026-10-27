@@ -106,6 +106,61 @@ class WatchItem(TenantOwnedMixin, Base, TimestampMixin):
     company: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
+class DcaSignalState(TenantOwnedMixin, Base, TimestampMixin):
+    """Ultimo veredicto DCA por ticker seguido (watchlist y/o cartera).
+
+    Una fila por (tenant, simbolo). ``level`` usa los codigos del motor
+    (4..1 compra, -1/-2 recorte). ``last_alerted_*`` es la memoria del aviso:
+    el mismo nivel en el mismo mes nunca vuelve a avisar.
+    """
+
+    __tablename__ = "dca_signal_states"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "symbol", name="uq_dca_signal_state_tenant_symbol"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(20), index=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    level: Mapped[int] = mapped_column(Integer)
+    previous_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(20))
+    period: Mapped[str] = mapped_column(String(7))
+    signal_date: Mapped[_DateT] = mapped_column(Date)
+    close: Mapped[Decimal] = mapped_column(Numeric(20, 6))
+    currency: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    metrics: Mapped[dict] = mapped_column(JSON, default=dict)
+    level_prices: Mapped[dict] = mapped_column(JSON, default=dict)
+    sources: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # "¿Cuantas veces estaba mas arriba?" (dca_signal_engine.hit_rates) de la
+    # ultima evaluacion; NULL = aun sin calcular.
+    hit_rates: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    params_version: Mapped[str] = mapped_column(String(40))
+    last_alerted_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_alerted_period: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    data_source: Mapped[str] = mapped_column(String(40))
+
+
+class DcaAlertOverride(TenantOwnedMixin, Base, TimestampMixin):
+    """Nivel minimo de aviso DCA por ticker (watchlist o cartera).
+
+    Sin fila = se usa el global (DCA_ALERT_MIN_LEVEL). ``min_level`` 1-4 =
+    nivel de compra minimo que avisa; 0 = avisos apagados para ese ticker.
+    Tabla propia (y no columna en watch_items) para cubrir tambien los
+    tickers que solo estan en cartera.
+    """
+
+    __tablename__ = "dca_alert_overrides"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "symbol", name="uq_dca_alert_override_tenant_symbol"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(20), index=True)
+    min_level: Mapped[int] = mapped_column(Integer)
+
+
 class EarningsDate(Base, TimestampMixin):
     """Fecha de resultados de un ticker (dato de mercado, no del tenant).
 
@@ -1152,6 +1207,11 @@ class ThesisVersion(TenantOwnedMixin, Base, TimestampMixin):
     hypothesis: Mapped[str | None] = mapped_column(Text, nullable=True)
     catalysts: Mapped[list | None] = mapped_column(JSON, nullable=True)
     invalidation_criteria: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Criterios de invalidacion ESTRUCTURADOS y opcionales: lista de
+    # {metric, operator, threshold, description}. A diferencia del texto libre
+    # de arriba, se evaluan: el evaluador de alertas los comprueba en cada
+    # pasada (app/services/thesis_invalidation_rules.py). None = sin criterios.
+    invalidation_rules: Mapped[list | None] = mapped_column(JSON, nullable=True)
     scenario_probabilities: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Analisis narrativo (capa LLM opcional): secciones compuestas por
     # seleccion de plantillas con slots deterministicos. Null en versiones
@@ -1967,6 +2027,9 @@ class KnowledgeDocument(TenantOwnedMixin, Base, TimestampMixin):
     language: Mapped[str] = mapped_column(String(20), default="en")
     status: Mapped[str] = mapped_column(String(40), default="ready", index=True)
     checksum: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    # Empresa a la que se refiere el documento (opcional, normalizado strip +
+    # upper). Lo usa la ficha /research/[ticker] para listar sus lecturas.
+    ticker: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
 
 

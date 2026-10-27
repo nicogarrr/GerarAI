@@ -34,6 +34,10 @@ INSTANT_METRICS = (
     "shares_diluted",
     "cash_and_equivalents",
     "total_debt",
+    # Puente EV -> equity: derechos de minoritarios y preferentes. Opcionales
+    # (no bloquean el DCF): la mayoría de emisores no los tiene.
+    "minority_interest",
+    "preferred_stock",
 )
 # The DCF equity bridge is EV - net_debt. A missing net_debt is NOT zero debt:
 # it is an unknown that must block the valuation instead of inventing equity.

@@ -45,6 +45,8 @@ import { CompanyHeaderQuote } from '@/components/research/CompanyHeaderQuote';
 import { CompanyHeaderQuoteSkeleton } from '@/components/research/CompanyHeaderQuoteSkeleton';
 import { ChangesSinceVisit } from '@/components/research/ChangesSinceVisit';
 import { AnalystTargetsSection } from '@/components/research/AnalystTargetsSection';
+import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
+import { TtmPanel } from '@/components/research/TtmPanel';
 import { GuideBrainButton } from '@/components/research/GuideBrainButton';
 import { GuideContextPanel } from '@/components/research/GuideContextPanel';
 import { getGuideContext } from '@/lib/research/assistant-client';
@@ -104,6 +106,8 @@ import {
 } from '@/lib/actions/research.actions';
 import { getCompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
 import { getCompanyHolders } from '@/lib/actions/investors.actions';
+import { getKnowledgeDocumentsForTicker } from '@/lib/actions/research-tools.actions';
+import { libraryDocumentHref } from '@/lib/knowledge/document-ticker';
 import { getWatchlist } from '@/lib/actions/watchlist.actions';
 import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
@@ -122,7 +126,8 @@ import { toChatCitations } from '@/lib/chat/citations';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
 import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
-import { getInsiderFilings } from '@/lib/actions/insider.actions';
+import { getInsiderFilings, getOwnershipSignals } from '@/lib/actions/insider.actions';
+import { OwnershipSignalsPanel } from '@/components/research/OwnershipSignalsPanel';
 import { insiderName, insiderRole } from '@/lib/insider/format';
 import { glossary, moatGlossaryKey } from '@/lib/glossary';
 import {
@@ -703,7 +708,7 @@ const EMPTY_VIEW_DATA: { [K in keyof ViewWorkspaces]: ViewWorkspaces[K] } = {
     scenarios: null,
   },
   changes: { changes: [], reviews: [], alerts: [], decisions: [], expectations: [], trades: [] },
-  financials: { facts: [], calculatedMetrics: [] },
+  financials: { facts: [], calculatedMetrics: [], ttm: null },
   model: null,
   'market-opportunity': null,
   moat: null,
@@ -1000,7 +1005,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           .slice(0, 5)
           .sort((a, b) => b.date.localeCompare(a.date))
       : [];
-    const per = await getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: 'No se pudo consultar el PER' }));
+    // Conexión 10b: insiders + 13F en paralelo con el PER; si falla, el panel lo dice.
+    const [per, ownershipSignals] = await Promise.all([
+      getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: 'No se pudo consultar el PER' })),
+      getOwnershipSignals(ticker).catch(() => null),
+    ]);
     content = (
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -1210,6 +1219,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             ))}
           </div>
         </Panel>
+        <OwnershipSignalsPanel signals={ownershipSignals} ticker={ticker} />
         {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><p className="text-sm text-gray-400">Elementos orbitales de CelesTrak y evolución del semieje mayor.</p><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
           {researchValuability(snapshot)}
@@ -1505,6 +1515,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           )}
           <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Métricas y modelo de research refrescados"><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />Recalcular</Button></MutationForm>
         </div>
+        <Panel title="Fundamentales actuales · TTM (últimos 4 trimestres)"><TtmPanel ttm={data.ttm} /></Panel>
         <Panel title="Métricas calculadas trazables"><MetricsGrid metrics={data.calculatedMetrics} /></Panel>
         <Panel title="Hechos financieros canónicos"><FactTable ticker={ticker} facts={data.facts} refreshLabel={
             fmpCovers(ticker, company.exchange)
@@ -1569,7 +1580,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   } else if (activeView === 'valuation') {
     content = <ValuationView valuation={await viewData('valuation')} currency={company.currency} ticker={ticker} />;
   } else if (activeView === 'documents') {
-    const documents = await viewData('documents');
+    // Conexión 10a: las lecturas de la biblioteca enlazadas a este ticker se
+    // piden en paralelo; si la biblioteca falla, la vista sigue sin ellas.
+    const [documents, libraryReadings] = await Promise.all([
+      viewData('documents'),
+      getKnowledgeDocumentsForTicker(ticker).catch(() => null),
+    ]);
     content = (
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -1586,6 +1602,28 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             <EmptyState
               action={<EmptyLink href="/research/sources">Importa tu primer documento</EmptyLink>}
               title="Sin documentos ingeridos."
+            />
+          )}
+        </Panel>
+        <Panel title="Lecturas de la biblioteca" actions={<Link className="text-sm text-teal-300" href="/knowledge?tab=subir">Añadir a la biblioteca</Link>}>
+          {libraryReadings === null ? (
+            <EmptyState title="No se pudo cargar la biblioteca ahora mismo." />
+          ) : libraryReadings.length ? (
+            <ul className="space-y-3">
+              {libraryReadings.map((reading) => (
+                <li className="rounded-lg border border-gray-800 p-4" key={reading.id}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FileText className="h-4 w-4 text-teal-300" />
+                    <Link className="font-medium text-gray-200 underline decoration-gray-700 underline-offset-4 transition hover:text-teal-200" href={libraryDocumentHref(reading.id)}>{reading.title}</Link>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">{reading.author ?? 'Autor desconocido'}{reading.publication_date ? ` · ${formatDate(reading.publication_date)}` : ''}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState
+              action={<EmptyLink href="/knowledge">Asigna este ticker a un documento de la biblioteca</EmptyLink>}
+              title={`Ningún libro, carta o nota de la biblioteca está enlazado a ${ticker}.`}
             />
           )}
         </Panel>
@@ -1694,6 +1732,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
           <MobileCollapse title="Precios objetivo de analistas"><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse>
+          <MobileCollapse title="Señales DCA: histórico"><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
         </header>
         {/*
             Selector de paso (Entender → Valorar → Seguir) y, debajo, solo los

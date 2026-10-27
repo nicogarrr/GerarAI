@@ -120,7 +120,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                         </p>
                         <p className="mt-1 text-xs">
                             Gráficos interactivos por{' '}
-                            <a className="public-footer-link" href="https://www.tradingview.com/" rel="noreferrer" target="_blank">
+                            <a className="public-footer-link underline" href="https://www.tradingview.com/" rel="noreferrer" target="_blank">
                                 TradingView
                             </a>
                             .

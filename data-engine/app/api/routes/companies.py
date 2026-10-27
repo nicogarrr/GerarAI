@@ -35,6 +35,7 @@ from app.schemas import (
     FinancialRefreshResponse,
     ThesisTickersOut,
 )
+from app.schemas.ttm import CompanyTtmOut
 from app.services import market_change
 from app.services.analyst_targets_service import AnalystTargets, analyst_targets_service
 from app.services.async_bridge import run_from_any_context
@@ -80,6 +81,7 @@ from app.services.moat_service import MoatService
 from app.services.peer_analysis_service import PeerAnalysisService
 from app.services.peer_comparison_service import DEFAULT_PEER_METRICS, PeerComparisonService
 from app.services.red_team_service import RedTeamService
+from app.services.ttm_service import build_company_ttm
 from app.services.wacc_input_service import WaccInputService
 
 logger = logging.getLogger(__name__)
@@ -458,6 +460,20 @@ def financial_terminal(
         years=years,
         periodicity=periodicity,
     )
+
+
+@router.get("/{ticker}/ttm", response_model=CompanyTtmOut)
+def company_ttm(ticker: str, db: Session = Depends(get_db)) -> dict:
+    """Fundamentales actuales en TTM (últimos 4 trimestres), con respaldo FY.
+
+    Flujos = suma de los 4 últimos trimestres consecutivos (Q4 = FY − 9M si no
+    hay 10-Q del cuarto); balance = último trimestre. Cada métrica dice su base
+    (TTM / FY / Q / SIN_DATOS) y su procedencia (OFICIAL / INFERIDO).
+    """
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return build_company_ttm(db, company)
 
 
 @router.get("/{ticker}/metrics/calculated", response_model=CalculatedMetricsResponse)

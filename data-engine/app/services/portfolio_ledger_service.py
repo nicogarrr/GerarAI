@@ -150,8 +150,21 @@ class PortfolioLedgerService:
         return total
 
     def rebuild_position(
-        self, db: Session, company_id: int, *, as_of: date | None = None
+        self,
+        db: Session,
+        company_id: int,
+        *,
+        as_of: date | None = None,
+        drop_when_empty: bool = False,
     ) -> Position | None:
+        """Reproduce las compras/ventas de la compania y reescribe su Position.
+
+        ``drop_when_empty``: el llamante acaba de QUITAR una pata compra/venta
+        (borrado o cambio de ticker). Si ya no queda ninguna, la Position que
+        habia es un fantasma y se borra. Sin el flag, una compania sin patas
+        conserva su Position (p. ej. la foto de posiciones de un extracto IBKR
+        a la que solo se le anade un dividendo).
+        """
         transactions = list(
             db.scalars(
                 select(Transaction)
@@ -181,6 +194,12 @@ class PortfolioLedgerService:
             (transaction.trade_date for transaction in transactions), default=None
         )
         valuation_date = as_of or last_transaction_date
+        if not transactions and drop_when_empty:
+            orphan = db.scalar(select(Position).where(Position.company_id == company_id))
+            if orphan is not None:
+                db.delete(orphan)
+                db.flush()
+            return None
         if valuation_date is None:
             return None
 

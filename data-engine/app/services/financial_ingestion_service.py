@@ -22,6 +22,11 @@ from app.services.fact_deletion import (
     drop_shadowed_facts,
     tenant_condition,
 )
+from app.services.ttm_fundamentals import (
+    NON_ADDITIVE_FLOWS,
+    PeriodValue,
+    derive_quarters_from_ytd,
+)
 
 MetricSpec = tuple[str, str, str]
 
@@ -60,6 +65,75 @@ SOURCE_PRIORITY: dict[str, int] = {
 }
 
 
+
+def _iso_currency(raw: Any) -> str | None:
+    """Codigo ISO de 3 letras en mayusculas, o None si no lo es."""
+    text = str(raw or "").strip().upper()
+    return text if len(text) == 3 and text.isalpha() else None
+
+
+def _with_reporting_currency(unit: str, currency: str | None) -> str:
+    """Sustituye la divisa de una unidad monetaria por la de reporte.
+
+    Las tablas de metricas dicen ``USD``/``USD/share`` como plantilla de
+    "importe monetario", no como hecho: BABA reporta en CNY, Toyota en JPY.
+    ``shares``, ``decimal`` y demas unidades no monetarias no cambian. Sin
+    divisa declarada se conserva la plantilla (comportamiento anterior).
+    """
+    if currency is None:
+        return unit
+    if unit == "USD":
+        return currency
+    if unit == "USD/share":
+        return f"{currency}/share"
+    return unit
+
+
+def _sec_reporting_currency(us_gaap: dict[str, Any]) -> str | None:
+    """Divisa de reporte de un filer SEC segun sus propios hechos us-gaap.
+
+    Un 10-K reporta en USD, pero un 20-F en US GAAP puede reportar en CNY
+    (BABA), TWD... y entonces companyfacts trae ``units: {"CNY": [...]}``.
+    Leer solo la clave ``USD`` dejaba a esos emisores sin hechos (o, peor,
+    con la traduccion de conveniencia del ultimo ano). Se cuenta, en los
+    conceptos de referencia, cuantas observaciones hay por divisa ISO y gana
+    la que mas tiene. Empate o ausencia de evidencia -> desconocida.
+    """
+    counts: Counter[str] = Counter()
+    for concept in _SEC_CURRENCY_PROBE_CONCEPTS:
+        units = (us_gaap.get(concept) or {}).get("units") or {}
+        for key, entries in units.items():
+            code = _iso_currency(key) if "/" not in str(key) else None
+            if code is not None and isinstance(entries, list):
+                counts[code] += len(entries)
+    if not counts:
+        return None
+    best = max(counts.values())
+    leaders = sorted(code for code, n in counts.items() if n == best)
+    return leaders[0] if len(leaders) == 1 else None
+
+
+def _sec_unit_keys(unit: str, currency: str | None) -> tuple[str, str] | None:
+    """(unidad a guardar, clave de ``units`` en companyfacts) para la divisa."""
+    if currency is None and unit in {"USD", "USD/share"}:
+        return None
+    stored = _with_reporting_currency(unit, currency)
+    if stored.endswith("/share"):
+        return stored, stored.replace("/share", "/shares")
+    return stored, stored
+
+
+_SEC_CURRENCY_PROBE_CONCEPTS = (
+    "Assets",
+    "Liabilities",
+    "StockholdersEquity",
+    "Revenues",
+    "RevenueFromContractWithCustomerExcludingAssessedTax",
+    "NetIncomeLoss",
+    "NetCashProvidedByUsedInOperatingActivities",
+    "CashAndCashEquivalentsAtCarryingValue",
+)
+
 INCOME_METRICS: list[MetricSpec] = [
     ("revenue", "revenue", "USD"),
     ("gross_profit", "grossProfit", "USD"),
@@ -88,6 +162,8 @@ BALANCE_METRICS: list[MetricSpec] = [
 CASH_FLOW_METRICS: list[MetricSpec] = [
     ("operating_cash_flow", "operatingCashFlow", "USD"),
     ("capital_expenditure", "capitalExpenditure", "USD"),
+    # Signo de flujo de caja: negativo = el circulante absorbió caja.
+    ("change_in_working_capital", "changeInWorkingCapital", "USD"),
     ("free_cash_flow", "freeCashFlow", "USD"),
     ("common_stock_repurchased", "commonStockRepurchased", "USD"),
     ("dividends_paid", "dividendsPaid", "USD"),
@@ -196,6 +272,10 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # balance cuadre por la diferencia de NCI. Se usa la de la matriz.
     ("total_equity",      ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"], "USD"),
     ("goodwill",          ["Goodwill"],                                                                              "USD"),
+    # Puente EV -> equity del DCF: patrimonio de minoritarios (NCI) y valor de
+    # las preferentes. Saldos de balance (instantes).
+    ("minority_interest", ["MinorityInterest"],                                                                     "USD"),
+    ("preferred_stock",   ["PreferredStockValue", "PreferredStockValueOutstanding"],                               "USD"),
     ("intangible_assets", SEC_INTANGIBLE_COMPONENTS,                                                                "USD"),
     ("operating_lease_liabilities", ["OperatingLeaseLiability", "OperatingLeaseLiabilityNoncurrent"],                "USD"),
     ("operating_cash_flow", ["NetCashProvidedByUsedInOperatingActivities"],                                         "USD"),
@@ -205,11 +285,23 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("finance_lease_additions", ["RightOfUseAssetObtainedInExchangeForFinanceLeaseLiability"], "USD"),
     ("depreciation_amortization", ["DepreciationDepletionAndAmortization", "DepreciationAmortizationAndAccretionNet",
                                    "Depreciation", "DepreciationAndAmortization"],                                                                  "USD"),
+    # Signo CONTRARIO al del flujo de caja (+ = el circulante sube y consume
+    # caja): _merge_for_metric lo niega para guardar el signo de FMP
+    # changeInWorkingCapital (ver SEC_CASH_FLOW_SIGN_FLIPPED_METRICS).
+    ("change_in_working_capital", ["IncreaseDecreaseInOperatingCapital"], "USD"),
     ("common_stock_repurchased", ["PaymentsForRepurchaseOfCommonStock", "StockRepurchasedDuringPeriodValue"], "USD"),
     ("common_stock_issued", ["ProceedsFromIssuanceOfCommonStock", "StockIssuedDuringPeriodValueNewIssues"], "USD"),
     ("shares_repurchased", ["StockRepurchasedDuringPeriodShares"], "shares"),
     ("stock_based_compensation", ["ShareBasedCompensation"], "USD"),
     ("dividends_paid",    ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"],                                "USD"),
+    # Drivers obligatorios de los marcos de tesis que SI estan en us-gaap y no
+    # se leian (la tesis los daba por ausentes con el dato en el 10-K):
+    # - aseguradoras: primas devengadas netas (Chubb FY2025: 53.014 M$);
+    # - espacio/defensa: cartera contratada = obligaciones de desempeno
+    #   pendientes (ASC 606), que es la cifra que Rocket Lab publica como
+    #   «backlog» (FY2025: 1.847,3 M$). Es un saldo (instantaneo).
+    ("earned_premiums",   ["PremiumsEarnedNet"],                                                                    "USD"),
+    ("backlog",           ["RevenueRemainingPerformanceObligation"],                                                "USD"),
 ]
 
 
@@ -576,10 +668,23 @@ def _compose_total_debt(
     return out
 
 
+# Métricas cuyo concepto us-gaap llega con el signo contrario al del estado de
+# flujos de caja. IncreaseDecreaseInOperatingCapital es + cuando el circulante
+# operativo SUBE (caja consumida); el hecho se guarda en el signo de FMP
+# changeInWorkingCapital (− = caja consumida), que es el que usan el
+# beneficio del propietario (app/services/owner_earnings.py) y el FCFE.
+SEC_CASH_FLOW_SIGN_FLIPPED_METRICS: frozenset[str] = frozenset({"change_in_working_capital"})
+
+
 def _merge_for_metric(
     by_concept: dict[str, dict[str, dict[str, Any]]], metric: str
 ) -> dict[str, dict[str, Any]]:
     """Merge concepts per period: summed when they are parts, else one winner."""
+    if metric in SEC_CASH_FLOW_SIGN_FLIPPED_METRICS:
+        return {
+            end: _negate_entry(entry)
+            for end, entry in _collapse_aliases(by_concept).items()
+        }
     if is_summed_component(metric):
         return _sum_disjoint_components(by_concept)
     if metric == "total_debt":
@@ -587,6 +692,14 @@ def _merge_for_metric(
     if metric in SCOPE_PRIORITY_METRICS:
         return _collapse_by_scope(by_concept)
     return _collapse_aliases(by_concept)
+
+
+def _negate_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    """Copia de la entrada con ``val`` cambiado de signo (el crudo no se toca)."""
+    value = _decimal(entry.get("val"))
+    if value is None:
+        return entry
+    return {**entry, "val": -value}
 
 
 BANK_REVENUE_COMPONENTS = ("InterestIncomeExpenseNet", "NoninterestIncome")
@@ -686,6 +799,43 @@ def _is_bank_like(company: Any) -> bool:
         str(getattr(company, "ticker", "") or "").strip().upper()
         in BANK_REVENUE_TICKERS
     )
+
+
+def _quarters_from_ytd(
+    by_end_q: dict[str, dict[str, Any]],
+    ytd_by_end: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Trimestres de 3 meses derivados de acumulados YTD de 10-Q.
+
+    Solo devuelve cierres que NO estan ya en ``by_end_q`` (un trimestre
+    presentado gana). La fila derivada hereda accn/filed/concepto del
+    acumulado mas reciente (el filing que la hace conocible) y lleva
+    ``_derived_from_ytd`` para persistirse como no reportada.
+    """
+    rows: list[PeriodValue] = []
+    for entry in [*by_end_q.values(), *ytd_by_end.values()]:
+        val = _decimal(entry.get("val"))
+        try:
+            start = date.fromisoformat(str(entry.get("start")))
+            end = date.fromisoformat(str(entry.get("end")))
+        except (TypeError, ValueError):
+            continue
+        if val is None:
+            continue
+        rows.append(PeriodValue(start=start, end=end, value=val))
+    derived: dict[str, dict[str, Any]] = {}
+    for quarter in derive_quarters_from_ytd(rows):
+        end = quarter.end.isoformat()
+        source = ytd_by_end.get(end)
+        if quarter.reported or end in by_end_q or source is None or quarter.start is None:
+            continue
+        derived[end] = {
+            **source,
+            "val": quarter.value,
+            "start": quarter.start.isoformat(),
+            "_derived_from_ytd": True,
+        }
+    return derived
 
 
 def _collect_by_concept(
@@ -1107,8 +1257,12 @@ def _fiscal_annual_pairs(us_gaap: dict[str, Any]) -> list[tuple[str, str]]:
     """Pares (mes normalizado, end) de todos los hechos de flujo anuales
     candidatos (300-380 dias, fp=FY, 10-K/20-F) sobre todo SEC_METRIC_MAP."""
     pairs: list[tuple[str, str]] = []
+    reporting_currency = _sec_reporting_currency(us_gaap)
     for _metric, concepts, unit in SEC_METRIC_MAP:
-        xbrl_unit_key = "USD/shares" if unit == "USD/share" else unit
+        unit_keys = _sec_unit_keys(unit, reporting_currency)
+        if unit_keys is None:
+            continue
+        unit, xbrl_unit_key = unit_keys
         for concept in concepts:
             entries = us_gaap.get(concept, {}).get("units", {}).get(xbrl_unit_key, [])
             for e in entries:
@@ -1316,6 +1470,9 @@ class FinancialIngestionService:
                 )
 
         us_gaap = facts_data.get("facts", {}).get("us-gaap", {})
+        # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
+        # Cada hecho monetario se guarda con ELLA como unidad.
+        reporting_currency = _sec_reporting_currency(us_gaap)
 
         # Evidencia de calendario a nivel de filing (submissions). Fail
         # closed: sin anclas no entra NINGUN hecho anual (la cobertura
@@ -1367,7 +1524,10 @@ class FinancialIngestionService:
         annual_by_metric: dict[str, dict[str, dict[str, Any]]] = {}
         restated_fy_keys: list[tuple[str, str]] = []
         for metric, concepts, unit in SEC_METRIC_MAP:
-            xbrl_unit_key = "USD/shares" if unit == "USD/share" else unit
+            unit_keys = _sec_unit_keys(unit, reporting_currency)
+            if unit_keys is None:
+                continue
+            unit, xbrl_unit_key = unit_keys
             metric_concepts = (
                 _revenue_concepts_for(concepts, bank_like)
                 if metric == "revenue"
@@ -1417,7 +1577,10 @@ class FinancialIngestionService:
         )
 
         for metric, concepts, unit in SEC_METRIC_MAP:
-            xbrl_unit_key = "USD/shares" if unit == "USD/share" else unit
+            unit_keys = _sec_unit_keys(unit, reporting_currency)
+            if unit_keys is None:
+                continue
+            unit, xbrl_unit_key = unit_keys
             # --- Trimestres (10-Q): mismas reglas de fusion por `end` ---
             # fp Q1-Q4 + form 10-Q; flujo = 70-110 dias (trimestre real; los
             # acumulados YTD de ~180 dias y los TTM quedan fuera); instantaneos
@@ -1462,6 +1625,29 @@ class FinancialIngestionService:
                     as_of=as_of,
                 ).items():
                     by_end_q.setdefault(end, entry)
+            if metric not in NON_ADDITIVE_FLOWS:
+                # El estado de flujos de efectivo de un 10-Q suele venir SOLO
+                # acumulado (3, 6 y 9 meses: AAPL, flujo operativo y capex),
+                # asi que el filtro de 70-110 dias dejaba sin Q2/Q3. Se derivan
+                # restando acumulados del mismo ejercicio: Q(t) = YTD(t) -
+                # YTD(t-1). Un trimestre de 3 meses presentado siempre gana;
+                # las filas derivadas van con is_reported=False (INFERIDO).
+                ytd_by_end = _merge_for_metric(
+                    _collect_by_concept(
+                        us_gaap,
+                        metric_concepts_q,
+                        xbrl_unit_key,
+                        forms={"10-Q"},
+                        periods={"Q1", "Q2", "Q3", "Q4"},
+                        min_span=150,
+                        max_span=290,
+                        as_of=as_of,
+                        require_start=True,
+                    ),
+                    metric,
+                )
+                for end, entry in _quarters_from_ytd(by_end_q, ytd_by_end).items():
+                    by_end_q.setdefault(end, entry)
             if by_end_q:
                 q_sorted = sorted(
                     by_end_q.values(), key=lambda e: str(e["end"]), reverse=True
@@ -1475,6 +1661,7 @@ class FinancialIngestionService:
                     fp = _fiscal_quarter_from_end(
                         str(entry["end"]), modal_fy_month
                     ) or str(entry["fp"])
+                    derived_from_ytd = bool(entry.get("_derived_from_ytd"))
                     db.add(
                         FinancialFact(
                             company_id=company.id,
@@ -1486,8 +1673,8 @@ class FinancialIngestionService:
                             fiscal_quarter=fp,
                             source_id=document.id,
                             source_type="SEC",
-                            is_reported=True,
-                            confidence=Decimal("0.9"),
+                            is_reported=not derived_from_ytd,
+                            confidence=Decimal("0.85") if derived_from_ytd else Decimal("0.9"),
                             accession_number=entry.get("accn"),
                             filed=_publication_date(entry),
                         )
@@ -2103,7 +2290,8 @@ class FinancialIngestionService:
                     company_id=company.id,
                     metric="free_cash_flow",
                     value=ocf.value + capex.value,
-                    unit="USD",
+                    # Misma divisa que sus componentes (CNY en un 20-F de BABA).
+                    unit=ocf.unit,
                     period=ocf.period,
                     fiscal_year=year,
                     fiscal_quarter="FY",
@@ -2165,7 +2353,7 @@ class FinancialIngestionService:
                         company_id=company.id,
                         metric="net_debt",
                         value=debt.value - cash.value,
-                        unit="USD",
+                        unit=debt.unit,
                         period=debt.period,
                         fiscal_year=year,
                         fiscal_quarter="FY",
@@ -2553,11 +2741,16 @@ class FinancialIngestionService:
         seen: set[tuple[str, str]] | None = None,
     ) -> int:
         period, fiscal_year, fiscal_quarter = _period(row)
+        # FMP declara la divisa de cada estado en ``reportedCurrency`` (BABA:
+        # CNY, Toyota: JPY). Antes todo se guardaba como USD y la valoracion
+        # comparaba un DCF en yuanes con un precio en dolares (~7x).
+        reported_currency = _iso_currency(row.get("reportedCurrency"))
         count = 0
-        for metric, fmp_key, unit in specs:
+        for metric, fmp_key, template_unit in specs:
             value = _decimal(row.get(fmp_key))
             if value is None:
                 continue
+            unit = _with_reporting_currency(template_unit, reported_currency)
             # Deduplicacion explicita por (metrica, periodo): dos filas del
             # payload que declaran la misma magnitud para el mismo periodo son
             # UN hecho (o un duplicado sucio del proveedor), nunca dos filas
@@ -2635,14 +2828,14 @@ class FinancialIngestionService:
             if fcf is None:
                 ocf = year_fact("operating_cash_flow", year)
                 capex = year_fact("capital_expenditure", year)
-                if ocf is not None and capex is not None:
+                if ocf is not None and capex is not None and ocf.unit == capex.unit:
                     fcf = self._add_derived_fact(
                         db,
                         company,
                         document,
                         "free_cash_flow",
                         ocf.value + capex.value,
-                        "USD",
+                        ocf.unit,
                         ocf.period,
                         year,
                         ocf.fiscal_quarter,
@@ -2652,6 +2845,8 @@ class FinancialIngestionService:
                 fcf is not None
                 and revenue is not None
                 and revenue.value > 0
+                # Un margen con FCF y revenue en divisas distintas no es un dato.
+                and fcf.unit == revenue.unit
                 and not already_derived("fcf_margin", year)
             ):
                 count += 1
@@ -2690,7 +2885,12 @@ class FinancialIngestionService:
                 )
             debt = year_fact("total_debt", year)
             cash = year_fact("cash_and_equivalents", year)
-            if debt is not None and cash is not None and not already_derived("net_debt", year):
+            if (
+                debt is not None
+                and cash is not None
+                and debt.unit == cash.unit
+                and not already_derived("net_debt", year)
+            ):
                 count += 1
                 self._add_derived_fact(
                     db,
@@ -2698,7 +2898,7 @@ class FinancialIngestionService:
                     document,
                     "net_debt",
                     debt.value - cash.value,
-                    "USD",
+                    debt.unit,
                     debt.period,
                     year,
                     debt.fiscal_quarter,
@@ -2811,11 +3011,22 @@ class FinancialIngestionService:
             return 0
         row = profile[0]
         period = datetime.now(UTC).date().isoformat()
+        # mktCap va en la divisa de COTIZACION del perfil, no en USD. Si esa
+        # divisa es una subunidad (GBp, ZAc, ILA) no se sabe si FMP la expresa
+        # en peniques o en libras: no se guarda (ausencia honesta).
+        raw_quote_currency = str(row.get("currency") or "").strip()
+        quote_currency = (
+            None
+            if raw_quote_currency in {"GBp", "GBX", "ZAc", "ZAC", "ILA", "ILa"}
+            else _iso_currency(raw_quote_currency) or "USD"
+        )
         count = 0
         for metric, field, unit in [
             ("beta", "beta", "decimal"),
-            ("market_cap", "mktCap", "USD"),
+            ("market_cap", "mktCap", quote_currency),
         ]:
+            if unit is None:
+                continue
             value = _decimal(row.get(field))
             if value is None:
                 continue

@@ -172,6 +172,10 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
     const dividendos = (casillas.dividendos ?? {}) as DataRecord;
     const dt = (filing.double_taxation ?? {}) as DataRecord;
     const lc = (filing.loss_compensation ?? {}) as DataRecord;
+    const intereses = (filing.intereses ?? {}) as {
+        received?: { amount_base?: number | null };
+        margin_interest_paid?: { amount_base?: number | null };
+    };
     const manualReview = Array.isArray(dt.manual_review) ? dt.manual_review as DataRecord[] : [];
     const specialTickers = Array.isArray(dividendos.special_payment_tickers)
         ? dividendos.special_payment_tickers as string[]
@@ -194,6 +198,20 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
                 <Row label="0339 · Suma de ganancias" value={money(acciones['0339_suma_ganancias'])} />
                 <Row label="0340 · Suma de pérdidas" value={money(acciones['0340_suma_perdidas'])} />
                 <Row label="0029 · Dividendos íntegros" value={money(dividendos['0029_ingresos_integros'])} />
+                <Row
+                    label="0027 · Intereses cobrados (cuenta del bróker)"
+                    value={
+                        intereses.received?.amount_base == null
+                            ? 'Sin datos: hay intereses sin tipo de cambio de su fecha (revisión manual)'
+                            : money(intereses.received.amount_base)
+                    }
+                />
+                {Number(intereses.margin_interest_paid?.amount_base ?? 0) > 0 && (
+                    <Row
+                        label="Intereses de margen pagados (no deducibles)"
+                        value={`${money(intereses.margin_interest_paid?.amount_base)} · no se restan en la declaración`}
+                    />
+                )}
                 <Row label="0597 · Retenciones españolas" value={
                     (dt.spanish_withholding_base as DataRecord | undefined)?.amount == null
                         ? 'Sin datos: retenciones españolas incompletas'

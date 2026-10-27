@@ -23,6 +23,7 @@ from app.services.tax_report_service import (
     cash_amount,
     cash_quantity_is_canonical,
     is_cash_action,
+    withholding_cost,
 )
 
 # Exchange -> listing-market country. Best-effort fallback only: the owning
@@ -130,6 +131,37 @@ def _benchmark_prices(db: Session, cutoff: date) -> list[Any] | None:
     return live
 
 
+#: Tipo de CashTransaction de IBKR Flex para aportaciones y retiradas externas
+#: (el importador las guarda como ``cash_misc`` con el atributo crudo ``type``).
+_EXTERNAL_TRANSFER_TOKENS = ("deposit", "withdraw")
+
+
+def _is_external_transfer(transaction: Any) -> bool:
+    """True si la fila es una aportación o retirada EXTERNA de la cuenta."""
+    action = (transaction.action or "").lower()
+    if action in {"deposit", "withdrawal"}:
+        return True
+    if action != "cash_misc":
+        return False
+    payload = transaction.raw_payload or {}
+    kind = str(payload.get("type") or payload.get("transactionType") or "").lower()
+    return any(token in kind for token in _EXTERNAL_TRANSFER_TOKENS)
+
+
+def _external_flow(transaction: Any) -> float:
+    """Flujo para el INVERSOR: una aportación es salida (-), una retirada entrada (+).
+
+    ``deposit``/``withdrawal`` guardan el importe como quantity × price (igual
+    que ``PortfolioSnapshotService._external_flows``); ``cash_misc`` de IBKR
+    lo guarda con signo en ``price`` (aportación positiva).
+    """
+    action = (transaction.action or "").lower()
+    if action in {"deposit", "withdrawal"}:
+        amount = abs(float(transaction.quantity or 0) * float(transaction.price or 0))
+        return -amount if action == "deposit" else amount
+    return -float(cash_amount(transaction))
+
+
 class PortfolioIntelligenceService:
     def build(self, db: Session, *, years: int = 5) -> dict[str, Any]:
         years = max(1, min(years, 20))
@@ -171,12 +203,21 @@ class PortfolioIntelligenceService:
             for position, company in rows
             if position.id in base_values
         }
-        price_series: dict[int, list[MarketPrice]] = {company.id: [] for _, company in rows}
+        price_series: dict[int, list[Any]] = {company.id: [] for _, company in rows}
         if rows:
             # Lote: 1 query para todas las series (anti N+1 por posición).
+            # Solo las columnas que se usan (filas ligeras con .date, .close,
+            # .adj_close y .source): ~25.000 entidades ORM completas costaban
+            # mas que todo el calculo.
             all_prices = list(
-                db.scalars(
-                    select(MarketPrice)
+                db.execute(
+                    select(
+                        MarketPrice.company_id,
+                        MarketPrice.date,
+                        MarketPrice.close,
+                        MarketPrice.adj_close,
+                        MarketPrice.source,
+                    )
                     .where(
                         MarketPrice.company_id.in_([company.id for _, company in rows]),
                         MarketPrice.date >= cutoff,
@@ -569,11 +610,33 @@ class PortfolioIntelligenceService:
     def _xirr(
         self, db: Session, positions: list[tuple[Position, Company]]
     ) -> tuple[float | None, dict[str, Any]]:
+        """Rentabilidad ponderada por dinero (XIRR) con UNA sola perspectiva.
+
+        Mezclar perspectivas contaba la caja dos veces: flujos de operación
+        (compras, ventas, dividendos) más un valor final con la caja del
+        bróker, que ya contiene el producto de esas ventas y dividendos
+        (compra -1.000, venta +1.100, caja 1.100 -> ~120 % en vez de 10 %).
+        Referencia: CFA Institute, Level I, "Money-weighted and time-weighted
+        rates of return"; GIPS 2020, glosario "External cash flow".
+
+        - ``account`` (hay depósitos/retiradas registrados): flujos = SOLO
+          aportaciones y retiradas externas; valor final = posiciones + caja.
+          Compras, ventas, dividendos, comisiones y retenciones son
+          movimientos internos y ya están dentro del valor final.
+        - ``investment`` (sin depósitos registrados, p. ej. solo operaciones
+          o importación ``trades_only``): flujos = compras, ventas, dividendos,
+          comisiones y retenciones; valor final = SOLO posiciones (la caja no
+          entra, porque sale de esos mismos flujos). ``cash_misc`` no
+          identificado como depósito no entra: es un movimiento de caja
+          interno o desconocido, no una inversión.
+        """
         fx = PortfolioFXService()
         base = fx.base_currency(db)
         cashflows: list[tuple[date, float]] = []
         ambiguous_cash_excluded = 0
         all_transactions = list(db.scalars(select(Transaction).order_by(Transaction.trade_date)).all())
+        external = {id(t) for t in all_transactions if _is_external_transfer(t)}
+        perspective = "account" if external else "investment"
         # Lote FX: 1 query para todos los flujos (anti N+1 por transacción).
         flow_table = fx.fx_table(
             db,
@@ -597,6 +660,21 @@ class PortfolioIntelligenceService:
             # turned a 20,00% money-weighted return into 25,00% with status
             # "calculated". Costs must reduce the return they are charged on.
             action = (transaction.action or "").lower()
+            if perspective == "account":
+                if id(transaction) not in external:
+                    # Movimiento interno de la cuenta: ya está en el valor final.
+                    continue
+                if action == "cash_misc" and not cash_quantity_is_canonical(transaction):
+                    ambiguous_cash_excluded += 1
+                    continue
+                cashflows.append(
+                    (transaction.trade_date, _external_flow(transaction) * float(rate))
+                )
+                continue
+            if action == "cash_misc":
+                # Perspectiva de inversión: un movimiento de caja sin
+                # identificar no es una compra ni una venta.
+                continue
             # Buy/sell are share-denominated (quantity x price); cash rows
             # carry the amount in `price` with quantity 0 or 1, so they go
             # through the shared helper: multiplying them by a 0/1 quantity
@@ -624,11 +702,15 @@ class PortfolioIntelligenceService:
                 net, sign = gross - fees, 1
             elif action in {"dividend", "interest"}:
                 net, sign = gross, 1
-            elif action in {"fee", "withholding"}:
-                # IBKR Flex informa retenciones y comisiones con importe
-                # NEGATIVO y la entrada manual en positivo: el coste siempre
-                # es una SALIDA para el inversor, sea cual sea el signo guardado
-                # (con -15 el flujo era -1 * -15 = +15 y la retencion sumaba).
+            elif action == "withholding":
+                # Retencion con signo segun su origen (``withholding_cost``):
+                # IBKR la publica en negativo y su REVERSION en positivo; la
+                # entrada manual, en positivo. Un abs() convertia la reversion
+                # en otra salida (-15, +15, -15 pesaba -45 en vez de -15).
+                net, sign = float(withholding_cost(transaction)), -1
+            elif action == "fee":
+                # IBKR Flex informa comisiones con importe NEGATIVO y la entrada
+                # manual en positivo: el coste siempre es una SALIDA.
                 net, sign = abs(gross), -1
             elif action == "cash_misc":
                 net, sign = gross, -1
@@ -644,9 +726,14 @@ class PortfolioIntelligenceService:
                 "status": "incomplete_ambiguous_cash",
                 "cashflows": len(cashflows),
                 "ambiguous_cash_excluded": ambiguous_cash_excluded,
+                "perspective": perspective,
+                "external_flows": len(external),
             }
         ending_value = sum(float(position.market_value_base or 0) for position, _ in positions)
-        cash_rows = list(db.scalars(select(CashBalance)).all())
+        # La caja solo entra en el valor final de la perspectiva de CUENTA.
+        cash_rows = (
+            list(db.scalars(select(CashBalance)).all()) if perspective == "account" else []
+        )
         # Lote FX: 1 query para todas las cajas (anti N+1).
         ending_rates = fx.rates_for(
             db,
@@ -665,6 +752,8 @@ class PortfolioIntelligenceService:
                 "status": "insufficient_cashflows",
                 "cashflows": len(cashflows),
                 "ambiguous_cash_excluded": ambiguous_cash_excluded,
+                "perspective": perspective,
+                "external_flows": len(external),
             }
         origin = min(day for day, _ in cashflows)
 
@@ -680,6 +769,8 @@ class PortfolioIntelligenceService:
                 "status": "no_xirr_root",
                 "cashflows": len(cashflows),
                 "ambiguous_cash_excluded": ambiguous_cash_excluded,
+                "perspective": perspective,
+                "external_flows": len(external),
             }
         for _ in range(200):
             middle = (low + high) / 2
@@ -694,6 +785,8 @@ class PortfolioIntelligenceService:
             "method": "bisection_xirr",
             "cashflows": len(cashflows),
             "ambiguous_cash_excluded": ambiguous_cash_excluded,
+            "perspective": perspective,
+            "external_flows": len(external),
         }
 
     # Pearson con muy pocas sesiones compartidas es ruido con aspecto de
@@ -709,13 +802,33 @@ class PortfolioIntelligenceService:
     ) -> tuple[dict[str, dict[str, float | None]], dict[str, dict[str, int]]]:
         result: dict[str, dict[str, float | None]] = {}
         observations: dict[str, dict[str, int]] = {}
+        # La matriz es simetrica (corr(a, b) == corr(b, a) bit a bit: mismos
+        # productos y mismas sumas en el mismo orden), asi que cada par se
+        # calcula una vez. La media de cada serie sobre unas fechas dadas se
+        # reutiliza entre pares: statistics.mean es exacta pero cara, y antes
+        # se recalculaba 2 veces por par (684 medias con 19 posiciones).
+        means: dict[tuple[int, tuple[date, ...]], float] = {}
+
+        def _cached_mean(company_id: int, series: dict[date, float], dates: tuple[date, ...]) -> float:
+            key = (company_id, dates)
+            if key not in means:
+                means[key] = mean([series[day] for day in dates])
+            return means[key]
+
+        computed: dict[tuple[int, int], tuple[float | None, int]] = {}
         for _, left_company in rows:
             result[left_company.ticker] = {}
             observations[left_company.ticker] = {}
             for _, right_company in rows:
+                mirrored = computed.get((right_company.id, left_company.id))
+                if mirrored is not None:
+                    correlation, count = mirrored
+                    observations[left_company.ticker][right_company.ticker] = count
+                    result[left_company.ticker][right_company.ticker] = correlation
+                    continue
                 left = returns.get(left_company.id, {})
                 right = returns.get(right_company.id, {})
-                dates = sorted(left.keys() & right.keys())
+                dates = tuple(sorted(left.keys() & right.keys()))
                 observations[left_company.ticker][right_company.ticker] = len(dates)
                 if left_company.id == right_company.id and dates:
                     correlation: float | None = 1.0
@@ -724,13 +837,15 @@ class PortfolioIntelligenceService:
                     correlation = None
                 else:
                     xs, ys = [left[day] for day in dates], [right[day] for day in dates]
-                    x_mean, y_mean = mean(xs), mean(ys)
+                    x_mean = _cached_mean(left_company.id, left, dates)
+                    y_mean = _cached_mean(right_company.id, right, dates)
                     numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys))
                     denominator = math.sqrt(
                         sum((x - x_mean) ** 2 for x in xs)
                         * sum((y - y_mean) ** 2 for y in ys)
                     )
                     correlation = numerator / denominator if denominator else None
+                computed[(left_company.id, right_company.id)] = (correlation, len(dates))
                 result[left_company.ticker][right_company.ticker] = correlation
         return result, observations
 
@@ -748,9 +863,13 @@ class PortfolioIntelligenceService:
         portfolio = [portfolio_returns[day] for day in dates]
         market = [benchmark_returns[day] for day in dates]
         market_mean = mean(market)
+        # La media de la cartera se calcula UNA vez: dentro del generador se
+        # recalculaba por cada observacion (O(n^2); ~1.250 medias exactas de
+        # ~1.250 valores con 5 años de historia).
+        portfolio_mean = mean(portfolio)
         variance = sum((value - market_mean) ** 2 for value in market)
         covariance = sum(
-            (left - mean(portfolio)) * (right - market_mean)
+            (left - portfolio_mean) * (right - market_mean)
             for left, right in zip(portfolio, market)
         )
         return (

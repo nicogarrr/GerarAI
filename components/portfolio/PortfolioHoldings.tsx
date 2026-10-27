@@ -20,6 +20,7 @@ import { Trash2, RefreshCw } from 'lucide-react';
 import AddTransactionButton from '@/components/portfolio/AddTransactionButton';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
+import { DcaLevelChip, FairValueLine, useHoldingSignals } from '@/components/portfolio/HoldingSignals';
 import ImportIBKRButton from '@/components/portfolio/ImportIBKRButton';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -62,6 +63,20 @@ function NativePnlLine({ holding, gainKnown, format }: { holding: PortfolioHoldi
   );
 }
 
+function FxEffectLine({ holding, format }: { holding: PortfolioHolding; format: (value: number, currency: string) => string }) {
+  // Solo con divisa nativa distinta de la base y con el reparto calculado.
+  if (holding.nativeCurrency === holding.baseCurrency) return null;
+  if (holding.priceEffect == null || holding.fxEffect == null) return null;
+  return (
+    <span
+      className="block text-right text-xs text-gray-400"
+      title={`Efecto precio: lo que se movió la acción en ${holding.nativeCurrency}, al tipo de hoy. Efecto divisa: lo que se movió el ${holding.nativeCurrency} frente al ${holding.baseCurrency} desde cada compra.`}
+    >
+      Precio {format(holding.priceEffect, holding.baseCurrency)} · Divisa {format(holding.fxEffect, holding.baseCurrency)}
+    </span>
+  );
+}
+
 export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency }: Props) {
   const router = useRouter();
   const [currentHoldings, setCurrentHoldings] = useState<PortfolioHolding[]>(holdings);
@@ -77,6 +92,8 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
     (holding) => !holding.valueMissing && !holding.fxMissing,
   )).map((slice) => [slice.symbol, slice.percentage]));
   const weight = (symbol: string) => formatPercent(weights.get(symbol), { fromRatio: false, digits: 1 }, NA);
+  // Nivel DCA de tu fórmula + valor justo único (tesis o motor), una sola petición.
+  const signals = useHoldingSignals(currentHoldings.map((holding) => holding.symbol));
 
   // Sync props if they change (e.g. from server revalidation)
   useEffect(() => {
@@ -231,6 +248,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         </dd>
                       </div>
                       <NativePnlLine holding={holding} gainKnown={gainKnown} format={format} />
+                      {gainKnown ? <FxEffectLine holding={holding} format={format} /> : null}
                       {/* Dato decisional fiscal reubicado (SERIE 1, auditoría): accesible por fila, nulo honesto. */}
                       <div className="flex items-center justify-between gap-2">
                         <dt className="text-gray-500">Fiscal</dt>
@@ -253,6 +271,8 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         </dd>
                       </div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">En cartera desde</dt><dd className="text-gray-200">{formatDate(holding.firstBuyDate)}</dd></div>
+                      <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">Nivel DCA</dt><dd><DcaLevelChip symbol={holding.symbol} signals={signals} /></dd></div>
+                      <div className="flex items-start justify-between gap-2"><dt className="text-gray-500">Valor justo</dt><dd><FairValueLine symbol={holding.symbol} price={holding.currentPrice} priceCurrency={holding.nativeCurrency} signals={signals} /></dd></div>
                       <div className="flex items-center justify-between gap-2"><dt className="text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</dt><dd><AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} /></dd></div>
                     </dl>
                   </div>
@@ -285,6 +305,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                   <TableHead className="text-right text-gray-400">Peso</TableHead>
                   <TableHead className="text-right text-gray-400">G/P</TableHead>
                   <TableHead className="text-right text-gray-400" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</TableHead>
+                  <TableHead className="text-right text-gray-400" title="Nivel de tu fórmula DCA y valor justo único (tesis publicada o motor de valoración)">DCA · Valor justo</TableHead>
 
                 </TableRow>
               </TableHeader>
@@ -344,10 +365,17 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                             {gainKnown ? formatPercent(holding.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' }, NA) : NA}
                           </Badge>
                           <NativePnlLine holding={holding} gainKnown={gainKnown} format={format} />
+                      {gainKnown ? <FxEffectLine holding={holding} format={format} /> : null}
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-sm">
                         <AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} />
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        <div className="flex flex-col items-end gap-1">
+                          <DcaLevelChip symbol={holding.symbol} signals={signals} />
+                          <FairValueLine symbol={holding.symbol} price={holding.currentPrice} priceCurrency={holding.nativeCurrency} signals={signals} />
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -363,6 +391,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <TableCell className="text-right font-semibold text-gray-100">
                       {format(cash, cashCurrency)}
                     </TableCell>
+                    <TableCell className="text-right text-gray-500">{NA}</TableCell>
                     <TableCell className="text-right text-gray-500">{NA}</TableCell>
                     <TableCell className="text-right text-gray-500">{NA}</TableCell>
                     <TableCell className="text-right text-gray-500">{NA}</TableCell>

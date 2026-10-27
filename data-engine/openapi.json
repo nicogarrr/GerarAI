@@ -757,6 +757,18 @@
             ],
             "title": "Source Url"
           },
+          "ticker": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
           "title": {
             "maxLength": 500,
             "minLength": 2,
@@ -2169,6 +2181,45 @@
         "title": "CompanySnapshotsBatchOut",
         "type": "object"
       },
+      "CompanyTtmOut": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "formula": {
+            "title": "Formula",
+            "type": "string"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/TtmMetricOut"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "as_of",
+          "formula",
+          "metrics"
+        ],
+        "title": "CompanyTtmOut",
+        "type": "object"
+      },
       "ContextNews": {
         "properties": {
           "date": {
@@ -2444,6 +2495,636 @@
           "formula"
         ],
         "title": "CustomMetricCreate",
+        "type": "object"
+      },
+      "DcaEvaluateOut": {
+        "properties": {
+          "alerted": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Alerted",
+            "type": "array"
+          },
+          "alerts_enabled": {
+            "title": "Alerts Enabled",
+            "type": "boolean"
+          },
+          "errors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "evaluated": {
+            "title": "Evaluated",
+            "type": "integer"
+          },
+          "params_version": {
+            "title": "Params Version",
+            "type": "string"
+          },
+          "skipped": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "tracked": {
+            "title": "Tracked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tracked",
+          "evaluated",
+          "alerted",
+          "skipped",
+          "errors",
+          "alerts_enabled",
+          "params_version"
+        ],
+        "title": "DcaEvaluateOut",
+        "type": "object"
+      },
+      "DcaHitRateCellOut": {
+        "properties": {
+          "avg_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Return"
+          },
+          "horizon_months": {
+            "title": "Horizon Months",
+            "type": "integer"
+          },
+          "months": {
+            "title": "Months",
+            "type": "integer"
+          },
+          "pct_higher": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct Higher"
+          }
+        },
+        "required": [
+          "horizon_months",
+          "months"
+        ],
+        "title": "DcaHitRateCellOut",
+        "type": "object"
+      },
+      "DcaHitRateRowOut": {
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/DcaHitRateCellOut"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "levels": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "signal_months": {
+            "title": "Signal Months",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "levels",
+          "signal_months",
+          "cells"
+        ],
+        "title": "DcaHitRateRowOut",
+        "type": "object"
+      },
+      "DcaHitRatesOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "disclaimer": {
+            "default": "Hist\u00f3rico, hipot\u00e9tico. No es asesoramiento.",
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "evaluated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluated At"
+          },
+          "first_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Period"
+          },
+          "horizons": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Horizons",
+            "type": "array"
+          },
+          "last_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Period"
+          },
+          "months_completed": {
+            "default": 0,
+            "title": "Months Completed",
+            "type": "integer"
+          },
+          "params_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params Version"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/DcaHitRateRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "available"
+        ],
+        "title": "DcaHitRatesOut",
+        "type": "object"
+      },
+      "DcaMinLevelIn": {
+        "properties": {
+          "min_level": {
+            "anyOf": [
+              {
+                "maximum": 4.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Level"
+          }
+        },
+        "title": "DcaMinLevelIn",
+        "type": "object"
+      },
+      "DcaMinLevelOut": {
+        "properties": {
+          "effective_min_level": {
+            "title": "Effective Min Level",
+            "type": "integer"
+          },
+          "min_level_override": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Level Override"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "min_level_override",
+          "effective_min_level"
+        ],
+        "title": "DcaMinLevelOut",
+        "type": "object"
+      },
+      "DcaSignalItemOut": {
+        "properties": {
+          "alerts_on": {
+            "title": "Alerts On",
+            "type": "boolean"
+          },
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "effective_min_level": {
+            "title": "Effective Min Level",
+            "type": "integer"
+          },
+          "in_portfolio": {
+            "title": "In Portfolio",
+            "type": "boolean"
+          },
+          "in_watchlist": {
+            "title": "In Watchlist",
+            "type": "boolean"
+          },
+          "min_level_override": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Level Override"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DcaSignalStateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "sources",
+          "in_watchlist",
+          "in_portfolio",
+          "effective_min_level",
+          "alerts_on"
+        ],
+        "title": "DcaSignalItemOut",
+        "type": "object"
+      },
+      "DcaSignalStateOut": {
+        "properties": {
+          "close": {
+            "title": "Close",
+            "type": "number"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "currency_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Label"
+          },
+          "data_source": {
+            "title": "Data Source",
+            "type": "string"
+          },
+          "evaluated_at": {
+            "format": "date-time",
+            "title": "Evaluated At",
+            "type": "string"
+          },
+          "fg": {
+            "title": "Fg",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_alerted_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Alerted Level"
+          },
+          "last_alerted_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Alerted Period"
+          },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
+          "level_prices": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Level Prices",
+            "type": "object"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Metrics",
+            "type": "object"
+          },
+          "params_version": {
+            "title": "Params Version",
+            "type": "string"
+          },
+          "period": {
+            "title": "Period",
+            "type": "string"
+          },
+          "previous_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Level"
+          },
+          "signal_date": {
+            "format": "date",
+            "title": "Signal Date",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "zone": {
+            "title": "Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "key",
+          "label",
+          "zone",
+          "color",
+          "fg",
+          "status",
+          "period",
+          "signal_date",
+          "close",
+          "params_version",
+          "data_source",
+          "evaluated_at"
+        ],
+        "title": "DcaSignalStateOut",
+        "type": "object"
+      },
+      "DcaSignalsOut": {
+        "properties": {
+          "alerts_enabled": {
+            "title": "Alerts Enabled",
+            "type": "boolean"
+          },
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "email_configured": {
+            "title": "Email Configured",
+            "type": "boolean"
+          },
+          "global_min_level": {
+            "title": "Global Min Level",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DcaSignalItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "signal_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal Months"
+          },
+          "trims_enabled": {
+            "title": "Trims Enabled",
+            "type": "boolean"
+          },
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/DcaZoneOut"
+            },
+            "title": "Zones",
+            "type": "array"
+          }
+        },
+        "required": [
+          "alerts_enabled",
+          "global_min_level",
+          "trims_enabled",
+          "channels",
+          "email_configured",
+          "zones",
+          "items"
+        ],
+        "title": "DcaSignalsOut",
+        "type": "object"
+      },
+      "DcaZoneOut": {
+        "properties": {
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "fg": {
+            "title": "Fg",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
+          "zone": {
+            "title": "Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "key",
+          "label",
+          "zone",
+          "color",
+          "fg"
+        ],
+        "title": "DcaZoneOut",
         "type": "object"
       },
       "DecisionJournalCreate": {
@@ -3010,6 +3691,25 @@
           "source_type"
         ],
         "title": "DocumentItemOut",
+        "type": "object"
+      },
+      "DocumentTickerUpdate": {
+        "description": "Ticker de la empresa a la que se refiere el documento; ``null`` lo quita.",
+        "properties": {
+          "ticker": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "title": "DocumentTickerUpdate",
         "type": "object"
       },
       "DriverAssumptionCreate": {
@@ -4617,6 +5317,71 @@
           }
         },
         "title": "InferredInputLLMRequest",
+        "type": "object"
+      },
+      "InvalidationRuleIn": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "metric": {
+            "maxLength": 130,
+            "title": "Metric",
+            "type": "string"
+          },
+          "operator": {
+            "enum": [
+              ">",
+              "<",
+              ">=",
+              "<=",
+              "==",
+              "!="
+            ],
+            "title": "Operator",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "required": [
+          "metric",
+          "operator",
+          "threshold"
+        ],
+        "title": "InvalidationRuleIn",
+        "type": "object"
+      },
+      "InvalidationRulesRequest": {
+        "properties": {
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/InvalidationRuleIn"
+            },
+            "maxItems": 20,
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "title": "InvalidationRulesRequest",
         "type": "object"
       },
       "KPIExtractionAction": {
@@ -8087,6 +8852,18 @@
             ],
             "title": "Invalidation Criteria"
           },
+          "invalidation_rules": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation Rules"
+          },
           "margin_of_safety": {
             "anyOf": [
               {
@@ -8433,7 +9210,8 @@
               "new_filing",
               "insiders",
               "shorts_rising",
-              "daily_digest"
+              "daily_digest",
+              "dca_levels"
             ],
             "title": "Event Type",
             "type": "string"
@@ -9072,6 +9850,18 @@
             ],
             "title": "Invalidation Criteria"
           },
+          "invalidation_rules": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation Rules"
+          },
           "latest_data_at": {
             "anyOf": [
               {
@@ -9344,6 +10134,136 @@
           "tickers"
         ],
         "title": "ThesisTickersOut",
+        "type": "object"
+      },
+      "TtmMetricOut": {
+        "properties": {
+          "basis": {
+            "enum": [
+              "TTM",
+              "FY",
+              "Q",
+              "SIN_DATOS"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Fact Ids",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "provenance": {
+            "enum": [
+              "OFICIAL",
+              "INFERIDO",
+              "SIN_DATOS"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "quarters": {
+            "items": {
+              "$ref": "#/components/schemas/TtmQuarterOut"
+            },
+            "title": "Quarters",
+            "type": "array"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "metric",
+          "value",
+          "unit",
+          "basis",
+          "label",
+          "provenance",
+          "period_end"
+        ],
+        "title": "TtmMetricOut",
+        "type": "object"
+      },
+      "TtmQuarterOut": {
+        "properties": {
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "period_end": {
+            "format": "date",
+            "title": "Period End",
+            "type": "string"
+          },
+          "reported": {
+            "title": "Reported",
+            "type": "boolean"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "period_end",
+          "value",
+          "reported",
+          "origin"
+        ],
+        "title": "TtmQuarterOut",
         "type": "object"
       },
       "UniversalSearchRequest": {
@@ -11633,7 +12553,8 @@
                 "new_filing",
                 "insiders",
                 "shorts_rising",
-                "daily_digest"
+                "daily_digest",
+                "dca_levels"
               ],
               "title": "Event Type",
               "type": "string"
@@ -25064,6 +25985,177 @@
         ]
       }
     },
+    "/api/companies/{ticker}/ttm": {
+      "get": {
+        "description": "Fundamentales actuales en TTM (\u00faltimos 4 trimestres), con respaldo FY.\n\nFlujos = suma de los 4 \u00faltimos trimestres consecutivos (Q4 = FY \u2212 9M si no\nhay 10-Q del cuarto); balance = \u00faltimo trimestre. Cada m\u00e9trica dice su base\n(TTM / FY / Q / SIN_DATOS) y su procedencia (OFICIAL / INFERIDO).",
+        "operationId": "company_ttm_api_companies__ticker__ttm_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyTtmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Company Ttm",
+        "tags": [
+          "companies"
+        ]
+      }
+    },
     "/api/corporate-actions": {
       "get": {
         "operationId": "list_actions_api_corporate_actions_get",
@@ -27741,6 +28833,181 @@
           }
         },
         "summary": "Insider Operations Route",
+        "tags": [
+          "insider"
+        ]
+      }
+    },
+    "/api/insider/ownership-signals": {
+      "get": {
+        "description": "Resumen para la tesis y la ficha: insiders (Form 4, 180 dias) + fondos 13F.\n\nSolo lee lo persistido (sin red). Nunca 500: un bloque que falla queda en\n``pendiente`` y uno sin datos en ``sin_datos`` con su motivo.",
+        "operationId": "insider_ownership_signals_api_insider_ownership_signals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "maxLength": 20,
+              "minLength": 1,
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Insider Ownership Signals Api Insider Ownership Signals Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Insider Ownership Signals",
         "tags": [
           "insider"
         ]
@@ -31447,6 +32714,23 @@
             }
           },
           {
+            "in": "query",
+            "name": "ticker",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
             "in": "header",
             "name": "x-cavaai-user",
             "required": false,
@@ -32109,6 +33393,186 @@
           }
         },
         "summary": "Get Document",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "patch": {
+        "operationId": "update_document_ticker_api_knowledge_documents__document_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentTickerUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Document Ticker Api Knowledge Documents  Document Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Document Ticker",
         "tags": [
           "knowledge"
         ]
@@ -42085,6 +43549,170 @@
           }
         },
         "summary": "Upsert Plan",
+        "tags": [
+          "plan"
+        ]
+      }
+    },
+    "/api/plan/contribution-split": {
+      "get": {
+        "description": "Reparto de la aportacion de este mes ponderado por nivel DCA.",
+        "operationId": "contribution_split_api_plan_contribution_split_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Contribution Split Api Plan Contribution Split Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Contribution Split",
         "tags": [
           "plan"
         ]
@@ -59588,6 +61216,189 @@
         ]
       }
     },
+    "/api/thesis/{ticker}/invalidation-rules": {
+      "put": {
+        "description": "Guarda los criterios MEDIBLES de invalidacion en la ultima tesis.\n\nCada criterio (metrica, operador, umbral) queda vigilado por el evaluador\nde alertas: cuando se cumple, llega un aviso. Lista vacia = sin criterios\n(las reglas de aviso derivadas se desactivan). Los criterios se conservan\nal regenerar la tesis.",
+        "operationId": "set_invalidation_rules_api_thesis__ticker__invalidation_rules_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvalidationRulesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Set Invalidation Rules Api Thesis  Ticker  Invalidation Rules Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Invalidation Rules",
+        "tags": [
+          "thesis"
+        ]
+      }
+    },
     "/api/thesis/{ticker}/latest": {
       "get": {
         "operationId": "latest_thesis_api_thesis__ticker__latest_get",
@@ -60314,6 +62125,181 @@
         ]
       }
     },
+    "/api/valuation/fair-value": {
+      "get": {
+        "description": "Valor justo \u00fanico por ticker (tesis o motor), con su procedencia.\n\nPor lotes no se recalcula el motor: se usa su \u00faltima valoraci\u00f3n persistida.",
+        "operationId": "fair_values_api_valuation_fair_value_get",
+        "parameters": [
+          {
+            "description": "CSV de tickers, m\u00e1x. 60",
+            "in": "query",
+            "name": "tickers",
+            "required": true,
+            "schema": {
+              "description": "CSV de tickers, m\u00e1x. 60",
+              "title": "Tickers",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Fair Values Api Valuation Fair Value Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fair Values",
+        "tags": [
+          "valuation"
+        ]
+      }
+    },
     "/api/valuation/{ticker}": {
       "get": {
         "operationId": "valuation_api_valuation__ticker__get",
@@ -60479,6 +62465,179 @@
           }
         },
         "summary": "Valuation",
+        "tags": [
+          "valuation"
+        ]
+      }
+    },
+    "/api/valuation/{ticker}/fair-value": {
+      "get": {
+        "description": "Valor justo \u00fanico de un ticker; recalcula el motor si la tesis no basta.",
+        "operationId": "fair_value_api_valuation__ticker__fair_value_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Fair Value Api Valuation  Ticker  Fair Value Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fair Value",
         "tags": [
           "valuation"
         ]
@@ -61007,6 +63166,501 @@
         ]
       }
     },
+    "/api/watchlist/dca-signals": {
+      "get": {
+        "description": "Nivel DCA actual de cada ticker de watchlist + cartera y su minimo de aviso.",
+        "operationId": "list_dca_signals_api_watchlist_dca_signals_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DcaSignalsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Dca Signals",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/watchlist/dca-signals/evaluate": {
+      "post": {
+        "description": "Evalua ahora watchlist + cartera (una vez por minuto como maximo).",
+        "operationId": "evaluate_dca_signals_now_api_watchlist_dca_signals_evaluate_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DcaEvaluateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate Dca Signals Now",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/watchlist/dca-signals/{symbol}/hit-rates": {
+      "get": {
+        "description": "\"\u00bfCu\u00e1ntas veces estaba m\u00e1s arriba?\" por nivel (3/6/12/24/36 meses).\n\nSale de la ultima evaluacion guardada (misma serie y parametros que el\nveredicto); sin evaluacion previa se declara no disponible, no se inventa.",
+        "operationId": "dca_hit_rates_api_watchlist_dca_signals__symbol__hit_rates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DcaHitRatesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dca Hit Rates",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
     "/api/watchlist/metrics/{symbol}": {
       "get": {
         "description": "Market cap y PER de respaldo para emisoras sin cobertura del\nproveedor US (QA AENA/ASML): market_cap del proveedor o derivado\n(precio x acciones, servicio derived_market_cap) y PER = ultimo cierre\n/ EPS diluido del ultimo ejercicio anual. Nulo honesto cuando no hay\nbase: nunca se fabrica el numero.",
@@ -61182,7 +63836,7 @@
     },
     "/api/watchlist/monitor": {
       "get": {
-        "description": "Datos densos por ticker para el monitor de watchlist.\n\nSolo datos propios o de fuentes publicas con trazabilidad: minimo de 52\nsemanas desde ``market_prices`` (ingesta propia), proximo resultado desde\nel conector publico de NASDAQ (misma fuente que /api/calendar/earnings) y\ncomparacion con la ultima tesis PUBLICADA de K (``expected_value``).\nCualquier pieza sin dato va a ``None``; nunca se inventa.",
+        "description": "Datos densos por ticker para el monitor de watchlist.\n\nSolo datos propios o de fuentes publicas con trazabilidad: minimo de 52\nsemanas desde ``market_prices`` (ingesta propia), proximo resultado desde\nel conector publico de NASDAQ (misma fuente que /api/calendar/earnings) y\ncomparacion con el valor justo UNICO (``fair_value_service``: tesis\npublicada o motor, con su procedencia en ``fair_value_source``/``_label``).\nCualquier pieza sin dato va a ``None``; nunca se inventa.",
         "operationId": "watchlist_monitor_api_watchlist_monitor_get",
         "parameters": [
           {
@@ -61513,6 +64167,187 @@
           }
         },
         "summary": "Delete Watch Item",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/watchlist/{symbol}/dca-alert-min-level": {
+      "put": {
+        "description": "Ajusta el nivel minimo de aviso DCA de un ticker (null = global, 0 = apagado).",
+        "operationId": "set_dca_alert_min_level_api_watchlist__symbol__dca_alert_min_level_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DcaMinLevelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DcaMinLevelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Dca Alert Min Level",
         "tags": [
           "watchlist"
         ]

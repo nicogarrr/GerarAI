@@ -288,7 +288,7 @@ def test_target_price_uses_valuation_service_and_dated_price(db, valued):
     assert targets["base"]["etiqueta"] == "INFERIDO"
     assert targets["base"]["precio_actual"] == pytest.approx(100.0)
     assert targets["base"]["precio_fecha"] == "2026-10-08"
-    assert targets["base"]["mos"] == pytest.approx(fcf5_ps * 25.0 / 100.0 - 1)
+    assert targets["base"]["mos"] == pytest.approx((fcf5_ps * 25.0 - 100.0) / (fcf5_ps * 25.0))
     assert payload["aviso_coherencia"] is None
     assert targets["bear"]["valor"] < targets["base"]["valor"] < targets["bull"]["valor"]
 
@@ -319,8 +319,10 @@ def test_blocked_engine_is_never_rescaled_to_final(db, monkeypatch):
 
 
 def test_mos_requires_dated_price(db, valued):
-    # Un mark de Position no tiene fecha de precio: MOS queda N/D y la
-    # comparacion no se persiste como final.
+    # Un mark de Position manual no tiene fecha de precio: MOS queda N/D y la
+    # comparacion no se persiste como final. Sin cierres en DB (un cierre
+    # fechado ganaria al mark sin fecha: el precio mas fresco manda).
+    db.query(MarketPrice).delete()
     db.add(
         Position(
             company_id=1,

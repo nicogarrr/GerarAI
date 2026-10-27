@@ -218,7 +218,7 @@ def test_the_two_allowed_roe_conventions_differ_by_exactly_the_equity_ratio():
 
 
 def test_dividend_leg_publishes_the_reconciling_payout():
-    """At g=2% the two legs agree only at payout = (0.095-0.02)/(0.095*1.02) = 77.40%."""
+    """At g=2% the two legs agree only at payout = 1 - 0.02/0.095 = 78.95%."""
     reconciliation = reconcile_regulated_asset_model(
         rate_base=1000.0,
         allowed_roe=0.095,
@@ -227,13 +227,13 @@ def test_dividend_leg_publishes_the_reconciling_payout():
         payout_ratio=0.80,
         growth=0.02,
     )
-    assert reconciliation["reconciling_payout"] == pytest.approx(0.7739938080495355)
+    assert reconciliation["reconciling_payout"] == pytest.approx(0.075 / 0.095)
     assert reconciliation["actual_payout"] == pytest.approx(0.80)
     assert reconciliation["reconciles"] is False
-    # D1 = 1000*0.095*0.80*1.02 = 77.52; V = 77.52/0.06 = 1292 vs 1250 excess-return.
-    assert reconciliation["dividend_next_year"] == pytest.approx(77.52)
-    assert reconciliation["dividend_leg_value"] == pytest.approx(1292.0)
-    assert reconciliation["residual"] == pytest.approx(-42.0)
+    # D1 = 1000*0.095*0.80 = 76; V = 76/0.06 = 1266.67 vs 1250 excess-return.
+    assert reconciliation["dividend_next_year"] == pytest.approx(76.0)
+    assert reconciliation["dividend_leg_value"] == pytest.approx(1266.6666666666667)
+    assert reconciliation["residual"] == pytest.approx(-16.666666666666668)
 
 
 def test_earning_power_shortfall_measures_the_regulatory_gap():
@@ -463,7 +463,7 @@ def test_utilities_engine_publishes_the_whole_arithmetic(db):
     assert result["status"] == "ok"
     assert result["base_value"] == pytest.approx(12.50, abs=1e-9)
     assert result["bear_value"] <= result["base_value"] <= result["bull_value"]
-    assert result["margin_of_safety"] == pytest.approx(result["expected_value"] / 12.0 - 1)
+    assert result["margin_of_safety"] == pytest.approx((result["expected_value"] - 12.0) / result["expected_value"])
     assert result["trace"]["no_net_debt_subtracted"] is True
     assert result["trace"]["engine_precedence_note"] == ENGINE_PRECEDENCE_NOTE
     assert result["dasr"]["enterprise_value"] == pytest.approx(1000.0 / 0.45)
@@ -554,7 +554,7 @@ def test_utilities_engine_converts_to_the_listed_share_for_an_adr_with_a_ratio(d
     assert result["value_per_share_basis"] == "ordinary_share"
     assert result["listed_share_values"]["base"] == pytest.approx(25.0)
     assert result["margin_of_safety"] == pytest.approx(
-        result["expected_value"] / 12.50 - 1
+        (result["expected_value"] - 12.50) / result["expected_value"]
     )
 
 

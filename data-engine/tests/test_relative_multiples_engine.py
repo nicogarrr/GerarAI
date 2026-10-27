@@ -433,7 +433,7 @@ def test_relative_engine_applies_the_peer_median_to_the_own_eps(db):
     assert result["base_value"] == pytest.approx(26.0)
     assert result["bull_value"] == pytest.approx(31.0)
     assert result["bear_value"] <= result["expected_value"] <= result["bull_value"]
-    assert result["margin_of_safety"] == pytest.approx(result["expected_value"] / 20.0 - 1)
+    assert result["margin_of_safety"] == pytest.approx((result["expected_value"] - 20.0) / result["expected_value"])
     assert result["trace"]["peer_set_size"] == 6
     assert result["trace"]["peer_set"]["method"] == "PEER_SELECTION_V2"
     assert "peer_set_below_five" not in result["publication_blockers"]

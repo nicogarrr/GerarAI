@@ -1,0 +1,441 @@
+"""Senales DCA por niveles sobre watchlist + cartera, con avisos sin repeticion.
+
+Para cada simbolo seguido por el tenant (watchlist y posiciones vivas, sin
+duplicar) se descarga la historia diaria, se calcula el veredicto del mes con
+el motor puro ``dca_signal_engine`` y se guarda en ``dca_signal_states``. Si el
+nivel cambia y supera el minimo efectivo (ajuste por ticker o global) se emite
+una alerta ``dca_level`` y se despacha por el outbox (in_app / email /
+Telegram con suscripcion "dca_levels").
+
+Reglas de aviso (deduplicacion):
+
+* Solo avisa un CAMBIO de nivel respecto al guardado (o la primera evaluacion
+  de un ticker, si ya esta en un nivel >= minimo).
+* Huella ``dca_level:{simbolo}:{mes}:{nivel}``: el mismo nivel en el mismo mes
+  nunca vuelve a avisar aunque el mes en formacion oscile (3X -> 2X -> 3X).
+* Escalar (2X -> 3X -> 4X) avisa de nuevo; seguir en el mismo nivel al
+  cambiar de mes no.
+* Recortes solo con DCA_ALERT_TRIMS=true. Ajuste por ticker 0 = sin avisos.
+
+Datos: Yahoo Finance (yfinance, historia completa) con la linea real del
+listado (``yahoo_symbol``); si falla, los cierres de ``market_prices``. Se usa
+el cierre ajustado solo si TODA la serie lo trae (nunca se mezcla); el cierre
+mostrado y los precios de nivel se expresan en precio real de cotizacion.
+Sin historia suficiente el ticker se omite con motivo: nunca se inventa.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, date, datetime, time
+from decimal import Decimal
+from typing import Any
+from zoneinfo import ZoneInfo
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.core.tenancy import tenant_filters
+from app.models import (
+    Company,
+    DcaAlertOverride,
+    DcaSignalState,
+    MarketPrice,
+    Position,
+    ResearchAlert,
+    WatchItem,
+)
+from app.services import dca_alert_copy
+from app.services.dca_signal_engine import (
+    DEFAULT_PARAMS,
+    ZONES,
+    DailyBar,
+    DcaParams,
+    MonthlyVerdict,
+    current_verdict,
+    hit_rates,
+)
+
+logger = logging.getLogger(__name__)
+
+ALERT_TYPE = "dca_level"
+SEVERITY_BY_LEVEL = {4: "critical", 3: "high", 2: "medium"}
+_ALLOWED_CHANNELS = ("in_app", "email", "push")
+_NY = ZoneInfo("America/New_York")
+# Un cierre del dia en curso solo esta asentado tras la sesion US (16:30 NY,
+# misma regla que market_close_sync / propicks_price_service).
+_SESSION_CLOSED_AFTER = time(16, 30)
+
+
+@dataclass(frozen=True)
+class PriceRow:
+    day: date
+    close: float
+    adj_close: float | None = None
+
+
+@dataclass(frozen=True)
+class FetchedHistory:
+    rows: list[PriceRow]
+    currency: str | None = None
+
+
+HistoryFetcher = Callable[[str], FetchedHistory]
+
+
+@dataclass
+class TrackedSymbol:
+    symbol: str
+    company: Company | None = None
+    sources: list[str] = field(default_factory=list)
+
+
+def fetch_yahoo_history(symbol: str, *, period: str = "max") -> FetchedHistory:
+    """Historia diaria de Yahoo (sin auto-ajuste) y la divisa del listado.
+
+    La divisa sale de ``history_metadata`` de la misma descarga (sin peticion
+    extra): Yahoo da "GBp" para las lineas de Londres en peniques.
+    """
+    import math
+
+    import yfinance as yf
+
+    ticker = yf.Ticker(symbol)
+    hist = ticker.history(period=period, auto_adjust=False)
+    rows: list[PriceRow] = []
+    for idx, row in hist.iterrows():
+        try:
+            close = float(row.get("Close"))
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(close) or close <= 0:
+            continue
+        adj_raw = row.get("Adj Close")
+        try:
+            adj = float(adj_raw) if adj_raw is not None else None
+        except (TypeError, ValueError):
+            adj = None
+        if adj is not None and (not math.isfinite(adj) or adj <= 0):
+            adj = None
+        day = idx.date() if hasattr(idx, "date") else idx
+        rows.append(PriceRow(day=day, close=close, adj_close=adj))
+    currency = None
+    try:
+        currency = (getattr(ticker, "history_metadata", None) or {}).get("currency")
+    except Exception:  # noqa: BLE001 - la divisa es informativa
+        currency = None
+    return FetchedHistory(rows=rows, currency=currency)
+
+
+def tracked_symbols(db: Session) -> dict[str, TrackedSymbol]:
+    """Simbolos seguidos por el tenant: watchlist + posiciones con cantidad > 0."""
+    tracked: dict[str, TrackedSymbol] = {}
+    for symbol in db.scalars(select(WatchItem.symbol).where(*tenant_filters(db, WatchItem))):
+        key = (symbol or "").strip().upper()
+        if key:
+            tracked.setdefault(key, TrackedSymbol(symbol=key)).sources.append("watchlist")
+    held = db.execute(
+        select(Company)
+        .join(Position, Position.company_id == Company.id)
+        .where(Position.quantity > 0, *tenant_filters(db, Position))
+    ).scalars()
+    for company in held:
+        key = (company.ticker or "").strip().upper()
+        if not key:
+            continue
+        item = tracked.setdefault(key, TrackedSymbol(symbol=key))
+        item.company = company
+        if "portfolio" not in item.sources:
+            item.sources.append("portfolio")
+    missing = [key for key, item in tracked.items() if item.company is None]
+    if missing:
+        for company in db.scalars(select(Company).where(Company.ticker.in_(missing))):
+            tracked[company.ticker.upper()].company = company
+    for item in tracked.values():
+        item.sources = sorted(set(item.sources), key=["watchlist", "portfolio"].index)
+    return dict(sorted(tracked.items()))
+
+
+def overrides(db: Session) -> dict[str, int]:
+    return {
+        row.symbol.upper(): int(row.min_level)
+        for row in db.scalars(select(DcaAlertOverride).where(*tenant_filters(db, DcaAlertOverride)))
+    }
+
+
+def effective_min_level(override: int | None, settings: Any | None = None) -> int:
+    """Nivel minimo efectivo: ajuste del ticker o global. 0 = sin avisos."""
+    if override is not None:
+        return int(override)
+    settings = settings or get_settings()
+    return int(settings.dca_alert_min_level)
+
+
+def alert_channels(settings: Any) -> list[str]:
+    raw = str(getattr(settings, "dca_alert_channels", "in_app") or "in_app")
+    channels = [c.strip() for c in raw.split(",") if c.strip() in _ALLOWED_CHANNELS]
+    return list(dict.fromkeys(channels)) or ["in_app"]
+
+
+def should_alert(
+    *,
+    level: int,
+    previous_level: int | None,
+    min_level: int,
+    trims_enabled: bool,
+) -> bool:
+    """Regla de aviso por cambio de nivel (sin mirar la huella del mes)."""
+    if previous_level is not None and level == previous_level:
+        return False
+    if min_level <= 0:
+        return False
+    if level >= 1:
+        return level >= min_level
+    return bool(trims_enabled)
+
+
+def _yahoo_symbol_for(item: TrackedSymbol) -> str | None:
+    from app.services.propicks_price_service import yahoo_symbol
+
+    if item.company is not None:
+        return yahoo_symbol(item.company)
+    # Sin ficha: el simbolo tal y como lo escribio el usuario en la watchlist.
+    return item.symbol
+
+
+def _db_history(db: Session, company: Company | None) -> FetchedHistory:
+    if company is None:
+        return FetchedHistory(rows=[])
+    rows = [
+        PriceRow(
+            day=price.date,
+            close=float(price.close),
+            adj_close=float(price.adj_close) if price.adj_close else None,
+        )
+        for price in db.scalars(
+            select(MarketPrice).where(MarketPrice.company_id == company.id).order_by(MarketPrice.date)
+        )
+        if price.close and float(price.close) > 0
+    ]
+    return FetchedHistory(rows=rows, currency=company.currency)
+
+
+def settled_rows(rows: Sequence[PriceRow], now: datetime) -> list[PriceRow]:
+    """Descarta barras futuras y la del dia en curso con la sesion US abierta."""
+    local = now.astimezone(_NY)
+    today = local.date()
+    closed = local.time() >= _SESSION_CLOSED_AFTER
+    return [row for row in rows if row.day < today or (row.day == today and closed)]
+
+
+def build_bars(rows: Sequence[PriceRow]) -> tuple[list[DailyBar], float]:
+    """Serie para el motor y factor serie->precio real del ultimo cierre."""
+    ordered = sorted(rows, key=lambda r: r.day)
+    if not ordered:
+        return [], 1.0
+    use_adj = all(row.adj_close for row in ordered)
+    bars = [DailyBar(day=row.day, close=float(row.adj_close if use_adj else row.close)) for row in ordered]
+    last = ordered[-1]
+    factor = (last.close / last.adj_close) if use_adj and last.adj_close else 1.0
+    return bars, factor
+
+
+def _company_name(item: TrackedSymbol) -> str | None:
+    return item.company.name if item.company is not None and item.company.name else None
+
+
+def _dca_payload(
+    item: TrackedSymbol,
+    verdict: MonthlyVerdict,
+    *,
+    close: float,
+    level_prices: dict[str, float | None],
+    currency: str | None,
+    previous_level: int | None,
+    params: DcaParams,
+) -> dict[str, Any]:
+    zone = ZONES[verdict.level]
+    return {
+        "symbol": item.symbol,
+        "company_name": _company_name(item),
+        "level": verdict.level,
+        "previous_level": previous_level,
+        "key": zone["key"],
+        "label": zone["label"],
+        "zone": zone["zone"],
+        "color": zone["color"],
+        "fg": zone["fg"],
+        "status": verdict.status,
+        "period": verdict.period,
+        "signal_date": verdict.signal_date.isoformat(),
+        "close": close,
+        "currency": currency,
+        "metrics": dict(verdict.metrics),
+        "level_prices": level_prices,
+        "touched_level": verdict.touched_level,
+        "sources": list(item.sources),
+        "sma_months": getattr(params, "sma_months", None),
+        "high_lookback_months": getattr(params, "high_lookback_months", None),
+        "params_version": params.version,
+    }
+
+
+def _scaled(value: float | None, factor: float) -> float | None:
+    return round(value * factor, 6) if value is not None else None
+
+
+def _emit_and_dispatch(db: Session, dca: dict[str, Any], *, company_id: int | None, settings: Any) -> dict:
+    from app.services.notification_service import NotificationService
+    from app.services.review_alert_service import ReviewAlertService
+
+    service = ReviewAlertService()
+    parts = [ALERT_TYPE, dca["symbol"], dca["period"], str(dca["level"])]
+    fingerprint = service.fingerprint_for(db, parts)
+    exists = db.scalar(
+        select(ResearchAlert.id).where(ResearchAlert.fingerprint == fingerprint, *tenant_filters(db, ResearchAlert))
+    )
+    if exists is not None:
+        return {"status": "duplicate", "alert_id": exists}
+    alert = service.emit_alert(
+        db,
+        company_id=company_id,
+        alert_type=ALERT_TYPE,
+        severity=SEVERITY_BY_LEVEL.get(int(dca["level"]), "low"),
+        title=dca_alert_copy.title(dca),
+        message=dca_alert_copy.message_text(dca),
+        fingerprint_parts=parts,
+        channels=alert_channels(settings),
+        metadata={"dca": dca},
+    )
+    db.commit()
+    try:
+        deliveries = NotificationService().dispatch(db, alert)
+    except Exception:  # noqa: BLE001 - el aviso queda en la app aunque falle un canal
+        logger.warning("dca dispatch failed alert_id=%s", alert.id, exc_info=True)
+        db.rollback()
+        deliveries = {"error": "dispatch_error"}
+    return {
+        "status": "alerted",
+        "alert_id": alert.id,
+        "deliveries": {k: v.get("status") if isinstance(v, dict) else v for k, v in deliveries.items()},
+    }
+
+
+def evaluate_watchlist(
+    db: Session,
+    *,
+    fetcher: HistoryFetcher | None = None,
+    today: date | None = None,
+    now: datetime | None = None,
+    params: DcaParams = DEFAULT_PARAMS,
+    use_db_fallback: bool = True,
+) -> dict[str, Any]:
+    """Evalua watchlist + cartera del tenant de la sesion. Devuelve un resumen."""
+    settings = get_settings()
+    now = now or datetime.now(UTC)
+    today = today or now.astimezone(_NY).date()
+    fetch = fetcher or fetch_yahoo_history
+    tracked = tracked_symbols(db)
+    per_ticker = overrides(db)
+    states = {
+        row.symbol.upper(): row
+        for row in db.scalars(select(DcaSignalState).where(*tenant_filters(db, DcaSignalState)))
+    }
+    summary: dict[str, Any] = {
+        "tracked": len(tracked),
+        "evaluated": 0,
+        "alerted": [],
+        "skipped": [],
+        "errors": [],
+        "alerts_enabled": bool(settings.dca_alerts_enabled),
+        "params_version": params.version,
+    }
+    for symbol, item in tracked.items():
+        history = FetchedHistory(rows=[])
+        source = None
+        yahoo = _yahoo_symbol_for(item)
+        if yahoo:
+            try:
+                history = fetch(yahoo)
+                source = "yahoo"
+            except Exception as exc:  # noqa: BLE001 - un ticker roto no frena el barrido
+                summary["errors"].append({"symbol": symbol, "error": type(exc).__name__})
+                history = FetchedHistory(rows=[])
+        rows = settled_rows(history.rows, now)
+        if not rows and use_db_fallback:
+            fallback = _db_history(db, item.company)
+            rows = settled_rows(fallback.rows, now)
+            history = fallback
+            source = "market_prices" if rows else source
+        bars, factor = build_bars(rows)
+        verdict = current_verdict(bars, params=params, today=today) if bars else None
+        if verdict is None:
+            reason = "sin_datos" if not bars else "historia_insuficiente"
+            if not yahoo and not bars:
+                reason = "sin_simbolo_yahoo_seguro"
+            summary["skipped"].append({"symbol": symbol, "reason": reason, "daily_bars": len(bars)})
+            continue
+        last_row = max(rows, key=lambda r: r.day)
+        currency = history.currency if source == "yahoo" and history.currency else (
+            item.company.currency if item.company is not None else None
+        )
+        level_prices = {key: _scaled(value, factor) for key, value in verdict.level_prices.items()}
+        state = states.get(symbol)
+        previous_level = state.level if state is not None else None
+        if state is None:
+            state = DcaSignalState(tenant_id=db.info.get("tenant_id"), symbol=symbol)
+            db.add(state)
+            states[symbol] = state
+        elif state.level != verdict.level:
+            state.previous_level = state.level
+        state.company_id = item.company.id if item.company is not None else None
+        state.level = verdict.level
+        state.status = verdict.status
+        state.period = verdict.period
+        state.signal_date = verdict.signal_date
+        state.close = Decimal(str(round(last_row.close, 6)))
+        state.currency = currency
+        state.metrics = dict(verdict.metrics)
+        state.level_prices = level_prices
+        state.sources = list(item.sources)
+        # Tabla "¿cuantas veces estaba mas arriba?" con la misma serie y los
+        # mismos parametros (solo meses confirmados, sin look-ahead).
+        state.hit_rates = hit_rates(bars, params=params, today=today)
+        state.params_version = params.version
+        state.evaluated_at = now
+        state.data_source = source or "desconocido"
+        db.flush()
+        summary["evaluated"] += 1
+        min_level = effective_min_level(per_ticker.get(symbol), settings)
+        if not settings.dca_alerts_enabled or not should_alert(
+            level=verdict.level,
+            previous_level=previous_level,
+            min_level=min_level,
+            trims_enabled=bool(settings.dca_alert_trims),
+        ):
+            continue
+        dca = _dca_payload(
+            item,
+            verdict,
+            close=last_row.close,
+            level_prices=level_prices,
+            currency=currency,
+            previous_level=previous_level,
+            params=params,
+        )
+        db.commit()
+        outcome = _emit_and_dispatch(db, dca, company_id=state.company_id, settings=settings)
+        state.last_alerted_level = verdict.level
+        state.last_alerted_period = verdict.period
+        db.commit()
+        if outcome["status"] == "alerted":
+            summary["alerted"].append({"symbol": symbol, "level": verdict.level, **outcome})
+    # Los tickers que ya no se siguen dejan de mostrarse.
+    for symbol, state in states.items():
+        if symbol not in tracked:
+            db.delete(state)
+    db.commit()
+    return summary

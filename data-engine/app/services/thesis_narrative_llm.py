@@ -119,7 +119,7 @@ def _fragment_templates(
             f"modelo es {base:.2f} {currency} (no positivo): el margen de seguridad no es interpretable."
         )
     elif status != "insufficient_data" and price is not None and base is not None and mos is not None:
-        # MoS = valor esperado/price - 1 (valuation/engines/base.py): se nombra
+        # MoS = (valor esperado - precio)/valor esperado (valuation/engines/base.py): se nombra
         # su base. Sin valor esperado cae al escenario base.
         ref_label, ref_value = margin_of_safety_reference(valuation) or ("escenario base", base)
         fragments["valoracion_posicion"] = (
@@ -452,8 +452,8 @@ def _section_templates(
         # Hechos vs interpretacion: el patron es fijo, el numero es un slot.
         ref_label = (margin_of_safety_reference(valuation) or ("escenario base", 0.0))[0]
         parrafos.append(
-            f"Un margen de seguridad del {percent_es(mos)} ({ref_label}/precio - 1: "
-            f"el {ref_label} equivale al {percent_es(mos + 1, 0)} del precio actual) no "
+            f"Un margen de seguridad del {percent_es(mos)} (({ref_label} - precio)/{ref_label}: "
+            f"el precio actual equivale al {percent_es(1 - mos, 0)} del {ref_label}) no "
             "es una predicción de revalorización ni de caída: es la relación "
             f"entre precio y {ref_label} con los supuestos registrados en "
             "esta tesis."

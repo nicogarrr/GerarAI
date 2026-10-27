@@ -251,6 +251,41 @@ def _prune_sources(
     return kept
 
 
+# Mercados de EE. UU. donde un emisor presenta ante la SEC. OTC queda fuera:
+# muchos valores OTC son extranjeros (p. ej. KRKNF, canadiense) y solo cuentan
+# si la ficha trae CIK.
+_SEC_EXCHANGES = frozenset({
+    "NYSE", "NASDAQ", "AMEX", "NYSE AMERICAN", "NYSEAMERICAN", "NYSE ARCA", "NYSEARCA",
+    "ARCA", "BATS", "CBOE", "NMS", "NGM", "NCM", "NASDAQGS", "NASDAQGM", "NASDAQCM",
+})
+
+
+def files_with_sec(company: Company) -> bool:
+    """¿Tiene sentido pedir hechos a la SEC para esta empresa?
+
+    Sí con CIK. Sin CIK, solo si cotiza en una bolsa de EE. UU. y el ticker no
+    lleva sufijo de mercado extranjero (CGEO.L, SAN.MC). La SEC no cubre la
+    Bolsa de Londres: decirle a alguien que ingiera datos SEC de CGEO.L es un
+    consejo imposible (prueba real, 27-oct).
+    """
+    if (company.cik or "").strip():
+        return True
+    ticker = (company.ticker or "").upper()
+    if "." in ticker:
+        return False
+    return (company.exchange or "").strip().upper() in _SEC_EXCHANGES
+
+
+def primary_sources_hint(company: Company) -> str:
+    if files_with_sec(company):
+        return "ingiere sus fuentes primarias (SEC/FMP)"
+    market = (company.exchange or "").strip() or "su mercado"
+    return (
+        f"la SEC no cubre {market}, así que sus fuentes son FMP y los informes "
+        "anuales de la propia empresa: ingiérelos desde su ficha"
+    )
+
+
 def _natural_company_answer(
     *,
     company: Company,
@@ -297,9 +332,8 @@ def _natural_company_answer(
         parts.append(f"Datos almacenados: {rendered}.")
     else:
         parts.append(
-            f"Todavia no tengo hechos financieros fiables almacenados para "
-            f"{company.ticker}; ingiere sus fuentes primarias (SEC/FMP) y te "
-            f"respondo con cifras."
+            f"Todavía no tengo hechos financieros fiables almacenados para "
+            f"{company.ticker}; {primary_sources_hint(company)} y te respondo con cifras."
         )
     if thesis:
         detalles = []
@@ -940,6 +974,21 @@ class ChatService:
                 await DividendIngestionService().sync_company(db, ticker=missing_dividends)
             except Exception:  # noqa: BLE001 - sin proveedor se responde con lo guardado
                 db.rollback()
+        # «¿Cuándo se invalidan mis tesis?»: la lista de tesis de
+        # answer_data_question no lleva los criterios de invalidación; el
+        # contexto personal sí.
+        if not ticker and re.search(r"(?i)\binvalid", question or ""):
+            from app.services.personal_answer import (
+                answer_personal_question,
+                detect_personal_intent,
+            )
+
+            thesis_intent = detect_personal_intent(question or "")
+            if thesis_intent is not None and thesis_intent.kind == "tesis":
+                personal = await answer_personal_question(db, question or "", thesis_intent, self.provider)
+                if personal is not None:
+                    personal.context = context_echo
+                    return personal
         data_answer = answer_data_question(db, question)
         if data_answer is not None:
             # A quote question may also request a concrete metric. Do not let
@@ -964,6 +1013,26 @@ class ChatService:
             or re.search(r"(?i)\b(?:evidencia|fuentes?|documentos?|riesgos?)\b", question or "")
         ):
             company = page_context.company
+        # Ticker nombrado que GerarAI no tiene («¿qué opinas de TSLAA?»): se dice,
+        # sin pasar por el generador libre, que inventaba sobre él.
+        if company is None and not ticker:
+            from app.services.chat_unknown_ticker import (
+                unknown_ticker_answer,
+                unknown_ticker_mentions,
+            )
+
+            known_tickers = list(db.scalars(select(Company.ticker)).all())
+            unknown = unknown_ticker_mentions(question, known_tickers)
+            if unknown:
+                return ChatResponse(
+                    answer=unknown_ticker_answer(unknown, known_tickers),
+                    sources=[],
+                    model="deterministic",
+                    prompt_version="unknown-ticker-v1",
+                    confidence=0.9,
+                    llm_trace={"path": "unknown_ticker", "generated": False, "provider_calls": 0, "tickers": unknown},
+                    context=context_echo,
+                )
         # Pregunta sobre el contenido de la página sin empresa: el cerebro solo
         # recibe el nombre de la sección, no sus datos. Lo dice, sin inventar
         # cifras ni citar fuentes ajenas.
@@ -1088,6 +1157,28 @@ class ChatService:
             if followup is not None:
                 followup.context = context_echo
                 return followup
+        # Preguntas sobre los datos propios sin empresa («¿qué riesgo tengo?»,
+        # «¿qué está barato de mi watchlist?», cartera vacía): antes caían en
+        # la abstención «Selecciona la empresa» o en el LLM sin contexto
+        # («no tengo acceso a tu watchlist»). Se responden con el contexto
+        # personal y comprobación de cifras (personal_answer).
+        if company is None and not ticker:
+            from app.services.personal_answer import (
+                answer_personal_question,
+                detect_personal_intent,
+            )
+
+            intent = detect_personal_intent(question or "")
+            if intent is not None:
+                history_text = "\n".join(
+                    f"{turn.role}: {turn.content[:300]}" for turn in (history or [])[-4:] if turn.content
+                ) or None
+                personal = await answer_personal_question(
+                    db, question or "", intent, self.provider, history_text=history_text
+                )
+                if personal is not None:
+                    personal.context = context_echo
+                    return personal
         if company is not None and not ticker:
             ticker = company.ticker
         # La abstencion financiera vive en el clasificador unificado de
@@ -1304,6 +1395,15 @@ class ChatService:
         )
         if unvalued:
             lines.append(f"- Sin valor en moneda base (no entran en los porcentajes): {', '.join(sorted(unvalued))}.")
+        # Reglas del panel de riesgo y TWR/caída máxima del histórico de snapshots:
+        # el Cerebro ya no se queda solo en la concentración.
+        from app.services.brain_context_tools import portfolio_risk_lines
+
+        try:
+            risk_lines, risk_sources = portfolio_risk_lines(db, tenant_id)
+        except Exception:  # noqa: BLE001 - el panel nunca rompe la respuesta de concentración
+            risk_lines, risk_sources = [], []
+        lines.extend(f"- {line}" if not line.startswith("- ") else line for line in risk_lines)
         as_of = min(pos.as_of for pos, _ in rows)
         answer = (
             "Cifras calculadas de tus posiciones guardadas "
@@ -1315,6 +1415,7 @@ class ChatService:
             self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))
             for pos, comp, _ in top
         ]
+        sources.extend(risk_sources)
         return ChatResponse(
             answer=answer,
             sources=sources,
@@ -1879,7 +1980,12 @@ class ChatService:
             if any(event.requires_update for event in news):
                 proposed_actions.append("Revisar cambios de tesis por noticias materiales")
             if not facts:
-                proposed_actions.append("Ingerir hechos financieros SEC/FMP antes de sacar conclusiones cuantitativas")
+                proposed_actions.append(
+                    "Ingerir hechos financieros SEC/FMP antes de sacar conclusiones cuantitativas"
+                    if files_with_sec(company)
+                    else f"Ingerir hechos financieros de FMP o de los informes de {company.ticker} "
+                    "(la SEC no cubre ese mercado) antes de sacar conclusiones cuantitativas"
+                )
 
             facts_text = (
                 "\n".join(

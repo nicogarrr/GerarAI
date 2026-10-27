@@ -11,6 +11,12 @@ class DCFInputs:
     net_debt: float
     shares_outstanding: float
     years: int = 5
+    # Otros derechos sobre el EV que no son del accionista común (puente
+    # completo EV -> equity: Damodaran, *Investment Valuation*, cap. 16; CFA
+    # Level II, "Free Cash Flow Valuation"). Valor contable reportado; 0 si el
+    # emisor no los declara (lo habitual cuando no existen).
+    minority_interest: float = 0.0
+    preferred_stock: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -58,7 +64,9 @@ def run_dcf(inputs: DCFInputs) -> DCFResult:
     terminal_value = terminal_fcf / (inputs.wacc - inputs.terminal_growth)
     pv_terminal_value = terminal_value / ((1 + inputs.wacc) ** inputs.years)
     enterprise_value = present_value + pv_terminal_value
-    equity_value = enterprise_value - inputs.net_debt
+    equity_value = (
+        enterprise_value - inputs.net_debt - inputs.minority_interest - inputs.preferred_stock
+    )
     value_per_share = equity_value / inputs.shares_outstanding
 
     # El valor terminal se lleva la mayor parte del EV en casi cualquier DCF de
@@ -84,6 +92,13 @@ def run_dcf(inputs: DCFInputs) -> DCFResult:
             "pv_explicit_fcf": present_value,
             "wacc_minus_growth": spread,
             "pv_terminal_share_of_ev": terminal_share,
+            "equity_bridge": {
+                "enterprise_value": enterprise_value,
+                "net_debt": inputs.net_debt,
+                "minority_interest": inputs.minority_interest,
+                "preferred_stock": inputs.preferred_stock,
+                "equity_value": equity_value,
+            },
         },
     )
 

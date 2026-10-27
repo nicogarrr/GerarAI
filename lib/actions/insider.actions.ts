@@ -3,6 +3,7 @@
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
 import { cachedFetch } from '@/lib/cache/memoryTTL';
+import type { OwnershipSignals } from '@/lib/research/ownership-signals';
 
 export type InsiderSignal = Record<string, unknown>;
 
@@ -250,6 +251,18 @@ export async function getInsiderOperations(days = 365): Promise<InsiderOperation
     return cachedFetch(
         `insider:user:${userId}:operations:${days}`,
         () => researchRequest<InsiderOperationsResult>(`/api/insider/operations?days=${days}`, { fast: true }),
+        60,
+    );
+}
+
+/** GET /api/insider/ownership-signals — insiders (Form 4, 180 días) + fondos 13F del ticker (lo que lee la tesis). */
+export async function getOwnershipSignals(ticker: string): Promise<OwnershipSignals> {
+    const { id: userId } = await requireAuthenticatedUser();
+    const clean = ticker.trim().toUpperCase();
+    const params = new URLSearchParams({ ticker: clean });
+    return cachedFetch(
+        `insider:user:${userId}:ownership:${clean}`,
+        () => researchRequest<OwnershipSignals>(`/api/insider/ownership-signals?${params.toString()}`, { fast: true }),
         60,
     );
 }

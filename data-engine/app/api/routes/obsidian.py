@@ -47,15 +47,31 @@ def _load_thesis_notes(db: Session, company: Company) -> list[Note]:
     ThesisVersion/Claim/ClaimEvidence/Document son TenantOwned: la sesión ya
     filtra por el tenant firmado, así que ninguna nota mezcla tenants.
     """
+    return _load_thesis_notes_by_company(db, [company]).get(company.id, [])
+
+
+def _load_thesis_notes_by_company(
+    db: Session, companies: list[Company]
+) -> dict[int, list[Note]]:
+    """Notas de tesis de VARIAS empresas con una consulta por tabla.
+
+    Mismo resultado que llamar a ``_load_thesis_notes`` empresa a empresa,
+    pero el coste ya no crece con el vault: antes eran hasta cinco consultas
+    por empresa (versiones, secciones, claims, evidencias y documentos).
+    Solo aparecen las empresas con alguna tesis.
+    """
+    by_id = {company.id: company for company in companies}
+    if not by_id:
+        return {}
     versions = list(
         db.scalars(
             select(ThesisVersion)
-            .where(ThesisVersion.company_id == company.id)
+            .where(ThesisVersion.company_id.in_(sorted(by_id)))
             .order_by(ThesisVersion.version, ThesisVersion.id)
         ).all()
     )
     if not versions:
-        return []
+        return {}
     version_ids = [v.id for v in versions]
     sections = list(
         db.scalars(
@@ -70,7 +86,11 @@ def _load_thesis_notes(db: Session, company: Company) -> list[Note]:
     claims = list(db.scalars(select(Claim).where(Claim.thesis_version_id.in_(version_ids))).all())
     evidence = (
         list(
-            db.scalars(select(ClaimEvidence).where(ClaimEvidence.claim_id.in_([c.id for c in claims]))).all()
+            db.scalars(
+                select(ClaimEvidence)
+                .where(ClaimEvidence.claim_id.in_([c.id for c in claims]))
+                .order_by(ClaimEvidence.id)
+            ).all()
         )
         if claims
         else []
@@ -94,29 +114,32 @@ def _load_thesis_notes(db: Session, company: Company) -> list[Note]:
                 tier=row.source_tier or "",
             )
         )
-    return [
-        Note(
-            title=f"Tesis {company.ticker} v{v.version}",
-            version=v.version,
-            date=v.updated_at.date().isoformat() if v.updated_at else "",
-            status=v.status or "",
-            body=v.thesis_markdown
-            or "\n\n".join(
-                part
-                for part in [
-                    v.executive_summary or "",
-                    *(
-                        f"## {section.title}\n\n{section.body}"
-                        for section in sections_by_version[v.id]
-                        if section.body
-                    ),
-                ]
-                if part
-            ),
-            sources=sources[v.id],
+    notes: dict[int, list[Note]] = {}
+    for v in versions:
+        company = by_id[v.company_id]
+        notes.setdefault(company.id, []).append(
+            Note(
+                title=f"Tesis {company.ticker} v{v.version}",
+                version=v.version,
+                date=v.updated_at.date().isoformat() if v.updated_at else "",
+                status=v.status or "",
+                body=v.thesis_markdown
+                or "\n\n".join(
+                    part
+                    for part in [
+                        v.executive_summary or "",
+                        *(
+                            f"## {section.title}\n\n{section.body}"
+                            for section in sections_by_version[v.id]
+                            if section.body
+                        ),
+                    ]
+                    if part
+                ),
+                sources=sources[v.id],
+            )
         )
-        for v in versions
-    ]
+    return notes
 
 
 @router.get("/{ticker}/obsidian.zip")
@@ -155,8 +178,21 @@ def export_obsidian_vault(db: Session = Depends(get_db)) -> Response:
     portfolio_tickers = set(companies)
     watch_tickers: set[str] = set()
     unresolved: list[str] = []
-    for item in db.scalars(select(WatchItem)).all():
-        company = resolve_company(db, item.symbol)
+    watch_items = list(db.scalars(select(WatchItem)).all())
+    # Match exacto de todos los símbolos en un IN (antes, resolve_company por
+    # símbolo). resolve_company solo se usa para los que no casan exacto
+    # (sufijo de mercado, clase de acción, FIGI), con la misma política.
+    wanted = sorted({item.symbol.strip().upper() for item in watch_items})
+    exact = (
+        {
+            company.ticker: company
+            for company in db.scalars(select(Company).where(Company.ticker.in_(wanted))).all()
+        }
+        if wanted
+        else {}
+    )
+    for item in watch_items:
+        company = exact.get(item.symbol.strip().upper()) or resolve_company(db, item.symbol)
         if company is None:
             unresolved.append(item.symbol)
             continue
@@ -176,8 +212,9 @@ def export_obsidian_vault(db: Session = Depends(get_db)) -> Response:
     ]
     notes_by_ticker: dict[str, list[Note]] = {}
     texts: dict[str, str] = {}
+    notes_by_company = _load_thesis_notes_by_company(db, list(companies.values()))
     for ticker, company in companies.items():
-        notes = _load_thesis_notes(db, company)
+        notes = notes_by_company.get(company.id, [])
         if not notes:
             continue
         notes_by_ticker[ticker] = notes

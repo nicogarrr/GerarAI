@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -31,6 +33,8 @@ from app.llm.routing import TaskModelRouter
 
 if TYPE_CHECKING:  # pragma: no cover - solo para el type checker
     from app.llm.response_cache import LLMResponseCache
+
+logger = logging.getLogger(__name__)
 
 #: `finish_reason` que significa "respuesta completa y utilizable". Cualquier
 #: otra cosa (truncado, filtro de contenido, error) marca la respuesta como
@@ -340,6 +344,57 @@ class OpenAICompatibleProvider(LLMProvider):
                     task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
 
+    def effective_reasoning_effort(self, request: LLMRequest, model: str) -> str | None:
+        """Nivel de razonamiento que de verdad viaja en el sobre (None = no se envia)."""
+        effort = request.reasoning_effort or self._reasoning_effort
+        if effort and (
+            self._reasoning_effort_models is None
+            or model in self._reasoning_effort_models
+        ):
+            return effort
+        return None
+
+    def _log_call(
+        self,
+        request: LLMRequest,
+        model: str,
+        *,
+        status: str,
+        duration_ms: int,
+        response: LLMResponse | None = None,
+        error: str | None = None,
+        extra_metadata: Mapping[str, str] | None = None,
+    ) -> None:
+        """Una linea por llamada: proveedor, modelo, razonamiento y clave usados.
+
+        Permite comprobar en los logs de Render/Oracle que cada llamada fue a
+        OpenCode Go con DeepSeek V4.1 Flash y el nivel esperado. Nunca se
+        registran prompts, respuestas ni la clave; solo su ambito
+        (plataforma o tenant).
+        """
+        host = urlsplit(self._base_url).hostname or "?"
+        fallback_from = (extra_metadata or {}).get("fallback_from")
+        level = logging.WARNING if status == "failed" else logging.INFO
+        logger.log(
+            level,
+            "llm.call provider=%s model=%s requested_model=%s reasoning_effort=%s "
+            "task=%s status=%s duration_ms=%d host=%s key_scope=%s fallback_from=%s "
+            "output_tokens=%s reasoning_tokens=%s error=%s",
+            self.name,
+            response.model if response is not None else model,
+            model,
+            self.effective_reasoning_effort(request, model) or "none_sent",
+            request.task or "-",
+            status,
+            duration_ms,
+            host,
+            getattr(self, "billing_scope", "platform"),
+            fallback_from or "-",
+            response.usage.output_tokens if response is not None else "-",
+            response.usage.reasoning_tokens if response is not None else "-",
+            error or "-",
+        )
+
     def _build_payload(self, request: LLMRequest, model: str) -> dict[str, Any]:
         """Sobre OpenAI-compatible. Unico lugar que decide que se envia."""
         payload: dict[str, Any] = {
@@ -349,11 +404,8 @@ class OpenAICompatibleProvider(LLMProvider):
         # El override de la request gana al default del proveedor (p. ej. una
         # ruta estructurada larga pide "none" sin tocar al chat). El filtro de
         # modelos soportados se aplica igual en ambos casos.
-        effort = request.reasoning_effort or self._reasoning_effort
-        if effort and (
-            self._reasoning_effort_models is None
-            or model in self._reasoning_effort_models
-        ):
+        effort = self.effective_reasoning_effort(request, model)
+        if effort:
             payload["reasoning_effort"] = effort
         if request.temperature is not None:
             payload["temperature"] = request.temperature
@@ -439,6 +491,15 @@ class OpenAICompatibleProvider(LLMProvider):
         try:
             response = await self._complete(request, model)
         except (Exception, asyncio.CancelledError) as exc:
+            cancelled = isinstance(exc, asyncio.CancelledError)
+            self._log_call(
+                request,
+                model,
+                status="cancelled" if cancelled else "failed",
+                duration_ms=int((_time.monotonic() - _started) * 1000),
+                error=None if cancelled else type(exc).__name__,
+                extra_metadata=extra_metadata,
+            )
             _tracing.trace_generation(
                 name=f"llm.{request.task or 'complete'}",
                 model=model,
@@ -456,6 +517,14 @@ class OpenAICompatibleProvider(LLMProvider):
                 error_class=None if isinstance(exc, asyncio.CancelledError) else type(exc).__name__,
             )
             raise
+        self._log_call(
+            request,
+            model,
+            status="ok",
+            duration_ms=int((_time.monotonic() - _started) * 1000),
+            response=response,
+            extra_metadata=extra_metadata,
+        )
         _tracing.trace_generation(
             name=f"llm.{request.task or 'complete'}",
             model=response.model,
