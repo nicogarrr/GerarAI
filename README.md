@@ -1,5 +1,7 @@
 # GerarAI
 
+<p><img src="docs/images/gerarai-logo.png" alt="GerarAI" width="220" /></p>
+
 **Investment research that keeps company evidence, valuation, versioned theses and portfolio decisions together.**
 
 [![CI](https://github.com/nicogarrr/GerarAI/actions/workflows/ci.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/ci.yml)
@@ -26,9 +28,24 @@
 
 **Start here:** [Local setup](#quick-start) · [Architecture](docs/ARCHITECTURE.md) · [Release checklist](docs/RELEASE_1_0.md) · [Security](SECURITY.md)
 
+## App preview
+
+Real GerarAI UI rendered locally from the current application code, with the existing E2E authentication bypass and a synthetic knowledge-graph fixture served by a minimal local test API. These are interface previews, not production data or an end-to-end backend validation. No personal account, portfolio, balances or real email addresses are shown.
+
+### Desktop
+
+![GerarAI desktop interface: knowledge graph with synthetic demo data](docs/images/gerarai-desktop.png)
+
+### Mobile
+
+<img src="docs/images/gerarai-mobile.png" alt="GerarAI mobile interface: knowledge-graph controls with synthetic demo data" width="320" />
+
+The wordmark above is exported from the existing `GerarAIWordmark` header component with the app stylesheet, without redesigning it.
+
 ## Contents
 
 - [The research loop](#the-research-loop)
+- [App preview](#app-preview)
 - [What it is](#what-it-is)
 - [Key features](#key-features)
 - [Architecture](#architecture)
