@@ -75,7 +75,7 @@ def test_insufficient_overlap_is_honest(db):
 
 def test_alpha_and_information_ratio_math(db):
     company = _spy(db)
-    days = 60
+    days = 61  # solape >= 60 sesiones (MIN_ANNUALIZATION_SESSIONS) para anualizar
     start = date(2026, 1, 1)
     _flat_prices(db, company, days + 1, 0.001)  # benchmark: +0.1%/day
     # Portfolio: same dates, +0.2%/day => positive alpha.
