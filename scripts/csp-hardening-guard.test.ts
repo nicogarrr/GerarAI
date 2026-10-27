@@ -48,3 +48,21 @@ test('el resto de la política no cambia entre entornos', async () => {
     const dev = (await cspFor('development')).replace(/script-src[^;]+;/, '');
     assert.equal(prod, dev);
 });
+
+async function headerFor(key: string): Promise<string | undefined> {
+    const groups = await (nextConfig.headers as () => Promise<Array<{ headers: HeaderEntry[] }>>)();
+    return groups.flatMap((g) => g.headers).find((h) => h.key === key)?.value;
+}
+
+test("ambos entornos: object-src 'none' (sin plugins ni <object>/<embed>)", async () => {
+    for (const env of ['production', 'development']) {
+        assert.match(await cspFor(env), /object-src 'none'/);
+    }
+});
+
+test('cabeceras de aislamiento y endurecimiento presentes', async () => {
+    assert.equal(await headerFor('Cross-Origin-Opener-Policy'), 'same-origin');
+    assert.equal(await headerFor('X-Content-Type-Options'), 'nosniff');
+    assert.equal(await headerFor('X-Frame-Options'), 'SAMEORIGIN');
+    assert.match((await headerFor('Strict-Transport-Security')) ?? '', /max-age=\d{8,}/);
+});
