@@ -47,8 +47,7 @@ def sync_official_closes(
     chunk: int = CHUNK,
 ) -> dict[str, Any]:
     now = now or datetime.now(UTC)
-    today_ny = now.astimezone(_NY).date()
-    skip_today = _session_open(now)
+    skipped = 0
     companies = list(db.scalars(select(Company).order_by(Company.ticker)).all())
     by_symbol = {s: c for c in companies if (s := yahoo_symbol(c)) is not None}
     symbols = list(by_symbol)
@@ -58,15 +57,13 @@ def sync_official_closes(
         part = symbols[start : start + chunk]
         history = fetcher(part, period=period)
         for symbol in part:
-            bars = [
-                bar
-                for bar in history.get(symbol) or []
-                if not (skip_today and bar.day >= today_ny)
-            ]
+            bars = history.get(symbol) or []
             if not bars:
                 continue
-            written += upsert_prices(db, by_symbol[symbol], bars)
-            covered += 1
+            count = upsert_prices(db, by_symbol[symbol], bars, now=now)
+            written += count
+            skipped += len(bars) - count
+            covered += int(count > 0)
         db.commit()
     return {
         "status": "ok",
@@ -74,7 +71,7 @@ def sync_official_closes(
         "with_symbol": len(symbols),
         "covered": covered,
         "bars_written": written,
-        "partial_session_skipped": skip_today,
+        "partial_session_skipped": skipped > 0,
     }
 
 
