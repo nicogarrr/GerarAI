@@ -118,35 +118,64 @@ def search_knowledge(
     for post in postprocessors:
         nodes = post.postprocess_nodes(nodes, bundle)
 
-    chosen: list[NodeWithScore] = []
-    for n in nodes:
-        if any(_overlaps(n.node.metadata, c.node.metadata) for c in chosen):
-            continue
-        chosen.append(n)
-        if len(chosen) >= top_k:
-            break
-
-    parents = resolve_parents(sorted({n.node.metadata["parent_id"] for n in chosen}))
+    # Seleccion con relleno: si un padre no se resuelve o la cita no verifica,
+    # se descarta y se sigue con el siguiente candidato hasta tener top_k citas
+    # verificadas (antes se cortaba en top_k ANTES de verificar y salian menos
+    # fuentes). Los padres se resuelven por lotes; en el caso normal es una
+    # sola llamada con los mismos ids que antes.
+    parents: dict[str, tuple[str, str]] = {}
+    requested: set[str] = set()
+    accepted: list[NodeWithScore] = []
+    verified: list[tuple[NodeWithScore, tuple[str, str], Any]] = []
     citations: list[Citation] = []
     dropped = 0
-    for n in chosen:
-        m = n.node.metadata
-        parent = parents.get(m["parent_id"])
-        if parent is None:
-            dropped += 1
-            continue
-        parent_text, parent_hash = parent
-        result = verify_citation(
-            quote=n.node.get_content(),
-            parent_text=parent_text,
-            char_start=m["char_start"],
-            char_end=m["char_end"],
-            text_sha256=m["text_sha256"],
-            parent_text_sha256=parent_hash,
+    remaining = list(nodes)
+    while remaining and len(verified) < top_k:
+        batch: list[NodeWithScore] = []
+        rest: list[NodeWithScore] = []
+        for n in remaining:
+            if len(verified) + len(batch) >= top_k:
+                rest.append(n)
+                continue
+            if any(_overlaps(n.node.metadata, c.node.metadata) for c in accepted):
+                continue
+            if any(_overlaps(n.node.metadata, c.node.metadata) for c in batch):
+                # Puede servir si el que solapa no llega a verificarse.
+                rest.append(n)
+                continue
+            batch.append(n)
+        remaining = rest
+        if not batch:
+            break
+        missing = sorted(
+            {n.node.metadata["parent_id"] for n in batch} - requested
         )
-        if not result.ok:
-            dropped += 1
-            continue
+        if missing:
+            requested.update(missing)
+            parents.update(resolve_parents(missing))
+        for n in batch:
+            m = n.node.metadata
+            parent = parents.get(m["parent_id"])
+            if parent is None:
+                dropped += 1
+                continue
+            parent_text, parent_hash = parent
+            result = verify_citation(
+                quote=n.node.get_content(),
+                parent_text=parent_text,
+                char_start=m["char_start"],
+                char_end=m["char_end"],
+                text_sha256=m["text_sha256"],
+                parent_text_sha256=parent_hash,
+            )
+            if not result.ok:
+                dropped += 1
+                continue
+            accepted.append(n)
+            verified.append((n, parent, result))
+
+    for n, (parent_text, _parent_hash), result in verified:
+        m = n.node.metadata
         citations.append(
             Citation(
                 number=len(citations) + 1,
