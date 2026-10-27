@@ -174,7 +174,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                             </Badge>
                         </div>
                         <OverflowScrollRegion label="Posiciones 13F declaradas" className="mt-4">
-                            <table className="w-full min-w-[820px] text-left text-sm">
+                            <table className="w-full min-w-[820px] text-left text-sm [&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
                                 <caption className="sr-only">Posiciones declaradas en el último informe 13F del gestor, tal como constan en EDGAR</caption>
                                 <thead className="text-xs uppercase text-gray-500">
                                     <tr>
