@@ -72,6 +72,7 @@ export const FRAMEWORK_TERMS: Record<string, string> = {
     interest_rates: 'tipos de interés', liquidity: 'liquidez', management: 'gestión', market_size: 'tamaño de mercado', permitting: 'permisos',
     pricing: 'precios', pricing_cycle: 'ciclo de precios', rate_sensitivity: 'sensibilidad a tipos', rates: 'tipos de interés', refinancing: 'refinanciación',
     regulation: 'regulación', reinvestment: 'reinversión', reserve_adequacy: 'suficiencia de reservas', supply_chain: 'cadena de suministro',
+    mix: 'mezcla de producto',
 };
 
 export const FRAMEWORK_LABELS: Record<string, string> = {

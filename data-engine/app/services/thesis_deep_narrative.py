@@ -43,6 +43,7 @@ from app.llm.thesis_go import create_thesis_narrative_provider
 from app.models.entities import Company, Document, FinancialFact
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
+from app.services.framework_terms_es import framework_term_es
 from app.services.memo_text_es import date_es, percent_es
 from app.services.number_format import format_compact_es
 from app.services.text_clip import clip_words
@@ -460,8 +461,17 @@ def fact_pack(
         )
     mandatory_missing = list((long_term_model or {}).get("missing_mandatory_drivers") or [])
     if mandatory_missing:
+        # Etiquetas en español (nunca la clave interna, que el LLM repetiría
+        # tal cual) y aclaración de que no bloquean la valoración.
+        labels = [
+            _DRIVER_LABELS_ES.get(key) or framework_term_es(key) or key.replace("_", " ")
+            for key in mandatory_missing
+        ]
         add(
-            "Drivers obligatorios del marco sin dato: " + ", ".join(mandatory_missing) + ".",
+            "Datos operativos del marco sin dato (no figuran en el XBRL; no bloquean "
+            "la valoración, que proyecta con el crecimiento histórico): "
+            + ", ".join(labels)
+            + ".",
             "Motor fundamental de largo plazo.",
         )
 

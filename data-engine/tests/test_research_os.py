@@ -655,8 +655,10 @@ def test_fmp_refresh_normalizes_facts_and_valuation_uses_them(monkeypatch):
     # F7: la confianza se deriva de la evidencia (ya no la constante 55). Con
     # valoracion no publicable cae en la banda 35-75 (floor/ceiling de _confidence_score).
     assert 35 <= thesis_payload["data_confidence_score"] <= 75
-    assert "Drivers obligatorios ausentes:" in thesis_payload["thesis_markdown"]
-    assert "Drivers obligatorios ausentes: ninguno" not in thesis_payload["thesis_markdown"]
+    # Los KPIs del marco sin dato se declaran «sin dato (motivo)», sin clave interna.
+    assert "Datos operativos del marco:" in thesis_payload["thesis_markdown"]
+    assert "sin dato (" in thesis_payload["thesis_markdown"]
+    assert "Datos operativos del marco: todos con dato" not in thesis_payload["thesis_markdown"]
 
 
 def test_fmp_refresh_402_returns_actionable_message(monkeypatch):

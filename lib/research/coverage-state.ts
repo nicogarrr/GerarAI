@@ -8,7 +8,9 @@ export function researchValuability(snapshot: {
 }): string {
   const thesis = snapshot.latest_thesis;
   const model = snapshot.model_summary;
-  const blocked = new Set(['insufficient_data', 'blocked', 'missing_mandatory_drivers', 'preview_only']);
+  // 'missing_mandatory_drivers' ya no bloquea (27/10/2026): un KPI operativo sin
+  // dato se declara «sin dato (motivo)» y no impide valorar con los inputs centrales.
+  const blocked = new Set(['insufficient_data', 'blocked', 'preview_only']);
   if (!thesis || !model || blocked.has(thesis.status) || blocked.has(model.status) ||
       blocked.has(snapshot.valuation_summary.status) || !model.publishable) {
     return NOT_VALUABLE;

@@ -290,6 +290,21 @@ class _SplitAdjustedFact:
         return getattr(self.fact, name)
 
 
+def _driver_gap_reason(key: str, *, formula_input: bool) -> str:
+    """Motivo legible de un driver del marco sin dato (sin jerga interna)."""
+    if key == "traceable_wacc":
+        return "falta un WACC con fuentes (tipo libre de riesgo y beta)"
+    if formula_input:
+        return (
+            "falta una entrada de la fórmula operativa; la proyección usa el "
+            "crecimiento histórico de los ingresos"
+        )
+    return (
+        "dato operativo que no figura en los datos XBRL presentados al regulador; "
+        "se publica en el texto del informe anual"
+    )
+
+
 def _has_unexplained_share_jump(series: list[dict[str, Any]]) -> bool:
     """Salto entre anos consecutivos incompatible con emision/recompra
     organica: tipico de un split (o reverse split) sin CorporateAction
@@ -579,9 +594,22 @@ class LongTermModelService:
                 }
 
         coverage = self._coverage(history, assumptions, scenarios)
+        # Solo los inputs CENTRALES (historial de ingresos, margen FCF,
+        # acciones) bloquean el modelo: sin ellos no hay numero. Un KPI
+        # operativo del marco sin dato (suscriptores, lanzamientos, AUM...)
+        # no cambia la proyeccion, que usa el crecimiento historico; se
+        # declara «sin dato (motivo)» en driver_gaps, recorta la probabilidad
+        # del escenario base (_scenario_specs) y NO despublica la tesis
+        # (27/10/2026: 14 de 19 tesis de Nico salian «sin datos suficientes»
+        # por KPIs que no existen en XBRL).
         status = "ok" if not missing_core else "insufficient_data"
-        if not missing_core and missing_mandatory_drivers:
-            status = "missing_mandatory_drivers"
+        driver_gaps = [
+            {
+                "key": key,
+                "motivo": _driver_gap_reason(key, formula_input=key in missing_formula_inputs),
+            }
+            for key in missing_mandatory_drivers
+        ]
         publication_blockers: list[str] = []
         if assumptions["wacc"].source_type != "calculated_metric":
             publication_blockers.append("traceable_wacc")
@@ -601,7 +629,6 @@ class LongTermModelService:
             "status": status,
             "publishable": (
                 status == "ok"
-                and not missing_mandatory_drivers
                 and not publication_blockers
                 and coverage["coverage_percent"] >= 60
             ),
@@ -616,6 +643,7 @@ class LongTermModelService:
             "missing_inputs": missing_core + missing_mandatory_drivers + publication_blockers,
             "publication_blockers": publication_blockers,
             "missing_mandatory_drivers": missing_mandatory_drivers,
+            "driver_gaps": driver_gaps,
             "historical_review": {
                 "years_covered": len(years),
                 "first_year": years[0] if years else None,

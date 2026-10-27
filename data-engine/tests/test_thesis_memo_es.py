@@ -250,7 +250,8 @@ def test_matriz_estados_copy_no_inventa_estado_tesis():
     assert "NO es la aprobación humana ni la publicación): sí" in md
     assert "Versión del modelo fundamental usada en esta corrida: `7`" in md
     assert "NO acredita persistencia duradera" in md
-    assert "Estado del análisis del modelo fundamental (no es el estado de esta tesis): `complete`" in md
+    # El estado del motor sale en español legible, nunca como código entre comillas.
+    assert "Estado del análisis del modelo fundamental (no es el estado de esta tesis): complete." in md
     md_fail = _render({"publishable": True}, audit_fail, {})
     assert "ESTA corrida" in md_fail and "no superada" in md_fail
     assert "NO es la aprobación humana ni la publicación): no" in md_fail
