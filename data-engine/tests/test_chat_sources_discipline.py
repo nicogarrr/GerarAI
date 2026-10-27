@@ -141,7 +141,9 @@ def test_prune_sources_solo_lo_citado_y_deduplicado():
     kept = _prune_sources(sources, sections, answer)
     titles = [s["title"] for s in kept]
     assert "Ingresos (ejercicio 2025)" in titles
-    assert titles.count("SEC XBRL facts - HIMS") == 1
+    # Dos pasajes distintos del mismo documento, ambos citados, son dos
+    # evidencias (antes solo sobrevivia el primero y el LLM perdia el resto).
+    assert titles.count("SEC XBRL facts - HIMS") == 2
     assert "Afirmacion viva no citada" in titles  # las claims vivas siempre viajan
     assert "Evidencia de la afirmacion viva" in titles  # la evidencia acompaña a su claim
     assert "Generado desde la fuente SEC" not in titles  # evidencia huerfana (sin claim), podada

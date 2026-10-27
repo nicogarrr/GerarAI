@@ -242,6 +242,11 @@ def _prune_sources(
         if not keep:
             continue
         dedupe_key = (kind, " ".join(str(source.get("title") or "").lower().split()))
+        if kind == "document_chunk":
+            # Cada pasaje citado es evidencia distinta (empleados en un sitio,
+            # MAPCs en otro): deduplicar por titulo dejaba al LLM solo el
+            # primer pasaje del 10-K.
+            dedupe_key = (kind, str(source.get("id")))
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
@@ -759,22 +764,18 @@ class ChatService:
             statement = statement.where(ResearchSession.company_id == company.id)
         return list(db.scalars(statement).all())
 
-    def _document_chunks(self, db: Session, company: Company, question: str, limit: int = 4) -> list[tuple[DocumentChunk, Document]]:
-        query_terms = [term.lower() for term in question.split() if len(term) >= 4]
-        rows = db.execute(
-            select(DocumentChunk, Document)
-            .join(Document, DocumentChunk.document_id == Document.id)
-            .where(Document.company_id == company.id)
-            .order_by(desc(Document.published_at), DocumentChunk.chunk_index)
-            .limit(80)
-        ).all()
-        scored: list[tuple[int, DocumentChunk, Document]] = []
-        for chunk, document in rows:
-            lowered = chunk.text.lower()
-            overlap = sum(1 for term in query_terms if term in lowered)
-            scored.append((overlap, chunk, document))
-        scored.sort(key=lambda item: (item[0], item[2].published_at is not None), reverse=True)
-        return [(chunk, document) for _, chunk, document in scored[:limit]]
+    def _document_chunks(
+        self, db: Session, company: Company, question: str, limit: int = 4
+    ) -> list[tuple[DocumentChunk, Document, str]]:
+        """Pasajes de los documentos de la empresa (todo el 10-K, no solo los
+        80 primeros fragmentos), con puente castellano->ingles y sin la
+        cabecera XBRL. El tercer elemento es el pasaje que viaja al prompt."""
+        from app.services.filing_passages import company_passages
+
+        return [
+            (passage.chunk, passage.document, passage.text)
+            for passage in company_passages(db, company, question, limit=limit)
+        ]
 
     def _rag_chunks(
         self,
@@ -1765,7 +1766,7 @@ class ChatService:
                             confidence=_decimal_to_float(evidence.confidence),
                         )
                     )
-            for chunk, document in db_chunks:
+            for chunk, document, passage in db_chunks:
                 sources.append(
                     self._source_entry(
                         "document_chunk",
@@ -1775,7 +1776,9 @@ class ChatService:
                         source_type=document.source_type,
                         source_tier=source_tier_key(document.source_type),
                         url=document.source_url,
-                        text=_short(chunk.text, 240),
+                        # El pasaje que responde (hasta ~900 car.), no los
+                        # 240 primeros caracteres del fragmento.
+                        text=passage,
                     )
                 )
             for chunk in rag_chunks:
@@ -1941,9 +1944,9 @@ class ChatService:
                 if chunk.get("point_id") and chunk.get("text")
             ] + library_lines
             db_evidence_lines = [
-                f"- {_short(chunk.text, 180)} ({document.source_type}) "
+                f"- {_short(passage, 180)} ({document.source_type}) "
                 f"[document_chunk:{chunk.id}]"
-                for chunk, document in db_chunks[:3]
+                for chunk, document, passage in db_chunks[:3]
             ]
             news_lines = [
                 f"- {event.title} [{event.impact_direction}, materiality {event.materiality_score}] "
