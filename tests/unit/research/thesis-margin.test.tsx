@@ -21,31 +21,31 @@ const fixture = {
 
 describe('actual ThesisMemo historical margin', () => {
   it('warns with old backend raw value and keeps archive unchanged', () => {
-    render(<ThesisMemo thesis={fixture} currency="USD" />);
+    render(<ThesisMemo thesis={fixture} currency="USD" model={{ publishable: true }} />);
     expect(screen.getByRole('note')).toHaveTextContent('fórmula no verificada');
     expect(screen.getByText('Margen archivado')).toBeInTheDocument();
     expect(screen.getByText('-64,9 %')).toBeInTheDocument();
     expect(screen.queryByText('sobre valor esperado')).not.toBeInTheDocument();
   });
   it('shows the archived API field if comparable is null', () => {
-    render(<ThesisMemo thesis={{ ...fixture, margin_of_safety: null, archived_margin_of_safety: '-0.649' }} currency="USD" />);
+    render(<ThesisMemo thesis={{ ...fixture, margin_of_safety: null, archived_margin_of_safety: '-0.649' }} currency="USD" model={{ publishable: true }} />);
     expect(screen.getByText('-64,9 %')).toBeInTheDocument();
     expect(screen.getByRole('note')).toBeInTheDocument();
   });
   it('shows verified formula and no warning for new explicit provenance', () => {
-    render(<ThesisMemo thesis={{ ...fixture, margin_of_safety: '-1.849581', valuation_basis: { margin_of_safety_convention: 'discount_to_value_v1' } }} currency="USD" />);
+    render(<ThesisMemo thesis={{ ...fixture, margin_of_safety: '-1.849581', valuation_basis: { margin_of_safety_convention: 'discount_to_value_v1' } }} currency="USD" model={{ publishable: true }} />);
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
     expect(screen.getByText(/base del modelo de esta versión/)).toBeInTheDocument();
   });
   it('does not leak a draft archived percentage', () => {
-    render(<ThesisMemo thesis={{ ...fixture, status: 'draft' }} currency="USD" />);
+    render(<ThesisMemo thesis={{ ...fixture, status: 'draft' }} currency="USD" model={{ publishable: true }} />);
     expect(screen.getByRole('note')).toHaveTextContent('Texto archivado de v11');
     expect(screen.queryByText('-64,9 %')).not.toBeInTheDocument();
   });
   it('captures full real memo SSR for pixel review with interactive children stubbed', () => {
     if (process.env.MOS_VISUAL_OUT) {
       const visualFixture = process.env.MOS_VERIFIED ? { ...fixture, margin_of_safety: '-1.849581', valuation_basis: { margin_of_safety_convention: 'discount_to_value_v1' } } : fixture;
-      writeFileSync(process.env.MOS_VISUAL_OUT, renderToStaticMarkup(<ThesisMemo thesis={visualFixture} currency="USD" />));
+      writeFileSync(process.env.MOS_VISUAL_OUT, renderToStaticMarkup(<ThesisMemo thesis={visualFixture} currency="USD" model={{ publishable: true }} />));
     }
     cleanup();
   });

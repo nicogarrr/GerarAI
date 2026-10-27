@@ -24,7 +24,7 @@ const fixture = {
 
 describe('withheld valuation cannot escape through persisted thesis prose', () => {
   it.each(['published', 'draft', 'insufficient_data'])('withholds every free-text surface for %s when model is blocked', (status) => {
-    render(<ThesisMemo thesis={{ ...fixture, status }} currency="USD" ticker="AAPL" modelBlocked debateBody={archived} extraSections={[{ id: 99, title: 'Extra archive', body: archived }]} />);
+    render(<ThesisMemo thesis={{ ...fixture, status }} currency="USD" ticker="AAPL" model={{ publishable: false }} debateBody={archived} extraSections={[{ id: 99, title: 'Extra archive', body: archived }]} />);
     expect(screen.queryByText(/65,1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/119,92/)).not.toBeInTheDocument();
     expect(screen.queryByText('compra')).not.toBeInTheDocument();
@@ -33,8 +33,14 @@ describe('withheld valuation cannot escape through persisted thesis prose', () =
     expect(screen.getByRole('note')).toHaveTextContent('no es publicable');
     expect(screen.queryByText(/rango indicativo parcial/)).not.toBeInTheDocument();
   });
+  it.each([undefined, null, {}, { publishable: undefined }])('fails closed for absent or unknown model %j', (model) => {
+    render(<ThesisMemo thesis={fixture} currency="USD" model={model as unknown as { publishable: boolean }} />);
+    expect(screen.queryByText(/65,1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/119,92/)).not.toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent('no se pudo verificar');
+  });
   it('preserves source text and the historical formula warning when the valuation is not blocked', () => {
-    render(<ThesisMemo thesis={fixture} currency="USD" />);
+    render(<ThesisMemo thesis={fixture} currency="USD" model={{ publishable: true }} />);
     expect(screen.getByRole('note')).toHaveTextContent('fórmula no verificada');
     expect(screen.getAllByText(archived).length).toBeGreaterThan(0);
     expect(screen.getByText('compra')).toBeInTheDocument();
@@ -42,5 +48,5 @@ describe('withheld valuation cannot escape through persisted thesis prose', () =
 });
 
 it('exports the blocked component fixture for optional visual review', () => {
-  if (process.env.WITHHELD_VISUAL_OUT) writeFileSync(process.env.WITHHELD_VISUAL_OUT, renderToStaticMarkup(<ThesisMemo thesis={fixture} currency="USD" modelBlocked />));
+  if (process.env.WITHHELD_VISUAL_OUT) writeFileSync(process.env.WITHHELD_VISUAL_OUT, renderToStaticMarkup(<ThesisMemo thesis={fixture} currency="USD" />));
 });

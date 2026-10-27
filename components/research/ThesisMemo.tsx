@@ -1,3 +1,4 @@
+import { canShowThesisText } from '@/components/research/ThesisSummary';
 import { frameworkTerm } from '@/lib/research/framework-terms';
 import { thesisMoney, thesisEps } from '@/lib/research/thesis-number-format';
 import { thesisScenarioDisplay } from '@/lib/research/listed-share-values';
@@ -175,7 +176,7 @@ export default function ThesisMemo({
   ticker,
   currency,
   debateBody,
-  modelBlocked = false,
+  model,
   extraSections = [],
 }: {
   thesis: ResearchThesis;
@@ -187,11 +188,13 @@ export default function ThesisMemo({
   /** Cuerpo persistido de la seccion thesis_debate (veredicto previo). */
   debateBody?: string | null;
   /** Modelo fundamental no publicable: la tesis no muestra cifras de valoración. */
-  modelBlocked?: boolean;
+  model?: { publishable: boolean } | null;
   /** Secciones específicas de la empresa: van como páginas del memorando. */
   extraSections?: { id: number | string; title: string; body: string }[];
 }) {
-  const hideFigures = modelBlocked || (thesis.status !== 'published' && thesis.status !== 'approved');
+  const modelBlocked = model?.publishable !== true;
+  const hideFigures = !canShowThesisText(thesis, model);
+  const withheldReason = modelBlocked ? model?.publishable === false ? 'el modelo no es publicable' : 'no se pudo verificar que el modelo sea publicable' : 'la tesis no está publicada ni aprobada';
   const probabilities = thesis.scenario_probabilities ?? {};
   // Missing provenance stays unknown even against an older backend returning raw margin.
   const knownMargin = thesis.valuation_basis?.margin_of_safety_convention === 'discount_to_value_v1';
@@ -321,7 +324,7 @@ export default function ThesisMemo({
 
       {hideFigures ? (
         <aside role="note" className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm leading-6 text-amber-200">
-          Texto archivado de v{thesis.version}{generatedLabel ? `, generada el ${generatedLabel}` : ', sin fecha de generación verificada'}: resumen, narrativa y memorando retenidos porque {modelBlocked ? 'el modelo no es publicable' : 'la tesis no está publicada ni aprobada'}.
+          Texto archivado de v{thesis.version}{generatedLabel ? `, generada el ${generatedLabel}` : ', sin fecha de generación verificada'}: resumen, narrativa y memorando retenidos porque {withheldReason}.
           {' '}Pueden contener cifras de valoración antiguas sin verificar; no se presentan como análisis actual. El original se conserva guardado, sin cambios.
         </aside>
       ) : <p className="text-sm leading-6 text-gray-300">{cleanThesisText(thesis.executive_summary)}</p>}
@@ -363,7 +366,7 @@ export default function ThesisMemo({
         </h3>
         {hideFigures ? (
           <p className="text-sm text-gray-400">
-            Sin cifras de valoración: {modelBlocked ? 'el modelo no es publicable todavía' : thesis.status === 'insufficient_data' ? 'faltan datos' : 'la tesis es un borrador'}. El texto guardado también se retiene para no mostrar esas cifras por otra vía.
+            Sin cifras de valoración: {withheldReason}. El texto guardado también se retiene para no mostrar esas cifras por otra vía.
           </p>
         ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
