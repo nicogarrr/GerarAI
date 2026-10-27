@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 from app.models import Company, MarketPrice, Position, Transaction
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.portfolio_ledger_service import BUY_ACTIONS, SELL_ACTIONS
+from app.services.price_units import price_in_currency
 
 METHOD = "ledger_reconstruction"
 SCOPE = "positions_only_no_cash_no_dividends"
@@ -99,12 +100,13 @@ class PortfolioReconstructionService:
                 ids.add(t.company_id)
                 currency[t.company_id] = (t.currency or "USD").upper()
         company_ids = sorted(ids)
-        tickers = {company.id: company.ticker for _, company in (rows or [])}
-        missing = [cid for cid in company_ids if cid not in tickers]
+        companies_by_id = {company.id: company for _, company in (rows or [])}
+        missing = [cid for cid in company_ids if cid not in companies_by_id]
         if missing:
-            tickers.update(
-                {c.id: c.ticker for c in db.scalars(select(Company).where(Company.id.in_(missing))).all()}
-            )
+            companies_by_id.update({
+                c.id: c for c in db.scalars(select(Company).where(Company.id.in_(missing))).all()
+            })
+        tickers = {cid: company.ticker for cid, company in companies_by_id.items()}
 
         signed: list[tuple[date, int, Decimal, Decimal]] = []  # fecha, company, dqty, flow nativo
         net: dict[int, Decimal] = defaultdict(Decimal)
@@ -148,7 +150,15 @@ class PortfolioReconstructionService:
             )
         ).all():
             if row.close and row.close > 0:
-                prices[(row.company_id, row.date)] = row.close
+                company = companies_by_id.get(row.company_id)
+                if company is None:
+                    continue
+                converted = price_in_currency(
+                    row.close, quote_currency=row.quote_currency,
+                    target_currency=currency[row.company_id], company=company,
+                )
+                if converted is not None:
+                    prices[(row.company_id, row.date)] = converted
         days = sorted({d for (_, d) in prices if d >= warmup})
         fx_table = fx.fx_table(
             db,

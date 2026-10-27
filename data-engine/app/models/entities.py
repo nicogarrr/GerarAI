@@ -853,6 +853,9 @@ class MarketPrice(Base, TimestampMixin):
     # NULL = la fuente no da el volumen (spot sin dato); un 0 fabricado
     # coronaba al ticker como el menos activo con un dato inexistente.
     volume: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Exact unit supplied by the provider: GBP != GBp/GBX. NULL is legacy
+    # or an upstream response without a verifiable quote unit, never guessed.
+    quote_currency: Mapped[str | None] = mapped_column(String(12), nullable=True)
     source: Mapped[str] = mapped_column(String(80), default="seed")
 
 

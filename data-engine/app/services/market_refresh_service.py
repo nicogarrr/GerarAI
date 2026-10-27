@@ -23,6 +23,7 @@ from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.fmp import FMPClient
 from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.portfolio_ledger_service import PortfolioLedgerService
+from app.services.price_units import price_in_currency
 from app.services.propicks_price_service import yahoo_symbol
 from app.services.risk_service import RiskService
 from app.services.screener_service import ScreenerService
@@ -116,6 +117,7 @@ class PriceObservation:
     # Volumen del dia SOLO si el proveedor lo da: None es honesto, un 0
     # inventado corona al ticker como "menos activo" con un dato falso.
     volume: int | None = None
+    quote_currency: str | None = None
 
 
 class PriceProvider(Protocol):
@@ -236,7 +238,7 @@ class PublicPriceProvider:
                             volume = int(raw_volume) if raw_volume is not None else None
                             return (
                                 company,
-                                PriceObservation(company.ticker, value, quote_date, "FMP", volume=volume),
+                                PriceObservation(company.ticker, value, quote_date, "FMP", volume=volume, quote_currency="USD"),
                                 None,
                             )
             except UpstreamRateLimited:
@@ -267,7 +269,7 @@ class PublicPriceProvider:
                         observed_date = datetime.fromtimestamp(timestamp, tz=UTC).date()
                         return (
                             company,
-                            PriceObservation(company.ticker, value, observed_date, "Finnhub"),
+                            PriceObservation(company.ticker, value, observed_date, "Finnhub", quote_currency="USD"),
                             None,
                         )
             except UpstreamRateLimited:
@@ -281,10 +283,10 @@ class PublicPriceProvider:
         return company, None, {"ticker": company.ticker, "reason": reason}
 
 
-YahooIntradayFetcher = Callable[[list[str]], dict[str, "tuple[Decimal, date]"]]
+YahooIntradayFetcher = Callable[[list[str]], dict[str, tuple[Decimal, date] | tuple[Decimal, date, str | None]]]
 
 
-def fetch_intraday_yahoo(symbols: list[str]) -> dict[str, tuple[Decimal, date]]:
+def fetch_intraday_yahoo(symbols: list[str]) -> dict[str, tuple[Decimal, date] | tuple[Decimal, date, str | None]]:
     """Ultimo precio intradia (velas de 15 min) via yfinance. Aislado para tests."""
     import yfinance as yf
     from pandas import Timestamp
@@ -302,7 +304,7 @@ def fetch_intraday_yahoo(symbols: list[str]) -> dict[str, tuple[Decimal, date]]:
     )
     if frame is None or frame.empty:
         return {}
-    latest: dict[str, tuple[Decimal, date]] = {}
+    latest: dict[str, tuple[Decimal, date] | tuple[Decimal, date, str | None]] = {}
     for symbol in symbols:
         try:
             try:
@@ -315,7 +317,13 @@ def fetch_intraday_yahoo(symbols: list[str]) -> dict[str, tuple[Decimal, date]]:
             value = Decimal(str(round(float(closes.iloc[-1]), 4)))
             day = Timestamp(closes.index[-1]).date()
             if value > 0:
-                latest[symbol] = (value, day)
+                # fast_info is provider metadata for this actual symbol. A
+                # suffix cannot establish that the raw value is in pence.
+                try:
+                    unit = yf.Ticker(symbol).fast_info["currency"]
+                except Exception:
+                    unit = None
+                latest[symbol] = (value, day, unit)
         except (KeyError, IndexError):
             continue
     return latest
@@ -344,12 +352,15 @@ class YahooIntradayPriceProvider:
         except Exception as exc:
             return {}, [{"provider": "yahoo", "reason": redact_secrets(f"{type(exc).__name__}:{exc}")}]
         observations: dict[str, PriceObservation] = {}
-        for symbol, (value, day) in latest.items():
+        for symbol, observation in latest.items():
+            value, day = observation[:2]
+            unit = observation[2] if len(observation) > 2 else None
             ticker = ticker_by_yahoo.get(symbol)
             if ticker is None:
                 continue
             observations[ticker] = PriceObservation(
-                ticker=ticker, price=value, price_date=day, source="yahoo_finance_intraday"
+                ticker=ticker, price=value, price_date=day, source="yahoo_finance_intraday",
+                quote_currency=unit
             )
         errors = [
             {"ticker": company.ticker, "reason": "yahoo_sin_precio_intradia"}
@@ -437,6 +448,7 @@ class MarketRefreshService:
                     adj_close=None,
                     volume=observation.volume,
                     source=observation.source,
+                    quote_currency=observation.quote_currency,
                 )
                 db.add(market)
             elif market.source == "yfinance" and observation.price_date < as_of:
@@ -447,8 +459,23 @@ class MarketRefreshService:
             else:
                 # An existing row is a real bar from the OHLCV path: update
                 # only the close, never the session's open/high/low.
-                market.close = observation.price
+                close = observation.price
+                if market.quote_currency != observation.quote_currency and market.adj_close is not None:
+                    # Preserve adjusted history in its stored unit. Unknown
+                    # legacy units cannot be reconciled from price magnitude.
+                    close = (
+                        price_in_currency(
+                            observation.price, quote_currency=observation.quote_currency,
+                            target_currency=market.quote_currency, company=company,
+                        ) if market.quote_currency and observation.quote_currency else None
+                    )
+                    if close is None:
+                        price_errors.append({"ticker": company.ticker, "reason": "incompatible_bar_unit"})
+                        continue
+                market.close = close
                 market.source = observation.source
+                if market.adj_close is None:
+                    market.quote_currency = observation.quote_currency
                 # El volumen solo se toca cuando el proveedor trae uno nuevo:
                 # un None intradia nunca pisa el volumen real de la barra.
                 if observation.volume is not None:
@@ -605,10 +632,22 @@ class MarketRefreshService:
                     }
                 )
                 continue
+            price = price_in_currency(
+                latest.close, quote_currency=latest.quote_currency,
+                target_currency=position.currency, company=company,
+            )
+            if price is None:
+                ledger._blank_valuation(position)
+                stale_prices.append({
+                    "ticker": company.ticker, "status": "unknown_price_unit",
+                    "quote_currency": latest.quote_currency,
+                    "position_currency": position.currency,
+                })
+                continue
             ledger.update_market_price(
                 db,
                 company_id=company.id,
-                price=latest.close,
+                price=price,
                 as_of=latest.date,
                 position=position,
                 fx_rate=PortfolioFXService.rate_from_table(

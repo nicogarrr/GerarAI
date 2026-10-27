@@ -2984,12 +2984,16 @@ class FinancialIngestionService:
             select(MarketPrice).where(MarketPrice.company_id == company.id, MarketPrice.date == quote_date)
         )
         if existing:
+            if existing.adj_close is not None and existing.quote_currency != (item.get("currency") or None):
+                # Do not mix an adjusted series with a close of unknown/different unit.
+                return
             # La fila existente es una barra real: se actualiza solo el close
             # y se preservan OHLC y el adjusted autentico de esa fecha.
             existing.close = price
             if volume is not None:
                 existing.volume = volume
             existing.source = "FMP"
+            existing.quote_currency = item.get("currency") or None
             return
         # Una quote spot no es una barra ajustada: adj_close queda NULL en vez
         # de copiar close, que afirmaria un ajuste nunca realizado y
@@ -3005,6 +3009,7 @@ class FinancialIngestionService:
                 adj_close=None,
                 volume=volume,
                 source="FMP",
+                quote_currency=item.get("currency") or None,
             )
         )
 

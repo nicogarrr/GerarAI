@@ -546,3 +546,85 @@ def test_late_spot_does_not_overwrite_closed_official_bar(db):
     bar = db.scalars(select(MarketPrice).where(MarketPrice.date == date(2026, 9, 21))).one()
     assert bar.close == Decimal("100.40")
     assert bar.source == "yfinance"
+
+
+@pytest.mark.parametrize("unit,close,expected", [
+    ("GBX", "4255", "4255"), ("GBp", "4255", "4255"),
+    ("GBP", "42.55", "4255"), (None, "4255", None),
+    ("USD", "42.55", None),
+])
+def test_refresh_london_price_unit_not_guessed(db, unit, close, expected):
+    from app.models import FXRate
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+
+    day = date(2026, 10, 26)
+    ledger = PortfolioLedgerService()
+    ledger.create_transaction(db, ticker="CGEO.L", action="buy", quantity=Decimal("100"),
+                              price=Decimal("42.55"), currency="GBP", trade_date=day)
+    company = ledger.ensure_company(db, "CGEO.L")
+    db.add(FXRate(base_currency="EUR", quote_currency="GBP", rate=Decimal("1.17"), rate_date=day))
+    db.commit()
+
+    class Prices:
+        async def fetch(self, companies, *, as_of):
+            return {"CGEO.L": PriceObservation("CGEO.L", Decimal(close), day, "test", quote_currency=unit)}, []
+
+    class FX:
+        async def fetch(self, **kwargs):
+            return ECBRates(rate_date=day, rates={"GBP": Decimal("1.17")})
+
+    result = asyncio.run(MarketRefreshService(Prices(), FX()).refresh(db, as_of=day))
+    position = db.scalar(select(Position).where(Position.company_id == company.id))
+    stored = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id))
+    assert stored.close == Decimal(close)  # raw provider value is never rewritten
+    assert stored.quote_currency == unit
+    if expected is None:
+        assert position.market_value_base is None
+        assert position.market_value_native is None
+        assert result["stages"][2]["stale_prices"][0]["status"] == "unknown_price_unit"
+    else:
+        assert position.market_value == Decimal(expected)
+        assert position.market_value_base == Decimal(expected) * Decimal("1.17")
+        assert position.unrealized_pnl == 0
+
+
+def test_reconstruction_converts_explicit_price_unit(db):
+    from app.models import FXRate
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+    from app.services.portfolio_reconstruction_service import PortfolioReconstructionService
+
+    day = date(2026, 10, 26)
+    ledger = PortfolioLedgerService()
+    ledger.create_transaction(db, ticker="CGEO.L", action="buy", quantity=Decimal("100"),
+                              price=Decimal("42.55"), currency="GBP", trade_date=day)
+    company = ledger.ensure_company(db, "CGEO.L")
+    db.add(FXRate(base_currency="EUR", quote_currency="GBP", rate=Decimal("1.17"), rate_date=day))
+    db.add(MarketPrice(company_id=company.id, date=day, close=Decimal("4255"),
+                       quote_currency="GBX", source="test"))
+    db.commit()
+    result = PortfolioReconstructionService().build(db)
+    assert result.series[-1]["value_base"] == pytest.approx(4978.35)
+    assert result.price_check["max_abs_diff_vs_close"] == 0
+
+
+def test_refresh_preserves_adjusted_series_unit(db):
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+
+    day = date(2026, 10, 26)
+    ledger = PortfolioLedgerService()
+    ledger.create_transaction(db, ticker="CGEO.L", action="buy", quantity=Decimal("100"),
+                              price=Decimal("42.55"), currency="GBP", trade_date=day)
+    company = ledger.ensure_company(db, "CGEO.L")
+    db.add(MarketPrice(company_id=company.id, date=day, close=Decimal("4250"),
+                       adj_close=Decimal("4200"), quote_currency="GBX", source="yfinance"))
+    db.commit()
+
+    class Prices:
+        async def fetch(self, companies, *, as_of):
+            return {"CGEO.L": PriceObservation("CGEO.L", Decimal("42.55"), day, "test", quote_currency="GBP")}, []
+
+    asyncio.run(MarketRefreshService(Prices(), _FakeFXProvider()).refresh(db, as_of=day))
+    price = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id))
+    assert price.close == Decimal("4255")
+    assert price.adj_close == Decimal("4200")
+    assert price.quote_currency == "GBX"
