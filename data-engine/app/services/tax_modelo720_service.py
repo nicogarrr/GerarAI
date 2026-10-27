@@ -86,7 +86,9 @@ def q4_average_native(points: list[tuple[date, Decimal]], fiscal_year: int) -> D
     if not by_day:
         return None
     days = sorted(by_day)
-    if abs((days[0] - q_start).days) > Q4_MAX_GAP_DAYS:
+    # El primer dato debe ser del 1/10 o ANTERIOR (hasta el margen): un saldo
+    # posterior al 1/10 no se puede aplicar hacia atras a dias ya transcurridos.
+    if days[0] > q_start or (q_start - days[0]).days > Q4_MAX_GAP_DAYS:
         return None
     if (q_end - days[-1]).days > Q4_MAX_GAP_DAYS:
         return None
