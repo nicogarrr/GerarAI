@@ -92,7 +92,7 @@ def test_synthesize_general_no_inventa_si_vacio():
 
 def test_prompt_chat_general_registrado():
     prompt = get_prompt("chat_general")
-    assert prompt.version == "chat-general-v3"
+    assert prompt.version == "chat-general-v4"
     assert "cifras" in prompt.text
 
 

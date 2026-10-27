@@ -613,6 +613,25 @@ _POSITION_QUERY_RE = re.compile(
     r"|\bcu[aá]nt[oa]\s+pesa[n]?\b"
     r"|\bqu[eé]\s+peso\s+tiene[n]?\b"
 )
+# Impuesto de una venta de un ticker concreto («¿cuánto IRPF pagaría si vendo
+# todo UBER?»). Antes el verbo «vendo» la sacaba de la ruta de posición (es
+# un verbo de orden) y el sintetizador de empresa no recibía la posición:
+# respondía «no tengo su posición» con 30 UBER guardadas (prueba real
+# realqa-23). Es una simulación sobre datos guardados, nunca una orden.
+_SALE_TAX_RE = re.compile(
+    r"(?i)\b(?:irpf|impuestos?|hacienda|tribut\w*|plusval[ií]as?)\b"
+)
+# «si vendo 10 UBER» / «vendiera 12,5 acciones»: cantidad parcial opcional.
+_SALE_QTY_RE = re.compile(
+    r"(?i)\bvend\w*\s+(?:solo\s+|s[oó]lo\s+)?(\d+(?:[.,]\d+)?)\s*(?:acciones|t[ií]tulos|participaciones)?\b"
+)
+_SALE_TAX_PROMPT_VERSION = "portfolio-sale-tax-v2"
+_SALE_HALF_RE = re.compile(r"(?i)\bvend\w*\s+(?:la\s+)?mitad\b")
+# «¿cuántos impuestos paga UBER?» es la fiscalidad de la empresa, no la tuya:
+# hace falta venta, IRPF o primera persona para ir a la simulación.
+_SALE_CONTEXT_RE = re.compile(
+    r"(?i)\b(?:vend\w*|venta|irpf|pagar[ií]a|pagar[ée]|tributar[ií]a|mis|tengo)\b"
+)
 # Cuando la misma frase pide ademas caja o patrimonio se adjunta ese bloque.
 _RANK_HIGH_RE = re.compile(
     r"(?i)\b(?:m[aá]s\s+(?:alto|caro|grande|pesad[oa])|mayor|m[aá]xim[oa]|m[aá]s\s+peso|pesa\s+m[aá]s)\b"
@@ -1089,6 +1108,15 @@ class ChatService:
                 llm_trace={"path": "capabilities", "generated": False, "provider_calls": 0},
                 context=context_echo,
             )
+        if (
+            company is not None
+            and _SALE_TAX_RE.search(question or "")
+            and _SALE_CONTEXT_RE.search(question or "")
+        ):
+            tax_answer = self._sale_tax_answer(db, company, question or "")
+            if tax_answer is not None:
+                tax_answer.context = context_echo
+                return tax_answer
         if (
             company is not None
             and _POSITION_QUERY_RE.search(question or "")
@@ -1739,6 +1767,177 @@ class ChatService:
             prompt_version="portfolio-position-v1",
             confidence=0.9,
             llm_trace={"path": "portfolio_position", "generated": False, "provider_calls": 0},
+        )
+
+    def _sale_tax_answer(self, db: Session, company: Company, question: str) -> ChatResponse | None:
+        """IRPF estimado si el usuario vendiera hoy su posición guardada en ``company``.
+
+        Determinista y en tuteo. La ganancia es FIFO (art. 37.2 LIRPF): se
+        venden primero los lotes más antiguos, con el coste en euros al tipo
+        de la fecha de compra. Sin compras individuales guardadas se usa el
+        coste medio y se dice. La cuota sale de la escala del ahorro del año en
+        curso, como si fuera la única operación del ejercicio. Sin tenant
+        devuelve None.
+        """
+        from app.services.sale_simulation import repurchase_deadline, simulate_fifo_sale
+        from app.services.tax_irpf_filing import calculate_savings_tax
+
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return None
+        trace: dict = {"path": "portfolio_sale_tax", "generated": False, "provider_calls": 0}
+        pos = db.execute(
+            select(Position)
+            .where(
+                Position.quantity > 0,
+                Position.tenant_id == tenant_id,
+                Position.company_id == company.id,
+            )
+            .order_by(Position.as_of.desc())
+        ).scalars().first()
+        if pos is None:
+            return ChatResponse(
+                answer=(
+                    f"No tienes ninguna posición guardada en {company.ticker}, así que no hay venta "
+                    "que simular. Si la tienes en el bróker, añádela en Cartera y te calculo el IRPF."
+                ),
+                sources=[],
+                model="deterministic",
+                prompt_version=_SALE_TAX_PROMPT_VERSION,
+                confidence=0.9,
+                llm_trace=trace,
+            )
+        held = Decimal(pos.quantity)
+        qty = held
+        match = _SALE_QTY_RE.search(question)
+        if _SALE_HALF_RE.search(question):
+            qty = held / 2
+        elif match:
+            try:
+                asked = Decimal(match.group(1).replace(",", "."))
+            except ArithmeticError:
+                asked = held
+            if 0 < asked < held:
+                qty = asked
+        share = qty / held
+        qty_text = _fmt_number_es(float(qty), 4)
+        what = (
+            f"todas tus {qty_text} acciones de {company.ticker}" if qty == held
+            else f"{qty_text} de tus {_fmt_number_es(float(held), 4)} acciones de {company.ticker}"
+        )
+        source = self._source_entry(
+            "position", pos.id, f"Posición {company.ticker}", url="/portfolio", as_of=str(pos.as_of)
+        )
+        today = date.today()
+        fifo = simulate_fifo_sale(
+            db, tenant_id=tenant_id, company_id=company.id, quantity=qty, held_quantity=held, sale_date=today,
+        )
+        fifo_cost = fifo.cost_eur if fifo is not None else None
+        value_base = pos.market_value_base if (pos.base_currency or "EUR") == "EUR" else None
+        avg_cost = pos.cost_basis_base if (pos.base_currency or "EUR") == "EUR" else None
+        trace["method"] = "fifo" if fifo_cost is not None else "average_cost"
+        if value_base is None or (fifo_cost is None and avg_cost is None):
+            native_value = pos.market_value_native if pos.market_value_native is not None else pos.market_value
+            native_cost = (
+                pos.cost_basis_native if pos.cost_basis_native is not None
+                else Decimal(pos.average_cost or 0) * held
+            )
+            ccy = _currency_display(pos.currency)
+            answer = (
+                f"Tengo tu posición: {_fmt_number_es(float(held), 4)} acciones de {company.ticker} "
+                f"a un coste medio de {_fmt_money_es(float(pos.average_cost or 0))} {ccy}. "
+                "Pero no puedo estimarte el IRPF en euros: falta "
+                + ("el valor actual en euros" if value_base is None and (fifo_cost is not None or avg_cost is not None)
+                   else "el coste en euros (tipo de cambio de la fecha de compra)")
+                + " de la posición, y Hacienda calcula la ganancia en euros."
+            )
+            if native_value is not None and native_cost:
+                diff = (Decimal(native_value) - Decimal(native_cost)) * share
+                kind = "ganancia" if diff >= 0 else "pérdida"
+                answer += (
+                    f" En {ccy} y a coste medio, vender {what} te daría una {kind} de "
+                    f"{_fmt_money_es(float(abs(diff)))} {ccy}."
+                )
+            answer += " Cuando la cartera tenga el coste en euros, te lo calculo con los tramos del ahorro."
+            return ChatResponse(
+                answer=answer,
+                sources=[source],
+                model="deterministic",
+                prompt_version=_SALE_TAX_PROMPT_VERSION,
+                confidence=0.7,
+                llm_trace=trace,
+            )
+        value = Decimal(value_base) * share
+        if fifo is not None and fifo_cost is not None:
+            cost = fifo_cost
+            lot_texts = [
+                f"{_fmt_date_es(lot.trade_date.isoformat())}, {_fmt_number_es(float(lot.quantity), 4)} acciones, "
+                f"coste {_fmt_money_es(float(lot.cost_eur or 0))} €"
+                for lot in fifo.lots
+            ]
+            method = (
+                "Método FIFO, obligatorio en IRPF (art. 37.2 LIRPF): salen primero las acciones más antiguas. "
+                "Lotes vendidos: " + "; ".join(lot_texts) + "."
+            )
+        else:
+            cost = Decimal(avg_cost or 0) * share
+            method = (
+                "Ojo: sin historial de lotes; estimación con coste medio, puede diferir de FIFO. "
+                "Hacienda exige FIFO (art. 37.2 LIRPF): registra tus compras en Cartera y te lo calculo por lotes."
+            )
+        gain = value - cost
+        year = today.year
+        head = (
+            f"Si vendieras hoy {what} (datos a {_fmt_date_es(pos.as_of.isoformat())}): "
+            f"valor {_fmt_money_es(float(value))} €, coste {_fmt_money_es(float(cost))} €"
+        )
+        # Última escala del ahorro verificada: 2025 (Ley 7/2024). Para años posteriores se
+        # reutiliza y se dice, sin afirmar que sea la vigente de ese año.
+        scale_label = (
+            f"escala del ahorro {year}" if year <= 2025
+            else f"escala del ahorro de 2025 (la última verificada; la de {year} no está confirmada)"
+        )
+        if gain > 0:
+            tax = calculate_savings_tax(gain, year)
+            rate = (tax / gain * 100) if gain else Decimal("0")
+            answer = (
+                f"{head}, ganancia de {_fmt_money_es(float(gain))} €. "
+                f"IRPF estimado: {_fmt_money_es(float(tax))} € (un {_fmt_number_es(float(rate), 1)} % "
+                f"de la ganancia, {scale_label}: 19 % hasta 6.000 €, 21 % hasta 50.000 €…). "
+                "Lo calculo como si fuera tu única operación del año: si ya tienes otras ganancias, "
+                "el tramo sube, y las pérdidas del año lo compensan."
+            )
+        else:
+            loss = -gain
+            answer = f"{head}, pérdida de {_fmt_money_es(float(loss))} €. No pagarías IRPF por esta venta."
+            deadline = _fmt_date_es(repurchase_deadline(today).isoformat())
+            if fifo is not None and fifo_cost is not None and fifo.blocking_qty > 0:
+                blocked = loss * fifo.blocking_qty / qty
+                dates = ", ".join(_fmt_date_es(d.isoformat()) for d in fifo.blocking_dates)
+                trace["wash_sale_blocked_qty"] = float(fifo.blocking_qty)
+                answer += (
+                    f" Pero ojo con la regla de los dos meses: compraste {company.ticker} el {dates} "
+                    f"y esas {_fmt_number_es(float(fifo.blocking_qty), 4)} acciones siguen en cartera tras la venta, "
+                    f"así que {_fmt_money_es(float(blocked))} € de la pérdida no se pueden compensar ahora: "
+                    "se aplazan hasta que vendas esas acciones."
+                )
+                if fifo.blocking_qty < qty:
+                    answer += (
+                        f" El resto, {_fmt_money_es(float(loss - blocked))} €, sí compensa otras ganancias del año."
+                    )
+            else:
+                answer += (
+                    " La pérdida compensa otras ganancias del año, siempre que no recompres "
+                    f"{company.ticker} antes del {deadline} (regla de los dos meses)."
+                )
+        answer += f" {method} Es una estimación, no asesoría fiscal; el detalle está en Fiscal."
+        return ChatResponse(
+            answer=answer,
+            sources=[source],
+            model="deterministic",
+            prompt_version=_SALE_TAX_PROMPT_VERSION,
+            confidence=0.8 if fifo_cost is not None else 0.6,
+            llm_trace=trace,
         )
 
     def _deterministic_answer(
