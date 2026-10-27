@@ -12,7 +12,7 @@ agregado y se reportan en cobertura.
 """
 
 import asyncio
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -183,3 +183,36 @@ def test_sync_is_untouched_by_the_yield_gate(db: Session):
     )
     assert result["status"] == "ok" and result["inserted"] == 0
     assert company.id is not None
+
+
+def test_ttm_yield_excludes_declared_future_and_year_old_ex_dates(db: Session):
+    """TTM = (hoy - 1 año, hoy]: 4 pagos trimestrales de 0,25 sobre precio 100 = 1 %.
+
+    Un dividendo ya declarado con ex_date futuro y el de hace exactamente un
+    año no son de los ultimos 12 meses: con ellos salian 6 pagos (1,5 %).
+    """
+    company = _company(db, "QTR")
+    _position(db, company, price="100.00", currency="USD", value_base="900.00")
+    today = date.today()
+    offsets = [-30, -120, -210, -300, 20]  # 4 pasados + 1 declarado futuro
+    ex_dates = [today + timedelta(days=offset) for offset in offsets]
+    try:
+        ex_dates.append(today.replace(year=today.year - 1))
+    except ValueError:  # 29 de febrero
+        ex_dates.append(today.replace(year=today.year - 1, day=28))
+    for ex_date in ex_dates:
+        db.add(
+            DividendRecord(
+                company_id=company.id,
+                ex_date=ex_date,
+                amount=Decimal("0.25"),
+                currency="USD",
+                source="fmp",
+            )
+        )
+    db.commit()
+
+    position = _yields(db)["positions"][0]
+    assert position["records_12m"] == 4
+    assert position["ttm_dividend_per_share"] == pytest.approx(1.0)
+    assert position["dividend_yield"] == pytest.approx(0.01)
