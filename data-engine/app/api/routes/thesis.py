@@ -587,6 +587,9 @@ async def debate_thesis_endpoint(ticker: str, db: Session = Depends(get_db)) -> 
     thesis = await run_in_threadpool(ThesisService().latest, db, ticker)
     if not thesis:
         raise HTTPException(status_code=404, detail="No thesis for ticker")
+    reason = await run_in_threadpool(thesis_withheld_reason, db, thesis)
+    if reason:
+        raise HTTPException(status_code=409, detail=archived_thesis_notice(thesis, reason))
     company = await run_in_threadpool(resolve_company, db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
