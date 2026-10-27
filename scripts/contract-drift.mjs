@@ -36,6 +36,9 @@ function loadArgs(argv) {
   return args;
 }
 
+/**
+ * @param {{ root?: string, openapiPath?: string }} [options]
+ */
 export function scanContract({ root = ROOT, openapiPath } = {}) {
   const spec = JSON.parse(fs.readFileSync(openapiPath ?? path.join(root, 'data-engine', 'openapi.json'), 'utf8'));
 
