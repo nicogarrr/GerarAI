@@ -269,3 +269,38 @@ def test_contribution_half_cent_retry_has_same_explicit_precision_as_first_write
     first = service.add_contribution(db, **args)
     assert first.amount == Decimal(expected)
     assert service.add_contribution(db, **args).id == first.id
+
+
+@pytest.mark.parametrize("raw", ["0.001", "0.0049", "0", "-0.001", "-1"])
+def test_contribution_rejects_nonpositive_rounded_amount_without_writes(db, raw):
+    from sqlalchemy import func, select
+
+    from app.models import PlanContribution
+
+    service = InvestmentPlanService()
+    _plan(service, db)
+    with pytest.raises(ValueError, match="precisión de céntimos"):
+        service.add_contribution(db, date_=date(2026, 9, 1), amount=Decimal(raw), external_id="too-small")
+    assert db.scalar(select(func.count()).select_from(PlanContribution)) == 0
+
+
+def test_contribution_half_cent_remains_positive(db):
+    service = InvestmentPlanService()
+    _plan(service, db)
+    assert service.add_contribution(db, date_=date(2026, 9, 1), amount=Decimal("0.005")).amount == Decimal("0.01")
+
+
+def test_contribution_route_rejects_positive_input_rounded_to_zero(db):
+    from fastapi import HTTPException
+    from sqlalchemy import func, select
+
+    from app.api.routes.plan import ContributionInput, add_contribution
+    from app.models import PlanContribution
+
+    _plan(InvestmentPlanService(), db)
+    payload = ContributionInput(date=date(2026, 9, 1), amount=0.001)
+    with pytest.raises(HTTPException) as caught:
+        add_contribution(payload, db)
+    assert caught.value.status_code == 400
+    assert "precisión de céntimos" in caught.value.detail
+    assert db.scalar(select(func.count()).select_from(PlanContribution)) == 0

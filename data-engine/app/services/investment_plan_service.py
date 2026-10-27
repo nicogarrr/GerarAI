@@ -117,6 +117,8 @@ class InvestmentPlanService:
         # Normalize before BOTH persistence and retry comparison. Letting the
         # DB/driver round a float first differs at half cents across backends.
         amount = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if amount <= 0:
+            raise ValueError("El importe de la aportación debe ser positivo con precisión de céntimos.")
         plan = self.get_plan(db)
         if plan is None:
             raise ValueError("Investment plan does not exist yet; create it first")
