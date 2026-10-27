@@ -176,10 +176,14 @@ export function formatCompact(
   if (parsed === null) return fallback;
   const abs = Math.abs(parsed);
   const { maximumFractionDigits = 2, ...rest } = options;
-  if (abs >= 1e9) {
+  // La escala se elige con la cifra YA redondeada (ECMA-402, notation
+  // «compact»): 999.999.999 redondea a 1.000 M y debe salir «1 mil M».
+  const digits = Math.min(Math.max(Math.trunc(maximumFractionDigits), 0), 20);
+  const roundsTo = (scaled: number) => Number(scaled.toFixed(digits));
+  if (abs >= 1e9 || roundsTo(abs / 1e6) >= 1000) {
     return `${formatNumber(parsed / 1e9, { maximumFractionDigits, ...rest }, fallback)} mil M`;
   }
-  if (abs >= 1e6) {
+  if (abs >= 1e6 || roundsTo(abs) >= 1e6) {
     return `${formatNumber(parsed / 1e6, { maximumFractionDigits, ...rest }, fallback)} M`;
   }
   return new Intl.NumberFormat(FORMAT_LOCALE, {
