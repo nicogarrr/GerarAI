@@ -30,14 +30,18 @@ test.describe("investor knowledge flow", () => {
     // activa está en el DOM, así que el chequeo de vacío va tras navegar.
     await page.goto("/knowledge");
 
-    if (await page.getByText("Aún no hay documentos de conocimiento.").isVisible()) {
+    // Esperar al estado terminal de la lista (vacía o con documentos) ANTES de
+    // decidir: un isVisible()/count() de una sola lectura corre contra la página
+    // aun renderizando y ve «0 enlaces» aunque los documentos lleguen un instante
+    // despues (fallo visto en CI sobre un commit que no toca esta pagina).
+    const emptyState = page.getByText("Aún no hay documentos de conocimiento.");
+    // Listed documents expose chunk browsing and principle extraction per row.
+    const chunksLinks = page.getByRole("link", { name: "Fragmentos" });
+    await expect(emptyState.or(chunksLinks.first())).toBeVisible({ timeout: 15_000 });
+    if (await emptyState.isVisible()) {
       return;
     }
 
-    // El listado vive en la pestaña Biblioteca.
-    await page.goto("/knowledge");
-    // Listed documents expose chunk browsing and principle extraction per row.
-    const chunksLinks = page.getByRole("link", { name: "Fragmentos" });
     expect(await chunksLinks.count()).toBeGreaterThan(0);
     await expect(chunksLinks.first()).toHaveAttribute("href", /\/knowledge\?document=\d+/);
     await expect(page.getByRole("button", { name: "Extraer" }).first()).toBeVisible();
