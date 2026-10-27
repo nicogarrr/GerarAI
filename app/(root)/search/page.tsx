@@ -85,21 +85,21 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
       </header>
 
       <form className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5" method="get">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Input autoFocus className="h-11 w-full text-base" defaultValue={query.q} name="q" placeholder="Busca en todo el research..." required />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400 flex-1"><span>Buscar en el research</span><Input autoFocus className="h-11 w-full text-base" defaultValue={query.q} name="q" placeholder="Busca en todo el research..." required /></label>
           <Button className="h-11 w-full shrink-0 sm:w-auto" type="submit"><SearchIcon aria-hidden="true" className="h-4 w-4" />Buscar</Button>
         </div>
         <details className="mt-4">
           <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-gray-400"><Filter aria-hidden="true" className="h-4 w-4" />Filtros avanzados</summary>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <TickerSearchInput className="h-11 w-full" defaultValue={query.ticker} name="ticker" placeholder="Ticker" />
-            <Input className="h-11 w-full" defaultValue={query.entity_types} name="entity_types" placeholder="Tipos de entidad, separados por comas" />
-            <Input className="h-11 w-full" defaultValue={query.source_types} name="source_types" placeholder="Tipos de fuente, separados por comas" />
-            <Input className="h-11 w-full" defaultValue={query.statuses} name="statuses" placeholder="Estados, separados por comas" />
-            <Input className="h-11 w-full" defaultValue={query.collection_id} min="1" name="collection_id" placeholder="ID de colección" type="number" />
-            <Input aria-label="Fecha desde" className="h-11 w-full" defaultValue={query.date_from} name="date_from" type="date" />
-            <Input aria-label="Fecha hasta" className="h-11 w-full" defaultValue={query.date_to} name="date_to" type="date" />
-            <select aria-label="Tipo de búsqueda" className="h-11 w-full rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 md:text-sm" defaultValue={query.vector ?? 'true'} name="vector"><option value="true">Léxico + vectorial</option><option value="false">Solo léxico</option></select>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Ticker</span><TickerSearchInput className="h-11 w-full" defaultValue={query.ticker} name="ticker" placeholder="Ticker" /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Tipos de entidad</span><Input className="h-11 w-full" defaultValue={query.entity_types} name="entity_types" placeholder="Tipos de entidad, separados por comas" /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Tipos de fuente</span><Input className="h-11 w-full" defaultValue={query.source_types} name="source_types" placeholder="Tipos de fuente, separados por comas" /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Estados</span><Input className="h-11 w-full" defaultValue={query.statuses} name="statuses" placeholder="Estados, separados por comas" /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>ID de colección</span><Input className="h-11 w-full" defaultValue={query.collection_id} min="1" name="collection_id" placeholder="ID de colección" type="number" /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Fecha desde</span><Input aria-label="Fecha desde" className="h-11 w-full" defaultValue={query.date_from} name="date_from" type="date" /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Fecha hasta</span><Input aria-label="Fecha hasta" className="h-11 w-full" defaultValue={query.date_to} name="date_to" type="date" /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Tipo de búsqueda</span><select aria-label="Tipo de búsqueda" className="h-11 w-full rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 md:text-sm" defaultValue={query.vector ?? 'true'} name="vector"><option value="true">Léxico + vectorial</option><option value="false">Solo léxico</option></select></label>
           </div>
         </details>
       </form>

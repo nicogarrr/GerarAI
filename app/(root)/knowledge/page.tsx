@@ -270,9 +270,9 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         <MutationForm action={createKnowledgeCollection} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Colección creada">
           <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Nueva colección</h2></div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Input className="h-11 w-full" name="name" placeholder={t('knowledge.qualityCompounders')} required />
-            <Input className="h-11 w-full" name="collection_type" defaultValue="custom" placeholder="Tipo de colección" required />
-            <Textarea className="min-h-[88px] w-full sm:col-span-2" name="description" placeholder="Ámbito y uso previsto" />
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Nombre de la colección</span><Input className="h-11 w-full" name="name" placeholder={t('knowledge.qualityCompounders')} required /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Tipo de colección</span><Input className="h-11 w-full" name="collection_type" defaultValue="custom" placeholder="Tipo de colección" required /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400 sm:col-span-2"><span>Descripción (opcional)</span><Textarea className="min-h-[88px] w-full" name="description" placeholder="Ámbito y uso previsto" /></label>
             <Button className="h-11 w-full sm:col-span-2 sm:w-fit" type="submit">Crear colección</Button>
           </div>
         </MutationForm>
