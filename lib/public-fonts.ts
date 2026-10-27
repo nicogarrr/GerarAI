@@ -12,6 +12,9 @@ export const publicEditorial = localFont({
   src: "../app/fonts/InstrumentSerif.woff2",
   variable: "--font-editorial",
   weight: "400",
-  display: "swap",
-  preload: false,
+  // Cargar pronto, sin sustituir la tipografía tras el primer pintado:
+  // una descarga lenta no debe mover el título y los botones de la landing.
+  display: "optional",
+  preload: true,
+  adjustFontFallback: "Times New Roman",
 });
