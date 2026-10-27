@@ -206,6 +206,9 @@ export type ResearchThesis = {
   bull_value: string | null;
   expected_value: string | null;
   margin_of_safety: string | null;
+  archived_margin_of_safety?: string | null;
+  margin_of_safety_convention?: string | null;
+  margin_of_safety_status?: string;
   data_confidence_score: number;
   source_coverage_score: number;
   red_team_score: number;
@@ -239,6 +242,7 @@ export type ResearchThesis = {
   }> | null;
   /** Base por acción de los escenarios al generar la tesis; null/ausente = tesis anterior sin evidencia. */
   valuation_basis?: {
+    margin_of_safety_convention?: string | null;
     value_per_share_basis?: string | null;
     adr_ratio?: number | null;
     listed_share_values?: Partial<Record<'bear' | 'base' | 'bull' | 'expected', number>> | null;
