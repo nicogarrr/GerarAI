@@ -16,7 +16,7 @@
 
 - **Workspace por empresa** (`/research/[ticker]`): snapshot coherente, tesis versionada con auditoría, claims con evidencia a favor/en contra, memoria y chat con fuentes.
 - **Tesis con abogado del diablo**: debate bull/bear automático con veredicto persistido en la tesis.
-- **Valoración determinista**: DCF, SOTP, pre-revenue, bancos, aseguradoras, REITs, holdings y materias primas — con traza de cálculo y regla anti-look-ahead (sin datos futuros).
+- **Valoración determinista**: DCF, SOTP, pre-revenue, bancos, aseguradoras, REITs, holdings y materias primas — con traza de cálculo. Anti-look-ahead: la serie histórica de múltiplos con `as_of` pasado solo usa precios hasta esa fecha y cifras SEC cuyo filing (`filed`) es anterior; sin `filed`, cierre del periodo + 120 días. Límite: de cada periodo se guarda solo la última cifra (reexpresada), así que antes de la reexpresión ese periodo sale «sin datos», no con la cifra original.
 - **Señales insider**: compras de directivos desde SEC EDGAR (Form 4, gratis), con detección de cluster-buy y alerta en Telegram.
 - **Alertas en Telegram**: reglas de precio/noticias/earnings + urgencia puntuada por IA; las tesis se aprueban desde el propio Telegram (Publicar / Revisar).
 - **Biblioteca de conocimiento (RAG)**: sube PDFs/MDs, extrae principios, apruébalos y pregúntales con búsqueda semántica (Qdrant + embeddings locales).
