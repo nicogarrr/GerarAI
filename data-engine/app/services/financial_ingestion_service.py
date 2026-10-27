@@ -88,6 +88,8 @@ BALANCE_METRICS: list[MetricSpec] = [
 CASH_FLOW_METRICS: list[MetricSpec] = [
     ("operating_cash_flow", "operatingCashFlow", "USD"),
     ("capital_expenditure", "capitalExpenditure", "USD"),
+    # Signo de flujo de caja: negativo = el circulante absorbió caja.
+    ("change_in_working_capital", "changeInWorkingCapital", "USD"),
     ("free_cash_flow", "freeCashFlow", "USD"),
     ("common_stock_repurchased", "commonStockRepurchased", "USD"),
     ("dividends_paid", "dividendsPaid", "USD"),
@@ -205,6 +207,10 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("finance_lease_additions", ["RightOfUseAssetObtainedInExchangeForFinanceLeaseLiability"], "USD"),
     ("depreciation_amortization", ["DepreciationDepletionAndAmortization", "DepreciationAmortizationAndAccretionNet",
                                    "Depreciation", "DepreciationAndAmortization"],                                                                  "USD"),
+    # Signo CONTRARIO al del flujo de caja (+ = el circulante sube y consume
+    # caja): _merge_for_metric lo niega para guardar el signo de FMP
+    # changeInWorkingCapital (ver SEC_CASH_FLOW_SIGN_FLIPPED_METRICS).
+    ("change_in_working_capital", ["IncreaseDecreaseInOperatingCapital"], "USD"),
     ("common_stock_repurchased", ["PaymentsForRepurchaseOfCommonStock", "StockRepurchasedDuringPeriodValue"], "USD"),
     ("common_stock_issued", ["ProceedsFromIssuanceOfCommonStock", "StockIssuedDuringPeriodValueNewIssues"], "USD"),
     ("shares_repurchased", ["StockRepurchasedDuringPeriodShares"], "shares"),
@@ -576,10 +582,23 @@ def _compose_total_debt(
     return out
 
 
+# Métricas cuyo concepto us-gaap llega con el signo contrario al del estado de
+# flujos de caja. IncreaseDecreaseInOperatingCapital es + cuando el circulante
+# operativo SUBE (caja consumida); el hecho se guarda en el signo de FMP
+# changeInWorkingCapital (− = caja consumida), que es el que usan el
+# beneficio del propietario (app/services/owner_earnings.py) y el FCFE.
+SEC_CASH_FLOW_SIGN_FLIPPED_METRICS: frozenset[str] = frozenset({"change_in_working_capital"})
+
+
 def _merge_for_metric(
     by_concept: dict[str, dict[str, dict[str, Any]]], metric: str
 ) -> dict[str, dict[str, Any]]:
     """Merge concepts per period: summed when they are parts, else one winner."""
+    if metric in SEC_CASH_FLOW_SIGN_FLIPPED_METRICS:
+        return {
+            end: _negate_entry(entry)
+            for end, entry in _collapse_aliases(by_concept).items()
+        }
     if is_summed_component(metric):
         return _sum_disjoint_components(by_concept)
     if metric == "total_debt":
@@ -587,6 +606,14 @@ def _merge_for_metric(
     if metric in SCOPE_PRIORITY_METRICS:
         return _collapse_by_scope(by_concept)
     return _collapse_aliases(by_concept)
+
+
+def _negate_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    """Copia de la entrada con ``val`` cambiado de signo (el crudo no se toca)."""
+    value = _decimal(entry.get("val"))
+    if value is None:
+        return entry
+    return {**entry, "val": -value}
 
 
 BANK_REVENUE_COMPONENTS = ("InterestIncomeExpenseNet", "NoninterestIncome")

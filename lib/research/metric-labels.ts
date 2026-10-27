@@ -43,6 +43,7 @@ export const METRIC_LABELS: Record<string, string> = {
     depreciation_and_amortization: 'Depreciación y amortización',
     maintenance_capex: 'Capex de mantenimiento',
     normalized_working_capital: 'Capital circulante normalizado',
+    change_in_working_capital: 'Variación del capital circulante (flujo de caja)',
     free_cash_flow: 'Flujo de caja libre',
     dividends_paid: 'Dividendos pagados',
     common_stock_repurchased: 'Recompra de acciones propias',

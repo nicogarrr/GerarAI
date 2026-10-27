@@ -18,8 +18,9 @@ def _cache(**overrides):
     base = {
         "net_income": [_fact(100)],
         "maintenance_capex": [_fact(10)],
-        "normalized_change_in_working_capital": [_fact(5)],
-        "change_in_working_capital": [],
+        "capital_expenditure": [],
+        # Signo de flujo de caja: −5 = el circulante absorbió 5 de caja.
+        "change_in_working_capital": [_fact(-5)],
         "depreciation_amortization": [],
         "depreciation_and_amortization": [],
     }

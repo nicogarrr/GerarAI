@@ -856,3 +856,27 @@ def test_fcfe_engine_uses_a_sourced_traceable_wacc_when_there_is_one(db):
     # prefers the explicit cost_of_equity fact, so the WACC must NOT leak in.
     assert result["trace"]["assumptions"]["cost_of_equity"] == 0.10
     assert "cost_of_equity_source" not in result["publication_blockers"]
+
+
+def test_fcfe_engine_negates_the_cash_flow_change_in_working_capital(db):
+    """``change_in_working_capital`` se guarda en signo de flujo de caja
+    (FMP ``changeInWorkingCapital``: −8 = el circulante absorbió 8 de caja).
+    El puente FCFE resta un AUMENTO del circulante (+8), así que el hecho se
+    niega antes de entrar: mismo FCFE que con ``delta_working_capital`` = 8.
+
+        300 - (120 - 60) + 15 - 8 = 247
+    """
+    company = _company(
+        db, "FCFECFWC", company_type="insurer", valuation_model="fcfe_equity_value"
+    )
+    facts = {key: value for key, value in FCFE_FACTS.items() if key != "delta_working_capital"}
+    facts["change_in_working_capital"] = -8.0
+    _facts(db, company, facts)
+    _price(db, company, 20.0)
+    context = FreeCashFlowToEquityEngine().build_context(db, company, 20.0)
+    result = FreeCashFlowToEquityEngine().value(context)
+
+    assert result["fcfe"]["bridge"]["fcfe"] == pytest.approx(247.0)
+    assumptions = result["trace"]["assumptions"]
+    assert assumptions["delta_working_capital"] == pytest.approx(8.0)
+    assert assumptions["delta_working_capital_source"] == "negated_cash_flow_change_in_working_capital"
