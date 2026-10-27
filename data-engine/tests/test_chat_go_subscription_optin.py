@@ -173,18 +173,19 @@ def test_si_go_falla_groq_responde_sin_esperar_la_ventaja():
     assert time.monotonic() - start < 3.0
 
 
-def test_la_ventaja_por_defecto_solo_se_aplica_con_primario_go():
+def test_go_tiene_dos_tercios_del_plazo_antes_del_respaldo():
     settings = _race_settings()
     chain = create_chat_llm_provider(settings)
     assert chain.primary.name == GO_SUBSCRIPTION_PROVIDER
-    assert chain.delay == settings.chat_go_head_start_seconds == 2.0
+    # Sin carrera: Go tiene 2/3 del presupuesto del chat antes del respaldo.
+    assert chain.delay == settings.chat_total_timeout_seconds * 2 / 3
     off = create_chat_llm_provider(_settings(
         chat_go_subscription_enabled=False,
         opencode_go_model="deepseek-v4.1-flash-free",
         groq_chat_fallback_enabled=True, groq_api_key="g-test",
         groq_free_plan_confirmed=True, groq_zdr_confirmed=True,
     ))
-    assert off.delay == 2
+    assert off.delay == off.total * 2 / 3
 
 
 def test_go_primario_eleva_max_tokens_a_2600_sin_tocar_otros_proveedores():

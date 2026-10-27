@@ -56,10 +56,11 @@ async def test_429_uses_independent_provider_with_pinned_model():
 
 
 @run_async
-async def test_slow_primary_remains_eligible_and_backup_cancelled():
-    p, b = Fake(delay=.08), Fake(delay=.2)
-    out = await ChatFallbackProvider(p, b, total=.3, delay=.03).complete(LLMRequest([Message("user", "hola")], task="chat"))
-    assert out.provider == "opencode-go" and b.cancelled
+async def test_slow_primary_within_its_budget_wins_and_backup_never_starts():
+    # Sin carrera (2026-10-27): el respaldo solo arranca si Go falla o agota su plazo.
+    p, b = Fake(delay=.08), Fake(delay=.01)
+    out = await ChatFallbackProvider(p, b, total=.3, delay=.2).complete(LLMRequest([Message("user", "hola")], task="chat"))
+    assert out.provider == "opencode-go" and not b.calls
 
 
 @run_async
@@ -127,10 +128,10 @@ async def test_real_adapter_envelope_is_groq_not_deepseek():
 
 
 @run_async
-async def test_backup_failure_still_allows_slow_valid_primary():
+async def test_slow_valid_primary_never_touches_a_failing_backup():
     p, b = Fake(delay=.08), Fake(ProviderHTTPError("groq", 429))
-    out = await ChatFallbackProvider(p, b, total=.3, delay=.01).complete(LLMRequest([Message("user", "hola")], task="chat"))
-    assert out.provider == "opencode-go"
+    out = await ChatFallbackProvider(p, b, total=.3, delay=.2).complete(LLMRequest([Message("user", "hola")], task="chat"))
+    assert out.provider == "opencode-go" and not b.calls
 
 
 @run_async
@@ -224,13 +225,14 @@ async def test_invalid_fast_backup_keeps_valid_slow_primary_through_synthesis(ba
         invalid = json.dumps(payload)
     p = Fake(response(valid, model="valid-primary"), delay=.08)
     b = Fake(response(invalid, model=GROQ_MODEL, provider="groq"), delay=.01)
-    provider = ChatFallbackProvider(p, b, total=.4, delay=.001)
+    provider = ChatFallbackProvider(p, b, total=.4, delay=.25)
     result = await ChatSynthesisService(provider).synthesize(
         question="Resumen sintético", ticker="AAA", baseline=_baseline(), enable_debate=False,
     )
     assert result.model == "valid-primary"
     assert result.llm_trace["citation_verification"] is True
-    assert not p.cancelled and b.calls
+    # Go respondio dentro de su plazo: el respaldo (invalido) ni se llama.
+    assert not p.cancelled and not b.calls
 
 
 @run_async
@@ -239,10 +241,10 @@ async def test_invalid_fast_general_backup_preserves_valid_slow_primary():
     from app.services.chat_synthesis_service import ChatSynthesisService
     p = Fake(response("Respuesta breve en español.", model="valid-primary"), delay=.08)
     b = Fake(response("The company is profitable and the earnings are growing.", model=GROQ_MODEL, provider="groq"), delay=.01)
-    result = await ChatSynthesisService(ChatFallbackProvider(p, b, total=.4, delay=.001)).synthesize_general(
+    result = await ChatSynthesisService(ChatFallbackProvider(p, b, total=.4, delay=.25)).synthesize_general(
         question="Cuéntame algo", baseline=ChatResponse(answer="", sources=[]),
     )
-    assert result.model == "valid-primary" and not p.cancelled
+    assert result.model == "valid-primary" and not p.cancelled and not b.calls
 
 
 def test_candidate_validation_context_is_per_call_not_shared():
@@ -289,10 +291,11 @@ async def test_primary_bad_language_cannot_cancel_valid_backup():
     assert result.model == GROQ_MODEL and len(p.calls) == 1 and not b.cancelled
 
 
-def test_default_free_backup_hedge_does_not_wait_25_seconds():
+def test_default_primary_budget_is_two_thirds_of_the_total():
+    # Ya no es una ventaja de 2 s: es el plazo de Go antes de pasar al respaldo.
     provider = ChatFallbackProvider(Fake(), Fake())
-    assert provider.delay == 2
-    assert provider.with_candidate_validator(lambda _: None).delay == 2
+    assert provider.delay == 30
+    assert provider.with_candidate_validator(lambda _: None).delay == 30
 
 
 @run_async
@@ -543,15 +546,11 @@ async def test_fallback_trail_lists_each_failed_backup_and_empty_for_primary():
 
 
 @run_async
-async def test_fallback_trail_labels_a_pending_primary_as_pending_not_timeout():
-    """Si el respaldo gana la carrera mientras el primario sigue pendiente, NO se inventa un TimeoutError."""
-    class Slow(Fake):
-        async def complete(self, request):
-            await asyncio.sleep(5)
-            return await super().complete(request)
-
-    out = await ChatFallbackProvider(Slow(), Fake(response(model=GROQ_MODEL, provider="groq")), total=2, delay=.05).complete(
+async def test_fallback_trail_labels_a_primary_out_of_budget_as_timeout():
+    """Go agota su plazo: se cancela y solo entonces responde el respaldo."""
+    slow = Fake(delay=5)
+    out = await ChatFallbackProvider(slow, Fake(response(model=GROQ_MODEL, provider="groq")), total=2, delay=.05).complete(
         LLMRequest([Message("user", "hola")], task="chat"))
-    assert out.provider == "groq"
-    assert out.fallback_trail == ("fake:?:pending_when_fallback_won",)
+    assert out.provider == "groq" and slow.cancelled
+    assert out.fallback_trail == ("fake:?:timeout",)
     assert not any("TimeoutError" in t for t in out.fallback_trail)

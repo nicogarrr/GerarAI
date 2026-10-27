@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.llm import LLMRequest, Message, ResponseFormat, parse_json_response
 from app.llm.base import LLMProvider
+from app.llm.chat_provider import fallback_notice
 from app.llm.interactive_deadline import complete_with_deadline
 from app.schemas import ChatResponse, SynthesisSection
 from app.services.budget import BudgetController, BudgetExceededError
@@ -522,6 +523,18 @@ def _history_for_prompt(history: list[Any] | None) -> list[dict[str, str]]:
     return kept
 
 
+def _with_fallback_notice(answer: str, response: Any) -> str:
+    """Antepone «Respondido por respaldo (...) porque OpenCode Go falló: ...».
+
+    Decision del dueno (2026-10-27): una respuesta de respaldo nunca se
+    presenta como si fuera de OpenCode Go.
+    """
+    notice = fallback_notice(response)
+    if not notice or not answer:
+        return answer
+    return f"{notice}\n\n{answer}"
+
+
 class ChatSynthesisService:
     def __init__(self, provider: LLMProvider, tracer: LangfuseTracer | None = None) -> None:
         self.provider = provider
@@ -676,7 +689,7 @@ class ChatSynthesisService:
                 baseline.sections = sections
                 # Lo visible es la prosa natural; las secciones verificadas
                 # quedan plegadas con sus citas.
-                baseline.answer = (payload.get("answer") or "").strip()
+                baseline.answer = _with_fallback_notice((payload.get("answer") or "").strip(), response)
                 baseline.prompt_version = PROMPT_VERSION
                 baseline.model = response.model
                 baseline.confidence = confidence
@@ -956,7 +969,7 @@ class ChatSynthesisService:
             or (_plain(str(source.get("title") or "")) and _plain(str(source.get("title") or "")) in answer_plain)
         ]
         return ChatResponse(
-            answer=text,
+            answer=_with_fallback_notice(text, guarded.response),
             # La doctrina consultada viaja como fuente visible y plegable
             # (esquema unificado); sin doctrina usada la prosa no se presenta
             # como respaldada.
