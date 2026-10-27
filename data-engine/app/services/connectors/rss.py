@@ -11,6 +11,7 @@ from xml.etree import ElementTree
 import httpx
 
 from app.services.connectors.base import ConnectorItem, ConnectorResult
+from app.services.public_fetch import fetch_public_url_async
 
 
 def _local_name(tag: str) -> str:
@@ -62,18 +63,17 @@ class RSSConnector:
             "Accept": "application/atom+xml, application/rss+xml, application/xml, text/xml",
         }
 
-    async def _fetch(self, url: str) -> httpx.Response:
+    async def _fetch(self, url: str) -> bytes:
         if self.client is not None:
             response = await self.client.get(url, headers=self.headers)
-        else:
-            async with httpx.AsyncClient(
-                timeout=self.timeout,
-                follow_redirects=True,
-                headers=self.headers,
-            ) as client:
-                response = await client.get(url)
-        response.raise_for_status()
-        return response
+            response.raise_for_status()
+            return response.content
+        # Sin cliente inyectado: pasa por public_fetch (bloquea IPs privadas,
+        # fija la IP resuelta y revalida cada redirección).
+        content, _content_type, _final_url = await fetch_public_url_async(
+            url, timeout=self.timeout, headers=self.headers
+        )
+        return content
 
     async def poll(
         self,
@@ -84,8 +84,8 @@ class RSSConnector:
     ) -> ConnectorResult:
         metadata: dict[str, Any] = {"feed_url": url, "ticker": ticker}
         try:
-            response = await self._fetch(url)
-            root = ElementTree.fromstring(response.content)
+            content = await self._fetch(url)
+            root = ElementTree.fromstring(content)
             feed_title, entries = self._entries(root)
             metadata["feed_title"] = feed_title
             items: list[ConnectorItem] = []

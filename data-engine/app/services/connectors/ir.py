@@ -8,6 +8,7 @@ from urllib.parse import urldefrag, urljoin, urlparse
 import httpx
 
 from app.services.connectors.base import ConnectorItem, ConnectorResult
+from app.services.public_fetch import fetch_public_url_async
 
 PRESS_PAGE_RE = re.compile(
     r"(?:news(?:room|-and-events|-events)?|press(?:-releases)?|media|releases)",
@@ -94,6 +95,18 @@ def discover_press_release_links(html_text: str, base_url: str) -> list[tuple[st
     return releases
 
 
+def _decode_html(content: bytes, content_type: str | None) -> str:
+    charset = None
+    if content_type:
+        match = re.search(r"charset=([\w.-]+)", content_type, re.IGNORECASE)
+        if match:
+            charset = match.group(1)
+    try:
+        return content.decode(charset or "utf-8", errors="replace")
+    except LookupError:
+        return content.decode("utf-8", errors="replace")
+
+
 class IRConnector:
     """Discover and poll public investor-relations pages for release links."""
 
@@ -114,15 +127,14 @@ class IRConnector:
     async def _fetch(self, url: str) -> str:
         if self.client is not None:
             response = await self.client.get(url, headers=self.headers)
-        else:
-            async with httpx.AsyncClient(
-                timeout=self.timeout,
-                follow_redirects=True,
-                headers=self.headers,
-            ) as client:
-                response = await client.get(url)
-        response.raise_for_status()
-        return response.text
+            response.raise_for_status()
+            return response.text
+        # Sin cliente inyectado: pasa por public_fetch (bloquea IPs privadas,
+        # fija la IP resuelta y revalida cada redirección).
+        content, content_type, _final_url = await fetch_public_url_async(
+            url, timeout=self.timeout, headers=self.headers
+        )
+        return _decode_html(content, content_type)
 
     async def poll(
         self,
