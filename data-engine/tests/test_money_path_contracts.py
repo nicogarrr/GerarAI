@@ -74,6 +74,25 @@ def test_is_number_accepts_both_locales(raw):
     assert _is_number(raw) is True
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("0,250", Decimal("0.250")),  # dividendo por accion es-ES, 3 decimales
+        ("0.250", Decimal("0.250")),
+        ("-0,125", Decimal("-0.125")),
+        ("(0.125)", Decimal("-0.125")),
+        ("00,500", Decimal("0.500")),
+        ("1,250", Decimal("1250")),  # con parte entera distinta de 0 sigue siendo miles
+        ("1.250", Decimal("1250")),
+    ],
+)
+def test_zero_integer_part_is_always_a_decimal_separator(raw, expected):
+    """Un grupo de miles nunca empieza por 0: "0,250" es 0,25 y no 250."""
+    parsed = parse_localized_number(raw)
+    assert parsed is not None, raw
+    assert parsed[0] == expected
+
+
 @pytest.mark.parametrize("raw", ["", None, "abc", "12abc", "1.2.3.4x"])
 def test_is_number_rejects_garbage(raw):
     assert _is_number(raw) is False
