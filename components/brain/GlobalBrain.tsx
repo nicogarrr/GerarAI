@@ -13,7 +13,7 @@ import { brainStorageKey, restoreConversation, serializeConversation, BRAIN_SUGG
 import { chatWithPortfolio } from '@/lib/actions/brain.actions';
 import { askResearchAssistantAction } from '@/lib/research/assistant-actions';
 import type { AssistantResponse } from '@/lib/research/assistant-contract';
-import { markBrainReady, OPEN_BRAIN_PENDING_KEY, type OpenBrainDetail } from '@/lib/brain/open-brain';
+import { markBrainReady, brainHandoffContext, OPEN_BRAIN_PENDING_KEY, type OpenBrainDetail } from '@/lib/brain/open-brain';
 import { brainPageContext } from '@/lib/brain/page-context';
 import { BrainGuideAnswer } from './BrainGuideAnswer';
 import dynamic from 'next/dynamic';
@@ -98,14 +98,11 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     }, []);
 
     function applyOpenBrainDetail(detail?: OpenBrainDetail | null) {
-        if (!detail) return;
-        if (detail.ticker && /^[A-Z0-9.\-]{1,20}$/i.test(detail.ticker)) {
-            setGuideTicker(detail.ticker.toUpperCase());
-        }
-        if (typeof detail.review_id === 'number' && Number.isSafeInteger(detail.review_id) && detail.review_id > 0) {
-            setReviewId(detail.review_id);
-        }
-        if (detail.question) setInput(detail.question.slice(0, 2000));
+        // Cada apertura sustituye el anclaje anterior, incluso sin review_id.
+        const context = brainHandoffContext(detail);
+        setGuideTicker(context.ticker);
+        setReviewId(context.reviewId);
+        if (detail?.question) setInput(detail.question.slice(0, 2000));
     }
 
     useEffect(() => {

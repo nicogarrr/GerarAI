@@ -46,3 +46,13 @@ export function openBrain(detail: OpenBrainDetail): void {
         // sessionStorage bloqueado: el usuario abre el Cerebro a mano.
     }
 }
+
+/** El contexto de una apertura nunca hereda ticker ni revisión de otra. */
+export function brainHandoffContext(detail?: OpenBrainDetail | null): { ticker: string; reviewId: number | undefined } {
+    const ticker = detail?.ticker && /^[A-Z0-9.\-]{1,20}$/i.test(detail.ticker) ? detail.ticker.toUpperCase() : '';
+    const id = detail?.review_id;
+    return {
+        ticker,
+        reviewId: ticker && typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : undefined,
+    };
+}
