@@ -72,6 +72,12 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
     const spec = status.providers.find((entry) => entry.id === provider);
     const isCustom = spec?.requires_custom_url === true;
     const canStoreKey = status.encryption_available;
+    // The tenant test cannot use platform credentials. A saved key is bound
+    // to its provider and URL; changing either requires a new key.
+    const hasTestKey = Boolean(apiKey.trim()) || Boolean(
+        status.api_key_configured && !clearApiKey && provider === status.provider
+        && (!isCustom || baseUrl.trim() === status.base_url),
+    );
 
     function changeProvider(next: string) {
         setProvider(next);
@@ -113,6 +119,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
     }
 
     async function testConnection() {
+        if (!hasTestKey) return;
         setTesting(true);
         setTestResult(null);
         try {
@@ -128,8 +135,12 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
             } else {
                 toast.error(result.message);
             }
-        } catch (cause) {
-            showErrorToast(cause);
+        } catch {
+            // Never reflect an upstream URL/key. Keep recovery in the form,
+            // including production Server Action errors whose text is masked.
+            const message = 'No se pudo comprobar tu clave. Revisa proveedor y clave API; si sigue fallando, vuelve a intentarlo más tarde.';
+            setTestResult({ ok: false, status_code: null, provider, base_url: '', model, message });
+            toast.error(message);
         } finally {
             setTesting(false);
         }
@@ -304,12 +315,17 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 </p>
             ) : null}
 
+            <p className="text-xs text-gray-400" id="llm-test-help">
+                Esta prueba comprueba tu clave API propia, no el proveedor de GerarAI.
+                {hasTestKey ? ' Consulta la conexión sin generar texto ni consumir tokens.' : ' Introduce una clave para habilitarla. No necesitas una clave propia para usar la IA de GerarAI.'}
+            </p>
             <div className="flex flex-wrap gap-2">
                 <Button disabled={busy || !model.trim()} type="submit">
                     {busy ? 'Guardando...' : 'Guardar'}
                 </Button>
                 <Button
-                    disabled={busy || testing || !model.trim()}
+                    aria-describedby="llm-test-help"
+                    disabled={busy || testing || !model.trim() || !hasTestKey}
                     onClick={() => void testConnection()}
                     type="button"
                     variant="outline"
