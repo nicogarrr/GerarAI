@@ -1072,7 +1072,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         <Panel collapsible="mobile"
           actions={
             <Link
-              className="text-sm text-teal-300 hover:text-teal-200"
+              className="inline-flex min-h-[44px] items-center sm:min-h-0 text-sm text-teal-300 hover:text-teal-200"
               href={`/research/news?ticker=${encodeURIComponent(ticker)}`}
             >
               Ver todas
@@ -1108,7 +1108,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         <Panel collapsible="mobile"
           actions={
             <Link
-              className="text-sm text-teal-300 hover:text-teal-200"
+              className="inline-flex min-h-[44px] sm:min-h-0 items-center text-sm text-teal-300 hover:text-teal-200"
               href={`/research/${encodeURIComponent(ticker)}?view=changes`}
             >
               Ver todos los cambios
