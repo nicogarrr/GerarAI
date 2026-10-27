@@ -364,7 +364,7 @@ export function DecisionAndRealityPanel({
   const selectClass = 'h-10 rounded-md border border-gray-700 bg-gray-900 px-3 text-sm text-gray-200';
   return (
     <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="rounded-lg border border-gray-800 bg-surface-1 p-5">
+      <div className="scroll-mt-24 rounded-lg border border-gray-800 bg-surface-1 p-5" id="diario-decisiones">
         <div className="mb-4 flex items-center gap-2">
           <GitBranch aria-hidden="true" className="h-5 w-5 text-teal-300" />
           <h2 className="text-lg font-semibold text-gray-100">Diario de decisiones</h2>

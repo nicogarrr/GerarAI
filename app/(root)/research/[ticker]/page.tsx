@@ -1219,6 +1219,19 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             ))}
           </div>
         </Panel>
+        {/*
+            Entrada visible (también en móvil) al diario de decisiones: el
+            formulario «Decisión» vive en ?view=changes y antes no había forma
+            de llegar a él desde el resumen de la ficha.
+        */}
+        <Link
+          className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg border border-gray-800 bg-surface-1 px-4 py-3 text-sm text-gray-200 transition hover:border-teal-700 hover:text-teal-200"
+          data-testid="decision-journal-entry"
+          href={`/research/${encodeURIComponent(ticker)}?view=changes#diario-decisiones`}
+        >
+          <span>¿Has comprado, vendido o decidido esperar? Apúntalo en tu diario de decisiones.</span>
+          <span className="shrink-0 font-medium text-teal-300">Registrar una decisión →</span>
+        </Link>
         <OwnershipSignalsPanel signals={ownershipSignals} ticker={ticker} />
         {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><p className="text-sm text-gray-400">Elementos orbitales de CelesTrak y evolución del semieje mayor.</p><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
