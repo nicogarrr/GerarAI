@@ -392,10 +392,13 @@ class Settings(BaseSettings):
     # por ticker. DCA_ALERT_TRIMS: avisar tambien de las zonas de recorte.
     # DCA_ALERT_CHANNELS: canales base; Telegram se anade solo si el tenant
     # tiene suscripcion "dca_levels" con chat vinculado.
-    dca_alerts_enabled: bool = True
+    # Apagado por defecto: activarlo es una decision explicita (env), nunca un
+    # efecto del despliegue. Con el default anterior (True + email) cada tenant
+    # recibia avisos por correo sin haberlo aprobado.
+    dca_alerts_enabled: bool = False
     dca_alert_min_level: int = Field(default=2, ge=1, le=4)
     dca_alert_trims: bool = False
-    dca_alert_channels: str = "in_app,email"
+    dca_alert_channels: str = "in_app"
     # Langfuse Cloud EU shadow tracing (stage 3): SOLO observabilidad.
     # Apagado por defecto; nunca es fuente de verdad de negocio (eso es
     # Postgres). Sin payloads: solo metadatos de la allowlist. Muestreo del
