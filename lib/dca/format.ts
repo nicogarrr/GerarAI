@@ -43,3 +43,11 @@ export function dcaSignalMetric(state: DcaSignalState, signalMonths: number | nu
     const drawdown = dcaPercent(metrics.drawdown);
     return drawdown ? { label: 'Caída desde máximo 36m', value: drawdown } : null;
 }
+
+/** Edad de los datos de la señal («hoy», «hace 1 día», «hace 9 días»). */
+export function dcaDataAge(days: number | null | undefined): string | null {
+    if (typeof days !== 'number' || !Number.isFinite(days) || days < 0) return null;
+    const whole = Math.floor(days);
+    if (whole === 0) return 'hoy';
+    return whole === 1 ? 'hace 1 día' : `hace ${whole} días`;
+}

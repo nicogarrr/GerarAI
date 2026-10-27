@@ -1,6 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DcaSignalItem } from '@/lib/dca/types';
-import { DCA_STATUS_LABEL, dcaPrice, dcaRsi, dcaSignalMetric } from '@/lib/dca/format';
+import { DCA_STATUS_LABEL, dcaDataAge, dcaPrice, dcaRsi, dcaSignalMetric } from '@/lib/dca/format';
 
 interface DcaLevelBadgeProps {
     item: DcaSignalItem | undefined;
@@ -21,20 +21,23 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
         );
     }
     const forming = state.status === 'forming';
+    const stale = state.stale === true;
+    const age = dcaDataAge(state.data_age_days);
+    const staleText = stale ? (age ? `desactualizado · ${age}` : 'desactualizado') : null;
     const metric = dcaSignalMetric(state, signalMonths);
     const rsi = dcaRsi(state.metrics?.rsi);
     const close = dcaPrice(state.close, state.currency_label);
     const prices = (['2x', '3x', '4x'] as const)
         .map((key) => ({ key, value: dcaPrice(state.level_prices?.[key], state.currency_label) }))
         .filter((entry) => entry.value);
-    return (
+    const badge = (
         <Tooltip>
             <TooltipTrigger asChild>
                 <button
                     type="button"
                     className="inline-flex min-h-6 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
                     style={{ backgroundColor: state.color, color: state.fg, borderColor: state.color === '#FFFFFF' ? '#9CA3AF' : state.color }}
-                    aria-label={`${item?.symbol ?? ''}: ${state.label}, ${DCA_STATUS_LABEL[state.status] ?? state.status}`}
+                    aria-label={`${item?.symbol ?? ''}: ${state.label}, ${DCA_STATUS_LABEL[state.status] ?? state.status}${staleText ? `, ${staleText}` : ''}`}
                 >
                     {state.label}
                     {forming ? <span aria-hidden="true" className="opacity-70">·</span> : null}
@@ -50,8 +53,22 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                     <p>Cierre que activaría: {prices.map((entry) => `${entry.key.toUpperCase()} ${entry.value}`).join(' · ')}</p>
                 ) : null}
                 {forming ? <p className="text-gray-400">El mes no ha cerrado: el veredicto puede cambiar.</p> : null}
+                {stale ? (
+                    <p className="text-amber-300">
+                        Datos desactualizados{age ? ` (último cierre ${age})` : ''}: el nivel puede no ser el actual.
+                    </p>
+                ) : null}
                 <p className="text-gray-500">Apoyo a la decisión, no asesoramiento financiero.</p>
             </TooltipContent>
         </Tooltip>
+    );
+    if (!staleText) return badge;
+    return (
+        <span className="inline-flex max-w-full flex-wrap items-center gap-1">
+            {badge}
+            <span data-testid="dca-stale" className="text-[10px] leading-tight text-amber-400 whitespace-nowrap">
+                {staleText}
+            </span>
+        </span>
     );
 }
