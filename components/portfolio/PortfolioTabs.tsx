@@ -12,6 +12,7 @@ import PortfolioSummary from '@/components/portfolio/PortfolioSummary';
 import { hasCostBasis } from '@/lib/portfolio-insight';
 import { windowNav } from '@/lib/portfolio-nav';
 import PortfolioHoldings from '@/components/portfolio/PortfolioHoldings';
+import AddTransactionButton from '@/components/portfolio/AddTransactionButton';
 import PortfolioTransactions from '@/components/portfolio/PortfolioTransactions';
 import PortfolioAllocation from '@/components/portfolio/PortfolioAllocation';
 const PortfolioNavChart = dynamic(() => import('./PortfolioNavChart'), {
@@ -112,7 +113,7 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-[1600px] flex-col overflow-x-clip p-4 pb-24 sm:p-4 sm:pb-24 lg:p-6 lg:pb-24">
                 {/* Header */}
                 <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex w-full items-center gap-3">
+                    <div className="flex w-full flex-wrap items-center gap-3">
                         <div className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 flex items-center justify-center">
                             <Wallet aria-hidden="true" className="h-5 w-5 text-white" />
                         </div>
@@ -121,7 +122,13 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
 
                             <p className="mt-0.5 text-xs text-gray-500">Precios con ~15 min de retardo durante el horario de mercado (Yahoo Finance)</p>
                         </div>
-                        <RefreshPortfolioButton userId={userId} />
+                        {/* Acción principal de la página: antes solo existía dentro de la
+                            pestaña «Posiciones», y con la cartera vacía el «Resumen» era un
+                            callejón sin salida (auditoría UX 2026-10-27). */}
+                        <div className="flex items-center gap-2">
+                            <AddTransactionButton userId={userId} />
+                            <RefreshPortfolioButton userId={userId} />
+                        </div>
                     </div>
                 </div>
 
@@ -217,9 +224,12 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
                                     {formatMoney(summary.totalValue, summary.baseCurrency)}
                                 </p>
                                 {summary.holdings.length === 0 ? (
-                                    <p className="text-sm text-gray-500">
-                                        Sin posiciones todavía: el rendimiento aparecerá cuando registres la primera.
-                                    </p>
+                                    <div className="mt-2 space-y-3">
+                                        <p className="text-sm text-gray-400">
+                                            Aún no tienes posiciones. Registra tu primera compra y verás aquí el valor, la rentabilidad y el reparto de tu cartera.
+                                        </p>
+                                        <AddTransactionButton userId={userId} />
+                                    </div>
                                 ) : !hasCostBasis(summary) ? (
                                     <p className="text-sm text-gray-500">
                                         Rentabilidad no disponible: falta una base de coste válida. La cifra superior es el valor neto, no el beneficio del periodo.
