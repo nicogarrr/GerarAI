@@ -19,6 +19,7 @@
  */
 
 import { getSectorAverages } from '@/lib/actions/sectorData.actions';
+import { filterCandlesUpTo } from '@/lib/utils/candleCutoff';
 import { formatNumber, formatPercent } from '@/lib/format';
 import {
     dailyChangePoints,
@@ -156,6 +157,13 @@ export async function calculateAdvancedStockScore(
         : null;
     const resolvedAsOf = asOf
         ?? (lastCandleTs !== null ? new Date(lastCandleTs * 1000).toISOString() : new Date().toISOString());
+
+    // V3: el corte temporal FILTRA, no etiqueta. Ninguna vela posterior a
+    // resolvedAsOf entra en momentum ni en `facts` (antes `asOf` se
+    // devolvía como etiqueta mientras el cálculo consumía todas las velas).
+    const candles = historicalData ? filterCandlesUpTo(historicalData, resolvedAsOf) : undefined;
+    const explicitCutoff = asOf !== undefined;
+    const asOfTsSec = Date.parse(resolvedAsOf) / 1000;
 
     // Foto de métricas reales para trazabilidad (solo se rellena con valores no nulos).
     const facts: Record<string, number | string> = { sector };
@@ -301,9 +309,9 @@ export async function calculateAdvancedStockScore(
     categoryScores.cashFlow = Math.min(100, categoryScores.cashFlow);
 
     // ========== 5. MOMENTUM (Impulso) ==========
-    // Usar datos históricos si están disponibles
-    if (historicalData && historicalData.prices.length > 0) {
-        const prices = historicalData.prices;
+    // Usar datos históricos si están disponibles (ya filtrados por el corte)
+    if (candles && candles.prices.length > 0) {
+        const prices = candles.prices;
         const currentPrice = prices[prices.length - 1];
 
         // Retorno a 3 meses (aprox 63 días)
@@ -340,14 +348,21 @@ export async function calculateAdvancedStockScore(
         }
     }
 
+    // Con corte explícito, la cotización solo entra si su timestamp no es
+    // posterior al corte; sin timestamp demostrable no se usa (honestidad PIT).
+    const quoteTs = getNumeric((quote as Record<string, unknown>)?.t);
+    const quoteAfterCutoff = explicitCutoff
+        && (quoteTs === null || !Number.isFinite(asOfTsSec) || quoteTs > asOfTsSec);
+
     // Usar cambio diario si no hay datos históricos
-    if (quote.dp) {
+    if (quote.dp && !quoteAfterCutoff) {
         // quote.dp ya viene en % (Finnhub «Percent change»): umbrales +1 % / +2 %, con signo.
         categoryScores.momentum += dailyChangePoints(Number(quote.dp));
     }
 
-    // Comparación con S&P 500
-    if (indexComparison.vsSP500) {
+    // Comparación con S&P 500: snapshot externo sin fecha; con corte
+    // explícito no se puede demostrar point-in-time y se excluye.
+    if (indexComparison.vsSP500 && !explicitCutoff) {
         const vsSP500 = indexComparison.vsSP500.change || 0;
         categoryScores.momentum += vsSP500 > 5 ? 20 : vsSP500 > 0 ? 15 : vsSP500 > -5 ? 10 : 5;
 
@@ -430,10 +445,14 @@ export async function calculateAdvancedStockScore(
     snapshot('currentRatio', getMetric('currentRatioQuarterly', 'currentRatioAnnual', 'currentRatioTTM'));
     snapshot('quickRatio', getMetric('quickRatioQuarterly', 'quickRatioAnnual', 'quickRatioTTM'));
     snapshot('interestCoverage', getMetric('netInterestCoverageTTM', 'netInterestCoverageAnnual'));
-    snapshot('price', getNumeric((quote as Record<string, unknown>)?.c ?? (quote as Record<string, unknown>)?.price));
+    // Precio en facts: con corte explícito es el de la última vela filtrada;
+    // `quote.c` es la cotización actual (futuro para el replay).
+    snapshot('price', explicitCutoff
+        ? (candles && candles.prices.length > 0 ? candles.prices[candles.prices.length - 1] : null)
+        : getNumeric((quote as Record<string, unknown>)?.c ?? (quote as Record<string, unknown>)?.price));
     snapshot('vsSP500', indexComparison.vsSP500?.change);
-    if (historicalData && historicalData.prices.length > 0) {
-        const priceList = historicalData.prices;
+    if (candles && candles.prices.length > 0) {
+        const priceList = candles.prices;
         const lastPrice = priceList[priceList.length - 1];
         const retBack = (back: number): number | null => {
             if (priceList.length <= back) return null;
