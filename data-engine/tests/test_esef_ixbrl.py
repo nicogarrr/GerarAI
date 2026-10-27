@@ -144,7 +144,71 @@ def test_build_package_payloads_happy_path(monkeypatch):
     assert len(p["sha256"]) == 64  # sha256 real del zip
     assert p["package_urls"]["2024-12-31"] == "https://x/2024.zip"
     rev = p["facts"]["ifrs-full:Revenue"]["iso4217:EUR"]
-    assert {e["end"] for e in rev if not e["dims"]} == {"2024-12-31", "2025-12-31"}
+    assert {e["end"] for e in rev if not e["dims"]} == {"2025-12-31"}
+    assert len(p["presentation_archive"]) == 2
+    assert p["requires_presentation_review"] is True
+    assert p["coverage"]["older_only_fact_keys_excluded"] > 0
+
+
+def test_package_presentations_keep_represented_and_original_scopes(monkeypatch):
+    import build_esef_snapshots as builder
+
+    from app.services.esef_package_sources import EsefPackageSource
+
+    lei = '635400TLVVBNXLFHWC59'
+    # Deliberately unsorted input; synthetic values with real Kerry perimeter
+    # example. These are not a substitute for issuer filings or live DB checks.
+    monkeypatch.setattr(builder, 'REVIEWED_PACKAGES', (
+        EsefPackageSource(lei, '2024-12-31', 'https://fixture/2024.zip'),
+        EsefPackageSource(lei, '2023-12-31', 'https://fixture/2023.zip'),
+    ))
+    original = DOC.replace('LEITEST00000000000001', lei).replace('2025', '2023').replace('6,757.6', '8,020.3')
+    latest = original.replace('8,020.3', '6,974.9')
+    # A concept only in the older report must remain in archive, not be silently
+    # promoted into the selected presentation as if scope were comparable.
+    latest = latest.replace('ifrs-full:Equity', 'ifrs-full:OtherEquity')
+
+    async def fetch(url):
+        return _zip_with_xhtml(original if '2023' in url else latest)
+
+    p = asyncio.run(builder.build_package_payloads('2026-10-27', fetch=fetch))[lei]
+    rev = lambda facts: next(e['val'] for e in facts['ifrs-full:Revenue']['iso4217:EUR'] if not e['dims'])
+    assert rev(p['facts']) == '6974900000.0'
+    assert [rev(a['facts']) for a in p['presentation_archive']] == ['8020300000.0', '6974900000.0']
+    assert 'ifrs-full:Equity' not in p['facts']
+    assert 'ifrs-full:Equity' in p['presentation_archive'][0]['facts']
+    assert p['selected_presentation']['source_url'] == 'https://fixture/2024.zip'
+    assert all(len(a['sha256']) == 64 for a in p['presentation_archive'])
+    assert p['coverage']['comparability'] == 'not_asserted_across_presentations'
+    assert p['coverage']['older_only_fact_keys_excluded'] == 1
+    assert p['requires_presentation_review'] is True
+
+
+def test_partial_package_build_cannot_reenable_history_replacement(monkeypatch):
+    import build_esef_snapshots as builder
+
+    from app.services.esef_package_sources import EsefPackageSource
+
+    lei = '635400TLVVBNXLFHWC59'
+    monkeypatch.setattr(builder, 'REVIEWED_PACKAGES', (
+        EsefPackageSource(lei, '2023-12-31', 'https://fixture/2023.zip'),
+        EsefPackageSource(lei, '2024-12-31', 'https://fixture/2024.zip'),
+    ))
+    valid = DOC.replace('LEITEST00000000000001', lei)
+    for rejected_old in ('missing_report', 'wrong_lei'):
+        async def fetch(url):
+            if '2024' in url:
+                return _zip_with_xhtml(valid)
+            if rejected_old == 'wrong_lei':
+                return _zip_with_xhtml(DOC.replace('LEITEST00000000000001', 'WRONGLEI'))
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w') as zf:
+                zf.writestr('pkg/readme.txt', 'no report')
+            return buf.getvalue()
+
+        p = asyncio.run(builder.build_package_payloads('2026-10-27', fetch=fetch))[lei]
+        assert len(p['presentation_archive']) == 1
+        assert p['requires_presentation_review'] is True
 
 
 def test_typed_dimensions_never_look_consolidated():

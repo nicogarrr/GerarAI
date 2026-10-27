@@ -1984,6 +1984,14 @@ class FinancialIngestionService:
         snapshot = esef_connector.read_esef_snapshot(ticker)
         if snapshot is None:
             raise RuntimeError(f"Sin snapshot ESEF local para {ticker}: por ahora solo hay cobertura de emisores IBEX revisados")
+        # Multi-package snapshots now preserve incompatible presentations in
+        # an archive instead of silently blending them. Their current facts
+        # may be narrower; reject BEFORE source creation/deletion/commit.
+        if snapshot.get("requires_presentation_review"):
+            raise RuntimeError(
+                "esef_presentation_review_required: snapshot preserves separate "
+                "filing presentations; automatic history replacement is blocked"
+            )
         from app.services.esef_issuer_mapping import (
             reviewed_isins_for_ticker,
             reviewed_names_for_ticker,
