@@ -25,15 +25,23 @@ def _off_loop() -> bool:
     return False
 
 
+
+def _draft_thesis(markdown: str, summary: str):
+    # Una ThesisVersion real: la puerta de publicación lee tenant_id,
+    # company_id y status. Borrador sin modelo posterior: vigente.
+    from app.models import ThesisVersion
+
+    return ThesisVersion(id=None, tenant_id=None, company_id=None, version=1, status="draft",
+                         thesis_markdown=markdown, executive_summary=summary)
+
+
 def test_thesis_debate_sync_work_off_the_event_loop(monkeypatch):
     init_db()
     calls: list[bool] = []
 
     def fake_latest(self, db, ticker):  # noqa: ARG001
         calls.append(_off_loop())
-        from types import SimpleNamespace
-
-        return SimpleNamespace(id=None, thesis_markdown="# t", executive_summary="s")
+        return _draft_thesis("# t", "s")
 
     monkeypatch.setattr("app.api.routes.thesis.ThesisService.latest", fake_latest)
     monkeypatch.setattr(
@@ -153,7 +161,7 @@ def test_thesis_debate_without_free_provider_returns_honest_503(monkeypatch):
     init_db()
     monkeypatch.setattr(
         "app.api.routes.thesis.ThesisService.latest",
-        lambda self, db, ticker: SimpleNamespace(id=None, thesis_markdown="# test", executive_summary=""),
+        lambda self, db, ticker: _draft_thesis("# test", ""),
     )
     monkeypatch.setattr(
         "app.api.routes.thesis.resolve_company",

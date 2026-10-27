@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.routes.thesis import router
+from app.models import ThesisVersion
 
 app = FastAPI()
 app.include_router(router, prefix="/api/thesis")
@@ -12,9 +13,16 @@ from app.core.database import init_db
 from app.llm.free_interactive import FreeLLMUnavailable
 
 
+def _draft_thesis() -> ThesisVersion:
+    # Una ThesisVersion real (no un SimpleNamespace): la puerta de publicación
+    # lee tenant_id/company_id/status. Borrador sin modelo posterior: vigente.
+    return ThesisVersion(id=None, tenant_id=None, company_id=None, version=1, status="draft",
+                         thesis_markdown="tesis", executive_summary="")
+
+
 def test_quota_exhausted_is_503_not_200(monkeypatch):
     init_db()
-    monkeypatch.setattr("app.api.routes.thesis.ThesisService.latest", lambda *a: SimpleNamespace(id=None, thesis_markdown="tesis", executive_summary=""))
+    monkeypatch.setattr("app.api.routes.thesis.ThesisService.latest", lambda *a: _draft_thesis())
     monkeypatch.setattr("app.api.routes.thesis.resolve_company", lambda *a: SimpleNamespace(id=None, ticker="EXEL"))
     seen = []
     monkeypatch.setattr("app.llm.free_interactive.create_free_interactive_provider", lambda: object())
@@ -33,7 +41,7 @@ def test_quota_exhausted_is_503_not_200(monkeypatch):
 
 def test_invalid_result_is_503_with_distinct_public_reason(monkeypatch):
     init_db()
-    monkeypatch.setattr("app.api.routes.thesis.ThesisService.latest", lambda *a: SimpleNamespace(id=None, thesis_markdown="tesis", executive_summary=""))
+    monkeypatch.setattr("app.api.routes.thesis.ThesisService.latest", lambda *a: _draft_thesis())
     monkeypatch.setattr("app.api.routes.thesis.resolve_company", lambda *a: SimpleNamespace(id=None, ticker="EXEL"))
     monkeypatch.setattr("app.llm.free_interactive.create_free_interactive_provider", lambda: object())
     async def invalid(*a, **kw):

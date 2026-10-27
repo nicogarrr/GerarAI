@@ -5,10 +5,20 @@ from sqlalchemy import select
 
 import main
 from app.core.database import SessionLocal
-from app.models import Claim, ClaimEvidence, Company, ThesisDiff, ThesisSection, ThesisVersion
+from app.models import (
+    Claim,
+    ClaimEvidence,
+    Company,
+    FundamentalModelVersion,
+    ThesisDiff,
+    ThesisSection,
+    ThesisVersion,
+)
 from app.seed import seed
 
 TICKER = "ASTS"
+# Modelo publicable propio del test (la DB de test es compartida: se borra por huella).
+MODEL_FINGERPRINT = "memo-test-input"
 
 
 def _clean() -> None:
@@ -22,6 +32,9 @@ def _clean() -> None:
             db.query(ThesisSection).delete()
             db.query(ThesisDiff).delete()
             db.query(ThesisVersion).filter(ThesisVersion.company_id == company.id).delete()
+            db.query(FundamentalModelVersion).filter(
+                FundamentalModelVersion.input_fingerprint == MODEL_FINGERPRINT
+            ).delete()
             db.commit()
     finally:
         db.close()
@@ -48,7 +61,15 @@ def _seed_two_versions() -> tuple[int, int]:
             rating="buy", data_confidence_score=65, source_coverage_score=72,
             red_team_score=82, valuation_risk_score=38,
         )
-        db.add_all([v1, v2])
+        # v1 está «published» con cifras: la puerta de publicación exige un
+        # modelo publicable vigente para mostrarla (si no, sale archivada).
+        model = FundamentalModelVersion(
+            company_id=company.id, version=1, engine_version="test", algorithm_version="test",
+            framework_key="dcf", horizon_years=10, status="ok", publishable=True,
+            input_fingerprint=MODEL_FINGERPRINT, forecast_fingerprint="forecast",
+            market_snapshot_fingerprint="market", valuation_snapshot_fingerprint="valuation",
+        )
+        db.add_all([v1, v2, model])
         db.flush()
         db.add(ThesisDiff(
             company_id=company.id, from_version_id=v1.id, to_version_id=v2.id,

@@ -182,6 +182,9 @@ def _mock_no_network(monkeypatch):
 
 def _clean_asts_evidence():
     """Aislamiento: la DB de test es compartida; borra evidencia ASTS previa."""
+    # El fixture autouse corre antes que el test: en una DB recién creada
+    # (fichero suelto o primer test del proceso) aún no hay tablas.
+    init_db()
     db = SessionLocal()
     try:
         company = db.scalar(select(Company).where(Company.ticker == "ASTS"))

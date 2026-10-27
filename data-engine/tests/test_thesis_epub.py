@@ -27,7 +27,7 @@ from sqlalchemy.pool import StaticPool
 
 import main
 from app.core.database import Base, get_db
-from app.models import Claim, Company, Tenant, ThesisSection, ThesisVersion
+from app.models import Claim, Company, FundamentalModelVersion, Tenant, ThesisSection, ThesisVersion
 from app.services.thesis_epub_service import (
     DISCLAIMER_ES,
     EPUB_MIMETYPE,
@@ -272,6 +272,16 @@ def client():
         rating="buy",
     )
     session.add(thesis)
+    # Tesis «final»: la puerta de publicación exige un modelo publicable
+    # vigente para mostrar su valoración (si no, sale archivada).
+    session.add(
+        FundamentalModelVersion(
+            company_id=company.id, version=1, engine_version="test", algorithm_version="test",
+            framework_key="dcf", horizon_years=10, status="ok", publishable=True,
+            input_fingerprint="epub-input", forecast_fingerprint="forecast",
+            market_snapshot_fingerprint="market", valuation_snapshot_fingerprint="valuation",
+        )
+    )
     session.flush()
 
     session.add(

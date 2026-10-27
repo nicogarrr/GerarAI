@@ -64,7 +64,17 @@ from sqlalchemy.pool import StaticPool
 
 import main
 from app.core.database import Base, get_db
-from app.models import Claim, ClaimEvidence, Company, Document, Position, Tenant, ThesisVersion, WatchItem
+from app.models import (
+    Claim,
+    ClaimEvidence,
+    Company,
+    Document,
+    FundamentalModelVersion,
+    Position,
+    Tenant,
+    ThesisVersion,
+    WatchItem,
+)
 from app.services.obsidian_export import (
     CompanyEntry,
     build_obsidian_vault,
@@ -224,7 +234,16 @@ def _obsidian_tenant_seed(session: Session, tenant_id: int, company: Company, ma
         rating="buy",
         tenant_id=tenant_id,
     )
-    session.add_all([position, watch, thesis])
+    # Tesis «final»: la puerta de publicación exige el modelo publicable
+    # vigente del mismo tenant para exportar su texto (si no, sale archivada).
+    model = FundamentalModelVersion(
+        company_id=company.id, version=1, engine_version="test", algorithm_version="test",
+        framework_key="dcf", horizon_years=10, status="ok", publishable=True,
+        input_fingerprint=f"input-{marker}", forecast_fingerprint="forecast",
+        market_snapshot_fingerprint="market", valuation_snapshot_fingerprint="valuation",
+        tenant_id=tenant_id,
+    )
+    session.add_all([position, watch, thesis, model])
     session.flush()
     claim = Claim(
         company_id=company.id,
