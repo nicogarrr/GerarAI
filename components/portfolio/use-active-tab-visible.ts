@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef } from 'react';
 
 /** Reveal the URL-selected tab without moving page scroll or keyboard focus. */
