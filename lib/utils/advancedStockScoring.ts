@@ -19,6 +19,7 @@
  */
 
 import { getSectorAverages } from '@/lib/actions/sectorData.actions';
+import { computeComparableCategoryScores } from '@/lib/utils/sectorMetrics';
 import { formatNumber, formatPercent } from '@/lib/format';
 import {
     dailyChangePoints,
@@ -183,14 +184,24 @@ export async function calculateAdvancedStockScore(
 
     // Comparar con sector (P/E bajo es mejor, pero depende del sector)
     if (pe !== null && pe > 0) {
-        const sectorPE = sectorMetrics?.avgPE || 25; // PE promedio del sector real
+        // V4: sin media real del sector el benchmark por defecto (25) es un
+        // criterio GENERICO absoluto, nunca «vs sector»: los textos con la
+        // comparacion solo salen con sectorMetrics reales.
+        const realSectorPE = sectorMetrics?.avgPE ?? null;
+        const sectorPE = realSectorPE ?? 25; // benchmark generico, NO sectorial
         const peScore = pe < sectorPE * 0.8 ? 30 : pe < sectorPE ? 25 : pe < sectorPE * 1.2 ? 20 : 15;
         categoryScores.value += peScore;
 
-        if (pe < sectorPE * 0.7) {
-            strengths.push(`PER bajo vs sector (${formatNumber(pe, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} vs ${formatNumber(sectorPE, { minimumFractionDigits: 1, maximumFractionDigits: 1 })})`);
+        if (realSectorPE !== null) {
+            if (pe < realSectorPE * 0.7) {
+                strengths.push(`PER bajo vs sector (${formatNumber(pe, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} vs ${formatNumber(realSectorPE, { minimumFractionDigits: 1, maximumFractionDigits: 1 })})`);
+            } else if (pe > realSectorPE * 1.5) {
+                weaknesses.push(`PER alto vs sector (${formatNumber(pe, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} vs ${formatNumber(realSectorPE, { minimumFractionDigits: 1, maximumFractionDigits: 1 })})`);
+            }
+        } else if (pe < sectorPE * 0.7) {
+            strengths.push(`PER bajo (${formatNumber(pe, { minimumFractionDigits: 1, maximumFractionDigits: 1 })})`);
         } else if (pe > sectorPE * 1.5) {
-            weaknesses.push(`PER alto vs sector (${formatNumber(pe, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} vs ${formatNumber(sectorPE, { minimumFractionDigits: 1, maximumFractionDigits: 1 })})`);
+            weaknesses.push(`PER alto (${formatNumber(pe, { minimumFractionDigits: 1, maximumFractionDigits: 1 })})`);
         }
     }
 
@@ -234,7 +245,9 @@ export async function calculateAdvancedStockScore(
         const sectorGrowth = (sectorMetrics?.avgRevenueGrowth ?? null);
         categoryScores.growth += revenueGrowthPoints(revenueGrowth, sectorGrowth);
 
-        if (sectorGrowth !== null && growth > sectorGrowth * 1.3) {
+        // V6: el multiplicador solo aplica con benchmark positivo; con sector
+        // en contraccion se compara directo (-5 % si supera a -10 %).
+        if (sectorGrowth !== null && growth > (sectorGrowth > 0 ? sectorGrowth * 1.3 : sectorGrowth)) {
             strengths.push(`Crecimiento superior al sector (${formatPercent(growth, { digits: 1 })} vs ${formatPercent(sectorGrowth, { digits: 1 })})`);
         }
     }
@@ -258,7 +271,8 @@ export async function calculateAdvancedStockScore(
         const sectorMargin = sectorMetrics?.avgNetMargin ?? null; // Margen promedio del sector real
         categoryScores.profitability += netMarginPoints(netMargin, sectorMargin);
 
-        if (sectorMargin !== null && margin > sectorMargin * 1.2) {
+        // V6: el multiplicador solo aplica con benchmark positivo.
+        if (sectorMargin !== null && margin > (sectorMargin > 0 ? sectorMargin * 1.2 : sectorMargin)) {
             strengths.push(`Margen neto superior al sector (${formatPercent(margin, { digits: 1 })} vs ${formatPercent(sectorMargin, { digits: 1 })})`);
         }
     }
@@ -286,9 +300,12 @@ export async function calculateAdvancedStockScore(
     if (fcfYield !== null && fcfYield > 0) {
         categoryScores.cashFlow += fcfYield > 0.05 ? 40 : fcfYield > 0.03 ? 35 : fcfYield > 0 ? 25 : 10;
         if (fcfYield > 0.05) strengths.push(`FCF yield alto (${formatPercent(fcfYield, { digits: 1 })})`);
-    } else if (priceToFcf && priceToFcf < 15) {
-        // Si yield falla pero P/FCF es bueno
+    } else if (priceToFcf !== null && priceToFcf > 0 && priceToFcf < 15) {
+        // Si yield falla pero P/FCF es bueno (positivo: un P/FCF negativo
+        // es FCF negativo, no una ganga; V5 le daba 30 puntos de caja).
         categoryScores.cashFlow += 30;
+    } else if (priceToFcf !== null && priceToFcf <= 0) {
+        weaknesses.push('FCF por acción negativo (P/FCF sin lectura de valor)');
     }
 
     if (cashFlowPerShare !== null && cashFlowPerShare > 0) {
@@ -370,8 +387,12 @@ export async function calculateAdvancedStockScore(
     if (debtToEquity !== null) {
         const dte = Math.abs(debtToEquity);
 
-        // Usar D/E promedio real del sector
-        const sectorNormalDte = sectorMetrics?.avgDebtToEquity || (
+        // V4: sin media real del sector el benchmark por defecto es un
+        // criterio GENERICO (heuristico por nombre de sector conocido o
+        // 1.5), nunca «vs sector»: los textos con la comparacion solo
+        // salen con sectorMetrics reales.
+        const realSectorDte = sectorMetrics?.avgDebtToEquity ?? null;
+        const sectorNormalDte = realSectorDte ?? (
             sector === 'Financial Services' ? 8.0 :
                 sector === 'Energy' ? 3.0 :
                     sector === 'Technology' ? 0.5 : 1.5
@@ -379,14 +400,18 @@ export async function calculateAdvancedStockScore(
 
         if (dte < sectorNormalDte * 0.7) {
             categoryScores.debtLiquidity += 35;
-            strengths.push(`Baja deuda vs sector (D/E: ${formatNumber(dte, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vs ${formatNumber(sectorNormalDte, { minimumFractionDigits: 1, maximumFractionDigits: 1 })})`);
+            strengths.push(realSectorDte !== null
+                ? `Baja deuda vs sector (D/E: ${formatNumber(dte, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vs ${formatNumber(realSectorDte, { minimumFractionDigits: 1, maximumFractionDigits: 1 })})`
+                : `Baja deuda (D/E: ${formatNumber(dte, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`);
         } else if (dte < sectorNormalDte) {
             categoryScores.debtLiquidity += 30;
         } else if (dte < sectorNormalDte * 1.5) {
             categoryScores.debtLiquidity += 20;
         } else {
             categoryScores.debtLiquidity += 10;
-            weaknesses.push(`Alta deuda vs sector (D/E: ${formatNumber(dte, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vs ${formatNumber(sectorNormalDte, { minimumFractionDigits: 1, maximumFractionDigits: 1 })})`);
+            weaknesses.push(realSectorDte !== null
+                ? `Alta deuda vs sector (D/E: ${formatNumber(dte, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vs ${formatNumber(realSectorDte, { minimumFractionDigits: 1, maximumFractionDigits: 1 })})`
+                : `Alta deuda (D/E: ${formatNumber(dte, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`);
         }
     }
 
@@ -460,14 +485,30 @@ export async function calculateAdvancedStockScore(
         categoryScores.debtLiquidity * SCORING_WEIGHTS.debtLiquidity
     );
 
+    // V7: el delta vs sector resta scores de la MISMA formula y el MISMO
+    // conjunto de metricas en ambos lados (computeComparableCategoryScores).
+    // Antes la empresa puntuaba con mas metricas y otras bandas que el
+    // sector: igualando multiplos comparables daba vsSector -15.
+    const companyComparable = computeComparableCategoryScores({
+        pe,
+        pb,
+        ps,
+        revenueGrowth: revenueGrowth !== null ? percentToRatio(revenueGrowth) : null,
+        netMargin: netMargin !== null ? percentToRatio(netMargin) : null,
+        roe: roe !== null ? percentToRatio(roe) : null,
+        roa: roa !== null ? percentToRatio(roa) : null,
+        debtToEquity,
+        currentRatio,
+    });
+
     // Comparar con promedios del sector (solo si hay datos reales)
     const vsSector = sectorData ? {
-        value: sectorAverages.value === null ? null : categoryScores.value - sectorAverages.value,
-        growth: sectorAverages.growth === null ? null : categoryScores.growth - sectorAverages.growth,
-        profitability: sectorAverages.profitability === null ? null : categoryScores.profitability - sectorAverages.profitability,
-        cashFlow: sectorAverages.cashFlow === null ? null : categoryScores.cashFlow - sectorAverages.cashFlow,
-        momentum: sectorAverages.momentum === null ? null : categoryScores.momentum - sectorAverages.momentum,
-        debtLiquidity: sectorAverages.debtLiquidity === null ? null : categoryScores.debtLiquidity - sectorAverages.debtLiquidity,
+        value: sectorAverages.value === null || companyComparable.value === null ? null : companyComparable.value - sectorAverages.value,
+        growth: sectorAverages.growth === null || companyComparable.growth === null ? null : companyComparable.growth - sectorAverages.growth,
+        profitability: sectorAverages.profitability === null || companyComparable.profitability === null ? null : companyComparable.profitability - sectorAverages.profitability,
+        cashFlow: sectorAverages.cashFlow === null || companyComparable.cashFlow === null ? null : companyComparable.cashFlow - sectorAverages.cashFlow,
+        momentum: sectorAverages.momentum === null || companyComparable.momentum === null ? null : companyComparable.momentum - sectorAverages.momentum,
+        debtLiquidity: sectorAverages.debtLiquidity === null || companyComparable.debtLiquidity === null ? null : companyComparable.debtLiquidity - sectorAverages.debtLiquidity,
     } : {
         value: null, // Sin comparación disponible
         growth: null,
