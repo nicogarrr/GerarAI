@@ -49,6 +49,7 @@ from sqlalchemy.orm import Session
 
 from app.models import FinancialFact, MarketPrice
 from app.models.entities import Company
+from app.services.price_units import close_in_company_currency
 from app.services.split_adjustment import (
     cumulative_split_factor_after,
     period_end_date,
@@ -208,10 +209,20 @@ def refresh_derived_market_cap(
         _drop_derived()
         return {"status": "unavailable", "reason": "no_shares"}
     value, basis, split_factor = shares
+    # El cap va en la divisa de la compania; un cierre cotizado en otra
+    # divisa (SHEL.L en GBp con cuentas en USD) se convierte con FX
+    # point-in-time. Sin tipo valido: N/D, nunca peniques etiquetados USD.
+    close = close_in_company_currency(
+        db, Decimal(price.close), quote_currency=price.quote_currency,
+        company=company, on=price.date,
+    )
+    if close is None:
+        _drop_derived()
+        return {"status": "unavailable", "reason": "no_fx_for_quote_currency"}
     # La columna es Numeric(24,6): sin cuantizar a 6 decimales lo calculado
     # (una division larga) nunca iguala lo almacenado y cada GET reescribe
     # (medido con AENA: dos refrescos seguidos devolvian ok, no skipped).
-    market_cap = (Decimal(price.close) * value).quantize(Decimal("0.000001"))
+    market_cap = (close * value).quantize(Decimal("0.000001"))
     unit = str(getattr(company, "currency", "") or "USD")
     period = price.date.isoformat()
     adjusted = split_factor != 1
@@ -263,7 +274,8 @@ def refresh_derived_market_cap(
         "status": "ok",
         "market_cap": float(market_cap),
         "price_date": price.date.isoformat(),
-        "price": float(price.close),
+        "price": float(close),
+        "quote_currency": price.quote_currency,
         "shares_basis": basis,
         "split_factor": float(split_factor),
         "currency": str(getattr(company, "currency", "") or "USD"),

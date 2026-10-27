@@ -27,6 +27,7 @@ from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, MarketPrice, ProPickCandidate, ProPickRun
 from app.services import movers_cache
 from app.services.connectors.yahoo import yahoo_chart_symbol
+from app.valuation.currency import SUFFIX_QUOTE_UNIT, listing_quote_unit, normalize_currency
 
 # Dias de CALENDARIO (momentum_from_series resta timedelta(days=...)): 126/252
 # eran dias de bolsa y salian como ~4 y ~8 meses etiquetados 6m/12m.
@@ -54,6 +55,26 @@ _EXCHANGE_YAHOO_SUFFIX = {
     # XETRA -> .DE verificado contra Yahoo chart API 2026-09-27: SAP.DE =
     # exchange GER, divisa EUR, ~185,92 EUR (el ADR NYSE:SAP son ~210 USD).
     "XETRA": ".DE",
+    "DEUTSCHE BOERSE AG": ".DE",
+    # Londres y Euronext (verificado con yfinance 2026-10-27): SHEL.L = LSE en
+    # GBp, CGEO.L = LSE en GBp, MC.PA = Paris en EUR, ABI.BR = Bruselas en EUR,
+    # GALP.LS = Lisboa en EUR, ENI.MI = Milan en EUR. Ojo: el sufijo .L NO fija
+    # la divisa (SMSN.L y CSPX.L cotizan en USD); la divisa del precio es la que
+    # Yahoo declara para la cotizacion (PriceBar.quote_currency), nunca la de
+    # las cuentas de la empresa.
+    "LONDON STOCK EXCHANGE": ".L",
+    "EURONEXT PARIS": ".PA",
+    "NYSE EURONEXT - EURONEXT PARIS": ".PA",
+    "NYSE EURONEXT - PARIS": ".PA",
+    "EURONEXT BRUSSELS": ".BR",
+    "NYSE EURONEXT - EURONEXT BRUSSELS": ".BR",
+    "NYSE EURONEXT - BRUSSELS": ".BR",
+    "EURONEXT LISBON": ".LS",
+    "NYSE EURONEXT - EURONEXT LISBON": ".LS",
+    "NYSE EURONEXT - LISBON": ".LS",
+    "BORSA ITALIANA": ".MI",
+    "EURONEXT MILAN": ".MI",
+    "MILAN STOCK EXCHANGE": ".MI",
 }
 
 
@@ -86,10 +107,37 @@ def yahoo_symbol(company: Company) -> str | None:
     )
     if currency == "USD" and us_exchange:
         # La USD es evidencia de linea americana (bulk import UNKNOWN, NYSE,
-        # NASDAQ, OTC). Bolsa conocida no-US con USD (SHEL LSE/USD): la linea
-        # US no es el instrumento que declara la bolsa -> None.
+        # NASDAQ, OTC). Bolsa conocida no-US sin sufijo mapeado con USD: la
+        # linea US no es el instrumento que declara la bolsa -> None. (SHEL
+        # LSE/USD ya no llega aqui: Londres mapea a .L, la linea de Londres.)
         return ticker
     return None
+
+
+def _symbol_suffix(symbol: str) -> str | None:
+    text = symbol.strip().upper()
+    return "." + text.rsplit(".", 1)[1] if "." in text else None
+
+
+def bar_unit_is_known(company: Company, bar: PriceBar) -> bool:
+    """¿Se sabe en que divisa esta esta barra?
+
+    La divisa del precio es la que Yahoo declara para la cotizacion
+    (``quote_currency``). Sin ella, los lectores caen a la unidad del listado
+    deducida del ticker y de ``Company.currency`` (price_units). Esa deduccion
+    solo vale si coincide con la unidad por defecto de la plaza del simbolo
+    Yahoo: SHEL (LSE, cuentas en USD) -> SHEL.L cotiza en peniques, y una
+    barra sin divisa se leeria como 3.927 USD. En ese caso la barra no se
+    guarda: «sin precio» antes que un precio en otra divisa."""
+    if bar.quote_currency:
+        return True
+    symbol = yahoo_symbol(company) or (company.ticker or "")
+    suffix = _symbol_suffix(symbol)
+    venue_unit = SUFFIX_QUOTE_UNIT.get(suffix) if suffix else None
+    if venue_unit is None:
+        return True
+    declared_unit = listing_quote_unit(company.ticker, getattr(company, "currency", None))
+    return normalize_currency(venue_unit) == normalize_currency(declared_unit)
 
 
 @dataclass(frozen=True)
@@ -224,6 +272,8 @@ def upsert_prices(
     written = 0
     for bar in bars:
         if not _bar_is_final(company, bar, now):
+            continue
+        if not bar_unit_is_known(company, bar):
             continue
         values = {
             "company_id": company.id,

@@ -16,6 +16,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Company, FinancialFact, MarketPrice
+from app.services.price_units import close_in_company_currency
 from app.services.split_adjustment import (
     cumulative_split_factor_after,
     period_end_date,
@@ -150,7 +151,19 @@ def load_screener_ratios(
         if price is None and not use_live:
             output[company.ticker.upper()] = metrics
             continue
-        close = live_close if use_live else price.close
+        if use_live:
+            close = live_close
+        else:
+            # Cierre cotizado en otra divisa que las cuentas (SHEL.L en GBp,
+            # cuentas en USD): FX point-in-time a la divisa de la compania;
+            # sin tipo, ratios nulos (nunca peniques contra EPS en USD).
+            close = close_in_company_currency(
+                db, Decimal(str(price.close)), quote_currency=price.quote_currency,
+                company=company, on=price.date,
+            )
+            if close is None:
+                output[company.ticker.upper()] = metrics
+                continue
         price_provenance = (
             {"source": live.get("source") or "live", "date": live.get("as_of"), "id": None}
             if use_live
