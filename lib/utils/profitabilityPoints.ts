@@ -26,6 +26,12 @@ export function netMarginPoints(rawMarginPct: number, sectorMargin: number | nul
     // mas que el sector. El tramo relativo maximo exige ademas margen
     // claramente positivo; superar un benchmark en perdidas solo suma el
     // tramo intermedio.
+    // TRADEOFF documentado (review #2467): una empresa en perdidas puede
+    // puntuar 30 por ser "menos mala" que su sector (-5 % vs -10 %), mas
+    // que la misma empresa sin datos sectoriales (0). Es fuerza relativa
+    // INTENCIONADA: el score compara contra pares. Cambiarlo (puntos solo
+    // con margen > 0) es una decision de filosofia de scoring, no de
+    // correccion; se deja al dueno del producto.
     if (sectorMargin !== null) {
         if (sectorMargin > 0) {
             if (margin > sectorMargin * 1.3) return 35;
@@ -53,6 +59,7 @@ export function revenueGrowthPoints(rawGrowthPct: number, sectorGrowth: number |
     const growth = percentToRatio(rawGrowthPct);
     // V6: misma inversion que netMarginPoints: con sector en contraccion,
     // crecer -12 % superaba -10 % * 1,5 = -15 % y recibia el maximo (40).
+    // Mismo tradeoff de fuerza relativa documentado en netMarginPoints.
     if (sectorGrowth !== null) {
         if (sectorGrowth > 0) {
             if (growth > sectorGrowth * 1.5) return 40;

@@ -187,7 +187,9 @@ export async function calculateAdvancedStockScore(
         // V4: sin media real del sector el benchmark por defecto (25) es un
         // criterio GENERICO absoluto, nunca «vs sector»: los textos con la
         // comparacion solo salen con sectorMetrics reales.
-        const realSectorPE = sectorMetrics?.avgPE ?? null;
+        // Una media real 0 o negativa no es comparable economicamente:
+        // se trata como ausente (mismo criterio que null).
+        const realSectorPE = sectorMetrics?.avgPE != null && sectorMetrics.avgPE > 0 ? sectorMetrics.avgPE : null;
         const sectorPE = realSectorPE ?? 25; // benchmark generico, NO sectorial
         const peScore = pe < sectorPE * 0.8 ? 30 : pe < sectorPE ? 25 : pe < sectorPE * 1.2 ? 20 : 15;
         categoryScores.value += peScore;
@@ -391,7 +393,8 @@ export async function calculateAdvancedStockScore(
         // criterio GENERICO (heuristico por nombre de sector conocido o
         // 1.5), nunca «vs sector»: los textos con la comparacion solo
         // salen con sectorMetrics reales.
-        const realSectorDte = sectorMetrics?.avgDebtToEquity ?? null;
+        // Una media real 0 o negativa no es comparable: se trata como ausente.
+        const realSectorDte = sectorMetrics?.avgDebtToEquity != null && sectorMetrics.avgDebtToEquity > 0 ? sectorMetrics.avgDebtToEquity : null;
         const sectorNormalDte = realSectorDte ?? (
             sector === 'Financial Services' ? 8.0 :
                 sector === 'Energy' ? 3.0 :

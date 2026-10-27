@@ -122,7 +122,7 @@ describe('V4/V5: contratos de fuente del scorer', () => {
     });
 
     it('los textos «vs sector» de deuda solo salen con media real del sector', () => {
-        assert.match(source, /const realSectorDte = sectorMetrics\?\.avgDebtToEquity \?\? null/);
+        assert.match(source, /const realSectorDte = sectorMetrics\?\.avgDebtToEquity != null && sectorMetrics\.avgDebtToEquity > 0/);
         assert.match(source, /Baja deuda \(D\/E:/); // variante absoluta honesta
     });
 
@@ -130,6 +130,13 @@ describe('V4/V5: contratos de fuente del scorer', () => {
         assert.match(source, /priceToFcf !== null && priceToFcf > 0 && priceToFcf < 15/);
         assert.match(source, /priceToFcf !== null && priceToFcf <= 0/);
         assert.doesNotMatch(source, /priceToFcf && priceToFcf < 15/);
+    });
+
+    it('una media sectorial real 0 o negativa se trata como ausente (no comparable)', () => {
+        // Review #2467: con `?? null`, un avgPE=0 REAL pasaba a ser benchmark
+        // y todo PER positivo quedaba «alto vs sector (X vs 0,0)» con 15 pts.
+        assert.match(source, /avgPE > 0 \? sectorMetrics\.avgPE : null/);
+        assert.match(source, /avgDebtToEquity > 0 \? sectorMetrics\.avgDebtToEquity : null/);
     });
 
     it('vsSector usa la fórmula común, no los categoryScores de la empresa', () => {
