@@ -58,7 +58,7 @@ export default function BaseCurrencyForm({ initial }: { initial: PortfolioCurren
                 <label className="flex flex-col gap-1 text-sm text-gray-300">
                     Divisa base
                     <Select value={currency} onValueChange={setCurrency}>
-                        <SelectTrigger className="w-64" aria-label="Divisa base">
+                        <SelectTrigger className="w-64 data-[size=default]:h-11" aria-label="Divisa base">
                             <SelectValue placeholder="EUR" />
                         </SelectTrigger>
                         <SelectContent>

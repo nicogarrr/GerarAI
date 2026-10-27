@@ -436,7 +436,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                         size="icon"
                         onClick={() => setIsMaximized(!isMaximized)}
                         aria-label={isMaximized ? 'Restaurar el cerebro' : 'Maximizar el cerebro'}
-                        className="h-6 w-6 text-slate-400 hover:text-white"
+                        className="size-11 text-slate-400 hover:text-white"
                     >
                         {isMaximized ? <Minimize2 aria-hidden="true" className="h-4 w-4" /> : <Maximize2 aria-hidden="true" className="h-4 w-4" />}
                     </Button>
@@ -445,7 +445,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                         size="icon"
                         onClick={() => setIsOpen(false)}
                         aria-label="Cerrar el cerebro"
-                        className="h-6 w-6 text-slate-400 hover:text-white"
+                        className="size-11 text-slate-400 hover:text-white"
                     >
                         <X aria-hidden="true" className="h-4 w-4" />
                     </Button>
@@ -523,7 +523,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                                     key={text}
                                     type="button"
                                     onClick={() => { setInput(text); inputRef.current?.focus(); }}
-                                    className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:border-indigo-400 hover:text-indigo-200"
+                                    className="inline-flex min-h-11 items-center rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:border-indigo-400 hover:text-indigo-200"
                                 >
                                     {text}
                                 </button>

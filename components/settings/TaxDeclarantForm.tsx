@@ -88,6 +88,7 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                     <label className="space-y-1 text-sm text-gray-300" key={field.key}>
                         <span>{field.label}</span>
                         <Input
+                            className="h-11"
                             autoComplete={field.autoComplete}
                             disabled={busy}
                             onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
@@ -98,7 +99,7 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                 <label className="space-y-1 text-sm text-gray-300">
                     <span>Presentaste el 720 en ejercicios anteriores</span>
                     <select
-                        className="h-10 w-full rounded-lg border border-gray-600 bg-transparent px-3 text-sm"
+                        className="h-11 w-full rounded-lg border border-gray-600 bg-transparent px-3 text-sm"
                         disabled={busy}
                         onChange={(event) => setFiled(event.target.value)}
                         value={filed}
@@ -121,7 +122,7 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                                             <span>País de custodia</span>
                                             <Input
                                                 aria-label={`País de custodia de ${partidaLabel(key)}`}
-                                                className="w-24 uppercase"
+                                                className="h-11 w-24 uppercase"
                                                 id={`custody-country-${key}`}
                                                 placeholder="Ej. ES"
                                                 disabled={busy}
@@ -132,12 +133,13 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                                         </label>
                                     </div>
                                     <details className="mt-3">
-                                        <summary className="min-h-10 cursor-pointer py-2 text-teal-300">Entidad depositaria y fecha</summary>
+                                        <summary className="min-h-11 cursor-pointer py-2 text-teal-300">Entidad depositaria y fecha</summary>
                                         <div className="mt-2 grid gap-3 md:grid-cols-2">
                                             {ISIN.test(key) ? (
                                                 <label className="space-y-1">
                                                     <span>Primera adquisición</span>
                                                     <Input
+                                                        className="h-11"
                                                         disabled={busy}
                                                         onChange={(event) => setDates((current) => ({ ...current, [key]: event.target.value }))}
                                                         type="date"
@@ -149,6 +151,7 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                                                 <label className="space-y-1" key={field.key}>
                                                     <span>{field.label}</span>
                                                     <Input
+                                                        className="h-11"
                                                         disabled={busy}
                                                         onChange={(event) => setEntities((current) => ({
                                                             ...current,
