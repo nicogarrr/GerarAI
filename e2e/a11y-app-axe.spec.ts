@@ -35,10 +35,17 @@ async function audit(page: Page): Promise<AxeViolation[]> {
     const axe = (window as unknown as { axe: { run: (ctx: Document, opts: object) => Promise<{ violations: AxeViolation[] }> } }).axe;
     const result = await axe.run(document, {
       runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
-      rules: { "label-content-name-mismatch": { enabled: true } },
+      rules: { "label-content-name-mismatch": { enabled: true }, "heading-order": { enabled: true } },
     });
     return result.violations;
   });
+}
+
+async function expectAuthenticatedRoute(page: Page, path: string) {
+  await expect.poll(() => new URL(page.url()).pathname).toBe(path);
+  await expect(page.locator("main#content")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Buscar acciones|Search stocks/ })).toBeVisible();
+  await expect(page.locator("main#content").getByRole("heading", { level: 1 })).toBeVisible();
 }
 
 for (const vp of VIEWPORTS) {
@@ -48,6 +55,7 @@ for (const vp of VIEWPORTS) {
       const response = await page.goto(path);
       expect(response?.status(), `${path} respondio ${response?.status()}`).toBeLessThan(400);
       await page.waitForLoadState("networkidle").catch(() => undefined);
+      await expectAuthenticatedRoute(page, path);
       const violations = await audit(page);
       const report = violations
         .map((v) => `${v.id} (${v.impact}): ${v.help}\n  ${v.nodes.slice(0, 5).map((n) => n.target.join(" ")).join("\n  ")}`)
@@ -60,6 +68,7 @@ for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto("/inicio");
     await page.waitForLoadState("networkidle").catch(() => undefined);
+    await expectAuthenticatedRoute(page, "/inicio");
     const violations = (await audit(page)).filter((v) => v.id === "label-content-name-mismatch");
     const report = violations
       .map((v) => v.nodes.slice(0, 5).map((n) => n.target.join(" ")).join("\n"))
