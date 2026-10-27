@@ -106,6 +106,18 @@ def _strict_binding(settings) -> bool:
     )
 
 
+# Mensajes 401 en español (los ve el usuario cuando la sesión no llega bien
+# firmada al motor de datos). El frontend decide por el código 401, no por el texto.
+MSG_IDENTITY_REQUIRED = "Tu sesión no es válida o ha caducado. Vuelve a iniciar sesión."
+MSG_INVALID_SIGNATURE = "La firma de tu sesión no es válida. Vuelve a iniciar sesión."
+MSG_INVALID_TIMESTAMP = "La hora de la firma de tu sesión no es válida. Vuelve a iniciar sesión."
+MSG_EXPIRED = "Tu sesión ha caducado. Vuelve a iniciar sesión."
+MSG_REQUEST_MISMATCH = "La firma de tu sesión no corresponde a esta petición."
+MSG_BOUND_SIGNATURE_REQUIRED = "Falta la firma de la petición. Vuelve a iniciar sesión."
+MSG_INVALID_IDENTITY = "Tu sesión no es válida. Vuelve a iniciar sesión."
+MSG_REPLAYED = "Esta petición ya se había usado. Vuelve a intentarlo."
+
+
 def _unauthorized(detail: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED, detail=detail
@@ -132,7 +144,7 @@ async def get_research_principal(
     )
     if not supplied:
         if required:
-            raise _unauthorized("A signed Research OS identity is required")
+            raise _unauthorized(MSG_IDENTITY_REQUIRED)
         return None
 
     research_auth_secret = settings.research_auth_secret
@@ -145,42 +157,42 @@ async def get_research_principal(
     # compare_digest(str, str) raises TypeError for non-ASCII input.
     # Only lowercase hex SHA-256 signatures are emitted by the identity bridge.
     if re.fullmatch(r"[0-9a-f]{64}", x_cavaai_signature or "") is None:
-        raise _unauthorized("Invalid Research OS identity signature")
+        raise _unauthorized(MSG_INVALID_SIGNATURE)
 
     try:
         issued_at = int(x_cavaai_timestamp or "0")
     except ValueError as exc:
-        raise _unauthorized("Invalid Research OS identity timestamp") from exc
+        raise _unauthorized(MSG_INVALID_TIMESTAMP) from exc
 
     now = int(time.time())
     # Tolerancia solo hacia el pasado: un timestamp futuro nunca es valido.
     if issued_at > now:
-        raise _unauthorized("Invalid Research OS identity timestamp")
+        raise _unauthorized(MSG_INVALID_TIMESTAMP)
     max_age = settings.research_auth_max_age_seconds
     if now - issued_at > max_age:
-        raise _unauthorized("Expired Research OS identity")
+        raise _unauthorized(MSG_EXPIRED)
 
     bound_parts = (x_cavaai_nonce, x_cavaai_method, x_cavaai_path, x_cavaai_body_hash)
     uses_bound_payload = any(part is not None for part in bound_parts)
     if uses_bound_payload:
         if any(part is None for part in bound_parts):
-            raise _unauthorized("Invalid Research OS identity signature")
+            raise _unauthorized(MSG_INVALID_SIGNATURE)
         method = (x_cavaai_method or "").upper()
         path = x_cavaai_path or ""
         if method != request.method.upper() or path != request.url.path:
             raise _unauthorized(
-                "Research OS identity does not match the request"
+                MSG_REQUEST_MISMATCH
             )
         raw_body = getattr(request.state, "raw_body", None)
         if raw_body is None:
             raw_body = await request.body()
         if (x_cavaai_body_hash or "") != body_digest(raw_body):
             raise _unauthorized(
-                "Research OS identity does not match the request"
+                MSG_REQUEST_MISMATCH
             )
     elif _strict_binding(settings):
         raise _unauthorized(
-            "A request-bound Research OS identity signature is required"
+            MSG_BOUND_SIGNATURE_REQUIRED
         )
 
     expected = sign_research_identity(
@@ -194,10 +206,10 @@ async def get_research_principal(
         body_hash=x_cavaai_body_hash if uses_bound_payload else None,
     )
     if not hmac.compare_digest(expected, x_cavaai_signature or ""):
-        raise _unauthorized("Invalid Research OS identity signature")
+        raise _unauthorized(MSG_INVALID_SIGNATURE)
 
     if not (x_cavaai_user or "").strip() or not (x_cavaai_tenant or "").strip():
-        raise _unauthorized("Invalid Research OS identity")
+        raise _unauthorized(MSG_INVALID_IDENTITY)
 
     if uses_bound_payload:
         # Consume the nonce only once the signature is fully verified so an
@@ -226,7 +238,7 @@ async def get_research_principal(
                 detail="Authentication backend unavailable",
             ) from exc
         if not fresh:
-            raise _unauthorized("Replayed Research OS identity")
+            raise _unauthorized(MSG_REPLAYED)
 
     return ResearchPrincipal(
         user_id=(x_cavaai_user or "").strip(),

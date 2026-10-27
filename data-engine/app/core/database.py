@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, event, false, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker, with_loader_criteria
 
-from app.core.auth import ResearchPrincipal, get_research_principal
+from app.core.auth import MSG_IDENTITY_REQUIRED, ResearchPrincipal, get_research_principal
 from app.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
@@ -250,7 +250,7 @@ def get_db(
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="A signed Research OS identity is required",
+            detail=MSG_IDENTITY_REQUIRED,
         )
     db = SessionLocal()
     try:
