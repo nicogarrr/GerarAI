@@ -19,7 +19,7 @@ descarta ese cambio (`git checkout -- AGENTS.md`). `CLAUDE.md` solo apunta aqui.
 
 ## Gates antes de abrir una PR
 Backend (desde `data-engine/`): `uv sync --frozen --extra test --extra dev --no-install-project`,
-`ruff check .`, `pyright` (0 errores; unos ~250 warnings son baseline), export de openapi y
+`ruff check .`, `pyright` (0 errores; los warnings no bloquean y su número no se apunta a mano: caduca con cada PR), export de openapi y
 `APP_ENV=test pytest -q -p no:warnings`. En imagen slim sin `git` fallan 4 tests conocidos de
 `tests/test_repo_and_image_hygiene.py::test_market_data_paths_are_ignored`; cualquier otro fallo es tuyo.
 Dependencias: `requirements.txt` se genera con `scripts/sync_requirements.py --write`.

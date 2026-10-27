@@ -61,12 +61,16 @@ def estimate_funding_gap(
         )
 
     # Negative OCF implies cash burn; positive OCF reduces the gap.
+    # OCF positivo financia primero el capex: la necesidad de capex es la
+    # quema neta max(capex - OCF, 0) (es decir, -FCF si FCF < 0). Antes se
+    # ignoraba el OCF positivo y se sumaba el capex entero.
     burn_proxy = 0.0
     burn_proxy_source = "operating_cash_flow" if ocf is not None else "unavailable"
     if ocf is not None and ocf < 0:
         burn_proxy = abs(ocf) * default_horizon_years
+    ocf_offset = ocf if (ocf is not None and ocf > 0) else 0.0
 
-    capex_need = (planned_capex or 0.0) * default_horizon_years
+    capex_need = max((planned_capex or 0.0) - ocf_offset, 0.0) * default_horizon_years
     available = cash or 0.0
     funding_gap = max(capex_need + burn_proxy + min_cash_buffer - available, 0.0)
 

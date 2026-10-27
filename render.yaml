@@ -1,4 +1,13 @@
-# Render Blueprint — despliegue cloud opcional del data-engine.
+# Render Blueprint — despliegue cloud EXPERIMENTAL del data-engine (no soportado en la 1.0).
+#
+# El camino de producción oficial es docker-compose.prod.yml (Oracle Cloud Always
+# Free, ver docs/oracle-setup.md), que es el que tiene restore drill en CI.
+# Este blueprint NO despliega tal cual: /health/ready exige Postgres, Redis,
+# Qdrant y MinIO, y Render free no trae ninguno. Antes de usarlo necesitas
+# rellenar en el dashboard DATABASE_URL, REDIS_URL, QDRANT_URL y MINIO_* con
+# servicios externos (p. ej. Supabase, Upstash, Qdrant Cloud, Cloudflare R2);
+# si falta uno, el healthcheck no sana y Render no publica el servicio.
+#
 # Nota: en el tier FREE los web services hibernan tras ~15 min de inactividad,
 # por lo que el scheduler de workers NO corre 24/7. Para workers siempre
 # activos en cloud se requiere el tier paid (o el PC local como Scheduled Task).

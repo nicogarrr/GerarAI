@@ -9,6 +9,7 @@ import {CountrySelectField} from "@/components/forms/CountrySelectField";
 import FooterLink from "@/components/forms/FooterLink";
 import AuthPitch from "@/components/forms/AuthPitch";
 import {signUpWithEmail} from "@/lib/actions/auth.actions";
+import {emailFieldValidation} from "@/lib/validation/email";
 import AccessRequestForm from "@/components/forms/AccessRequestForm";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
@@ -104,13 +105,7 @@ const SignUpForm = ({ signUpOpen }: { signUpOpen: boolean }) => {
                     placeholder="email@ejemplo.com"
                     register={register}
                     error={errors.email}
-                    validation={{
-                        required: 'El email es obligatorio',
-                        pattern: {
-                            value: /^[\w-.]+@([\w-]+\.)+[\w-]{2,}$/,
-                            message: 'Introduce un email válido'
-                        }
-                    }}
+                    validation={emailFieldValidation}
                 />
 
                 <InputField

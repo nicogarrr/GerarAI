@@ -79,6 +79,18 @@ def _followed_company_ids(db: Session):
     return union(held, watched)
 
 
+def _effective_scope(scope: str | None, ticker: str | None) -> str:
+    """Scope por defecto: una consulta explicita por ticker NO se acota.
+
+    Sin `scope`, un `ticker` pedido de forma explicita consulta esa empresa
+    (como antes del filtro de universo seguido); sin ticker, el inventario
+    global usa `followed`. Un `scope` explicito siempre se respeta.
+    """
+    if scope is not None:
+        return scope
+    return "all" if ticker else "followed"
+
+
 def _document_filters(
     db: Session,
     *,
@@ -108,7 +120,7 @@ def _document_filters(
 @router.get("/documents")
 def documents(
     ticker: str | None = None,
-    scope: Annotated[str, Query(pattern="^(followed|all)$")] = "followed",
+    scope: Annotated[str | None, Query(pattern="^(followed|all)$")] = None,
     source_type: Annotated[str | None, Query(max_length=80)] = None,
     q: Annotated[str | None, Query(max_length=120)] = None,
     include_chunks: bool = False,
@@ -131,7 +143,11 @@ def documents(
         .outerjoin(Company, Document.company_id == Company.id)
         .where(
             *_document_filters(
-                db, company=company, scope=scope, source_type=source_type, q=q
+                db,
+                company=company,
+                scope=_effective_scope(scope, ticker),
+                source_type=source_type,
+                q=q,
             )
         )
     )
@@ -143,9 +159,7 @@ def documents(
     # fecha de publicacion van al final (la UI los etiqueta «sin fecha»);
     # created_at solo desempata dentro de la misma fecha.
     rows = db.execute(
-        statement.order_by(
-            desc(Document.published_at).nullslast(), desc(Document.created_at)
-        )
+        statement.order_by(desc(Document.published_at).nullslast(), desc(Document.created_at))
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
@@ -176,9 +190,7 @@ def documents(
             "ticker": company.ticker if company else None,
             "title": document.title,
             "source_type": document.source_type,
-            "source_tier": classify_source(
-                document.source_type, document.source_url
-            ).key,
+            "source_tier": classify_source(document.source_type, document.source_url).key,
             "source_url": document.source_url,
             "storage_uri": document.storage_uri,
             "checksum": document.checksum,
@@ -193,7 +205,7 @@ def documents(
 @router.get("/documents/count")
 def documents_count(
     ticker: str | None = None,
-    scope: Annotated[str, Query(pattern="^(followed|all)$")] = "followed",
+    scope: Annotated[str | None, Query(pattern="^(followed|all)$")] = None,
     source_type: Annotated[str | None, Query(max_length=80)] = None,
     q: Annotated[str | None, Query(max_length=120)] = None,
     db: Session = Depends(get_db),
@@ -218,7 +230,11 @@ def documents_count(
         .outerjoin(Company, Document.company_id == Company.id)
         .where(
             *_document_filters(
-                db, company=company, scope=scope, source_type=source_type, q=q
+                db,
+                company=company,
+                scope=_effective_scope(scope, ticker),
+                source_type=source_type,
+                q=q,
             )
         )
     )
@@ -281,9 +297,7 @@ async def extract_document_kpis(
         # La extraccion mezcla sqlalchemy y el LLM: hilo del pool, con la
         # corutina del servicio puenteado (no bloquea el event loop).
         return await run_in_threadpool(
-            lambda: run_from_any_context(
-                KPIExtractionService().extract_document(db, document)
-            )
+            lambda: run_from_any_context(KPIExtractionService().extract_document(db, document))
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

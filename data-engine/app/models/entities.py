@@ -581,6 +581,13 @@ class FinancialFact(TenantOwnedMixin, Base, TimestampMixin):
     # al anclar cada fila a su filing y lo persiste para que la procedencia
     # OFICIAL sea auditable por accession. NULL en derivadas y no-SEC.
     accession_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Fecha en que se PUBLICO el filing del que sale la cifra guardada (campo
+    # `filed` de SEC companyfacts). Es el eje "cuando lo supo el mercado": una
+    # cifra del FY2019 reexpresada en un 10-K de 2021 no era conocible en 2020.
+    # La ingesta guarda la ultima cifra (reexpresada) con SU fecha de filing;
+    # la primera version publicada no se conserva. NULL en no-SEC, en filas
+    # anteriores a la migracion 0082 y en derivadas sin entradas fechadas.
+    filed: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     # Procedencia del dato: el documento (filing SEC/ESEF, pagina del proveedor)
     # del que salio la cifra. La carga eager se pide SOLO en el endpoint de
@@ -2722,12 +2729,17 @@ class EtfHolding(Base):
     source_url: Mapped[str] = mapped_column(Text)
 
 
-class TenantLLMSettings(Base, TimestampMixin):
+class TenantLLMSettings(TenantOwnedMixin, Base, TimestampMixin):
     """Proveedor/modelo/clave LLM propios de un tenant.
 
     ``tenant_id`` es unico: una fila por tenant, borrada en cascada con el
     tenant. La clave NUNCA se guarda en claro: solo el sobre cifrado y los
     ultimos cuatro caracteres para poder mostrarla en ajustes.
+
+    Hereda ``TenantOwnedMixin``: la sesion filtra las SELECT de entidad por
+    tenant, asigna el tenant a las filas nuevas y rechaza reasignarlo. La
+    columna ``tenant_id`` se redeclara aqui (NOT NULL + ON DELETE CASCADE),
+    por lo que el esquema de la migracion 0081 no cambia.
     """
 
     __tablename__ = "tenant_llm_settings"

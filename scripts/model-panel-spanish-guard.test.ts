@@ -7,10 +7,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+// @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
+import { metricLabel } from '../lib/research/metric-labels.ts';
 
 const panel = readFileSync('components/research/FundamentalModelPanels.tsx', 'utf8');
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-const labels = readFileSync('lib/research/metric-labels.ts', 'utf8');
 
 test('drivers, KPIs y entradas faltantes pasan por metricLabel', () => {
     assert.match(panel, /revenue_drivers\.map\(termLabel\)/);
@@ -26,8 +27,17 @@ test('no queda «Value/share» en la UI y unknown/low/high tienen etiqueta en es
     assert.match(page, /low: 'baja'/);
 });
 
-test('las entradas de modelo mas habituales tienen etiqueta', () => {
+test('las entradas de modelo mas habituales tienen etiqueta en espanol (no la clave humanizada)', () => {
+    // Comportamiento, no texto: se llama a metricLabel. Sin etiqueta propia
+    // devolveria el fallback «traceable wacc», que es lo que se veta.
     for (const key of ['traceable_wacc', 'organic_growth', 'share_count', 'working_capital', 'monthly_arpu']) {
-        assert.ok(labels.includes(`${key}:`), key);
+        const label = metricLabel(key);
+        assert.notEqual(label, key.replaceAll('_', ' '), `${key} sin etiqueta propia`);
+        assert.doesNotMatch(label, /_/, `${key}: «${label}» lleva snake_case`);
+        assert.equal(metricLabel(key.toUpperCase()), label, `${key}: la clave en mayusculas no encuentra la etiqueta`);
     }
+});
+
+test('una clave desconocida se humaniza, nunca se muestra en snake_case', () => {
+    assert.equal(metricLabel('clave_nueva_del_backend'), 'clave nueva del backend');
 });
