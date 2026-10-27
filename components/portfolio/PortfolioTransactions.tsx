@@ -142,7 +142,7 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                     </div>
 
                     {/* Acciones siempre visibles en táctil, solo hover en escritorio */}
-                    <div className="flex justify-end gap-2 mt-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <div className="flex justify-end gap-2 mt-2 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
                       <EditTransactionDialog transaction={tx} userId={userId} />
                       <Button
                         variant="ghost"
