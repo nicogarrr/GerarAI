@@ -216,3 +216,56 @@ def test_drift_weights_group_each_sector_with_its_tickers(db):
                     "Fin", "ticker:V", "asset_class:Cash"]
     # El detalle de la sugerencia no lleva signo "+": "por debajo" ya lo dice.
     assert drift["suggestions"][0]["detail"].startswith("AAPL está 80.0 puntos por debajo")
+
+
+@pytest.mark.parametrize("updates", [
+    {"date_": date(2026, 9, 2)}, {"amount": Decimal("301")}, {"currency": "USD"},
+])
+def test_contribution_same_external_key_with_changed_identity_is_conflict(db, updates):
+    from app.services.investment_plan_service import ContributionConflict
+
+    service = InvestmentPlanService()
+    _plan(service, db)
+    args = dict(date_=date(2026, 9, 1), amount=Decimal("300"), currency="EUR", external_id="same-import-key", note="original")
+    first = service.add_contribution(db, **args)
+    with pytest.raises(ContributionConflict):
+        service.add_contribution(db, **{**args, **updates})
+    db.expire(first)
+    assert (first.date, first.amount, first.currency, first.note) == (date(2026, 9, 1), Decimal("300"), "EUR", "original")
+    assert len(service.list_contributions(db)) == 1
+
+
+def test_contribution_retry_keeps_stored_precision_and_note_is_not_identity(db):
+    service = InvestmentPlanService()
+    _plan(service, db)
+    args = dict(date_=date(2026, 9, 1), amount=Decimal("300.001"), currency="EUR", external_id="same-import-key")
+    first = service.add_contribution(db, **args, note="original")
+    again = service.add_contribution(db, **args, note="retry note")
+    assert again.id == first.id
+    assert again.note == "original"
+
+
+def test_contribution_conflict_handler_is_409_and_same_retry_still_succeeds(db):
+    from fastapi import HTTPException
+
+    from app.api.routes.plan import ContributionInput, add_contribution
+
+    service = InvestmentPlanService()
+    _plan(service, db)
+    original = ContributionInput(date=date(2026, 9, 1), amount=300, currency="EUR", external_id="route-key")
+    first = add_contribution(original, db)
+    assert add_contribution(original, db)["id"] == first["id"]
+    with pytest.raises(HTTPException) as caught:
+        add_contribution(original.model_copy(update={"amount": 999}), db)
+    assert caught.value.status_code == 409
+    assert len(service.list_contributions(db)) == 1
+
+
+@pytest.mark.parametrize("raw,expected", [("1.015", "1.02"), ("2.675", "2.68"), ("1.005", "1.01"), ("0.0149", "0.01")])
+def test_contribution_half_cent_retry_has_same_explicit_precision_as_first_write(db, raw, expected):
+    service = InvestmentPlanService()
+    _plan(service, db)
+    args = dict(date_=date(2026, 9, 1), amount=Decimal(raw), currency="EUR", external_id="half-cent")
+    first = service.add_contribution(db, **args)
+    assert first.amount == Decimal(expected)
+    assert service.add_contribution(db, **args).id == first.id
