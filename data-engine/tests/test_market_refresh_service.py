@@ -661,9 +661,9 @@ def test_financial_spot_preserves_all_ohlc_unit(db, unit, expected, adjusted):
 
 def test_blank_same_currency_mark_is_not_zero_terminal_xirr(db):
     from app.models import Transaction
+    from app.services.portfolio_fx_service import PortfolioFXService
     from app.services.portfolio_intelligence_service import PortfolioIntelligenceService
     from app.services.portfolio_ledger_service import PortfolioLedgerService
-    from app.services.portfolio_fx_service import PortfolioFXService
 
     company = Company(ticker="AAPL", name="Apple", currency="EUR", exchange="NASDAQ",
                       company_type="holding", valuation_model="unassigned")
