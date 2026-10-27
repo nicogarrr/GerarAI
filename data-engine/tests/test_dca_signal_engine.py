@@ -192,3 +192,23 @@ def test_nico_v1_young_ticker_uses_available_sma_and_caps_4x() -> None:
     verdict = evaluate_series(_month_end_bars(closes), month_complete=True)[-1]
     assert verdict.metrics["sma_months_used"] == 15
     assert verdict.level == 3
+
+
+def test_young_series_never_shows_4x_price_or_touch() -> None:
+    """Antes de 24 meses no hay 4X: ni nivel, ni precio de 4X, ni "toco 4X"."""
+    closes = [100.0 if i % 2 == 0 else 105.0 for i in range(19)] + [40.0]
+    bars = _month_end_bars(closes)
+    bars[-1] = DailyBar(day=bars[-1].day, close=40.0, low=30.0)
+    v = evaluate_series(bars, month_complete=True)[-1]
+    assert v.metrics["months_of_history"] == 20
+    assert v.level == 3
+    assert v.level_prices["4x"] is None
+    assert v.level_prices["3x"] is not None
+    assert v.touched_level is None
+
+
+def test_mature_series_keeps_4x_price() -> None:
+    closes = [100.0 if i % 2 == 0 else 105.0 for i in range(29)] + [40.0]
+    v = evaluate_series(_month_end_bars(closes), month_complete=True)[-1]
+    assert v.level == 4
+    assert v.level_prices["4x"] is not None

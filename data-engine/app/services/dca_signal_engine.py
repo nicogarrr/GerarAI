@@ -267,8 +267,14 @@ def evaluate_series(
                 level = LEVEL_STRONG_TRIM
             elif trim_gap >= params.trim_light_gap and r_val >= params.trim_rsi_light:
                 level = LEVEL_LIGHT_TRIM
-        if params.cap4_before_months and i + 1 < params.cap4_before_months and level == 4:
-            level = 3
+        if params.cap4_before_months and i + 1 < params.cap4_before_months:
+            # Valor joven: 4X no existe todavia. Tampoco se muestra su precio ni
+            # se dice que el minimo del mes "toco 4X".
+            if level == 4:
+                level = 3
+            touched = min(touched, 3)
+            if "4x" in level_prices:
+                level_prices["4x"] = None
         verdicts.append(
             MonthlyVerdict(
                 period=key,
