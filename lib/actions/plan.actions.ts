@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
+import { isContributionSplit, type ContributionSplit } from '@/lib/plan/contribution-split';
 
 export type PlanRecord = Record<string, unknown>;
 
@@ -32,6 +33,20 @@ export async function getPlanDrift(): Promise<PlanRecord | null> {
     await requireAuthenticatedUser();
     return nullIfPlanStub(await researchRequest<PlanRecord>('/api/plan/drift'));
 }
+
+/** GET /api/plan/contribution-split — reparto de la aportación de este mes
+ *  ponderado por nivel DCA. Opcional: si el backend aún no lo expone o falla,
+ *  devuelve null y la tarjeta muestra su estado vacío (no rompe /plan). */
+export async function getPlanContributionSplit(): Promise<ContributionSplit | null> {
+    await requireAuthenticatedUser();
+    try {
+        const record = await researchRequest<unknown>('/api/plan/contribution-split');
+        return isContributionSplit(record) ? record : null;
+    } catch {
+        return null;
+    }
+}
+
 export type PlanTargetInput = {
     kind: 'ticker' | 'sector' | 'asset_class';
     label: string;
