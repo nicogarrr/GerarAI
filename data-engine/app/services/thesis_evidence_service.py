@@ -68,12 +68,24 @@ SEC_EVIDENCE_TAGS: dict[str, tuple[list[str], str]] = {
         ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"],
         "USD",
     ),
+    # Mismos alias que la ingesta completa (SEC_METRIC_MAP). Desde ASU 2016-18
+    # muchos emisores solo presentan el tag combinado con caja restringida:
+    # POOL dejo de informar CashAndCashEquivalentsAtCarryingValue tras FY2018 y
+    # la tesis se quedaba con la caja de 2016-2018 y «falta deuda neta». Va el
+    # ultimo: a igual periodo manda la caja sin restringida.
     "cash_and_equivalents": (
-        ["CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsAndShortTermInvestments"],
+        [
+            "CashAndCashEquivalentsAtCarryingValue",
+            "CashCashEquivalentsAndShortTermInvestments",
+            "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+        ],
         "USD",
     ),
+    # Orden por alcance: el combinado (largo + corto plazo) es la deuda total;
+    # LongTermDebtNoncurrent deja fuera la parte corriente (POOL FY2025:
+    # 1.186,4 M frente a 1.199,5 M del total) y por eso va el ultimo.
     "total_debt": (
-        ["LongTermDebtNoncurrent", "LongTermDebt", "DebtLongtermAndShorttermCombinedAmount"],
+        ["DebtLongtermAndShorttermCombinedAmount", "LongTermDebt", "LongTermDebtNoncurrent"],
         "USD",
     ),
 }
