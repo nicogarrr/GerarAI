@@ -10,7 +10,9 @@ import test from 'node:test';
 const src = readFileSync('components/forms/InputField.tsx', 'utf8');
 
 test('InputField deriva inputMode="email" para campos email', () => {
-    assert.match(src, /inputMode\s*=\s*\(type === 'email' \|\| name\.toLowerCase\(\) === 'email'\)/, 'derivación por type o name');
+    // La derivación puede tener casos delante (p. ej. totpCode → numeric);
+    // lo que importa es que type="email" o name="email" acaben en 'email'.
+    assert.match(src, /const inputMode\s*=.*\(type === 'email' \|\| name\.toLowerCase\(\) === 'email'\)\s*\?\s*'email'/, 'derivación por type o name');
     assert.match(src, /inputMode=\{inputMode\}/, 'se pasa al input');
 });
 
