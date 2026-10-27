@@ -1327,6 +1327,7 @@ class LongTermModelService:
                 )
                 ignored_inferred.append("terminal_growth")
             if (
+                # nosemgrep: gerarai-money-none-to-zero -- solo endurece el guardarrail WACC-g: con g desconocido el diferencial se mide contra 0, que es el caso mas conservador
                 wacc.value - (terminal.value or 0.0) < MIN_WACC_TERMINAL_SPREAD - 1e-9
                 and wacc.source_type == "inferred_input"
             ):
@@ -2013,14 +2014,20 @@ class LongTermModelService:
             )
         )
         required = solved.get("required_revenue_growth")
-        base_growth = assumptions["revenue_growth"].value or 0
+        base_growth = assumptions["revenue_growth"].value
         return {
             "status": solved.get("status", "ok"),
             **solved,
             "base_revenue_growth": assumptions["revenue_growth"].value,
             "fcf_margin": margin,
             "wacc": wacc,
-            "growth_gap_vs_base": (required - base_growth) if required is not None else None,
+            # Sin crecimiento base conocido no hay brecha: antes se restaba 0 y
+            # la brecha publicada era el crecimiento exigido entero.
+            "growth_gap_vs_base": (
+                (required - base_growth)
+                if required is not None and base_growth is not None
+                else None
+            ),
             "source_fact_ids": _unique_ids(ids=assumptions["revenue_growth"].source_fact_ids + assumptions["fcf_margin"].source_fact_ids),
             "trace": {**solved["trace"], "source_fact_ids": assumptions["revenue_growth"].source_fact_ids + assumptions["fcf_margin"].source_fact_ids, "horizon_years": horizon},
         }

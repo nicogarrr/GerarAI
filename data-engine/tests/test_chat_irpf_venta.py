@@ -414,3 +414,22 @@ def test_impuestos_que_paga_aapl_siguen_en_la_ficha_de_empresa(db):
     assert resp.llm_trace.get("path") != "portfolio_sale_tax"
     assert "No tienes AAPL en cartera" not in resp.answer
     assert "AAPL" in resp.answer
+
+
+
+def test_sin_coste_guardado_no_dice_coste_medio_cero(db):
+    """average_cost=0 (default) es coste desconocido: la respuesta decia
+    «a un coste medio de 0,00 USD»."""
+    comp = _company(db)
+    db.add(Position(
+        tenant_id=1, company_id=comp.id, quantity=Decimal("30"), average_cost=Decimal("0"),
+        market_value=Decimal("2700"), market_value_native=Decimal("2700"),
+        market_value_base=Decimal("2400"), cost_basis_native=None, cost_basis_base=None,
+        currency="USD", base_currency="EUR", as_of=date(2026, 10, 27),
+    ))
+    db.commit()
+    resp = _ask(db, "¿Cuánto IRPF pagaría si vendo hoy todo UBER?")
+    assert resp.llm_trace["path"] == "portfolio_sale_tax"
+    assert "coste medio de 0,00" not in resp.answer
+    assert "sin coste medio guardado" in resp.answer
+    assert "ganancia de" not in resp.answer
