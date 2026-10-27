@@ -67,6 +67,12 @@ def _patch_no_yfinance(monkeypatch):
 
     monkeypatch.setattr(WaccInputService, "_yfinance_market_inputs", _empty)
 
+    async def _no_damodaran(self, as_of):
+        return None
+
+    # Sin red: el ERP queda en el valor de settings (ver test_damodaran_erp.py).
+    monkeypatch.setattr(WaccInputService, "_damodaran_implied_erp", _no_damodaran)
+
 
 def _patch_fred(monkeypatch, stub):
     monkeypatch.setattr(
@@ -331,6 +337,7 @@ def test_refresh_stores_yfinance_beta_and_market_cap(db, monkeypatch):
         assert ticker == "AAPL"
         return {"beta": Decimal("1.24"), "market_cap": Decimal("3000000000000")}
 
+    _patch_no_yfinance(monkeypatch)
     _patch_fred(monkeypatch, _StubFred(configured=True))
     monkeypatch.setattr(WaccInputService, "_yfinance_market_inputs", _market)
     company = _company(db)
