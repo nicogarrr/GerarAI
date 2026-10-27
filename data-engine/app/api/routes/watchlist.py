@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -42,6 +42,11 @@ def _payload(item: WatchItem) -> dict:
     }
 
 
+def _find_watch_item(db: Session, symbol: str) -> WatchItem | None:
+    """Fila del tenant activo para ``symbol`` (ya normalizado en mayúsculas)."""
+    return db.scalar(select(WatchItem).where(WatchItem.symbol == symbol))
+
+
 @router.get("")
 def list_watchlist(db: Session = Depends(get_db)) -> list[dict]:
     """Watch items of the active tenant, most recently added first.
@@ -49,7 +54,11 @@ def list_watchlist(db: Session = Depends(get_db)) -> list[dict]:
     Tenant scoping is applied implicitly by the session (see database.py):
     rows are only visible when their tenant_id matches the signed identity.
     """
-    items = db.scalars(select(WatchItem).order_by(desc(WatchItem.created_at))).all()
+    # Desempate por id: altas en el mismo instante (importaciones, dos
+    # pestañas) no deben bailar entre páginas de un refresco a otro.
+    items = db.scalars(
+        select(WatchItem).order_by(desc(WatchItem.created_at), desc(WatchItem.id))
+    ).all()
     states = tracked_statuses(db, [item.symbol for item in items])
     return [{**_payload(item), "analysis": states.get(item.symbol)} for item in items]
 
@@ -60,14 +69,28 @@ def upsert_watch_item(
 ) -> dict:
     """Add a symbol to the watchlist, or update its label if it exists."""
     symbol = payload.symbol.strip().upper()
-    item = db.scalar(select(WatchItem).where(WatchItem.symbol == symbol))
+    item = _find_watch_item(db, symbol)
     created = item is None
     if item is None:
         item = WatchItem(symbol=symbol, company=payload.company)
         db.add(item)
     elif payload.company is not None:
         item.company = payload.company
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Doble clic o dos pestañas: otra petición dio de alta el mismo
+        # símbolo entre la lectura y el commit. La restricción única
+        # (tenant, símbolo) lo para; respondemos con la fila existente en
+        # vez de un 500.
+        db.rollback()
+        item = _find_watch_item(db, symbol)
+        if item is None:
+            raise
+        created = False
+        if payload.company is not None and item.company != payload.company:
+            item.company = payload.company
+            db.commit()
     db.refresh(item)
     if created:
         try:
@@ -82,11 +105,9 @@ def upsert_watch_item(
 
 @router.delete("/{symbol}", status_code=204)
 def delete_watch_item(symbol: str, db: Session = Depends(get_db)) -> None:
-    item = db.scalar(
-        select(WatchItem).where(WatchItem.symbol == symbol.strip().upper())
-    )
+    item = _find_watch_item(db, symbol.strip().upper())
     if item is None:
-        raise HTTPException(status_code=404, detail="Watch item not found")
+        raise HTTPException(status_code=404, detail="Ese ticker no está en tu watchlist")
     db.delete(item)
     db.commit()
 
