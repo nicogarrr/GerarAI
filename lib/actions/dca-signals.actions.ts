@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest, jsonBody } from '@/lib/research/client';
 import { classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
-import type { DcaEvaluateSummary, DcaHitRates, DcaSignalsResponse } from '@/lib/dca/types';
+import type { DcaBacktest, DcaEvaluateSummary, DcaHitRates, DcaSignalsResponse } from '@/lib/dca/types';
 
 /** Señales DCA (watchlist + cartera) del backend research. `unavailable`
     distingue un fallo del servicio de una lista realmente vacía. */
@@ -66,5 +66,34 @@ export async function getDcaHitRates(symbol: string): Promise<DcaHitRates | null
     } catch (error) {
         console.error('getDcaHitRates error:', error);
         return null;
+    }
+}
+
+/** Backtest DCA plano vs DCA por niveles (Fórmula Nico v1) de cualquier ticker.
+    Sin look-ahead: el backend usa solo datos hasta el cierre de cada mes. */
+export async function getDcaBacktest(input: {
+    symbol: string;
+    start?: string;
+    end?: string;
+    base?: number;
+}): Promise<{ data: DcaBacktest | null; error: string | null }> {
+    const symbol = input.symbol.trim().toUpperCase();
+    if (!/^[A-Z0-9.\-=^]{1,24}$/.test(symbol)) {
+        return { data: null, error: 'Ticker no válido' };
+    }
+    const params = new URLSearchParams();
+    if (input.start) params.set('start', input.start);
+    if (input.end) params.set('end', input.end);
+    if (input.base && Number.isFinite(input.base) && input.base > 0) params.set('base', String(input.base));
+    try {
+        await requireAuthenticatedUser();
+        const query = params.toString();
+        const data = await researchRequest<DcaBacktest>(
+            `/api/watchlist/dca-signals/${encodeURIComponent(symbol)}/backtest${query ? `?${query}` : ''}`,
+        );
+        return { data, error: null };
+    } catch (error) {
+        console.error('getDcaBacktest error:', error);
+        return { data: null, error: getFriendlyErrorMessage(error) };
     }
 }

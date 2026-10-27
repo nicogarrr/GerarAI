@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -388,6 +388,54 @@ class DcaHitRatesOut(BaseModel):
     disclaimer: str = "Histórico, hipotético. No es asesoramiento."
 
 
+class DcaBacktestPlanOut(BaseModel):
+    key: str
+    label: str
+    invested: float
+    deployed: float
+    cash_left: float
+    shares: float
+    avg_cost: float | None = None
+    final_value: float
+    multiple: float | None = None
+    irr: float | None = None
+    max_drawdown: float
+    worst_unrealized: float
+    buys: int
+    irr_vs_plain: float | None = None
+    value_vs_plain: float | None = None
+    shares_per_money_vs_plain: float | None = None
+
+
+class DcaBacktestLevelOut(BaseModel):
+    level: int
+    label: str
+    color: str
+    months: int
+
+
+class DcaBacktestOut(BaseModel):
+    symbol: str
+    available: bool
+    reason: str | None = None
+    params_version: str | None = None
+    currency: str | None = None
+    currency_label: str | None = None
+    data_source: str | None = None
+    first_signal: str | None = None
+    last_signal: str | None = None
+    first_buy: date | None = None
+    last_buy: date | None = None
+    valued_at_period: str | None = None
+    final_price: float | None = None
+    months: int = 0
+    base_amount: float = 100.0
+    plans: list[DcaBacktestPlanOut] = Field(default_factory=list)
+    levels: list[DcaBacktestLevelOut] = Field(default_factory=list)
+    hit_rates: DcaHitRatesOut | None = None
+    disclaimer: str = "Histórico, hipotético. No es asesoramiento."
+
+
 class DcaSignalItemOut(BaseModel):
     symbol: str
     company_name: str | None = None
@@ -585,3 +633,65 @@ def dca_hit_rates(symbol: str, db: Session = Depends(get_db)) -> dict:
         "evaluated_at": state.evaluated_at,
         "rows": rows,
     }
+
+
+_PERIOD_RE = r"^\d{4}-(0[1-9]|1[0-2])$"
+
+
+@router.get("/dca-signals/{symbol}/backtest", response_model=DcaBacktestOut)
+def dca_backtest(
+    symbol: str,
+    start: str | None = Query(None, pattern=_PERIOD_RE, description="Primer mes con señal (YYYY-MM)"),
+    end: str | None = Query(None, pattern=_PERIOD_RE, description="Último mes con señal (YYYY-MM)"),
+    base: float = Query(100.0, gt=0, le=1_000_000, description="Aportación base mensual"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Backtest DCA plano vs DCA por niveles (Fórmula Nico v1) para cualquier ticker.
+
+    Sin look-ahead: veredicto con datos hasta el cierre de cada mes y compra al
+    primer cierre del mes siguiente. Usa la misma serie que la señal diaria
+    (Yahoo, cierre ajustado si existe y sin la barra del día en curso).
+    """
+    from app.services import dca_signal_service as svc
+    from app.services.dca_alert_copy import currency_label
+    from app.services.dca_backtest import backtest_dca
+    from app.services.dca_signal_engine import ZONES
+
+    key = symbol.strip().upper()
+    if not key or len(key) > 24:
+        raise HTTPException(status_code=422, detail="Ticker inválido")
+    if start and end and start > end:
+        raise HTTPException(status_code=422, detail="El inicio va después del final")
+    company = db.scalar(select(Company).where(Company.ticker == key))
+    yahoo = key
+    if company is not None:
+        from app.services.propicks_price_service import yahoo_symbol
+
+        yahoo = yahoo_symbol(company) or key
+    try:
+        fetched = svc.fetch_yahoo_history(yahoo)
+    except Exception as exc:  # proveedor caido o ticker desconocido: se dice, no se inventa
+        raise HTTPException(status_code=502, detail=f"No se pudo descargar el histórico de {key}") from exc
+    rows = svc.settled_rows(fetched.rows, datetime.now(UTC))
+    bars, _factor = svc.build_bars(rows)
+    if not bars:
+        return {"symbol": key, "available": False, "reason": "Sin histórico de precios para este ticker"}
+    result = backtest_dca(bars, start=start, end=end, base_amount=base, today=date.today())
+    currency = fetched.currency or (company.currency if company is not None else None)
+    out: dict = {
+        "symbol": key,
+        "currency": currency,
+        "currency_label": currency_label(currency),
+        "data_source": "yfinance",
+        **result,
+    }
+    hits = result.get("hit_rates")
+    if hits:
+        colors = {zone["key"]: zone["color"] for zone in ZONES.values()}
+        out["hit_rates"] = {
+            "symbol": key,
+            "available": bool(hits.get("rows")),
+            **hits,
+            "rows": [{**row, "color": colors.get(row.get("key"), "#94A3B8")} for row in hits.get("rows", [])],
+        }
+    return out

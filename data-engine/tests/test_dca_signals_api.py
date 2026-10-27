@@ -110,3 +110,17 @@ def test_hit_rates_endpoint(client):
     assert [row["key"] for row in body["rows"]] == ["2x-4x", "4x", "3x", "2x"]
     assert all(row["color"] for row in body["rows"])
     assert body["disclaimer"].startswith("Histórico, hipotético")
+
+
+def test_backtest_endpoint_any_ticker_plain_vs_levels(client):
+    response = client.get("/api/watchlist/dca-signals/dcabt/backtest", params={"base": 50})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["symbol"] == "DCABT" and body["available"] is True
+    plans = {p["key"]: p for p in body["plans"]}
+    assert set(plans) == {"plain", "levels", "fixed_budget"}
+    assert plans["plain"]["invested"] == 50 * body["months"]
+    assert plans["fixed_budget"]["invested"] == plans["plain"]["invested"]
+    assert body["params_version"] == "nico-v1"
+    assert body["disclaimer"].startswith("Histórico, hipotético")
+    assert client.get("/api/watchlist/dca-signals/DCABT/backtest", params={"start": "2026-13"}).status_code == 422

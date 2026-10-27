@@ -94,3 +94,44 @@ export interface DcaHitRates {
     rows: DcaHitRateRow[];
     disclaimer: string;
 }
+
+export interface DcaBacktestPlan {
+    key: 'plain' | 'levels' | 'fixed_budget' | string;
+    label: string;
+    invested: number;
+    deployed: number;
+    cash_left: number;
+    shares: number;
+    avg_cost: number | null;
+    final_value: number;
+    multiple: number | null;
+    irr: number | null;
+    max_drawdown: number;
+    worst_unrealized: number;
+    buys: number;
+    irr_vs_plain?: number | null;
+    value_vs_plain?: number | null;
+    shares_per_money_vs_plain?: number | null;
+}
+
+export interface DcaBacktest {
+    symbol: string;
+    available: boolean;
+    reason: string | null;
+    params_version: string | null;
+    currency: string | null;
+    currency_label: string | null;
+    data_source: string | null;
+    first_signal: string | null;
+    last_signal: string | null;
+    first_buy: string | null;
+    last_buy: string | null;
+    valued_at_period: string | null;
+    final_price: number | null;
+    months: number;
+    base_amount: number;
+    plans: DcaBacktestPlan[];
+    levels: { level: number; label: string; color: string; months: number }[];
+    hit_rates: DcaHitRates | null;
+    disclaimer: string;
+}

@@ -13,6 +13,7 @@ import StrategyFactsheet from './StrategyFactsheet';
 import TrackRecordView from './TrackRecordView';
 import StrategySelector from './StrategySelector';
 import WalkForwardResults from './WalkForwardResults';
+import DcaBacktestPanel from './DcaBacktestPanel';
 import { STRATEGY_CATALOG, mergeStrategies } from './monthlyRebalance';
 import { runWalkForwardBacktest, type WalkForwardBacktestResult } from '@/lib/actions/propicks-backtest.actions';
 import { generateProPicksForStrategy, type ProPick } from '@/lib/actions/proPicks.actions';
@@ -267,6 +268,8 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                         <p className="text-sm">Pulsa «Ejecutar backtest» para lanzar la simulación walk-forward point-in-time.</p>
                     </Card>
                 )}
+
+                <DcaBacktestPanel />
             </TabsContent>
         </Tabs>
     );

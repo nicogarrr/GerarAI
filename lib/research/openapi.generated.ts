@@ -5156,6 +5156,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/watchlist/dca-signals/{symbol}/backtest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dca Backtest
+         * @description Backtest DCA plano vs DCA por niveles (Fórmula Nico v1) para cualquier ticker.
+         *
+         *     Sin look-ahead: veredicto con datos hasta el cierre de cada mes y compra al
+         *     primer cierre del mes siguiente. Usa la misma serie que la señal diaria
+         *     (Yahoo, cierre ajustado si existe y sin la barra del día en curso).
+         */
+        get: operations["dca_backtest_api_watchlist_dca_signals__symbol__backtest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist/dca-signals/{symbol}/hit-rates": {
         parameters: {
             query?: never;
@@ -6288,6 +6312,101 @@ export interface components {
              * @default decimal
              */
             unit: string;
+        };
+        /** DcaBacktestLevelOut */
+        DcaBacktestLevelOut: {
+            /** Color */
+            color: string;
+            /** Label */
+            label: string;
+            /** Level */
+            level: number;
+            /** Months */
+            months: number;
+        };
+        /** DcaBacktestOut */
+        DcaBacktestOut: {
+            /** Available */
+            available: boolean;
+            /**
+             * Base Amount
+             * @default 100
+             */
+            base_amount: number;
+            /** Currency */
+            currency?: string | null;
+            /** Currency Label */
+            currency_label?: string | null;
+            /** Data Source */
+            data_source?: string | null;
+            /**
+             * Disclaimer
+             * @default Histórico, hipotético. No es asesoramiento.
+             */
+            disclaimer: string;
+            /** Final Price */
+            final_price?: number | null;
+            /** First Buy */
+            first_buy?: string | null;
+            /** First Signal */
+            first_signal?: string | null;
+            hit_rates?: components["schemas"]["DcaHitRatesOut"] | null;
+            /** Last Buy */
+            last_buy?: string | null;
+            /** Last Signal */
+            last_signal?: string | null;
+            /** Levels */
+            levels?: components["schemas"]["DcaBacktestLevelOut"][];
+            /**
+             * Months
+             * @default 0
+             */
+            months: number;
+            /** Params Version */
+            params_version?: string | null;
+            /** Plans */
+            plans?: components["schemas"]["DcaBacktestPlanOut"][];
+            /** Reason */
+            reason?: string | null;
+            /** Symbol */
+            symbol: string;
+            /** Valued At Period */
+            valued_at_period?: string | null;
+        };
+        /** DcaBacktestPlanOut */
+        DcaBacktestPlanOut: {
+            /** Avg Cost */
+            avg_cost?: number | null;
+            /** Buys */
+            buys: number;
+            /** Cash Left */
+            cash_left: number;
+            /** Deployed */
+            deployed: number;
+            /** Final Value */
+            final_value: number;
+            /** Invested */
+            invested: number;
+            /** Irr */
+            irr?: number | null;
+            /** Irr Vs Plain */
+            irr_vs_plain?: number | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Max Drawdown */
+            max_drawdown: number;
+            /** Multiple */
+            multiple?: number | null;
+            /** Shares */
+            shares: number;
+            /** Shares Per Money Vs Plain */
+            shares_per_money_vs_plain?: number | null;
+            /** Value Vs Plain */
+            value_vs_plain?: number | null;
+            /** Worst Unrealized */
+            worst_unrealized: number;
         };
         /** DcaEvaluateOut */
         DcaEvaluateOut: {
@@ -21671,6 +21790,53 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DcaEvaluateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dca_backtest_api_watchlist_dca_signals__symbol__backtest_get: {
+        parameters: {
+            query?: {
+                /** @description Primer mes con señal (YYYY-MM) */
+                start?: string | null;
+                /** @description Último mes con señal (YYYY-MM) */
+                end?: string | null;
+                /** @description Aportación base mensual */
+                base?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaBacktestOut"];
                 };
             };
             /** @description Validation Error */
