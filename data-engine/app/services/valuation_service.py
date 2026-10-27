@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, MutableMapping
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
 from app.models import Company, MarketPrice, Position, ValuationModel, ValuationOutput
+from app.valuation.currency import listing_quote_unit, to_major_units
 from app.valuation.engines import resolve, resolve_engine_key
 from app.valuation.engines.base import MODEL_VERSION, apply_publication_blockers
 from app.valuation.point_in_time import (
@@ -101,52 +103,112 @@ def _assert_no_lookahead_guard(valuation: dict, *, as_of: date | None = None) ->
     }
 
 
-def _position_price(
+@dataclass(frozen=True)
+class ModelPrice:
+    """Precio del modelo en la divisa PRINCIPAL del listado, con su fecha."""
+
+    value: float
+    currency: str
+    as_of: date | None
+    source: str  # "market_close" | "position_mark"
+
+
+def resolve_model_price(
     db: Session, company_id: int, as_of: date | None = None
-) -> float | None:
-    """Return a real market price or None. Never invent a placeholder price."""
-    # Con cutoff, el mark de la posicion es el precio de HOY (sin fecha): no se
-    # usa, y el cierre se acota a date <= as_of.
-    position = (
-        None
-        if as_of is not None
-        else db.scalar(select(Position).where(Position.company_id == company_id).limit(1))
-    )
-    if position and position.market_price and float(position.market_price) > 0:
-        return float(position.market_price)
+) -> ModelPrice | None:
+    """El precio real mas FRESCO del valor, en unidad principal; None si no hay.
+
+    Candidatos: el ultimo cierre de ``MarketPrice`` (``date <= as_of`` con
+    cutoff) y el mark de una posicion ABIERTA (``quantity > 0``), con la fecha
+    ``Position.as_of`` que escriben la reconstruccion, IBKR y el refresco de
+    mercado. Gana el mas reciente; a igual fecha, el cierre oficial. Un mark
+    sin fecha fiable (fila manual) solo sirve si no hay ningun cierre. Antes se
+    preferia el mark de cualquier fila de posicion (incluida una cerrada,
+    elegida con ``limit(1)`` sin orden) aunque hubiera un cierre mas nuevo.
+
+    Unidades: el cierre se guarda como lo da el proveedor (Londres en
+    peniques); aqui se pasa a la divisa principal del listado (GBX/100 ->
+    GBP), igual que el mark (``Position.currency``). Con cutoff el mark no se
+    usa: es el precio de la posicion HOY, no a esa fecha.
+    """
+    company = db.get(Company, company_id)
+    ticker = company.ticker if company is not None else None
+    company_currency = company.currency if company is not None else None
+    quote_unit = listing_quote_unit(ticker, company_currency)
+
+    close: ModelPrice | None = None
     price_query = select(MarketPrice).where(MarketPrice.company_id == company_id)
     if as_of is not None:
         price_query = price_query.where(MarketPrice.date <= as_of)
     market_price = db.scalar(price_query.order_by(desc(MarketPrice.date)).limit(1))
     if market_price and market_price.close and float(market_price.close) > 0:
-        return float(market_price.close)
-    return None
+        converted = to_major_units(market_price.close, quote_unit)
+        if converted is not None:
+            close = ModelPrice(
+                value=converted.value,
+                currency=converted.currency,
+                as_of=market_price.date,
+                source="market_close",
+            )
+
+    mark: ModelPrice | None = None
+    if as_of is None:
+        position = db.scalar(
+            select(Position)
+            .where(
+                Position.company_id == company_id,
+                Position.quantity > 0,
+                Position.market_price > 0,
+            )
+            .order_by(desc(Position.as_of), desc(Position.id))
+            .limit(1)
+        )
+        if position is not None:
+            converted = to_major_units(
+                position.market_price, position.currency or quote_unit
+            )
+            if converted is not None and converted.value > 0:
+                # Una fila "manual" toma ``as_of`` del default de la columna
+                # (hoy al insertarla): no es la fecha del precio (F348). Solo
+                # los marks del libro, IBKR o el refresco declaran fecha.
+                dated = (position.source or "manual") != "manual"
+                mark = ModelPrice(
+                    value=converted.value,
+                    currency=converted.currency,
+                    as_of=position.as_of if dated else None,
+                    source="position_mark",
+                )
+
+    if close is None:
+        return mark
+    if mark is None:
+        return close
+    if mark.as_of is not None and close.as_of is not None and mark.as_of > close.as_of:
+        return mark
+    return close
+
+
+def _position_price(
+    db: Session, company_id: int, as_of: date | None = None
+) -> float | None:
+    """Return a real market price or None. Never invent a placeholder price.
+
+    Ver :func:`resolve_model_price`: el mas fresco, en unidad principal."""
+    resolved = resolve_model_price(db, company_id, as_of)
+    return resolved.value if resolved is not None else None
 
 
 def _position_price_as_of(
     db: Session, company_id: int, as_of: date | None = None
 ) -> str | None:
     """Fecha (ISO) del precio que ``_position_price`` resuelve, con la misma
-    precedencia (posicion primero, ultimo cierre despues). None si no hay
-    precio o la fuente no declara fecha. La ficha lo usa para rotular el
-    precio del modelo con su fecha, nunca como precio actual."""
-    position = (
-        None
-        if as_of is not None
-        else db.scalar(select(Position).where(Position.company_id == company_id).limit(1))
-    )
-    if position and position.market_price and float(position.market_price) > 0:
-        # Sin procedencia real del mark: updated_at es la ultima modificacion
-        # de la fila (una reconstruccion mueve la fecha SIN refrescar el
-        # precio), nunca la fecha del precio. None honesto.
+    precedencia. None si no hay precio o la fuente no declara fecha. La ficha
+    lo usa para rotular el precio del modelo con su fecha, nunca como precio
+    actual."""
+    resolved = resolve_model_price(db, company_id, as_of)
+    if resolved is None or resolved.as_of is None:
         return None
-    price_query = select(MarketPrice).where(MarketPrice.company_id == company_id)
-    if as_of is not None:
-        price_query = price_query.where(MarketPrice.date <= as_of)
-    market_price = db.scalar(price_query.order_by(desc(MarketPrice.date)).limit(1))
-    if market_price and market_price.close and float(market_price.close) > 0:
-        return market_price.date.isoformat()
-    return None
+    return resolved.as_of.isoformat()
 
 
 class ValuationService:
@@ -208,9 +270,22 @@ class ValuationService:
         # DB), no la cotizacion en vivo: la ficha lo rotula con esta fecha.
         # La fecha es best-effort: sin ella, None honesto (el precio ya esta).
         try:
-            result["trace"]["price_as_of"] = _position_price_as_of(db, company.id, as_of)
+            resolved_price = resolve_model_price(db, company.id, as_of)
         except Exception:  # noqa: BLE001 - la fecha nunca rompe la valoracion
-            result["trace"]["price_as_of"] = None
+            resolved_price = None
+        result["trace"]["price_as_of"] = (
+            resolved_price.as_of.isoformat()
+            if resolved_price is not None and resolved_price.as_of is not None
+            else None
+        )
+        # Divisa PRINCIPAL del precio (CGEO.L: GBP, ya dividido entre 100) y
+        # de donde sale: el cierre o el mark de la posicion, el mas fresco.
+        result["trace"]["price_currency"] = (
+            resolved_price.currency if resolved_price is not None else None
+        )
+        result["trace"]["price_source"] = (
+            resolved_price.source if resolved_price is not None else None
+        )
 
         return result
 
