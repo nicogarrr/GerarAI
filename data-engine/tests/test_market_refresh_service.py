@@ -657,3 +657,26 @@ def test_financial_spot_preserves_all_ohlc_unit(db, unit, expected, adjusted):
     assert bar.close == expected
     assert bar.quote_currency == "GBX"
     assert bar.adj_close == adjusted
+
+
+def test_blank_same_currency_mark_is_not_zero_terminal_xirr(db):
+    from app.models import Transaction
+    from app.services.portfolio_intelligence_service import PortfolioIntelligenceService
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    company = Company(ticker="AAPL", name="Apple", currency="EUR", exchange="NASDAQ",
+                      company_type="holding", valuation_model="unassigned")
+    db.add(company)
+    portfolio = PortfolioFXService().ensure_portfolio(db)
+    db.flush()
+    position = Position(company_id=company.id, quantity=1, currency="EUR", market_value_base=None)
+    db.add(position)
+    PortfolioLedgerService()._blank_valuation(position)
+    db.add(Transaction(portfolio_id=portfolio.id, company_id=company.id, trade_date=date(2025, 1, 1),
+                       action="buy", quantity=1, price=100, currency="EUR"))
+    db.commit()
+    value, trace = PortfolioIntelligenceService()._xirr(db, [(position, company)])
+    assert value is None
+    assert trace["status"] == "incomplete_missing_fx"
+    assert trace["missing_fx"][0]["kind"] == "position"
