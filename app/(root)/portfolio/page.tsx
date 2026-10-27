@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { getPortfolioSummary, getPortfolioTransactions, getPortfolioScores, getPortfolioForecast, getPortfolioTearsheet, getPortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
+import { getPortfolioSummary, getPortfolioTransactionPage, getPortfolioScores, getPortfolioForecast, getPortfolioTearsheet, getPortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
 import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import BackendOffline from '@/components/system/BackendOffline';
@@ -20,7 +20,9 @@ export const metadata: Metadata = {
     'Posiciones, movimientos, factores de calidad y tearsheet de tu cartera, con base de coste y tipos de cambio por transacción.',
 };
 
-export default async function PortfolioPage() {
+export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ transactionOffset?: string }> }) {
+  const query = await searchParams;
+  const offset = Number.isSafeInteger(Number(query.transactionOffset)) && Number(query.transactionOffset) >= 0 ? Number(query.transactionOffset) : 0;
   let userId: string;
 
   try {
@@ -31,7 +33,7 @@ export default async function PortfolioPage() {
 
   let result: [
     Awaited<ReturnType<typeof getPortfolioSummary>>,
-    Awaited<ReturnType<typeof getPortfolioTransactions>>,
+    Awaited<ReturnType<typeof getPortfolioTransactionPage>>,
     Awaited<ReturnType<typeof getPortfolioScores>>,
     Awaited<ReturnType<typeof getPortfolioTearsheet>>,
     Awaited<ReturnType<typeof getPortfolioForecast>> | null,
@@ -44,7 +46,7 @@ export default async function PortfolioPage() {
     // transactions y tearsheet son lecturas tolerantes a falta de historial.
     const [summaryResult, transactionsResult, scoresResult, tearsheetResult, forecastResult, dividendsResult] = await Promise.all([
       getPortfolioSummary(userId).then((value) => ({ value, error: null as string | null, cause: null as unknown })).catch((error) => ({ value: null, error: error instanceof Error ? error.message : 'No se pudo cargar la cartera', cause: error as unknown })),
-      getPortfolioTransactions(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: [] as Awaited<ReturnType<typeof getPortfolioTransactions>>, error: error instanceof Error ? error.message : 'No se pudieron cargar los movimientos' })),
+      getPortfolioTransactionPage(userId, offset).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? error.message : 'No se pudieron cargar los movimientos' })),
       // Un fallo al pedir los factores no son cinco ceros: son cinco fatores
       // desconocidos, y la UI los pinta como "no disponible" en vez de
       // "0,00", que es lo que se veia cuando el backend no respondia.
@@ -81,7 +83,8 @@ export default async function PortfolioPage() {
   return (
     <PortfolioTabs
       summary={summary}
-      transactions={transactions}
+      transactions={transactions.items}
+      transactionPage={{ total: transactions.total, offset: transactions.offset }}
       scores={scores}
       tearsheet={tearsheet}
       forecast={forecast}

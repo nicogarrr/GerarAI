@@ -42,6 +42,7 @@ type Transaction = {
 type Props = {
     summary: PortfolioSummaryType;
     transactions: Transaction[];
+    transactionPage?: { total: number; offset: number };
     scores: { quality: number | null; growth: number | null; value: number | null; dividend: number | null; cagr3y: number | null; history?: PortfolioPerformanceHistory };
     tearsheet: PortfolioTearsheetType | null;
     forecast: PortfolioForecastType | null;
@@ -66,7 +67,7 @@ function normalizeTab(value: string | null): PortfolioTab {
     return (VALID_TABS as readonly string[]).includes(value ?? '') ? (value as PortfolioTab) : 'resumen';
 }
 
-export default function PortfolioTabs({ summary, transactions, scores, tearsheet, forecast, dividends, userId, partialMessage }: Props) {
+export default function PortfolioTabs({ summary, transactions, transactionPage, scores, tearsheet, forecast, dividends, userId, partialMessage }: Props) {
     const searchParams = useSearchParams();
     const pathname = usePathname();
     const tabParam = searchParams.get('tab');
@@ -319,7 +320,7 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
                 {/* Tab: Movimientos */}
                 <TabsContent value="movimientos" className="mt-0">
                     <div className="max-w-4xl">
-                        <PortfolioTransactions transactions={transactions} userId={userId} />
+                        <PortfolioTransactions transactions={transactions} userId={userId} page={transactionPage} />
                     </div>
                 </TabsContent>
 
