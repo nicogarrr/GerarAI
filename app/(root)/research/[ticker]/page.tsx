@@ -1,8 +1,7 @@
 import { ThesisSummary } from '@/components/research/ThesisSummary';
 import { CompanyNavigation } from '@/components/research/CompanyNavigation';
-import CompanyChatForm from '@/components/research/CompanyChatForm';
-import ChatAnswerMarkdown from '@/components/research/ChatAnswerMarkdown';
-import ScrollToOnMount from '@/components/research/ScrollToOnMount';
+import BrainAskForm from '@/components/research/BrainAskForm';
+import LegacyChatRedirect from '@/components/research/LegacyChatRedirect';
 import { formatResearchMetric } from '@/lib/research/metric-value';
 import { financialFormula, financialPeriod, financialVersionLabel } from '@/lib/research/financial-display';
 import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
@@ -81,7 +80,6 @@ import { Stat } from '@/components/ui/stat';
 import { getCompanyPer } from '@/lib/actions/company-per.actions';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  askResearchCompanyChat,
   createResearchClaim,
   getResearchChangesWorkspace,
   getResearchCompanySnapshot,
@@ -122,8 +120,6 @@ import { NewsHeadline } from '@/components/research/NewsHeadline';
 import { SourceAuditDetail } from '@/components/research/SourceAuditDetail';
 import { dedupeNewsEvents, newsDisplayTitle } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
-import CitationsList from '@/components/chat/CitationsList';
-import { toChatCitations } from '@/lib/chat/citations';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
 import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
@@ -682,7 +678,6 @@ type ViewWorkspaces = {
   documents: Awaited<ReturnType<typeof getResearchDocumentsWorkspace>>;
   sources: Awaited<ReturnType<typeof getResearchSourceAuditsWorkspace>>;
   holders: Awaited<ReturnType<typeof getCompanyHolders>>;
-  chat: Awaited<ReturnType<typeof askResearchCompanyChat>>;
 };
 
 /**
@@ -719,7 +714,6 @@ const EMPTY_VIEW_DATA: { [K in keyof ViewWorkspaces]: ViewWorkspaces[K] } = {
   documents: [],
   sources: [],
   holders: null,
-  chat: null,
 };
 
 /**
@@ -774,14 +768,6 @@ function launchViewData(
   }
 }
 
-/** El motor puede citar instantes ISO crudos ("2026-10-18T09:00:00+00:00"): se muestran como fecha y hora de Madrid. */
-function humanizeChatAnswer(answer: string): string {
-  return answer.replace(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/g, (iso) => {
-    const formatted = formatUserDateTime(iso);
-    return formatted === NA ? iso : formatted;
-  });
-}
-
 export default async function ResearchCompanyPage({ params, searchParams }: PageProps) {
   const [{ ticker: rawTicker }, query] = await Promise.all([params, searchParams]);
   assertTickerShape(rawTicker);
@@ -829,13 +815,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   const viewPromise = viewTask
     ? settleResearchBatch([viewTask], RESEARCH_RENDER_BUDGET_MS)
     : Promise.resolve([]);
-  // El chat es un POST al motor y puede tardar más que una lectura: también sale
-  // en la primera fase. Su rama solo recoge el resultado y conserva el matiz que
-  // importa: un backend caído sigue siendo BackendOffline (no un chat vacío),
-  // porque el usuario puede reintentar.
-  const chatPromise = activeView === 'chat' && query.chat
-    ? withResearchTelemetry('company-chat', () => askResearchCompanyChat(ticker, query.chat as string))
-    : undefined;
   // En master-miss estas promesas no se consumen: el manejador se adjunta
   // EN CREACIÓN, porque un .catch posterior deja ventana de unhandledRejection
   // si rechazan durante los awaits intermedios. La propagación al consumidor
@@ -844,7 +823,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   drainRejection(moatPromise);
   drainRejection(newsPromise);
   drainRejection(viewPromise);
-  drainRejection(chatPromise);
   let snapshot: Awaited<typeof snapshotPromise>;
   try {
     snapshot = await snapshotPromise;
@@ -1646,46 +1624,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       </Panel>
     );
   } else {
-    let response: Awaited<ReturnType<typeof askResearchCompanyChat>> | null = null;
-    let chatFailed = false;
-    if (chatPromise) {
-      try {
-        response = await chatPromise;
-      } catch {
-        // Chat caído o lento: se conservan la página y el campo (la pantalla de offline
-        // los tapaba); el aviso va dentro del panel.
-        chatFailed = true;
-      }
-    }
     content = (
       <div className="space-y-6" id="chat-empresa" style={{ scrollMarginTop: '1rem' }}>
-        <ScrollToOnMount targetId="chat-empresa" />
-        <Panel title="Chat de la empresa con fuentes">
-          {/* Asistente por intención (WorldStocks punto 4): atajos que lanzan
-              una pregunta guiada por el MISMO contrato de evidencia
-              determinista de abajo. No añaden respuestas nuevas ni texto
-              generado: solo formulan la pregunta. */}
+        <LegacyChatRedirect ticker={ticker} question={query.chat} />
+        <Panel title="Pregunta al Cerebro sobre esta empresa">
+          {/* Sin chat propio: los atajos y el campo abren el Cerebro (panel
+              global) con el ticker puesto, con su contexto de página e historial. */}
           <ChatIntentLinks ticker={ticker} />
+          <BrainAskForm ticker={ticker} />
         </Panel>
-        {response ? (
-          <Panel title="Respuesta">
-            {/* El motor emite markdown ligero: con texto plano se veían los
-                asteriscos literales. El badge pluraliza (1 cita · 1 fuente). */}
-            <ChatAnswerMarkdown text={humanizeChatAnswer(response.answer)} />
-            <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline">modelo {response.model && response.model !== 'deterministic' ? response.model : 'determinista'}</Badge><Badge variant="outline">{toChatCitations(response.sources).length} {toChatCitations(response.sources).length === 1 ? 'cita' : 'citas'} · {response.sources.length} {response.sources.length === 1 ? 'fuente' : 'fuentes'}</Badge><Badge variant="outline">{response.blocked ? 'datos insuficientes' : 'con evidencia'}</Badge></div>
-            <CitationsList citations={[]} sources={response.sources} />
-          </Panel>
-        ) : chatFailed ? (
-          <EmptyState title="Sin datos para responder ahora mismo. Reintenta en unos segundos o haz otra pregunta." />
-        ) : (
-          <EmptyState title="Haz una pregunta para recuperar el contrato de evidencia determinista y la síntesis con fuentes." />
-        )}
-        {/* El campo queda fijo abajo mientras se lee la respuesta: la cabecera
-            de la ficha ya ocupa una pantalla y la respuesta puede ser larga, y
-            el input quedaba fuera de vista (y=1780 en un viewport de 713px). */}
-        <div className="sticky bottom-0 z-20 rounded-lg border border-gray-700 bg-surface-0/95 p-3 backdrop-blur-sm">
-          <CompanyChatForm ticker={ticker} defaultQuestion={query.chat} />
-        </div>
       </div>
     );
   }

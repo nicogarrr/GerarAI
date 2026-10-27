@@ -70,19 +70,19 @@ test.describe("audit closure flows", () => {
     await expect(page.getByRole("button", { name: /debate/i }).first()).toBeVisible();
   });
 
-  test("research chat renders citations when sources exist", async ({ page }) => {
-    await page.goto("/research/AAPL?view=chat&chat=deuda+nivel");
-    const citations = page.getByText("Citas y evidencia");
-    const blocked = page.getByText("datos insuficientes");
-    const empty = page.getByText(/Haz una pregunta/);
-    const failed = page.getByText(/Sin datos para responder/);
-    const offline = page.getByText(/backend/i);
+  test("la ficha no tiene chat propio: el campo abre el Cerebro", async ({ page }) => {
+    await page.goto("/research/AAPL?view=chat");
+    const field = page.getByLabel("Pregunta sobre AAPL");
     const noResearch = page.getByText(
-      // F286: fuera del master la ficha ya no es «Research aún no generado»
-      // sino uno de los tres estados honestos sin CTA.
-      /Research aún no generado|todavía no tiene research|Identidad del ticker no verificada|No encontramos este ticker|No pudimos comprobar este ticker/,
+      /Research aún no generado|todavía no tiene research|Identidad del ticker no verificada|No encontramos este ticker|No pudimos comprobar este ticker|backend/i,
     );
-    const states = (await citations.count()) + (await blocked.count()) + (await empty.count()) + (await failed.count()) + (await offline.count()) + (await noResearch.count());
-    expect(states).toBeGreaterThan(0);
+    if ((await field.count()) === 0) {
+      expect(await noResearch.count()).toBeGreaterThan(0);
+      return;
+    }
+    await field.fill("deuda nivel");
+    await page.getByRole("button", { name: "Preguntar", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
   });
+
 });

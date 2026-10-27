@@ -267,16 +267,9 @@ describe('la ficha real no serializa sus lecturas', () => {
     assert.doesNotMatch(PAGE, /getWatchlist\(\)\)\.catch\(\(\) => \[\]\)/);
   });
 
-  it('el chat sale en la primera fase y su rechazo queda drenado', () => {
-    // El chat es un POST al motor: si se pidiera dentro de su rama, seria una
-    // cuarta fase encadenada al snapshot.
-    const launched = PAGE.indexOf('const chatPromise =');
-    const awaited = PAGE.indexOf('response = await chatPromise;');
-    assert.ok(launched > -1 && awaited > launched, 'el chat se lanza antes de recogerse');
-    assert.ok(
-      PAGE.indexOf('drainRejection(chatPromise)') < PAGE.indexOf('snapshot = await snapshotPromise'),
-      'el drenaje del chat va antes del primer await, como el de las demas promesas',
-    );
+  it('la ficha no lanza el chat: la pregunta vive en el Cerebro', () => {
+    assert.ok(!PAGE.includes('chatPromise'));
+    assert.ok(!PAGE.includes('askResearchCompanyChat'));
   });
 
   it('cada lectura de research se lanza con telemetria o entra en el lote', () => {

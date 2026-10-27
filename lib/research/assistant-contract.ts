@@ -1,3 +1,6 @@
+import type { BrainHistoryTurn } from '@/lib/brain/history';
+import type { BrainPageContext } from '@/lib/brain/page-context';
+
 /** Contrato v1 congelado del asistente de investigación. Sin writeback. */
 export type AssistantMode = 'explore' | 'guide';
 export type AssistantSectionKey = 'facts' | 'calculations' | 'hypotheses' | 'inferences' | 'contradictions' | 'insufficient_data' | 'conclusion';
@@ -7,6 +10,9 @@ export type AssistantRequest = {
   question: string;
   ticker?: string;
   review_id?: number;
+  /** Contexto de página y turnos previos del Cerebro (solo contexto, no evidencia). */
+  page?: BrainPageContext | null;
+  history?: BrainHistoryTurn[];
 };
 export type AssistantResponse = {
   mode: AssistantMode;
@@ -25,6 +31,8 @@ export type AssistantResponse = {
   suggested_next_steps: string[];
   review_id: number | null;
   writeback: false;
+  /** Eco del contexto de página resuelto en servidor (pastilla "Viendo X"). */
+  context?: { label: string; ticker: string | null; company_name: string | null; company_resolved: boolean } | null;
 };
 export type GuideContext = {
   ticker: string;

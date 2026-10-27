@@ -1,5 +1,6 @@
 import 'server-only';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { trimBrainHistory } from '@/lib/brain/history';
 import { jsonBody, researchRequest } from '@/lib/research/client';
 import type { AssistantRequest, AssistantResponse, GuideContext } from '@/lib/research/assistant-contract';
 
@@ -16,7 +17,7 @@ export async function askResearchAssistant(request: AssistantRequest): Promise<A
   }
   const response = await researchRequest<AssistantResponse>('/api/research/assistant', {
     method: 'POST',
-    body: jsonBody({ mode: request.mode, question, ...(ticker ? { ticker } : {}), ...(request.review_id ? { review_id: request.review_id } : {}) }),
+    body: jsonBody({ mode: request.mode, question, ...(ticker ? { ticker } : {}), ...(request.review_id ? { review_id: request.review_id } : {}), ...(request.page ? { page: request.page } : {}), history: trimBrainHistory(request.history) }),
   });
   // Fallo cerrado: un backend incompatible no puede presentarse como modo sin escritura.
   if (response.writeback !== false || response.mode !== request.mode ||

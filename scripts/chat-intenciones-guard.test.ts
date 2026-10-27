@@ -13,7 +13,8 @@ import { CHAT_INTENTS, chatIntentHref } from '../lib/research/chat-intents.ts';
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 const links = readFileSync('components/research/ChatIntentLinks.tsx', 'utf8');
 
-const form = readFileSync('components/research/CompanyChatForm.tsx', 'utf8');
+const form = readFileSync('components/research/BrainAskForm.tsx', 'utf8');
+const legacy = readFileSync('components/research/LegacyChatRedirect.tsx', 'utf8');
 
 describe('chat de la ficha: asistente por intención', () => {
     it('existen las 3 intenciones con su etiqueta en español', () => {
@@ -26,27 +27,22 @@ describe('chat de la ficha: asistente por intención', () => {
             assert.ok(q.includes('AAPL'), `la pregunta no nombra al ticker: ${q}`);
         }
     });
-    it('los atajos lanzan el chat real con la pregunta codificada en la URL', () => {
-        const href = chatIntentHref('AAPL', CHAT_INTENTS[0]);
-        assert.match(href, /^\/research\/AAPL\?view=chat&chat=/);
-        assert.ok(href.includes(encodeURIComponent(CHAT_INTENTS[0].question('AAPL'))));
+    it('los atajos abren el Cerebro con el ticker y la pregunta, no un chat propio', () => {
         assert.match(links, /CHAT_INTENTS\.map/);
-        assert.match(links, /chatIntentHref\(ticker, intent\)/);
+        assert.match(links, /openBrain\(\{ ticker, question: intent\.question\(ticker\) \}\)/);
+        assert.doesNotMatch(links, /next\/link/);
     });
-    it('la ficha monta los atajos y el formulario libre sigue intacto', () => {
+    it('la ficha monta atajos y formulario que abren el Cerebro; no queda formulario GET ni llamada al motor', () => {
         assert.match(page, /<ChatIntentLinks ticker=\{ticker\} \/>/);
-        assert.match(page, /<CompanyChatForm ticker=\{ticker\}/);
-        assert.match(form, /<Input name="chat"/);
-        assert.match(form, /<input type="hidden" name="view" value="chat" \/>/);
+        assert.match(page, /<BrainAskForm ticker=\{ticker\} \/>/);
+        assert.match(form, /openBrain\(\{ ticker, question: text \}\)/);
+        assert.doesNotMatch(form, /next\/form/);
+        assert.doesNotMatch(page, /CompanyChatForm|askResearchCompanyChat|chatPromise/);
     });
-    it('al enviar, el navegador vuelve al panel del chat y los atajos también', () => {
-        assert.match(chatIntentHref('AAPL', CHAT_INTENTS[0]), /#chat-empresa$/);
-        assert.match(page, /id="chat-empresa"/);
-        assert.match(form, /action=\{`\/research\/\$\{encodeURIComponent\(ticker\)\}#chat-empresa`\}/);
-    });
-    it('un fallo del chat no tapa la página con BackendOffline: aviso dentro del panel y campo visible', () => {
-        const chatBlock = page.slice(page.indexOf('let chatFailed = false;'), page.indexOf('content = (', page.indexOf('let chatFailed = false;')));
-        assert.ok(!chatBlock.includes('BackendOffline'));
-        assert.match(chatBlock, /chatFailed = true/);
+    it('los enlaces antiguos ?chat= abren el Cerebro y limpian el parametro', () => {
+        assert.match(page, /<LegacyChatRedirect ticker=\{ticker\} question=\{query\.chat\} \/>/);
+        assert.match(legacy, /openBrain\(\{ ticker, question: text\.slice\(0, 2000\) \}\)/);
+        assert.match(legacy, /router\.replace\(`\$\{pathname\}\?view=chat`/);
+        assert.match(chatIntentHref('AAPL', CHAT_INTENTS[0]), /^\/research\/AAPL\?view=chat&chat=/);
     });
 });

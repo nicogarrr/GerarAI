@@ -51,7 +51,7 @@ test('3. el Cerebro escucha el evento con detalle y consume el handoff de sesió
 });
 
 test('3b. modo guía: ticker y review_id llegan al asistente de research (solo lectura)', () => {
-  assert.match(brain, /await askResearchAssistantAction\(\{\s*mode: 'guide',\s*question: userMsg,\s*ticker: cleanTicker,\s*\.\.\.\(reviewId \? \{ review_id: reviewId \} : \{\}\),?\s*\}\)/);
+  assert.match(brain, /await askResearchAssistantAction\(\{\s*mode: 'guide',\s*question: userMsg,\s*ticker: cleanTicker,\s*\.\.\.\(reviewId \? \{ review_id: reviewId \} : \{\}\),\s*page,\s*history,?\s*\}\)/);
   // Sin ticker el Cerebro NO llama al asistente: la guía es opt-in por el selector.
   assert.match(brain, /const cleanTicker = guideTicker\.trim\(\)\.toUpperCase\(\);\s*if \(cleanTicker\) \{/);
   // Fallo cerrado: un backend que no confirme writeback:false no se presenta como solo lectura.

@@ -1,18 +1,20 @@
-import Link from 'next/link';
+'use client';
+
 import { Button } from '@/components/ui/button';
-import { CHAT_INTENTS, chatIntentHref } from '@/lib/research/chat-intents';
+import { openBrain } from '@/lib/brain/open-brain';
+import { CHAT_INTENTS } from '@/lib/research/chat-intents';
 
 /**
- * Atajos del asistente por intención (WorldStocks punto 4). Solo formulan la
- * pregunta guiada y la lanzan por el MISMO chat con contrato de evidencia:
- * no añaden respuestas nuevas ni texto generado.
+ * Atajos por intención (WorldStocks punto 4). Solo formulan la pregunta y la
+ * abren en el Cerebro con el ticker puesto: no añaden respuestas nuevas ni
+ * texto generado.
  */
 export function ChatIntentLinks({ ticker }: { ticker: string }) {
   return (
     <div className="mb-3 flex flex-wrap gap-2">
       {CHAT_INTENTS.map((intent) => (
-        <Button asChild variant="outline" key={intent.key}>
-          <Link href={chatIntentHref(ticker, intent)}>{intent.label}</Link>
+        <Button key={intent.key} type="button" variant="outline" onClick={() => openBrain({ ticker, question: intent.question(ticker) })}>
+          {intent.label}
         </Button>
       ))}
     </div>
