@@ -4,6 +4,7 @@ import { formatDate, formatMoney, formatPercent } from '@/lib/format';
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { useActiveTabVisible } from './use-active-tab-visible';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import dynamic from 'next/dynamic';
 import PortfolioDataNotice from '@/components/portfolio/PortfolioDataNotice';
@@ -70,6 +71,8 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
     const tabParam = searchParams.get('tab');
     const [activeTab, setActiveTab] = useState<PortfolioTab>(() => normalizeTab(tabParam));
 
+    const tabViewportRef = useActiveTabVisible(activeTab);
+
     // Navegación cliente posterior a la hidratación (atrás/adelante,
     // enlaces con ?tab=): sincroniza el estado con la URL.
     useEffect(() => {
@@ -132,7 +135,7 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
                 <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                 {/* Con teclado no hay barra de scroll: la region enfocable deja las
                     pestañas alcanzables con las flechas (WCAG 2.1.1). */}
-                <div role="region" aria-label="Secciones de la cartera" tabIndex={0} className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+                <div ref={tabViewportRef} role="region" aria-label="Secciones de la cartera" tabIndex={0} className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
                     <TabsList className="bg-[#0a0a0a] border border-gray-800 p-1 rounded-xl mb-6 flex h-auto w-max max-w-none flex-nowrap gap-1 sm:h-9">
                     <TabsTrigger
                         value="resumen"
