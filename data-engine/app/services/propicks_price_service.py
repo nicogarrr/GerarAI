@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, MarketPrice, ProPickCandidate, ProPickRun
+from app.services import movers_cache
 from app.services.connectors.yahoo import yahoo_chart_symbol
 
 # Dias de CALENDARIO (momentum_from_series resta timedelta(days=...)): 126/252
@@ -265,6 +266,9 @@ def upsert_prices(
             else:
                 db.add(MarketPrice(**values))
         written += 1
+    if written:
+        # Movers cachea el cálculo de cierres: se invalida tras el commit.
+        movers_cache.mark_prices_written(db)
     return written
 
 

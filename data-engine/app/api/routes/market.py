@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.services import market_change, market_themes
+from app.services import market_change, market_themes, movers_cache
 from app.services.provenance import SourceKind, coverage_for_age, provenance
 
 router = APIRouter()
@@ -435,8 +435,14 @@ def market_movers(
     Sin filas devuelve universo vacío, nunca KeyError ni 500. El cambio sale de
     `market_change.compute_session_changes`, la misma función que usan Mercado
     y watchlist. Los rankings solo admiten valores que superan el suelo de
-    liquidez documentado arriba; el universo y sus exclusiones se declaran."""
-    movers, stale_excluded, session_day = market_change.compute_session_changes(db)
+    liquidez documentado arriba; el universo y sus exclusiones se declaran.
+    El cálculo se cachea `movers_cache.TTL_SECONDS` y se invalida cuando
+    `upsert_prices` escribe cierres."""
+    # Cálculo de todo el universo cacheado (TTL corto + invalidación al
+    # escribir cierres: ver app/services/movers_cache.py).
+    movers, stale_excluded, session_day = movers_cache.get_or_compute(
+        lambda: market_change.compute_session_changes(db)
+    )
     if not movers:
         return {
             "as_of": None,
