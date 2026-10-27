@@ -1,3 +1,4 @@
+import { CompanyNavigation } from '@/components/research/CompanyNavigation';
 import CompanyChatForm from '@/components/research/CompanyChatForm';
 import ChatAnswerMarkdown from '@/components/research/ChatAnswerMarkdown';
 import ScrollToOnMount from '@/components/research/ScrollToOnMount';
@@ -12,7 +13,7 @@ import { listingStatus } from '@/lib/research/listing-status';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
 import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
 import { groupClaimsByVersion } from '@/lib/research/claim-groups';
-import { GROUPS, MODULES, asView, moduleHref, type View } from '@/lib/research/research-views';
+import { asView, type View } from '@/lib/research/research-views';
 import { researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -1222,19 +1223,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             ))}
           </div>
         </Panel>
-        {/*
-            Entrada visible (también en móvil) al diario de decisiones: el
-            formulario «Decisión» vive en ?view=changes y antes no había forma
-            de llegar a él desde el resumen de la ficha.
-        */}
-        <Link
-          className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg border border-gray-800 bg-surface-1 px-4 py-3 text-sm text-gray-200 transition hover:border-teal-700 hover:text-teal-200"
-          data-testid="decision-journal-entry"
-          href={`/research/${encodeURIComponent(ticker)}?view=changes#diario-decisiones`}
-        >
-          <span>¿Has comprado, vendido o decidido esperar? Apúntalo en tu diario de decisiones.</span>
-          <span className="shrink-0 font-medium text-teal-300">Registrar una decisión →</span>
-        </Link>
         <OwnershipSignalsPanel signals={ownershipSignals} ticker={ticker} />
         {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><p className="text-sm text-gray-400">Elementos orbitales de CelesTrak y evolución del semieje mayor.</p><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
@@ -1706,9 +1694,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     );
   }
 
-  const activeModule = MODULES.find((module) => module.key === activeView) ?? MODULES[0];
-  const activeGroupLabel = GROUPS.find((group) => group.key === activeModule.group)?.label ?? '';
-  const groupModules = MODULES.filter((module) => module.group === activeModule.group && (module.key !== 'satellites' || ticker === 'ASTS'));
   const recentChangeCount = snapshot.recent_changes?.length ?? 0;
   // F143: el distintivo de tenencia sale de la posicion viva del tenant
   // (snapshot.in_portfolio), no de companies.company_type, que es una
@@ -1740,6 +1725,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               <CompanyActionsMenu ticker={ticker} changeCount={recentChangeCount} />
             </div>
           </div>
+          <CompanyNavigation ticker={ticker} activeView={activeView} />
           {(() => {
             const listing = listingStatus(company.exchange, headerMarket?.quote?.priceAsOf ?? null, new Date());
             return listing.stale ? <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200" role="status">{listing.message}</p> : null;
@@ -1750,42 +1736,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           <MobileCollapse title="Precios objetivo de analistas"><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse>
           <MobileCollapse title="Señales DCA: histórico"><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
         </header>
-        {/*
-            Selector de paso (Entender → Valorar → Seguir) y, debajo, solo los
-            módulos de ese paso. Antes eran 16 píldoras planas en una fila: no
-            se escaneaban y el usuario no encontraba la tesis. Los dos `nav`
-            llevan su propia etiqueta porque cada uno es un nivel distinto.
-            `scroll={false}`: cambiar de pestaña solo cambia el contenido, sin
-            devolver al usuario al inicio de la página (salto que parecía un
-            refresco). Los módulos de subruta (`path`) son otra página y ahí sí
-            arrancan arriba, como cualquier navegación.
-        */}
-        <nav aria-label="Etapas del research" className="-mx-4 mb-3 flex flex-wrap gap-x-6 gap-y-2 border-b border-gray-800 px-4 pb-2 sm:mx-0 sm:px-0">
-          {GROUPS.map((group) => (
-            <Link
-              aria-current={activeModule.group === group.key ? 'true' : undefined}
-              className={`inline-flex min-h-[44px] items-center whitespace-nowrap border-b-2 py-2.5 text-sm font-medium transition ${activeModule.group === group.key ? 'border-teal-300 text-gray-100' : 'border-transparent text-gray-500 hover:text-gray-200'}`}
-              href={`/research/${encodeURIComponent(ticker)}?view=${group.key}`}
-              key={group.key}
-              scroll={false}
-            >
-              {group.label}
-            </Link>
-          ))}
-        </nav>
-        {groupModules.length > 1 ? <nav aria-label={`Módulos de ${activeGroupLabel}`} className="-mx-4 mb-7 flex flex-wrap gap-2 px-4 pb-2 sm:mx-0 sm:px-0 sm:pb-0">
-          {groupModules.map((module) => (
-            <Link
-              aria-current={activeView === module.key ? 'page' : undefined}
-              className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-lg border px-4 py-2.5 text-sm transition sm:min-h-0 sm:px-3 sm:py-2 ${activeView === module.key ? 'border-teal-600 bg-teal-950/40 text-teal-200' : 'border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200'}`}
-              href={moduleHref(ticker, module)}
-              key={module.key}
-              scroll={!('path' in module)}
-            >
-              {module.label}
-            </Link>
-          ))}
-        </nav> : null}
         {content}
       </div>
     </main>
