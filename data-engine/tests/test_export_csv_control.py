@@ -3,7 +3,6 @@
 import csv
 import io
 from datetime import date
-from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
@@ -31,15 +30,26 @@ def test_csv_ordinary_values_and_real_numbers_are_unchanged(value):
 
 def test_streamed_csv_escapes_note_without_splitting_cells(monkeypatch):
     note = '\t=1+1,"quoted"\nnext line'
-    monkeypatch.setattr(route.InvestmentPlanService, "list_contributions", lambda *a: [
-        SimpleNamespace(date=date(2026, 1, 2), amount=-12.5, currency="EUR", note=note),
-    ])
     monkeypatch.setattr(route.PortfolioFXService, "portfolio", lambda *a: None)
     monkeypatch.setattr(route.TaxReportService, "compute_report", lambda *a: {})
     engine = create_engine(
         "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     Base.metadata.create_all(engine)
+    # Real persisted contribution: annual export no longer calls the paginated
+    # UI listing method. Keep the same HTTP/CSV escaping assertions below.
+    from decimal import Decimal
+
+    from app.models import PlanContribution
+
+    with Session(engine) as seed:
+        seed.info["tenant_id"] = 1
+        plan = route.InvestmentPlanService().upsert_plan(
+            seed, monthly_contribution=Decimal("1"), start_date=date(2026, 1, 1),
+            horizon_years=30, target_allocations=[],
+        )
+        seed.add(PlanContribution(plan_id=plan.id, date=date(2026, 1, 2), amount=Decimal("-12.5"), currency="EUR", note=note))
+        seed.commit()
     app = FastAPI()
     app.include_router(route.router, prefix="/api/export")
 

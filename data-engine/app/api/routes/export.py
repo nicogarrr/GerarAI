@@ -20,6 +20,7 @@ from app.core.database import get_db
 from app.models import (
     Company,
     DecisionJournalEntry,
+    PlanContribution,
     Position,
     TaxReport,
     Transaction,
@@ -127,6 +128,14 @@ def export_year(
         )
 
     plan_service = InvestmentPlanService()
+    plan = plan_service.get_plan(db)
+    yearly_contributions = db.scalars(
+        select(PlanContribution).where(
+            PlanContribution.plan_id == plan.id,
+            PlanContribution.date >= start,
+            PlanContribution.date <= end,
+        ).order_by(PlanContribution.date, PlanContribution.id)
+    ).all() if plan is not None else []
     contributions = [
         {
             "date": c.date.isoformat(),
@@ -134,8 +143,7 @@ def export_year(
             "currency": c.currency,
             "note": c.note,
         }
-        for c in plan_service.list_contributions(db)
-        if c.date >= start and c.date <= end
+        for c in yearly_contributions
     ]
 
     tax = None
