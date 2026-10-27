@@ -120,3 +120,11 @@ def test_reviewer_conjugations_and_negated_corrections_never_price(db, clause):
     if "No " in clause:
         assert "negada" in response.answer
         assert "Has incluido una venta pasada" not in response.answer
+
+
+def test_absence_of_prior_sales_is_not_presented_as_a_real_sale(db):
+    q = "Compré 10 acciones a 10 euros y si vendo 6 a 5 euros, sin haber vendido antes, ¿IRPF?"
+    response = ChatService()._hypothetical_sale_answer(db, q, parse_purchase_lots(q), None, "TEST")
+    assert "Has incluido una venta pasada" not in response.answer
+    assert "o su ausencia" in response.answer
+    assert "IRPF estimado" not in response.answer

@@ -34,7 +34,7 @@ def sale_intent_issue(question: str) -> str | None:
         )
     if _HISTORICAL_SALE.search(question or ""):
         return (
-            "Has incluido una venta pasada. Esta estimación no reconstruye ventas previas escritas "
+            "El mensaje menciona una venta pasada o su ausencia. Esta estimación no reconstruye ventas previas escritas "
             "en el mensaje ni sus pérdidas diferidas. No he usado esa venta como si fuera la de hoy. "
             "Registra el historial completo en Cartera para simular sobre él, o confirma los lotes "
             "que siguen en cartera y una sola venta hipotética (cantidad y precio)."
