@@ -116,15 +116,23 @@ def _read_response(response) -> bytes:
     return data
 
 
+def _require_https(url: str) -> None:
+    """Solo https: urllib abriria tambien file:// y ftp:// (lectura local / SSRF)."""
+    if not url.lower().startswith("https://"):
+        raise ValueError(f"URL no https rechazada: {url.split(':', 1)[0]}://")
+
+
 def _fetch_json(url: str) -> dict[str, Any]:
+    _require_https(url)
     request = urllib.request.Request(url, headers=default_headers())
-    with urllib.request.urlopen(request, timeout=30) as response:
+    with urllib.request.urlopen(request, timeout=30) as response:  # nosec B310 - https verificado arriba
         return json.loads(_read_response(response).decode("utf-8"))
 
 
 def _fetch_bytes(url: str) -> bytes:
+    _require_https(url)
     request = urllib.request.Request(url, headers=default_headers())
-    with urllib.request.urlopen(request, timeout=60) as response:
+    with urllib.request.urlopen(request, timeout=60) as response:  # nosec B310 - https verificado arriba
         return _read_response(response)
 
 
