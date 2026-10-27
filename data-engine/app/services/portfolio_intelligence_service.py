@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models import CashBalance, Company, FinancialFact, MarketPrice, Position, Transaction
 from app.services.async_bridge import run_from_any_context
-from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.portfolio_fx_service import PortfolioFXService, currency_key
 from app.services.portfolio_ledger_service import BUY_ACTIONS, SELL_ACTIONS
 from app.services.portfolio_reconstruction_service import PortfolioReconstructionService
 from app.services.portfolio_snapshot_service import PortfolioSnapshotService
@@ -742,7 +742,7 @@ class PortfolioIntelligenceService:
             as_of=date.today(),
         )
         for cash in cash_rows:
-            rate = ending_rates.get(cash.currency.upper())
+            rate = ending_rates.get(currency_key(cash.currency))
             if rate is not None:
                 ending_value += float(cash.balance * rate)
         if ending_value:

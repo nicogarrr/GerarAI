@@ -14,6 +14,12 @@ from app.valuation.currency import normalize_currency
 TAX_CURRENCY = "EUR"
 
 
+def currency_key(raw: str) -> str:
+    """Injective monetary-unit key: GBP and GBp must never collide."""
+    major, divisor = normalize_currency(raw)
+    return major if divisor == 1 else f"{major}/{divisor}"
+
+
 class PortfolioFXService:
     """Tenant-scoped portfolio configuration and point-in-time FX lookup."""
 
@@ -206,11 +212,17 @@ class PortfolioFXService:
         replicando la semántica de :meth:`rate`.
         """
         quotes = {str(code) for code in quote_currencies if code}
+        base_major, base_divisor = normalize_currency(base_currency)
+        if all(normalize_currency(code)[0] == base_major for code in quotes):
+            return {
+                currency_key(code): Decimal(base_divisor) / Decimal(normalize_currency(code)[1])
+                for code in quotes
+            }
         table = self.fx_table(
             db, currencies=quotes, base_currency=base_currency, as_of_max=as_of
         )
         return {
-            code.upper(): self.rate_from_table(
+            currency_key(code): self.rate_from_table(
                 table, quote_currency=code, base_currency=base_currency, as_of=as_of
             )
             for code in quotes
