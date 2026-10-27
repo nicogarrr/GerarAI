@@ -6,6 +6,7 @@ distintas (cotizacion en vivo vs cierres de BD)."""
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from types import SimpleNamespace
 
 from sqlalchemy import and_, func, select
@@ -48,11 +49,19 @@ def common_sessions(db: Session) -> tuple:
     return (sessions[0] if sessions else None), (sessions[1] if len(sessions) > 1 else None)
 
 
-def compute_session_changes(db: Session) -> tuple[list[dict], int, object]:
+def compute_session_changes(
+    db: Session, tickers: Collection[str] | None = None
+) -> tuple[list[dict], int, object]:
     """(filas por compania con change_pct, excluidas sin sesion comun, ultima sesion comun).
 
     change_pct es None salvo que el ultimo cierre sea el de la ultima sesion
-    comun y el previo el de la sesion inmediatamente anterior."""
+    comun y el previo el de la sesion inmediatamente anterior.
+
+    `tickers` (opcional) limita el calculo a esas compañías (sin distinguir
+    mayúsculas). Las sesiones comunes se siguen calculando sobre TODO el
+    universo, así que cada fila es idéntica a la del cálculo completo; solo se
+    evita leer y normalizar los cierres de las compañías que nadie pidió
+    (/api/market/changes pide 3-30 tickers y recalculaba ~1200)."""
     # Ventana POR COMPAÑÍA: los dos últimos cierres de cada una, sin suelo
     # temporal global. Un corte global de N días expulsaba del universo a
     # cualquier compañía con el último cierre más viejo que la ventana, y a
@@ -63,6 +72,16 @@ def compute_session_changes(db: Session) -> tuple[list[dict], int, object]:
     # cada CTE y una lectura por clave; nunca un row_number sobre toda la
     # historia.
     official = MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES)
+    if tickers is not None:
+        wanted = sorted({t.strip().upper() for t in tickers if t and t.strip()})
+        if not wanted:
+            return [], 0, None
+        official = and_(
+            official,
+            MarketPrice.company_id.in_(
+                select(Company.id).where(func.upper(Company.ticker).in_(wanted))
+            ),
+        )
     latest_day = db.scalar(select(func.max(MarketPrice.date)).where(official))
     if latest_day is None:
         return [], 0, None
