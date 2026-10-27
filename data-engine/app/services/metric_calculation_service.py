@@ -5,6 +5,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
+from app.core.units import is_from_percent, to_fraction
 from app.models import CalculatedMetric, Company, FinancialFact
 from app.services.moat_profile import NONCOMPARABLE_PROFILES, PROFILE_LABELS, financial_quality_profile
 
@@ -740,7 +741,7 @@ class MetricCalculationService:
         rejected_inputs: list[str] = []
         if direct:
             _, fact = direct
-            rate, normalized = self._normalize_rate(fact.value)
+            rate, normalized = self._normalize_rate(fact.value, unit=fact.unit)
             if rate is not None and Decimal("0") <= rate <= Decimal("1"):
                 return rate, {
                     "tax_rate": str(rate),
@@ -921,13 +922,12 @@ class MetricCalculationService:
         self,
         raw_value: Decimal,
         allow_negative: bool = False,
+        unit: str | None = None,
     ) -> tuple[Decimal | None, bool]:
-        rate = Decimal(raw_value)
-        if rate > 1 and rate <= 100:
-            rate /= Decimal("100")
-            normalized = True
-        else:
-            normalized = False
+        # Helper único de unidades: la unidad del hecho manda; la heurística
+        # «>1 => %» solo queda para hechos sin unidad útil.
+        rate, method = to_fraction(Decimal(raw_value), unit)
+        normalized = is_from_percent(method)
         if rate < 0 and not allow_negative:
             return None, normalized
         if rate > 1:
@@ -1050,7 +1050,7 @@ class MetricCalculationService:
             )
             if direct_debt_cost:
                 facts["cost_of_debt"] = direct_debt_cost[1]
-                cost_of_debt, _ = self._normalize_rate(direct_debt_cost[1].value)
+                cost_of_debt, _ = self._normalize_rate(direct_debt_cost[1].value, unit=direct_debt_cost[1].unit)
                 cost_of_debt_source = "reported_cost_of_debt"
                 if cost_of_debt is None:
                     missing.append("valid_cost_of_debt")
@@ -1114,7 +1114,7 @@ class MetricCalculationService:
                 else:
                     facts["country_risk_premium"] = country_risk[1]
                     normalized_country_risk, _ = self._normalize_rate(
-                        country_risk[1].value
+                        country_risk[1].value, unit=country_risk[1].unit
                     )
                     if normalized_country_risk is None:
                         missing.append("valid_country_risk_premium")
@@ -1140,9 +1140,10 @@ class MetricCalculationService:
             risk_free_rate, rf_normalized = self._normalize_rate(
                 facts["risk_free_rate"].value,
                 allow_negative=True,
+                unit=facts["risk_free_rate"].unit,
             )
             equity_risk_premium, erp_normalized = self._normalize_rate(
-                facts["equity_risk_premium"].value
+                facts["equity_risk_premium"].value, unit=facts["equity_risk_premium"].unit
             )
             beta = Decimal(facts["beta"].value)
             debt = Decimal(facts["total_debt"].value)
@@ -1173,7 +1174,7 @@ class MetricCalculationService:
                 continue
 
             country_risk_rate = self._normalize_rate(
-                facts["country_risk_premium"].value
+                facts["country_risk_premium"].value, unit=facts["country_risk_premium"].unit
             )[0]
             assert country_risk_rate is not None
             assert tax_rate is not None
@@ -1601,8 +1602,8 @@ class MetricCalculationService:
         erp_facts = self._facts_for_metric(db, company, "equity_risk_premium")
         if not rf_facts or not beta_facts or not erp_facts:
             return None
-        risk_free, _ = self._normalize_rate(rf_facts[0].value, allow_negative=True)
-        erp, _ = self._normalize_rate(erp_facts[0].value)
+        risk_free, _ = self._normalize_rate(rf_facts[0].value, allow_negative=True, unit=rf_facts[0].unit)
+        erp, _ = self._normalize_rate(erp_facts[0].value, unit=erp_facts[0].unit)
         if risk_free is None or erp is None:
             return None
         beta = Decimal(beta_facts[0].value)
@@ -1615,7 +1616,7 @@ class MetricCalculationService:
         country_rate = Decimal("0")
         crp_facts = self._facts_for_metric(db, company, "country_risk_premium")
         if crp_facts:
-            normalized_crp, _ = self._normalize_rate(crp_facts[0].value)
+            normalized_crp, _ = self._normalize_rate(crp_facts[0].value, unit=crp_facts[0].unit)
             if normalized_crp is not None:
                 country_rate = normalized_crp
         cost_of_equity = risk_free + beta * erp + country_rate
