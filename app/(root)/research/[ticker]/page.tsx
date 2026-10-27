@@ -104,6 +104,8 @@ import {
 } from '@/lib/actions/research.actions';
 import { getCompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
 import { getCompanyHolders } from '@/lib/actions/investors.actions';
+import { getKnowledgeDocumentsForTicker } from '@/lib/actions/research-tools.actions';
+import { libraryDocumentHref } from '@/lib/knowledge/document-ticker';
 import { getWatchlist } from '@/lib/actions/watchlist.actions';
 import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
@@ -1569,7 +1571,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   } else if (activeView === 'valuation') {
     content = <ValuationView valuation={await viewData('valuation')} currency={company.currency} ticker={ticker} />;
   } else if (activeView === 'documents') {
-    const documents = await viewData('documents');
+    // Conexión 10a: las lecturas de la biblioteca enlazadas a este ticker se
+    // piden en paralelo; si la biblioteca falla, la vista sigue sin ellas.
+    const [documents, libraryReadings] = await Promise.all([
+      viewData('documents'),
+      getKnowledgeDocumentsForTicker(ticker).catch(() => null),
+    ]);
     content = (
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -1586,6 +1593,28 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             <EmptyState
               action={<EmptyLink href="/research/sources">Importa tu primer documento</EmptyLink>}
               title="Sin documentos ingeridos."
+            />
+          )}
+        </Panel>
+        <Panel title="Lecturas de la biblioteca" actions={<Link className="text-sm text-teal-300" href="/knowledge?tab=subir">Añadir a la biblioteca</Link>}>
+          {libraryReadings === null ? (
+            <EmptyState title="No se pudo cargar la biblioteca ahora mismo." />
+          ) : libraryReadings.length ? (
+            <ul className="space-y-3">
+              {libraryReadings.map((reading) => (
+                <li className="rounded-lg border border-gray-800 p-4" key={reading.id}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FileText className="h-4 w-4 text-teal-300" />
+                    <Link className="font-medium text-gray-200 underline decoration-gray-700 underline-offset-4 transition hover:text-teal-200" href={libraryDocumentHref(reading.id)}>{reading.title}</Link>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">{reading.author ?? 'Autor desconocido'}{reading.publication_date ? ` · ${formatDate(reading.publication_date)}` : ''}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState
+              action={<EmptyLink href="/knowledge">Asigna este ticker a un documento de la biblioteca</EmptyLink>}
+              title={`Ningún libro, carta o nota de la biblioteca está enlazado a ${ticker}.`}
             />
           )}
         </Panel>
