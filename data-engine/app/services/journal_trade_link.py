@@ -90,6 +90,19 @@ def resolve_trade(db: Session, company: Company, transaction_id: int) -> Transac
     return trade
 
 
+def resolve_decision_trade(
+    db: Session, company: Company, transaction_id: int, decision: str,
+) -> Transaction:
+    """An execution must match the decision's side, not merely its ticker."""
+    expected = DECISION_TRADE_ACTION.get(decision)
+    if expected is None:
+        raise ValueError("Esta decisión no admite una operación de compra o venta.")
+    trade = resolve_trade(db, company, transaction_id)
+    if str(trade.action).lower() != expected:
+        raise ValueError("La operación debe ser del mismo sentido que la decisión (compra o venta).")
+    return trade
+
+
 def trade_summary(trade: Transaction) -> dict[str, Any]:
     action = str(trade.action).lower()
     return {
