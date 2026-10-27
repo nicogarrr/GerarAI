@@ -33,6 +33,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.services.portfolio_fx_service import PortfolioFXService
+from app.valuation.currency import normalize_currency
 
 ECB_DATA_URL = "https://data-api.ecb.europa.eu/service/data/EXR/D.{codes}.EUR.SP00.A"
 ECB_SOURCE = "ECB"
@@ -46,9 +47,18 @@ MINOR_UNITS: dict[str, tuple[str, Decimal]] = {
 
 
 def _normalize(code: str) -> str:
+    """Codigo de subunidad canonico para el BCE, con la MISMA tabla que la
+    valoracion (``normalize_currency``): GBp/GBX/GBPENCE -> GBX, ZAc -> ZAC,
+    ILa/ILX -> ILA. Antes solo ``GBp`` se reconocia aqui; cualquier otra
+    grafia de subunidad que el resto del codigo ya divide entre 100 se pedia
+    al BCE como si fuese una divisa (que no existe) y el informe fiscal se
+    quedaba sin tipo para esas operaciones."""
     normalized = code.strip()
-    if normalized == "GBp":
-        return "GBX"
+    major, divisor = normalize_currency(normalized)
+    if major is not None and divisor != 1:
+        for minor, (minor_major, minor_divisor) in MINOR_UNITS.items():
+            if minor_major == major and minor_divisor == divisor:
+                return minor
     return normalized.upper()
 
 
