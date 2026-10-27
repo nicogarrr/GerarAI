@@ -448,3 +448,94 @@ def test_xirr_withholding_and_fee_negative_amounts_are_outflows(db, monkeypatch)
     assert meta["status"] == "calculated"
     # -1000 + 85/(1+r)^(184/365) + 1000/(1+r) = 0  ->  r = 0,088657
     assert xirr == pytest.approx(0.088657, abs=1e-5)
+
+
+@pytest.mark.parametrize("action", ["buy", "sell", "dividend", "interest", "fee", "withholding"])
+def test_xirr_missing_fx_in_investment_flow_is_incomplete(db, monkeypatch, action):
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    today = _freeze_today(monkeypatch)
+    company = _company(db)
+    portfolio = PortfolioFXService().ensure_portfolio(db)
+    db.add_all([
+        Transaction(portfolio_id=portfolio.id, company_id=company.id,
+                    trade_date=today - timedelta(days=365), action="buy",
+                    quantity=1, price=1000, currency="EUR"),
+        Transaction(portfolio_id=portfolio.id, company_id=company.id,
+                    trade_date=today, action=action,
+                    quantity=1, price=100, currency="HKD"),
+    ])
+    position = Position(portfolio_id=portfolio.id, company_id=company.id,
+                        quantity=1, currency="EUR", market_value_base=1100,
+                        as_of=today)
+    db.add(position)
+    db.commit()
+    result, trace = PortfolioIntelligenceService()._xirr(db, [(position, company)])
+    assert result is None
+    assert trace["status"] == "incomplete_missing_fx"
+    assert trace["missing_fx"][0]["kind"] == "cashflow"
+
+
+def test_xirr_account_missing_fx_ending_cash_not_omitted(db, monkeypatch):
+    from app.models import CashBalance
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    today = _freeze_today(monkeypatch)
+    portfolio = PortfolioFXService().ensure_portfolio(db)
+    db.add_all([
+        Transaction(portfolio_id=portfolio.id, trade_date=today - timedelta(days=365),
+                    action="deposit", quantity=1, price=10000, currency="EUR"),
+        CashBalance(currency="EUR", balance=6000),
+        CashBalance(currency="HKD", balance=20000),
+    ])
+    db.commit()
+    result, trace = PortfolioIntelligenceService()._xirr(db, [])
+    assert result is None
+    assert trace["status"] == "incomplete_missing_fx"
+    assert trace["missing_fx"] == [{"kind": "ending_cash", "currency": "HKD"}]
+    # Synthetic rate, not a market assertion. Supplying it restores coverage.
+    PortfolioFXService().upsert_rate(db, base_currency="EUR", quote_currency="HKD",
+                                   rate=Decimal("0.12"), rate_date=today, source="test")
+    db.commit()
+    result, trace = PortfolioIntelligenceService()._xirr(db, [])
+    assert trace["status"] == "calculated"
+    assert result == pytest.approx(-0.16, abs=1e-4)
+
+
+def test_xirr_account_internal_missing_fx_does_not_block(db, monkeypatch):
+    from app.models import CashBalance
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    today = _freeze_today(monkeypatch)
+    portfolio = PortfolioFXService().ensure_portfolio(db)
+    db.add_all([
+        Transaction(portfolio_id=portfolio.id, trade_date=today - timedelta(days=365),
+                    action="deposit", quantity=1, price=1000, currency="EUR"),
+        Transaction(portfolio_id=portfolio.id, trade_date=today, action="dividend",
+                    quantity=1, price=100, currency="HKD"),
+        CashBalance(currency="EUR", balance=1100),
+    ])
+    db.commit()
+    result, trace = PortfolioIntelligenceService()._xirr(db, [])
+    assert trace["status"] == "calculated"
+    assert result == pytest.approx(0.1, abs=1e-4)
+
+
+def test_xirr_unknown_position_value_is_not_zero(db, monkeypatch):
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    today = _freeze_today(monkeypatch)
+    company = _company(db)
+    portfolio = PortfolioFXService().ensure_portfolio(db)
+    db.add(Transaction(portfolio_id=portfolio.id, company_id=company.id,
+                       trade_date=today - timedelta(days=365), action="buy",
+                       quantity=1, price=1000, currency="EUR"))
+    position = Position(portfolio_id=portfolio.id, company_id=company.id,
+                        quantity=1, currency="HKD", market_value_base=None,
+                        market_value=10000, as_of=today)
+    db.add(position)
+    db.commit()
+    result, trace = PortfolioIntelligenceService()._xirr(db, [(position, company)])
+    assert result is None
+    assert trace["status"] == "incomplete_missing_fx"
+    assert trace["missing_fx"][0]["kind"] == "position"
