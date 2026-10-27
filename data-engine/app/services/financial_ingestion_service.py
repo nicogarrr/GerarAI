@@ -326,6 +326,37 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
 # reviewed trae WeightedAverageNumberOfShares en base scope). EBITDA no es tag
 # IFRS estandar: se deriva como operating_income + D&A en _derive_esef_metrics
 # (no aplica a bancos sin beneficio operativo, p.ej. SAN).
+# Emisores extranjeros que presentan a la SEC en IFRS (40-F canadienses como
+# Brookfield BN, 20-F en IFRS): companyfacts trae SOLO la taxonomia
+# ``ifrs-full`` y la lectura us-gaap los dejaba con 0 hechos y la tesis
+# «sin datos suficientes» (27/10/2026). Misma estructura que SEC_METRIC_MAP
+# y mismas reglas de admision (ancla de filing, 300-380 dias, fp=FY); solo
+# cambian los conceptos. Se usa unicamente si el filer no trae us-gaap.
+# Semantica alineada con us-gaap: beneficio y patrimonio ATRIBUIBLES a la
+# dominante (NetIncomeLoss/StockholdersEquity), nunca el total con
+# minoritarios (ProfitLoss/Equity), que en un holding como BN es ~2,5x.
+SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
+    ("revenue",           ["Revenue", "RevenueFromContractsWithCustomers"],                            "USD"),
+    ("gross_profit",      ["GrossProfit"],                                                             "USD"),
+    ("operating_income",  ["ProfitLossFromOperatingActivities"],                                       "USD"),
+    ("income_before_tax", ["ProfitLossBeforeTax"],                                                     "USD"),
+    ("income_tax_expense", ["IncomeTaxExpenseContinuingOperations"],                                   "USD"),
+    ("interest_expense",  ["InterestExpense", "FinanceCosts"],                                         "USD"),
+    ("net_income",        ["ProfitLossAttributableToOwnersOfParent"],                                  "USD"),
+    ("eps_diluted",       ["DilutedEarningsLossPerShare"],                                             "USD/share"),
+    # IAS 33: AdjustedWeightedAverageShares = media ponderada DILUIDA.
+    ("shares_diluted",    ["AdjustedWeightedAverageShares"],                                           "shares"),
+    ("total_assets",      ["Assets"],                                                                  "USD"),
+    ("total_liabilities", ["Liabilities"],                                                             "USD"),
+    ("total_equity",      ["EquityAttributableToOwnersOfParent"],                                      "USD"),
+    ("cash_and_equivalents", ["CashAndCashEquivalents"],                                               "USD"),
+    ("operating_cash_flow", ["CashFlowsFromUsedInOperatingActivities"],                                "USD"),
+    ("capital_expenditure", ["PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"],    "USD"),
+    ("depreciation_amortization", ["DepreciationAndAmortisationExpense"],                              "USD"),
+    ("dividends_paid",    ["DividendsPaidClassifiedAsFinancingActivities", "DividendsPaid"],          "USD"),
+]
+
+
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["ifrs-full:Revenue", "ifrs-full:RevenueFromInterest"],                        "iso4217:EUR"),
     ("net_income",        ["ifrs-full:ProfitLoss"],                                                      "iso4217:EUR"),
@@ -569,6 +600,13 @@ DEBT_SIGNAL_CONCEPTS: frozenset[str] = frozenset({
     "ProceedsFromIssuanceOfDebt", "ProceedsFromIssuanceOfLongTermDebt",
     "ProceedsFromShortTermDebt", "ProceedsFromConvertibleDebt",
     "ProceedsFromLinesOfCredit", "PaymentsOfDebtIssuanceCosts",
+    # ifrs-full (40-F/20-F en IFRS, p. ej. BN): prestamos y su flujo. Sin
+    # ellos un filer IFRS con deuda salia con deuda neta = -caja.
+    "Borrowings", "LongtermBorrowings", "ShorttermBorrowings",
+    "CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings",
+    "NoncurrentPortionOfNoncurrentBorrowings",
+    "ProceedsFromBorrowingsClassifiedAsFinancingActivities",
+    "RepaymentsOfBorrowingsClassifiedAsFinancingActivities",
 })
 
 # Ventana de evidencia (regla del auditor: "ultimos N ejercicios"): 5 anos
@@ -1479,6 +1517,14 @@ class FinancialIngestionService:
                 )
 
         us_gaap = facts_data.get("facts", {}).get("us-gaap", {})
+        # 40-F/20-F en IFRS (BN): sin us-gaap, la misma lectura va sobre
+        # ifrs-full con su mapa de conceptos; el resto de reglas no cambia.
+        metric_map = SEC_METRIC_MAP
+        taxonomy = "us-gaap"
+        if not us_gaap and facts_data.get("facts", {}).get("ifrs-full"):
+            us_gaap = facts_data["facts"]["ifrs-full"]
+            metric_map = SEC_IFRS_METRIC_MAP
+            taxonomy = "ifrs-full"
         # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
         # Cada hecho monetario se guarda con ELLA como unidad.
         reporting_currency = _sec_reporting_currency(us_gaap)
@@ -1532,7 +1578,7 @@ class FinancialIngestionService:
         # cuyos filings salieron de la ventana de submissions).
         annual_by_metric: dict[str, dict[str, dict[str, Any]]] = {}
         restated_fy_keys: list[tuple[str, str]] = []
-        for metric, concepts, unit in SEC_METRIC_MAP:
+        for metric, concepts, unit in metric_map:
             unit_keys = _sec_unit_keys(unit, reporting_currency)
             if unit_keys is None:
                 continue
@@ -1585,7 +1631,7 @@ class FinancialIngestionService:
             db, company, document, restated_fy_keys=restated_fy_keys
         )
 
-        for metric, concepts, unit in SEC_METRIC_MAP:
+        for metric, concepts, unit in metric_map:
             unit_keys = _sec_unit_keys(unit, reporting_currency)
             if unit_keys is None:
                 continue
@@ -1839,6 +1885,8 @@ class FinancialIngestionService:
             existing_meta = dict(document.metadata_ or {})
             existing_meta["xbrl_concept_by_metric_period"] = concept_usage
             existing_meta["capital_fact_provenance"] = capital_provenance
+            # Taxonomia leida (us-gaap o ifrs-full): procedencia del concepto.
+            existing_meta["xbrl_taxonomy"] = taxonomy
             document.metadata_ = existing_meta
 
         drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
