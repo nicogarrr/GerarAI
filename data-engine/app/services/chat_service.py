@@ -1664,12 +1664,15 @@ class ChatService:
         # cada chunk, asi que una respuesta sobre ASTS salia con "Fuentes:
         # Numantia Patrimonio - Carta 2020" sin relacion alguna con ASTS.
         vector_chat = os.getenv("CAVAAI_ENABLE_VECTOR_CHAT") == "1"
-        # Con el vectorial apagado la doctrina sigue llegando por texto SQL,
-        # pero solo si la pregunta apunta a la biblioteca o a un autor.
+        # Con el vectorial apagado la doctrina llega por texto SQL. En una
+        # pregunta general (sin empresa) se busca siempre: exigir palabras como
+        # "cartas" o "Buffett" dejaba fuera "¿qué es el margen de seguridad?" o
+        # "¿cuánto ha rentado Numantia?" aunque la biblioteca lo tuviera. El
+        # umbral lexico (dos terminos juntos, una frase o una entidad) evita
+        # traer fragmentos a un "hola".
         library_context = (
             retrieve_library_context(db, question, vector=vector_chat)
-            if (vector_chat or _DOCTRINE_CUE_RE.search(question or ""))
-            and (company is None or _DOCTRINE_CUE_RE.search(question or ""))
+            if company is None or _DOCTRINE_CUE_RE.search(question or "")
             else []
         )
         library_lines = [
