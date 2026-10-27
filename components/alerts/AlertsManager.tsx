@@ -342,7 +342,7 @@ function AlertsManager() {
                                         })
                                     }
                                 >
-                                    <SelectTrigger className="bg-gray-900 border-gray-600 text-gray-100 h-11 text-base sm:h-9 sm:text-sm">
+                                    <SelectTrigger id="type" className="bg-gray-900 border-gray-600 text-gray-100 h-11 text-base sm:h-9 sm:text-sm">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="bg-gray-900 border-gray-600">
@@ -366,7 +366,7 @@ function AlertsManager() {
                                                 })
                                             }
                                         >
-                                            <SelectTrigger className="bg-gray-900 border-gray-600 text-gray-100 h-11 text-base sm:h-9 sm:text-sm">
+                                            <SelectTrigger id="operator" className="bg-gray-900 border-gray-600 text-gray-100 h-11 text-base sm:h-9 sm:text-sm">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-gray-900 border-gray-600">
