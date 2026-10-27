@@ -20,7 +20,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0086_journal_transaction_link"
-down_revision = "0082_financial_facts_filed"
+down_revision = "0084_knowledge_document_ticker"
 branch_labels = None
 depends_on = None
 
