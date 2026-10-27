@@ -25,6 +25,7 @@ from app.models import (
     DividendRecord,
     Document,
     FinancialFact,
+    FundamentalModelVersion,
     InsiderFiling,
     InsiderTransaction,
     KnowledgeChunk,
@@ -99,6 +100,16 @@ def _thesis(db: Session, tenant: Tenant, company: Company, version: int, value: 
             executive_summary=f"v{version}",
             expected_value=value,
             valuation_basis={},
+        )
+    )
+    # Tesis publicada: su valor justo exige el modelo publicable vigente del
+    # mismo tenant (puerta de publicación, fail-closed).
+    db.add(
+        FundamentalModelVersion(
+            company_id=company.id, version=version, engine_version="test", algorithm_version="test",
+            framework_key="dcf", horizon_years=10, status="ok", publishable=True,
+            input_fingerprint=f"iso-{tenant.id}-{company.id}-{version}", forecast_fingerprint="forecast",
+            market_snapshot_fingerprint="market", valuation_snapshot_fingerprint="valuation",
         )
     )
     db.commit()
