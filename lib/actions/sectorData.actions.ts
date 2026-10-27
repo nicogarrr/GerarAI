@@ -1,6 +1,7 @@
 'use server';
 
 import { cache } from 'react';
+import { calculateAverage, normalizeGrowthScore, normalizeProfitabilityScore } from '@/lib/utils/sectorMetrics';
 import { fetchJSON } from '@/lib/upstream/finnhub';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 
@@ -25,6 +26,7 @@ export interface SectorAverages {
         avgPE: number;
         avgPB: number;
         avgPS: number;
+        // Fracciones: 15% = 0.15; nunca porcentajes crudos.
         avgROE: number;
         avgROA: number;
         avgNetMargin: number;
@@ -101,10 +103,10 @@ export const getSectorAverages = cache(async (sector: string): Promise<SectorAve
         const avgPE = calculateAverage(metrics, ['peTTM', 'pe', 'priceToEarnings']);
         const avgPB = calculateAverage(metrics, ['pbTTM', 'pb', 'priceToBook']);
         const avgPS = calculateAverage(metrics, ['psTTM', 'ps', 'priceToSales']);
-        const avgROE = calculateAverage(metrics, ['roeTTM', 'roe', 'returnOnEquity']);
-        const avgROA = calculateAverage(metrics, ['roaTTM', 'roa', 'returnOnAssets']);
-        const avgNetMargin = calculateAverage(metrics, ['netProfitMarginTTM', 'netProfitMargin', 'profitMargin']);
-        const avgRevenueGrowth = calculateAverage(metrics, ['revenueGrowthTTM', 'revenueGrowth', 'salesGrowth']);
+        const avgROE = calculateAverage(metrics, ['roeTTM', 'roe', 'returnOnEquity'], 'percent');
+        const avgROA = calculateAverage(metrics, ['roaTTM', 'roa', 'returnOnAssets'], 'percent');
+        const avgNetMargin = calculateAverage(metrics, ['netProfitMarginTTM', 'netProfitMargin', 'profitMargin'], 'percent');
+        const avgRevenueGrowth = calculateAverage(metrics, ['revenueGrowthTTM', 'revenueGrowth', 'salesGrowth'], 'percent');
         const avgDebtToEquity = calculateAverage(metrics, ['debtToEquityTTM', 'debtToEquity', 'totalDebtToEquity']);
         const avgCurrentRatio = calculateAverage(metrics, ['currentRatioTTM', 'currentRatio']);
 
@@ -112,7 +114,7 @@ export const getSectorAverages = cache(async (sector: string): Promise<SectorAve
         const averages = {
             value: normalizeValueScore(avgPE || 25, avgPB || 3, avgPS || 5),
             growth: normalizeGrowthScore(avgRevenueGrowth || 0),
-            profitability: normalizeProfitabilityScore(avgNetMargin || 0.15, avgROE || 0.15, avgROA || 0.08),
+            profitability: normalizeProfitabilityScore(avgNetMargin ?? 0.15, avgROE ?? 0.15, avgROA ?? 0.08),
             cashFlow: 50, // Por defecto, necesitaríamos FCF que no está siempre disponible
             momentum: 50, // Por defecto, necesitaríamos datos históricos
             debtLiquidity: normalizeDebtScore(avgDebtToEquity || 1.5, avgCurrentRatio || 1.5),
@@ -143,27 +145,6 @@ export const getSectorAverages = cache(async (sector: string): Promise<SectorAve
 /**
  * Calcula promedio de una métrica buscando en diferentes nombres posibles
  */
-function calculateAverage(metrics: any[], metricNames: string[]): number | null {
-    const values: number[] = [];
-
-    for (const metric of metrics) {
-        for (const name of metricNames) {
-            const value = metric[name];
-            if (value !== null && value !== undefined && value !== '') {
-                const num = typeof value === 'string' ? parseFloat(value.replace(/,/g, '')) : Number(value);
-                if (!isNaN(num)) {
-                    // Normalizar si viene en porcentaje
-                    const normalized = Math.abs(num) > 1 && name.includes('Growth') || name.includes('Margin') || name.includes('RO') ? num / 100 : num;
-                    values.push(normalized);
-                    break;
-                }
-            }
-        }
-    }
-
-    if (values.length === 0) return null;
-    return values.reduce((a, b) => a + b, 0) / values.length;
-}
 
 /**
  * Normaliza score de valor (0-100)
@@ -200,44 +181,6 @@ function normalizeValueScore(pe: number, pb: number, ps: number): number {
 /**
  * Normaliza score de crecimiento (0-100)
  */
-function normalizeGrowthScore(revenueGrowth: number): number {
-    const growth = Math.abs(revenueGrowth) > 1 ? revenueGrowth / 100 : revenueGrowth;
-    
-    if (growth > 0.2) return 90;
-    if (growth > 0.15) return 80;
-    if (growth > 0.1) return 70;
-    if (growth > 0.05) return 60;
-    if (growth > 0) return 50;
-    return 30;
-}
-
-/**
- * Normaliza score de rentabilidad (0-100)
- */
-function normalizeProfitabilityScore(netMargin: number, roe: number, roa: number): number {
-    let score = 0;
-    
-    const margin = Math.abs(netMargin) > 1 ? netMargin / 100 : netMargin;
-    if (margin > 0.2) score += 35;
-    else if (margin > 0.15) score += 30;
-    else if (margin > 0.1) score += 25;
-    else if (margin > 0.05) score += 20;
-    else if (margin > 0) score += 15;
-    
-    const roeValue = Math.abs(roe) > 1 ? roe / 100 : roe;
-    if (roeValue > 0.2) score += 35;
-    else if (roeValue > 0.15) score += 30;
-    else if (roeValue > 0.1) score += 25;
-    else if (roeValue > 0.05) score += 20;
-    else if (roeValue > 0) score += 15;
-    
-    const roaValue = Math.abs(roa) > 1 ? roa / 100 : roa;
-    if (roaValue > 0.1) score += 30;
-    else if (roaValue > 0.05) score += 25;
-    else if (roaValue > 0) score += 20;
-    
-    return Math.min(100, score);
-}
 
 /**
  * Normaliza score de deuda/liquidez (0-100)

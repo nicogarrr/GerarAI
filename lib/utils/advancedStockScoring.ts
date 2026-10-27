@@ -231,7 +231,7 @@ export async function calculateAdvancedStockScore(
         const growth = percentToRatio(revenueGrowth);
 
         // Comparar con sector (crecimiento típico del sector)
-        const sectorGrowth = (sectorMetrics?.avgRevenueGrowth || 0.15);
+        const sectorGrowth = (sectorMetrics?.avgRevenueGrowth ?? 0.15);
         categoryScores.growth += revenueGrowthPoints(revenueGrowth, sectorGrowth);
 
         if (growth > sectorGrowth * 1.3) {
@@ -255,7 +255,7 @@ export async function calculateAdvancedStockScore(
     if (netMargin !== null) {
         // Conserva el signo: un margen negativo es una pérdida, no rentabilidad.
         const margin = percentToRatio(netMargin);
-        const sectorMargin = sectorMetrics?.avgNetMargin || 0.15; // Margen promedio del sector real
+        const sectorMargin = sectorMetrics?.avgNetMargin ?? 0.15; // Margen promedio del sector real
         categoryScores.profitability += netMarginPoints(netMargin, sectorMargin);
 
         if (margin > sectorMargin * 1.2) {
