@@ -7,6 +7,7 @@ import { researchRequest } from '@/lib/research/client';
  */
 export type DatedChange = {
   price: number;
+  currency: string;
   change: number | null;
   changePercent: number | null;
   previousClose: number | null;
@@ -18,6 +19,7 @@ type ChangesResponse = {
     string,
     {
       price: number;
+  currency: string;
       change: number | null;
       change_pct: number | null;
       previous_close: number | null;
@@ -40,6 +42,7 @@ export async function fetchDatedChanges(symbols: string[]): Promise<Record<strin
       if (item.change_pct === null || item.change_pct === undefined) continue;
       out[symbol.toUpperCase()] = {
         price: item.price,
+        currency: item.currency,
         change: item.change,
         changePercent: item.change_pct,
         previousClose: item.previous_close,

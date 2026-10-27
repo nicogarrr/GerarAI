@@ -10,6 +10,8 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import Company, FinancialFact, MarketPrice
+from app.services.price_units import price_in_currency
+from app.valuation.currency import fact_currency, listing_currency, normalize_currency
 from app.valuation.period_bounds import parse_period_bounds, to_date
 
 # Retraso conservador entre el cierre de un periodo y la publicacion de su
@@ -99,22 +101,34 @@ class HistoricalValuationService:
                 continue
             annual_facts.setdefault(row.fiscal_year, {}).setdefault(row.metric, row)
 
+        currency = normalize_currency(company.currency)[0] or listing_currency(
+            company.ticker, company.currency
+        )
         series = []
         for year in sorted(annual_prices.keys() | annual_facts.keys()):
             price_row = annual_prices.get(year)
             year_facts = annual_facts.get(year, {})
-            price = price_row.close if price_row else None
+            price = (
+                price_in_currency(
+                    price_row.close,
+                    quote_currency=price_row.quote_currency,
+                    target_currency=currency,
+                    company=company,
+                )
+                if price_row
+                else None
+            )
             shares = self._value(year_facts, "shares_diluted")
             # Ingestion writes eps_diluted; "eps" is only a legacy alias (F376).
-            eps = self._value(year_facts, "eps_diluted")
+            eps = self._monetary_value(year_facts, "eps_diluted", currency)
             if eps is None:
-                eps = self._value(year_facts, "eps")
-            fcf = self._value(year_facts, "free_cash_flow")
-            revenue = self._value(year_facts, "revenue")
+                eps = self._monetary_value(year_facts, "eps", currency)
+            fcf = self._monetary_value(year_facts, "free_cash_flow", currency)
+            revenue = self._monetary_value(year_facts, "revenue", currency)
             # A missing debt/cash fact is unknown, not zero: only a reported
             # value (including a reported 0) may enter enterprise value.
-            debt = self._value(year_facts, "total_debt")
-            cash = self._value(year_facts, "cash_and_equivalents")
+            debt = self._monetary_value(year_facts, "total_debt", currency)
+            cash = self._monetary_value(year_facts, "cash_and_equivalents", currency)
             market_cap = price * shares if price is not None and shares is not None else None
             enterprise_value = (
                 market_cap + debt - cash
@@ -140,9 +154,7 @@ class HistoricalValuationService:
 
         multiple_keys = ("pe", "ev_to_fcf", "ev_to_revenue")
         statistics = {
-            key: self._statistics(
-                [point[key] for point in series if point[key] is not None]
-            )
+            key: self._statistics([point[key] for point in series if point[key] is not None])
             for key in multiple_keys
         }
         missing = {
@@ -157,15 +169,14 @@ class HistoricalValuationService:
         }
         return {
             "ticker": company.ticker,
-            "currency": company.currency,
+            "currency": currency,
             "years_requested": years,
             "series": series,
             "statistics": statistics,
             "coverage": {
                 "points": len(series),
                 "complete_valuation_points": sum(
-                    all(point[key] is not None for key in multiple_keys)
-                    for point in series
+                    all(point[key] is not None for key in multiple_keys) for point in series
                 ),
                 "missing_by_metric": missing,
             },
@@ -213,9 +224,16 @@ class HistoricalValuationService:
         return row.value if row else None
 
     @staticmethod
-    def _divide(
-        numerator: Decimal | None, denominator: Decimal | None
-    ) -> Decimal | None:
+    def _monetary_value(rows: dict[str, FinancialFact], metric: str, currency: str) -> Decimal | None:
+        row = rows.get(metric)
+        # No FX or guessed reporting currency in historical multiples.
+        if row is None or fact_currency(row.unit) != currency:
+            return None
+        _, divisor = normalize_currency(row.unit.split("/", 1)[0].strip())
+        return row.value / Decimal(divisor)
+
+    @staticmethod
+    def _divide(numerator: Decimal | None, denominator: Decimal | None) -> Decimal | None:
         if numerator is None or denominator is None or denominator == 0:
             return None
         return numerator / denominator

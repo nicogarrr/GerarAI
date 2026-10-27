@@ -6,10 +6,14 @@ distintas (cotizacion en vivo vs cierres de BD)."""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, MarketPrice
+from app.services.price_units import price_in_currency
+from app.valuation.currency import listing_currency
 
 # Unica fuente que cuenta como cierre oficial: barras diarias reales (job
 # market_close_sync). Finnhub/FMP/yahoo intradia son fotos spot de un momento
@@ -101,6 +105,7 @@ def compute_session_changes(db: Session) -> tuple[list[dict], int, object]:
                     Company.name,
                     Company.sector,
                     Company.currency,
+                    MarketPrice.quote_currency,
                 )
                 .join(
                     pair_cte,
@@ -113,13 +118,20 @@ def compute_session_changes(db: Session) -> tuple[list[dict], int, object]:
             ).all()
         )
 
-    def _entry(day, close, volume, registered, ticker, name, sector, currency) -> dict:
+    def _entry(day, close, volume, registered, ticker, name, sector, currency, quote_currency) -> dict:
+        company = SimpleNamespace(ticker=ticker, currency=currency)
+        currency = listing_currency(ticker, currency)
+        normalized = (
+            price_in_currency(close, quote_currency=quote_currency, target_currency=currency, company=company)
+            if close is not None
+            else None
+        )
         return {
             "ticker": ticker,
             "name": name,
             "sector": sector,
             "currency": currency,
-            "price": float(close or 0),
+            "price": float(normalized) if normalized is not None else None,
             # Volumen desconocido o 0 = None (la UI muestra N/D): una sesion
             # negociada no tiene volumen 0, es un dato ausente de la fuente.
             "volume": int(volume) if volume else None,
@@ -131,15 +143,37 @@ def compute_session_changes(db: Session) -> tuple[list[dict], int, object]:
         }
 
     latest: dict[int, dict] = {}
-    for company_id, day, close, volume, registered, ticker, name, sector, currency in _rows_at(
-        latest_pairs, latest_pairs.c.last_date
-    ):
-        latest[company_id] = _entry(day, close, volume, registered, ticker, name, sector, currency)
+    for (
+        company_id,
+        day,
+        close,
+        volume,
+        registered,
+        ticker,
+        name,
+        sector,
+        currency,
+        quote_currency,
+    ) in _rows_at(latest_pairs, latest_pairs.c.last_date):
+        latest[company_id] = _entry(
+            day, close, volume, registered, ticker, name, sector, currency, quote_currency
+        )
     previous: dict[int, dict] = {}
-    for company_id, day, close, volume, registered, ticker, name, sector, currency in _rows_at(
-        previous_pairs, previous_pairs.c.prev_date
-    ):
-        previous[company_id] = _entry(day, close, volume, registered, ticker, name, sector, currency)
+    for (
+        company_id,
+        day,
+        close,
+        volume,
+        registered,
+        ticker,
+        name,
+        sector,
+        currency,
+        quote_currency,
+    ) in _rows_at(previous_pairs, previous_pairs.c.prev_date):
+        previous[company_id] = _entry(
+            day, close, volume, registered, ticker, name, sector, currency, quote_currency
+        )
     # Sesion comun: los rankings comparan manzanas con manzanas. Una fila solo
     # entra si su ultimo cierre es el de la ultima sesion comun Y su cierre
     # previo es el de la sesion inmediatamente anterior; con otro hueco, el
@@ -150,18 +184,17 @@ def compute_session_changes(db: Session) -> tuple[list[dict], int, object]:
     stale_excluded = 0
     for company_id, last in latest.items():
         prev = previous.get(company_id)
-        base = float(prev["price"]) if prev else 0.0
+        base = float(prev["price"]) if prev and prev["price"] is not None else 0.0
         current = session_day is not None and last["date"] == session_day.isoformat()
         comparable = (
             current
             and prev is not None
+            and last["price"] is not None
             and prev["date"] == (prev_session_day.isoformat() if prev_session_day else None)
         )
         # Sin cierre anterior no hay cambio medible: None (la UI muestra "—"),
         # nunca un 0.0% que aparenta un dato que no existe.
-        change_pct = (
-            round((last["price"] - base) / base * 100, 2) if base and comparable else None
-        )
+        change_pct = round((last["price"] - base) / base * 100, 2) if base and comparable else None
         if not current:
             stale_excluded += 1
         movers.append(
@@ -186,20 +219,29 @@ def ticker_close_change(db: Session, company_id: int) -> dict | None:
     if session_day is None or prev_session_day is None:
         return None
     rows = db.execute(
-        select(MarketPrice.date, MarketPrice.close)
+        select(MarketPrice.date, MarketPrice.close, MarketPrice.quote_currency)
         .where(MarketPrice.company_id == company_id, MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES))
         .order_by(MarketPrice.date.desc())
         .limit(2)
     ).all()
     if len(rows) < 2:
         return None
-    (last_day, last_close), (prev_day, prev_close) = rows
+    (last_day, last_close, last_unit), (prev_day, prev_close, prev_unit) = rows
     if last_day != session_day or prev_day != prev_session_day:
         return None
-    last, prev = float(last_close or 0), float(prev_close or 0)
+    company = db.get(Company, company_id)
+    if company is None:
+        return None
+    currency = listing_currency(company.ticker, company.currency)
+    last = price_in_currency(last_close, quote_currency=last_unit, target_currency=currency, company=company)
+    prev = price_in_currency(prev_close, quote_currency=prev_unit, target_currency=currency, company=company)
+    if last is None or prev is None:
+        return None
+    last, prev = float(last), float(prev)
     if last <= 0 or prev <= 0:
         return None
     return {
+        "currency": currency,
         "close": last,
         "previous_close": prev,
         "date": last_day.isoformat(),

@@ -415,7 +415,7 @@ MIN_MOVERS_TURNOVER = 1_000_000.0
 
 
 def _is_liquid_for_movers(mover: dict) -> bool:
-    if mover["price"] < MIN_MOVERS_PRICE:
+    if mover["price"] is None or mover["price"] < MIN_MOVERS_PRICE:
         return False
     volume = mover["volume"]
     return volume is not None and mover["price"] * volume >= MIN_MOVERS_TURNOVER
@@ -492,6 +492,7 @@ def market_changes(
     items = {
         m["ticker"].upper(): {
             "price": m["price"],
+            "currency": m["currency"],
             "change": round(m["price"] - m["previous_close"], 4)
             if m["previous_close"] is not None
             else None,

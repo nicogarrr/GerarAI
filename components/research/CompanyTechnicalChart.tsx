@@ -8,6 +8,7 @@ import { getCompanyChartHistory, type CompanyChartHistory, type CompanyChartBar 
 import MobileCollapse from '@/components/ui/mobile-collapse';
 import { TRADINGVIEW_URL } from '@/lib/market/candles';
 import { CHART_RANGES, type CompanyChartRange } from '@/lib/market/chart-ranges';
+import { normalizeChartPriceUnits } from '@/lib/market/chart-price-units';
 import { adx, cleanBars, dailyPivots, fibonacci, rangeBars, sma, structure } from '@/lib/market/technical';
 
 function price(value: number, currency: string | null) {
@@ -17,7 +18,8 @@ function price(value: number, currency: string | null) {
 export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyMarketSnapshot }) {
     const [retry, setRetry] = useState(0);
     const [range, setRange] = useState<CompanyChartRange>('1M');
-    const bars = useMemo(() => cleanBars(snapshot.history), [snapshot.history]);
+    const daily = useMemo(() => normalizeChartPriceUnits(cleanBars(snapshot.history), { ticker: snapshot.ticker, currency: snapshot.currency, candleCurrency: snapshot.historyCurrency }), [snapshot.history, snapshot.ticker, snapshot.currency, snapshot.historyCurrency]);
+    const bars = daily.bars;
     const [remote, setRemote] = useState<{ range: CompanyChartRange; data: CompanyChartHistory } | null>(null);
     const [requestState, setRequestState] = useState<'loading' | 'ready' | 'error'>('ready');
     const needsRemote = range === '1D' || range === '5D' || range === '5A' || range === 'Máx';
@@ -30,7 +32,9 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
         }).catch(() => { if (!cancelled) setRequestState('error'); });
         return () => { cancelled = true; };
     }, [snapshot.ticker, range, needsRemote, retry]);
-    const visible = useMemo(() => needsRemote ? remote?.range === range ? remote.data.bars : [] : rangeBars(bars, range as '1M' | '6M' | 'YTD' | '1A'), [bars, range, needsRemote, remote]);
+    const remotePrices = useMemo(() => normalizeChartPriceUnits(remote?.range === range ? remote.data.bars : [], { ticker: snapshot.ticker, currency: snapshot.currency, candleCurrency: remote?.range === range ? remote.data.currency : null }), [remote, range, snapshot.ticker, snapshot.currency]);
+    const visible = useMemo(() => needsRemote ? remotePrices.bars : rangeBars(bars, range as '1M' | '6M' | 'YTD' | '1A'), [bars, range, needsRemote, remotePrices]);
+    const visibleCurrency = needsRemote ? remotePrices.currency : daily.currency;
     const hourly = range === '1D' || range === '5D';
     const historySource = needsRemote ? remote?.range === range ? remote.data.source : null : snapshot.historySource;
 
@@ -43,7 +47,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
     const last = bars.at(-1);
     const shortTerm = !last || average == null ? 'Sin datos' : last.close > average ? 'Sobre SMA50' : last.close < average ? 'Bajo SMA50' : 'En SMA50';
     const slope = average == null || previousAverage == null ? null : average > previousAverage ? 'sube' : average < previousAverage ? 'baja' : 'plana';
-    const chartLevels = levels;
+    const chartLevels = daily.currency === visibleCurrency ? levels : [];
     return (
         <section className="min-w-0 overflow-hidden rounded-xl border border-gray-800 bg-surface-1" data-testid="company-technical-chart" aria-label="Precio y lectura técnica">
             <div className="grid min-w-0 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -52,7 +56,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                         <h2 className="text-sm font-semibold text-gray-200">Precio</h2>
                         <span className="text-xs text-gray-500">{hourly ? 'Horario (UTC)' : 'Diario'} · {historySource || 'Fuente no disponible'}{visible.at(-1) ? ` · ${formatMarketDate(visible.at(-1)!.date)}` : ''}</span>
                     </div>
-                    {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">Cargando rango {range}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">No se pudo cargar este rango</div> : <PriceCanvas bars={visible} levels={chartLevels} currency={snapshot.currency} hourly={hourly} />}
+                    {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">Cargando rango {range}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">No se pudo cargar este rango</div> : <PriceCanvas bars={visible} levels={chartLevels} currency={visibleCurrency} hourly={hourly} />}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                         <div className="grid w-full grid-cols-8 gap-0 sm:w-auto sm:gap-1" aria-label="Rango del gráfico">
                             {CHART_RANGES.map((value) => <button type="button" key={value} disabled={range === value && requestState !== 'error'} aria-pressed={range === value} className={`min-h-11 rounded-md px-1 text-[11px] transition sm:px-3 sm:text-xs ${range === value ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { if (range === value) setRetry((count) => count + 1); setRequestState(value === '1D' || value === '5D' || value === '5A' || value === 'Máx' ? 'loading' : 'ready'); setRange(value); }}>{value}</button>)}
@@ -73,18 +77,18 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                             </dl>
                             <div className="space-y-2 border-t border-gray-800 pt-3 leading-5">
                                 {trend !== 'Sin datos' ? <p>{trend === 'Alcista' ? 'Máximos y mínimos crecientes' : trend === 'Bajista' ? 'Máximos y mínimos decrecientes' : 'Máximos y mínimos sin dirección conjunta'} entre los dos últimos bloques de 10 sesiones.</p> : <p>Estructura: sin datos OHLC suficientes.</p>}
-                                {average != null && last ? <p>Cierre {price(last.close, snapshot.currency)}, {last.close > average ? 'sobre' : last.close < average ? 'bajo' : 'en'} la media de 50 sesiones ({price(average, snapshot.currency)}).</p> : null}
+                                {average != null && last ? <p>Cierre {price(last.close, daily.currency)}, {last.close > average ? 'sobre' : last.close < average ? 'bajo' : 'en'} la media de 50 sesiones ({price(average, daily.currency)}).</p> : null}
                                 {strength != null ? <p>ADX14 {formatNumber(strength, { maximumFractionDigits: 1 })}: {strength >= 25 ? 'fuerza de tendencia' : 'sin fuerza de tendencia confirmada'}. No indica dirección.</p> : null}
                             </div>
                         </>
                         <div>
                             <h3 className="mb-2 font-medium text-gray-200">Niveles clave del día (pivotes){last ? ` · ${formatMarketDate(last.date)}` : ''}</h3>
-                            {levels.length ? <dl className="space-y-2">{levels.map((level) => <div key={level.label} className="flex justify-between border-b border-gray-800 pb-1.5"><dt className={level.kind === 'support' ? 'text-teal-300' : 'text-red-300'}>{level.label}</dt><dd className="tabular-nums text-gray-200">{price(level.price, snapshot.currency)}</dd></div>)}</dl> : <p>Sin datos OHLC para calcular niveles.</p>}
+                            {levels.length ? <dl className="space-y-2">{levels.map((level) => <div key={level.label} className="flex justify-between border-b border-gray-800 pb-1.5"><dt className={level.kind === 'support' ? 'text-teal-300' : 'text-red-300'}>{level.label}</dt><dd className="tabular-nums text-gray-200">{price(level.price, daily.currency)}</dd></div>)}</dl> : <p>Sin datos OHLC para calcular niveles.</p>}
                             <p className="mt-2 text-[11px] text-gray-500">Calculados con máximo, mínimo y cierre; no son giros confirmados.</p>
                         </div>
                         <div>
                             <h3 className="mb-2 font-medium text-gray-200">Niveles de retroceso ({range})</h3>
-                            {fib.length ? <dl className="space-y-3">{fib.map((level) => <div key={level.ratio} className="flex justify-between border-b border-gray-800 pb-2"><dt>{formatNumber(level.ratio * 100)} %</dt><dd className="tabular-nums text-gray-200">{price(level.price, snapshot.currency)}</dd></div>)}</dl> : <p>Sin datos OHLC para Fibonacci.</p>}
+                            {fib.length ? <dl className="space-y-3">{fib.map((level) => <div key={level.ratio} className="flex justify-between border-b border-gray-800 pb-2"><dt>{formatNumber(level.ratio * 100)} %</dt><dd className="tabular-nums text-gray-200">{price(level.price, visibleCurrency)}</dd></div>)}</dl> : <p>Sin datos OHLC para Fibonacci.</p>}
                             <p className="mt-3 text-[11px] text-gray-500">Desde el máximo al mínimo del tramo visible.</p>
                         </div>
                     </div>

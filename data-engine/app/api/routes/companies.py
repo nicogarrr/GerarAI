@@ -159,7 +159,13 @@ async def company_extended_quote(ticker: str, db: Session = Depends(get_db)) -> 
             logger.warning("extended-quote close change unavailable for %s", ticker, exc_info=True)
             info = None
         if info:
-            quote.close_change = info["change"]
+            from app.valuation.currency import normalize_currency
+
+            source_currency, source_divisor = normalize_currency(info.get("currency"))
+            quote_currency, quote_divisor = normalize_currency(quote.currency)
+            if not source_currency or (quote_currency and source_currency != quote_currency):
+                return quote
+            quote.close_change = info["change"] * quote_divisor / source_divisor if quote_currency else None
             quote.close_change_percent = info["change_percent"]
             quote.close_change_date = info["date"]
             quote.close_change_previous_date = info["previous_date"]
