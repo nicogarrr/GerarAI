@@ -162,9 +162,13 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
             if len(closes) >= 2
             else float(meta.get("chartPreviousClose") or last)
         )
-        opens = [value for value in (quote.get("open") or []) if value is not None]
-        highs = [value for value in (quote.get("high") or []) if value is not None]
-        lows = [value for value in (quote.get("low") or []) if value is not None]
+        # Todas las magnitudes deben pertenecer a la misma vela seleccionada;
+        # no tomar el último OHLC provisional tras descartar su cierre.
+        def selected_value(key):
+            values = quote.get(key) or []
+            value = values[last_idx] if last_idx < len(values) else None
+            return float(value) if value is not None else last
+
         change = last - previous
         timestamps = result.get("timestamp") or []
         candle_ts = timestamps[last_idx] if last_idx < len(timestamps) else None
@@ -194,9 +198,9 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
             "currency": meta.get("currency"),
             "d": change,
             "dp": (change / previous * 100) if previous else 0.0,
-            "h": float(highs[-1]) if highs else last,
-            "l": float(lows[-1]) if lows else last,
-            "o": float(opens[-1]) if opens else last,
+            "h": selected_value("high"),
+            "l": selected_value("low"),
+            "o": selected_value("open"),
             "pc": previous,
             # Fecha real de la vela que publica "c" (epoch y fecha ISO en la
             # zona del mercado); None si Yahoo no sirvio timestamps - nunca
