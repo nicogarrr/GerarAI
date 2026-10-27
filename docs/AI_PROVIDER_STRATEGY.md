@@ -12,18 +12,17 @@ and it is not billed per token: the cost is the existing subscription.
 https://opencode.ai/zen/go/v1/chat/completions
 ```
 
-The owner approved this model explicitly. The rest of the providers are free
-backups in `auto` mode (review finding M1): `GROQ_CHAT_FALLBACK_ENABLED` and
-`GEMINI_CHAT_FALLBACK_ENABLED` default to `auto`, which builds a backup ONLY
-when its key and its free-plan confirmations are present (Groq also needs
-`GROQ_ZDR_CONFIRMED=true`) and the primary is OpenCode Go. Without a key a
-backup is skipped, never faked; `false` keeps it off even with a key; `true`
-makes it mandatory (provider construction fails if something is missing).
-The chat and background chains then run Go -> Groq -> Gemini (OpenRouter
-`:free` after Groq in the chat). `tests/test_llm_degraded_mode.py` exercises
-the chain with a mocked transport, including "all providers down" and
-`LLM_PROVIDER=disabled` (deterministic answer flagged as fallback, no LLM
-text).
+The owner approved this model explicitly. Decision 2026-10-27: every LLM call
+goes through the owner's OpenCode Go key with DeepSeek V4.1 Flash, and no other
+provider answers without an explicit opt-in. `GROQ_CHAT_FALLBACK_ENABLED` and
+`GEMINI_CHAT_FALLBACK_ENABLED` default to `auto`, which now means **off** even
+when the key and the free-plan confirmations are present. Only `true` turns a
+backup on (and then provider construction fails if the key or a confirmation is
+missing). The OpenRouter `:free` chat backup also needs
+`OPENROUTER_CHAT_FALLBACK_ENABLED=true`. The debate chain no longer appends the
+free OpenCode models behind the Go model, and with a tenant key it uses the
+tenant provider. Every call logs a `llm.call` line with provider, model and
+reasoning effort, so a backup answer is visible in the logs.
 
 - Groq (`openai/gpt-oss-120b`): chat and background backup.
 - Gemini AI Studio: optional backup after Groq; requires confirming the key's
