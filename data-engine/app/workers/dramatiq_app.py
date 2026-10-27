@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import threading
 import time
 import uuid
 from datetime import UTC, datetime
@@ -563,6 +564,7 @@ def _message_id(message) -> str | None:
 # ---------------------------------------------------------------------------
 
 _local_leases: dict[str, tuple[str, float]] = {}
+_local_leases_lock = threading.Lock()
 
 
 def _emit_fingerprint(*parts: Any) -> str:
@@ -606,10 +608,13 @@ def acquire_job_lease(
         except Exception:  # noqa: BLE001 — fallback local documentado
             pass
     now = time.time()
-    held = _local_leases.get(job_name)
-    if held is not None and held[1] > now:
-        return None
-    _local_leases[job_name] = (token, now + max(int(ttl_seconds), 1))
+    # Los actores de dramatiq corren en hilos: comprobar y escribir sin cerrojo
+    # dejaba entrar a dos hilos a la vez en el mismo lease.
+    with _local_leases_lock:
+        held = _local_leases.get(job_name)
+        if held is not None and held[1] > now:
+            return None
+        _local_leases[job_name] = (token, now + max(int(ttl_seconds), 1))
     return token
 
 
@@ -648,9 +653,10 @@ def release_job_lease(
                 client.close()
         except Exception:  # noqa: BLE001 — best-effort
             pass
-    held = _local_leases.get(job_name)
-    if held is not None and held[0] == token:
-        _local_leases.pop(job_name, None)
+    with _local_leases_lock:
+        held = _local_leases.get(job_name)
+        if held is not None and held[0] == token:
+            _local_leases.pop(job_name, None)
 
 
 def _lease_redis_url() -> str | None:
