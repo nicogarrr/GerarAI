@@ -296,8 +296,8 @@ export type PortfolioIntelligence = {
       ticker: string;
       contribution_pnl: number | null;
       contribution_share: number | null;
-      end_value: number;
-      start_value: number;
+      end_value: number | null;
+      start_value: number | null;
       net_invested: number;
       income: number;
       reason: string | null;
