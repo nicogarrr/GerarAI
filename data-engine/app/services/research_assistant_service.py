@@ -22,6 +22,7 @@ from app.models import (
     ThesisVersion,
 )
 from app.services.text_clip import clip_words
+from app.valuation.margin_convention import historical_margin_note
 
 
 def _url(value: str | None) -> str | None:
@@ -299,7 +300,8 @@ def _thesis_citations(db: Session, company: Company, tenant_id: int) -> list[dic
         if thesis.expected_value is not None:
             parts.append(f"Valor esperado {_money(thesis.expected_value, company.currency)}.")
         if thesis.margin_of_safety is not None:
-            parts.append(f"Margen de seguridad {float(thesis.margin_of_safety) * 100:,.1f} %".replace(".", ",") + ".")
+            parts.append(f"Margen de seguridad archivado {float(thesis.margin_of_safety) * 100:,.1f} %".replace(".", ",") + ". "
+                         + historical_margin_note(thesis.valuation_basis))
         if thesis.executive_summary:
             parts.append(clip_words(thesis.executive_summary.strip(), 300, ellipsis=""))
         return " ".join(parts)

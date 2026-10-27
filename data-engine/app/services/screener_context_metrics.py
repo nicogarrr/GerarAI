@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Company, ThesisVersion, ValuationModel, ValuationOutput
+from app.valuation.margin_convention import margin_convention_known
 
 MARGIN_OF_SAFETY = "margen_seguridad"
 HAS_THESIS = "tiene_tesis"
@@ -76,7 +77,10 @@ def _margin_of_safety(db: Session) -> dict[int, Any]:
         outputs.sort(key=lambda row: row.scenario != "base")
         value = None
         for output in outputs:
-            value = _decimal((output.output_payload or {}).get("margin_of_safety"))
+            payload = output.output_payload or {}
+            if not margin_convention_known(payload.get("trace")):
+                continue
+            value = _decimal(payload.get("margin_of_safety"))
             if value is not None:
                 break
         if value is None:

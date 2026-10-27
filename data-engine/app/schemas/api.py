@@ -154,6 +154,9 @@ class SnapshotThesisSummaryOut(BaseModel):
     bull_value: Decimal | None
     expected_value: Decimal | None
     margin_of_safety: Decimal | None
+    archived_margin_of_safety: Decimal | None = None
+    margin_of_safety_convention: str | None = None
+    margin_of_safety_status: str = "unknown_convention"
     data_confidence_score: int
     source_coverage_score: int
     hypothesis: str | None = None
@@ -175,6 +178,9 @@ class SnapshotValuationSummaryOut(BaseModel):
     bull_value: Decimal | None = None
     expected_value: Decimal | None = None
     margin_of_safety: Decimal | None = None
+    archived_margin_of_safety: Decimal | None = None
+    margin_of_safety_convention: str | None = None
+    margin_of_safety_status: str = "unknown_convention"
     updated_at: datetime | None = None
 
 

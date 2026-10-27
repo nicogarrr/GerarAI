@@ -262,6 +262,8 @@ def test_thesis_margin_uses_latest_published_version_only(db):
     db.commit()
     response = asyncio.run(ChatService().answer(db, "¿Cuánto margen de seguridad tiene Apple según mi tesis? AAPL", "portfolio", None))
     assert "v11" in response.answer and "-64,90 %" in response.answer
+    assert "fórmula no verificada" in response.answer
+    assert "no es un margen comparable" in response.answer
     assert "bajista $60.00" in response.answer and "no es la cotización actual" in response.answer
     assert "50,00" not in response.answer
     assert response.sources[0]["url"] == "/research/AAPL?view=thesis"

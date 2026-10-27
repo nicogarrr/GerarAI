@@ -1,3 +1,4 @@
+import { ArchivedThesisNotice } from '@/components/knowledge/ArchivedThesisNotice';
 import { ExtractionRefresh } from '@/components/knowledge/ExtractionRefresh';
 import { extractionResultText, hasDefaultCollections, noPrinciplesText } from '@/lib/knowledge/job-feedback';
 import ReactMarkdown from 'react-markdown';
@@ -372,6 +373,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
       {selectedDocument ? (
         <section className="min-w-0 rounded-xl border border-teal-900/50 bg-surface-1 p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-teal-300">Explorador de fragmentos</p><h2 className="text-lg font-semibold text-gray-100">{selectedDocument.title}</h2></div><Button asChild size="sm" variant="ghost"><Link href="/knowledge">Cerrar</Link></Button></div>
+          <ArchivedThesisNotice documentType={selectedDocument.document_type} />
           {/* Conexión 10a: asociar el documento a una empresa lo muestra en su ficha. Vacío = quitar. */}
           <MutationForm action={setKnowledgeDocumentTicker.bind(null, selectedDocument.id)} className="mb-4 flex flex-wrap items-end gap-2" successMessage="Ticker guardado">
             <div className="min-w-[12rem] flex-1 sm:flex-none">
