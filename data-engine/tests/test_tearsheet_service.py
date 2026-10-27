@@ -265,3 +265,80 @@ def test_gross_fields_are_unknown_if_any_position_valuation_is_missing_or_nonfin
     assert result["top_1_gross_positions_weight"] is None
     assert result["top_5_gross_positions_weight"] is None
     assert result["top_1_weight"] == pytest.approx(0.9)  # NAV contract unchanged
+
+
+
+def _seed_returns(db: Session, returns: list[float | None]) -> None:
+    """Snapshots diarios con ``daily_return`` dado (None = serie rota/base)."""
+    tenant = Tenant(external_id="tearsheet-gap", name="Tearsheet gap")
+    db.add(tenant)
+    db.flush()
+    portfolio = Portfolio(tenant_id=tenant.id, name="Main", base_currency="EUR", is_default=True)
+    db.add(portfolio)
+    db.flush()
+    for day, r in enumerate(returns, start=1):
+        db.add(
+            PortfolioDailySnapshot(
+                tenant_id=tenant.id,
+                portfolio_id=portfolio.id,
+                snapshot_date=date(2026, 9, day),
+                base_currency="EUR",
+                positions_value_base=Decimal("1000"),
+                cash_value_base=Decimal("0"),
+                total_value_base=Decimal("1000"),
+                daily_return=Decimal(str(r)) if r is not None else None,
+            )
+        )
+    db.flush()
+
+
+def test_build_does_not_splice_return_segments_across_a_gap():
+    """Auditoria A: un hueco (daily_return=None tras la base) rompe la serie.
+
+    Antes se descartaban los None y se encadenaban +50 % y -40 % de dos
+    tramos distintos como si fueran dias consecutivos (rentabilidad -10 %
+    sobre un periodo que nadie midio). Solo se usa el tramo continuo mas
+    reciente y la API dice que la serie tiene huecos.
+    """
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        _seed_returns(db, [None, 0.5, None, -0.4, 0.1])
+        result = TearsheetService().build(db)
+
+    metrics = result["metrics"]
+    assert metrics["n_observations"] == 2
+    assert metrics["cumulative_return"] == pytest.approx(0.6 * 1.1 - 1.0)
+    assert result["qualification"]["continuous"] is False
+    assert result["qualification"]["series_breaks"] == 1
+    assert result["qualification"]["excluded_returns"] == 1
+    assert result["qualification"]["start_date"] == "2026-09-03"
+    assert result["qualification"]["end_date"] == "2026-09-05"
+    assert result["trace"]["n_returns"] == 2
+
+
+def test_build_without_gaps_is_qualified_as_continuous():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        _seed_returns(db, [None, 0.01, -0.02, 0.03])
+        result = TearsheetService().build(db)
+    assert result["metrics"]["n_observations"] == 3
+    assert result["qualification"] == {
+        "continuous": True,
+        "series_breaks": 0,
+        "excluded_returns": 0,
+        "start_date": "2026-09-01",
+        "end_date": "2026-09-04",
+    }
+
+
+def test_build_gap_leaving_one_return_is_insufficient_not_spliced():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        _seed_returns(db, [None, 0.02, 0.03, None, 0.01])
+        result = TearsheetService().build(db)
+    assert result["status"] == "insufficient_data"
+    assert result["metrics"]["n_observations"] == 1
+    assert result["qualification"]["excluded_returns"] == 2
