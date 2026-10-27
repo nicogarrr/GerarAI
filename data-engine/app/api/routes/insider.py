@@ -12,6 +12,7 @@ from app.core.database import get_db
 from app.core.tenancy import tenant_filters
 from app.models.entities import Company, Document, InsiderFiling, InsiderTransaction
 from app.services import insider_feed, insider_operations, insider_service
+from app.services.ticker_ownership_signals import ownership_signals
 
 router = APIRouter()
 
@@ -93,6 +94,19 @@ def insider_feed_route(
             "c_suite_buys": [],
             "big_buys": [],
         }
+
+
+@router.get("/ownership-signals")
+def insider_ownership_signals(
+    ticker: str = Query(min_length=1, max_length=20),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Resumen para la tesis y la ficha: insiders (Form 4, 180 dias) + fondos 13F.
+
+    Solo lee lo persistido (sin red). Nunca 500: un bloque que falla queda en
+    ``pendiente`` y uno sin datos en ``sin_datos`` con su motivo.
+    """
+    return ownership_signals(db, ticker)
 
 
 @router.get("/filings")

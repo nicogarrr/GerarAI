@@ -3,6 +3,7 @@ import {
   researchIdentityHeaders,
 } from '@/lib/auth/research-identity';
 import { AppError, ExternalAPIError } from '@/lib/types/errors';
+import { researchErrorDetail } from '@/lib/research/error-detail';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 
@@ -80,8 +81,7 @@ export function requestSignal(external: AbortSignal | null | undefined, timeoutM
 async function responseError(response: Response, path: string): Promise<never> {
   let detail = `${response.status} ${response.statusText}`.trim();
   try {
-    const payload = await response.json() as { detail?: string; message?: string };
-    detail = payload.detail ?? payload.message ?? detail;
+    detail = researchErrorDetail(await response.json(), detail);
   } catch {
     // Preserve the HTTP status when the backend did not return JSON.
   }

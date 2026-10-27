@@ -25,7 +25,7 @@ python scripts/run_coverage_gate.py --report # imprime y sale 0 siempre
 compara el resultado contra `data-engine/coverage_baseline.json`.
 
 **`--cov` NO esta en `addopts`.** A proposito: `python -m pytest` a secas es lo que
-ejecutan `ci.yml`, `CONTRIBUTING` y las plantillas de PR, y meter `pytest-cov` en
+ejecutan `ci.yml`, [`CONTRIBUTING.md`](../CONTRIBUTING.md) y las plantillas de PR, y meter `pytest-cov` en
 `addopts` haria que esos comandos exploten con `unrecognized arguments` en
 cualquier entorno que no lo tenga instalado. La medicion es opt-in.
 

@@ -442,7 +442,7 @@ def test_prepare_flag_off_sin_evidencia_es_sin_datos(context, monkeypatch, tmp_p
 
 def test_generation_wires_preflight_before_savepoint():
     from pathlib import Path
-    source = (Path(__file__).parents[1] / "app/services/thesis_service.py").read_text()
+    source = (Path(__file__).parents[1] / "app/services/thesis_service.py").read_text(encoding="utf-8")
     start = source.index("def generate(")
     end = source.index("def _generate_atomic(", start)
     wrapper = source[start:end]

@@ -69,6 +69,27 @@ PRINCIPLE_BATCH_MAX_CHARS = 24_000
 PRINCIPLE_BATCH_MAX_CHUNKS = 12
 
 
+# Forma de ticker aceptada en la biblioteca: letras/digitos y los separadores
+# de clase o mercado habituales (BRK-B, SAN.MC, CGEO.L, ^GSPC, BTC-USD).
+_KNOWLEDGE_TICKER_RE = re.compile(r"^[A-Z0-9^][A-Z0-9.\-=^]{0,31}$")
+
+
+def normalize_knowledge_ticker(value: str | None) -> str | None:
+    """Ticker opcional de un documento: strip + upper; vacio -> ``None``.
+
+    Lanza ``ValueError`` (mensaje fijo, apto para 400) si no tiene forma de
+    ticker: con espacios, simbolos raros o mas de 32 caracteres.
+    """
+    if value is None:
+        return None
+    normalized = value.strip().upper()
+    if not normalized:
+        return None
+    if not _KNOWLEDGE_TICKER_RE.fullmatch(normalized) or not re.search(r"[A-Z0-9]", normalized):
+        raise ValueError("El ticker no es válido (ej.: AAPL, BRK-B, SAN.MC)")
+    return normalized
+
+
 def _slug(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
     if not normalized:
@@ -161,7 +182,9 @@ class KnowledgeLibraryService:
         publication_date: date | None = None,
         language: str = "en",
         content_type: str | None = None,
+        ticker: str | None = None,
     ) -> dict[str, Any]:
+        normalized_ticker = normalize_knowledge_ticker(ticker)
         if not content:
             raise ValueError("Knowledge document is empty")
         if len(content) > MAX_DOCUMENT_BYTES:
@@ -210,6 +233,7 @@ class KnowledgeLibraryService:
             language=language.strip().lower()[:20] or "en",
             status="ready",
             checksum=checksum,
+            ticker=normalized_ticker,
             metadata_={
                 "filename": filename,
                 "content_type": content_type,
@@ -732,6 +756,7 @@ class KnowledgeLibraryService:
             "language": document.language,
             "status": document.status,
             "checksum": document.checksum,
+            "ticker": document.ticker,
             "metadata": document.metadata_,
             "created_at": document.created_at,
         }
@@ -740,6 +765,7 @@ class KnowledgeLibraryService:
     def list_documents(
         db: Session, *, collection_id: int | None = None, limit: int = 200,
         offset: int = 0, document_type: str | None = None, status: str | None = None,
+        ticker: str | None = None,
     ) -> list[dict]:
         statement = (
             select(KnowledgeDocument)
@@ -752,10 +778,24 @@ class KnowledgeLibraryService:
             statement = statement.where(KnowledgeDocument.document_type == document_type)
         if status is not None:
             statement = statement.where(KnowledgeDocument.status == status)
+        if ticker is not None and ticker.strip():
+            # Se guarda normalizado (upper): el filtro normaliza igual, asi
+            # ``?ticker=san.mc`` encuentra ``SAN.MC``.
+            statement = statement.where(KnowledgeDocument.ticker == ticker.strip().upper())
         return [
             KnowledgeLibraryService.document_dict(document)
             for document in db.scalars(statement).all()
         ]
+
+    @staticmethod
+    def set_document_ticker(
+        db: Session, document: KnowledgeDocument, ticker: str | None
+    ) -> dict:
+        """Asigna, cambia o quita (``None``/vacio) el ticker de un documento."""
+        document.ticker = normalize_knowledge_ticker(ticker)
+        db.commit()
+        db.refresh(document)
+        return KnowledgeLibraryService.document_dict(document)
 
     @staticmethod
     def delete_document(db: Session, document: KnowledgeDocument) -> dict[str, int]:

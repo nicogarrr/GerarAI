@@ -484,13 +484,22 @@ class Settings(BaseSettings):
     # (precio 0, admite tools y response_format). El nivel gratuito de Gemini puede
     # usar los datos para mejorar el servicio: no enviar nada que no deba salir.
     groq_api_key: str | None = Field(default=None, repr=False)
-    groq_chat_fallback_enabled: bool = False
+    # Respaldos del chat y de los trabajos en segundo plano (Groq, luego
+    # Gemini) cuando falla el primario OpenCode Go. Tres estados (hallazgo M1
+    # de la revision: el plan B estaba apagado y habia que encenderlo a mano):
+    #   None ("auto", por defecto) -> activo SOLO si estan la clave y las
+    #     confirmaciones de plan gratuito (y ZDR en Groq) y el primario es
+    #     OpenCode Go. Sin clave el respaldo se salta; nunca se inventa texto.
+    #   True  -> forzado: falla el arranque del proveedor si falta algo.
+    #   False -> apagado aunque haya clave.
+    # Usa siempre `groq_chat_fallback_active` / `gemini_chat_fallback_active`.
+    groq_chat_fallback_enabled: bool | None = None
     groq_free_plan_confirmed: bool = False
     groq_zdr_confirmed: bool = False
     # Respaldo del chat DESPUES de Groq (gemini-3.5-flash-lite, luego gemini-3.8-flash;
     # usa gemini_api_key de mas abajo). Fail-closed: requiere confirmar que la clave
     # es de un proyecto SIN facturacion (tier gratuito).
-    gemini_chat_fallback_enabled: bool = False
+    gemini_chat_fallback_enabled: bool | None = None
     gemini_free_plan_confirmed: bool = False
 
     gemini_api_key: str | None = Field(default=None, repr=False)
@@ -657,6 +666,43 @@ class Settings(BaseSettings):
         if database_scheme.startswith("sqlite"):
             raise ValueError("SQLite is not allowed as DATABASE_URL in production")
         return self
+
+    @field_validator("groq_chat_fallback_enabled", "gemini_chat_fallback_enabled", mode="before")
+    @classmethod
+    def parse_fallback_flag(cls, value: object) -> object:
+        """``auto`` o vacio (``${VAR:-auto}`` en compose) -> None (modo auto)."""
+        if value is None:
+            return None
+        if isinstance(value, str) and value.strip().lower() in {"", "auto"}:
+            return None
+        return value
+
+    def _primary_is_opencode_go(self) -> bool:
+        requested = (self.llm_provider or "").strip().lower()
+        return requested in {"auto", "opencode", "opencode_go", "opencode-go"}
+
+    @property
+    def groq_chat_fallback_active(self) -> bool:
+        """Groq entra como respaldo: forzado, o auto con clave + plan gratis + ZDR."""
+        if self.groq_chat_fallback_enabled is not None:
+            return self.groq_chat_fallback_enabled
+        return bool(
+            self._primary_is_opencode_go()
+            and (self.groq_api_key or "").strip()
+            and self.groq_free_plan_confirmed
+            and self.groq_zdr_confirmed
+        )
+
+    @property
+    def gemini_chat_fallback_active(self) -> bool:
+        """Gemini entra como respaldo: forzado, o auto con clave + plan gratis confirmado."""
+        if self.gemini_chat_fallback_enabled is not None:
+            return self.gemini_chat_fallback_enabled
+        return bool(
+            self._primary_is_opencode_go()
+            and (self.gemini_api_key or "").strip()
+            and self.gemini_free_plan_confirmed
+        )
 
     @model_validator(mode="after")
     def validate_production_llm_model(self) -> Self:

@@ -17,7 +17,9 @@ Rules
   (``1.234,56`` and ``1,234.56`` both mean 1234.56)
 * a single separator followed by 1-2 digits is a decimal separator (``0,24``)
 * a single separator followed by exactly 3 digits is a thousands separator
-  (``1,234`` and ``1.250``), and a repeated separator is grouping
+  (``1,234`` and ``1.250``) unless the integer part is 0 (``0,250`` and
+  ``0.250`` are 0.25: no thousands group starts with 0), and a repeated
+  separator is grouping
   (``1.234.567``); without this, ``(1.250)`` thousand became -1.25 instead of
   -1.250.000 and es-ES grouping was rejected outright
 * parentheses around the whole token mean negative (accounting notation)
@@ -31,6 +33,9 @@ from decimal import Decimal, InvalidOperation
 
 # A single comma followed by one or two digits: a decimal separator.
 _DECIMAL_COMMA = re.compile(r"^[-+]?\d+,\d{1,2}$")
+# Parte entera formada solo por ceros y UN separador decimal ("0.250"): no
+# puede ser agrupacion de miles, porque un grupo inicial nunca es 0.
+_ZERO_INTEGER = re.compile(r"^0+\.\d+$")
 # A numeric token, optionally signed, with digits and separators only.
 _NUMERIC = re.compile(r"^[-+]?\d[\d.,\s\u00a0]*$")
 # A run of digits and separators inside free text, keeping the sign and the
@@ -94,14 +99,21 @@ def parse_localized_number(value: object) -> tuple[Decimal, bool] | None:
             else raw.replace(".", "").replace(",", ".")
         )
     elif "," in raw:
-        raw = raw.replace(",", ".") if _DECIMAL_COMMA.match(f"0{raw}") else raw.replace(",", "")
+        # Parte entera 0 ("0,250"): un grupo de miles nunca empieza por 0, asi
+        # que el separador unico es decimal aunque le sigan 3 cifras (antes
+        # "0,125 EUR por accion" se leia como 125: error x1000).
+        if _DECIMAL_COMMA.match(f"0{raw}") or _ZERO_INTEGER.match(raw.replace(",", ".")):
+            raw = raw.replace(",", ".")
+        else:
+            raw = raw.replace(",", "")
     elif "." in raw:
         # A lone period is treated like a lone comma, which is what makes
         # "(1.250)" thousand come out as -1.250.000 instead of -1.25 (a 1000x
         # error the other way), and it is what keeps es-ES grouping such as
         # "1.234.567" parseable at all instead of raising InvalidOperation.
         groups = raw.split(".")
-        if all(len(group) == 3 for group in groups[1:]):
+        # "0.250" es 0,25, nunca 250 (mismo motivo que con la coma).
+        if not _ZERO_INTEGER.match(raw) and all(len(group) == 3 for group in groups[1:]):
             raw = "".join(groups)
     try:
         parsed = Decimal(f"{sign}{raw}")

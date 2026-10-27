@@ -17,12 +17,17 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ["RESEARCH_AUTH_REQUIRED"] = "false"
 # Keep TestClient lifespans quiet: the worker scheduler must not start in tests.
 os.environ["WORKERS_ENABLED"] = "false"
+# Backend de matplotlib fijo y sin pantalla. Si el entorno hereda otro (p. ej. el
+# de Jupyter/VS Code, `module://matplotlib_inline.backend_inline`, o TkAgg sin
+# display), importar pyplot falla durante la recolección de los tests de riesgo.
+# Se fuerza ANTES de que ningún test importe matplotlib.
+os.environ["MPLBACKEND"] = "Agg"
 # Hermetic tests: never inherit the local Postgres stack. Environment
 # variables take precedence over the .env file in pydantic-settings, so this
 # forces a disposable SQLite file for every test process.
 #
 # Fichero UNICO por sesion, no un `./cavaai_test.db` fijo. Con el nombre fijo
-# el esquema y las filas de una corrida se나무aban a la siguiente: 19 tests de
+# el esquema y las filas de una corrida se arrastraban a la siguiente: 19 tests de
 # test_calculated_metrics.py fallaban en la segunda ejecucion en la misma
 # maquina y pasaban en un checkout limpio, porque sus fixtures de limpieza
 # borran por ticker y no el resto. Un fichero por sesion hace la suite
@@ -79,6 +84,15 @@ _TEST_ISOLATED_ENV_VARS = (
     "INSIDER_ALERTS_ENABLED",
     "ALERT_EMAIL_WEBHOOK_URL",
     "ALERT_PUSH_WEBHOOK_URL",
+    # Respaldos LLM en modo auto: una clave del .env local no debe encenderlos.
+    "GROQ_API_KEY",
+    "GROQ_CHAT_FALLBACK_ENABLED",
+    "GROQ_FREE_PLAN_CONFIRMED",
+    "GROQ_ZDR_CONFIRMED",
+    "GEMINI_API_KEY",
+    "GEMINI_CHAT_FALLBACK_ENABLED",
+    "GEMINI_FREE_PLAN_CONFIRMED",
+    "OPENROUTER_API_KEY",
 )
 
 # Pydantic Settings still reads .env when the environment variable is absent.
@@ -95,6 +109,14 @@ _TEST_ISOLATED_ENV_DEFAULTS = {
     "INSIDER_ALERTS_ENABLED": "false",
     "ALERT_EMAIL_WEBHOOK_URL": "",
     "ALERT_PUSH_WEBHOOK_URL": "",
+    "GROQ_API_KEY": "",
+    "GROQ_CHAT_FALLBACK_ENABLED": "auto",
+    "GROQ_FREE_PLAN_CONFIRMED": "false",
+    "GROQ_ZDR_CONFIRMED": "false",
+    "GEMINI_API_KEY": "",
+    "GEMINI_CHAT_FALLBACK_ENABLED": "auto",
+    "GEMINI_FREE_PLAN_CONFIRMED": "false",
+    "OPENROUTER_API_KEY": "",
 }
 os.environ.update(_TEST_ISOLATED_ENV_DEFAULTS)
 

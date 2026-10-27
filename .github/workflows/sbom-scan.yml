@@ -118,13 +118,11 @@ jobs:
             file: data-engine/Dockerfile
             production: "false"
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/setup-buildx-action@v4.4.1
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: "Construir ${{ matrix.name }} (sin push: no depende de registry)"
         id: build
-        uses: docker/build-push-action@v7.4.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
@@ -157,7 +155,7 @@ jobs:
             "${{ matrix.production }}" | tee -a "digests/${{ matrix.name }}.tsv"
           docker image inspect "$ref" --format 'User={{.Config.User}} Entrypoint={{json .Config.Entrypoint}} Cmd={{json .Config.Cmd}}'
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ always() }}
         with:
           name: digest-${{ matrix.name }}
@@ -202,15 +200,13 @@ jobs:
             file: data-engine/Dockerfile
             production: "false"
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/setup-buildx-action@v4.4.1
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Reconstruir desde la cache del job build
         # Sin registry no hay forma de pasar la imagen entre jobs: se reconstruye
         # y la cache `type=gha` que dejo el job build lo convierte en una capa.
         # El contexto es el mismo commit, asi que es el mismo contenido.
-        uses: docker/build-push-action@v7.4.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
@@ -247,7 +243,7 @@ jobs:
           dependency-snapshot: false
 
       - name: Subir SBOM CycloneDX
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ always() }}
         with:
           name: sbom-${{ matrix.name }}-cyclonedx
@@ -256,7 +252,7 @@ jobs:
           retention-days: 90
 
       - name: Subir SBOM SPDX
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ always() }}
         with:
           name: sbom-${{ matrix.name }}-spdx
@@ -285,7 +281,7 @@ jobs:
         name: [frontend-dev, frontend-prod, backend-dev, backend-prod]
     steps:
       - name: SBOM del job sbom
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: sbom-${{ matrix.name }}-cyclonedx
           path: sbom
@@ -326,7 +322,7 @@ jobs:
 
       - name: "Motor 2: anchore/scan-action (grype sobre el SBOM)"
         id: anchore_scan
-        uses: anchore/scan-action@v7.4.2
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:
           sbom: sbom/${{ matrix.name }}.grype.cdx.json
           output-format: json
@@ -339,7 +335,7 @@ jobs:
         run: echo "${{ steps.anchore_scan.outcome }}" > reports/status.txt
 
       - name: Subir informe del motor 2
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ always() }}
         with:
           name: engine2-${{ matrix.name }}
@@ -385,19 +381,17 @@ jobs:
             file: data-engine/Dockerfile
             production: "false"
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
       - name: Dependencias del gate (pyyaml)
         run: python -m pip install --disable-pip-version-check pyyaml
 
-      - uses: docker/setup-buildx-action@v4.4.1
-
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Reconstruir desde la cache del job build
-        uses: docker/build-push-action@v7.4.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
@@ -409,7 +403,7 @@ jobs:
           cache-from: type=gha,scope=img-${{ matrix.name }}
 
       - name: Informe del motor 2 (job engine2)
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: engine2-${{ matrix.name }}
           path: engine2
@@ -430,7 +424,7 @@ jobs:
 
       - name: "Motor 1: trivy sobre la imagen (vuln)"
         id: trivy_vuln
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: cavaai/${{ matrix.name }}:${{ github.sha }}
           format: json
@@ -452,7 +446,7 @@ jobs:
 
       - name: "Motor 1: trivy sobre la imagen (secret)"
         id: trivy_secret
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           # Paso aparte, no por coste: un secret solo se detecta en las capas de la
           # imagen, y asi el informe de secrets y el de CVEs no se pisan. Si uno
@@ -466,7 +460,7 @@ jobs:
 
       - name: "Motor 1: trivy misconfiguration (los 4 Dockerfiles + los 2 compose)"
         id: trivy_misconfig
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           # Se evalua el repo entero, no solo el Dockerfile de esta imagen: una
           # imagen de produccion tampoco es segura si el compose que la levanta
@@ -505,7 +499,7 @@ jobs:
             --summary "reports/summary-${{ matrix.name }}.json"
 
       - name: Subir informes
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ always() }}
         with:
           name: reports-${{ matrix.name }}

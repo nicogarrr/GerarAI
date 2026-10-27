@@ -22,7 +22,7 @@ import { showErrorToast } from '@/lib/toast';
 const REASONING_OPTIONS = [
     { value: '__unset__', label: 'Sin especificar' },
     { value: 'none', label: 'Ninguno' },
-    { value: 'minimal', label: 'Minimo' },
+    { value: 'minimal', label: 'Mínimo' },
     { value: 'low', label: 'Bajo' },
     { value: 'medium', label: 'Medio' },
     { value: 'high', label: 'Alto' },
@@ -39,7 +39,7 @@ function statusLabel(settings: LlmSettings): string {
         return `Configurado con tu clave${settings.api_key_last4 ? ` (...${settings.api_key_last4})` : ''}`;
     }
     if (settings.status === 'missing_key') {
-        return 'Falta tu API key';
+        return 'Falta tu clave API';
     }
     return 'Configuracion desactivada';
 }
@@ -135,7 +135,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
     }
 
     return (
-        <form className="space-y-4" onSubmit={submit}>
+        <form aria-label="Configuración del modelo de IA" className="space-y-4" onSubmit={submit}>
             <div className="rounded-lg border border-gray-700/50 bg-gray-900/40 p-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-gray-100">{statusLabel(status)}</span>
@@ -146,8 +146,8 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 <p className="mt-1 text-gray-400">{status.message}</p>
                 {!status.encryption_available ? (
                     <p className="mt-2 text-amber-300">
-                        El cifrado no esta configurado en el servidor. Puedes elegir proveedor y modelo,
-                        pero no guardar una API key propia.
+                        El cifrado no está configurado en el servidor. Puedes elegir proveedor y modelo,
+                        pero no guardar una clave API propia.
                     </p>
                 ) : null}
             </div>
@@ -236,7 +236,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 </label>
 
                 <label className="space-y-1 text-sm text-gray-300 md:col-span-2" htmlFor="llm-api-key">
-                    <span>API key</span>
+                    <span>Clave API</span>
                     <Input
                         autoComplete="new-password"
                         disabled={busy || !canStoreKey}
@@ -248,7 +248,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                         placeholder={
                             status.api_key_configured && status.api_key_last4
                                 ? `Guardada (...${status.api_key_last4}); escribe otra para cambiarla`
-                                : 'Pega tu API key'
+                                : 'Pega tu clave API'
                         }
                         type="password"
                         value={apiKey}
@@ -281,12 +281,12 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                     onChange={(event) => setEnabled(event.target.checked)}
                     type="checkbox"
                 />
-                Usar esta configuracion para la IA de mi cuenta
+                Usar esta configuración para la IA de mi cuenta
             </label>
 
             <p className="text-xs text-gray-500">
                 Los proveedores de pago los paga el usuario; GerarAI no asume ese coste.
-                Consulta la <a className="text-teal-300 hover:underline" href="/privacidad">politica de privacidad</a>.
+                Consulta la <a className="text-teal-300 hover:underline" href="/privacidad">política de privacidad</a>.
             </p>
 
             {testResult ? (
@@ -309,7 +309,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                     type="button"
                     variant="outline"
                 >
-                    {testing ? 'Probando...' : 'Probar conexion'}
+                    {testing ? 'Probando...' : 'Probar conexión'}
                 </Button>
             </div>
         </form>
