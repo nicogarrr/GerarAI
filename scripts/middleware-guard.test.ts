@@ -21,7 +21,7 @@ describe('middleware de sesión', () => {
     it('exige cookie de sesión (normal y __Secure-) y redirige a /sign-in', () => {
         assert.match(mw, /better-auth\.session_token/);
         assert.match(mw, /__Secure-better-auth\.session_token/);
-        assert.match(mw, /NextResponse\.redirect\(new URL\('\/sign-in', request\.url\)\)/);
+        assert.match(mw, /NextResponse\.redirect\(signInUrlFor\(request\.url\)\)/);
     });
 
     it('respeta el bypass E2E con las tres condiciones de require-user', () => {

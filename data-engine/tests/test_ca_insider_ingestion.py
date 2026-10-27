@@ -179,7 +179,7 @@ def test_build_feed_final_contract_keeps_ca_out_of_usd_totals_and_signals(db, mo
 
 
 def test_desktop_and_mobile_preserve_source_and_missing_currency_labels():
-    source = (Path(__file__).resolve().parents[2] / "components/insider/InsiderFeed.tsx").read_text()
+    source = (Path(__file__).resolve().parents[2] / "components/insider/InsiderFeed.tsx").read_text(encoding="utf-8")
     desktop = source.split("<table", 1)[1].split("</table>", 1)[0]
     mobile = source.split("function OperationCard", 1)[1].split("export", 1)[0]
     for layout in (desktop, mobile):

@@ -26,11 +26,21 @@ from app.services.review_alert_service import ReviewAlertService
 # could never fire and always reported `matched: false`.
 _OPERATORS = frozenset({">", "<", ">=", "<=", "==", "!="})
 
+_NUMERIC_RULE_TYPES = frozenset({"price_above", "price_below", "price_change"})
 
-# Operators the evaluator understands. `create()` did not validate the operator,
-# so a rule created with "!=" (which the screener's comparator table does accept)
-# could never fire and always reported `matched: false`.
-_OPERATORS = frozenset({">", "<", ">=", "<=", "==", "!="})
+
+def _numeric_threshold(value: Any) -> float | None:
+    """Umbral numérico finito o None. Rechaza texto («abc»), separadores de miles
+    ambiguos («1,234»), booleanos y NaN/Infinity."""
+    if isinstance(value, bool):
+        return None
+    try:
+        number = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError):
+        return None
+    if not number.is_finite():
+        return None
+    return float(number)
 
 
 def _is_non_finite(value: Any) -> bool:
@@ -69,6 +79,10 @@ class AlertRuleService:
             # whole evaluation pass; a threshold that is not a finite number is
             # meaningless for every operator.
             raise ValueError(f"Alert threshold must be a finite number: {value!r}")
+        if rule_type in _NUMERIC_RULE_TYPES and _numeric_threshold(value) is None:
+            # Un umbral de texto en una regla de precio/cambio nunca puede
+            # cumplirse (``_matches`` no ordena texto): se rechaza al crearla.
+            raise ValueError(f"Alert threshold must be a number: {value!r}")
         name = f"{company.ticker}: {rule_type} {operator} {value}"[:300]
         target = self._target(rule_type)
         rule = db.scalar(
@@ -304,14 +318,34 @@ class AlertRuleService:
                     .limit(2)
                 ).all()
             )
-            if len(prices) < 2 or prices[1].close == 0:
+            if len(prices) < 2:
                 return None, {"kind": kind, "status": "missing_two_prices"}
-            change = (Decimal(prices[0].close) / Decimal(prices[1].close) - 1) * 100
+            latest, previous = prices
+            # Cierres ajustados cuando ambas filas los traen: un split o una
+            # distribución entre las dos sesiones no es un movimiento de precio
+            # (200 -> 110 tras un split 2:1 es +10 %, no -45 %). Mismo criterio
+            # que el digest de cartera (portfolio_moves_service). Sin ajuste en
+            # alguna fila se usa el cierre cotizado, como hasta ahora.
+            if (
+                latest.adj_close is not None
+                and previous.adj_close is not None
+                and latest.adj_close > 0
+                and previous.adj_close > 0
+            ):
+                current_value, previous_value = latest.adj_close, previous.adj_close
+                basis = "adj_close"
+            else:
+                current_value, previous_value = latest.close, previous.close
+                basis = "close"
+            if previous_value is None or current_value is None or previous_value == 0:
+                return None, {"kind": kind, "status": "missing_two_prices"}
+            change = (Decimal(current_value) / Decimal(previous_value) - 1) * 100
             age_days = (date.today() - prices[0].date).days
             return change, {
                 "kind": kind,
                 "price_ids": [prices[0].id, prices[1].id],
                 "latest_date": prices[0].date.isoformat(),
+                "basis": basis,
                 "age_days": age_days,
                 "status": (
                     "stale"

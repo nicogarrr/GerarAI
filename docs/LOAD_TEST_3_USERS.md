@@ -50,7 +50,7 @@ Nunca ejecutes estos comandos con el compose de producción ni reutilices sus
 volúmenes.
 
 ```powershell
-cd C:\Users\nicoi\CavaAI\.worktrees\loadtest
+cd <ruta-del-repo>\.worktrees\loadtest
 # .env de prueba con RESEARCH_AUTH_SECRET, POSTGRES_* y, si aplica,
 # OPENCODE_GO_API_KEY. Está ignorado por git.
 docker compose -p cavaai-loadtest up -d backend

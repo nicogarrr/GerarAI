@@ -16,7 +16,7 @@
 
 - **Workspace por empresa** (`/research/[ticker]`): snapshot coherente, tesis versionada con auditoría, claims con evidencia a favor/en contra, memoria y chat con fuentes.
 - **Tesis con abogado del diablo**: debate bull/bear automático con veredicto persistido en la tesis.
-- **Valoración determinista**: DCF, SOTP, pre-revenue, bancos, aseguradoras, REITs, holdings y materias primas — con traza de cálculo y regla anti-look-ahead (sin datos futuros).
+- **Valoración determinista**: DCF, SOTP, pre-revenue, bancos, aseguradoras, REITs, holdings y materias primas — con traza de cálculo. Anti-look-ahead: la serie histórica de múltiplos con `as_of` pasado solo usa precios hasta esa fecha y cifras SEC cuyo filing (`filed`) es anterior; sin `filed`, cierre del periodo + 120 días. Límite: de cada periodo se guarda solo la última cifra (reexpresada), así que antes de la reexpresión ese periodo sale «sin datos», no con la cifra original.
 - **Señales insider**: compras de directivos desde SEC EDGAR (Form 4, gratis), con detección de cluster-buy y alerta en Telegram.
 - **Alertas en Telegram**: reglas de precio/noticias/earnings + urgencia puntuada por IA; las tesis se aprueban desde el propio Telegram (Publicar / Revisar).
 - **Biblioteca de conocimiento (RAG)**: sube PDFs/MDs, extrae principios, apruébalos y pregúntales con búsqueda semántica (Qdrant + embeddings locales).
@@ -53,7 +53,12 @@ en [docs/AI_PROVIDER_STRATEGY.md](docs/AI_PROVIDER_STRATEGY.md):
   OpenRouter (`:free`) y el Go aprobado, solo miembros con clave.
 - `LLM_PROVIDER=disabled` (o `LLM_ENABLED=false`) no construye proveedor; el
   chat queda deshabilitado y `/health/ready` devuelve 503.
-- Groq/Gemini/OpenRouter como respaldos del chat están apagados por defecto.
+- Groq/Gemini/OpenRouter son respaldos gratuitos en modo `auto` (por
+  defecto): cada uno entra solo si tiene clave y las confirmaciones de plan
+  gratuito (`GROQ_FREE_PLAN_CONFIRMED`+`GROQ_ZDR_CONFIRMED`,
+  `GEMINI_FREE_PLAN_CONFIRMED`); sin clave se salta. `*_CHAT_FALLBACK_ENABLED=false`
+  los apaga. Si todo falla, el chat responde en modo determinista marcado
+  como fallback, sin inventar texto.
   La caché de respuestas Go es por tenant y nunca cachea un fallback.
 
 ## Arranque rápido (< 30 min)
@@ -188,8 +193,9 @@ Todos aceptan `--json` para volcar el informe. El eval del RAG indexa en
 Next.js (App Router, server actions firmadas HMAC) habla con FastAPI
 (`/api/*`, firma X-CavaAI-*): Postgres como canónico, Qdrant como índice
 semántico reconstruible, MinIO para originales y Redis/Dramatiq para jobs.
-OpenCode Go es el LLM por defecto (la cascada opcional con Gemini/OpenRouter
-free aprobados se activa a mano) y Jev hace las micro-decisiones.
+OpenCode Go es el LLM por defecto, con respaldos gratuitos (Groq/Gemini)
+que entran solos cuando hay clave y plan gratuito confirmado, y Jev hace las
+micro-decisiones.
 
 Autenticación doble: sesiones Better Auth en MongoDB + firma HMAC con secreto
 de 32 mínimo en la research API (ventana 300 s, tenant = tu userId).
@@ -207,7 +213,7 @@ data-engine/
   app/valuation/     motores + guardia point-in-time
   app/llm/           factory de proveedores (OpenCode Go por defecto) + cliente Jev
   alembic/versions/  migraciones 0001→0080 (lineales, con downgrade)
-  tests/             7.256 tests herméticos (7.246 pasan, 8 skip, 2 xpass; CI 2026-10-26) · evals/  evals financieras
+  tests/             tests herméticos de pytest (la cifra actual, en el resumen del job «Backend quality» de CI) · evals/  evals financieras
 e2e/                 specs Playwright del flujo inversor
 docs/                PRODUCT_VISION, runbooks, privacidad
 ```
@@ -217,14 +223,19 @@ Ver [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) y la propia app en
 
 ## Producción
 
-- Frontend en Vercel; backend con autoarranque local, `docker-compose.prod.yml` (Oracle) o `render.yaml` (Render).
+- **Camino oficial para la 1.0**: frontend en Vercel + backend con
+  `docker-compose.prod.yml` en Oracle Cloud. Es el único despliegue probado de
+  punta a punta (healthchecks, reinicio automático y restore drill en CI).
 - **Oracle Cloud (Always Free)**: `docker-compose.prod.yml` levanta el stack 24/7
   en una VM Ampere ARM (Caddy + PostgreSQL + Redis + Qdrant + MinIO + backend +
   worker + scheduler), con healthchecks y reinicio automático; ver
   `docs/oracle-setup.md` para la cuenta y el `.env.production`.
-- **Render (free)**: `render.yaml` (raíz del repo) despliega solo el backend con
-  `data-engine/Dockerfile.prod` y healthcheck `/health/ready`; en el tier free
-  hiberna a los ~15 min, así que los workers no corren 24/7.
+- **Autoarranque local (Windows)**: `arrancar_gerarai.bat` para uso personal en el PC.
+- **Render (experimental, no soportado)**: `render.yaml` (raíz del repo) solo
+  describe el backend con `data-engine/Dockerfile.prod`. **No despliega tal
+  cual**: `/health/ready` exige Postgres, Redis, Qdrant y MinIO externos que hay
+  que configurar a mano en el dashboard, el tier free hiberna a los ~15 min y los
+  workers van apagados (`WORKERS_ENABLED=false`).
 - Migraciones siempre explícitas (`alembic upgrade head`); el seed solo instala taxonomía pública, nunca tu cartera.
 - Puertos de BD cerrados al exterior; secretos solo en el dashboard de deploy.
 - Qdrant se reconstruye desde Postgres (`RAGIndex().rebuild_tenant`).

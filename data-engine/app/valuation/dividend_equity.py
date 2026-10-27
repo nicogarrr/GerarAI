@@ -460,7 +460,7 @@ class FcfeInputs:
     being projected, not the balance of the asset base. They are stored as
     reported, so a provider that signs capex as an outflow yields a negative
     ``capex`` and the bridge below stays correct either way (the term is
-    ``(1 - b) * (capex - depreciation)`` and flipping both signs flips nothing
+    ``capex - depreciation`` and flipping both signs flips nothing
     only if they share a convention — which is exactly why the engine refuses
     when only one of them is present).
     """
@@ -499,7 +499,16 @@ def fcfe_bridge(
     delta_total_debt: float,
     delta_working_capital: float,
 ) -> dict:
-    """``FCFE = NI - (1 - b)(capex - D&A) + Δdebt - ΔWC``, term by term.
+    """``FCFE = NI - (capex - D&A) + Δdebt - ΔWC``, term by term.
+
+    Definición estándar (CFA L2, «Free Cash Flow Valuation»: FCFE = NI + NCC -
+    FCInv - WCInv + net borrowing). La reinversión neta se resta ENTERA: la
+    parte financiada con deuda ya entra por ``Δdebt``. Antes se multiplicaba
+    por ``(1 - b)`` con ``b`` = ratio de retención, lo que mezclaba la forma de
+    Damodaran con ratio de DEUDA (que entonces no suma Δdebt) con la política
+    de dividendos: con b = 1 la reinversión desaparecía y el FCFE salía igual
+    al beneficio neto. ``retention_ratio`` se conserva solo como dato de
+    traza; no cambia el FCFE de un ejercicio.
 
     Returned as a dict rather than a float so the engine can publish the whole
     bridge in the trace: the value of an FCFE model is entirely in the sign
@@ -507,19 +516,18 @@ def fcfe_bridge(
     hides it.
     """
     net_reinvestment = capex - depreciation_amortization
-    retained_reinvestment = (1 - retention_ratio) * net_reinvestment
-    fcfe = net_income - retained_reinvestment + delta_total_debt - delta_working_capital
+    fcfe = net_income - net_reinvestment + delta_total_debt - delta_working_capital
     return {
         "net_income": net_income,
         "capex": capex,
         "depreciation_amortization": depreciation_amortization,
         "net_reinvestment_capex_less_depreciation": net_reinvestment,
         "retention_ratio": retention_ratio,
-        "retained_reinvestment": retained_reinvestment,
+        "net_reinvestment_subtracted": net_reinvestment,
         "delta_total_debt": delta_total_debt,
         "delta_working_capital": delta_working_capital,
         "fcfe": fcfe,
-        "formula": "FCFE = NI - (1 - b)(capex - D&A) + delta_total_debt - delta_working_capital",
+        "formula": "FCFE = NI - (capex - D&A) + delta_total_debt - delta_working_capital",
     }
 
 
@@ -536,8 +544,10 @@ def reconcile_fcfe_against_dividend_model(
 ) -> dict:
     """Show that FCFE is the Gordon model plus a reinvestment/financing bridge.
 
-    With ``b = 0`` (no retention), ``Δdebt = 0`` and ``ΔWC = 0`` the FCFE
-    stream equals net income, so the FCFE value must equal ``D1/(ke - g)``.
+    With ``capex = D&A``, ``Δdebt = 0`` and ``ΔWC = 0`` the FCFE stream equals
+    net income, so the FCFE value must equal ``D1/(ke - g)``. (La condición
+    ``retention_ratio_is_zero`` se mantiene por compatibilidad de la traza; la
+    que de verdad cuenta es ``net_reinvestment_capex_less_depreciation == 0``.)
     Every deviation of the real inputs from those conditions is a named,
     quantified reason the two engines disagree — which is the answer to "why
     do my DDM and my FCFE say different things", instead of two numbers with
@@ -556,7 +566,7 @@ def reconcile_fcfe_against_dividend_model(
         "net_income_gordon_price": pure_ddm_price,
         "bridge_gap_per_share": fcfe_price - pure_ddm_price,
         "fcfe_minus_net_income": bridge_gap,
-        "bridge_formula": "FCFE - NI = -(1 - b)(capex - D&A) + delta_total_debt - delta_working_capital",
+        "bridge_formula": "FCFE - NI = -(capex - D&A) + delta_total_debt - delta_working_capital",
         "net_reinvestment_capex_less_depreciation": net_reinvestment_capex_less_depreciation,
         "identity_conditions": conditions,
         "identity_holds": all(conditions.values()),

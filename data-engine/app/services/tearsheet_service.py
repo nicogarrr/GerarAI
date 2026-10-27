@@ -94,19 +94,16 @@ def compute_metrics(
     # desviacion ~1e-19 en lugar de 0 y el Sharpe divergeria.
     sharpe = mean / volatility * np.sqrt(periods) if volatility > 1e-12 else None
 
-    downside = excess[excess < 0]
-    if downside.size >= 2:
-        downside_vol = float(np.std(downside, ddof=1))
-        sortino = (
-            mean / downside_vol * np.sqrt(periods) if downside_vol > 1e-12 else None
-        )
-    elif downside.size == 1:
-        # Una sola observacion negativa: ddof=1 no define varianza; el
-        # Sortino degenera (sin dispersion a la baja el ratio no es finito).
-        sortino = None
-    else:
-        # Sin periodos negativos no hay riesgo a la baja medible.
-        sortino = None
+    # Sortino & Price (1994): desviacion a la baja respecto al objetivo
+    # (aqui risk_free) sobre TODAS las observaciones:
+    #   DD = sqrt( sum(min(r_i - T, 0)^2) / N )
+    # No es la desviacion tipica (ddof=1, centrada en su media) de solo los
+    # periodos negativos: eso infraestima/sobreestima el riesgo y daba None
+    # con un unico periodo negativo o con perdidas iguales.
+    shortfall = np.minimum(excess, 0.0)
+    downside_vol = float(np.sqrt(np.mean(shortfall**2)))
+    # Sin periodos por debajo del objetivo no hay riesgo a la baja medible.
+    sortino = mean / downside_vol * np.sqrt(periods) if downside_vol > 1e-12 else None
 
     wealth = np.cumprod(1.0 + values)
     # F367: el patrimonio inicial (1.0) cuenta como pico; sin él una caída en

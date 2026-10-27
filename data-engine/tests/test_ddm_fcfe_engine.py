@@ -418,7 +418,11 @@ def _fcfe_inputs(**overrides) -> FcfeInputs:
 
 
 def test_fcfe_bridge_is_term_by_term():
-    """FCFE = 200 - 0.7*(80-40) + 20 - 5 = 200 - 28 + 15 = 187."""
+    """FCFE = NI - (capex - D&A) + Δdeuda - ΔWC = 200 - 40 + 20 - 5 = 175.
+
+    La reinversión neta se resta entera: la parte financiada con deuda ya entra
+    por Δdeuda. Con el antiguo factor (1 - b) salía 187 (CFA L2, FCFE).
+    """
     bridge = fcfe_bridge(
         net_income=200.0,
         capex=80.0,
@@ -428,16 +432,34 @@ def test_fcfe_bridge_is_term_by_term():
         delta_working_capital=5.0,
     )
     assert bridge["net_reinvestment_capex_less_depreciation"] == pytest.approx(40.0)
-    assert bridge["retained_reinvestment"] == pytest.approx(28.0)
-    assert bridge["fcfe"] == pytest.approx(187.0)
+    assert bridge["net_reinvestment_subtracted"] == pytest.approx(40.0)
+    assert bridge["fcfe"] == pytest.approx(175.0)
+
+
+def test_fcfe_bridge_does_not_scale_reinvestment_by_retention():
+    """El ratio de retención no cambia el FCFE de un ejercicio.
+
+    NI 100, capex 50, D&A 20, sin deuda ni ΔWC: FCFE = 100 - 30 = 70 con
+    cualquier b. Antes: b=0,6 daba 88 y b=1 daba 100 (reinversión ignorada).
+    """
+    for retention in (0.0, 0.6, 1.0):
+        bridge = fcfe_bridge(
+            net_income=100.0,
+            capex=50.0,
+            depreciation_amortization=20.0,
+            retention_ratio=retention,
+            delta_total_debt=0.0,
+            delta_working_capital=0.0,
+        )
+        assert bridge["fcfe"] == pytest.approx(70.0)
 
 
 def test_fcfe_value_is_the_gordon_price_of_the_own_stream():
-    """187*(1+0.03) = 192.61; 192.61/(0.10-0.03) = 192.61/0.07 = 2751.571428..."""
+    """175*(1+0.03) = 180.25; 180.25/(0.10-0.03) = 180.25/0.07 = 2575.0"""
     result = run_fcfe(_fcfe_inputs())
-    assert result.fcfe == pytest.approx(187.0)
-    assert result.value_per_share == pytest.approx(2751.571428571428, abs=1e-9)
-    assert result.equity_value == pytest.approx(275157.1428571428, abs=1e-6)
+    assert result.fcfe == pytest.approx(175.0)
+    assert result.value_per_share == pytest.approx(2575.0, abs=1e-9)
+    assert result.equity_value == pytest.approx(257500.0, abs=1e-6)
 
 
 def test_fcfe_collapses_onto_the_gordon_price_when_nothing_is_retained_or_financed():
@@ -462,7 +484,7 @@ def test_fcfe_collapses_onto_the_gordon_price_when_nothing_is_retained_or_financ
 def test_fcfe_reconciliation_names_the_bridge_that_makes_it_differ():
     reconciliation = run_fcfe(_fcfe_inputs()).trace["reconciliation"]
     assert reconciliation["identity_holds"] is False
-    assert reconciliation["fcfe_minus_net_income"] == pytest.approx(-13.0)
+    assert reconciliation["fcfe_minus_net_income"] == pytest.approx(-25.0)
     assert reconciliation["bridge_gap_per_share"] < 0
 
 
@@ -725,9 +747,9 @@ def test_fcfe_engine_publishes_the_bridge_and_never_subtracts_net_debt(db):
     assert result["status"] == "partial"
     assert result["publishable"] is False
     bridge = result["fcfe"]["bridge"]
-    # 300 - (1-0.30)*(120-60) + 15 - 8 = 300 - 42 + 7 = 265
-    assert bridge["fcfe"] == pytest.approx(265.0)
-    assert bridge["retained_reinvestment"] == pytest.approx(42.0)
+    # 300 - (120-60) + 15 - 8 = 300 - 60 + 7 = 247
+    assert bridge["fcfe"] == pytest.approx(247.0)
+    assert bridge["net_reinvestment_subtracted"] == pytest.approx(60.0)
     assert result["fcfe"]["no_net_debt_subtracted"] is True
     sign_block = result["trace"]["assumptions"]["sign_normalisation"]
     assert sign_block["applied"] is True

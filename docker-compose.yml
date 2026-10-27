@@ -1,6 +1,11 @@
 # ============================================
 # Docker Compose - Entorno Completo de Desarrollo
 # ============================================
+#
+# Seguridad: todos los puertos publicados escuchan solo en 127.0.0.1 por defecto
+# (las contraseñas de desarrollo de abajo son públicas). Para exponerlos a la LAN,
+# define GERARAI_BIND_HOST=0.0.0.0 en tu .env de forma consciente y cambia antes
+# MONGO_ROOT_PASSWORD, POSTGRES_PASSWORD, MINIO_ROOT_PASSWORD y CLICKHOUSE_PASSWORD.
 
 services:
   # ==========================================
@@ -11,7 +16,7 @@ services:
     container_name: cavaai-mongodb
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:27017:27017"
     volumes:
       - mongodb_data:/data/db
     environment:
@@ -32,7 +37,7 @@ services:
     container_name: cavaai-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -56,7 +61,7 @@ services:
     container_name: cavaai-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -71,8 +76,8 @@ services:
     container_name: cavaai-qdrant
     restart: unless-stopped
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:6333:6333"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
@@ -98,8 +103,8 @@ services:
     restart: unless-stopped
     command: server --address ":9000" --console-address ":9001" /data
     ports:
-      - "9002:9000"
-      - "9003:9001"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:9002:9000"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:9003:9001"
     volumes:
       - minio_data:/data
     environment:
@@ -125,7 +130,7 @@ services:
     container_name: cavaai-backend
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:8000:8000"
     volumes:
       - ./data-engine:/app
       - /app/__pycache__
@@ -309,7 +314,7 @@ services:
     container_name: cavaai-frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:3000:3000"
     volumes:
       - .:/app
       - /app/node_modules
@@ -354,7 +359,7 @@ services:
     restart: unless-stopped
     user: "101:101"
     ports:
-      - "8123:8123"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:8123:8123"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - clickhouse_logs:/var/log/clickhouse-server
@@ -417,7 +422,7 @@ services:
       langfuse-worker:
         condition: service_started
     ports:
-      - "3002:3000"
+      - "${GERARAI_BIND_HOST:-127.0.0.1}:3002:3000"
     environment:
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-}
       NEXTAUTH_URL: http://localhost:3002

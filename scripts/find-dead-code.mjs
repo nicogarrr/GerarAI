@@ -84,7 +84,6 @@ const ENTRY_POINTS = {
     'scripts/research-client-contract.loader.mjs',
     'scripts/research-identity-guard.loader.mjs',
     'scripts/transaction-validation.loader.mjs',
-    'scripts/opencode_model_rotator.py',
     'infra/postgres/init.sql',
   ],
   /** Globs: every match is an entry point. */

@@ -1,4 +1,4 @@
-"""Cifrado en reposo de las API keys LLM por tenant (Fernet/AES-GCM).
+"""Cifrado en reposo de las API keys LLM por tenant (Fernet).
 
 La clave se toma de ``LLM_SETTINGS_ENCRYPTION_KEY`` (>=32 bytes) y en
 local/test se deriva de ``RESEARCH_AUTH_SECRET``. En produccion NUNCA se usa

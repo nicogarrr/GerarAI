@@ -84,7 +84,7 @@ def create_free_interactive_provider(settings: Settings | None = None, *, client
         member.interactive_quota_breaker = True
     # AI Studio is free only with confirmed no billing, not merely by model ID.
     # Reuse the existing guard; never add Gemini to the OpenCode free registry.
-    if settings.gemini_chat_fallback_enabled:
+    if settings.gemini_chat_fallback_active:
         for model in GEMINI_MODELS:
             gemini = _gemini_backup(settings, client, timeout_seconds=8,
                                     total_timeout_seconds=9, max_output_tokens=4000)
