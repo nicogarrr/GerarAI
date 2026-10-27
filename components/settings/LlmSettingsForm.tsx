@@ -157,7 +157,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 <label className="space-y-1 text-sm text-gray-300" htmlFor="llm-provider">
                     <span>Proveedor</span>
                     <Select disabled={busy} onValueChange={changeProvider} value={provider}>
-                        <SelectTrigger className="w-full" id="llm-provider">
+                        <SelectTrigger className="w-full data-[size=default]:h-11" id="llm-provider">
                             <SelectValue placeholder="Elige proveedor" />
                         </SelectTrigger>
                         <SelectContent>
@@ -173,6 +173,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 <label className="space-y-1 text-sm text-gray-300" htmlFor="llm-model">
                     <span>Modelo</span>
                     <Input
+                        className="h-11"
                         autoComplete="off"
                         disabled={busy}
                         id="llm-model"
@@ -186,6 +187,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                     <label className="space-y-1 text-sm text-gray-300 md:col-span-2" htmlFor="llm-base-url">
                         <span>URL base (HTTPS publico compatible con OpenAI)</span>
                         <Input
+                            className="h-11"
                             autoComplete="off"
                             disabled={busy}
                             id="llm-base-url"
@@ -207,6 +209,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 <label className="space-y-1 text-sm text-gray-300" htmlFor="llm-fallback">
                     <span>Modelo de respaldo (opcional)</span>
                     <Input
+                        className="h-11"
                         autoComplete="off"
                         disabled={busy}
                         id="llm-fallback"
@@ -223,7 +226,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                         onValueChange={setReasoningEffort}
                         value={reasoningEffort}
                     >
-                        <SelectTrigger className="w-full" id="llm-reasoning">
+                        <SelectTrigger className="w-full data-[size=default]:h-11" id="llm-reasoning">
                             <SelectValue placeholder="Sin especificar" />
                         </SelectTrigger>
                         <SelectContent>
@@ -239,6 +242,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 <label className="space-y-1 text-sm text-gray-300 md:col-span-2" htmlFor="llm-api-key">
                     <span>Clave API</span>
                     <Input
+                        className="h-11"
                         autoComplete="new-password"
                         disabled={busy || !canStoreKey}
                         id="llm-api-key"
