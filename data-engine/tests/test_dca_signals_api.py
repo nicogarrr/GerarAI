@@ -124,3 +124,26 @@ def test_backtest_endpoint_any_ticker_plain_vs_levels(client):
     assert body["params_version"] == "nico-v1"
     assert body["disclaimer"].startswith("Histórico, hipotético")
     assert client.get("/api/watchlist/dca-signals/DCABT/backtest", params={"start": "2026-13"}).status_code == 422
+
+
+def test_list_reports_when_daily_evaluation_is_disabled(client, monkeypatch):
+    """Prueba real en vivo (realqa-15): con DCA_EVALUATION_ENABLED=false en el
+    servidor el job diario sale «disabled» cada noche, ningun ticker tiene
+    nivel y el panel decia «Sin evaluar» sin explicar por que. El listado
+    declara ahora si la evaluacion diaria esta encendida."""
+    from app.core.config import get_settings
+
+    client.post("/api/watchlist", json={"symbol": "DCATST"})
+    monkeypatch.setenv("DCA_EVALUATION_ENABLED", "false")
+    get_settings.cache_clear()
+    try:
+        body = client.get("/api/watchlist/dca-signals").json()
+        assert body["evaluation_enabled"] is False
+        # «Evaluar ahora» sigue funcionando con la evaluacion diaria apagada.
+        assert client.post("/api/watchlist/dca-signals/evaluate").status_code == 200
+        item = next(i for i in client.get("/api/watchlist/dca-signals").json()["items"] if i["symbol"] == "DCATST")
+        assert item["state"] is not None
+    finally:
+        monkeypatch.delenv("DCA_EVALUATION_ENABLED")
+        get_settings.cache_clear()
+    assert client.get("/api/watchlist/dca-signals").json()["evaluation_enabled"] is True

@@ -6583,6 +6583,11 @@ export interface components {
             channels: string[];
             /** Email Configured */
             email_configured: boolean;
+            /**
+             * Evaluation Enabled
+             * @default true
+             */
+            evaluation_enabled: boolean;
             /** Global Min Level */
             global_min_level: number;
             /** Items */

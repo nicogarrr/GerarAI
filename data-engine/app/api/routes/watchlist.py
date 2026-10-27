@@ -450,6 +450,9 @@ class DcaSignalItemOut(BaseModel):
 
 class DcaSignalsOut(BaseModel):
     alerts_enabled: bool
+    # False = la evaluacion diaria (DCA_EVALUATION_ENABLED) esta apagada en el
+    # servidor: ningun ticker tendra nivel salvo con «Evaluar ahora».
+    evaluation_enabled: bool = True
     global_min_level: int
     trims_enabled: bool
     channels: list[str]
@@ -542,6 +545,7 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
         })
     return {
         "alerts_enabled": bool(settings.dca_alerts_enabled),
+        "evaluation_enabled": bool(settings.dca_evaluation_enabled),
         "global_min_level": int(settings.dca_alert_min_level),
         "trims_enabled": bool(settings.dca_alert_trims),
         "channels": dca.alert_channels(settings),
