@@ -162,6 +162,10 @@ def _external_flow(transaction: Any) -> float:
     return -float(cash_amount(transaction))
 
 
+# Sesiones minimas para anualizar la rentabilidad (mismo umbral que la reconstruccion).
+MIN_ANNUALIZATION_SESSIONS = 60
+
+
 class PortfolioIntelligenceService:
     def build(self, db: Session, *, years: int = 5) -> dict[str, Any]:
         years = max(1, min(years, 20))
@@ -253,11 +257,14 @@ class PortfolioIntelligenceService:
             portfolio_returns = indicative_returns
         partial_day = self._partial_trading_day(price_series, snapshots, datetime.now(UTC))
         twr = self._compound(list(portfolio_returns.values()))
-        # Una ventana reconstruida corta no se anualiza: extrapolar 8 sesiones a un
-        # ano daria una cifra sin sentido.
+        # Una ventana corta no se anualiza, venga de snapshots, reconstruccion o
+        # pesos actuales: extrapolar 1 dia (+0,99 %) a un ano daba 1097 %.
+        short_annualization_window = bool(portfolio_returns) and (
+            len(portfolio_returns) < MIN_ANNUALIZATION_SESSIONS
+        )
         annualized_return = (
             (1 + twr) ** (252 / len(portfolio_returns)) - 1
-            if portfolio_returns and twr > -1 and not (use_reconstruction and len(portfolio_returns) < 60)
+            if portfolio_returns and twr > -1 and not short_annualization_window
             else None
         )
         volatility = (
@@ -423,6 +430,13 @@ class PortfolioIntelligenceService:
                         "Price/snapshot series may include the current trading day before the 22:00 UTC close cutoff (possible partial bar; conservative approximation, not a confirmed close): daily metrics (TWR, volatility, drawdown, VaR) use it as-is."
                     ]
                     if partial_day
+                    else []
+                )
+                + (
+                    [
+                        f"Annualized return not shown: only {len(portfolio_returns)} daily return(s) available (minimum {MIN_ANNUALIZATION_SESSIONS}); extrapolating a short window to a year would be misleading."
+                    ]
+                    if short_annualization_window
                     else []
                 )
                 + (
