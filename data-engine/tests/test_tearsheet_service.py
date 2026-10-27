@@ -342,3 +342,27 @@ def test_build_gap_leaving_one_return_is_insufficient_not_spliced():
     assert result["status"] == "insufficient_data"
     assert result["metrics"]["n_observations"] == 1
     assert result["qualification"]["excluded_returns"] == 2
+
+
+
+def test_margin_exposure_labels_equity_weight_as_leverage_and_keeps_cash_sign():
+    """Auditoria A: posiciones 100, caja -25, NAV 75. equity_weight (1.333) es
+    apalancamiento, no distribucion: la API lo dice y da la caja con signo."""
+    snap = PortfolioDailySnapshot(
+        snapshot_date=date(2026, 9, 1), base_currency="EUR",
+        positions_value_base=Decimal("100"), cash_value_base=Decimal("-25"),
+        total_value_base=Decimal("75"),
+    )
+    row = PositionDailySnapshot(
+        snapshot_date=date(2026, 9, 1), quantity=Decimal("1"), market_price_native=Decimal("100"),
+        currency="EUR", market_value_native=Decimal("100"), market_value_base=Decimal("100"),
+    )
+    result = exposure_from_snapshot(snap, [row])
+    assert result["equity_weight"] == pytest.approx(100 / 75)
+    assert result["net_leverage"] == pytest.approx(100 / 75)
+    assert result["gross_leverage"] == pytest.approx(100 / 75)
+    assert result["weight_bases"]["equity_weight"] == "leverage_positions_over_nav"
+    assert result["weight_bases"]["top_1_gross_positions_weight"] == "gross_positions_abs"
+    assert result["cash_value_base"] == pytest.approx(-25.0)
+    assert result["positions_value_base"] == pytest.approx(100.0)
+    assert result["top_1_gross_positions_weight"] == pytest.approx(1.0)
