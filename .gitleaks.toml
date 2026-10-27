@@ -1,0 +1,17 @@
+# Configuracion de gitleaks (CI: .github/workflows/gitleaks.yml; local: pre-commit).
+# Reglas por defecto de gitleaks + allowlist minima de valores FALSOS conocidos.
+# No anadas aqui rutas enteras (tests/, *.example): justo ahi se pegaron las
+# claves reales que hoy siguen en el historial.
+title = "GerarAI gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valores ficticios de tests y placeholders documentados"
+regexes = [
+  # Secreto HMAC de prueba de los tests del backend.
+  '0123456789abcdef0123456789abcdef',
+  # Placeholder de .env.production.example (se sustituye en el despliegue).
+  'GKgenera-GK-mas-24-hex',
+]
