@@ -254,3 +254,7 @@ from app.models.knowledge_rag import (
 )
 
 __all__.extend(["KnowledgeRagParent", "KnowledgeRagSource"])
+
+from app.models.ibkr_connection import IBKRConnection as IBKRConnection  # noqa: E402
+
+__all__.append("IBKRConnection")

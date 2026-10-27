@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { getIBKRConnection } from '@/lib/actions/ibkr-settings.actions';
 import SettingsContent from '@/components/settings/SettingsContent';
 import { getLlmSettings } from '@/lib/actions/llm-settings.actions';
 import { getPortfolioCurrencySettings } from '@/lib/actions/portfolio-settings.actions';
@@ -17,11 +18,12 @@ export default async function SettingsPage() {
   } catch {
     redirect('/sign-in');
   }
-  const [declarant, llm, currency] = await Promise.all([
+  const [declarant, llm, currency, ibkr] = await Promise.all([
     getTaxDeclarant().catch(() => null),
     getLlmSettings().catch(() => null),
     getPortfolioCurrencySettings().catch(() => null),
+    getIBKRConnection().catch(() => null),
   ]);
 
-  return <SettingsContent declarant={declarant} llm={llm} currency={currency} />;
+  return <SettingsContent declarant={declarant} llm={llm} currency={currency} ibkr={ibkr} />;
 }

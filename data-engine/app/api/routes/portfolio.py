@@ -817,6 +817,9 @@ def _require_ibkr_owner(db: Session):
         raise HTTPException(status_code=403, detail="La importación Flex no está habilitada para esta cuenta.")
     if not (settings.ibkr_flex_account_id or "").strip():
         raise HTTPException(status_code=503, detail="Falta configurar la cuenta IBKR esperada.")
+    from app.models import IBKRConnection
+    if db.scalar(select(IBKRConnection.id).where(IBKRConnection.tenant_id == db.info.get("tenant_id"))) is not None:
+        raise HTTPException(status_code=409, detail="Usa el conector IBKR de Ajustes para esta cartera.")
     return settings
 
 

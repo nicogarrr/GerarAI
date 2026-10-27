@@ -273,3 +273,67 @@ def settings(db: Session = Depends(get_db)) -> dict:
             "qdrant_url": bool(app_settings.qdrant_url),
         },
     }
+
+
+class IBKRConnectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    token: str = Field(repr=False)
+    query_id: str = Field(min_length=1, max_length=32)
+    account_id: str = Field(min_length=3, max_length=64)
+    complete_query: bool = False
+
+
+@router.get("/ibkr")
+def get_ibkr_connection(db: Session = Depends(get_db)) -> dict:
+    from app.services import ibkr_connection_service as ibkr
+    _require_tenant(db)
+    return ibkr.view(db)
+
+
+@router.put("/ibkr", dependencies=[Depends(enforce_llm_test_rate_limit)])
+async def connect_ibkr(payload: IBKRConnectRequest, db: Session = Depends(get_db)) -> dict:
+    from starlette.concurrency import run_in_threadpool
+
+    from app.services import ibkr_connection_service as ibkr
+    _require_tenant(db)
+    settings = get_settings()
+    if not encryption_available(settings):
+        raise HTTPException(status_code=503, detail="El cifrado no está disponible. No se ha guardado el token.")
+    try:
+        token, query_id, account_id = ibkr.validate_input(payload.token, payload.query_id, payload.account_id)
+        # Release the auth read transaction before waiting for IBKR.
+        await run_in_threadpool(db.commit)
+        xml = await ibkr.download(token, query_id)
+        statement_date = ibkr.check_report(xml, account_id)
+        return await run_in_threadpool(
+            ibkr.save_connection, db, settings, token=token, query_id=query_id,
+            account_id=account_id, complete_query=payload.complete_query,
+            statement_date=statement_date,
+        )
+    except (ibkr.ConnectionError, LLMSettingsCryptoError) as exc:
+        await run_in_threadpool(db.rollback)
+        detail = str(exc) if isinstance(exc, ibkr.ConnectionError) else "El cifrado no está disponible. No se ha guardado el token."
+        raise HTTPException(status_code=422, detail=detail) from None
+
+
+@router.delete("/ibkr")
+def disconnect_ibkr(db: Session = Depends(get_db)) -> dict:
+    from app.services import ibkr_connection_service as ibkr
+    _require_tenant(db)
+    return ibkr.disconnect(db)
+
+
+@router.post("/ibkr/sync", dependencies=[Depends(enforce_llm_test_rate_limit)])
+async def sync_ibkr_connection(db: Session = Depends(get_db)) -> dict:
+    from starlette.concurrency import run_in_threadpool
+
+    from app.services import ibkr_connection_service as ibkr
+    _require_tenant(db)
+    try:
+        token, query_id, account_id, revision = await run_in_threadpool(ibkr.credentials, db, get_settings())
+        xml = await ibkr.download(token, query_id)
+        return await run_in_threadpool(ibkr.import_report, db, xml, account_id, revision)
+    except (ibkr.ConnectionError, LLMSettingsCryptoError) as exc:
+        await run_in_threadpool(ibkr.record_failure, db)
+        detail = str(exc) if isinstance(exc, ibkr.ConnectionError) else "No se pudo leer el token cifrado. Vuelve a conectar IBKR."
+        raise HTTPException(status_code=422, detail=detail) from None
