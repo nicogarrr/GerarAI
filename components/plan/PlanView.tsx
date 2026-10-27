@@ -127,8 +127,9 @@ const planMonthly = (value: unknown, record: DataRecord) => {
         ? record.monthly_contribution_currency
         : null;
     if (recorded) return formatMoney(value as number | string | null, recorded);
-    // Contrato nuevo activo y plan legacy sin divisa: importe crudo, sin simbolo inventado.
-    if (record.currency_contract_enabled === true) {
+    // Plan legacy sin divisa (contrato activo, o el backend marca monthly_currency_recorded=false):
+    // importe crudo, sin simbolo inventado. Coherente con «Próxima aportación», que lee el mismo campo.
+    if (record.currency_contract_enabled === true || record.monthly_currency_recorded === false) {
         return typeof value === 'number' ? `${formatNumber(value)} (divisa no registrada)` : NA;
     }
     return typeof record.base_currency === 'string'

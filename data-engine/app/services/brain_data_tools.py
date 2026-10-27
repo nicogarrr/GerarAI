@@ -485,15 +485,28 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
         return _response(lines, sources, "portfolio_theses")
     # Exact catalog matches only. Comparisons need at least two explicit tickers;
     # a single-price query needs exactly one. No page-context guess here.
-    tokens = set(re.findall(r"\b[A-Z][A-Z0-9.-]{1,14}\b", question))
-    companies = list(db.scalars(select(Company).where(Company.ticker.in_(tokens))).all()) if tokens else []
-    if (comparison and len(companies) < 2) or (not comparison and len(companies) != 1):
+    tokens = re.findall(r"\b[A-Z][A-Z0-9.-]{1,14}\b", question)
+    companies = list(db.scalars(select(Company).where(Company.ticker.in_(set(tokens)))).all()) if tokens else []
+    # «PER de CB y UNH» / «precio de AAPL, MSFT y KKR»: varios tickers sin la
+    # palabra «compara». Antes exigía exactamente uno, devolvía None y la
+    # pregunta caía en el generador general sin fuentes («No puedo
+    # responderte con fuentes», prueba real realqa-14). Se listan los datos
+    # guardados de cada uno, en el orden en que los nombra el usuario.
+    multi_valuation = valuation and not comparison and 2 <= len(companies) <= 4
+    if (comparison and len(companies) < 2) or (not comparison and not multi_valuation and len(companies) != 1):
         return None
+    order = {ticker: index for index, ticker in reversed(list(enumerate(tokens)))}
+    ordered = (
+        sorted(companies, key=lambda item: order.get(item.ticker, len(tokens)))
+        if multi_valuation else sorted(companies, key=lambda item: item.ticker)
+    )
     lines, sources = [], []
-    for company in sorted(companies, key=lambda item: item.ticker)[:4]:
+    for company in ordered[:4]:
         company_lines, company_sources = _company_data(db, company)
         lines.extend(company_lines)
         sources.extend(company_sources)
     if comparison:
         lines.append("Comparativa de los datos guardados de precio y PER; no basta para decidir qué empresa es mejor inversión.")
+    if multi_valuation:
+        return _response(lines, sources, "company_quotes")
     return _response(lines, sources, "company_comparison" if comparison else "company_quote")

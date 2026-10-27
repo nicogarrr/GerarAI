@@ -30,6 +30,7 @@ from app.valuation.engines.base import (
     apply_publication_blockers,
     insufficient_result,
 )
+from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
 from app.valuation.point_in_time import (
     PRECISION_UNKNOWN,
     assert_period_no_lookahead,
@@ -373,6 +374,8 @@ class ValuationService:
         result["trace"] = result.get("trace") or {}
         result["trace"].setdefault("engine", resolve_engine_key(company))
         result["trace"].setdefault("model_version", MODEL_VERSION)
+        # Written only by a fresh computation, never added when reading history.
+        result["trace"]["margin_of_safety_convention"] = MARGIN_OF_SAFETY_CONVENTION
         result["trace"]["resolved_engine"] = resolve_engine_key(company)
         free_data = _free_data_trace(db, company)
         if free_data is not None:

@@ -60,6 +60,7 @@ from app.valuation.engines.base import (
     margin_of_safety_reference,
 )
 from app.valuation.financial_snapshot import FinancialSnapshotBuilder
+from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
 from app.valuation.moat_framework import empty_moat_framework
 
 _HORA_ES = {
@@ -659,6 +660,7 @@ class ThesisService:
                 else "excluded"
             ),
             "model_version": MODEL_VERSION,
+            "margin_of_safety_convention": MARGIN_OF_SAFETY_CONVENTION,
             "prompt_version": PROMPT_VERSION,
             "valuation_status": valuation.get("status"),
             "engine": (valuation.get("trace") or {}).get("engine"),
@@ -1351,10 +1353,13 @@ class ThesisService:
             for item in ((valuation.get("trace") or {}).get("inferred_inputs") or [])
             if isinstance(item, dict)
         ]
-        if not basis and not used:
+        convention = (valuation.get("trace") or {}).get("margin_of_safety_convention")
+        if not basis and not used and not convention:
             return None
         listed = valuation.get("listed_share_values")
         extra = {"inferred_inputs_used": used} if used else {}
+        if convention:
+            extra["margin_of_safety_convention"] = convention
         # Liga verificable modelo<->tesis: el forecast solo usa horizonte y
         # probabilidades del modelo cuando ESTE fingerprint coincide. Se omite
         # la clave cuando no hay modelo ligado (contrato sin ruido).

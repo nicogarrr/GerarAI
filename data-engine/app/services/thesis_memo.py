@@ -19,6 +19,10 @@ from app.core.tenancy import tenant_filters
 from app.models import Claim, ClaimEvidence, Company, SourceAudit, ThesisSection, ThesisVersion
 from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, money_thesis, percent_es
 from app.services.thesis_approval_service import APPROVAL_SECTION_TITLE
+from app.valuation.margin_convention import (
+    MARGIN_OF_SAFETY_CONVENTION,
+    MARGIN_OF_SAFETY_FORMULA,
+)
 
 
 def _fraction_row_to_percent(line: str) -> str:
@@ -170,6 +174,21 @@ def build_memo_markdown(
         when = f"{latest_data_at:%Y-%m-%d}" if latest_data_at else "desconocida"
         lines.append(f"\n> AVISO: tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).")
     lines.append("")
+
+    if not draft and thesis.margin_of_safety is not None:
+        convention = (thesis.valuation_basis or {}).get("margin_of_safety_convention")
+        if convention == MARGIN_OF_SAFETY_CONVENTION:
+            lines.append(
+                f"> Convención del margen de seguridad: {MARGIN_OF_SAFETY_FORMULA}; "
+                "V es el valor de referencia del modelo y P el precio comparable de esta versión."
+            )
+        else:
+            lines.append(
+                "> AVISO: margen de seguridad histórico sin convención de fórmula verificada. "
+                "Se conserva la cifra y el texto originales; no se ha recalculado. "
+                "No comparar este porcentaje con el margen actual (V - P) / V."
+            )
+        lines.append("")
 
     if not draft:
         audit = db.scalars(

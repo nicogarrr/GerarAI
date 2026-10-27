@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from datetime import date
+import logging
+import os
+from collections.abc import Callable
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -12,6 +15,18 @@ from app.models import Company, Position, Transaction
 from app.services.portfolio_fx_service import PortfolioFXService
 
 _UNSET = object()
+
+logger = logging.getLogger(__name__)
+
+#: Divisas/fecha de inicio ya intentadas en este proceso: si el BCE no responde
+#: o no publica la divisa, no se reintenta en cada reconstruccion.
+_ECB_BACKFILL_TRIED: set[tuple[str, date]] = set()
+
+
+def _default_fx_backfill(db: Session, currencies: set[str], start: date, end: date) -> dict:
+    from app.services.connectors.ecb_history import backfill_ecb_rates_sync
+
+    return backfill_ecb_rates_sync(db, currencies=currencies, start=start, end=end)
 
 #: Acciones válidas del ledger (enum cerrado: buy/sell mueven posición,
 #: el resto son movimientos de caja/ajuste que no tocan cantidad).
@@ -37,8 +52,73 @@ class ValuationHeldError(ValueError):
 class PortfolioLedgerService:
     """Canonical transaction ledger and derived positions for one tenant."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        fx_backfill: Callable[[Session, set[str], date, date], dict] | None = None,
+    ) -> None:
         self.fx = PortfolioFXService()
+        # realqa-10 (27-oct-2026): una cuenta EUR con compras en USD del
+        # 02/03/2026 salia sin coste ni G/P («Conversion o coste no disponible»)
+        # porque `fx_rates` solo tenia los tipos que guarda el refresco diario
+        # desde que se desplego, y la descarga historica del BCE (#2349) no la
+        # llamaba nadie. Ahora, si falta el tipo de la fecha de una operacion,
+        # se descarga la serie oficial del BCE desde esa fecha y se usa el
+        # ultimo tipo publicado en o antes de ella (fin de semana/festivo).
+        # En tests no hay red: solo se descarga con un `fx_backfill` inyectado.
+        if fx_backfill is None and os.environ.get("APP_ENV", "").lower() != "test":
+            fx_backfill = _default_fx_backfill
+        self._fx_backfill = fx_backfill
+
+    def ensure_historical_fx(
+        self,
+        db: Session,
+        *,
+        currencies: set[str],
+        base_currency: str,
+        since: date,
+    ) -> dict | None:
+        """Descarga del BCE los tipos que faltan para valorar operaciones desde ``since``.
+
+        Solo actua si NO hay ningun tipo (directo o inverso) en o antes de
+        ``since`` para alguna divisa: la busqueda de :class:`PortfolioFXService`
+        ya usa el ultimo tipo publicado en o antes de cada fecha. Base EUR
+        unicamente (el BCE publica contra el euro). Nunca lanza: si el BCE no
+        responde, la posicion sigue marcando el coste como no disponible.
+        """
+        if self._fx_backfill is None or base_currency.upper() != "EUR":
+            return None
+        missing = {
+            code
+            for code in currencies
+            if code.upper() != "EUR"
+            and (code.upper(), since) not in _ECB_BACKFILL_TRIED
+            and self.fx.rate(db, quote_currency=code, base_currency="EUR", as_of=since) is None
+        }
+        if not missing:
+            return None
+        for code in missing:
+            _ECB_BACKFILL_TRIED.add((code.upper(), since))
+        # Unos dias antes: si la operacion cae en fin de semana o festivo
+        # TARGET, el tipo valido es el del ultimo dia publicado.
+        start = since - timedelta(days=10)
+        try:
+            summary = self._fx_backfill(db, missing, start, date.today())
+        except Exception as exc:  # red, BCE caido, CSV raro: se degrada, no se rompe
+            logger.warning(
+                "fx.ecb_backfill failed currencies=%s since=%s error=%s",
+                sorted(missing),
+                since.isoformat(),
+                type(exc).__name__,
+            )
+            return None
+        logger.info(
+            "fx.ecb_backfill currencies=%s since=%s written=%s",
+            sorted(missing),
+            since.isoformat(),
+            (summary or {}).get("written"),
+        )
+        return summary
 
     def ensure_company(self, db: Session, ticker: str, name: str | None = None) -> Company:
         normalized = ticker.strip().upper()
@@ -182,6 +262,13 @@ class PortfolioLedgerService:
             )
         portfolio = self.fx.ensure_portfolio(db)
         base_currency = portfolio.base_currency.upper()
+        if transactions:
+            self.ensure_historical_fx(
+                db,
+                currencies=currencies,
+                base_currency=base_currency,
+                since=min(transaction.trade_date for transaction in transactions),
+            )
         quantity = Decimal("0")
         cost = Decimal("0")
         cost_base = Decimal("0")
