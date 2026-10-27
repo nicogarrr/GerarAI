@@ -766,6 +766,18 @@ class PortfolioIntelligenceService:
             base_currency=base,
             as_of=date.today(),
         )
+        if perspective == "account" and not cash_rows:
+            # Con depositos registrados el valor final DEBE incluir la caja. Sin
+            # ninguna fila de caja (p. ej. extracto sin CashReport) la caja
+            # desaparece y el XIRR sale sesgado (deposito 1.000, compra 500,
+            # posicion 550: -45 % en vez de +5 %). No se inventa la caja: se
+            # declara el hueco y no se publica cifra.
+            return None, {
+                "status": "incomplete_missing_cash_balance",
+                "cashflows": len(cashflows),
+                "perspective": perspective,
+                "external_flows": len(external),
+            }
         for cash in cash_rows:
             rate = ending_rates.get(currency_key(cash.currency))
             if rate is not None:
