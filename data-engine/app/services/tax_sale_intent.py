@@ -16,6 +16,7 @@ _HISTORICAL_SALE = re.compile(
     r"(?i)\b(?:vend[ií]|vendi[oó]|vendimos|vendiste(?:is)?|vendieron|"
     r"vend[ií]a(?:s|n|mos)?|vendid[oa]s?)\b"
     r"|\bventa\s+(?:pasada|anterior|realizada|previa)\b"
+    r"|\b(?:hubo|hab[ií]a|hice|realic[ée]|efectu[ée])\s+(?:(?:ya|una|la|otra)\s+){0,3}venta\b"
 )
 _NEGATED_SALE = re.compile(
     r"(?i)\b(?:no|nunca|jam[aá]s)\s+(?:(?:he|has|ha|hemos|hab[ií]a|hab[ií]as|"

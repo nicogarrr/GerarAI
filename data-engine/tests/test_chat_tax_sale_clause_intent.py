@@ -74,6 +74,7 @@ def test_saved_position_also_does_not_select_first_sale(db):
     "He vendido 4 acciones y si vendo las demás a 5 euros, ¿IRPF?",
     "Ya había vendido 4 acciones; ¿qué IRPF si vendo 6?",
     "Venta anterior de 4 acciones a 12 y hoy vendo 6 a 5, ¿IRPF?",
+    "Ya hubo una venta de 4 a 12 en marzo y hoy vendo 6 a 5, ¿IRPF?",
     "¿Qué IRPF si vendo 4 a 12 euros o vendo 6 a 5 euros?",
     "Si vendiera 4 a 12 y vendiese 6 a 5, ¿qué IRPF?",
 ])
