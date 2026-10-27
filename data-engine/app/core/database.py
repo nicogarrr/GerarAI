@@ -2,7 +2,7 @@ import logging
 from collections.abc import Generator
 
 from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy import create_engine, event, select, text
+from sqlalchemy import create_engine, event, false, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker, with_loader_criteria
 
@@ -129,9 +129,22 @@ def _scope_tenant_queries(execute_state) -> None:
     if execute_state.execution_options.get("include_all_tenants"):
         return
     tenant_id = execute_state.session.info.get("tenant_id")
+    from app.models.entities import InferredInput, TenantOwnedMixin
+
+    # Inferences are private even in unscoped background/test sessions. NULL
+    # authors are quarantined, never a public fallback. Maintenance reads use
+    # the explicit include_all_tenants escape hatch above.
     if tenant_id is None:
+        if execute_state.is_select:
+            execute_state.statement = execute_state.statement.options(
+                with_loader_criteria(InferredInput, lambda model: false(), include_aliases=True)
+            )
+        elif (execute_state.is_update or execute_state.is_delete) and (
+            getattr(getattr(execute_state.statement, "table", None), "name", None)
+            == "inferred_inputs"
+        ):
+            raise RuntimeError("Tenant context is required for inferred input writes")
         return
-    from app.models.entities import TenantOwnedMixin
 
     if execute_state.is_select:
         execute_state.statement = execute_state.statement.options(
@@ -181,7 +194,19 @@ def _assign_tenant_to_new_rows(session: Session, _flush_context, _instances) -> 
     tenant_id = session.info.get("tenant_id")
     from sqlalchemy import inspect as sa_inspect
 
-    from app.models.entities import TenantOwnedMixin
+    from app.models.entities import InferredInput, TenantOwnedMixin
+
+    # Also reject attached/privileged-loaded cross-tenant mutations and deletes.
+    # Do not rely only on SELECT filters to protect an already-loaded object.
+    for instance in [*session.new, *session.dirty, *session.deleted]:
+        if not isinstance(instance, InferredInput):
+            continue
+        if tenant_id is None:
+            raise RuntimeError("Tenant context is required for inferred input writes")
+        if instance.tenant_id is not None and instance.tenant_id != tenant_id:
+            raise RuntimeError("Cross-tenant writes are not allowed")
+        if instance not in session.new and instance.tenant_id is None:
+            raise RuntimeError("Legacy inferred input ownership requires audited recovery")
 
     # P1-5: tenant_id es inmutable en filas persistentes. Reasignarlo (o
     # vaciarlo) via session.dirty no debe poder hacer commit.

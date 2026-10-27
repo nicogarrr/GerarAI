@@ -29,6 +29,7 @@ def db():
     )
     Base.metadata.create_all(engine)
     with Session(engine) as session:
+        session.info["tenant_id"] = 1
         yield session
     engine.dispose()
 

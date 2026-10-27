@@ -389,11 +389,13 @@ def test_rate_spread_rechecked_after_llm_returns(db, key, value, other_key, othe
 @pytest.mark.parametrize("key", RATE_VALUES)
 def test_other_tenant_quota_does_not_block_rates(db, key):
     seed_rate_source(db, key)
+    db.info["tenant_id"] = 2
     for i in range(svc.DAILY_QUOTA):
         db.add(InferredInput(tenant_id=2, company_id=1, input_key="fcf_margin", value=0.1,
                              base="b" * 25, source_urls=["https://a.example.com/x"],
                              origin="llm", created_at=NOW))
     db.commit()
+    db.info["tenant_id"] = 1
     row = run_rate(db, Provider(rate_good(key)), key)
     assert row.tenant_id == 1 and row.input_key == key
 

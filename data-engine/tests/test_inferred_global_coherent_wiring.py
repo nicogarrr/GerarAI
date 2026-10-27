@@ -1,6 +1,4 @@
-"""Datos de empresa globales (decision de producto, opcion A) y rama coherente del
-motor pre_revenue: el InferredInput fcf_margin se consulta cuando el snapshot
-es coherente y no hay FCF reportado. Las opiniones de usuario siguen aisladas."""
+"""Tenant-private inferences with coherent pre-revenue valuation and provenance."""
 
 from decimal import Decimal
 
@@ -56,6 +54,7 @@ VALUES = {"revenue": 70_918_000.0, "shares_diluted": 255_982_592.0, "operating_c
 
 
 def _company(db):
+    db.info.setdefault("tenant_id", 2)
     c = Company(ticker="CUV", name="Cov", exchange="NASDAQ", company_type="growth",
                 valuation_model="pre_revenue", factor_tags=["pre_fcf"])
     db.add(c)
@@ -69,25 +68,25 @@ def _value(db, company, values=None):
     return PreRevenueScenarioEngine().value(ctx)
 
 
-def test_inferred_input_is_not_tenant_owned():
-    assert not issubclass(InferredInput, TenantOwnedMixin)
+def test_inferred_input_is_tenant_owned():
+    assert issubclass(InferredInput, TenantOwnedMixin)
 
 
-def test_inferred_input_visible_from_any_tenant_session(engine):
+def test_inferred_input_invisible_from_other_tenant_sessions(engine):
     with Session(engine) as writer:
         writer.info["tenant_id"] = 2
         company = _company(writer)
         row = InferredInputService().create(
             writer, company, input_key="fcf_margin", value=Decimal("0.25"), base=BASE, source_urls=URLS
         )
-        assert row.tenant_id == 2  # autoria informativa
+        assert row.tenant_id == 2
         company_id = company.id
     for tenant in (1, 5, 6, None):
         with Session(engine) as reader:
             if tenant is not None:
                 reader.info["tenant_id"] = tenant
             got = InferredInputService().latest_valid(reader, company_id, "fcf_margin")
-            assert got is not None and float(got.value) == 0.25
+            assert got is None
 
 
 def test_coherent_branch_without_fcf_or_inferred_stays_insufficient(engine):
@@ -106,7 +105,7 @@ def test_coherent_branch_consults_inferred_margin_and_is_not_publishable(engine)
             db, company, input_key="fcf_margin", value=Decimal("0.25"), base=BASE, source_urls=URLS
         )
     with Session(engine) as other:
-        other.info["tenant_id"] = 5
+        other.info["tenant_id"] = 2
         company = other.scalar(select(Company).where(Company.ticker == "CUV"))
         result = _value(other, company)
         assert result["status"] == "partial"
@@ -142,10 +141,7 @@ def test_reported_fcf_wins_over_inferred(engine):
         assert result["base_value"] is None
 
 
-def test_tenant_owned_company_data_stays_isolated_while_inputs_are_global(engine):
-    """Aislamiento multi-tenant: solo el dato publico/canonico de empresa
-    (InferredInput) es global; hechos y documentos (opiniones, PDFs del usuario)
-    siguen filtrados por tenant."""
+def test_inputs_facts_and_documents_all_stay_isolated(engine):
     from app.models.entities import Document, FinancialFact
 
     with Session(engine) as t2:
@@ -162,7 +158,7 @@ def test_tenant_owned_company_data_stays_isolated_while_inputs_are_global(engine
         cid = company.id
     with Session(engine) as t5:
         t5.info["tenant_id"] = 5
-        assert InferredInputService().latest_valid(t5, cid, "fcf_margin") is not None
+        assert InferredInputService().latest_valid(t5, cid, "fcf_margin") is None
         assert t5.scalars(select(Document).where(Document.company_id == cid)).all() == []
         assert t5.scalars(select(FinancialFact).where(FinancialFact.company_id == cid)).all() == []
     with Session(engine) as t2b:

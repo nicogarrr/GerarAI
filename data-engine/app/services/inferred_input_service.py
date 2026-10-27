@@ -95,11 +95,11 @@ def validate(key: str, value: float | Decimal | None, base: str | None, urls: li
 
 
 _company_locks_guard = threading.Lock()
-_company_locks: dict[int, threading.Lock] = {}
+_company_locks: dict[tuple[int, int], threading.Lock] = {}
 
 
 def validate_rate_spread(db: Session, company: Company, input_key: str, value: Decimal) -> None:
-    """Validate the proposed rate against current global company inputs, without fallback."""
+    """Validate the proposed rate against current tenant company inputs, without fallback."""
     if input_key not in {"wacc", "terminal_growth"}:
         return
     from app.valuation.engines.base import default_terminal_growth, default_wacc, traceable_wacc
@@ -132,11 +132,13 @@ class InferredInputService:
         source_urls: list[str],
         origin: str = "llm",
     ) -> InferredInput:
+        if db.info.get("tenant_id") is None:
+            raise InferredInputError("tenant_requerido")
         problems = validate(input_key, value, base, source_urls)
         if problems:
             raise InferredInputError("; ".join(problems))
         row = InferredInput(
-            tenant_id=db.info.get("tenant_id"),  # autoria informativa, no filtro
+            tenant_id=db.info["tenant_id"],
             company_id=company.id,
             input_key=input_key,
             value=value,
@@ -160,7 +162,7 @@ class InferredInputService:
         source_urls: list[str],
         origin: str = "llm",
     ) -> InferredInput:
-        """Serialize global rate validation and save for both HTTP write paths.
+        """Serialize tenant-local rate validation and save for both HTTP write paths.
 
         Callers commit their read transaction BEFORE entering their write locks.
         LLM callers take the tenant/day quota lock first, then this company lock;
@@ -169,12 +171,15 @@ class InferredInputService:
         Legacy create remains available for historical/imported rows; HTTP writes
         always use this guarded path.
         """
+        tenant_id = db.info.get("tenant_id")
+        if tenant_id is None:
+            raise InferredInputError("tenant_requerido")
         with _company_locks_guard:
-            lock = _company_locks.setdefault(company_id, threading.Lock())
+            lock = _company_locks.setdefault((tenant_id, company_id), threading.Lock())
         with lock:
             try:
                 if db.get_bind().dialect.name == "postgresql":
-                    raw = f"inferred-rate-pair:company:{company_id}".encode()
+                    raw = f"inferred-rate-pair:tenant:{tenant_id}:company:{company_id}".encode()
                     key = int.from_bytes(hashlib.sha256(raw).digest()[:8], "big") >> 1
                     db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": key})
                 company = db.get(Company, company_id, populate_existing=True)
@@ -192,9 +197,13 @@ class InferredInputService:
 
     def latest_valid(self, db: Session, company_id: int, input_key: str) -> InferredInput | None:
         """Ultimo input vigente que sigue siendo valido; el resto se ignora."""
+        tenant_id = db.info.get("tenant_id")
+        if tenant_id is None:
+            return None
         row = db.scalar(
             select(InferredInput)
-            .where(InferredInput.company_id == company_id, InferredInput.input_key == input_key)
+            .where(InferredInput.tenant_id == tenant_id,
+                   InferredInput.company_id == company_id, InferredInput.input_key == input_key)
             .order_by(desc(InferredInput.id))
             .limit(1)
         )
