@@ -4588,6 +4588,71 @@
         "title": "InferredInputLLMRequest",
         "type": "object"
       },
+      "InvalidationRuleIn": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "metric": {
+            "maxLength": 130,
+            "title": "Metric",
+            "type": "string"
+          },
+          "operator": {
+            "enum": [
+              ">",
+              "<",
+              ">=",
+              "<=",
+              "==",
+              "!="
+            ],
+            "title": "Operator",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "required": [
+          "metric",
+          "operator",
+          "threshold"
+        ],
+        "title": "InvalidationRuleIn",
+        "type": "object"
+      },
+      "InvalidationRulesRequest": {
+        "properties": {
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/InvalidationRuleIn"
+            },
+            "maxItems": 20,
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "title": "InvalidationRulesRequest",
+        "type": "object"
+      },
       "KPIExtractionAction": {
         "properties": {
           "action": {
@@ -8056,6 +8121,18 @@
             ],
             "title": "Invalidation Criteria"
           },
+          "invalidation_rules": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation Rules"
+          },
           "margin_of_safety": {
             "anyOf": [
               {
@@ -9040,6 +9117,18 @@
               }
             ],
             "title": "Invalidation Criteria"
+          },
+          "invalidation_rules": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation Rules"
           },
           "latest_data_at": {
             "anyOf": [
@@ -59185,6 +59274,189 @@
           }
         },
         "summary": "Submit Thesis Inputs",
+        "tags": [
+          "thesis"
+        ]
+      }
+    },
+    "/api/thesis/{ticker}/invalidation-rules": {
+      "put": {
+        "description": "Guarda los criterios MEDIBLES de invalidacion en la ultima tesis.\n\nCada criterio (metrica, operador, umbral) queda vigilado por el evaluador\nde alertas: cuando se cumple, llega un aviso. Lista vacia = sin criterios\n(las reglas de aviso derivadas se desactivan). Los criterios se conservan\nal regenerar la tesis.",
+        "operationId": "set_invalidation_rules_api_thesis__ticker__invalidation_rules_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvalidationRulesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Set Invalidation Rules Api Thesis  Ticker  Invalidation Rules Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Invalidation Rules",
         "tags": [
           "thesis"
         ]

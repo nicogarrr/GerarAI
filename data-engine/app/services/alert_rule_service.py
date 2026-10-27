@@ -96,6 +96,12 @@ class AlertRuleService:
         return rule
 
     def evaluate_all(self, db: Session) -> list[dict[str, Any]]:
+        # Los criterios medibles de las tesis entran como reglas
+        # `thesis_invalidation` antes de la pasada: mismo evaluador, mismo
+        # cooldown y misma entrega por canales que el resto de reglas.
+        from app.services.thesis_invalidation_rules import sync_all_thesis_rules
+
+        sync_all_thesis_rules(db)
         rules = list(
             db.scalars(
                 select(AlertRule)
@@ -144,6 +150,12 @@ class AlertRuleService:
                 f"{company.ticker}: se cumplió la regla «{rule.name}» "
                 f"(valor observado: {observed})."
             )
+            if observation.get("kind") == "thesis_metric":
+                from app.services.thesis_invalidation_rules import (
+                    alert_message as thesis_alert_message,
+                )
+
+                alert_message = thesis_alert_message(company, rule, observed)
             news_event = None
             if observation.get("kind") == "news_event" and observation.get("news_event_id"):
                 news_event = db.get(NewsEvent, observation["news_event_id"])
@@ -358,6 +370,10 @@ class AlertRuleService:
                 "kind": kind,
                 "earnings_run_id": run.id if run else None,
             }
+        if kind == "thesis_metric":
+            from app.services.thesis_invalidation_rules import observe
+
+            return observe(db, rule)
         if kind == "financial_metric":
             metric = str((rule.target or {}).get("metric") or "")
             fact = db.scalar(

@@ -649,6 +649,62 @@ class ThesisApproveRequest(BaseModel):
     actor: str = Field(default="user", min_length=1, max_length=160)
 
 
+class InvalidationRuleIn(BaseModel):
+    metric: str = Field(..., max_length=130)
+    operator: Literal[">", "<", ">=", "<=", "==", "!="]
+    threshold: float | str
+    description: str | None = Field(default=None, max_length=300)
+
+
+class InvalidationRulesRequest(BaseModel):
+    rules: list[InvalidationRuleIn] = Field(default_factory=list, max_length=20)
+
+
+@router.put("/{ticker}/invalidation-rules")
+def set_invalidation_rules(
+    ticker: str, payload: InvalidationRulesRequest, db: Session = Depends(get_db)
+) -> dict:
+    """Guarda los criterios MEDIBLES de invalidacion en la ultima tesis.
+
+    Cada criterio (metrica, operador, umbral) queda vigilado por el evaluador
+    de alertas: cuando se cumple, llega un aviso. Lista vacia = sin criterios
+    (las reglas de aviso derivadas se desactivan). Los criterios se conservan
+    al regenerar la tesis.
+    """
+    from app.services.thesis_invalidation_rules import (
+        describe_rule,
+        normalize_rules,
+        sync_thesis_rules,
+    )
+
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    thesis = db.scalar(
+        select(ThesisVersion)
+        .where(ThesisVersion.company_id == company.id)
+        .order_by(desc(ThesisVersion.version))
+        .limit(1)
+    )
+    if thesis is None:
+        raise HTTPException(status_code=404, detail="No thesis for ticker")
+    try:
+        rules = normalize_rules([rule.model_dump() for rule in payload.rules])
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    thesis.invalidation_rules = rules or None
+    db.flush()
+    alert_rules = sync_thesis_rules(db, company)
+    db.commit()
+    return {
+        "ticker": company.ticker,
+        "thesis_version_id": thesis.id,
+        "version": thesis.version,
+        "invalidation_rules": [{**rule, "label": describe_rule(rule)} for rule in rules],
+        "alert_rule_ids": [rule.id for rule in alert_rules],
+    }
+
+
 @router.post("/{ticker}/approve")
 def approve_thesis(ticker: str, payload: ThesisApproveRequest, db: Session = Depends(get_db)) -> dict:
     """Aprueba o rechaza la ultima tesis persistida del ticker.

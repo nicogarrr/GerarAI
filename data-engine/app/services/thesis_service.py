@@ -943,6 +943,13 @@ class ThesisService:
             hypothesis=hypothesis,
             catalysts=catalysts,
             invalidation_criteria=invalidation,
+            # Los criterios medibles los pone el usuario: sobreviven a cada
+            # regeneracion de la tesis (si no, el aviso dejaria de vigilarse).
+            invalidation_rules=(
+                list(previous.invalidation_rules)
+                if previous is not None and previous.invalidation_rules
+                else None
+            ),
             scenario_probabilities=scenario_probabilities,
             narrative_sections=narrative_sections,
             valuation_basis=valuation_basis,

@@ -4806,6 +4806,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/thesis/{ticker}/invalidation-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Invalidation Rules
+         * @description Guarda los criterios MEDIBLES de invalidacion en la ultima tesis.
+         *
+         *     Cada criterio (metrica, operador, umbral) queda vigilado por el evaluador
+         *     de alertas: cuando se cumple, llega un aviso. Lista vacia = sin criterios
+         *     (las reglas de aviso derivadas se desactivan). Los criterios se conservan
+         *     al regenerar la tesis.
+         */
+        put: operations["set_invalidation_rules_api_thesis__ticker__invalidation_rules_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/thesis/{ticker}/latest": {
         parameters: {
             query?: never;
@@ -6721,6 +6746,25 @@ export interface components {
              */
             input_key: "fcf_margin" | "wacc" | "terminal_growth";
         };
+        /** InvalidationRuleIn */
+        InvalidationRuleIn: {
+            /** Description */
+            description?: string | null;
+            /** Metric */
+            metric: string;
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=";
+            /** Threshold */
+            threshold: number | string;
+        };
+        /** InvalidationRulesRequest */
+        InvalidationRulesRequest: {
+            /** Rules */
+            rules?: components["schemas"]["InvalidationRuleIn"][];
+        };
         /** KPIExtractionAction */
         KPIExtractionAction: {
             /**
@@ -7892,6 +7936,8 @@ export interface components {
             id: number;
             /** Invalidation Criteria */
             invalidation_criteria?: unknown[] | null;
+            /** Invalidation Rules */
+            invalidation_rules?: unknown[] | null;
             /** Margin Of Safety */
             margin_of_safety: string | null;
             /** Rating */
@@ -8216,6 +8262,8 @@ export interface components {
             }[] | null;
             /** Invalidation Criteria */
             invalidation_criteria?: unknown[] | null;
+            /** Invalidation Rules */
+            invalidation_rules?: unknown[] | null;
             /** Latest Data At */
             latest_data_at?: string | null;
             /** Margin Of Safety */
@@ -20311,6 +20359,52 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_invalidation_rules_api_thesis__ticker__invalidation_rules_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvalidationRulesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
