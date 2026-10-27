@@ -422,6 +422,8 @@ class Settings(BaseSettings):
     dca_alerts_enabled: bool = True
     dca_alert_min_level: int = Field(default=2, ge=1, le=4)
     dca_alert_trims: bool = False
+    # Cierre mas antiguo (dias naturales) con el que aun se emite una senal DCA.
+    dca_max_data_age_days: int = Field(default=14, ge=1, le=90)
     dca_alert_channels: str = "in_app,email"
     # Langfuse Cloud EU shadow tracing (stage 3): SOLO observabilidad.
     # Apagado por defecto; nunca es fuente de verdad de negocio (eso es
