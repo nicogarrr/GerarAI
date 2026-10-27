@@ -1485,6 +1485,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/ttm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Ttm
+         * @description Fundamentales actuales en TTM (últimos 4 trimestres), con respaldo FY.
+         *
+         *     Flujos = suma de los 4 últimos trimestres consecutivos (Q4 = FY − 9M si no
+         *     hay 10-Q del cuarto); balance = último trimestre. Cada métrica dice su base
+         *     (TTM / FY / Q / SIN_DATOS) y su procedencia (OFICIAL / INFERIDO).
+         */
+        get: operations["company_ttm_api_companies__ticker__ttm_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/corporate-actions": {
         parameters: {
             query?: never;
@@ -5971,6 +5995,17 @@ export interface components {
                 [key: string]: components["schemas"]["CompanySnapshotOut"];
             };
         };
+        /** CompanyTtmOut */
+        CompanyTtmOut: {
+            /** As Of */
+            as_of: string | null;
+            /** Formula */
+            formula: string;
+            /** Metrics */
+            metrics: components["schemas"]["TtmMetricOut"][];
+            /** Ticker */
+            ticker: string;
+        };
         /** ContextNews */
         ContextNews: {
             /**
@@ -8400,6 +8435,49 @@ export interface components {
         ThesisTickersOut: {
             /** Tickers */
             tickers: string[];
+        };
+        /** TtmMetricOut */
+        TtmMetricOut: {
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "TTM" | "FY" | "Q" | "SIN_DATOS";
+            /** Fact Ids */
+            fact_ids?: number[];
+            /** Label */
+            label: string;
+            /** Metric */
+            metric: string;
+            /** Note */
+            note?: string | null;
+            /** Period End */
+            period_end: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "OFICIAL" | "INFERIDO" | "SIN_DATOS";
+            /** Quarters */
+            quarters?: components["schemas"]["TtmQuarterOut"][];
+            /** Unit */
+            unit: string | null;
+            /** Value */
+            value: string | null;
+        };
+        /** TtmQuarterOut */
+        TtmQuarterOut: {
+            /** Origin */
+            origin: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Reported */
+            reported: boolean;
+            /** Value */
+            value: string;
         };
         /** UniversalSearchRequest */
         UniversalSearchRequest: {
@@ -12120,6 +12198,46 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_ttm_api_companies__ticker__ttm_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyTtmOut"];
                 };
             };
             /** @description Validation Error */

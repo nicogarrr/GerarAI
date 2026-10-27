@@ -2181,6 +2181,45 @@
         "title": "CompanySnapshotsBatchOut",
         "type": "object"
       },
+      "CompanyTtmOut": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "formula": {
+            "title": "Formula",
+            "type": "string"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/TtmMetricOut"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "as_of",
+          "formula",
+          "metrics"
+        ],
+        "title": "CompanyTtmOut",
+        "type": "object"
+      },
       "ContextNews": {
         "properties": {
           "date": {
@@ -9344,6 +9383,136 @@
           "tickers"
         ],
         "title": "ThesisTickersOut",
+        "type": "object"
+      },
+      "TtmMetricOut": {
+        "properties": {
+          "basis": {
+            "enum": [
+              "TTM",
+              "FY",
+              "Q",
+              "SIN_DATOS"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Fact Ids",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "provenance": {
+            "enum": [
+              "OFICIAL",
+              "INFERIDO",
+              "SIN_DATOS"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "quarters": {
+            "items": {
+              "$ref": "#/components/schemas/TtmQuarterOut"
+            },
+            "title": "Quarters",
+            "type": "array"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "metric",
+          "value",
+          "unit",
+          "basis",
+          "label",
+          "provenance",
+          "period_end"
+        ],
+        "title": "TtmMetricOut",
+        "type": "object"
+      },
+      "TtmQuarterOut": {
+        "properties": {
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "period_end": {
+            "format": "date",
+            "title": "Period End",
+            "type": "string"
+          },
+          "reported": {
+            "title": "Reported",
+            "type": "boolean"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "period_end",
+          "value",
+          "reported",
+          "origin"
+        ],
+        "title": "TtmQuarterOut",
         "type": "object"
       },
       "UniversalSearchRequest": {
@@ -24692,6 +24861,177 @@
           }
         },
         "summary": "Get Thesis Scenarios",
+        "tags": [
+          "companies"
+        ]
+      }
+    },
+    "/api/companies/{ticker}/ttm": {
+      "get": {
+        "description": "Fundamentales actuales en TTM (\u00faltimos 4 trimestres), con respaldo FY.\n\nFlujos = suma de los 4 \u00faltimos trimestres consecutivos (Q4 = FY \u2212 9M si no\nhay 10-Q del cuarto); balance = \u00faltimo trimestre. Cada m\u00e9trica dice su base\n(TTM / FY / Q / SIN_DATOS) y su procedencia (OFICIAL / INFERIDO).",
+        "operationId": "company_ttm_api_companies__ticker__ttm_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyTtmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Company Ttm",
         "tags": [
           "companies"
         ]

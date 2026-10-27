@@ -45,6 +45,7 @@ import { CompanyHeaderQuote } from '@/components/research/CompanyHeaderQuote';
 import { CompanyHeaderQuoteSkeleton } from '@/components/research/CompanyHeaderQuoteSkeleton';
 import { ChangesSinceVisit } from '@/components/research/ChangesSinceVisit';
 import { AnalystTargetsSection } from '@/components/research/AnalystTargetsSection';
+import { TtmPanel } from '@/components/research/TtmPanel';
 import { GuideBrainButton } from '@/components/research/GuideBrainButton';
 import { GuideContextPanel } from '@/components/research/GuideContextPanel';
 import { getGuideContext } from '@/lib/research/assistant-client';
@@ -706,7 +707,7 @@ const EMPTY_VIEW_DATA: { [K in keyof ViewWorkspaces]: ViewWorkspaces[K] } = {
     scenarios: null,
   },
   changes: { changes: [], reviews: [], alerts: [], decisions: [], expectations: [] },
-  financials: { facts: [], calculatedMetrics: [] },
+  financials: { facts: [], calculatedMetrics: [], ttm: null },
   model: null,
   'market-opportunity': null,
   moat: null,
@@ -1513,6 +1514,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           )}
           <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Métricas y modelo de research refrescados"><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />Recalcular</Button></MutationForm>
         </div>
+        <Panel title="Fundamentales actuales · TTM (últimos 4 trimestres)"><TtmPanel ttm={data.ttm} /></Panel>
         <Panel title="Métricas calculadas trazables"><MetricsGrid metrics={data.calculatedMetrics} /></Panel>
         <Panel title="Hechos financieros canónicos"><FactTable ticker={ticker} facts={data.facts} refreshLabel={
             fmpCovers(ticker, company.exchange)

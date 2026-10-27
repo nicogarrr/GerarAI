@@ -8,6 +8,7 @@ import { sourcesPageInfo } from '@/lib/research/sources-inventory';
 import { researchRequest } from '@/lib/research/client';
 import { paginateAll } from '@/lib/paginate-all';
 import type { components } from '@/lib/research/openapi.generated';
+import type { ResearchTtm } from '@/lib/research/ttm-display';
 
 
 type ResearchCompany = {
@@ -892,14 +893,16 @@ export async function getResearchChangesWorkspace(ticker: string) {
 
 export async function getResearchFinancialsWorkspace(ticker: string) {
   const encoded = encodeURIComponent(ticker.toUpperCase());
-  const [facts, metrics] = await Promise.all([
+  const [facts, metrics, ttm] = await Promise.all([
     getJson<ResearchFact[]>(`/api/companies/${encoded}/facts?limit=250`, []),
     getJson<{ metrics: ResearchCalculatedMetric[] }>(
       `/api/companies/${encoded}/metrics/calculated`,
       { metrics: [] },
     ),
+    // Fundamentales actuales en TTM (últimos 4 trimestres) con respaldo FY.
+    getJson<ResearchTtm | null>(`/api/companies/${encoded}/ttm`, null),
   ]);
-  return { facts, calculatedMetrics: metrics.metrics };
+  return { facts, calculatedMetrics: metrics.metrics, ttm };
 }
 
 export async function getResearchLongTermModel(ticker: string) {
