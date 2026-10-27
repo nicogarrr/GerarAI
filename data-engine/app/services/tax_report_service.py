@@ -510,6 +510,24 @@ def replay_tax_fifo(events, resolve_rate, start, end):
     return lots, year_sales
 
 
+def sanitize_realized_over_sells(realized: list[dict]) -> list[dict]:
+    """Read-time copy for legacy reports, never rewrite persisted JSON."""
+    from copy import deepcopy
+
+    result = deepcopy(realized)
+    for bucket in result:
+        affected = bool(bucket.get("over_sell"))
+        for sale in bucket.get("sales", []):
+            if sale.get("over_sell"):
+                affected = True
+                for key in ("cost_native", "cost_base", "gain_native", "gain_base", "raw_gain_native"):
+                    sale[key] = None
+        if affected:
+            bucket["gain_native"] = None
+            bucket["gain_base"] = None
+    return result
+
+
 class TaxReportService:
     """Compute and persist per-fiscal-year tax snapshots."""
 
@@ -1144,7 +1162,7 @@ class TaxReportService:
             data = {
                 "summary": report.summary,
                 "dividends": report.dividends,
-                "realized": report.realized,
+                "realized": sanitize_realized_over_sells(report.realized),
                 "misc": report.misc,
                 "generated_at": report.generated_at.isoformat() if report.generated_at else None,
                 "persisted": True,

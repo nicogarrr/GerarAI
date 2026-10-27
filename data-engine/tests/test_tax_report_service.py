@@ -594,3 +594,37 @@ def test_over_sell_casillas_row_is_nd_and_keeps_observed_proceeds(db):
     assert row["transmission_base"] == 600.0  # dato observado de la venta
     assert row["acquisition_base"] is None
     assert row["gain_base"] is None
+
+
+def test_legacy_persisted_oversell_is_sanitized_on_get_and_export_without_write(db, monkeypatch):
+    import asyncio
+    import json
+    from copy import deepcopy
+
+    from app.api.routes.export import export_year
+    from app.models import TaxReport
+
+    original = [{"ticker": "OVS", "currency": "EUR", "over_sell": True, "gain_native": 600.0, "gain_base": 600.0,
+                 "sales": [{"date": "2026-03-10", "quantity": 5, "proceeds_base": 600.0, "proceeds_native": 600.0,
+                            "cost_base": 0.0, "cost_native": 0.0, "gain_base": 600.0, "gain_native": 600.0,
+                            "raw_gain_native": 600.0, "over_sell": True}]}]
+    stored = TaxReport(fiscal_year=2026, summary={}, dividends=[], realized=deepcopy(original), misc=[])
+    db.add(stored)
+    db.commit()
+    monkeypatch.setattr(TaxReportService, "_build_filing", lambda *a, **k: {})
+    read = TaxReportService().get_report(db, 2026)
+    assert read["realized"][0]["gain_base"] is None
+    assert read["realized"][0]["sales"][0]["cost_base"] is None
+    assert read["realized"][0]["sales"][0]["proceeds_base"] == 600
+    assert stored.realized == original
+    assert not db.is_modified(stored, include_collections=True)
+
+    response = export_year(2026, format="json", db=db)
+    async def collect():
+        chunks = [chunk async for chunk in response.body_iterator]
+        return b"".join(chunk if isinstance(chunk, bytes) else chunk.encode() for chunk in chunks)
+    exported = json.loads(asyncio.run(collect()))
+    assert exported["tax"]["realized"][0]["gain_base"] is None
+    assert exported["tax"]["realized"][0]["sales"][0]["gain_native"] is None
+    db.expire(stored)
+    assert stored.realized == original
