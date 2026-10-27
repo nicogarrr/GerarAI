@@ -106,6 +106,8 @@ class ModelRouter(Protocol):
 
 class LLMProvider(ABC):
     name: str
+    #: Quien paga las llamadas: "platform" (GerarAI) o "tenant" (clave propia).
+    billing_scope: str = "platform"
     #: Lo que ESTE adaptador implementa. Vacio por defecto: un adaptador que no
     #: lo declare no puede afirmar ninguna capacidad (fail closed).
     supported_capabilities: frozenset[str] = frozenset()

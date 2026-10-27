@@ -2722,6 +2722,34 @@ class EtfHolding(Base):
     source_url: Mapped[str] = mapped_column(Text)
 
 
+class TenantLLMSettings(Base, TimestampMixin):
+    """Proveedor/modelo/clave LLM propios de un tenant.
+
+    ``tenant_id`` es unico: una fila por tenant, borrada en cascada con el
+    tenant. La clave NUNCA se guarda en claro: solo el sobre cifrado y los
+    ultimos cuatro caracteres para poder mostrarla en ajustes.
+    """
+
+    __tablename__ = "tenant_llm_settings"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", name="uq_tenant_llm_settings_tenant"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(40), default="opencode-go")
+    base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    model: Mapped[str] = mapped_column(String(200), default="deepseek-v4.1-flash")
+    fallback_model: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    reasoning_effort: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    api_key_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    api_key_last4: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    key_version: Mapped[int] = mapped_column(Integer, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class PrivacyAuditEvent(Base):
     """Auditoria de operaciones de privacidad que debe sobrevivir al borrado.
 
