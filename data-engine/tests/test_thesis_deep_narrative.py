@@ -151,7 +151,8 @@ def test_deep_narrative_returns_sections_with_code_owned_citations_and_model_tra
     assert any("Fuentes citadas:" in p and "https://example.org/news/123" in p for p in result["sections"][2]["parrafos"])
     # La ruta pide el workflow profundo, no el selector de 200 tokens.
     assert provider.requests[0].task == "deep_thesis"
-    assert provider.requests[0].max_tokens == 4000
+    # 16000: deja sitio al razonamiento de la tabla por seccion (tesis_profunda).
+    assert provider.requests[0].max_tokens == 16000
     db, records = context
     assert records == [("deepseek-v4.1-flash", "thesis_deep_narrative", 0, 150, False)]
 

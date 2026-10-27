@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.core.config import get_settings
 from app.llm import LLMRequest, LLMResponse, Message
 from app.llm.base import LLMProvider
 from app.services.budget import BudgetController, BudgetExceededError
@@ -115,6 +116,7 @@ async def _complete_text(
         task=task,
         temperature=temperature,
         max_tokens=max_tokens,
+        reasoning_effort=get_settings().reasoning_effort_for("debate"),
     )
     # Un texto con CJK, ingles mezclado o tokens corruptos se reintenta una vez;
     # si falla otra vez levanta LLMOutputRejected y el llamador degrada a la
@@ -397,6 +399,7 @@ async def risk_lenses(
             task="red_team",
             temperature=0.2,
             max_tokens=4000,
+            reasoning_effort=get_settings().reasoning_effort_for("debate"),
         )
         budget = BudgetController() if db is not None else None
         if budget is not None and not budget.can_spend(db, 0.02):

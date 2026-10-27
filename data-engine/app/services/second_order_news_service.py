@@ -124,7 +124,9 @@ async def _extract_with_llm(text: str, context: str = "", before_retry=None) -> 
         task="news_second_order",
         model=model,
         temperature=0,
-        max_tokens=900,
+        # 900 no dejaba sitio al razonamiento: 3000 con el esfuerzo de la tabla.
+        max_tokens=3000,
+        reasoning_effort=settings.reasoning_effort_for("segundo_orden"),
         response_format=ResponseFormat.json_schema(_SCHEMA, name="second_order_themes"),
     )
     # Pin an approved model: task overrides may route to paid models.

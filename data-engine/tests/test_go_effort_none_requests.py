@@ -1,4 +1,6 @@
-"""ASTS y traduccion publica de titulares envian reasoning_effort=none por request (piloto Go 2026-10-26: respuesta vacia con effort alto).
+"""ASTS y traduccion publica de titulares envian el esfuerzo de su seccion (tabla por seccion: low)
+con topes que dejan sitio al razonamiento (piloto Go 2026-10-26: con effort alto y topes cortos
+la respuesta llegaba vacia).
 
 Offline: MockTransport captura el payload; ninguna llamada de red."""
 import asyncio
@@ -31,19 +33,19 @@ def _go_provider(captured: list):
     return create_llm_provider(settings, client=client, max_retries=0), settings
 
 
-def test_asts_envia_effort_none_y_conserva_limites() -> None:
+def test_asts_envia_effort_de_la_tabla_y_tope_con_sitio() -> None:
     from app.services import asts_llm_service as S
     captured: list = []
     provider, settings = _go_provider(captured)
     with mock.patch.object(S, "create_llm_provider", return_value=provider), mock.patch.object(S, "get_settings", return_value=settings):
         asyncio.run(S._analyze_with_llm("SINTETICO"))
     payload = captured[0]
-    assert payload["reasoning_effort"] == "none"
-    assert payload["max_tokens"] == 900 and payload["temperature"] == 0 and payload["model"] == "deepseek-v4.1-flash"
+    assert payload["reasoning_effort"] == settings.reasoning_effort_for("asts") == "low"
+    assert payload["max_tokens"] == 4000 and payload["temperature"] == 0 and payload["model"] == "deepseek-v4.1-flash"
     assert "response_format" not in payload  # el adaptador Go lo elimina (#2181)
 
 
-def test_traduccion_publica_envia_effort_none() -> None:
+def test_traduccion_publica_envia_effort_de_la_tabla() -> None:
     import app.services.public_headline_translation as H
     captured: list = []
     provider, _ = _go_provider(captured)
@@ -53,4 +55,4 @@ def test_traduccion_publica_envia_effort_none() -> None:
     with mock.patch.object(H, "reserve_quota", lambda *a, **k: {"allowed": True}):
         asyncio.run(H.translate_external_headline(_Db(), "Meta Raises 2026 Capex Guidance To $72 Billion Amid AI Push", provider=provider))
     payload = captured[0]
-    assert payload["reasoning_effort"] == "none" and payload["max_tokens"] == 240
+    assert payload["reasoning_effort"] == "low" and payload["max_tokens"] >= 600
