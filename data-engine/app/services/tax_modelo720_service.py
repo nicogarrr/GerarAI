@@ -64,14 +64,22 @@ SNAPSHOT_MAX_LAG_DAYS = 10
 Q4_MAX_GAP_DAYS = 7
 
 
-def q4_average_native(points: list[tuple[date, Decimal]], fiscal_year: int) -> Decimal | None:
+def q4_average_detail(points: list[tuple[date, Decimal]], fiscal_year: int) -> dict | None:
     """Saldo medio del 4.º trimestre (1/10–31/12) en la divisa de la cuenta.
 
     Media de los saldos DIARIOS del trimestre (92 días): el saldo de un día
     sin captura es el de la última captura anterior. Solo se calcula con
-    cobertura suficiente: una captura a menos de ``Q4_MAX_GAP_DAYS`` del 1/10,
-    ningún hueco mayor entre capturas y la última a menos de ese margen del
-    31/12. Sin cobertura devuelve ``None`` (no se inventa el saldo medio).
+    cobertura suficiente: una captura el 1/10 o anterior (como mucho
+    ``Q4_MAX_GAP_DAYS`` antes), ningún hueco mayor entre capturas y la última
+    a menos de ese margen del 31/12. Sin cobertura devuelve ``None`` (no se
+    inventa el saldo medio, ni se aplica hacia atrás un saldo posterior).
+
+    Devuelve ``average`` (Decimal), ``observed_days`` (días del trimestre con
+    captura propia), ``carried_days`` (días cuyo saldo se arrastra de una
+    captura anterior) y ``estimate``: ``True`` en cuanto un solo día se
+    arrastra. Con capturas semanales la media es una ESTIMACIÓN (el saldo
+    entre capturas no se observó); solo con captura de los 92 días es el
+    saldo medio diario exacto.
 
     Base: art. 42 bis.4.b RD 1065/2007 y Orden HAP/72/2013 (saldo a 31/12 y
     saldo medio del último trimestre); FAQ AEAT del 720: ambos se convierten
@@ -97,14 +105,28 @@ def q4_average_native(points: list[tuple[date, Decimal]], fiscal_year: int) -> D
     total = Decimal("0")
     current = by_day[days[0]]
     idx = 0
+    observed = 0
     n_days = (q_end - q_start).days + 1
     for offset in range(n_days):
         day = q_start + timedelta(days=offset)
         while idx < len(days) and days[idx] <= day:
             current = by_day[days[idx]]
             idx += 1
+        if day in by_day:
+            observed += 1
         total += current
-    return total / Decimal(n_days)
+    return {
+        "average": total / Decimal(n_days),
+        "observed_days": observed,
+        "carried_days": n_days - observed,
+        "estimate": observed < n_days,
+    }
+
+
+def q4_average_native(points: list[tuple[date, Decimal]], fiscal_year: int) -> Decimal | None:
+    """Solo el saldo medio de :func:`q4_average_detail` (``None`` sin cobertura)."""
+    detail = q4_average_detail(points, fiscal_year)
+    return None if detail is None else detail["average"]
 
 
 def _money(value: Decimal | None) -> float | None:
@@ -466,8 +488,10 @@ class Modelo720Service:
         q4_total = Decimal("0")
         q4_rows = 0
         q4_unknown: list[str] = []
+        # Cuentas cuyo saldo medio arrastra capturas (no hay saldo de cada día).
+        q4_estimated: list[str] = []
 
-        def _q4_native(cash) -> Decimal | None:
+        def _q4_native(cash) -> dict | None:
             points = [
                 (snap.snapshot_date, snap.balance_native)
                 for snap in db.scalars(
@@ -483,7 +507,7 @@ class Modelo720Service:
                 )
                 if snap.balance_native is not None
             ]
-            return q4_average_native(points, fiscal_year)
+            return q4_average_detail(points, fiscal_year)
 
         for cash in cash_rows:
             ticker = f"cash-{cash.currency}"
@@ -494,12 +518,14 @@ class Modelo720Service:
                 # (p. ej. dólares convertidos a euros en diciembre).
                 custody_zero = custody_map.get(f"CASH:{cash.currency}".upper())
                 if cash.fx_rate is not None and custody_zero not in (None, "ES"):
-                    avg_zero = _q4_native(cash)
-                    if avg_zero is None:
+                    detail_zero = _q4_native(cash)
+                    if detail_zero is None:
                         q4_unknown.append(ticker)
-                    elif avg_zero != 0:
-                        q4_total += avg_zero * Decimal(str(cash.fx_rate))
+                    elif detail_zero["average"] != 0:
+                        q4_total += detail_zero["average"] * Decimal(str(cash.fx_rate))
                         q4_rows += 1
+                        if detail_zero["estimate"]:
+                            q4_estimated.append(ticker)
                 continue
             if cuentas_max_date is None or cash.snapshot_date > cuentas_max_date:
                 cuentas_max_date = cash.snapshot_date
@@ -541,21 +567,30 @@ class Modelo720Service:
                 continue
             amount = Decimal(str(cash.balance_native)) * Decimal(str(cash.fx_rate))
             cuentas_total += amount
-            avg_native = _q4_native(cash)
+            q4_detail = _q4_native(cash)
             avg_base = (
-                avg_native * Decimal(str(cash.fx_rate)) if avg_native is not None else None
+                q4_detail["average"] * Decimal(str(cash.fx_rate))
+                if q4_detail is not None
+                else None
             )
             if avg_base is None:
                 q4_unknown.append(ticker)
             else:
                 q4_total += avg_base
                 q4_rows += 1
+                if q4_detail is not None and q4_detail["estimate"]:
+                    q4_estimated.append(ticker)
             cuentas_detail.append({
                 "currency": cash.currency,
                 "custody_country": custody,
                 "snapshot_date": cash.snapshot_date.isoformat(),
                 "value_base": _money(amount),
                 "average_q4_base": _money(avg_base),
+                # True: media estimada arrastrando la última captura a los
+                # días sin captura (p. ej. semanales); False: saldo observado
+                # los 92 días; None: sin saldo medio.
+                "average_q4_estimate": None if q4_detail is None else q4_detail["estimate"],
+                "average_q4_observed_days": None if q4_detail is None else q4_detail["observed_days"],
             })
 
         # Cobertura: una posición/saldo ACTUAL sin ningún snapshot a cierre
@@ -662,6 +697,15 @@ class Modelo720Service:
             cuentas_threshold_total, cuentas_max_date,
             stale=stale_c, huecos=bool(huecos_c), q4_missing=not q4_known,
         )
+        q4_is_estimate = q4_known and bool(q4_estimated)
+        if q4_is_estimate:
+            cuentas_reasons = cuentas_reasons + [
+                "Saldo medio del 4.º trimestre ESTIMADO "
+                f"({', '.join(sorted(set(q4_estimated)))}): faltan saldos "
+                "diarios y cada día sin captura toma el saldo de la última "
+                "captura anterior. No es el saldo medio diario exacto que "
+                "pide el modelo; contrastar con el extracto del banco o bróker."
+            ]
         if q4_unknown:
             cuentas_reasons = cuentas_reasons + [
                 "Sin capturas de saldo suficientes en el 4.º trimestre para "
@@ -734,6 +778,17 @@ class Modelo720Service:
                     "balances": sorted(cuentas_detail, key=lambda r: r["currency"]),
                     "average_q4_missing": not q4_known,
                     "average_q4_total_base": _money(q4_total) if q4_known else None,
+                    # Cómo se obtuvo el saldo medio: «saldo_diario_observado»
+                    # (captura los 92 días), «estimado_arrastre_capturas»
+                    # (días sin captura con el saldo de la anterior) o None.
+                    "average_q4_estimate": q4_is_estimate if q4_known else None,
+                    "average_q4_method": (
+                        None
+                        if not q4_known
+                        else "estimado_arrastre_capturas"
+                        if q4_is_estimate
+                        else "saldo_diario_observado"
+                    ),
                     "custody": custody_state,
                     "snapshot_lag_days": _lag(cuentas_max_date),
                     "reasons": cuentas_reasons,
@@ -789,7 +844,9 @@ def _notas() -> list[str]:
         "Cuentas: el umbral se evalúa con el mayor entre el saldo a 31/12 y "
         "el saldo medio del 4.º trimestre (ambos al tipo de cambio del 31/12). "
         "Si faltan capturas semanales de caja en el 4T, el saldo medio no se "
-        "calcula (average_q4_missing) y el resultado no es concluyente.",
+        "calcula (average_q4_missing) y el resultado no es concluyente. "
+        "Con capturas no diarias el saldo medio es una estimación "
+        "(average_q4_estimate / average_q4_method), no el saldo medio diario exacto.",
         "Chequeo orientativo: la obligación real depende también de "
         "titularidad, cotitulares y variaciones del año; contrastar "
         "con los extractos del bróker.",
