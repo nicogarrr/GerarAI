@@ -423,7 +423,11 @@ export function DecisionAndRealityPanel({
                 </div>
               ) : trades.length > 0 ? (
                 <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-2 flex flex-wrap items-center gap-2" successMessage="Decisión enlazada a la operación">
-                  {isSuggested(entry.metadata) ? (
+                  {ambiguousCandidateIds(entry.metadata) && tradesForEntry(trades, entry.metadata).length === 0 ? (
+                    <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-unavailable-link" role="status">
+                      Las operaciones sugeridas ya no están disponibles; no se ha enlazado ninguna.
+                    </p>
+                  ) : isSuggested(entry.metadata) ? (
                     <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-suggested-link" role="status">
                       Sugerencia sin confirmar: una operación coincide en empresa, sentido y fecha (hasta 3 días después). No se conoce cantidad ni cuenta, así que no se ha enlazado. Confírmala o deja la decisión sin operación.
                     </p>

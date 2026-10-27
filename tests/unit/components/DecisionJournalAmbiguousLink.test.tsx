@@ -92,6 +92,8 @@ describe('Diario: sin candidatas vigentes no se ofrecen todas las operaciones', 
             />,
         );
         expect(screen.queryByLabelText('Enlazar a una operación')).toBeNull();
+        expect(screen.getByTestId('journal-unavailable-link')).toHaveTextContent('Las operaciones sugeridas ya no están disponibles');
+        expect(screen.queryByTestId('journal-ambiguous-link')).toBeNull();
         expect(screen.getByRole('button', { name: 'No enlazar (sin operación)' })).toBeTruthy();
     });
 });
