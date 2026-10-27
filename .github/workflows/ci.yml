@@ -79,7 +79,30 @@ jobs:
       - name: Transaction form validation (F1, no silent submits)
         run: node --experimental-strip-types --test scripts/transaction-validation.test.ts
       - name: Full guard bundle (scripts/*.test.ts, auto-discovered)
-        run: npm run test:guards
+        # --coverage: mismo bundle; ademas deja coverage/frontend/guards.lcov
+        # con las lineas de lib/ y components/ que los guards ejecutan.
+        run: npm run test:guards -- --coverage
+      - name: Frontend behaviour tests (Vitest + Testing Library, cobertura con trinquete)
+        run: npm run test:coverage
+      - name: Frontend coverage summary
+        if: ${{ always() }}
+        run: |
+          if [ -f coverage/frontend/lcov.info ]; then
+            npm run --silent coverage:summary | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Sin informe de Vitest: el paso anterior no llego a generarlo." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Publish frontend coverage report artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: frontend-coverage
+          path: |
+            coverage/frontend/lcov.info
+            coverage/frontend/coverage-summary.json
+            coverage/frontend/guards.lcov
+          if-no-files-found: warn
+          retention-days: 14
       - name: UI format guards (es-ES, scroll movil)
         run: node --experimental-strip-types --test scripts/ui-format-guard.test.ts
       - name: Market date guard (YYYY-MM-DD no pierde un dia)
