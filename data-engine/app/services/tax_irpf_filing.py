@@ -234,6 +234,60 @@ def build_casillas(dividends: list[dict], realized: list[dict], fiscal_year: int
     }
 
 
+def _treaty_creditable(bucket: dict, gross: Decimal, withheld: Decimal, rate: Decimal) -> Decimal:
+    """Retención acreditable con el tope del convenio aplicado DIVIDENDO A DIVIDENDO.
+
+    El convenio limita la retención exigible al tipo del convenio sobre el
+    importe bruto de CADA dividendo (España-EE.UU., BOE-A-1990-30940, art.
+    10.2.b: "15 por 100 del importe bruto de los dividendos"), y el art. 80.1.a
+    LIRPF solo deja deducir el impuesto "efectivamente satisfecho" que el
+    convenio permite: el exceso se reclama en origen. Por eso el tope es
+    Σ_i min(retención_i, tipo × bruto_i), nunca min(Σ retención, tipo × Σ
+    bruto): sumado por país, la retención baja de un valor (p. ej. 10 %)
+    "hace hueco" al exceso de otro (30 % sin W-8BEN) y la deducción sale inflada.
+
+    Dividendo = pago del bloque (ticker) en una fecha, a partir de las filas
+    ``payments``. Una retención sin dividendo ese día (ajuste o reversión
+    posterior) se imputa al dividendo anterior más cercano del mismo valor (o
+    al primero si no hay anterior). Si las filas no concilian con los totales
+    del bloque (falta un importe, fila ambigua o sin filas), el tope se aplica
+    por valor (bloque), que es la granularidad más fina disponible.
+    """
+    block_cap = min(max(withheld, Decimal("0")), gross * rate)
+    gross_by_date: dict[str, Decimal] = {}
+    withheld_by_date: dict[str, Decimal] = {}
+    for payment in bucket.get("payments") or []:
+        kind = payment.get("type")
+        if kind not in {"dividend", "withholding"}:
+            continue
+        amount = payment.get("amount_base")
+        if amount is None or payment.get("ambiguous") or not payment.get("date"):
+            return block_cap
+        target = gross_by_date if kind == "dividend" else withheld_by_date
+        day = str(payment["date"])
+        target[day] = target.get(day, Decimal("0")) + Decimal(str(amount))
+    if not gross_by_date:
+        return block_cap
+    tolerance = Decimal("0.01") * (len(gross_by_date) + len(withheld_by_date))
+    if (
+        abs(sum(gross_by_date.values(), Decimal("0")) - gross) > tolerance
+        or abs(sum(withheld_by_date.values(), Decimal("0")) - withheld) > tolerance
+    ):
+        return block_cap
+    dates = sorted(gross_by_date)
+    assigned = dict.fromkeys(dates, Decimal("0"))
+    for day, amount in withheld_by_date.items():
+        if day in assigned:
+            assigned[day] += amount
+            continue
+        prior = [d for d in dates if d < day]
+        assigned[prior[-1] if prior else dates[0]] += amount
+    return sum(
+        (min(max(assigned[d], Decimal("0")), gross_by_date[d] * rate) for d in dates),
+        Decimal("0"),
+    )
+
+
 def build_double_taxation(
     dividends: list[dict],
     country_by_ticker: dict[str, str | None],
@@ -244,7 +298,8 @@ def build_double_taxation(
 
     La deducción es el MENOR de:
       (a) la retención extranjera soportada, con tope en el tipo del convenio
-          sobre el íntegro (solo países con tipo verificado en el BOE), y
+          sobre el íntegro de CADA dividendo (Σ min(retención_i, tipo ×
+          bruto_i); solo países con tipo verificado en el BOE), y
       (b) la cuota que correspondería en España, calculada con el TIPO MEDIO
           EFECTIVO DE GRAVAMEN (TME) de la declaración COMPLETA: cuota
           íntegra estatal y autonómica ×100 / base liquidable del ahorro,
@@ -330,9 +385,19 @@ def build_double_taxation(
                 ),
             })
             continue
-        entry = by_country.setdefault(country, {"gross": Decimal("0"), "withheld": Decimal("0")})
-        entry["gross"] += Decimal(str(gross or 0))
-        entry["withheld"] += Decimal(str(withheld or 0))
+        entry = by_country.setdefault(
+            country, {"gross": Decimal("0"), "withheld": Decimal("0"), "creditable": Decimal("0")}
+        )
+        gross_d = Decimal(str(gross or 0))
+        withheld_d = Decimal(str(withheld or 0))
+        entry["gross"] += gross_d
+        entry["withheld"] += withheld_d
+        if country != "ES":
+            # Tope del convenio por DIVIDENDO (no por país): art. 10.2.b del
+            # convenio y art. 80.1.a LIRPF; ver _treaty_creditable.
+            entry["creditable"] += _treaty_creditable(
+                bucket, gross_d, withheld_d, TREATY_DIVIDEND_RATES[country]
+            )
 
     countries = []
     total_deduction = Decimal("0")
@@ -347,7 +412,7 @@ def build_double_taxation(
         if data["withheld"] <= 0:
             continue
         treaty_rate = TREATY_DIVIDEND_RATES[country]
-        creditable = min(data["withheld"], data["gross"] * treaty_rate)
+        creditable = data["creditable"]
         if data["withheld"] > creditable:
             any_excess = True  # hay exceso reclamable en origen: se señala
         if tme is not None:
