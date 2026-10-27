@@ -54,4 +54,25 @@ describe('EditTransactionDialog comisiones', () => {
         });
         expect(updateTransaction.mock.calls[0][9]).toBe(2.5);
     });
+
+    it('fila sin dato de comisión: el campo va vacío y guardar sin tocarlo OMITE fees (no borra la registrada)', async () => {
+        const dialog = await open(base);
+        const input = within(dialog).getByLabelText(/^Comisiones/) as HTMLInputElement;
+        expect(input.value).toBe('');
+        await act(async () => {
+            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Cambios' }).closest('form')!);
+        });
+        expect(updateTransaction).toHaveBeenCalledTimes(1);
+        expect(updateTransaction.mock.calls[0]).toHaveLength(10);
+        expect(updateTransaction.mock.calls[0][9]).toBeUndefined();
+    });
+
+    it('fila sin dato de comisión: si el usuario teclea una, se envía', async () => {
+        const dialog = await open(base);
+        fireEvent.change(within(dialog).getByLabelText(/^Comisiones/), { target: { value: '4' } });
+        await act(async () => {
+            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Cambios' }).closest('form')!);
+        });
+        expect(updateTransaction.mock.calls[0][9]).toBe(4);
+    });
 });

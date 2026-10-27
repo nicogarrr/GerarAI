@@ -50,7 +50,8 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
         type: transaction.type,
         quantity: transaction.quantity.toString(),
         price: transaction.price.toString(),
-        fees: (transaction.fees ?? 0).toString(),
+        // Sin dato de comisión en la fila el campo queda vacío: guardar sin tocarlo OMITE fees y el backend conserva la registrada (nunca se resetea a 0).
+        fees: transaction.fees === undefined ? '' : transaction.fees.toString(),
         date: transaction.date.slice(0, 10),
         notes: transaction.notes || '',
         currency: transaction.currency || 'USD',
