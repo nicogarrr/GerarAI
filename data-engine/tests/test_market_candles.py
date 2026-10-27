@@ -161,3 +161,15 @@ def test_optional_ohlc_fields_are_independently_preserved():
     assert out["o"] == [None, 11.5]
     assert out["h"] == [10.5, None]
     assert out["l"] == [9, None]
+
+
+def test_candles_carry_currency_declared_in_same_yahoo_response():
+    payload = _payload()
+    payload["chart"]["result"][0]["meta"] = {"currency": "GBp"}
+    out = market._fetch_yahoo_candles(_Client(resp=_Resp(200, payload)), "CGEO.L", 0, 9999, "1d")
+    assert out is not None and out["currency"] == "GBp"
+
+
+def test_candles_without_meta_currency_have_no_currency_key():
+    out = market._fetch_yahoo_candles(_Client(resp=_Resp(200, _payload())), "SAN.MC", 0, 9999, "1d")
+    assert out is not None and "currency" not in out

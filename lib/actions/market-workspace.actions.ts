@@ -47,6 +47,8 @@ export type CompanyMarketSnapshot = {
         volume: number | null;
     }>;
     historySource?: string | null;
+    /** Divisa que el proveedor declara en la misma respuesta de velas; null si no la trae. */
+    historyCurrency?: string | null;
     status: 'available' | 'partial' | 'unavailable';
 };
 
@@ -160,6 +162,7 @@ export async function getCompanyMarketSnapshot(ticker: string): Promise<CompanyM
         },
         history,
         historySource: candles.source ?? null,
+        historyCurrency: typeof candles.currency === 'string' && candles.currency.trim() ? candles.currency.trim() : null,
         // La insignia del historial describe la serie (F161): sin velas es
         // «no disponible» aunque la cotización puntual haya cargado.
         status: marketHistoryStatus(history.length),

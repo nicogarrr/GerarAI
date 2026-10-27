@@ -24,7 +24,7 @@ import { fetchJSON } from '@/lib/upstream/finnhub';
 
 const FINNHUB_BASE_URL = env.FINNHUB_BASE_URL;
 
-export type FinnhubCandles = { source?: string; s: 'ok' | 'no_data'; c: number[]; t: number[]; o: (number | null)[]; h: (number | null)[]; l: (number | null)[]; v: (number | null)[] };
+export type FinnhubCandles = { source?: string; /** Divisa de la misma respuesta del proveedor (solo la trae el backend/Yahoo). */ currency?: string; s: 'ok' | 'no_data'; c: number[]; t: number[]; o: (number | null)[]; h: (number | null)[]; l: (number | null)[]; v: (number | null)[] };
 
 export async function getCandles(symbol: string, from: number, to: number, resolution: 'D' | 'W' | 'M' | '60' = 'D', revalidateSeconds = 1800): Promise<FinnhubCandles> {
     await requireAuthenticatedUser();
