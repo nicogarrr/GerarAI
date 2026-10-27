@@ -12,6 +12,36 @@ from app.schemas.api import VALUATION_WITHHELD_REASON, valuation_uses_inferred_i
 MODEL_WITHHELD_REASON = "El modelo no es publicable; el texto y las cifras archivados no son análisis actual."
 
 
+def model_withheld_reason(thesis: ThesisVersion, model: FundamentalModelVersion | None) -> str | None:
+    if model is None:
+        return "No hay un modelo publicable verificado; el texto y las cifras archivados no son análisis actual."
+    if not model.publishable:
+        return MODEL_WITHHELD_REASON
+    if valuation_uses_inferred_inputs(thesis.valuation_basis):
+        return VALUATION_WITHHELD_REASON
+    return None
+
+
+def withhold_thesis_payload(payload: dict, thesis: ThesisVersion, reason: str | None) -> dict:
+    """Sanitize a detached response, never an ORM row or persisted archive."""
+    if not reason:
+        return payload
+    payload = dict(payload)
+    for key in ("bear_value", "base_value", "bull_value", "expected_value", "margin_of_safety",
+                "archived_margin_of_safety", "margin_of_safety_convention", "hypothesis", "catalysts",
+                "invalidation_criteria", "invalidation_rules", "scenario_probabilities", "narrative_sections"):
+        if key in payload:
+            payload[key] = None
+    payload["rating"] = "insufficient_data"
+    payload["margin_of_safety_status"] = "withheld"
+    payload["executive_summary"] = archived_thesis_notice(thesis, reason)
+    if "thesis_markdown" in payload:
+        payload["thesis_markdown"] = payload["executive_summary"]
+    if "valuation_withheld_reason" in payload:
+        payload["valuation_withheld_reason"] = reason
+    return payload
+
+
 def thesis_withheld_reasons(db: Session, theses: list[ThesisVersion]) -> dict[int, str | None]:
     """Batch lookup keeps whole-vault export independent of company count."""
     if not theses:
@@ -28,14 +58,7 @@ def thesis_withheld_reasons(db: Session, theses: list[ThesisVersion]) -> dict[in
     reasons = {}
     for thesis in theses:
         model = latest.get((thesis.tenant_id, thesis.company_id))
-        if model is None:
-            reason = "No hay un modelo publicable verificado; el texto y las cifras archivados no son análisis actual."
-        elif not model.publishable:
-            reason = MODEL_WITHHELD_REASON
-        elif valuation_uses_inferred_inputs(thesis.valuation_basis):
-            reason = VALUATION_WITHHELD_REASON
-        else:
-            reason = None
+        reason = model_withheld_reason(thesis, model)
         reasons[thesis.id] = reason
     return reasons
 

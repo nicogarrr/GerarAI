@@ -29,7 +29,12 @@ from app.services.thesis_epub_service import (
 )
 from app.services.thesis_graph_service import ThesisGraphService
 from app.services.thesis_memo import build_memo_markdown
-from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
+from app.services.thesis_publication_gate import (
+    archived_thesis_notice,
+    thesis_withheld_reason,
+    thesis_withheld_reasons,
+    withhold_thesis_payload,
+)
 from app.services.thesis_service import ThesisService, latest_inputs_provenance, latest_missing_inputs
 
 router = APIRouter()
@@ -68,7 +73,7 @@ def generate_thesis(payload: ThesisGenerateRequest, db: Session = Depends(get_db
         thesis = ThesisService().generate(db, payload.ticker, payload.force_new_version)
     except Exception as exc:
         raise _safe_generate_error(exc) from exc
-    out = ThesisOut.model_validate(thesis).model_dump()
+    out = withhold_thesis_payload(ThesisOut.model_validate(thesis).model_dump(), thesis, thesis_withheld_reason(db, thesis))
     out["missing_inputs"] = latest_missing_inputs(db, thesis.company_id)
     out["inputs_provenance"] = latest_inputs_provenance(
         db, thesis.company_id, thesis.valuation_basis
@@ -220,7 +225,7 @@ def latest_thesis(ticker: str, db: Session = Depends(get_db)) -> dict:
     # precios, noticias o documentos) -> conviene regenerar la tesis.
     latest_data_at = service.data_freshness(db, thesis.company_id, as_of=thesis.updated_at)
     stale = latest_data_at is not None and latest_data_at > thesis.updated_at
-    payload = ThesisOut.model_validate(thesis).model_dump()
+    payload = withhold_thesis_payload(ThesisOut.model_validate(thesis).model_dump(), thesis, thesis_withheld_reason(db, thesis))
     payload["stale"] = stale
     payload["latest_data_at"] = latest_data_at
     payload["missing_inputs"] = latest_missing_inputs(db, thesis.company_id)
@@ -236,11 +241,11 @@ def thesis_versions(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
     db: Session = Depends(get_db),
-) -> list[ThesisVersion]:
+) -> list[dict]:
     company = resolve_company(db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    return list(
+    versions = list(
         db.scalars(
             select(ThesisVersion)
             .where(ThesisVersion.company_id == company.id)
@@ -249,6 +254,9 @@ def thesis_versions(
             .limit(page_size)
         ).all()
     )
+    reasons = thesis_withheld_reasons(db, versions)
+    return [withhold_thesis_payload(ThesisOut.model_validate(row).model_dump(), row, reasons[row.id])
+            for row in versions]
 
 
 @router.get("/{ticker}/history")

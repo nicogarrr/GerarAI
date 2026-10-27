@@ -326,6 +326,8 @@ def test_snapshot_margin_requires_provenance_preserving_archived_number(db, conv
     company = _company(db, "MARGIN")
     _fill(db, company, thesis_versions=1, changes=0)
     thesis = db.scalar(select(ThesisVersion).where(ThesisVersion.company_id == company.id))
+    model = db.scalar(select(FundamentalModelVersion).where(FundamentalModelVersion.company_id == company.id))
+    model.publishable = True
     thesis.margin_of_safety = Decimal("0.3")
     thesis.valuation_basis = {"margin_of_safety_convention": convention}
     db.commit()
