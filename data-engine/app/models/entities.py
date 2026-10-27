@@ -2722,12 +2722,17 @@ class EtfHolding(Base):
     source_url: Mapped[str] = mapped_column(Text)
 
 
-class TenantLLMSettings(Base, TimestampMixin):
+class TenantLLMSettings(TenantOwnedMixin, Base, TimestampMixin):
     """Proveedor/modelo/clave LLM propios de un tenant.
 
     ``tenant_id`` es unico: una fila por tenant, borrada en cascada con el
     tenant. La clave NUNCA se guarda en claro: solo el sobre cifrado y los
     ultimos cuatro caracteres para poder mostrarla en ajustes.
+
+    Hereda ``TenantOwnedMixin``: la sesion filtra las SELECT de entidad por
+    tenant, asigna el tenant a las filas nuevas y rechaza reasignarlo. La
+    columna ``tenant_id`` se redeclara aqui (NOT NULL + ON DELETE CASCADE),
+    por lo que el esquema de la migracion 0081 no cambia.
     """
 
     __tablename__ = "tenant_llm_settings"
