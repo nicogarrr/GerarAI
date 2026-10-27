@@ -155,21 +155,29 @@ class RetentionService:
             "database_failures": 0,
         }
 
+        expired = and_(
+            *tenant_filters(db, Document),
+            Document.retention_tombstoned_at.is_(None),
+            or_(Document.published_at < document_cutoff,
+                and_(Document.published_at.is_(None), Document.created_at < document_cutoff)),
+        )
+        # Excluir referencias ANTES de limit: un lote inicial protegido no
+        # debe impedir para siempre que se purguen documentos posteriores.
+        referenced_chunks = select(DocumentChunk.id).where(
+            *tenant_filters(db, DocumentChunk), DocumentChunk.document_id == Document.id,
+            or_(*(
+                select(model.id).where(
+                    *tenant_filters(db, model), model.document_chunk_id == DocumentChunk.id,
+                ).exists()
+                for model in (ClaimEvidence, EvidenceSuggestion, KPIExtractionCandidate)
+            )),
+        ).correlate(Document)
+        protected = referenced_chunks.exists()
+        result["documents_deferred_evidence"] = int(db.scalar(
+            select(func.count()).select_from(Document).where(expired, protected)
+        ) or 0)
         documents = db.scalars(
-            select(Document)
-            .where(
-                *tenant_filters(db, Document),
-                Document.retention_tombstoned_at.is_(None),
-                or_(
-                    Document.published_at < document_cutoff,
-                    and_(
-                        Document.published_at.is_(None),
-                        Document.created_at < document_cutoff,
-                    ),
-                ),
-            )
-            .order_by(Document.id)
-            .limit(limit)
+            select(Document).where(expired, ~protected).order_by(Document.id).limit(limit)
         ).all()
         for document in documents:
             metadata = dict(document.metadata_ or {})

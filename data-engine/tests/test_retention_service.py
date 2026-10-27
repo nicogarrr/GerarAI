@@ -351,3 +351,29 @@ def test_suggestion_reference_is_deferred_in_dry_run_and_real_run(monkeypatch):
         result = service.purge_tenant(session, now=NOW, dry_run=dry_run, retention_days=2555, telemetry_days=90)
         assert result['documents_deferred_evidence'] == 1
         assert result['documents_tombstoned'] == 0
+
+
+def test_protected_first_document_does_not_starve_later_batches(monkeypatch):
+    from app.models import EvidenceSuggestion
+
+    session, _, company = _db()
+    protected = _old_document(session, company, 'Protected first', 'minio://protected.pdf')
+    chunk = session.scalar(select(DocumentChunk).where(DocumentChunk.document_id == protected.id))
+    session.add(EvidenceSuggestion(company_id=company.id, document_id=protected.id,
+                                   document_chunk_id=chunk.id, statement='Keep evidence'))
+    free = [_old_document(session, company, f'Free {i}', f'minio://free-{i}.pdf') for i in range(3)]
+    ids = [document.id for document in free]
+    session.commit()
+    service = RetentionService()
+    deleted = []
+    monkeypatch.setattr(service.store, 'delete', lambda uri: deleted.append(uri))
+    monkeypatch.setattr(service.index, 'delete_document_points', lambda *args: None)
+    for _ in range(3):
+        result = service.purge_tenant(session, now=NOW, dry_run=False, retention_days=2555,
+                                      telemetry_days=90, limit=1)
+        assert result['documents_deferred_evidence'] == 1
+        assert result['documents_tombstoned'] == 1
+        assert result['documents_examined'] == 1
+    assert deleted == [f'minio://free-{i}.pdf' for i in range(3)]
+    assert all(session.get(Document, document_id).retention_tombstoned_at for document_id in ids)
+    assert session.get(Document, protected.id).retention_tombstoned_at is None
