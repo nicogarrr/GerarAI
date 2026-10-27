@@ -251,6 +251,41 @@ def _prune_sources(
     return kept
 
 
+# Mercados de EE. UU. donde un emisor presenta ante la SEC. OTC queda fuera:
+# muchos valores OTC son extranjeros (p. ej. KRKNF, canadiense) y solo cuentan
+# si la ficha trae CIK.
+_SEC_EXCHANGES = frozenset({
+    "NYSE", "NASDAQ", "AMEX", "NYSE AMERICAN", "NYSEAMERICAN", "NYSE ARCA", "NYSEARCA",
+    "ARCA", "BATS", "CBOE", "NMS", "NGM", "NCM", "NASDAQGS", "NASDAQGM", "NASDAQCM",
+})
+
+
+def files_with_sec(company: Company) -> bool:
+    """¿Tiene sentido pedir hechos a la SEC para esta empresa?
+
+    Sí con CIK. Sin CIK, solo si cotiza en una bolsa de EE. UU. y el ticker no
+    lleva sufijo de mercado extranjero (CGEO.L, SAN.MC). La SEC no cubre la
+    Bolsa de Londres: decirle a alguien que ingiera datos SEC de CGEO.L es un
+    consejo imposible (prueba real, 27-oct).
+    """
+    if (company.cik or "").strip():
+        return True
+    ticker = (company.ticker or "").upper()
+    if "." in ticker:
+        return False
+    return (company.exchange or "").strip().upper() in _SEC_EXCHANGES
+
+
+def primary_sources_hint(company: Company) -> str:
+    if files_with_sec(company):
+        return "ingiere sus fuentes primarias (SEC/FMP)"
+    market = (company.exchange or "").strip() or "su mercado"
+    return (
+        f"la SEC no cubre {market}, así que sus fuentes son FMP y los informes "
+        "anuales de la propia empresa: ingiérelos desde su ficha"
+    )
+
+
 def _natural_company_answer(
     *,
     company: Company,
@@ -297,9 +332,8 @@ def _natural_company_answer(
         parts.append(f"Datos almacenados: {rendered}.")
     else:
         parts.append(
-            f"Todavia no tengo hechos financieros fiables almacenados para "
-            f"{company.ticker}; ingiere sus fuentes primarias (SEC/FMP) y te "
-            f"respondo con cifras."
+            f"Todavía no tengo hechos financieros fiables almacenados para "
+            f"{company.ticker}; {primary_sources_hint(company)} y te respondo con cifras."
         )
     if thesis:
         detalles = []
@@ -1946,7 +1980,12 @@ class ChatService:
             if any(event.requires_update for event in news):
                 proposed_actions.append("Revisar cambios de tesis por noticias materiales")
             if not facts:
-                proposed_actions.append("Ingerir hechos financieros SEC/FMP antes de sacar conclusiones cuantitativas")
+                proposed_actions.append(
+                    "Ingerir hechos financieros SEC/FMP antes de sacar conclusiones cuantitativas"
+                    if files_with_sec(company)
+                    else f"Ingerir hechos financieros de FMP o de los informes de {company.ticker} "
+                    "(la SEC no cubre ese mercado) antes de sacar conclusiones cuantitativas"
+                )
 
             facts_text = (
                 "\n".join(
