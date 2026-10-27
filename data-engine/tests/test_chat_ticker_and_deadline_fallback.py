@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.llm import interactive_deadline
 from app.models.entities import Base, Company
-from app.schemas import ChatRequest
+from app.schemas import ChatRequest, ChatResponse
 from app.services.chat_service import ChatService
 
 
@@ -53,13 +53,25 @@ def test_uppercase_es_with_company_cue_still_resolves(db):
 
 @pytest.fixture
 def short_deadline(monkeypatch):
-    # 2 s y no .3: la recuperacion previa a la sintesis (_deterministic_answer)
-    # tarda mas de .3 s en un runner cargado y entonces el plazo vence ANTES
-    # de sintetizar: devuelve el baseline (mismo fallback_reason) y no el
-    # texto «tardó demasiado» que este test comprueba. La sintesis cuelga 30 s,
-    # asi que 2 s sigue disparando el plazo.
+    # 2 s: margen para el trabajo previo a la sintesis (resolver empresa, BD).
+    # La sintesis cuelga 30 s, asi que el plazo vence siempre dentro de ella.
     monkeypatch.setattr(interactive_deadline, "get_settings",
                         lambda: SimpleNamespace(chat_total_timeout_seconds=2.0))
+
+
+@pytest.fixture
+def instant_baseline(monkeypatch):
+    """La recuperacion determinista no consume plazo: el plazo vence en la sintesis.
+
+    No se simula el comportamiento bajo prueba (el vencimiento del plazo en la
+    sintesis), solo se quita la dependencia de la velocidad del runner de la
+    fase previa.
+    """
+    monkeypatch.setattr(
+        ChatService, "_deterministic_answer",
+        lambda self, db, question, scope, ticker: ChatResponse(
+            answer="BASELINE", sources=[], model="deterministic", confidence=0.5),
+    )
 
 
 @pytest.fixture
@@ -77,7 +89,7 @@ def _assert_deadline_fallback(response):
     assert "tardó demasiado" in response.answer
 
 
-def test_answer_returns_deterministic_on_total_deadline(db, short_deadline, hanging_synthesis):
+def test_answer_returns_deterministic_on_total_deadline(db, short_deadline, hanging_synthesis, instant_baseline):
     service = ChatService()
     start = time.monotonic()
     response = asyncio.run(service.answer(db, "qué es el margen operativo", "general", None))
@@ -85,13 +97,36 @@ def test_answer_returns_deterministic_on_total_deadline(db, short_deadline, hang
     _assert_deadline_fallback(response)
 
 
-def test_route_returns_deterministic_on_total_deadline(db, short_deadline, hanging_synthesis):
+def test_route_returns_deterministic_on_total_deadline(db, short_deadline, hanging_synthesis, instant_baseline):
     from app.api.routes.chat import chat
     payload = ChatRequest(question="qué es el margen operativo", scope="general")
     start = time.monotonic()
     response = asyncio.run(chat(payload, db))
     assert time.monotonic() - start < 10
     _assert_deadline_fallback(response)
+
+
+def test_answer_deadline_spent_in_recovery_returns_baseline(db, monkeypatch):
+    """Plazo agotado en la recuperacion previa (RAG lento): responde el baseline
+    determinista con fallback_reason chat_total_deadline, sin llegar a sintetizar."""
+    monkeypatch.setattr(interactive_deadline, "get_settings",
+                        lambda: SimpleNamespace(chat_total_timeout_seconds=.2))
+
+    def slow_baseline(self, db, question, scope, ticker):
+        time.sleep(.4)  # la recuperacion consume todo el plazo
+        return ChatResponse(answer="BASELINE", sources=[], model="deterministic", confidence=0.5)
+
+    async def synth_must_not_run(*args, **kwargs):
+        raise AssertionError("no debe sintetizar con el plazo agotado")
+
+    monkeypatch.setattr(ChatService, "_deterministic_answer", slow_baseline)
+    monkeypatch.setattr(
+        "app.services.chat_synthesis_service.ChatSynthesisService.synthesize_general",
+        synth_must_not_run)
+    response = asyncio.run(ChatService().answer(db, "qué es el margen operativo", "general", None))
+    assert response.model == "deterministic"
+    assert response.llm_trace["fallback_reason"] == "chat_total_deadline"
+    assert response.answer == "BASELINE"
 
 
 def _mk(db: Session, ticker: str) -> Company:
