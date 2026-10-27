@@ -116,6 +116,10 @@ async def lifespan(_: FastAPI):
     _HEALTH_REQUIRED_EXECUTOR.shutdown(wait=False)
     _HEALTH_PROBE_EXECUTOR.shutdown(wait=False)
     _HEALTH_LLM_EXECUTOR.shutdown(wait=False)
+    # Cliente Yahoo compartido de /api/market/quote y /candles (keep-alive).
+    from app.api.routes.market import close_shared_yahoo_client
+
+    close_shared_yahoo_client()
 
 
 _app_env = get_settings().app_env.strip().lower()

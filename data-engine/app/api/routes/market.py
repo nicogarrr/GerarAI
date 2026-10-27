@@ -94,6 +94,37 @@ _quote_cache_lock = threading.RLock()
 
 _YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
+# Un solo cliente HTTP para /quote y /candles: antes cada fallo de caché abría
+# un httpx.Client nuevo (DNS + TCP + TLS a Yahoo en cada petición). httpx.Client
+# es seguro entre hilos, y las rutas síncronas corren en el threadpool.
+# Timeouts: conectar 5 s (Yahoo caído no bloquea un hilo 15 s solo en el
+# handshake), esperar un hueco del pool 5 s, lectura 15 s (quote) / 20 s (velas).
+_YAHOO_QUOTE_TIMEOUT = httpx.Timeout(15.0, connect=5.0, pool=5.0)
+_YAHOO_CANDLES_TIMEOUT = httpx.Timeout(20.0, connect=5.0, pool=5.0)
+_YAHOO_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10, keepalive_expiry=30.0)
+_yahoo_client: httpx.Client | None = None
+_yahoo_client_lock = threading.Lock()
+
+
+def _shared_yahoo_client() -> httpx.Client:
+    """Cliente Yahoo compartido (keep-alive); se recrea si alguien lo cerró."""
+    global _yahoo_client
+    with _yahoo_client_lock:
+        if _yahoo_client is None or _yahoo_client.is_closed:
+            _yahoo_client = httpx.Client(
+                headers=dict(_HEADERS), timeout=_YAHOO_QUOTE_TIMEOUT, limits=_YAHOO_LIMITS
+            )
+        return _yahoo_client
+
+
+def close_shared_yahoo_client() -> None:
+    """Cierra el cliente compartido (apagado del proceso y tests)."""
+    global _yahoo_client
+    with _yahoo_client_lock:
+        if _yahoo_client is not None:
+            _yahoo_client.close()
+        _yahoo_client = None
+
 # La conversión de clases US punto->guion (BRK.B -> BRK-B) vive en el
 # conector Yahoo (fuente única); aquí se reexporta con el nombre histórico.
 from app.services.connectors.yahoo import yahoo_chart_symbol as _yahoo_chart_symbol
@@ -121,7 +152,7 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
         resp = client.get(
             f"{_YAHOO_CHART_URL}/{symbol}",
             params={"range": "5d", "interval": "1d"},
-            timeout=15,
+            timeout=_YAHOO_QUOTE_TIMEOUT,
         )
     except httpx.HTTPError:
         return None
@@ -228,9 +259,7 @@ def market_quote(symbol: str) -> dict:
         cached = _quote_cache.get(normalized)
         if cached and now - cached["at"] < _QUOTE_CACHE_TTL:
             return cached["data"]
-    headers = dict(_HEADERS)
-    with httpx.Client(headers=headers) as client:
-        data = _fetch_yahoo_quote(client, normalized)
+    data = _fetch_yahoo_quote(_shared_yahoo_client(), normalized)
     if not data:
         raise HTTPException(status_code=404, detail="Sin cotización disponible")
     with _quote_cache_lock:
@@ -262,7 +291,7 @@ def _fetch_yahoo_candles(
         resp = client.get(
             f"{_YAHOO_CHART_URL}/{symbol}",
             params={"period1": from_ts, "period2": to_ts, "interval": interval},
-            timeout=20,
+            timeout=_YAHOO_CANDLES_TIMEOUT,
         )
     except httpx.HTTPError:
         return None
@@ -343,9 +372,7 @@ def market_candles(
         cached = _candles_cache.get(cache_key)
         if cached and now - cached["at"] < _CANDLES_CACHE_TTL:
             return cached["data"]
-    headers = dict(_HEADERS)
-    with httpx.Client(headers=headers) as client:
-        data = _fetch_yahoo_candles(client, normalized, from_ts, to_ts, interval)
+    data = _fetch_yahoo_candles(_shared_yahoo_client(), normalized, from_ts, to_ts, interval)
     if not data:
         raise HTTPException(status_code=404, detail="Sin velas disponibles")
     with _candles_cache_lock:
