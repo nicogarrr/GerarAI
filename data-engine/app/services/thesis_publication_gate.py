@@ -12,7 +12,34 @@ from app.schemas.api import VALUATION_WITHHELD_REASON, valuation_uses_inferred_i
 MODEL_WITHHELD_REASON = "El modelo no es publicable; el texto y las cifras archivados no son análisis actual."
 
 
+# Estados con los que la propia tesis declara una valoración publicable o
+# publicada. Solo esas cifras necesitan el respaldo de un modelo publicable.
+VALUATION_CLAIM_STATUSES = frozenset({"published", "final"})
+
+
+def _is_current_unpublished_analysis(thesis: ThesisVersion, model: FundamentalModelVersion | None) -> bool:
+    """Borrador vigente: no es un archivo y ya se etiqueta solo.
+
+    Una tesis en borrador, parcial o con datos insuficientes no afirma una
+    valoración publicable (su propio texto dice «indicativa» o «no publicable»).
+    Es vigente si no hay ningún modelo posterior (``model is None``) o si se
+    generó con el último modelo (misma huella de entradas). Una tesis que
+    afirma valoración publicable, o un borrador superado por un modelo nuevo,
+    siguen la puerta estricta.
+    """
+    if (thesis.status or "draft") in VALUATION_CLAIM_STATUSES:
+        return False
+    if model is None:
+        return True
+    linked = (thesis.valuation_basis or {}).get("model_input_fingerprint")
+    return bool(linked) and linked == model.input_fingerprint
+
+
 def model_withheld_reason(thesis: ThesisVersion, model: FundamentalModelVersion | None) -> str | None:
+    if _is_current_unpublished_analysis(thesis, model):
+        if valuation_uses_inferred_inputs(thesis.valuation_basis):
+            return VALUATION_WITHHELD_REASON
+        return None
     if model is None:
         return "No hay un modelo publicable verificado; el texto y las cifras archivados no son análisis actual."
     if not model.publishable:
