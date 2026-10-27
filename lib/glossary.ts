@@ -210,6 +210,6 @@ export const moatGlossaryKey: Record<string, GlossaryKey> = {
 
 /** Etiqueta en español para una clave de moat del backend; fallback legible si llega una clave desconocida. */
 export function moatLabel(type: string): string {
-  const key = moatGlossaryKey[type];
+  const key = Object.hasOwn(moatGlossaryKey, type) ? moatGlossaryKey[type] : undefined;
   return key ? glossary[key].term.replace('Moat: ', '') : type.replaceAll('_', ' ');
 }
