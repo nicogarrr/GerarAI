@@ -14,6 +14,8 @@ import re
 import traceback
 import uuid
 
+from app.core.log_redaction import redact_telegram_tokens
+
 logger = logging.getLogger("gerarai.request_errors")
 
 _STATUS_DEFAULTS: dict[int, str] = {
@@ -61,7 +63,7 @@ def redact_secrets(text: str) -> str:
     return _SECRET_KV_RE.sub(
         r"\1=REDACTED",
         _SECRET_QUERY_RE.sub(
-            r"\1=REDACTED", _USERINFO_RE.sub(r"\1:REDACTED@", text)
+            r"\1=REDACTED", _USERINFO_RE.sub(r"\1:REDACTED@", redact_telegram_tokens(text))
         ),
     )
 
