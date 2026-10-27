@@ -15,9 +15,11 @@ import React, {useState} from "react";
 type Props = {
     /** Solo se muestra el enlace de recuperación si el despliegue puede enviar correo. */
     passwordResetAvailable: boolean;
+    /** Ruta interna ya saneada (`safeInternalPath`) a la que volver tras entrar. */
+    redirectTo?: string;
 };
 
-const SignInForm = ({ passwordResetAvailable }: Props) => {
+const SignInForm = ({ passwordResetAvailable, redirectTo = '/inicio' }: Props) => {
     const router = useRouter()
     const [twoFactorRequired, setTwoFactorRequired] = useState(false);
     const [pendingCredentials, setPendingCredentials] = useState<{ email: string; password: string } | null>(null);
@@ -39,7 +41,7 @@ const SignInForm = ({ passwordResetAvailable }: Props) => {
         try {
             const result = await signInWithEmail(data);
             if (result.success) {
-                router.push('/inicio');
+                router.push(redirectTo);
                 router.refresh();
                 return;
             }
@@ -68,7 +70,7 @@ const SignInForm = ({ passwordResetAvailable }: Props) => {
                 totpCode,
             });
             if (result.success) {
-                router.push('/inicio');
+                router.push(redirectTo);
                 router.refresh();
                 return;
             }
