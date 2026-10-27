@@ -297,7 +297,8 @@ export async function getWatchlistEntryData(
 // ---- Monitor denso (F: watchlist monitor) ----
 // Datos propios/trazables del backend research: minimo 52 semanas desde
 // market_prices, proximo resultado via NASDAQ publico (mismo conector que
-// /api/calendar/earnings) y comparacion con la ultima tesis publicada.
+// /api/calendar/earnings) y comparacion con el valor justo unico (tesis
+// publicada o motor, con su etiqueta de procedencia).
 // Cualquier pieza sin dato llega a null: la UI pinta N/D, nunca inventa.
 export type WatchlistMonitorItem = {
     low_52w: number | null;
@@ -307,6 +308,11 @@ export type WatchlistMonitorItem = {
     last_close_date: string | null;
     fair_value: number | null;
     fair_value_thesis_version: number | null;
+    /** Procedencia del valor justo único (misma cifra que inicio y screener). */
+    fair_value_source?: 'tesis' | 'motor' | 'motor_orientativo' | null;
+    fair_value_label?: string | null;
+    fair_value_as_of?: string | null;
+    fair_value_publishable?: boolean | null;
     valuation_side: 'infravalorada' | 'sobrevalorada' | null;
     currency: string | null;
     next_earnings_date: string | null;

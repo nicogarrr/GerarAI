@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models import CalculatedMetric, Company
 from app.services.inferred_input_service import InferredInputService, pick_rate_pair
+from app.valuation.adr_ratios import table_adr_ratio
 from app.valuation.financial_snapshot import FinancialSnapshot, FinancialSnapshotBuilder
 from app.valuation.moat_framework import empty_moat_framework
 
@@ -84,7 +85,14 @@ ADR_TAG_PREFIX = "adr:"
 
 
 def adr_ratio(company: Company) -> float | None:
-    """Ordinary shares represented by one ADR, or ``None`` if not applicable."""
+    """Ordinary shares represented by one ADR, or ``None`` if not applicable.
+
+    Precedencia: la etiqueta ``adr:N`` de ``factor_tags`` y, si no la hay, la
+    tabla citada de :mod:`app.valuation.adr_ratios` (BABA 8, TM 10, TSM 5...).
+    Una etiqueta mal formada (``adr:0``, ``adr:x``) o dos ratios distintos
+    devuelven None aunque la tabla tenga fila: un dato contradictorio no se
+    tapa con la tabla.
+    """
     ratios: set[float] = set()
     for tag in company.factor_tags or []:
         text = str(tag).strip().lower()
@@ -96,7 +104,10 @@ def adr_ratio(company: Company) -> float | None:
             if not math.isfinite(ratio) or ratio <= 0:
                 return None
             ratios.add(ratio)
-    return next(iter(ratios)) if len(ratios) == 1 else None
+    if ratios:
+        return next(iter(ratios)) if len(ratios) == 1 else None
+    row = table_adr_ratio(company.ticker)
+    return float(row.ordinary_per_adr) if row is not None else None
 
 
 def is_adr_without_ratio(company: Company) -> bool:

@@ -33,7 +33,8 @@ def test_monitor_twenty_companies_has_constant_query_count(monkeypatch):
     event.listen(engine, "before_cursor_execute", lambda *a: statements.append(a[2]))
     result = asyncio.run(watchlist.watchlist_monitor(
         tickers=','.join(f"BATCH{i}" for i in range(20)), db=db))
-    assert len(statements) == 6
+    # +1 consulta (valuation_models) del valor justo único; sigue siendo constante.
+    assert len(statements) == 7
     assert len(result["items"]) == 20
     for row in result["items"].values():
         assert row["low_52w"] == 80
@@ -46,7 +47,7 @@ def test_monitor_twenty_companies_has_constant_query_count(monkeypatch):
         assert row["valuation_side"] == "infravalorada"
     statements.clear()
     asyncio.run(watchlist.watchlist_monitor(tickers="BATCH0", db=db))
-    assert len(statements) == 6
+    assert len(statements) == 7
     db.close()
 
 

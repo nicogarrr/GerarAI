@@ -374,6 +374,7 @@ def fact_pack(
     rag_context: list[dict] | None = None,
     financial_facts: list[FinancialFact] | None = None,
     fact_locators: dict[int, str] | None = None,
+    ownership_facts: list[tuple[str, str]] | None = None,
 ) -> list[dict]:
     """Paquete deterministico de hechos citables: la unica materia del modelo.
 
@@ -646,6 +647,10 @@ def fact_pack(
         else:
             texto = f'{source} publicó "{clip_words(headline, 160)}".'
         add(texto, _source_locator(item))
+    # Conexion 10b: resumen de insiders (Form 4) y fondos 13F ya persistidos,
+    # con cifras deterministas y su fuente SEC (texto propio, no de terceros).
+    for texto, fuente in list(ownership_facts or [])[:2]:
+        add(texto, fuente)
     for item in list(filing_items or [])[:3]:
         add(
             f"Filing {item.get('form') or 'formulario no disponible'}, "
@@ -854,6 +859,7 @@ def maybe_deep_narrative(
     filing_items: list[dict] | None = None,
     rag_context: list[dict] | None = None,
     financial_facts: list[FinancialFact] | None = None,
+    ownership_facts: list[tuple[str, str]] | None = None,
 ) -> dict | None:
     """Narrativa extensa redactada por el modelo configurado, o None.
 
@@ -872,6 +878,7 @@ def maybe_deep_narrative(
         list(news_items or []), filing_items, rag_context,
         financial_facts=financial_facts,
         fact_locators=_resolve_fact_locators(db, long_term_model),
+        ownership_facts=ownership_facts,
     )
     if len(facts) < 3:
         # Sin minimo de hechos anclados no hay explicacion honesta que redactar.

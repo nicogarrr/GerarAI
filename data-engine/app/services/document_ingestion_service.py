@@ -1,6 +1,7 @@
 import hashlib
 import os
 import re
+import zipfile
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from html.parser import HTMLParser
@@ -23,6 +24,36 @@ from app.services.public_fetch import fetch_public_url
 
 MAX_DOCUMENT_BYTES = 15 * 1024 * 1024
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".html", ".htm", ".pdf", ".docx", ".xlsx", ".csv", ".tsv"}
+
+# DOCX/XLSX son ZIP: el limite de 15 MB aplica al fichero comprimido, asi que
+# un documento muy comprimible (zip bomb) podia inflarse a gigabytes dentro de
+# python-docx/openpyxl. Se revisan los tamanos declarados en el directorio
+# central antes de parsear (zipfile no descomprime mas alla de file_size).
+MAX_OOXML_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
+MAX_OOXML_ENTRIES = 10_000
+MAX_OOXML_ENTRY_RATIO = 200
+OOXML_RATIO_MIN_ENTRY_BYTES = 1024 * 1024
+
+
+def _guard_ooxml_zip(content: bytes) -> None:
+    """Rechaza DOCX/XLSX cuyo contenido descomprimido es desproporcionado."""
+    try:
+        with zipfile.ZipFile(BytesIO(content)) as archive:
+            entries = archive.infolist()
+    except zipfile.BadZipFile as exc:
+        raise ValueError("El documento no es un DOCX/XLSX valido (ZIP corrupto)") from exc
+    if len(entries) > MAX_OOXML_ENTRIES:
+        raise ValueError("El documento tiene demasiadas entradas internas para ingerirlo")
+    total = 0
+    for entry in entries:
+        total += entry.file_size
+        if total > MAX_OOXML_UNCOMPRESSED_BYTES:
+            raise ValueError("El documento descomprimido supera el limite de ingesta")
+        if (
+            entry.file_size >= OOXML_RATIO_MIN_ENTRY_BYTES
+            and entry.file_size > MAX_OOXML_ENTRY_RATIO * max(entry.compress_size, 1)
+        ):
+            raise ValueError("El documento tiene una compresion anomala (posible zip bomb)")
 
 
 @dataclass
@@ -360,8 +391,10 @@ class DocumentIngestionService:
         if ext == ".pdf":
             return self._parse_pdf(content)
         if ext == ".docx":
+            _guard_ooxml_zip(content)
             return self._parse_docx(content)
         if ext == ".xlsx":
+            _guard_ooxml_zip(content)
             return self._parse_xlsx(content)
         return self._parse_text(content, ext)
 
