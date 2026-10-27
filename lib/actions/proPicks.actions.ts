@@ -14,7 +14,7 @@ import { getLatestFunnelPicks } from '@/lib/actions/propicks-funnel.actions';
 import { withOptionalBudget } from '@/lib/propicks/optional-budget';
 
 /** Selección con tope de rotación (núcleo puro en proPicksStrategies, reexportada aquí para el pipeline). */
-import { selectRebalancedPicks, type RankedCandidate } from '@/lib/utils/proPicksStrategies';
+export { selectRebalancedPicks, type RankedCandidate } from '@/lib/utils/proPicksStrategies';
 
 export interface ConfidenceReason {
   /** Texto mostrado en UI. Siempre incluye `value` para que sea verificable. */
@@ -232,7 +232,7 @@ const SECTOR_NORM_CATEGORIES = ['value', 'growth', 'profitability', 'cashFlow', 
  * alimentan R4 (score = Σ categoría × peso canónico ±1); lo normalizado solo
  * sirve para comparar/ordenar entre sectores sin sesgo de nivel.
  */
-function normalizeSectorCategoryScores(picks: readonly ProPick[]): Map<string, SectorCategoryScores> {
+export function normalizeSectorCategoryScores(picks: readonly ProPick[]): Map<string, SectorCategoryScores> {
   const bySector = new Map<string, ProPick[]>();
   for (const pick of picks) {
     const sector = pick.sector ?? 'Unknown';
@@ -415,7 +415,11 @@ async function evaluateSymbol(symbol: string, strategyId: string): Promise<ProPi
   }
 }
 
-async function evaluateUniverse(strategyId: string): Promise<ProPick[]> {
+// Pipeline viejo por universo fijo: hoy no lo llama ninguna ruta (lo
+// sustituyó el funnel diario, propicks-funnel.actions.ts) pero conserva los
+// contratos de fuente que vigilan los guards (buildConfidence,
+// getStockFinancialDataLight, z-score…), así que queda exportado como API.
+export async function evaluateUniverse(strategyId: string): Promise<ProPick[]> {
   const picks: ProPick[] = [];
   const batchSize = 8;
   for (let index = 0; index < LIQUID_UNIVERSE.length; index += batchSize) {
