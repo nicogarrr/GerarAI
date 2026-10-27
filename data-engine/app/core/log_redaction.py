@@ -33,6 +33,11 @@ _USERINFO_RE = re.compile(r"(?i)(\b[a-z][a-z0-9+.-]*://)[^/\s:@]+:[^/\s@]+@")
 _FEED_TOKEN_RE = re.compile(r"(?i)(/api/calendar/feed/)gfc_[A-Za-z0-9_-]+(\.ics)?")
 _GFC_RE = re.compile(r"\bgfc_[A-Za-z0-9_-]{16,}")
 
+# Telegram embeds bot credentials in URL path segments, including /file/bot.
+# Match the credential shape on any configured API host, not just api.telegram.org.
+_TELEGRAM_TOKEN_RE = re.compile(r"(?i)(/bot)[0-9]+(?::|%3a)[A-Za-z0-9_-]+")
+
+
 REDACTED = "[REDACTED]"
 
 
@@ -45,7 +50,13 @@ def _mask(match: re.Match[str]) -> str:
     return match.group(0) if tail.lower() in _ALREADY else match.group(1) + REDACTED
 
 
+def redact_telegram_tokens(text: str) -> str:
+    """Remove bot path credentials while retaining the endpoint for diagnosis."""
+    return _TELEGRAM_TOKEN_RE.sub(lambda m: m.group(1) + REDACTED, text)
+
+
 def redact(text: str) -> str:
+    text = redact_telegram_tokens(text)
     text = _FEED_TOKEN_RE.sub(lambda m: m.group(1) + REDACTED + (m.group(2) or ""), text)
     text = _GFC_RE.sub(REDACTED, text)
     text = _QUERY_RE.sub(_mask, text)
