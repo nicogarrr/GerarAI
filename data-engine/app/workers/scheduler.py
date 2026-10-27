@@ -51,6 +51,7 @@ from app.workers.dramatiq_app import (
     run_propicks_funnel,
     scan_contradictions,
     scan_insider_watchlist,
+    scan_schedule13dg_watchlist,
     sync_ibkr_flex,
     sync_investor_holdings,
     sync_official_closes,
@@ -359,6 +360,18 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         day_of_week="sun",
         hour=3,
         minute=45,
+    )
+    # SC 13D/13G (titulares >5%): evento raro, una corrida diaria acotada
+    # tras el cierre de EDGAR basta; coste 0 (submissions JSON + presupuesto
+    # de descargas por corrida).
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, scan_schedule13dg_watchlist),
+        "cron",
+        job_id="schedule13dg_watchlist_daily",
+        hour=22,
+        minute=50,
+        jitter=300,
     )
     # Carteras de inversores (13F + Form 4): el 13F es trimestral (plazo de 45
     # dias) y los Form 4 de Trump/Bezos son poco frecuentes; semanal sobra y son

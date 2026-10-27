@@ -538,6 +538,53 @@ class InsiderTransaction(TenantOwnedMixin, Base, TimestampMixin):
     filing: Mapped["InsiderFiling"] = relationship(back_populates="transactions")
 
 
+class Schedule13DGFiling(TenantOwnedMixin, Base, TimestampMixin):
+    """Persisted SC 13D/13G filing (titular >5%), fuente primaria de propiedad.
+
+    One immutable row per accession number (tenant-scoped), igual que
+    ``InsiderFiling``: las enmiendas (…/A) crean su propia fila y nunca
+    sobrescriben el filing que corrigen. Los campos que el parser no pudo
+    leer quedan NULL: la UI muestra N/D, nunca una cifra inventada.
+    """
+
+    __tablename__ = "schedule_13dg_filings"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "accession_number", name="uq_schedule13dg_tenant_accession"
+        ),
+        Index("ix_schedule13dg_issuer", "issuer_cik"),
+        Index("ix_schedule13dg_ticker", "issuer_ticker"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    accession_number: Mapped[str] = mapped_column(String(40))
+    form: Mapped[str] = mapped_column(String(30))
+    is_amendment: Mapped[bool] = mapped_column(Boolean, default=False)
+    issuer_cik: Mapped[str] = mapped_column(String(20))
+    issuer_ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    issuer_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    filer_cik: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    holder_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    aggregate_shares: Mapped[float | None] = mapped_column(Float, nullable=True)
+    percent_of_class: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sole_voting_power: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shared_voting_power: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sole_dispositive_power: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shared_dispositive_power: Mapped[float | None] = mapped_column(Float, nullable=True)
+    holders: Mapped[list] = mapped_column(JSON, default=list)
+    securities_class_title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    snapshot_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    filing_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    report_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    signature_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    index_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    raw_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    parser_version: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20), default="parsed")
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
 class Document(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "documents"
     __table_args__ = (
