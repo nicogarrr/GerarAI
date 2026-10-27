@@ -6,8 +6,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.entities import (Base, Company, MarketPrice, Portfolio,
-                                 PortfolioDailySnapshot, Position)
+from app.models.entities import Base, Company, MarketPrice, Portfolio, PortfolioDailySnapshot, Position
 from app.services.portfolio_intelligence_service import PortfolioIntelligenceService
 
 
