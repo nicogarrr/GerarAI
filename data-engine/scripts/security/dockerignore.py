@@ -14,8 +14,8 @@ el `.dockerignore` de este repo:
     patron `data-engine/.venv/`  excluye ese arbol (la barra final se limpia)
     patron `!README.md` re-incluye tras un `*.md` previo (gana el ultimo que casa)
 
-Lo que este modulo NO intenta replicar: `**` (docker lo soporta; nadie lo usa en
-este repo) y el matiz de `MatchesOrParentMatches` para negaciones posterior al
+Soporta `**/` como cero o mas directorios y `**` como cualquier ruta.
+No intenta replicar el matiz de `MatchesOrParentMatches` para negaciones posterior al
 prune, donde docker no rescata un fichero dentro de un directorio ya excluido y
 este modulo tampoco.
 
@@ -74,7 +74,15 @@ def _glob_to_regex(pattern: str) -> re.Pattern[str]:
     while index < len(pattern):
         char = pattern[index]
         if char == "*":
-            out.append("[^/]*")
+            if index + 1 < len(pattern) and pattern[index + 1] == "*":
+                index += 1
+                if index + 1 < len(pattern) and pattern[index + 1] == "/":
+                    out.append("(?:.*/)?")
+                    index += 1
+                else:
+                    out.append(".*")
+            else:
+                out.append("[^/]*")
         elif char == "?":
             out.append("[^/]")
         elif char == "[":

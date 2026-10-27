@@ -123,3 +123,7 @@ ENV
 *.md
 !README.md
 
+
+# Dependencies at any depth (qa-e2e and nested apps are build contexts too).
+**/node_modules
+**/node_modules/**
