@@ -488,6 +488,24 @@ class DcaSignalItemOut(BaseModel):
     effective_min_level: int
     alerts_on: bool
     state: DcaSignalStateOut | None = None
+    # Por que no hay nivel: never_run | job_failed | skipped (con motivo).
+    evaluation_status: str = "never_run"
+    evaluation_reason: str | None = None
+
+
+class DcaRunOut(BaseModel):
+    status: str  # ok | error | running | interrupted
+    trigger: str  # scheduler | manual
+    started_at: datetime
+    finished_at: datetime | None = None
+    tracked: int
+    evaluated: int
+    skipped: int
+    errors: int
+    alerted: int
+    error: str | None = None
+    skipped_detail: list[dict] = Field(default_factory=list)
+    errors_detail: list[dict] = Field(default_factory=list)
 
 
 class DcaSignalsOut(BaseModel):
@@ -502,6 +520,8 @@ class DcaSignalsOut(BaseModel):
     signal_months: int | None = None
     zones: list[DcaZoneOut]
     items: list[DcaSignalItemOut]
+    # Ultima ejecucion de la evaluacion; null = nunca se ha ejecutado.
+    last_run: DcaRunOut | None = None
 
 
 class DcaMinLevelIn(BaseModel):
@@ -585,6 +605,9 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
         row.symbol.upper(): row
         for row in db.scalars(select(DcaSignalState).where(*tenant_filters(db, DcaSignalState)))
     }
+    from app.services import dca_run_log
+
+    run = dca_run_log.run_payload(dca_run_log.latest_run(db))
     items = []
     for symbol, item in tracked.items():
         override = per_ticker.get(symbol)
@@ -600,6 +623,8 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
             "effective_min_level": effective,
             "alerts_on": bool(settings.dca_alerts_enabled) and effective > 0,
             "state": _dca_state_payload(state) if state is not None else None,
+            "evaluation_status": (ev := dca_run_log.item_evaluation(symbol, state is not None, run))["status"],
+            "evaluation_reason": ev["reason"],
         })
     return {
         "alerts_enabled": bool(settings.dca_alerts_enabled),
@@ -611,6 +636,7 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
         "signal_months": getattr(DEFAULT_PARAMS, "sma_months", None),
         "zones": [{"level": level, **zone} for level, zone in ZONES.items()],
         "items": items,
+        "last_run": run,
     }
 
 
@@ -661,7 +687,21 @@ async def evaluate_dca_signals_now(db: Session = Depends(get_db)) -> dict:
             headers={"Retry-After": str(wait)},
         )
     _dca_last_manual_run[tenant] = now
-    return await run_in_threadpool(evaluate_watchlist, db)
+
+    def _evaluate() -> dict:
+        from app.services import dca_run_log
+
+        run = dca_run_log.start_run(db, "manual")
+        try:
+            summary = evaluate_watchlist(db)
+        except Exception as exc:
+            db.rollback()
+            dca_run_log.finish_run(db, run, error=f"{type(exc).__name__}: {exc}")
+            raise
+        dca_run_log.finish_run(db, run, summary=summary)
+        return summary
+
+    return await run_in_threadpool(_evaluate)
 
 
 @router.get("/dca-signals/{symbol}/hit-rates", response_model=DcaHitRatesOut)

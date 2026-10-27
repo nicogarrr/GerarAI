@@ -1,11 +1,11 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DcaSignalItem } from '@/lib/dca/types';
-import { DCA_STATUS_LABEL, dcaDataAge, dcaPrice, dcaRsi, dcaSignalMetric } from '@/lib/dca/format';
+import { DCA_STATUS_LABEL, dcaDataAge, dcaMissingBadge, dcaPrice, dcaRsi, dcaSignalMetric } from '@/lib/dca/format';
 
 interface DcaLevelBadgeProps {
     item: DcaSignalItem | undefined;
     signalMonths: number | null;
-    /** Sin estado evaluado: compacto no pinta nada, completo dice «Sin evaluar». */
+    /** Sin estado evaluado: compacto no pinta nada, completo dice «Sin evaluar», «Omitido» o «Evaluación fallida». */
     compact?: boolean;
 }
 
@@ -14,9 +14,16 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
     const state = item?.state ?? null;
     if (!state) {
         if (compact) return null;
+        const missing = dcaMissingBadge(item);
+        const tone =
+            missing.tone === 'error'
+                ? 'border-red-800 text-red-300'
+                : missing.tone === 'warn'
+                  ? 'border-amber-800 text-amber-300'
+                  : 'border-gray-700 text-gray-500';
         return (
-            <span className="inline-flex items-center rounded-full border border-gray-700 px-2 py-0.5 text-[11px] text-gray-500" title="Todavía no hay veredicto: se evalúa tras el cierre (L-V) o con «Evaluar ahora».">
-                Sin evaluar
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${tone}`} title={missing.title} data-testid="dca-missing-badge">
+                {missing.text}
             </span>
         );
     }

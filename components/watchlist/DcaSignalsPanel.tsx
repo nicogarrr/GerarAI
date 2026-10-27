@@ -3,6 +3,7 @@ import DcaEvaluateButton from '@/components/watchlist/DcaEvaluateButton';
 import DcaHitRatesPopover from '@/components/watchlist/DcaHitRatesPopover';
 import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
 import DcaMinLevelSelect from '@/components/watchlist/DcaMinLevelSelect';
+import { dcaRunSummary } from '@/lib/dca/format';
 import type { DcaSignalsResponse } from '@/lib/dca/types';
 
 interface DcaSignalsPanelProps {
@@ -21,6 +22,8 @@ export default function DcaSignalsPanel({ data, unavailable }: DcaSignalsPanelPr
             </Card>
         );
     }
+    const runSummary = dcaRunSummary(data.last_run);
+    const runTone = { ok: 'text-emerald-400', warn: 'text-amber-300', error: 'text-red-300', neutral: 'text-gray-400' }[runSummary.tone];
     const channels = data.channels.map((channel) => (channel === 'in_app' ? 'app' : channel === 'email' ? 'correo' : channel));
     return (
         <section aria-labelledby="dca-signals-title" className="space-y-3" data-testid="dca-signals">
@@ -33,6 +36,9 @@ export default function DcaSignalsPanel({ data, unavailable }: DcaSignalsPanelPr
                         {data.channels.includes('email') && !data.email_configured ? ' (correo sin configurar)' : ''}
                         {data.alerts_enabled ? '' : ' · avisos desactivados'}
                     </p>
+                    {data.last_run !== undefined ? (
+                        <p className={`text-xs ${runTone}`} data-testid="dca-last-run" role="status">{runSummary.text}</p>
+                    ) : null}
                 </div>
                 <DcaEvaluateButton />
             </div>

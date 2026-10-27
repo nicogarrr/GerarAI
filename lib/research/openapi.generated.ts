@@ -5604,6 +5604,40 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** DcaRunOut */
+        DcaRunOut: {
+            /** Alerted */
+            alerted: number;
+            /** Error */
+            error?: string | null;
+            /** Errors */
+            errors: number;
+            /** Errors Detail */
+            errors_detail?: {
+                [key: string]: unknown;
+            }[];
+            /** Evaluated */
+            evaluated: number;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Skipped */
+            skipped: number;
+            /** Skipped Detail */
+            skipped_detail?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Status */
+            status: string;
+            /** Tracked */
+            tracked: number;
+            /** Trigger */
+            trigger: string;
+        };
         /** IBKRConnectRequest */
         IBKRConnectRequest: {
             /** Account Id */
@@ -6699,6 +6733,13 @@ export interface components {
             company_name?: string | null;
             /** Effective Min Level */
             effective_min_level: number;
+            /** Evaluation Reason */
+            evaluation_reason?: string | null;
+            /**
+             * Evaluation Status
+             * @default never_run
+             */
+            evaluation_status: string;
             /** In Portfolio */
             in_portfolio: boolean;
             /** In Watchlist */
@@ -6781,6 +6822,7 @@ export interface components {
             global_min_level: number;
             /** Items */
             items: components["schemas"]["DcaSignalItemOut"][];
+            last_run?: components["schemas"]["DcaRunOut"] | null;
             /** Signal Months */
             signal_months?: number | null;
             /** Trims Enabled */
