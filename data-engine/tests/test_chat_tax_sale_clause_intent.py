@@ -9,10 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import Base, Company, Position, Transaction
 from app.services.chat_service import ChatService
-from app.services.sale_hypothetical import parse_purchase_lots
+from app.services.sale_hypothetical import parse_purchase_lots, simulate_hypothetical_sale
 from app.services.tax_sale_intent import sale_intent_issue
 
-CASE = "Compré 10 a 10 el 1 ene 2026 y vendí 4 a 12 el 1 mar 2026, ¿qué IRPF si vendo 6 a 5 euros?"
+CASE = "Compré 10 acciones a 10 euros el 1 de enero de 2026 y vendí 4 a 12 euros el 1 de marzo de 2026, ¿qué IRPF si vendo 6 a 5 euros?"
 
 
 class NoLLM:
@@ -91,3 +91,13 @@ def test_historical_and_multiple_sale_clauses_clarify(question):
 ])
 def test_one_sale_and_purchase_history_are_not_rejected(question):
     assert sale_intent_issue(question) is None
+
+
+def test_simulation_helper_also_returns_no_amount_for_historical_sale(db):
+    result = simulate_hypothetical_sale(db, lots=parse_purchase_lots(CASE), question=CASE,
+                                        company=None, today=date(2026, 10, 27))
+    assert result.sale_price is None
+    assert result.gain_eur is None
+    assert result.tax_eur is None
+    assert result.quantity == 0
+    assert "venta pasada" in result.missing[0]
