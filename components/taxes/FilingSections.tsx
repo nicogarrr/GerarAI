@@ -9,6 +9,7 @@ import { Landmark, FileDown, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatMoney, NA } from '@/lib/format';
 import { humanizeTaxText } from '@/lib/taxes/humanize-text';
+import { filingSectionKey } from '@/lib/taxes/section-keys';
 
 /**
  * Secciones de declaración de la página Impuestos (Modelo 100 + Modelo 720).
@@ -219,8 +220,8 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
             </div>
             {dt.partial === true && <p className="mt-2 text-xs text-amber-300">N/D en la deducción total: hay pagos que requieren revisión manual.</p>}
             {typeof filing.tme_percent_manual === 'number' && <Row label="TME manual aplicado (%)" value={String(filing.tme_percent_manual)} />}
-            <TmePreviewForm key={year} year={year} onPreview={onPreview} onReset={onReset} />
-            <SaleCasillas key={year} rows={Array.isArray(acciones.rows) ? acciones.rows as DataRecord[] : []} />
+            <TmePreviewForm key={filingSectionKey('tme-preview', year)} year={year} onPreview={onPreview} onReset={onReset} />
+            <SaleCasillas key={filingSectionKey('sale-casillas', year)} rows={Array.isArray(acciones.rows) ? acciones.rows as DataRecord[] : []} />
             <WarningList items={warnings} />
         </Section>
     );

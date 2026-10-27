@@ -14,7 +14,7 @@ import {
   importResearchSource,
 } from '@/lib/actions/research.actions';
 import { formatDate, formatNumber, NA } from '@/lib/format';
-import { firstSearchParam, normalizeSourcesTicker, sourcesHref } from '@/lib/research/sources-inventory';
+import { firstSearchParam, normalizeSourcesQuery, normalizeSourcesScope, normalizeSourcesTicker, normalizeSourcesType, sourcesHref } from '@/lib/research/sources-inventory';
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
 import { auditFixLabel } from '@/lib/audit-status-copy';
 import { sourceDisplay } from '@/lib/research/source-display';
@@ -66,6 +66,14 @@ function sourceTierLabel(value: string): string {
   return SOURCE_TIER_LABELS[value] ?? sourceDisplay(value);
 }
 
+const SOURCE_SCOPE_LABELS = {
+  followed: 'Mi universo',
+  all: 'Todas',
+} as const;
+
+const SOURCE_TYPE_FILTER_OPTIONS = Object.entries(SOURCE_TYPE_LABELS)
+  .filter(([value]) => value !== 'YAHOO_FUNDAMENTALS');
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -74,25 +82,38 @@ export const metadata: Metadata = { title: 'Fuentes' };
 export default async function ResearchSourcesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ ticker?: string | string[]; page?: string | string[] }>;
+  searchParams?: Promise<{
+    ticker?: string | string[];
+    page?: string | string[];
+    scope?: string | string[];
+    source_type?: string | string[];
+    q?: string | string[];
+  }>;
 }) {
   const params = (await searchParams) ?? {};
   // Claves repetidas (?ticker=A&ticker=B) llegan como array: primer valor.
   const ticker = normalizeSourcesTicker(firstSearchParam(params.ticker));
+  const scope = normalizeSourcesScope(firstSearchParam(params.scope));
+  const sourceType = normalizeSourcesType(firstSearchParam(params.source_type));
+  const query = normalizeSourcesQuery(firstSearchParam(params.q));
+  const filters = { scope, sourceType: sourceType || undefined, q: query || undefined };
   const requestedPage = Number(firstSearchParam(params.page)) || 1;
   const requestedPageNumber = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
   let sources: Awaited<ReturnType<typeof getResearchSources>>;
   try {
-    sources = await getResearchSources({ ticker: ticker || undefined, page: requestedPageNumber });
+    sources = await getResearchSources({
+      ticker: ticker || undefined,
+      page: requestedPageNumber,
+      scope,
+      sourceType: sourceType || undefined,
+      q: query || undefined,
+    });
   } catch (error) {
     // Solo la caída reconocida del backend (red o 5xx) degrada a BackendOffline;
     // auth, 4xx y errores de programación siguen al error boundary de la ruta.
     if (isBackendUnavailableError(error)) {
-      const retryParams = new URLSearchParams();
-      if (ticker) retryParams.set('ticker', ticker);
-      if (requestedPageNumber > 1) retryParams.set('page', String(requestedPageNumber));
-      const retryQuery = retryParams.toString();
-      return <BackendOffline feature="La sección de fuentes" retryHref={retryQuery ? `/research/sources?${retryQuery}` : '/research/sources'} />;
+      const retryHref = sourcesHref(ticker, requestedPageNumber, filters);
+      return <BackendOffline feature="La sección de fuentes" retryHref={retryHref} />;
     }
     throw error;
   }
@@ -116,6 +137,7 @@ export default async function ResearchSourcesPage({
               : `${formatNumber(documentsTotal, { maximumFractionDigits: 0 })} documentos`
             : `${formatNumber(documents.length, { maximumFractionDigits: 0 })} documentos en esta página`}{' '}
           · {formatNumber(audits.length, { maximumFractionDigits: 0 })} auditorías{ticker ? ' (global)' : ''}
+          {' '}· {SOURCE_SCOPE_LABELS[scope]}
         </div>
       </header>
 
@@ -124,26 +146,63 @@ export default async function ResearchSourcesPage({
           <FileText aria-hidden="true" className="h-5 w-5 text-teal-300" />
           <h2 className="text-lg font-semibold text-gray-100">Documentos</h2>
         </div>
-        <form action="/research/sources" className="mb-4 flex flex-wrap items-center gap-2" method="get">
-          <label className="sr-only" htmlFor="sources-ticker">
+        <form action="/research/sources" className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[220px_170px_220px_minmax(200px,1fr)_auto] xl:items-end" method="get">
+          <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-ticker">
             Filtrar por ticker
+            <TickerSearchInput
+              className="min-w-0 border-gray-800 bg-black/30 text-gray-200"
+              defaultValue={ticker}
+              id="sources-ticker"
+              name="ticker"
+              placeholder="Filtrar por ticker (p. ej. AAPL)"
+            />
           </label>
-          <TickerSearchInput
-            className="min-w-0 flex-1 border-gray-800 bg-black/30 text-gray-200 sm:max-w-xs sm:flex-none"
-            defaultValue={ticker}
-            id="sources-ticker"
-            name="ticker"
-            placeholder="Filtrar por ticker (p. ej. AAPL)"
-            
-          />
-          <Button size="sm" type="submit" variant="outline">
-            Filtrar
-          </Button>
-          {ticker ? (
-            <Link className="text-sm text-teal-300 hover:text-teal-200" href="/research/sources">
-              Quitar filtro
-            </Link>
-          ) : null}
+          <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-scope">
+            Alcance
+            <select
+              className="h-10 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
+              defaultValue={scope}
+              id="sources-scope"
+              name="scope"
+            >
+              <option value="followed">Mi universo</option>
+              <option value="all">Todas</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-source-type">
+            Tipo de fuente
+            <select
+              className="h-10 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
+              defaultValue={sourceType}
+              id="sources-source-type"
+              name="source_type"
+            >
+              <option value="">Todos los tipos</option>
+              {SOURCE_TYPE_FILTER_OPTIONS.map(([value, text]) => (
+                <option key={value} value={value}>{text}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-q">
+            Buscar
+            <Input
+              className="h-10 border-gray-800 bg-black/30 text-gray-200"
+              defaultValue={query}
+              id="sources-q"
+              name="q"
+              placeholder="Título o texto del documento"
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-3 sm:col-span-2 xl:col-span-1 xl:pb-0.5">
+            <Button size="sm" type="submit" variant="outline">
+              Filtrar
+            </Button>
+            {ticker || sourceType || query || scope === 'all' ? (
+              <Link className="text-sm text-teal-300 hover:text-teal-200" href={sourcesHref('', 1)}>
+                Limpiar filtros
+              </Link>
+            ) : null}
+          </div>
         </form>
         {documentsTotal !== null && (pageInfo?.pages ?? 1) > 1 ? (
           <p className="mb-4 text-sm text-gray-500">
@@ -193,18 +252,39 @@ export default async function ResearchSourcesPage({
                     {ticker ? (
                       <p>
                         Sin documentos de {ticker}.{' '}
-                        <Link className="text-teal-300 hover:text-teal-200" href="/research/sources">
-                          Quitar el filtro
-                        </Link>{' '}
-                        para ver el inventario completo.
+                        <Link className="text-teal-300 hover:text-teal-200" href={sourcesHref('', 1, filters)}>
+                          Quitar el filtro de ticker
+                        </Link>
+                      </p>
+                    ) : scope === 'followed' ? (
+                      <p>Sin documentos en tu universo.</p>
+                    ) : (
+                      <p>Sin documentos importados.</p>
+                    )}
+                    {scope === 'followed' ? (
+                      <div className="mx-auto mt-3 max-w-xl">
+                        <p className="text-xs text-gray-500">
+                          Esto no significa que no haya fuentes: tu universo puede no tener documentos con estos filtros.
+                          Cambia el alcance a «Todas» para ver el inventario completo.
+                        </p>
+                        <Link
+                          className="mt-3 inline-flex items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200"
+                          href={sourcesHref(ticker, 1, { scope: 'all', sourceType: sourceType || undefined, q: query || undefined })}
+                        >
+                          Ver todas las fuentes
+                        </Link>
+                      </div>
+                    ) : sourceType || query ? (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Prueba a quitar el tipo de fuente o la búsqueda, o{' '}
+                        <Link className="text-teal-300 hover:text-teal-200" href={sourcesHref(ticker, 1, { scope })}>
+                          limpiar los filtros
+                        </Link>.
                       </p>
                     ) : (
-                      <>
-                        <p>Sin documentos importados.</p>
-                        <span className="mt-2 block text-xs text-gray-500">
-                          Usa los formularios de arriba para subir tu primer documento o ingerir una URL.
-                        </span>
-                      </>
+                      <span className="mt-2 block text-xs text-gray-500">
+                        Usa los formularios de arriba para subir tu primer documento o ingerir una URL.
+                      </span>
                     )}
                   </td>
                 </tr>
@@ -217,7 +297,7 @@ export default async function ResearchSourcesPage({
             {pageInfo.page > 1 ? (
               <Link
                 className="rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700"
-                href={sourcesHref(ticker, pageInfo.page - 1)}
+                href={sourcesHref(ticker, pageInfo.page - 1, filters)}
               >
                 Anterior
               </Link>
@@ -229,7 +309,7 @@ export default async function ResearchSourcesPage({
             {pageInfo.page < pageInfo.pages ? (
               <Link
                 className="rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700"
-                href={sourcesHref(ticker, pageInfo.page + 1)}
+                href={sourcesHref(ticker, pageInfo.page + 1, filters)}
               >
                 Siguiente
               </Link>

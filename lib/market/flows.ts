@@ -65,6 +65,19 @@ export type MoneyFlow = {
 export type MoneyFlowThemeSummary = { id: string; name: string; tagline: string };
 
 /**
+ * Clave de lista para proveedores. El mismo ticker puede aparecer varias
+ * veces (RTX/LMT como proveedores duplicados): no basta ticker ni nombre;
+ * el índice desempata sin ocultar el duplicado.
+ */
+export function flowSupplierKey(
+  supplier: Pick<FlowSupplier, 'ticker' | 'name'>,
+  index: number,
+): string {
+  const ticker = supplier.ticker?.trim().toUpperCase() || 'sin-ticker';
+  return `${ticker}::${supplier.name}::${index}`;
+}
+
+/**
  * Importe de un flujo respetando la divisa de la fila (regla de Nico):
  * USD siempre en-US con $ delante → «$35.7B»; otras divisas en es-ES con el
  * código explícito (nunca se asume USD cuando la fila dice otra cosa).

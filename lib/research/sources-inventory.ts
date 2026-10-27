@@ -7,6 +7,35 @@
 
 export const SOURCES_PAGE_SIZE = 50;
 
+/** Alcance del inventario: el universo seguido por el usuario o todo. */
+export type SourcesScope = 'followed' | 'all';
+
+export const DEFAULT_SOURCES_SCOPE: SourcesScope = 'followed';
+
+export type SourcesFilters = {
+    scope?: SourcesScope;
+    sourceType?: string;
+    q?: string;
+};
+
+/**
+ * Normaliza el alcance desde searchParams. Cualquier valor ausente o no
+ * reconocido cae en «Mi universo»: el inventario global no es el defecto.
+ */
+export function normalizeSourcesScope(raw: string): SourcesScope {
+    return raw.trim().toLowerCase() === 'all' ? 'all' : DEFAULT_SOURCES_SCOPE;
+}
+
+/** source_type es un id interno del backend: se limpia, no se traduce. */
+export function normalizeSourcesType(raw: string): string {
+    return raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 80);
+}
+
+/** Texto de búsqueda acotado para no construir URLs desmesuradas. */
+export function normalizeSourcesQuery(raw: string): string {
+    return raw.replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+
 export type SourcesPageInfo = {
     /** Página efectiva, 1-based y acotada entre 1 y `pages`. */
     page: number;
@@ -26,11 +55,19 @@ export function sourcesPageInfo(total: number, requestedPage: number, pageSize: 
     return { page, pages, from, to };
 }
 
-/** Enlace del inventario conservando el filtro de ticker. */
-export function sourcesHref(ticker: string, page: number): string {
+/** Enlace del inventario conservando ticker, alcance, tipo y búsqueda. */
+export function sourcesHref(
+    ticker: string,
+    page: number,
+    filters: SourcesFilters = {},
+): string {
     const params = new URLSearchParams();
-    const clean = ticker.trim();
-    if (clean) params.set('ticker', clean.toUpperCase());
+    const clean = normalizeSourcesTicker(ticker);
+    if (clean) params.set('ticker', clean);
+    if (filters.scope) params.set('scope', filters.scope);
+    if (filters.sourceType) params.set('source_type', filters.sourceType);
+    const query = filters.q ? normalizeSourcesQuery(filters.q) : '';
+    if (query) params.set('q', query);
     if (page > 1) params.set('page', String(page));
     const qs = params.toString();
     return qs ? `/research/sources?${qs}` : '/research/sources';

@@ -1,7 +1,7 @@
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
-import { formatFlowAmount, type FlowSource, type MoneyFlow } from '@/lib/market/flows';
+import { flowSupplierKey, formatFlowAmount, type FlowSource, type MoneyFlow } from '@/lib/market/flows';
 import { NA } from '@/lib/format';
 
 type ThemeFlowProps = {
@@ -189,8 +189,8 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
             <p className="mt-1 text-[11px] text-gray-500">{flow.suppliers_note}</p>
           ) : null}
           <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-            {flow.suppliers.map((supplier) => (
-              <li className="rounded-lg border border-gray-800 bg-gray-900/40 p-3" key={supplier.ticker ?? supplier.name}>
+            {flow.suppliers.map((supplier, index) => (
+              <li className="rounded-lg border border-gray-800 bg-gray-900/40 p-3" key={flowSupplierKey(supplier, index)}>
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   {supplier.ticker ? (
                     <Link
