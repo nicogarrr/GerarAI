@@ -52,8 +52,8 @@ export default function PrivacyPage() {
                     </p>
                     <p>
                         No pedimos datos de salud, ideología, religión ni datos biométricos. No
-                        vendemos datos personales ni los usamos para entrenar modelos
-                        compartidos.
+                        vendemos datos personales. El tratamiento que hagan los proveedores de IA
+                        depende de sus condiciones y de la configuración elegida.
                     </p>
                 </section>
 
@@ -78,9 +78,9 @@ export default function PrivacyPage() {
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                         <li>
                             <strong>Modelos de lenguaje</strong>: OpenCode (modelos DeepSeek),
-                            Groq y Google (Gemini), en cadena de reserva según la configuración.
-                            Solo intervienen cuando usas una función con IA y solo reciben los
-                            extractos mínimos necesarios para esa petición.
+                            Groq, Google (Gemini) y OpenRouter, según la configuración de proveedores.
+                            Intervienen en las funciones con IA y reciben el contexto enviado por
+                            esas funciones, que puede incluir datos de investigación y de cartera.
                         </li>
                         <li>
                             <strong>Proveedores de datos de mercado</strong>: Finnhub, Financial
@@ -105,16 +105,14 @@ export default function PrivacyPage() {
                         </li>
                         <li>
                             <strong>Correo saliente</strong>: SMTP para avisos y
-                            restablecimiento de contraseña; en el despliegue actual, Gmail
-                            (Google).
+                            restablecimiento de contraseña, mediante el servidor SMTP configurado.
                         </li>
                     </ul>
                     <p className="mt-2">
                         Regiones y transferencias internacionales: el frontend se ejecuta en la
                         región de Fráncfort (fra1) de Vercel. Los proveedores de modelos de
                         lenguaje y el resto de servicios externos pueden tratar datos fuera de
-                        la Unión Europea; en las funciones con IA solo se envían los extractos
-                        mínimos necesarios para cada petición.
+                        la Unión Europea conforme a sus condiciones.
                     </p>
                 </section>
 
@@ -123,8 +121,10 @@ export default function PrivacyPage() {
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                         <li>
                             Documentos financieros: por defecto 2.555 días (7 años),
-                            configurable con <code>FINANCIAL_DOCUMENT_RETENTION_DAYS</code>. Al
-                            caducar se borran el original, los fragmentos y los vectores, y se
+                            configurable con <code>FINANCIAL_DOCUMENT_RETENTION_DAYS</code>. La purga
+                            requiere activar la tarea de conservación y desactivar el modo de simulación.
+                            Por defecto está apagada y en simulación; esos plazos no garantizan un borrado automático.
+                            Cuando se ejecuta la purga, se borran el original, los fragmentos y los vectores, y se
                             conserva una referencia tombstone sin contenido para que las
                             decisiones históricas sigan siendo auditables.
                         </li>
@@ -139,7 +139,8 @@ export default function PrivacyPage() {
                             expresamente.
                         </li>
                         <li>
-                            Copias de seguridad: se conservan las últimas 8 copias locales y,
+                            Copias de seguridad: el script local permite configurar cuántas conservar
+                            (8 por defecto); no es una garantía de ejecución. Además,
                             cuando está configurada, una copia en Cloudflare R2 cuya caducidad
                             fija la regla de expiración del bucket.
                         </li>
