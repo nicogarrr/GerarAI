@@ -134,19 +134,26 @@ def exposure_from_snapshot(
 ) -> dict[str, Any]:
     """Exposicion renta-variable/caja y concentracion del ultimo snapshot.
 
-    Los pesos se recalculan desde ``market_value_base`` sobre el total para
-    no depender de que la columna ``weight`` este informada.
+    top_1_weight/top_5_weight conservan su contrato sobre NAV neto, con caja.
+    Los nuevos top_*_gross_positions_weight usan la suma de posiciones y
+    permiten comparar concentracion sin confundirla con apalancamiento.
+    No se modifica PositionDailySnapshot.weight ni ningun snapshot persistido.
     """
     total = _safe_float(snapshot.total_value_base) or 0.0
     positions_value = _safe_float(snapshot.positions_value_base) or 0.0
     cash_value = _safe_float(snapshot.cash_value_base) or 0.0
     weights: list[float] = []
+    gross_weights: list[float] = []
     for row in position_rows:
         value = _safe_float(row.market_value_base)
-        if value is None or total <= 0:
+        if value is None:
             continue
-        weights.append(value / total)
+        if total > 0:
+            weights.append(value / total)
+        if positions_value > 0:
+            gross_weights.append(value / positions_value)
     weights.sort(reverse=True)
+    gross_weights.sort(reverse=True)
     equity_weight = positions_value / total if total > 0 else None
     return {
         "snapshot_date": snapshot.snapshot_date.isoformat(),
@@ -157,6 +164,10 @@ def exposure_from_snapshot(
         "n_positions": len(weights),
         "top_1_weight": _safe_float(weights[0]) if weights else None,
         "top_5_weight": _safe_float(sum(weights[:5])) if weights else None,
+        # Additive, explicit denominator. Existing NAV fields stay unchanged.
+        "gross_positions_value_base": _safe_float(snapshot.positions_value_base),
+        "top_1_gross_positions_weight": _safe_float(gross_weights[0]) if gross_weights else None,
+        "top_5_gross_positions_weight": _safe_float(sum(gross_weights[:5])) if gross_weights else None,
     }
 
 
