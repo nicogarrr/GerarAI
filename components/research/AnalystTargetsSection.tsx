@@ -30,7 +30,7 @@ export async function AnalystTargetsSection({ symbol, currency }: { symbol: stri
               : formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return (
         <section aria-labelledby="analyst-targets-title" className="rounded-xl border border-gray-800 bg-surface-1 p-4" data-testid="analyst-targets">
-            <h2 className="text-base font-semibold text-gray-100" id="analyst-targets-title">Precios objetivo de analistas</h2>
+            <h2 className="sr-only text-base font-semibold text-gray-100 md:not-sr-only" id="analyst-targets-title">Precios objetivo de analistas</h2>
             {!data || data.status === 'unavailable' ? (
                 <p className="mt-2 text-sm text-gray-400" role="status">{data?.note ?? 'No se pudieron consultar los precios objetivo ahora. Reintenta en unos minutos.'}</p>
             ) : data.rows.length === 0 && !data.consensus ? (
