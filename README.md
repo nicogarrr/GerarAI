@@ -38,6 +38,8 @@ Real GerarAI UI rendered locally from the current application code, with the exi
 
 ### Mobile
 
+Scrolled to the same synthetic graph, with the fixed header and bottom navigation visible.
+
 <img src="docs/images/gerarai-mobile.png" alt="GerarAI mobile interface: knowledge-graph controls with synthetic demo data" width="320" />
 
 The wordmark above is exported from the existing `GerarAIWordmark` header component with the app stylesheet, without redesigning it.
