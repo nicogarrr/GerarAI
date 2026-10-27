@@ -10,10 +10,17 @@ from pathlib import Path
 import re
 import sys
 from types import SimpleNamespace
-httpx = SimpleNamespace(Client=object, HTTPError=Exception)
+class FakeHTTPError(Exception):
+    pass
+
+httpx = SimpleNamespace(Client=object, HTTPError=FakeHTTPError, Timeout=lambda *args, **kwargs: (args, kwargs))
 
 module = ast.parse(Path('data-engine/app/api/routes/market.py').read_text())
 functions = [node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == '_fetch_yahoo_candles']
+# The production adapter uses this real module constant. Missing globals must
+# fail loudly, never be swallowed by a fake HTTPError=Exception.
+functions += [node for node in module.body if isinstance(node, ast.Assign)
+              and any(isinstance(target, ast.Name) and target.id == '_YAHOO_CANDLES_TIMEOUT' for target in node.targets)]
 # yahoo_chart_symbol vive en el conector compartido (market.py lo importa con
 # alias _yahoo_chart_symbol); se extrae de su modulo real igual que el adapter.
 connector = ast.parse(Path('data-engine/app/services/connectors/yahoo.py').read_text())
