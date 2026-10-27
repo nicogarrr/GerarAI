@@ -32,14 +32,18 @@ describe('bounded page actions', () => {
   expect(String(fetch.mock.calls[0][0])).toContain('/documents/1');
  });
  it('maps the 201st transaction with its currency and does not cache stale pages', async () => {
-  request.mockResolvedValue({ items: [{ id: 201, ticker: 'OLD', action: 'buy', quantity: 1, price: 10, trade_date: '2020-01-01', currency: 'EUR' }], total: 201 });
+  request.mockResolvedValue({ items: [{ id: 201, ticker: 'OLD', action: 'buy', quantity: 1, price: 10, fees: 2.5, trade_date: '2020-01-01', currency: 'EUR' }], total: 201 });
   const page = await getPortfolioTransactionPage('tenant-one', 200);
-  expect(page).toMatchObject({ total: 201, offset: 200, items: [{ _id: '201', currency: 'EUR' }] });
+  expect(page).toMatchObject({ total: 201, offset: 200, items: [{ _id: '201', currency: 'EUR', fees: 2.5 }] });
   expect(request).toHaveBeenCalledWith('/api/portfolio/transactions/page?limit=50&offset=200', { fast: true });
   await getPortfolioTransactionPage('tenant-one', 200); expect(request).toHaveBeenCalledTimes(2);
  });
  it('rejects cross-user reads before requesting a page', async () => {
   await expect(getPortfolioTransactionPage('tenant-two', 200)).rejects.toThrow('Cannot access another user portfolio');
   expect(request).not.toHaveBeenCalled();
+ });
+ it('does not invent zero fees when metadata is absent', async () => {
+  request.mockResolvedValue({ items: [{ id: 201, ticker: 'OLD', action: 'buy', quantity: 1, price: 10, trade_date: '2020-01-01', currency: 'EUR' }], total: 201 });
+  expect((await getPortfolioTransactionPage('tenant-one', 200)).items[0].fees).toBeUndefined();
  });
 });

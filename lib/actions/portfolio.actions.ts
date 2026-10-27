@@ -240,6 +240,7 @@ export async function getPortfolioTransactionPage(userId: string, offset = 0) {
         type: transaction.action,
         quantity: transaction.quantity,
         price: transaction.price,
+        fees: transaction.fees,
         date: transaction.trade_date,
         notes: transaction.notes ?? undefined,
         currency: transaction.currency,
