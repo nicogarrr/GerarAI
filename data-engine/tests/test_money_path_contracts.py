@@ -215,7 +215,9 @@ def _unattributed_dividend(db, portfolio, *, amount, currency="USD", action="div
 def test_tax_report_keeps_cash_with_no_company(db):
     """The INNER JOIN dropped every IBKR dividend from the filing."""
     _portfolio(db)
-    _fx(db, "USD", "EUR", 0.9)
+    # IRPF usa el tipo BCE de la fecha de la operación (máx. 7 días de antigüedad):
+    # el tipo tiene que existir para el 15/03, no solo para el 01/01.
+    _fx(db, "USD", "EUR", 0.9, when=date(2026, 3, 13))
     portfolio = db.query(Portfolio).one()
     _unattributed_dividend(db, portfolio, amount="120.00")
 
@@ -240,7 +242,9 @@ def test_tax_report_labels_unattributed_cash_by_symbol(db):
 
 def test_tax_report_surfaces_withholding_separately(db):
     _portfolio(db)
-    _fx(db, "USD", "EUR", 0.9)
+    # IRPF usa el tipo BCE de la fecha de la operación (máx. 7 días de antigüedad):
+    # el tipo tiene que existir para el 15/03, no solo para el 01/01.
+    _fx(db, "USD", "EUR", 0.9, when=date(2026, 3, 13))
     portfolio = db.query(Portfolio).one()
     _unattributed_dividend(db, portfolio, amount="120.00", action="withholding")
 
