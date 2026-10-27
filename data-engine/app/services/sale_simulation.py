@@ -42,7 +42,8 @@ TAX_CURRENCY = "EUR"
 
 @dataclass
 class ConsumedLot:
-    trade_date: date
+    #: None solo en una venta hipotética con lotes sin fecha (orden dado).
+    trade_date: date | None
     quantity: Decimal
     unit_cost_eur: Decimal | None
     unit_cost_native: Decimal
@@ -145,6 +146,22 @@ def simulate_fifo_sale(
     if sum(lot["qty"] for lot in lots) != Decimal(held_quantity) or quantity > held_quantity:
         return None
 
+    sale = consume_fifo(lots, quantity)
+    window_start = sale_date - WASH_SALE_WINDOW
+    blocking = [lot for lot in lots if lot["qty"] > 0 and lot["date"] >= window_start]
+    sale.blocking_qty = min(quantity, sum((lot["qty"] for lot in blocking), Decimal("0")))
+    sale.blocking_dates = sorted({lot["date"] for lot in blocking})
+    return sale
+
+
+def consume_fifo(lots: deque[dict], quantity: Decimal) -> FifoSale:
+    """Vende ``quantity`` de ``lots`` (ya en orden FIFO) y los deja con el resto.
+
+    Cada lote es un dict con ``qty``, ``unit`` (coste unitario en su divisa),
+    ``unit_eur`` (o None si falta el tipo), ``date`` y ``currency``. Es el
+    mismo núcleo para la posición guardada y para una venta hipotética con
+    los lotes que da el usuario en el chat.
+    """
     sale = FifoSale(quantity=quantity)
     remaining = quantity
     while remaining > 0 and lots:
@@ -155,10 +172,6 @@ def simulate_fifo_sale(
         remaining -= take
         if lot["qty"] == 0:
             lots.popleft()
-    window_start = sale_date - WASH_SALE_WINDOW
-    blocking = [lot for lot in lots if lot["qty"] > 0 and lot["date"] >= window_start]
-    sale.blocking_qty = min(quantity, sum((lot["qty"] for lot in blocking), Decimal("0")))
-    sale.blocking_dates = sorted({lot["date"] for lot in blocking})
     return sale
 
 
