@@ -43,6 +43,9 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
         manualSymbol.length <= SYMBOL_VALIDATION.MAX_LENGTH &&
         SYMBOL_VALIDATION.PATTERN.test(manualSymbol) &&
         !followed.has(manualSymbol);
+    // Prueba real 27/10: escribir un ticker que ya sigues (AAPL) dejaba el
+    // diálogo en blanco, porque la búsqueda oculta los símbolos seguidos.
+    const alreadyFollowed = manualSymbol.length > 0 && followed.has(manualSymbol);
 
     const handleAdd = async (stock: StockWithWatchlistStatus) => {
         if (adding || followed.has(stock.symbol.toUpperCase())) return;
@@ -109,6 +112,11 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
                             Añadir «{manualSymbol}» por su símbolo
                         </Button>
                     </div>
+                ) : null}
+                {alreadyFollowed && !adding ? (
+                    <p role="status" className="text-sm text-gray-400">
+                        Ya sigues «{manualSymbol}»: está en tu watchlist.
+                    </p>
                 ) : null}
                 {adding ? <p role="status" className="text-sm text-gray-400">Añadiendo {adding}…</p> : null}
             </DialogContent>
