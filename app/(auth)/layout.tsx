@@ -6,7 +6,7 @@ import {headers} from "next/headers";
 import {redirect} from "next/navigation";
 import {getAuth} from "@/lib/better-auth/auth";
 import {GerarAIWordmark} from "@/components/GerarAIWordmark";
-import {LineChart, Star} from "lucide-react";
+import {LineChart} from "lucide-react";
 import {productChain, productModules} from "@/lib/config/product";
 
 // Forzar renderizado dinámico porque usa headers() para verificar sesión
@@ -25,12 +25,12 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
     }
     return (
         <main className={`auth-layout ${publicSans.className}`}>
-            <section className="auth-left-section scrollbar-hide-default">
+            <section className="auth-left-section !px-6 sm:!px-8 lg:!px-12 xl:!px-20 scrollbar-hide-default">
                 {/* Tope de ancho: sin el, en pantallas ultrawide (2560px) el
                     formulario se estiraba a ~1150px y las lineas de texto
                     ilegibles. */}
                 <div className="mx-auto flex w-full max-w-md flex-col">
-                    <Link href="/" className="auth-logo flex items-center gap-2">
+                    <Link href="/" className="auth-logo !mb-8 flex items-center gap-2 lg:!mb-12">
                         <GerarAIWordmark />
                     </Link>
 
@@ -54,18 +54,11 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
                     </nav>
                 </div>
             </section>
-            <section className="auth-right-section">
+            <section className="auth-right-section !hidden lg:!flex">
                 <div className="lg:mt-4 lg:mb-16">
                     <blockquote className="auth-blockquote">
                         &ldquo;GerarAI convierte evidencia, memoria y modelos específicos de cada empresa en una tesis que puedes contrastar con la realidad.&rdquo;
                     </blockquote>
-                    <div className="flex items-center justify-end">
-                        <div className="flex items-center gap-0.5">
-                            {[1,2,3,4,5].map((star) => (
-                                <Star aria-hidden="true" className="h-4 w-4 fill-teal-400 text-teal-400" key={star}/>
-                            ))}
-                        </div>
-                    </div>
                 </div>
                 {/* Escala gray del tema, no slate: hasta ahora esta pantalla era
                     la unica con dos grises distintos (slate + gray) a la vez. */}

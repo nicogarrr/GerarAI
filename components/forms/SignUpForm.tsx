@@ -7,7 +7,6 @@ import SelectField from "@/components/forms/SelectField";
 import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from "@/lib/constants";
 import {CountrySelectField} from "@/components/forms/CountrySelectField";
 import FooterLink from "@/components/forms/FooterLink";
-import AuthPitch from "@/components/forms/AuthPitch";
 import {signUpWithEmail} from "@/lib/actions/auth.actions";
 import {emailFieldValidation} from "@/lib/validation/email";
 import AccessRequestForm from "@/components/forms/AccessRequestForm";
@@ -64,12 +63,10 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
 
     return (
         <>
-            <h1 className="form-title">Crea tu cuenta</h1>
-
-            {/* Contexto de producto: qué es GerarAI y qué se obtiene al entrar.
-                El mismo bloque que en el acceso, para que las dos pantallas
-                cuenten lo mismo. */}
-            <AuthPitch className="-mt-8 border-b border-gray-700/50 pb-8" />
+            <h1 className="form-title !mb-3">{signUpOpen ? 'Crea tu cuenta' : 'Pide acceso a GerarAI'}</h1>
+            <p className="mb-7 text-sm leading-6 text-gray-400">
+                {signUpOpen ? 'Tu espacio para analizar empresas y seguir tu cartera.' : 'Déjanos tu email para solicitar una invitación.'}
+            </p>
 
             {/* En producción el alta está cerrada por defecto (`disableSignUp`
                 en `lib/better-auth/auth.ts`, que se abre con
@@ -114,7 +111,10 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
 
             {/* Registro cerrado: el formulario de alta se sustituye por la solicitud de acceso
                 (el servidor rechazaria el alta de todos modos). */}
-            {!signUpOpen ? <AccessRequestForm /> : (
+            {!signUpOpen ? <>
+                <AccessRequestForm />
+                <div className="mt-6"><FooterLink text="¿Ya tienes cuenta?" linkText="Iniciar sesión" href="/sign-in" /></div>
+            </> : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <InputField
                     name="fullName"
@@ -224,7 +224,7 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
                 </div>
 
                 <Button type="submit" disabled={isSubmitting || !signUpOpen} className="brand-btn w-full mt-5">
-                    {isSubmitting ? 'Creando cuenta…' : signUpOpen ? 'Empieza tu viaje inversor' : 'Registro cerrado'}
+                    {isSubmitting ? 'Creando cuenta…' : signUpOpen ? 'Crear cuenta' : 'Registro cerrado'}
                 </Button>
 
                 <FooterLink text="¿Ya tienes cuenta?" linkText="Iniciar sesión" href="/sign-in" />
