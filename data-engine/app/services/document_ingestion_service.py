@@ -1,7 +1,9 @@
 import hashlib
 import os
 import re
+import struct
 import zipfile
+import zlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from html.parser import HTMLParser
@@ -28,7 +30,8 @@ SUPPORTED_EXTENSIONS = {".txt", ".md", ".html", ".htm", ".pdf", ".docx", ".xlsx"
 # DOCX/XLSX son ZIP: el limite de 15 MB aplica al fichero comprimido, asi que
 # un documento muy comprimible (zip bomb) podia inflarse a gigabytes dentro de
 # python-docx/openpyxl. Se revisan los tamanos declarados en el directorio
-# central antes de parsear (zipfile no descomprime mas alla de file_size).
+# central y se comprueba el flujo DEFLATE real con salida acotada antes de
+# pasarlo a python-docx/openpyxl. El directorio central no es de confianza.
 MAX_OOXML_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
 MAX_OOXML_ENTRIES = 10_000
 MAX_OOXML_ENTRY_RATIO = 200
@@ -54,6 +57,48 @@ def _guard_ooxml_zip(content: bytes) -> None:
             and entry.file_size > MAX_OOXML_ENTRY_RATIO * max(entry.compress_size, 1)
         ):
             raise ValueError("El documento tiene una compresion anomala (posible zip bomb)")
+
+
+    # ZipExtFile limita su salida a file_size (dato no fiable del directorio).
+    # Validar el DEFLATE bruto evita que un tamano falsificado oculte expansion.
+    actual_total = 0
+    for entry in entries:
+        if entry.flag_bits & 1:
+            raise ValueError("El documento ZIP cifrado no esta admitido")
+        if entry.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}:
+            raise ValueError("El metodo de compresion del documento no esta admitido")
+        offset = entry.header_offset
+        if offset < 0 or offset + 30 > len(content):
+            raise ValueError("El documento tiene una cabecera ZIP corrupta")
+        header = struct.unpack_from("<4s5H3I2H", content, offset)
+        if header[0] != b"PK\x03\x04" or header[3] != entry.compress_type:
+            raise ValueError("El documento tiene una cabecera ZIP inconsistente")
+        start = offset + 30 + header[-2] + header[-1]
+        end = start + entry.compress_size
+        if end > len(content):
+            raise ValueError("El documento tiene datos ZIP truncados")
+        inflater = zlib.decompressobj(-zlib.MAX_WBITS) if entry.compress_type == zipfile.ZIP_DEFLATED else None
+        size = 0
+        crc = 0
+        try:
+            for pos in range(start, end, 64 * 1024):
+                chunk = content[pos:min(pos + 64 * 1024, end)]
+                while chunk:
+                    remaining = MAX_OOXML_UNCOMPRESSED_BYTES - actual_total
+                    # Maximo 64 KiB de salida por iteracion, aunque el ZIP mienta.
+                    output = inflater.decompress(chunk, min(64 * 1024, remaining + 1)) if inflater else chunk
+                    size += len(output)
+                    actual_total += len(output)
+                    crc = zlib.crc32(output, crc)
+                    if actual_total > MAX_OOXML_UNCOMPRESSED_BYTES:
+                        raise ValueError("El documento descomprimido supera el limite real de ingesta")
+                    chunk = inflater.unconsumed_tail if inflater else b""
+            if inflater and (not inflater.eof or inflater.unused_data):
+                raise ValueError("El documento tiene un flujo ZIP incompleto o inconsistente")
+        except zlib.error as exc:
+            raise ValueError("El documento contiene un flujo ZIP corrupto") from exc
+        if size != entry.file_size or crc != entry.CRC:
+            raise ValueError("El documento tiene tamanos o CRC ZIP inconsistentes")
 
 
 @dataclass

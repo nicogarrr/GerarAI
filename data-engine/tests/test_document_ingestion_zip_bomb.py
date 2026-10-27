@@ -72,3 +72,45 @@ def test_real_docx_and_xlsx_still_parse():
     xlsx_parsed = DocumentIngestionService()._parse_native(_real_xlsx(), ".xlsx")
     assert xlsx_parsed.parser == "openpyxl"
     assert "revenue_growth" in xlsx_parsed.blocks[0].text
+
+
+def _forge_central_size(payload: bytes, size: int) -> bytes:
+    import struct
+
+    result = bytearray(payload)
+    offset = result.index(b"PK\x01\x02")
+    struct.pack_into("<I", result, offset + 24, size)
+    return bytes(result)
+
+
+def test_forged_directory_size_cannot_hide_real_expansion(monkeypatch):
+    # Acotado: 256 KiB reales, limite 128 KiB; no agota memoria.
+    payload = _forge_central_size(_zip({"word/document.xml": b"x" * (256 * 1024)}), 1)
+    monkeypatch.setattr(ingestion, "MAX_OOXML_UNCOMPRESSED_BYTES", 128 * 1024)
+    monkeypatch.setattr(
+        DocumentIngestionService, "_parse_docx",
+        lambda *args: pytest.fail("el parser no debe recibir un ZIP que excede el limite"),
+    )
+    with pytest.raises(ValueError, match="limite real"):
+        DocumentIngestionService()._parse_native(payload, ".docx")
+
+
+def test_small_forged_size_is_rejected_even_below_real_limit():
+    payload = _forge_central_size(_zip({"word/document.xml": b"abc" * 100}), 1)
+    with pytest.raises(ValueError, match="inconsistentes"):
+        _guard_ooxml_zip(payload)
+
+
+def test_multiple_forged_entries_are_rejected_before_parser(monkeypatch):
+    import struct
+
+    payload = bytearray(_zip({"a.xml": b"x" * 80_000, "b.xml": b"y" * 80_000}))
+    pos = 0
+    for _ in range(2):
+        pos = payload.index(b"PK\x01\x02", pos)
+        struct.pack_into("<I", payload, pos + 24, 1)
+        pos += 4
+    monkeypatch.setattr(ingestion, "MAX_OOXML_UNCOMPRESSED_BYTES", 128_000)
+    # Primera entrada se rechaza por discordancia antes de llegar al parser.
+    with pytest.raises(ValueError, match="inconsistentes|limite real"):
+        _guard_ooxml_zip(bytes(payload))
