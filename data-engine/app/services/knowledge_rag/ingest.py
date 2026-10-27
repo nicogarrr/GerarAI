@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.knowledge_rag import (
@@ -120,7 +121,20 @@ def register_source(
         warnings=[],
     )
     db.add(source)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Subida concurrente del mismo fichero: la otra transaccion gano el unique
+        # (tenant, sha256). Es un duplicado, no un error.
+        db.rollback()
+        winner = db.scalar(
+            select(KnowledgeRagSource).where(
+                KnowledgeRagSource.sha256 == sha, KnowledgeRagSource.tenant_id == tenant_id
+            )
+        )
+        if winner is None:
+            raise
+        return RegisterResult(winner, False)
     db.refresh(source)
     return RegisterResult(source, True)
 

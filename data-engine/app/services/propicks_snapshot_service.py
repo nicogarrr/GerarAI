@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Company, MarketPrice
@@ -64,6 +65,14 @@ def freeze_monthly_snapshot(db: Session, *, now: datetime | None = None) -> Prop
         payload={"params": stats["params"], "picks": picks},
     )
     db.add(row)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Otro proceso congelo el mes a la vez: gana el primero y no se sobrescribe.
+        db.rollback()
+        winner = db.scalar(select(PropickSnapshot).where(PropickSnapshot.month == month))
+        if winner is None:
+            raise
+        return winner
     db.refresh(row)
     return row
