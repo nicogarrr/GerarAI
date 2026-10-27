@@ -114,6 +114,25 @@ def build_inputs_provenance(long_term_model: dict[str, Any]) -> list[dict[str, A
             )
         )
     for driver in long_term_model.get("driver_model") or []:
+        if isinstance(driver, dict) and driver.get("status") == "derived":
+            # Identidad contable con hechos reportados del mismo ejercicio
+            # (p. ej. NOI de un REIT): se etiqueta «derivado» con su formula.
+            derivation = driver.get("derivation") or {}
+            trace = driver.get("trace") or {}
+            items.append(
+                _item(
+                    str(driver.get("key")),
+                    LABEL_DERIVADO,
+                    driver.get("value"),
+                    driver.get("unit"),
+                    f"derivado: {derivation.get('formula')} (FY{derivation.get('fiscal_year')})",
+                    list(driver.get("source_fact_ids") or []),
+                    driver.get("confidence"),
+                    "derived",
+                    trace.get("period"),
+                )
+            )
+            continue
         if not isinstance(driver, dict) or driver.get("status") != "sourced":
             continue
         trace = driver.get("trace") or {}
