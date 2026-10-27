@@ -1,7 +1,7 @@
 """HistoricalValuationService contract tests.
 
 Historical multiples are only meaningful point-in-time: future data must
-raise, missing inputs must stay visibly missing, and every multiple must
+stay out of the series, missing inputs must stay visibly missing, and every multiple must
 be traceable to the stored rows that produced it.
 """
 
@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import Base, Company, FinancialFact, MarketPrice
 from app.services.historical_valuation_service import HistoricalValuationService
-from app.valuation.point_in_time import LookaheadError
 
 
 @pytest.fixture
@@ -79,7 +78,7 @@ def test_series_math_and_source_ids(db):
     assert result["statistics"]["pe"]["median"] == pytest.approx(Decimal("20"))
 
 
-def test_future_data_raises_lookahead_error(db):
+def test_future_data_is_excluded_not_raised(db):
     company = _company(db)
     db.add(
         MarketPrice(
@@ -89,8 +88,11 @@ def test_future_data_raises_lookahead_error(db):
         )
     )
     db.commit()
-    with pytest.raises(LookaheadError):
-        HistoricalValuationService().build(db, company, as_of=date(2026, 9, 23))
+    _fact(db, company, metric="eps", fiscal_year=2027, value="1")
+    # Revision GerarAI A2: un replay filtra lo posterior a as_of en vez de
+    # abortar; ni el precio de dic-2026 ni el FY2027 entran en la serie.
+    result = HistoricalValuationService().build(db, company, as_of=date(2026, 9, 23))
+    assert result["series"] == []
 
 
 def test_missing_inputs_stay_none_and_are_reported(db):
