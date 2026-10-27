@@ -2644,26 +2644,24 @@ class ProPickCandidate(TenantOwnedMixin, Base, TimestampMixin):
     run: Mapped["ProPickRun"] = relationship(back_populates="candidates")
 
 
-class InferredInput(Base, TimestampMixin):
+class InferredInput(TenantOwnedMixin, Base, TimestampMixin):
     """Input INFERIDO: estimacion con base explicita y URLs web.
 
     Nunca es un fact ni un dato oficial. El motor solo lo usa si trae base y al
     menos una URL https; lo validan el servicio y el motor.
 
-    Dato de EMPRESA, no del usuario: es global por empresa y lo ve cualquier
-    sesion/tenant (decision de producto, app mono-usuario con tenants por
-    sesion). Por eso NO usa TenantOwnedMixin ni el filtro de tenant.
-    `tenant_id` queda solo como autoria informativa (quien lo creo), nunca como
-    filtro. Las opiniones del usuario NO van aqui y siguen aisladas por tenant.
+    Estimacion privada del tenant creador. Una empresa sigue siendo global,
+    pero sus inferencias no se comparten. Filas legacy sin autor se conservan
+    para recuperacion auditada y no son visibles en sesiones normales.
     """
 
     __tablename__ = "inferred_inputs"
-    __table_args__ = (Index("ix_inferred_inputs_company_key", "company_id", "input_key"),)
+    __table_args__ = (
+        Index("ix_inferred_inputs_company_key", "company_id", "input_key"),
+        Index("ix_inferred_inputs_tenant_company_key", "tenant_id", "company_id", "input_key"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    tenant_id: Mapped[int | None] = mapped_column(
-        ForeignKey("tenants.id"), nullable=True, index=True
-    )
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     input_key: Mapped[str] = mapped_column(String(80))
     value: Mapped[Decimal] = mapped_column(Numeric(24, 8))

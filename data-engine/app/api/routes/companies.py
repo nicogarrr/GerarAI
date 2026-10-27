@@ -676,9 +676,12 @@ def list_inferred_inputs(ticker: str, db: Session = Depends(get_db)) -> list[dic
     company = resolve_company(db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id is None:
+        return []
     rows = db.scalars(
         select(InferredInput)
-        .where(InferredInput.company_id == company.id)
+        .where(InferredInput.tenant_id == tenant_id, InferredInput.company_id == company.id)
         .order_by(desc(InferredInput.id))
         .limit(50)
     ).all()
@@ -695,7 +698,7 @@ def create_inferred_input(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     company_id = company.id
-    db.commit()  # Close reads before acquiring the global company-pair write lock.
+    db.commit()  # Close reads before acquiring the tenant/company-pair write lock.
     try:
         row = InferredInputService().create_guarded(
             db,

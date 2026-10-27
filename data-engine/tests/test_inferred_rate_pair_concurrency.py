@@ -1,4 +1,4 @@
-"""Global company rates must serialize even when writers belong to different tenants."""
+"""Rates serialize within a tenant; other tenants cannot invalidate a rate pair."""
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -26,8 +26,9 @@ BASE_TEXT = "Dado el documento publicado inferimos esta tasa anual de capital."
 URLS = ["https://www.sec.gov/Archives/10k.htm"]
 
 
+@pytest.mark.parametrize("same_tenant", [True, False])
 @pytest.mark.parametrize("paths", [("llm", "llm"), ("manual", "manual"), ("llm", "manual"), ("manual", "llm")])
-def test_cross_tenant_concurrent_wacc_and_growth_reject_one_writer(tmp_path, monkeypatch, paths):
+def test_concurrent_rate_pairs_are_private_and_coherent(tmp_path, monkeypatch, paths, same_tenant):
     engine = create_engine(f"sqlite:///{tmp_path / 'rates.db'}", connect_args={"timeout": 10})
     Base.metadata.create_all(engine)
     with Session(engine) as db:
@@ -42,7 +43,9 @@ def test_cross_tenant_concurrent_wacc_and_growth_reject_one_writer(tmp_path, mon
     original = InferredInputService.create_guarded
 
     def synchronized_create(self, db, company_id, **kwargs):
-        ready.wait(timeout=10)
+        # Same-tenant LLM writes already serialize on the quota lock.
+        if not (same_tenant and paths == ("llm", "llm")):
+            ready.wait(timeout=10)
         return original(self, db, company_id, **kwargs)
 
     monkeypatch.setattr(InferredInputService, "create_guarded", synchronized_create)
@@ -72,11 +75,14 @@ def test_cross_tenant_concurrent_wacc_and_growth_reject_one_writer(tmp_path, mon
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
             futures = [pool.submit(write, 1, "wacc", Decimal("0.055"), paths[0]),
-                       pool.submit(write, 2, "terminal_growth", Decimal("0.05"), paths[1])]
+                       pool.submit(write, 1 if same_tenant else 2, "terminal_growth", Decimal("0.05"), paths[1])]
             statuses = [future.result(timeout=20) for future in futures]
-        assert sorted(statuses) == [201, 422]
+        assert sorted(statuses) == ([201, 422] if same_tenant else [201, 201])
         with Session(engine) as db:
-            rows = db.scalars(select(InferredInput)).all()
+            rows = db.scalars(select(InferredInput).execution_options(include_all_tenants=True)).all()
+            if not same_tenant:
+                assert len(rows) == 2 and {row.tenant_id for row in rows} == {1, 2}
+                return
             assert len(rows) == 1
             wacc = float(rows[0].value) if rows[0].input_key == "wacc" else 0.10
             terminal = float(rows[0].value) if rows[0].input_key == "terminal_growth" else 0.03
