@@ -20,6 +20,7 @@ from app.models.entities import (
     Base,
     Company,
     DecisionJournalEntry,
+    FundamentalModelVersion,
     InvestmentPlan,
     MarketPrice,
     Portfolio,
@@ -153,6 +154,14 @@ def seeded_session() -> Session:
             thesis_markdown="#", executive_summary="Resumen", rating="buy",
             expected_value=Decimal(expected), hypothesis=f"Tesis de {ticker}",
             invalidation_criteria=criteria, created_at=NOW, updated_at=NOW,
+        ))
+        # Tesis publicada: su valor justo solo cuenta con un modelo publicable
+        # vigente del mismo tenant (puerta de publicación, fail-closed).
+        db.add(FundamentalModelVersion(
+            tenant_id=1, company_id=companies[ticker].id, version=1, engine_version="test",
+            algorithm_version="test", framework_key="dcf", horizon_years=10, status="ok",
+            publishable=True, input_fingerprint=f"cerebro-{ticker}", forecast_fingerprint="forecast",
+            market_snapshot_fingerprint="market", valuation_snapshot_fingerprint="valuation",
         ))
     db.add(ResearchAlert(
         tenant_id=1, company_id=companies["ONDS"].id, severity="high", status="open",
