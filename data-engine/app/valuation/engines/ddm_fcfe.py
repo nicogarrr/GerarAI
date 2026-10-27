@@ -723,7 +723,7 @@ class DividendDiscountEngine(_EquityMethodEngine):
 class FreeCashFlowToEquityEngine(_EquityMethodEngine):
     """Free cash flow to equity: the discounted stream IS the equity value.
 
-    ``FCFE = NI - (1 - b)(capex - D&A) + Δdebt - ΔWC`` projected at ``ke``. The
+    ``FCFE = NI - (capex - D&A) + Δdebt - ΔWC`` projected at ``ke``. The
     engine carries ``total_debt``/``net_debt`` as disclosure only and never
     subtracts them, which is the double count these models usually make; the
     trace proves it by showing the bridge that collapses onto the Gordon price.
@@ -783,7 +783,7 @@ class FreeCashFlowToEquityEngine(_EquityMethodEngine):
                 ),
                 extra_trace={
                     "fcfe_input_contract": {
-                        "formula": "FCFE = NI - (1 - b)(capex - D&A) + delta_total_debt - delta_working_capital",
+                        "formula": "FCFE = NI - (capex - D&A) + delta_total_debt - delta_working_capital",
                         "retention_ratio": "b; or derived as 1 - payout_ratio",
                         "sign_convention": (
                             "capex and depreciation are normalised to outflow/"

@@ -257,3 +257,58 @@ def test_horizon_coverage_mide_ventana_real_no_dos_filas():
     assert full is False
     # Sin filas: 0 y no completa.
     assert service._horizon_coverage([], cutoff, today) == (0.0, False)
+
+
+def test_xirr_withholding_and_fee_negative_amounts_are_outflows(db, monkeypatch):
+    """IBKR Flex trae 'Withholding Tax' y 'Other Fees' con importe NEGATIVO.
+
+    Compra -1.000 (hace 365 dias), dividendo +100 y retencion IBKR -15 (dia 184),
+    valor final 1.000. Flujos correctos: -1.000, +85, +1.000 -> XIRR = 8,866%.
+    Con el signo invertido la retencion sumaba (+115) -> 12,17%.
+    """
+    today = date.today()
+
+    class _FixedDate(date):
+        @classmethod
+        def today(cls):
+            return today
+
+    import app.services.portfolio_intelligence_service as pi_module
+
+    monkeypatch.setattr(pi_module, "date", _FixedDate)
+    company = _company(db)
+    service = PortfolioIntelligenceService()
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    portfolio = PortfolioFXService().ensure_portfolio(db)
+    start = today - timedelta(days=365)
+    mid = start + timedelta(days=184)
+    db.add_all([
+        Transaction(
+            portfolio_id=portfolio.id, company_id=company.id, trade_date=start,
+            action="buy", quantity=Decimal("10"), price=Decimal("100"),
+            currency="EUR", external_id="xirr-wht-buy",
+        ),
+        Transaction(
+            portfolio_id=portfolio.id, company_id=company.id, trade_date=mid,
+            action="dividend", quantity=Decimal("1"), price=Decimal("100"),
+            currency="EUR", external_id="xirr-wht-div",
+        ),
+        Transaction(
+            portfolio_id=portfolio.id, company_id=company.id, trade_date=mid,
+            action="withholding", quantity=Decimal("1"), price=Decimal("-15"),
+            currency="EUR", external_id="xirr-wht-tax",
+        ),
+    ])
+    position = Position(
+        portfolio_id=portfolio.id, company_id=company.id,
+        quantity=Decimal("10"), market_price=Decimal("100"),
+        market_value_base=Decimal("1000"), currency="EUR", as_of=today,
+    )
+    db.add(position)
+    db.commit()
+
+    xirr, meta = service._xirr(db, [(position, company)])
+    assert meta["status"] == "calculated"
+    # -1000 + 85/(1+r)^(184/365) + 1000/(1+r) = 0  ->  r = 0,088657
+    assert xirr == pytest.approx(0.088657, abs=1e-5)

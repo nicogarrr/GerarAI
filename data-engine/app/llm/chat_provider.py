@@ -422,7 +422,7 @@ def _groq_backup(
     total_timeout_seconds: float = 15,
     max_output_tokens: int = 2400,
 ) -> OpenAICompatibleProvider | None:
-    if not settings.groq_chat_fallback_enabled:
+    if not settings.groq_chat_fallback_active:
         return None
     if not (settings.groq_api_key and settings.groq_free_plan_confirmed and settings.groq_zdr_confirmed):
         raise ValueError("Groq chat requires a verified free plan, ZDR and API key")
@@ -453,7 +453,7 @@ def _gemini_backup(
     total_timeout_seconds: float = 18,
     max_output_tokens: int = 8000,
 ) -> OpenAICompatibleProvider | None:
-    if not settings.gemini_chat_fallback_enabled:
+    if not settings.gemini_chat_fallback_active:
         return None
     if not (settings.gemini_api_key and settings.gemini_free_plan_confirmed):
         raise ValueError("Gemini chat requires a verified free plan (no billing) and API key")
@@ -546,7 +546,7 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
     backup2 = _gemini_backup(settings, client)
     if backup2 is not None:
         backup2.interactive_quota_breaker = True
-    if not settings.groq_chat_fallback_enabled:
+    if not settings.groq_chat_fallback_active:
         if backup2 is None:
             return primary
         return ChatFallbackProvider(

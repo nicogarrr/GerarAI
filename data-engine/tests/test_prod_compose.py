@@ -84,12 +84,14 @@ def test_prod_llm_defaults_match_the_owner_approved_go_model():
         assert env.get("OPENCODE_GO_FALLBACK_MODEL") == "${OPENCODE_GO_FALLBACK_MODEL:-}", service
 
 
-def test_prod_chat_uses_the_go_subscription_and_backups_stay_off():
+def test_prod_chat_uses_the_go_subscription_and_backups_are_auto():
+    # Hallazgo M1: respaldos en modo auto (solo con clave + plan gratuito
+    # confirmado); sin clave siguen apagados. Ver test_llm_degraded_mode.py.
     compose = _load_compose()
     env = _service_env(compose, "backend")
     assert env.get("CHAT_GO_SUBSCRIPTION_ENABLED") == "${CHAT_GO_SUBSCRIPTION_ENABLED:-true}"
-    assert env.get("GROQ_CHAT_FALLBACK_ENABLED") == "${GROQ_CHAT_FALLBACK_ENABLED:-false}"
-    assert env.get("GEMINI_CHAT_FALLBACK_ENABLED") == "${GEMINI_CHAT_FALLBACK_ENABLED:-false}"
+    assert env.get("GROQ_CHAT_FALLBACK_ENABLED") == "${GROQ_CHAT_FALLBACK_ENABLED:-auto}"
+    assert env.get("GEMINI_CHAT_FALLBACK_ENABLED") == "${GEMINI_CHAT_FALLBACK_ENABLED:-auto}"
     assert env.get("OPENROUTER_API_KEY") == "${OPENROUTER_API_KEY:-}"
 
 

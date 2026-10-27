@@ -212,7 +212,7 @@ GerarAI is working when the user can add a company, upload filings/results/lette
 ### Pendiente prioritario (depende de credenciales/decisiones)
 1. IBKR: IBKR_FLEX_TOKEN + IBKR_FLEX_QUERY_ID para el import real de cartera (UI y pipeline listos).
 2. Rotar password de la cuenta de usuario (expuesto en logs de dev) y revocar token Vercel temporal.
-3. Hosting cloud del FastAPI: elegida la opcion Oracle Cloud Always Free (guia en docs/oracle-setup.md); despliegue en curso. render.yaml sigue como alternativa (free tier hiberna).
+3. Hosting cloud del FastAPI: elegida la opcion Oracle Cloud Always Free (guia en docs/oracle-setup.md); despliegue en curso. render.yaml queda como experimental y no soportado en la 1.0 (free tier hiberna y exige Postgres/Redis/Qdrant/MinIO externos para pasar /health/ready).
 4. E2E playwright en CI (specs existentes; ampliar cobertura de finanzas).
 5. Legal/privacidad (privacidad) y backup drills (Postgres + Mongo).
 

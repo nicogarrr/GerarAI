@@ -206,7 +206,16 @@ class DividendIngestionService(ProviderIngestionService):
         value is in another currency and summing the two would mix EUR and USD
         into a meaningless total), so it is excluded and reported in coverage.
         """
-        cutoff = date.today().replace(year=date.today().year - 1)
+        # Ventana TTM = (hoy - 1 año, hoy]: un dividendo ya declarado con
+        # ex_date futuro todavia no forma parte de los ultimos 12 meses (antes
+        # se sumaba y un pagador trimestral salia con 5 pagos: yield +25 %), y
+        # el ex_date de hace exactamente un año tampoco (es el pago que el de
+        # hoy sustituye). Mismo criterio que DividendProjectionService.
+        today = date.today()
+        try:
+            cutoff = today.replace(year=today.year - 1)
+        except ValueError:  # 29 de febrero -> 28 en el año anterior
+            cutoff = today.replace(year=today.year - 1, day=28)
         rows = list(
             db.execute(
                 select(Position, Company).join(Company, Position.company_id == Company.id)
@@ -223,7 +232,8 @@ class DividendIngestionService(ProviderIngestionService):
                 db.scalars(
                     select(DividendRecord).where(
                         DividendRecord.company_id == company.id,
-                        DividendRecord.ex_date >= cutoff,
+                        DividendRecord.ex_date > cutoff,
+                        DividendRecord.ex_date <= today,
                     )
                 ).all()
             )

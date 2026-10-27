@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -14,9 +15,16 @@ export const revalidate = 0;
 
 export default async function SavedScreenResultsPage({ params }: { params: Promise<{ screenId: string }> }) {
   const { screenId } = await params;
+  // Un id que no es un entero positivo (/screeners/abc) o un filtro que no
+  // existe o no es tuyo (/screeners/999999) es un 404 honesto, no la página
+  // genérica de error con «Reintentar» (reintentar nunca lo arregla).
+  const id = /^\d+$/.test(screenId) ? Number(screenId) : Number.NaN;
+  if (!Number.isSafeInteger(id) || id <= 0) notFound();
   const workspace = await getScreenerWorkspace();
-  const name = workspace.screens.find(screen => screen.id === Number(screenId))?.name ?? 'Filtro guardado';
-  const result = await runSavedScreen(Number(screenId));
+  const screen = workspace.screens.find(item => item.id === id);
+  if (!screen) notFound();
+  const name = screen.name || 'Filtro guardado';
+  const result = await runSavedScreen(id);
   const newMatches = new Set(result.new_match_company_ids ?? []);
   // Explicación honesta del 0 coincidencias: si el filtro no coincide por
   // FALTA DE DATO (p.ej. roic >= wacc sin cobertura de wacc), se dice qué

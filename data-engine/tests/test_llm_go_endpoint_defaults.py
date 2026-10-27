@@ -106,6 +106,10 @@ def test_production_does_not_accept_the_go_model_without_the_subscription() -> N
 
 
 def test_groq_and_gemini_stay_off_by_default() -> None:
+    # Modo auto (hallazgo M1): sin clave ni confirmacion de plan gratuito los
+    # respaldos siguen apagados; ver tests/test_llm_degraded_mode.py.
     settings = _settings()
-    assert settings.groq_chat_fallback_enabled is False
-    assert settings.gemini_chat_fallback_enabled is False
+    assert settings.groq_chat_fallback_enabled is None
+    assert settings.gemini_chat_fallback_enabled is None
+    assert settings.groq_chat_fallback_active is False
+    assert settings.gemini_chat_fallback_active is False

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { signInUrlFor } from '@/lib/auth/safe-redirect';
 
 /**
  * Primera línea del gating de sesión.
@@ -34,7 +35,8 @@ export function middleware(request: NextRequest) {
     }
     const hasSessionCookie = SESSION_COOKIES.some((name) => Boolean(request.cookies.get(name)?.value));
     if (!hasSessionCookie) {
-        return NextResponse.redirect(new URL('/sign-in', request.url));
+        // `?next=` conserva la ruta pedida para volver a ella tras el login.
+        return NextResponse.redirect(signInUrlFor(request.url));
     }
     return NextResponse.next();
 }

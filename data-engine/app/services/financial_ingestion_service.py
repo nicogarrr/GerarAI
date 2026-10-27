@@ -935,6 +935,18 @@ def _publication_date(entry: dict[str, Any]) -> date | None:
         return None
 
 
+def _latest_known_filed(*facts: Any) -> date | None:
+    """Fecha de filing de una derivada: la mas tardia de sus entradas.
+
+    Si alguna entrada no tiene ``filed`` no se puede probar cuando fue publica
+    la derivada: NULL (el lector aplica entonces su retraso conservador).
+    """
+    dates = [getattr(fact, "filed", None) for fact in facts]
+    if not dates or any(d is None for d in dates):
+        return None
+    return max(dates)
+
+
 def _period(row: dict[str, Any]) -> tuple[str, int | None, str | None]:
     fiscal_year = row.get("calendarYear") or row.get("fiscalYear")
     fiscal_quarter = row.get("period")
@@ -1477,6 +1489,7 @@ class FinancialIngestionService:
                             is_reported=True,
                             confidence=Decimal("0.9"),
                             accession_number=entry.get("accn"),
+                            filed=_publication_date(entry),
                         )
                     )
                     # Misma proveniencia por periodo que el bucle anual:
@@ -1534,6 +1547,7 @@ class FinancialIngestionService:
                             is_reported=True,
                             confidence=Decimal("0.95"),
                             accession_number=entry.get("accn"),
+                            filed=_publication_date(entry),
                         )
                     )
                     # Record which XBRL concept produced the value. Several
@@ -1613,6 +1627,7 @@ class FinancialIngestionService:
                     is_reported=True,
                     confidence=Decimal("0.95"),
                     accession_number=entry.get("accn"),
+                    filed=_publication_date(entry),
                 )
             )
             concept_usage.setdefault("shares_outstanding", {})[period] = (
@@ -2096,6 +2111,8 @@ class FinancialIngestionService:
                     source_type="SEC",
                     is_reported=False,
                     confidence=Decimal("0.85"),
+                    # Derivada: conocible cuando lo fueron AMBAS entradas.
+                    filed=_latest_known_filed(ocf, capex),
                 )
                 db.add(fcf)
                 derived += 1

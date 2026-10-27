@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -10,10 +10,15 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import Company, FinancialFact, MarketPrice
-from app.valuation.point_in_time import (
-    assert_fiscal_year_no_lookahead,
-    assert_no_lookahead,
-)
+from app.valuation.period_bounds import parse_period_bounds, to_date
+
+# Retraso conservador entre el cierre de un periodo y la publicacion de su
+# filing cuando la fila no trae `filed` (filas previas a la migracion 0082,
+# fuentes no SEC, derivadas sin entradas fechadas). Plazos SEC del 10-K: 60/75/90
+# dias segun tipo de emisor, +15 con prorroga (NT 10-K, Rule 12b-25) = 105 dias
+# como maximo ordinario. 120 dias cubre ese maximo con margen: en la duda la
+# cifra llega tarde a la reconstruccion, nunca antes de ser publica.
+UNFILED_PUBLICATION_LAG_DAYS = 120
 
 
 class HistoricalValuationService:
@@ -32,9 +37,17 @@ class HistoricalValuationService:
     ) -> dict[str, Any]:
         """Build per-year multiples using only data known on or before ``as_of``.
 
-        ``as_of`` defaults to today (previous behaviour). Any stored price or
-        fundamental dated after ``as_of`` raises ``LookaheadError`` instead of
-        silently leaking future information into the series.
+        ``as_of`` defaults to today. Prices dated after ``as_of`` and facts that
+        were not yet public on ``as_of`` are left OUT of the series (they do not
+        raise): a replay of a past date sees what was knowable on that date.
+
+        "Knowable" for a fact (``_known_on``): its filing date ``filed`` when
+        stored; otherwise the period end + ``UNFILED_PUBLICATION_LAG_DAYS``,
+        capped by the date the row was stored (a stored row is public by then).
+        A fact whose period cannot be placed in time is excluded from a past
+        replay. Only the latest (possibly restated) value of each period is
+        stored: when it was filed after ``as_of`` the period is reported as
+        missing, never back-filled with the restated figure.
         """
         as_of = as_of or date.today()
         minimum_year = as_of.year - max(1, min(years, 20)) + 1
@@ -44,6 +57,7 @@ class HistoricalValuationService:
                 .where(
                     MarketPrice.company_id == company.id,
                     MarketPrice.date >= date(minimum_year, 1, 1),
+                    MarketPrice.date <= as_of,
                 )
                 .order_by(MarketPrice.date)
             ).all()
@@ -55,6 +69,7 @@ class HistoricalValuationService:
                     FinancialFact.company_id == company.id,
                     FinancialFact.metric.in_(self.METRICS),
                     FinancialFact.fiscal_year >= minimum_year,
+                    FinancialFact.fiscal_year <= as_of.year,
                 )
                 .order_by(
                     FinancialFact.fiscal_year,
@@ -65,20 +80,22 @@ class HistoricalValuationService:
         )
         annual_prices: dict[int, MarketPrice] = {}
         for row in prices:
-            assert_no_lookahead(
-                as_of=as_of,
-                data_date=row.date,
-                label=f"MarketPrice {company.ticker} {row.date.isoformat()}",
-            )
             annual_prices[row.date.year] = row
         annual_facts: dict[int, dict[str, FinancialFact]] = {}
+        excluded_not_public: list[dict[str, Any]] = []
         for row in facts:
-            assert_fiscal_year_no_lookahead(
-                as_of=as_of,
-                fiscal_year=row.fiscal_year,
-                label=f"FinancialFact {company.ticker} {row.metric}",
-            )
             if row.fiscal_year is None or (row.fiscal_quarter or "").upper().startswith("Q"):
+                continue
+            known_on = self._known_on(row)
+            if known_on is None or known_on > as_of:
+                excluded_not_public.append(
+                    {
+                        "metric": row.metric,
+                        "fiscal_year": row.fiscal_year,
+                        "known_on": known_on.isoformat() if known_on else None,
+                        "filed_known": row.filed is not None,
+                    }
+                )
                 continue
             annual_facts.setdefault(row.fiscal_year, {}).setdefault(row.metric, row)
 
@@ -152,8 +169,21 @@ class HistoricalValuationService:
                 ),
                 "missing_by_metric": missing,
             },
+            "point_in_time": {
+                "as_of": as_of.isoformat(),
+                "price_rule": "close dated on or before as_of",
+                "fact_rule": (
+                    "filed <= as_of; without filed: period end + "
+                    f"{UNFILED_PUBLICATION_LAG_DAYS} days (capped by storage date) <= as_of"
+                ),
+                "restatements": (
+                    "only the latest filed value per period is stored; if it was filed "
+                    "after as_of the period is missing, not the restated figure"
+                ),
+                "excluded_not_public": excluded_not_public,
+            },
             "definitions": {
-                "price": "Last stored close in each calendar year",
+                "price": "Last stored close on or before as_of in each calendar year",
                 "fcf_per_share": "Annual free cash flow / diluted shares",
                 "revenue_per_share": "Annual revenue / diluted shares",
                 "pe": "Price / EPS",
@@ -161,6 +191,21 @@ class HistoricalValuationService:
                 "ev_to_revenue": "(price * diluted shares + debt - cash) / revenue",
             },
         }
+
+    @staticmethod
+    def _known_on(row: FinancialFact) -> date | None:
+        """Earliest date the stored figure can be proven or safely assumed public."""
+        filed = to_date(row.filed)
+        if filed is not None:
+            return filed
+        bounds = parse_period_bounds(
+            period=row.period, fiscal_year=row.fiscal_year, fiscal_quarter=row.fiscal_quarter
+        )
+        if bounds.end_date is None:
+            return None
+        assumed = bounds.end_date + timedelta(days=UNFILED_PUBLICATION_LAG_DAYS)
+        stored = to_date(row.created_at)
+        return min(assumed, stored) if stored is not None else assumed
 
     @staticmethod
     def _value(rows: dict[str, FinancialFact], metric: str) -> Decimal | None:
