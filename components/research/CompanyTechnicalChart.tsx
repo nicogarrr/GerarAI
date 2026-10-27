@@ -68,7 +68,8 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                 <MobileCollapse title="Lectura técnica"><aside className="min-w-0 border-t border-gray-800 p-4 xl:border-l xl:border-t-0" data-testid="technical-reading">
                     <h2 className="hidden text-base font-semibold text-gray-100 md:block">Lectura técnica</h2>
                     <div id={`technical-panel-${snapshot.ticker}`} className="mt-3 space-y-4 text-xs text-gray-400">
-                        {last ? <p className="text-[11px] text-gray-500">Cierres diarios hasta {formatMarketDate(last.date)}</p> : null}
+                        {last ? <p className="text-[11px] text-gray-500">Precios diarios observados hasta {formatMarketDate(last.date)}</p> : null}
+                        {last ? <p className="text-[11px] text-gray-500">El proveedor no confirma el cierre de la última vela: puede estar en curso. La lectura técnica y los niveles son provisionales.</p> : null}
                         <>
                             <dl className="grid grid-cols-3 gap-2">
                                 <Metric label="Estructura" value={trend} detail="Dos bloques de 10 sesiones" />
@@ -77,14 +78,14 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                             </dl>
                             <div className="space-y-2 border-t border-gray-800 pt-3 leading-5">
                                 {trend !== 'Sin datos' ? <p>{trend === 'Alcista' ? 'Máximos y mínimos crecientes' : trend === 'Bajista' ? 'Máximos y mínimos decrecientes' : 'Máximos y mínimos sin dirección conjunta'} entre los dos últimos bloques de 10 sesiones.</p> : <p>Estructura: sin datos OHLC suficientes.</p>}
-                                {average != null && last ? <p>Cierre {price(last.close, daily.currency)}, {last.close > average ? 'sobre' : last.close < average ? 'bajo' : 'en'} la media de 50 sesiones ({price(average, daily.currency)}).</p> : null}
+                                {average != null && last ? <p>Último precio diario {price(last.close, daily.currency)}, {last.close > average ? 'sobre' : last.close < average ? 'bajo' : 'en'} la media de 50 sesiones ({price(average, daily.currency)}).</p> : null}
                                 {strength != null ? <p>ADX14 {formatNumber(strength, { maximumFractionDigits: 1 })}: {strength >= 25 ? 'fuerza de tendencia' : 'sin fuerza de tendencia confirmada'}. No indica dirección.</p> : null}
                             </div>
                         </>
                         <div>
-                            <h3 className="mb-2 font-medium text-gray-200">Niveles clave del día (pivotes){last ? ` · ${formatMarketDate(last.date)}` : ''}</h3>
+                            <h3 className="mb-2 font-medium text-gray-200">Pivotes de referencia de la última vela{last ? ` · ${formatMarketDate(last.date)}` : ''}</h3>
                             {levels.length ? <dl className="space-y-2">{levels.map((level) => <div key={level.label} className="flex justify-between border-b border-gray-800 pb-1.5"><dt className={level.kind === 'support' ? 'text-teal-300' : 'text-red-300'}>{level.label}</dt><dd className="tabular-nums text-gray-200">{price(level.price, daily.currency)}</dd></div>)}</dl> : <p>Sin datos OHLC para calcular niveles.</p>}
-                            <p className="mt-2 text-[11px] text-gray-500">Calculados con máximo, mínimo y cierre; no son giros confirmados.</p>
+                            <p className="mt-2 text-[11px] text-gray-500">Calculados con máximo, mínimo y último precio de la vela; pueden cambiar si sigue en curso. No son giros confirmados.</p>
                         </div>
                         <div>
                             <h3 className="mb-2 font-medium text-gray-200">Niveles de retroceso ({range})</h3>
