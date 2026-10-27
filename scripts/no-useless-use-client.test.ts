@@ -206,6 +206,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/auth/ForgotPasswordForm.tsx': 'useState, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/auth/ResetPasswordForm.tsx': 'useState, useRouter, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/settings/TaxDeclarantForm.tsx': 'useState, jsx-onSubmit, jsx-onChange, libreria cliente: sonner',
+  'components/settings/LlmSettingsForm.tsx': 'useMemo, useState, jsx-onSubmit, jsx-onChange, formulario controlado del proveedor LLM del tenant',
   'components/system/BackendOfflineAutoRetry.tsx': 'useRouter, useState, useEffect',
   // Estado de error en línea compartido: botón Reintentar con onClick.
   'components/system/SectionLoadError.tsx': 'jsx-onClick',
