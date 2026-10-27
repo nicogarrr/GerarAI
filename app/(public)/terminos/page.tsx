@@ -80,7 +80,7 @@ export default function TermsPage() {
                     <p>
                         El servicio combina datos de proveedores públicos y privados (SEC EDGAR,
                         CNMV, Finnhub, FMP, Yahoo Finance, FRED, GDELT y CelesTrak, entre otros)
-                        y puede enviar extractos mínimos a un proveedor de modelos de lenguaje
+                        y puede enviar contexto de investigación y, según la función, datos de cartera a un proveedor de modelos de lenguaje
                         cuando actives las funciones correspondientes. Consulta la{' '}
                         <Link className="text-teal-300 underline" href="/privacidad">política de privacidad</Link>{' '}
                         para el detalle y los subencargados.
