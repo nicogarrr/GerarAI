@@ -3213,6 +3213,66 @@ def scan_insider_watchlist(
 
 
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
+def scan_schedule13dg_watchlist(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+    lookback: int = 40,
+    max_new_fetches: int = 10,
+) -> dict[str, Any]:
+    """Escaneo acotado de SC 13D/13G (titulares >5%) para la watchlist/cartera.
+
+    Solo emisores seguidos; salta accessions ya persistidos y deja
+    watermark + metricas en connector_states. Lo no parseable queda N/D
+    (status="unparsed"), nunca inventado. Reintentos Dramatiq solo para
+    fallos transitorios; los permanentes devuelven payload estructurado.
+    """
+    actor_name = "scan_schedule13dg_watchlist"
+    try:
+        from app.services import schedule13dg_monitor
+
+        db = _session(tenant_id, user_id)
+        # Ver refresh_market_pipeline: la sesion se abre antes del lease para
+        # que un ValueError de _session no lo retenga hasta el TTL.
+        try:
+            lease = acquire_job_lease(
+                f"scan_schedule13dg_watchlist:{tenant_id}",
+                ttl_seconds=600,
+                redis_url=_lease_redis_url(),
+            )
+        except Exception:
+            # Si la adquisicion lanza (Redis caido, red, ...), la sesion abierta
+            # justo arriba no puede quedar sin cerrar.
+            db.close()
+            raise
+        if lease is None:
+            db.close()
+            return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
+        try:
+            stats = schedule13dg_monitor.scan(
+                db,
+                tenant_id=tenant_id,
+                lookback=lookback,
+                max_new_fetches=max_new_fetches,
+            )
+        finally:
+            release_job_lease(
+                f"scan_schedule13dg_watchlist:{tenant_id}", lease, redis_url=_lease_redis_url()
+            )
+            db.close()
+        return {
+            "status": stats["status"],
+            "actor": actor_name,
+            "tickers_scanned": stats["tickers_scanned"],
+            "filings_seen": stats["filings_seen"],
+            "filings_new": stats["filings_new"],
+            "filings_unparsed": stats["filings_unparsed"],
+            "errors": stats["errors"][:20],
+        }
+    except Exception as exc:
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
+
+
+@dramatiq.actor(max_retries=2, min_backoff=15_000)
 @_coalesce_on_success("sync_investor_holdings", 12 * 60 * 60, ("tenant_id",))
 def sync_investor_holdings(
     tenant_id: int | None = None,

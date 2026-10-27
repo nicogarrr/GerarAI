@@ -1,9 +1,11 @@
-"""Institutional ownership endpoints (SEC Form 13F, reviewed managers only)."""
+"""Institutional ownership endpoints (SEC Form 13F, reviewed managers only,
+y SC 13D/13G de titulares >5% ya ingeridos)."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.services import schedule13dg_monitor, schedule13dg_service
 from app.services.manager_holding_ingestion_service import (
     LIMITATIONS,
     REVIEWED_MANAGERS,
@@ -62,3 +64,25 @@ def manager_holdings(cik: str, db: Session = Depends(get_db)) -> dict:
 
     maybe_autosync_holdings(db)
     return ManagerHoldingIngestionService().latest_holdings(db, cik=cik)
+
+
+@router.get("/schedule-13dg")
+def schedule_13dg(
+    ticker: str = Query(min_length=1, max_length=20),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Filings SC 13D/13G persistidos del ticker; campos no parseados = N/D."""
+    return schedule13dg_service.filings_for_ticker(db, ticker)
+
+
+@router.post("/schedule-13dg/sync")
+def schedule_13dg_sync(
+    ticker: str = Query(min_length=1, max_length=20),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Ingesta acotada de SC 13D/13G para UN ticker seguido (submissions JSON + presupuesto)."""
+    return schedule13dg_monitor.scan(
+        db,
+        tenant_id=db.info.get("tenant_id"),
+        tickers=[ticker],
+    )

@@ -130,6 +130,28 @@ def _release_before_fetch(db) -> None:
         db.commit()
 
 
+# Formularios SEC que entran al feed de noticias: los periodicos/corrientes
+# (10-K/10-Q/8-K/20-F/6-K) mas SC 13D/13G y sus enmiendas (titulares >5%,
+# fuente primaria de propiedad; EDGAR usa las dos familias de nombre).
+DEFAULT_SEC_NEWS_FORMS: frozenset[str] = frozenset(
+    {
+        "10-K",
+        "10-Q",
+        "8-K",
+        "20-F",
+        "6-K",
+        "SC 13D",
+        "SC 13D/A",
+        "SC 13G",
+        "SC 13G/A",
+        "SCHEDULE 13D",
+        "SCHEDULE 13D/A",
+        "SCHEDULE 13G",
+        "SCHEDULE 13G/A",
+    }
+)
+
+
 class FeedIngestionService:
     """Poll connectors and adapt their common result into existing ingestion services."""
 
@@ -186,7 +208,7 @@ class FeedIngestionService:
             self._sec_client = sec
         return await sec.recent_filings(
             cik,
-            forms=forms or {"10-K", "10-Q", "8-K", "20-F", "6-K"},
+            forms=forms or DEFAULT_SEC_NEWS_FORMS,
             limit=limit,
             ticker=ticker,
         )
