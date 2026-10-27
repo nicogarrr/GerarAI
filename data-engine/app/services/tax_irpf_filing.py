@@ -525,8 +525,9 @@ def build_loss_compensation(
 ) -> dict:
     """Compensación de saldos negativos de los 4 ejercicios anteriores.
 
-    ``prior_year_nets``: lista de ``{"year", "net_gyp_base", "incomplete"}``
-    con el resultado neto COMPUTABLE de cada ejercicio previo según el libro.
+    ``prior_year_nets``: lista de ``{"year", "net_gyp_base", "net_rcm_base",
+    "incomplete"}`` con el resultado neto COMPUTABLE de cada ejercicio previo
+    según el libro (``net_rcm_base``: dividendos + intereses, opcional).
     ``declared_pending``: saldos pendientes a 1 de enero por ejercicio de
     origen, copiados del ANEXO C.3 de la última declaración presentada
     (fuente manual autoritativa, almacenada por tenant).
@@ -573,6 +574,13 @@ def build_loss_compensation(
                 "casilla_resto": casillas[1] if casillas else None,
             })
     else:
+        # Simulación cronológica del arrastre (art. 49.1.b LIRPF): cada
+        # ejercicio intermedio con saldo positivo de GyP ya compensó los
+        # saldos negativos anteriores (el más antiguo primero), y el 25 % de
+        # sus rendimientos del capital mobiliario absorbió parte del resto
+        # (primero su propia pérdida, casilla 0446). Arrastrar la pérdida
+        # ENTERA, como si nada la hubiera consumido, sobrestimaba lo
+        # pendiente y compensaba de más en el ejercicio actual.
         for entry in sorted(prior_year_nets, key=lambda e: e["year"]):
             year = entry["year"]
             if year < window_start or year >= fiscal_year:
@@ -584,14 +592,35 @@ def build_loss_compensation(
                 })
                 continue
             net = Decimal(str(entry["net_gyp_base"]))
-            if net < 0:
+            rcm_raw = entry.get("net_rcm_base")
+            # Sin rendimientos conocidos no se resta nada por el 25 %: no
+            # se inventa una compensación que quizá no hubo.
+            year_cross = (
+                max(Decimal("0"), Decimal(str(rcm_raw))) * CROSS_COMPENSATION_LIMIT
+                if rcm_raw is not None else Decimal("0")
+            )
+            own_negative = abs(net) if net < 0 else Decimal("0")
+            own_cross = min(own_negative, year_cross)
+            year_cross -= own_cross
+            year_gains = net if net > 0 else Decimal("0")
+            for item in pending:
+                if year - item["year"] > CARRYFORWARD_WINDOW_YEARS:
+                    continue  # ya expirado en ese ejercicio
+                take = min(item["pending"], year_gains)
+                item["pending"] -= take
+                year_gains -= take
+                take = min(item["pending"], year_cross)
+                item["pending"] -= take
+                year_cross -= take
+            if own_negative - own_cross > 0:
                 pending.append({
                     "year": year,
-                    "pending": abs(net),
+                    "pending": own_negative - own_cross,
                     "source": "libro-estimativo",
                     "casilla_integracion": None,
                     "casilla_resto": None,
                 })
+        pending = [item for item in pending if item["pending"] > 0]
 
     incomplete = False
     saldo_gyp = None
