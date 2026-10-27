@@ -3478,10 +3478,11 @@ def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
     from app.services import ibkr_connection_service as ibkr
 
     with _session(tenant_id, user_id) as db:
+        revision: int | None = None
         try:
             token, query_id, account_id, revision = ibkr.credentials(db, get_settings())
             xml = _run(ibkr.download(token, query_id))
             return ibkr.import_report(db, xml, account_id, revision)
         except Exception:
-            ibkr.record_failure(db)
+            ibkr.record_failure(db, revision=revision)
             return {"status": "error", "message": "IBKR no disponible; se conservan los datos anteriores."}

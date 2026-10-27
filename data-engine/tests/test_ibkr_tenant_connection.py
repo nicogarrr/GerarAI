@@ -238,3 +238,88 @@ def test_reconnect_cannot_lower_historical_verified_date(disconnected, monkeypat
             service.import_report(db, xml, account, revision)
         assert calls == []
         assert service.view(db)["statement_date"] == date.today()
+
+
+@pytest.mark.parametrize("renew", [False, True])
+def test_report_failure_only_marks_the_revision_that_started_it(renew):
+    init_db()
+    with SessionLocal() as db:
+        tenant(db)
+        save(db)
+        _, _, _, revision = service.credentials(db, settings())
+        if renew:
+            save(db)
+        before = service.view(db)
+        service.record_failure(db, revision=revision)
+        after = service.view(db)
+        if renew:
+            assert after == before
+        else:
+            assert after["status"] == "error"
+            assert after["connected"] is True
+            assert after["last_attempt_at"] is not None
+
+
+def test_failure_without_obtained_credentials_does_not_change_connection():
+    init_db()
+    with SessionLocal() as db:
+        tenant(db)
+        save(db)
+        before = service.view(db)
+        service.record_failure(db, revision=None)
+        assert service.view(db) == before
+
+
+def test_failed_old_download_route_cannot_mark_reconnected_revision(monkeypatch):
+    import asyncio
+
+    from fastapi import HTTPException
+
+    from app.api.routes import settings as routes
+
+    init_db()
+    monkeypatch.setattr(routes, "get_settings", settings)
+    with SessionLocal() as db:
+        tenant(db)
+        save(db)
+        old_revision = service.connection(db).revision
+
+        async def failed_old_download(*args):
+            save(db)
+            assert service.connection(db).revision > old_revision
+            raise service.ConnectionError("Fallo sintético de la descarga anterior")
+
+        monkeypatch.setattr(service, "download", failed_old_download)
+        with pytest.raises(HTTPException) as caught:
+            asyncio.run(routes.sync_ibkr_connection(db))
+        assert caught.value.status_code == 422
+        assert service.view(db)["status"] == "connected"
+        assert service.view(db)["last_attempt_at"] is None
+
+
+def test_failed_old_download_worker_cannot_mark_reconnected_revision(monkeypatch):
+    from contextlib import contextmanager
+
+    from app.workers import dramatiq_app as workers
+
+    init_db()
+    monkeypatch.setattr(workers, "get_settings", settings)
+    with SessionLocal() as db:
+        owner = tenant(db)
+        save(db)
+        old_revision = service.connection(db).revision
+
+        @contextmanager
+        def scoped_session(*args):
+            yield db
+
+        async def failed_old_download(*args):
+            save(db)
+            assert service.connection(db).revision > old_revision
+            raise service.ConnectionError("Fallo sintético de la descarga anterior")
+
+        monkeypatch.setattr(workers, "_session", scoped_session)
+        monkeypatch.setattr(service, "download", failed_old_download)
+        assert workers.sync_one_tenant_ibkr.fn(owner, "synthetic-owner")["status"] == "error"
+        assert service.view(db)["status"] == "connected"
+        assert service.view(db)["last_attempt_at"] is None
