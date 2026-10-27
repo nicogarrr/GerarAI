@@ -117,4 +117,36 @@ describe('EditTransactionDialog', () => {
         process.off('unhandledRejection', onUnhandled);
         expect(h.showError).not.toHaveBeenCalled();
     });
+    it('comision: sin dato en la fila y campo vacio se omite', async () => {
+        const d = open();
+        await submit(d);
+        expect(h.update.mock.calls[0][9]).toBeUndefined();
+    });
+
+    it('comision escrita se envia como numero', async () => {
+        const d = open();
+        fireEvent.change(d.getByLabelText(/^Comisiones/), { target: { value: '1.5' } });
+        await submit(d);
+        expect(h.update.mock.calls[0][9]).toBe(1.5);
+    });
+
+    it('comision registrada en 0 se conserva como 0 (no se omite)', async () => {
+        const d = open({ ...base, fees: 0 });
+        await submit(d);
+        expect(h.update.mock.calls[0][9]).toBe(0);
+    });
+
+    it('editar notas se envia', async () => {
+        const d = open();
+        fireEvent.change(d.getByLabelText(/^Notas/), { target: { value: 'otra' } });
+        await submit(d);
+        expect(h.update.mock.calls[0][7]).toBe('otra');
+    });
+
+    it('Cancelar cierra el dialogo sin guardar', async () => {
+        const d = open();
+        fireEvent.click(d.getByRole('button', { name: 'Cancelar' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        expect(h.update).not.toHaveBeenCalled();
+    });
 });
