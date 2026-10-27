@@ -282,6 +282,14 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("shares_repurchased", ["StockRepurchasedDuringPeriodShares"], "shares"),
     ("stock_based_compensation", ["ShareBasedCompensation"], "USD"),
     ("dividends_paid",    ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"],                                "USD"),
+    # Drivers obligatorios de los marcos de tesis que SI estan en us-gaap y no
+    # se leian (la tesis los daba por ausentes con el dato en el 10-K):
+    # - aseguradoras: primas devengadas netas (Chubb FY2025: 53.014 M$);
+    # - espacio/defensa: cartera contratada = obligaciones de desempeno
+    #   pendientes (ASC 606), que es la cifra que Rocket Lab publica como
+    #   «backlog» (FY2025: 1.847,3 M$). Es un saldo (instantaneo).
+    ("earned_premiums",   ["PremiumsEarnedNet"],                                                                    "USD"),
+    ("backlog",           ["RevenueRemainingPerformanceObligation"],                                                "USD"),
 ]
 
 
