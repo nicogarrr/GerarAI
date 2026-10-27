@@ -269,3 +269,17 @@ def test_lotes_que_no_cuadran_con_la_posicion_no_se_usan(db):
     resp = _ask(db, "IRPF si vendo 10 acciones de NICO")
     assert resp.llm_trace["method"] == "average_cost"
     assert "sin historial de lotes" in resp.answer
+
+
+def test_la_escala_del_ahorro_no_se_presenta_como_vigente_sin_verificar(db):
+    """Solo la escala de 2025 está verificada: en años posteriores el texto lo dice."""
+    _uber(db)
+    answer = _ask(db, "¿Cuánto IRPF pagaría si vendo hoy todo UBER?").answer
+    year = date.today().year
+    if year <= 2025:
+        assert f"escala del ahorro {year}" in answer
+    else:
+        assert "escala del ahorro de 2025 (la última verificada" in answer
+        assert f"la de {year} no está confirmada" in answer
+        assert f"escala del ahorro {year}:" not in answer
+    assert "IRPF estimado: 94,10 €" in answer

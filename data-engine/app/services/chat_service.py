@@ -1891,13 +1891,19 @@ class ChatService:
             f"Si vendieras hoy {what} (datos a {_fmt_date_es(pos.as_of.isoformat())}): "
             f"valor {_fmt_money_es(float(value))} €, coste {_fmt_money_es(float(cost))} €"
         )
+        # Última escala del ahorro verificada: 2025 (Ley 7/2024). Para años posteriores se
+        # reutiliza y se dice, sin afirmar que sea la vigente de ese año.
+        scale_label = (
+            f"escala del ahorro {year}" if year <= 2025
+            else f"escala del ahorro de 2025 (la última verificada; la de {year} no está confirmada)"
+        )
         if gain > 0:
             tax = calculate_savings_tax(gain, year)
             rate = (tax / gain * 100) if gain else Decimal("0")
             answer = (
                 f"{head}, ganancia de {_fmt_money_es(float(gain))} €. "
                 f"IRPF estimado: {_fmt_money_es(float(tax))} € (un {_fmt_number_es(float(rate), 1)} % "
-                f"de la ganancia, escala del ahorro {year}: 19 % hasta 6.000 €, 21 % hasta 50.000 €…). "
+                f"de la ganancia, {scale_label}: 19 % hasta 6.000 €, 21 % hasta 50.000 €…). "
                 "Lo calculo como si fuera tu única operación del año: si ya tienes otras ganancias, "
                 "el tramo sube, y las pérdidas del año lo compensan."
             )
