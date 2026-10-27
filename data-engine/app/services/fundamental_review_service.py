@@ -31,7 +31,12 @@ class DecisionJournalService:
         decision: str,
         rationale: str,
         what_must_be_true: list[str],
+        transaction_id: int | None = None,
     ) -> DecisionJournalEntry:
+        from app.services.journal_trade_link import resolve_trade
+
+        # La operacion se valida ANTES de escribir nada (ValueError -> 422).
+        trade = resolve_trade(db, company, transaction_id) if transaction_id else None
         thesis = db.scalar(
             select(ThesisVersion)
             .where(ThesisVersion.company_id == company.id)
@@ -63,7 +68,39 @@ class DecisionJournalService:
                 "model_version": model.version if model else None,
             },
         )
+        if trade is not None:
+            # Decision ejecutada: su fecha y su precio son los de la operacion.
+            entry.transaction_id = trade.id
+            entry.decision_date = trade.trade_date
+            entry.price = trade.price
         db.add(entry)
+        db.commit()
+        db.refresh(entry)
+        return entry
+
+    def link_transaction(
+        self,
+        db: Session,
+        company: Company,
+        entry_id: int,
+        transaction_id: int | None,
+    ) -> DecisionJournalEntry:
+        """Enlaza (o desenlaza con None) una entrada existente a una operacion.
+
+        No reescribe la fecha ni el precio de la decision: la entrada ya
+        existia y su fecha es la de la decision, no la de la ejecucion.
+        """
+        from app.services.journal_trade_link import resolve_trade
+
+        entry = db.scalar(
+            select(DecisionJournalEntry).where(
+                DecisionJournalEntry.id == entry_id,
+                DecisionJournalEntry.company_id == company.id,
+            )
+        )
+        if entry is None:
+            raise LookupError("Entrada del diario no encontrada")
+        entry.transaction_id = resolve_trade(db, company, transaction_id).id if transaction_id else None
         db.commit()
         db.refresh(entry)
         return entry

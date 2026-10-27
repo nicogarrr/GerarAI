@@ -1891,6 +1891,12 @@ class DecisionJournalEntry(TenantOwnedMixin, Base, TimestampMixin):
     price: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="open", index=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    # Operacion real (compra/venta importada de IBKR o manual) que ejecuto esta
+    # decision. Opcional: una decision de "vigilar" no tiene operacion. Si se
+    # borra la operacion, la entrada del diario se conserva (SET NULL).
+    transaction_id: Mapped[int | None] = mapped_column(
+        ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 class ExpectationReview(TenantOwnedMixin, Base, TimestampMixin):

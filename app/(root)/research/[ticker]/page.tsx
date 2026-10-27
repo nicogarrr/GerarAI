@@ -702,7 +702,7 @@ const EMPTY_VIEW_DATA: { [K in keyof ViewWorkspaces]: ViewWorkspaces[K] } = {
     errors: [],
     scenarios: null,
   },
-  changes: { changes: [], reviews: [], alerts: [], decisions: [], expectations: [] },
+  changes: { changes: [], reviews: [], alerts: [], decisions: [], expectations: [], trades: [] },
   financials: { facts: [], calculatedMetrics: [] },
   model: null,
   'market-opportunity': null,
@@ -1394,7 +1394,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           <Panel title="Alertas"><div className="space-y-2">{data.alerts.length ? data.alerts.map((alert) => <div className="rounded-lg border border-gray-800 p-3 text-sm" key={alert.id}><Badge variant="outline">{label(alert.severity)}</Badge><p className="mt-2 text-gray-300">{alert.message}</p><p className="mt-2 text-xs text-gray-500">Registrada el {formatUserDateTime(alert.created_at)} (Madrid)</p>{safeHttpUrl(alert.source_url) ? <a className="mt-2 inline-block text-xs text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(alert.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">Ver fuente</a> : null}</div>) : <EmptyState title="Sin alertas." />}</div></Panel>
         </div>
         <GuideContextPanel ticker={ticker} context={guideContext} />
-        <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} />
+        <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} trades={data.trades} />
       </div>
     );
   } else if (activeView === 'holders') {

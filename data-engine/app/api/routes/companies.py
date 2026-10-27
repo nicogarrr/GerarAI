@@ -264,6 +264,14 @@ class DecisionJournalCreate(BaseModel):
     decision: Literal["buy", "hold", "trim", "sell", "watch", "avoid"]
     rationale: str = Field(min_length=5, max_length=5000)
     what_must_be_true: list[str] = Field(default_factory=list, max_length=30)
+    # Operacion real (compra/venta de IBKR o manual) que ejecuto la decision.
+    transaction_id: int | None = Field(default=None, ge=1)
+
+
+class DecisionJournalTradeLink(BaseModel):
+    """Enlaza una entrada del diario a una operacion; null la desenlaza."""
+
+    transaction_id: int | None = Field(default=None, ge=1)
 
 
 class DriverAssumptionCreate(BaseModel):
@@ -749,7 +757,43 @@ def decision_journal(ticker: str, db: Session = Depends(get_db)) -> list[dict]:
     company = resolve_company(db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    return [_decision_payload(entry) for entry in DecisionJournalService().list(db, company)]
+    from app.services.journal_trade_link import journal_entry_payload
+
+    return [journal_entry_payload(db, entry) for entry in DecisionJournalService().list(db, company)]
+
+
+@router.get("/{ticker}/decision-journal/trades")
+def decision_journal_trades(ticker: str, db: Session = Depends(get_db)) -> list[dict]:
+    """Compras y ventas del ticker que se pueden enlazar a una entrada del diario."""
+    from app.services.journal_trade_link import journal_trades
+
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return journal_trades(db, company)
+
+
+@router.put("/{ticker}/decision-journal/{entry_id}/transaction")
+def link_decision_journal_trade(
+    ticker: str,
+    entry_id: int,
+    payload: DecisionJournalTradeLink,
+    db: Session = Depends(get_db),
+) -> dict:
+    from app.services.journal_trade_link import journal_entry_payload
+
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    try:
+        entry = DecisionJournalService().link_transaction(
+            db, company, entry_id, payload.transaction_id
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return journal_entry_payload(db, entry)
 
 
 @router.post("/{ticker}/decision-journal", status_code=201)
@@ -761,14 +805,20 @@ def create_decision_journal_entry(
     company = resolve_company(db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    entry = DecisionJournalService().create(
-        db,
-        company,
-        decision=payload.decision,
-        rationale=payload.rationale,
-        what_must_be_true=[item.strip() for item in payload.what_must_be_true if item.strip()],
-    )
-    return _decision_payload(entry)
+    from app.services.journal_trade_link import journal_entry_payload
+
+    try:
+        entry = DecisionJournalService().create(
+            db,
+            company,
+            decision=payload.decision,
+            rationale=payload.rationale,
+            what_must_be_true=[item.strip() for item in payload.what_must_be_true if item.strip()],
+            transaction_id=payload.transaction_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return journal_entry_payload(db, entry)
 
 
 @router.get("/{ticker}/decision-lessons/taxonomy")
@@ -936,21 +986,6 @@ def review_expectation_reality(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     return [_expectation_payload(item) for item in ExpectationRealityService().review(db, company)]
-
-
-def _decision_payload(entry) -> dict:
-    return {
-        "id": entry.id,
-        "thesis_version_id": entry.thesis_version_id,
-        "model_version_id": entry.model_version_id,
-        "decision_date": entry.decision_date,
-        "decision": entry.decision,
-        "rationale": entry.rationale,
-        "what_must_be_true": entry.what_must_be_true,
-        "price": entry.price,
-        "status": entry.status,
-        "metadata": entry.metadata_,
-    }
 
 
 def _expectation_payload(item) -> dict:
