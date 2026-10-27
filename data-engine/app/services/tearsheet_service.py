@@ -166,6 +166,22 @@ def exposure_from_snapshot(
         "n_positions": len(weights),
         "top_1_weight": _safe_float(weights[0]) if weights else None,
         "top_5_weight": _safe_float(sum(weights[:5])) if weights else None,
+        # Auditoria A: caja/margen aparte con su signo, y el significado de
+        # cada peso explicito. equity_weight es posiciones/NAV: con margen
+        # supera 1 y es APALANCAMIENTO, no distribucion; los pesos de
+        # concentracion comparables con la vista de Cartera son los *_gross_*.
+        "positions_value_base": _safe_float(snapshot.positions_value_base),
+        "cash_value_base": _safe_float(snapshot.cash_value_base),
+        "net_leverage": _safe_float(equity_weight),
+        "gross_leverage": _safe_float(gross_value / total) if gross_value and total > 0 else None,
+        "weight_bases": {
+            "top_1_weight": "nav_with_cash",
+            "top_5_weight": "nav_with_cash",
+            "equity_weight": "leverage_positions_over_nav",
+            "cash_weight": "signed_cash_over_nav",
+            "top_1_gross_positions_weight": "gross_positions_abs",
+            "top_5_gross_positions_weight": "gross_positions_abs",
+        },
         # Additive, explicit denominator. Existing NAV fields stay unchanged.
         "gross_positions_value_base": _safe_float(gross_value),
         "top_1_gross_positions_weight": _safe_float(gross_weights[0]) if gross_weights else None,
