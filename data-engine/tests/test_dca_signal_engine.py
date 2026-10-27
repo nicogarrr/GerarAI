@@ -212,3 +212,22 @@ def test_mature_series_keeps_4x_price() -> None:
     v = evaluate_series(_month_end_bars(closes), month_complete=True)[-1]
     assert v.level == 4
     assert v.level_prices["4x"] is not None
+
+
+def test_flat_history_does_not_turn_one_percent_drop_into_4x() -> None:
+    bars = _month_end_bars([100.0] * 48 + [99.0], start=date(2022, 1, 1))
+    verdict = current_verdict(bars, today=date(2026, 2, 1))
+    assert verdict is not None
+    assert verdict.metrics["vol"] == 0.0
+    assert verdict.metrics["vol_ratio"] == 1.0
+    assert verdict.level != 4
+    assert verdict.metrics["adj_gap"] is not None
+    assert verdict.metrics["adj_gap"] < 0.02
+
+
+def test_near_zero_volatility_has_no_artificial_4x() -> None:
+    bars = _month_end_bars([100.0 + (n % 2) * 0.1 for n in range(48)] + [99.0])
+    verdict = current_verdict(bars, today=date(2022, 2, 1))
+    assert verdict is not None
+    assert verdict.level != 4
+    assert verdict.metrics["vol_ratio"] == 1.0

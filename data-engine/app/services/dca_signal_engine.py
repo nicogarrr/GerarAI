@@ -74,6 +74,10 @@ class DcaParams:
     vol_lookback_months: int = 36
     vol_min_months: int = 12
     vol_ratio_cap: float = 10.0
+    # Por debajo de esta vol anualizada (serie plana, precio congelado o de
+    # relleno) la vol no es fiable: no se ajusta el gap (vol_ratio = 1) en vez
+    # de dividir por casi cero y fabricar un 4X.
+    vol_min_reliable: float = 0.02
     # Sin 4X antes de N meses de historia (valores jovenes). None = sin limite.
     cap4_before_months: int | None = 24
     high_lookback_months: int = 36
@@ -230,7 +234,8 @@ def evaluate_series(
         vol = _trailing_vol(closes, i, params) if params.vol_beta else None
         vol_ratio = 1.0
         if vol is not None:
-            vol_ratio = min(max(vol / params.vol_ref, 1e-9), params.vol_ratio_cap)
+            if vol >= params.vol_min_reliable:
+                vol_ratio = min(max(vol / params.vol_ref, 1e-9), params.vol_ratio_cap)
         scale = vol_ratio**params.vol_beta if params.vol_beta else 1.0
         adj_gap = (long_gap / scale) if long_gap is not None else None
         if use_sma:
