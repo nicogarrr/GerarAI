@@ -142,7 +142,7 @@ def _facts(
         )
 
 
-def _close(db: Session, company: Company, close: str) -> None:
+def _close(db: Session, company: Company, close: str, *, quote_currency: str | None = None) -> None:
     value = Decimal(close)
     db.add(
         MarketPrice(
@@ -153,6 +153,7 @@ def _close(db: Session, company: Company, close: str) -> None:
             low=value,
             close=value,
             source="test",
+            quote_currency=quote_currency,
         )
     )
 
@@ -194,12 +195,14 @@ def test_golden_baba_cny_contra_adr_en_usd(db: Session) -> None:
     assert result["margin_of_safety"] == pytest.approx(margin_of_safety(137.142857, 120.0), rel=1e-6)
 
 
-def test_golden_cgeo_l_peniques_a_libras(db: Session) -> None:
+@pytest.mark.parametrize("quote_currency", ["GBX", "GBp"])
+def test_golden_cgeo_l_peniques_a_libras(db: Session, quote_currency: str) -> None:
     # FCF 45 M GBP / 30 M acciones = 1,5 GBP -> x15 = 22,5 GBP.
     # Cierre 4.255 GBX = 42,55 GBP. Misma divisa: sin FX.
     company = _company(db, "CGEO.L")
     _facts(db, company, currency="GBP", revenue=300_000_000, fcf=45_000_000, shares=30_000_000)
-    _close(db, company, "4255")
+    # The fixture must state the provider unit; .L alone is not proof of pence.
+    _close(db, company, "4255", quote_currency=quote_currency)
 
     result = _value(db, company)
 
@@ -209,6 +212,36 @@ def test_golden_cgeo_l_peniques_a_libras(db: Session) -> None:
     assert result["base_value"] == pytest.approx(22.5)
     assert result["current_price"] == pytest.approx(42.55)
     assert result["margin_of_safety"] == pytest.approx(margin_of_safety(22.5, 42.55))
+
+
+@pytest.mark.parametrize("quote_currency", [None, "USD"])
+def test_cgeo_ambiguous_or_incompatible_quote_has_no_price_or_mos(db: Session, quote_currency: str | None) -> None:
+    """Guard against making the golden green by guessing pence from .L."""
+    company = _company(db, "CGEO.L")
+    _facts(db, company, currency="GBP", revenue=300_000_000, fcf=45_000_000, shares=30_000_000)
+    _close(db, company, "4255", quote_currency=quote_currency)
+
+    result = _value(db, company)
+
+    # Intrinsic value can exist without a comparable market price.
+    assert result["base_value"] == pytest.approx(22.5)
+    assert result["current_price"] is None
+    assert result["margin_of_safety"] is None
+    assert result["trace"]["price_status"] == "missing_market_price"
+    assert result["trace"]["incomplete_without_price"] is True
+
+
+def test_cgeo_explicit_major_unit_is_not_divided_again(db: Session) -> None:
+    """A London ticker may explicitly receive GBP, not only GBX/GBp."""
+    company = _company(db, "CGEO.L")
+    _facts(db, company, currency="GBP", revenue=300_000_000, fcf=45_000_000, shares=30_000_000)
+    _close(db, company, "42.55", quote_currency="GBP")
+
+    result = _value(db, company)
+
+    assert result["current_price"] == pytest.approx(42.55)
+    assert result["margin_of_safety"] == pytest.approx(margin_of_safety(22.5, 42.55))
+    assert result["trace"]["price_status"] == "ok"
 
 
 def test_golden_san_mc_en_euros(db: Session) -> None:
