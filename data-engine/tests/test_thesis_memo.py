@@ -104,7 +104,7 @@ def test_full_thesis_renders_every_section(db):
     assert "| Bajista | $150.00 | 20 % |" in memo
     assert "| Base | $220.00 | 55 % |" in memo
     assert "| Alcista | $300.00 | 25 % |" in memo
-    assert "Precio actual: $200.00 · Valor esperado: $235.00 · Margen de seguridad: 15,0 %" in memo
+    assert "Precio del modelo: $200.00 · Valor esperado: $235.00 · Margen de seguridad: 15,0 %" in memo
     # Catalysts: dict form renders title + date; string form renders verbatim.
     assert "- Próximos resultados (2026-11-05)" in memo
     assert "- Resultados Q4 (2026-10-30)" in memo
@@ -396,7 +396,7 @@ def test_memo_money_uses_listing_currency_never_bare_dollar(db):
 
     assert "| Bajista | 2,90 EUR | 20 % |" in memo
     assert "| Base | 3,60 EUR | 60 % |" in memo
-    assert "Precio actual: 3,58 EUR · Valor esperado: 3,62 EUR · Margen de seguridad: 1,1 %" in memo
+    assert "Precio del modelo: 3,58 EUR · Valor esperado: 3,62 EUR · Margen de seguridad: 1,1 %" in memo
     assert "$" not in memo
 
 
@@ -444,3 +444,21 @@ def test_draft_does_not_disclose_margin_provenance_or_number(db):
     assert "Convención del margen" not in memo
     assert "margen de seguridad histórico" not in memo
     assert "15,0 %" not in memo
+
+
+def test_model_price_shows_quote_date_only_when_persisted(db):
+    """Auditoría v1.0 (2026-10-27): «Precio actual» mentía — el precio
+    persistido es el que usó el modelo al generar la versión. Se rotula
+    «Precio del modelo» y la fecha de la cotización solo aparece si quedó
+    persistida en valuation_basis; nunca una fecha inventada."""
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    thesis.valuation_basis = {"price_as_of": "2026-10-20"}
+    memo = build_memo_markdown(db, company, thesis)
+    assert "Precio del modelo al 2026-10-20: $200.00" in memo
+    assert "Precio actual" not in memo
+
+    thesis.valuation_basis = None
+    memo = build_memo_markdown(db, company, thesis)
+    assert "Precio del modelo: $200.00" in memo
+    assert "Precio actual" not in memo

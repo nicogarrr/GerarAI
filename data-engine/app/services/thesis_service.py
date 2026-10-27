@@ -1354,7 +1354,13 @@ class ThesisService:
             if isinstance(item, dict)
         ]
         convention = (valuation.get("trace") or {}).get("margin_of_safety_convention")
-        if not basis and not used and not convention:
+        # Fecha de la cotización que usó el modelo (snapshot de posición o
+        # último cierre, NUNCA el precio en vivo): se persiste con la versión
+        # para que la ficha, la página de tesis y el memo rotulen el precio
+        # como "precio del modelo al <fecha>". None honesto si el motor no la
+        # informó: la fecha no se inventa (auditoría v1.0, 2026-10-27).
+        price_as_of = (valuation.get("trace") or {}).get("price_as_of")
+        if not basis and not used and not convention and price_as_of is None:
             return None
         listed = valuation.get("listed_share_values")
         extra = {"inferred_inputs_used": used} if used else {}
@@ -1369,6 +1375,7 @@ class ThesisService:
         return {
             **extra,
             **({"model_input_fingerprint": model_fp} if model_fp else {}),
+            "price_as_of": price_as_of,
             "value_per_share_basis": str(basis) if basis else None,
             "adr_ratio": valuation.get("adr_ratio"),
             "listed_share_values": (
