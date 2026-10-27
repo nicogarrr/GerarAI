@@ -107,3 +107,6 @@ data-engine/htmlcov/
 
 # Runtime artifacts written by tests/app (never source)
 /storage/
+
+# venv aislado del crossover RAGAS (data-engine/scripts/ragas_crossover.sh)
+.venv-ragas/

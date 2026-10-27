@@ -209,8 +209,9 @@ python scripts/run_rag_evals.py --dry-run
 # Informe completo a JSON
 python scripts/run_rag_evals.py --dry-run --json /tmp/rag_evals.json
 
-# Crossover con las metricas reales de ragas (venv aislado, ver el fichero)
-python scripts/run_rag_evals.py --ragas-crossover
+# Crossover con las metricas reales de ragas: un solo comando, crea el venv
+# aislado .venv-ragas con las versiones fijadas de evals/rag/requirements-ragas.txt
+bash scripts/ragas_crossover.sh
 ```
 
 **Hermeticidad.** El runner instala un guardian que sustituye
