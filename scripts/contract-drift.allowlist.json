@@ -1,0 +1,13 @@
+{
+  "_comment": "Falsos positivos conocidos y derivas reales en zonas con dueño. Cada entrada casa kind+endpoint+field exactos; cualquier hallazgo nuevo rompe el contrato. Revisar este archivo en cada PR que lo toque.",
+  "entries": [
+    { "kind": "FIELD_NOT_IN_SCHEMA", "endpoint": "GET /api/propicks/gems", "field": "review_status", "reason": "Falso positivo: GemItem es tipo compartido con POST /api/propicks/review; en /gems estos campos opcionales no existen por diseño (sin revision LLM todavia)." },
+    { "kind": "FIELD_NOT_IN_SCHEMA", "endpoint": "GET /api/propicks/gems", "field": "decision", "reason": "Igual que review_status." },
+    { "kind": "FIELD_NOT_IN_SCHEMA", "endpoint": "GET /api/propicks/gems", "field": "thesis", "reason": "Igual que review_status." },
+    { "kind": "FIELD_NOT_IN_SCHEMA", "endpoint": "GET /api/propicks/gems", "field": "risks", "reason": "Igual que review_status." },
+    { "kind": "FIELD_NOT_IN_SCHEMA", "endpoint": "GET /api/propicks/gems", "field": "invalidation", "reason": "Igual que review_status." },
+    { "kind": "FIELD_NOT_IN_SCHEMA", "endpoint": "GET /api/propicks/gems", "field": "confidence", "reason": "Igual que review_status." },
+    { "kind": "FIELD_NOT_IN_SCHEMA", "endpoint": "GET /api/propicks/gems", "field": "veto_reason", "reason": "Igual que review_status." },
+    { "kind": "ENUM_BACKEND_VALUE_UNHANDLED", "endpoint": "POST /api/chat", "field": "key", "values": ["unverified_claims"], "reason": "DERIVA REAL (28-oct-2026): el backend emite secciones key=unverified_claims y la union TS de ResearchChatResponse no la cubre; la UI no las renderiza con su etiqueta. Zona Cerebro con dueño (#2515): la correccion la hace su owner; se registra aqui para que no se olvide." }
+  ]
+}
