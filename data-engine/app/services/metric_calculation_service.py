@@ -300,9 +300,25 @@ def _capital_scale_conflict(equity_fact: FinancialFact, debt_fact: FinancialFact
     return True
 
 
+# Clave de db.info para la cache de hechos de calculate_all (ver alli).
+_FACTS_CACHE_KEY = "metric_calculation_facts_cache"
+
+
 class MetricCalculationService:
     def calculate_all(self, db: Session, company: Company, persist: bool = True) -> list[MetricResult]:
-        results = [self.calculate(db, company, metric, persist=persist) for metric in METRIC_DEFINITIONS]
+        # Cache de hechos SOLO durante este calculate_all: muchas metricas
+        # comparten entradas (revenue, net_income...) y cada una repetia la
+        # misma consulta. Vive en db.info (sesion por peticion, nunca
+        # compartida entre hilos) y se borra al terminar, asi que una llamada
+        # posterior ve siempre los hechos frescos.
+        owns_cache = _FACTS_CACHE_KEY not in db.info
+        if owns_cache:
+            db.info[_FACTS_CACHE_KEY] = {}
+        try:
+            results = [self.calculate(db, company, metric, persist=persist) for metric in METRIC_DEFINITIONS]
+        finally:
+            if owns_cache:
+                db.info.pop(_FACTS_CACHE_KEY, None)
         if persist:
             db.commit()
         return results
@@ -534,7 +550,11 @@ class MetricCalculationService:
         return facts
 
     def _facts_for_metric(self, db: Session, company: Company, metric: str) -> list[FinancialFact]:
-        return list(
+        cache: dict[tuple[int, str], list[FinancialFact]] | None = db.info.get(_FACTS_CACHE_KEY)
+        key = (company.id, metric)
+        if cache is not None and key in cache:
+            return list(cache[key])
+        facts = list(
             db.scalars(
                 select(FinancialFact)
                 .where(FinancialFact.company_id == company.id, FinancialFact.metric == metric)
@@ -542,6 +562,10 @@ class MetricCalculationService:
                 .limit(20)
             ).all()
         )
+        if cache is not None:
+            cache[key] = facts
+            return list(facts)
+        return facts
 
     def _match_fact(self, db: Session, company: Company, metric: str, anchor: FinancialFact) -> FinancialFact | None:
         candidates = self._facts_for_metric(db, company, metric)
