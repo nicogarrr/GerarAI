@@ -45,3 +45,7 @@ Attached synthetic tables use broker names for three light/dark styles. They are
 Audit, owner design approval, full gates, verify full-app OpenAPI export, rebuild image with tesseract-ocr + eng/spa, test exact Docker image on ARM in test tenant. Confirm OCR latency/RSS and a real broker screenshot with owner consent. No promises of support for unseen broker layouts.
 
 Audit follow-up: transaction reassignment via edit cannot overwrite a screenshot snapshot. Red regression first failed (DID NOT RAISE), then passed after central rebuild guard; rollback keeps both original transaction company and snapshot quantity. Dated no-trade rebuild preserves/revalues snapshot without cost fabrication.
+
+## Design refinement after owner request
+
+New `portfolio-image-design-*` evidence compares the real previous dialog and new dialog in the same local synthetic harness, not production. Three short steps, local privacy cue, upload target, compact review cards with distinct units, expandable OCR/limits detail, and fixed final confirmation area. Pixel inspection at 390x844 and desktop; dialog scrollWidth == clientWidth == 356 (no horizontal overflow). Long position list scrolls inside the dialog, actions remain reachable; final save footer stays visible. Required limits remain visible before final save. Existing review/confirmation behavior is unchanged.
