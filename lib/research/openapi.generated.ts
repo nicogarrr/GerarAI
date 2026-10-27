@@ -4944,6 +4944,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/watchlist/dca-signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Dca Signals
+         * @description Nivel DCA actual de cada ticker de watchlist + cartera y su minimo de aviso.
+         */
+        get: operations["list_dca_signals_api_watchlist_dca_signals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/dca-signals/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evaluate Dca Signals Now
+         * @description Evalua ahora watchlist + cartera (una vez por minuto como maximo).
+         */
+        post: operations["evaluate_dca_signals_now_api_watchlist_dca_signals_evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/dca-signals/{symbol}/hit-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dca Hit Rates
+         * @description "¿Cuántas veces estaba más arriba?" por nivel (3/6/12/24/36 meses).
+         *
+         *     Sale de la ultima evaluacion guardada (misma serie y parametros que el
+         *     veredicto); sin evaluacion previa se declara no disponible, no se inventa.
+         */
+        get: operations["dca_hit_rates_api_watchlist_dca_signals__symbol__hit_rates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist/metrics/{symbol}": {
         parameters: {
             query?: never;
@@ -5006,6 +5069,26 @@ export interface paths {
         post?: never;
         /** Delete Watch Item */
         delete: operations["delete_watch_item_api_watchlist__symbol__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/{symbol}/dca-alert-min-level": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Dca Alert Min Level
+         * @description Ajusta el nivel minimo de aviso DCA de un ticker (null = global, 0 = apagado).
+         */
+        put: operations["set_dca_alert_min_level_api_watchlist__symbol__dca_alert_min_level_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6019,6 +6102,207 @@ export interface components {
              * @default decimal
              */
             unit: string;
+        };
+        /** DcaEvaluateOut */
+        DcaEvaluateOut: {
+            /** Alerted */
+            alerted: {
+                [key: string]: unknown;
+            }[];
+            /** Alerts Enabled */
+            alerts_enabled: boolean;
+            /** Errors */
+            errors: {
+                [key: string]: unknown;
+            }[];
+            /** Evaluated */
+            evaluated: number;
+            /** Params Version */
+            params_version: string;
+            /** Skipped */
+            skipped: {
+                [key: string]: unknown;
+            }[];
+            /** Tracked */
+            tracked: number;
+        };
+        /** DcaHitRateCellOut */
+        DcaHitRateCellOut: {
+            /** Avg Return */
+            avg_return?: number | null;
+            /** Horizon Months */
+            horizon_months: number;
+            /** Months */
+            months: number;
+            /** Pct Higher */
+            pct_higher?: number | null;
+        };
+        /** DcaHitRateRowOut */
+        DcaHitRateRowOut: {
+            /** Cells */
+            cells: components["schemas"]["DcaHitRateCellOut"][];
+            /** Color */
+            color?: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Levels */
+            levels: number[];
+            /** Signal Months */
+            signal_months: number;
+        };
+        /** DcaHitRatesOut */
+        DcaHitRatesOut: {
+            /** Available */
+            available: boolean;
+            /**
+             * Disclaimer
+             * @default Histórico, hipotético. No es asesoramiento.
+             */
+            disclaimer: string;
+            /** Evaluated At */
+            evaluated_at?: string | null;
+            /** First Period */
+            first_period?: string | null;
+            /** Horizons */
+            horizons?: number[];
+            /** Last Period */
+            last_period?: string | null;
+            /**
+             * Months Completed
+             * @default 0
+             */
+            months_completed: number;
+            /** Params Version */
+            params_version?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Rows */
+            rows?: components["schemas"]["DcaHitRateRowOut"][];
+            /** Symbol */
+            symbol: string;
+        };
+        /** DcaMinLevelIn */
+        DcaMinLevelIn: {
+            /** Min Level */
+            min_level?: number | null;
+        };
+        /** DcaMinLevelOut */
+        DcaMinLevelOut: {
+            /** Effective Min Level */
+            effective_min_level: number;
+            /** Min Level Override */
+            min_level_override: number | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** DcaSignalItemOut */
+        DcaSignalItemOut: {
+            /** Alerts On */
+            alerts_on: boolean;
+            /** Company Name */
+            company_name?: string | null;
+            /** Effective Min Level */
+            effective_min_level: number;
+            /** In Portfolio */
+            in_portfolio: boolean;
+            /** In Watchlist */
+            in_watchlist: boolean;
+            /** Min Level Override */
+            min_level_override?: number | null;
+            /** Sources */
+            sources: string[];
+            state?: components["schemas"]["DcaSignalStateOut"] | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** DcaSignalStateOut */
+        DcaSignalStateOut: {
+            /** Close */
+            close: number;
+            /** Color */
+            color: string;
+            /** Currency */
+            currency?: string | null;
+            /** Currency Label */
+            currency_label?: string | null;
+            /** Data Source */
+            data_source: string;
+            /**
+             * Evaluated At
+             * Format: date-time
+             */
+            evaluated_at: string;
+            /** Fg */
+            fg: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Last Alerted Level */
+            last_alerted_level?: number | null;
+            /** Last Alerted Period */
+            last_alerted_period?: string | null;
+            /** Level */
+            level: number;
+            /** Level Prices */
+            level_prices?: {
+                [key: string]: number | null;
+            };
+            /** Metrics */
+            metrics?: {
+                [key: string]: number | string | null;
+            };
+            /** Params Version */
+            params_version: string;
+            /** Period */
+            period: string;
+            /** Previous Level */
+            previous_level?: number | null;
+            /**
+             * Signal Date
+             * Format: date
+             */
+            signal_date: string;
+            /** Status */
+            status: string;
+            /** Zone */
+            zone: string;
+        };
+        /** DcaSignalsOut */
+        DcaSignalsOut: {
+            /** Alerts Enabled */
+            alerts_enabled: boolean;
+            /** Channels */
+            channels: string[];
+            /** Email Configured */
+            email_configured: boolean;
+            /** Global Min Level */
+            global_min_level: number;
+            /** Items */
+            items: components["schemas"]["DcaSignalItemOut"][];
+            /** Signal Months */
+            signal_months?: number | null;
+            /** Trims Enabled */
+            trims_enabled: boolean;
+            /** Zones */
+            zones: components["schemas"]["DcaZoneOut"][];
+        };
+        /** DcaZoneOut */
+        DcaZoneOut: {
+            /** Color */
+            color: string;
+            /** Fg */
+            fg: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Level */
+            level: number;
+            /** Zone */
+            zone: string;
         };
         /** DecisionJournalCreate */
         DecisionJournalCreate: {
@@ -7997,7 +8281,7 @@ export interface components {
              * Event Type
              * @enum {string}
              */
-            event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest";
+            event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels";
         };
         /** ThesisApproveRequest */
         ThesisApproveRequest: {
@@ -8946,7 +9230,7 @@ export interface operations {
                 "x-cavaai-body-hash"?: string | null;
             };
             path: {
-                event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest";
+                event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels";
             };
             cookie?: never;
         };
@@ -20665,6 +20949,122 @@ export interface operations {
             };
         };
     };
+    list_dca_signals_api_watchlist_dca_signals_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaSignalsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_dca_signals_now_api_watchlist_dca_signals_evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaEvaluateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dca_hit_rates_api_watchlist_dca_signals__symbol__hit_rates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaHitRatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     watchlist_metrics_api_watchlist_metrics__symbol__get: {
         parameters: {
             query?: never;
@@ -20776,6 +21176,50 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_dca_alert_min_level_api_watchlist__symbol__dca_alert_min_level_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DcaMinLevelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaMinLevelOut"];
+                };
             };
             /** @description Validation Error */
             422: {
