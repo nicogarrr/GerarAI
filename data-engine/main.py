@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DataError as SQLAlchemyDataError
 
 from app.api.router import api_router as research_api_router
 from app.api.routes.health import router as health_router
@@ -196,6 +197,25 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         content={"detail": safe_detail(exc, 500)},
     )
 
+
+
+async def db_value_out_of_range_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Entero o valor que la BD no puede representar (p. ej. ``offset=2**63``).
+
+    Sin esto llegaba al handler genérico y devolvía 500: SQLite lanza
+    OverflowError al enlazar el parámetro y Postgres DataError («bigint out of
+    range»). Es entrada inválida del cliente, así que 422. Un OverflowError que
+    no viene de la BD se trata como cualquier excepción no controlada (500).
+    """
+    from app.core.errors import MSG_VALUE_OUT_OF_RANGE, is_db_value_out_of_range
+
+    if is_db_value_out_of_range(exc):
+        return JSONResponse(status_code=422, content={"detail": MSG_VALUE_OUT_OF_RANGE})
+    return await unhandled_exception_handler(request, exc)
+
+
+app.add_exception_handler(OverflowError, db_value_out_of_range_handler)
+app.add_exception_handler(SQLAlchemyDataError, db_value_out_of_range_handler)
 
 # /api/health es público (sin firma): lo montamos fuera del research API
 # para que orquestación/monitoreo pueda consultarlo sin identidad.

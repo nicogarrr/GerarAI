@@ -87,3 +87,29 @@ def safe_detail(exc: Exception, status_code: int) -> str:
     )
     base = _STATUS_DEFAULTS.get(status_code, "Request failed")
     return f"{base} (ref: {ref})"
+
+
+MSG_VALUE_OUT_OF_RANGE = "Valor fuera de rango para este campo."
+
+
+def is_db_value_out_of_range(exc: BaseException) -> bool:
+    """True si la excepción es un valor de cliente que la BD no puede representar.
+
+    - Postgres: ``sqlalchemy.exc.DataError`` (``bigint out of range``, texto más
+      largo que la columna, valor numérico inválido...).
+    - SQLite: ``OverflowError`` al enlazar un entero > 2**63-1 dentro de
+      SQLAlchemy. Un OverflowError de cálculo (math, float) NO cuenta: ese sigue
+      siendo un 500, porque es un bug nuestro y no entrada inválida.
+    """
+    from sqlalchemy.exc import DataError
+
+    if isinstance(exc, DataError):
+        return True
+    if isinstance(exc, OverflowError):
+        tb = exc.__traceback__
+        while tb is not None:
+            module = tb.tb_frame.f_globals.get("__name__", "")
+            if isinstance(module, str) and module.startswith("sqlalchemy."):
+                return True
+            tb = tb.tb_next
+    return False
