@@ -1,21 +1,29 @@
 import DcaHitRatesCard from '@/components/watchlist/DcaHitRatesCard';
-import { getDcaHitRates } from '@/lib/actions/dca-signals.actions';
+import { getDcaHitRatesState } from '@/lib/actions/dca-signals.actions';
 
-/** Ficha de research: histórico de señales DCA si el ticker está en watchlist o cartera. */
+const EMPTY_CLASS = 'rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-xs text-gray-400';
+
+/** Ficha de research: histórico de señales DCA si el ticker está en watchlist o cartera.
+    El acordeón nunca queda vacío: cada estado dice lo que se sabe y nada más. */
 export async function DcaHitRatesSection({ ticker }: { ticker: string }) {
-    const data = await getDcaHitRates(ticker);
-    // Sin dato (ticker no seguido / sin evaluar, o servicio caído) el acordeón
-    // NO puede quedar abierto y vacío: se dice explícitamente.
-    if (!data) {
+    const state = await getDcaHitRatesState(ticker);
+    if (state.status === 'not_evaluated') {
         return (
-            <p role="status" data-testid="dca-hit-rates-empty" className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-xs text-gray-400">
-                Sin histórico de señales DCA para este ticker: aparece cuando está en tu watchlist o cartera y se ha evaluado, o el servicio no responde ahora mismo.
+            <p role="status" data-testid="dca-hit-rates-not-evaluated" className={EMPTY_CLASS}>
+                Este ticker aún no tiene señal DCA evaluada. El histórico aparece cuando está en tu watchlist o cartera y se ha evaluado.
+            </p>
+        );
+    }
+    if (state.status === 'unavailable') {
+        return (
+            <p role="status" data-testid="dca-hit-rates-unavailable" className={EMPTY_CLASS}>
+                Histórico no disponible ahora mismo: no se pudo consultar el servicio. Vuelve a intentarlo más tarde.
             </p>
         );
     }
     return (
         <section aria-label="Histórico de señales DCA" className="rounded-lg border border-gray-800 bg-gray-900/40 p-3">
-            <DcaHitRatesCard data={data} />
+            <DcaHitRatesCard data={state.data} />
         </section>
     );
 }
