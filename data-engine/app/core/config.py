@@ -584,6 +584,10 @@ class Settings(BaseSettings):
     # produccion es obligatoria (>=32 bytes); en local/test se deriva de
     # RESEARCH_AUTH_SECRET para no exigir otro secreto al desarrollador.
     llm_settings_encryption_key: str | None = Field(default=None, repr=False)
+    # Rotacion: claves ANTERIORES, separadas por comas, que solo se usan para
+    # descifrar lo ya guardado. Sin esto, cambiar la clave dejaba la IA de
+    # cada tenant desactivada («configuracion invalida») sin aviso.
+    llm_settings_encryption_key_previous: str | None = Field(default=None, repr=False)
     # GerarAI intentionally uses one provider for every task.
     llm_provider: str = "opencode-go"
     # Llamadas largas (extraccion de documentos/principios, tesis, KPIs): el

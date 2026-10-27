@@ -20,6 +20,7 @@ from app.core.llm_settings_crypto import (
     encrypt_api_key,
     encryption_available,
     last4,
+    needs_reencryption,
 )
 from app.llm.egress_guard import (
     PUBLIC_ONLY_MESSAGE,
@@ -230,6 +231,15 @@ def save_tenant_settings(
         row.api_key_ciphertext = encrypt_api_key(plaintext, settings)
         row.api_key_last4 = last4(plaintext)
         row.key_version = 1
+    elif row.api_key_ciphertext and needs_reencryption(row.api_key_ciphertext, settings):
+        # Clave cifrada con una clave anterior (rotacion): se recifra con la
+        # actual al guardar, para poder retirar la antigua despues.
+        try:
+            plaintext = decrypt_api_key(row.api_key_ciphertext, settings)
+        except LLMSettingsCryptoError:
+            plaintext = None
+        if plaintext is not None:
+            row.api_key_ciphertext = encrypt_api_key(plaintext, settings)
     db.flush()
     return row
 
