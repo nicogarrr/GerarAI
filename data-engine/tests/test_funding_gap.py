@@ -14,6 +14,10 @@ from app.valuation.dilution_model import DilutionInput, run_dilution
 from app.valuation.financial_snapshot import FinancialSnapshot
 from app.valuation.funding_gap import FundingGapResult, estimate_funding_gap
 
+# Colchón explícito (unidad de los hechos) para los tests que fijan el resto
+# de la aritmética; el colchón por defecto (meses de salida) tiene sus tests.
+EXPLICIT_BUFFER = 50.0
+
 
 def _snapshot(**metrics) -> FinancialSnapshot:
     return FinancialSnapshot(
@@ -34,7 +38,8 @@ def _snapshot_completo(**overrides) -> FinancialSnapshot:
 
 def test_caso_base_gap_estimado_y_dilucion_calculada():
     result = estimate_funding_gap(
-        _snapshot_completo(), current_price=10.0, value_per_share=8.0
+        _snapshot_completo(), current_price=10.0, value_per_share=8.0,
+        min_cash_buffer=EXPLICIT_BUFFER,
     )
     assert isinstance(result, FundingGapResult)
     # capex_need = 30*2 = 60; burn = 50*2 = 100; buffer 50; caja 100 -> gap 110.
@@ -153,6 +158,7 @@ def test_horizon_personalizable_cambia_el_burn():
         current_price=10.0,
         value_per_share=8.0,
         default_horizon_years=1.0,
+        min_cash_buffer=EXPLICIT_BUFFER,
     )
     assert result.burn_proxy == pytest.approx(50.0)
     assert result.funding_gap == pytest.approx(30.0 + 50.0 + 50.0 - 100.0)
@@ -174,7 +180,7 @@ def test_sin_shares_no_hay_dilucion():
         operating_cash_flow=-50.0,
         capital_expenditure=-30.0,
     )
-    result = estimate_funding_gap(snapshot, current_price=10.0, value_per_share=8.0)
+    result = estimate_funding_gap(snapshot, current_price=10.0, value_per_share=8.0, min_cash_buffer=EXPLICIT_BUFFER)
     assert result.funding_gap == pytest.approx(110.0)
     assert result.dilution is None
 
@@ -192,7 +198,8 @@ def test_shares_cero_o_negativas_no_diluyen():
 def test_precio_cero_o_faltante_no_diluye():
     for price in (0.0, None, -5.0):
         result = estimate_funding_gap(
-            _snapshot_completo(), current_price=price, value_per_share=8.0
+            _snapshot_completo(), current_price=price, value_per_share=8.0,
+            min_cash_buffer=EXPLICIT_BUFFER,
         )
         assert result.dilution is None
         assert result.funding_gap == pytest.approx(110.0)
@@ -221,6 +228,7 @@ def test_caja_negativa_amplia_el_hueco():
         _snapshot_completo(cash_and_equivalents=-500.0),
         current_price=10.0,
         value_per_share=8.0,
+        min_cash_buffer=EXPLICIT_BUFFER,
     )
     assert result.available_cash == -500.0
     # 60 + 100 + 50 - (-500) = 710.
@@ -269,6 +277,7 @@ def test_ocf_positivo_mayor_que_capex_solo_deja_el_colchon():
         _snapshot_completo(cash_and_equivalents=0.0, operating_cash_flow=80.0),
         current_price=10.0,
         value_per_share=8.0,
+        min_cash_buffer=EXPLICIT_BUFFER,
     )
     assert result.funding_gap == pytest.approx(50.0)
 
@@ -279,5 +288,57 @@ def test_ocf_positivo_menor_que_capex_reduce_el_hueco():
         _snapshot_completo(cash_and_equivalents=0.0, operating_cash_flow=10.0),
         current_price=10.0,
         value_per_share=8.0,
+        min_cash_buffer=EXPLICIT_BUFFER,
     )
     assert result.funding_gap == pytest.approx(90.0)
+
+
+# --------------------------------------------------------------------------
+# Colchón mínimo con unidades explícitas (auditoría de fórmulas: funding_gap)
+# --------------------------------------------------------------------------
+
+
+def test_colchon_por_defecto_son_seis_meses_de_salida_de_caja():
+    """A mano: caja 100, OCF −50/año, capex 30/año, horizonte 2 años.
+    Salida anual = 50 + 30 = 80 → colchón 6/12·80 = 40.
+    Hueco = 30·2 + 50·2 + 40 − 100 = 100 (antes 110 con el 50 fijo)."""
+    result = estimate_funding_gap(_snapshot_completo(), current_price=10.0, value_per_share=8.0)
+    assert result.min_cash_buffer == pytest.approx(40.0)
+    assert result.min_cash_buffer_basis == "6 meses de salida de caja anual"
+    assert result.funding_gap == pytest.approx(100.0)
+
+
+@pytest.mark.parametrize("escala", [1.0, 1e3, 1e6, 1e9])
+def test_hueco_escala_con_la_unidad_de_los_hechos(escala):
+    """Propiedad: los mismos hechos en miles, millones o unidades dan el
+    mismo hueco en su unidad. Con el 50 absoluto, en dólares no pesaba nada."""
+    base = estimate_funding_gap(_snapshot_completo(), current_price=10.0, value_per_share=8.0)
+    escalado = estimate_funding_gap(
+        _snapshot_completo(
+            cash_and_equivalents=100.0 * escala,
+            operating_cash_flow=-50.0 * escala,
+            capital_expenditure=-30.0 * escala,
+        ),
+        current_price=10.0,
+        value_per_share=8.0,
+    )
+    assert escalado.funding_gap == pytest.approx(base.funding_gap * escala)
+    assert escalado.min_cash_buffer == pytest.approx(base.min_cash_buffer * escala)
+
+
+def test_sin_salida_de_caja_no_hay_colchon_ni_hueco():
+    result = estimate_funding_gap(
+        _snapshot_completo(operating_cash_flow=200.0, capital_expenditure=-30.0),
+        current_price=10.0,
+        value_per_share=8.0,
+    )
+    assert result.min_cash_buffer == 0.0
+    assert result.funding_gap == 0.0
+
+
+def test_colchon_explicito_queda_marcado_en_la_traza():
+    result = estimate_funding_gap(
+        _snapshot_completo(), current_price=10.0, value_per_share=8.0, min_cash_buffer=50.0
+    )
+    assert result.min_cash_buffer_basis == "explicito"
+    assert result.funding_gap == pytest.approx(110.0)
