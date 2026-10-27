@@ -1844,7 +1844,9 @@ export interface paths {
          * @description Resumen para la tesis y la ficha: insiders (Form 4, 180 dias) + fondos 13F.
          *
          *     Solo lee lo persistido (sin red). Nunca 500: un bloque que falla queda en
-         *     ``pendiente`` y uno sin datos en ``sin_datos`` con su motivo.
+         *     ``pendiente`` y uno sin datos en ``sin_datos`` con su motivo. Si la cuenta
+         *     aun no tiene ningun 13F sincronizado, encola UNA vez su primera descarga
+         *     (no espera al cron del lunes) y lo dice en el detalle.
          */
         get: operations["insider_ownership_signals_api_insider_ownership_signals_get"];
         put?: never;
@@ -8547,6 +8549,8 @@ export interface components {
         };
         /** SnapshotThesisSummaryOut */
         SnapshotThesisSummaryOut: {
+            /** Archived Margin Of Safety */
+            archived_margin_of_safety?: string | null;
             /** Base Value */
             base_value: string | null;
             /** Bear Value */
@@ -8578,6 +8582,13 @@ export interface components {
             invalidation_rules?: unknown[] | null;
             /** Margin Of Safety */
             margin_of_safety: string | null;
+            /** Margin Of Safety Convention */
+            margin_of_safety_convention?: string | null;
+            /**
+             * Margin Of Safety Status
+             * @default unknown_convention
+             */
+            margin_of_safety_status: string;
             /** Rating */
             rating: string;
             /** Scenario Probabilities */
@@ -8593,6 +8604,8 @@ export interface components {
         };
         /** SnapshotValuationSummaryOut */
         SnapshotValuationSummaryOut: {
+            /** Archived Margin Of Safety */
+            archived_margin_of_safety?: string | null;
             /** Base Value */
             base_value?: string | null;
             /** Bear Value */
@@ -8605,6 +8618,13 @@ export interface components {
             expected_value?: string | null;
             /** Margin Of Safety */
             margin_of_safety?: string | null;
+            /** Margin Of Safety Convention */
+            margin_of_safety_convention?: string | null;
+            /**
+             * Margin Of Safety Status
+             * @default unknown_convention
+             */
+            margin_of_safety_status: string;
             /** Model Id */
             model_id?: number | null;
             /** Model Type */
@@ -8865,6 +8885,8 @@ export interface components {
         };
         /** ThesisOut */
         ThesisOut: {
+            /** Archived Margin Of Safety */
+            archived_margin_of_safety?: string | null;
             /** Base Value */
             base_value: string | null;
             /** Bear Value */
@@ -8906,6 +8928,13 @@ export interface components {
             latest_data_at?: string | null;
             /** Margin Of Safety */
             margin_of_safety: string | null;
+            /** Margin Of Safety Convention */
+            margin_of_safety_convention?: string | null;
+            /**
+             * Margin Of Safety Status
+             * @default unknown_convention
+             */
+            margin_of_safety_status: string;
             /** Missing Inputs */
             missing_inputs?: string[] | null;
             /** Narrative Sections */
