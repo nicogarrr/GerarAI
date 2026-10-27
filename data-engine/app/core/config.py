@@ -387,6 +387,10 @@ class Settings(BaseSettings):
     smtp_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
     # Destinatarios separados por comas.
     alert_email_to: str | None = None
+    # DCA_EVALUATION_ENABLED: la evaluacion diaria de senales DCA (guarda el
+    # nivel 1X-4X de watchlist + cartera). Es independiente de los avisos: con
+    # DCA_ALERTS_ENABLED=false se sigue evaluando y solo se callan los avisos.
+    dca_evaluation_enabled: bool = True
     # Senales DCA por niveles (1X-4X + recortes) sobre watchlist + cartera.
     # DCA_ALERT_MIN_LEVEL: nivel minimo de compra que avisa (1-4) salvo ajuste
     # por ticker. DCA_ALERT_TRIMS: avisar tambien de las zonas de recorte.
