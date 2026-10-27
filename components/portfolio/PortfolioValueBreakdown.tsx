@@ -39,7 +39,6 @@ export function PortfolioValueBreakdown({ summary }: { summary: PortfolioSummary
                     <dd className="mt-1 break-words text-xl font-bold text-white sm:text-2xl">{formatMoney(totalValue, baseCurrency)}</dd>
                 </div>
             </dl>
-            {fxBasisText(summary) && <p className="mt-3 text-xs text-gray-500">Tipos de cambio usados. {fxBasisText(summary)}.</p>}
             {summary.valuationDatesDiffer && <p className="mt-2 text-xs text-amber-300">Posiciones a {formatDate(summary.positionsAsOf)} y caja a {formatDate(summary.cashAsOf)}: el total combina fechas distintas.</p>}
             {status === 'incomplete_fx' && <p className="mt-3 text-xs text-amber-300">Faltan tipos de cambio. El desglose excluye esos saldos y posiciones.</p>}
         </div>
