@@ -53,7 +53,12 @@ en [docs/AI_PROVIDER_STRATEGY.md](docs/AI_PROVIDER_STRATEGY.md):
   OpenRouter (`:free`) y el Go aprobado, solo miembros con clave.
 - `LLM_PROVIDER=disabled` (o `LLM_ENABLED=false`) no construye proveedor; el
   chat queda deshabilitado y `/health/ready` devuelve 503.
-- Groq/Gemini/OpenRouter como respaldos del chat están apagados por defecto.
+- Groq/Gemini/OpenRouter son respaldos gratuitos en modo `auto` (por
+  defecto): cada uno entra solo si tiene clave y las confirmaciones de plan
+  gratuito (`GROQ_FREE_PLAN_CONFIRMED`+`GROQ_ZDR_CONFIRMED`,
+  `GEMINI_FREE_PLAN_CONFIRMED`); sin clave se salta. `*_CHAT_FALLBACK_ENABLED=false`
+  los apaga. Si todo falla, el chat responde en modo determinista marcado
+  como fallback, sin inventar texto.
   La caché de respuestas Go es por tenant y nunca cachea un fallback.
 
 ## Arranque rápido (< 30 min)
@@ -188,8 +193,9 @@ Todos aceptan `--json` para volcar el informe. El eval del RAG indexa en
 Next.js (App Router, server actions firmadas HMAC) habla con FastAPI
 (`/api/*`, firma X-CavaAI-*): Postgres como canónico, Qdrant como índice
 semántico reconstruible, MinIO para originales y Redis/Dramatiq para jobs.
-OpenCode Go es el LLM por defecto (la cascada opcional con Gemini/OpenRouter
-free aprobados se activa a mano) y Jev hace las micro-decisiones.
+OpenCode Go es el LLM por defecto, con respaldos gratuitos (Groq/Gemini)
+que entran solos cuando hay clave y plan gratuito confirmado, y Jev hace las
+micro-decisiones.
 
 Autenticación doble: sesiones Better Auth en MongoDB + firma HMAC con secreto
 de 32 mínimo en la research API (ventana 300 s, tenant = tu userId).

@@ -74,12 +74,16 @@ x-llm-env: &llm-env
   # API rechaza guardar claves con 503 y la UI muestra "cifrado no disponible".
   LLM_SETTINGS_ENCRYPTION_KEY: ${LLM_SETTINGS_ENCRYPTION_KEY:-}
   CHAT_TOTAL_TIMEOUT_SECONDS: ${CHAT_TOTAL_TIMEOUT_SECONDS:-45}
+  # Respaldos gratuitos si cae OpenCode Go (Groq -> Gemini; OpenRouter :free
+  # tras Groq). `auto` (defecto) = cada uno entra SOLO si tiene clave y las
+  # confirmaciones de plan gratuito (Groq ademas ZDR); sin clave se salta.
+  # `false` lo apaga aunque haya clave; `true` lo exige (falla si falta algo).
   GROQ_API_KEY: ${GROQ_API_KEY:-}
-  GROQ_CHAT_FALLBACK_ENABLED: ${GROQ_CHAT_FALLBACK_ENABLED:-false}
+  GROQ_CHAT_FALLBACK_ENABLED: ${GROQ_CHAT_FALLBACK_ENABLED:-auto}
   GROQ_FREE_PLAN_CONFIRMED: ${GROQ_FREE_PLAN_CONFIRMED:-false}
   GROQ_ZDR_CONFIRMED: ${GROQ_ZDR_CONFIRMED:-false}
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-  GEMINI_CHAT_FALLBACK_ENABLED: ${GEMINI_CHAT_FALLBACK_ENABLED:-false}
+  GEMINI_CHAT_FALLBACK_ENABLED: ${GEMINI_CHAT_FALLBACK_ENABLED:-auto}
   GEMINI_FREE_PLAN_CONFIRMED: ${GEMINI_FREE_PLAN_CONFIRMED:-false}
   OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
   OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemma-4-31b-it:free}
