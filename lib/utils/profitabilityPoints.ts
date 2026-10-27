@@ -21,7 +21,27 @@ export function percentToRatio(value: number): number {
 
 export function netMarginPoints(rawMarginPct: number, sectorMargin: number | null): number {
     const margin = percentToRatio(rawMarginPct);
-    return sectorMargin !== null && margin > sectorMargin * 1.3 ? 35 : sectorMargin !== null && margin > sectorMargin ? 30 : margin > 0.1 ? 25 : margin > 0 ? 15 : 0;
+    // V6: con benchmark NO positivo los multiplicadores se invierten (un
+    // margen -15 % supera -10 % * 1,3 = -13 %) y premiaban perder igual o
+    // mas que el sector. El tramo relativo maximo exige ademas margen
+    // claramente positivo; superar un benchmark en perdidas solo suma el
+    // tramo intermedio.
+    // TRADEOFF documentado (review #2467): una empresa en perdidas puede
+    // puntuar 30 por ser "menos mala" que su sector (-5 % vs -10 %), mas
+    // que la misma empresa sin datos sectoriales (0). Es fuerza relativa
+    // INTENCIONADA: el score compara contra pares. Cambiarlo (puntos solo
+    // con margen > 0) es una decision de filosofia de scoring, no de
+    // correccion; se deja al dueno del producto.
+    if (sectorMargin !== null) {
+        if (sectorMargin > 0) {
+            if (margin > sectorMargin * 1.3) return 35;
+            if (margin > sectorMargin) return 30;
+        } else {
+            if (margin > 0.1 && margin > sectorMargin) return 35;
+            if (margin > sectorMargin) return 30;
+        }
+    }
+    return margin > 0.1 ? 25 : margin > 0 ? 15 : 0;
 }
 
 export function roePoints(rawRoePct: number): number {
@@ -37,7 +57,19 @@ export function roaPoints(rawRoaPct: number): number {
 /** Crecimiento de ventas (en %) frente al del sector (en fracción). */
 export function revenueGrowthPoints(rawGrowthPct: number, sectorGrowth: number | null): number {
     const growth = percentToRatio(rawGrowthPct);
-    return sectorGrowth !== null && growth > sectorGrowth * 1.5 ? 40 : sectorGrowth !== null && growth > sectorGrowth ? 35 : growth > 0 ? 25 : 10;
+    // V6: misma inversion que netMarginPoints: con sector en contraccion,
+    // crecer -12 % superaba -10 % * 1,5 = -15 % y recibia el maximo (40).
+    // Mismo tradeoff de fuerza relativa documentado en netMarginPoints.
+    if (sectorGrowth !== null) {
+        if (sectorGrowth > 0) {
+            if (growth > sectorGrowth * 1.5) return 40;
+            if (growth > sectorGrowth) return 35;
+        } else {
+            if (growth > 0.1 && growth > sectorGrowth) return 40;
+            if (growth > sectorGrowth) return 35;
+        }
+    }
+    return growth > 0 ? 25 : 10;
 }
 
 export function epsGrowthPoints(rawGrowthPct: number): number {

@@ -23,8 +23,8 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, MarketPrice
-from app.services.currencies import price_in_currency
-from app.services.fiscal_fifo import FifoSale, apply_backward_repurchase, consume_fifo
+from app.services.price_units import price_in_currency
+from app.services.sale_simulation import FifoSale, apply_backward_repurchase, consume_fifo
 from app.services.tax_irpf_filing import calculate_savings_tax
 from app.services.tax_report_service import MAX_FX_AGE_DAYS, _rate_not_older_than
 from app.valuation.currency import listing_currency

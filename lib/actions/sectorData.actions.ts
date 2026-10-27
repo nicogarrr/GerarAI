@@ -1,7 +1,13 @@
 'use server';
 
 import { cache } from 'react';
-import { calculateAverage, normalizeGrowthScore, normalizeProfitabilityScore } from '@/lib/utils/sectorMetrics';
+import {
+    calculateAverage,
+    normalizeDebtScore,
+    normalizeGrowthScore,
+    normalizeProfitabilityScore,
+    normalizeValueScore,
+} from '@/lib/utils/sectorMetrics';
 import { fetchJSON } from '@/lib/upstream/finnhub';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 
@@ -157,63 +163,8 @@ export const getSectorAverages = cache(async (sector: string): Promise<SectorAve
  */
 
 /**
- * Normaliza score de valor (0-100)
- */
-function normalizeValueScore(pe: number, pb: number, ps: number): number {
-    let score = 0;
-    
-    // PE: más bajo es mejor (invertir)
-    if (pe > 0) {
-        if (pe < 15) score += 35;
-        else if (pe < 25) score += 30;
-        else if (pe < 35) score += 25;
-        else score += 15;
-    }
-    
-    // PB: más bajo es mejor
-    if (pb > 0) {
-        if (pb < 2) score += 35;
-        else if (pb < 4) score += 30;
-        else if (pb < 6) score += 25;
-        else score += 15;
-    }
-    
-    // PS: más bajo es mejor
-    if (ps > 0) {
-        if (ps < 3) score += 30;
-        else if (ps < 6) score += 25;
-        else score += 15;
-    }
-    
-    return Math.min(100, score);
-}
-
-/**
  * Normaliza score de crecimiento (0-100)
  */
-
-/**
- * Normaliza score de deuda/liquidez (0-100)
- */
-function normalizeDebtScore(debtToEquity: number, currentRatio: number): number {
-    let score = 0;
-    
-    const dte = Math.abs(debtToEquity);
-    // D/E más bajo es mejor, pero depende del sector
-    if (dte < 0.5) score += 40;
-    else if (dte < 1) score += 35;
-    else if (dte < 2) score += 30;
-    else if (dte < 3) score += 25;
-    else score += 15;
-    
-    // Current Ratio más alto es mejor
-    if (currentRatio > 2) score += 30;
-    else if (currentRatio > 1.5) score += 25;
-    else if (currentRatio > 1) score += 20;
-    else score += 10;
-    
-    return Math.min(100, score);
-}
 
 /**
  * Retorna null cuando no hay datos disponibles del sector
