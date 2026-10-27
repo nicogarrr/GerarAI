@@ -9,6 +9,7 @@ from typing import Any, NamedTuple
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.database import batch_refresh
 from app.core.tenancy import tenant_filters
 from app.llm import LLMRequest, Message, ResponseFormat, parse_json_response
@@ -268,6 +269,7 @@ class KPIExtractionService:
                 task="kpi_extraction",
                 temperature=0,
                 max_tokens=4000,
+                reasoning_effort=get_settings().reasoning_effort_for("extraccion"),
                 response_format=ResponseFormat.json_schema(
                     schema, name="company_kpi_observations", strict=True
                 ),

@@ -112,6 +112,29 @@ def _assert_not_placeholder(value: str, *, label: str) -> None:
             )
 
 
+#: Esfuerzo de razonamiento POR SECCION: la unica tabla. Medido el
+#: 2026-10-27 con 140 llamadas reales a deepseek-v4.1-flash (OpenCode Go) a
+#: Default/Low/High/Max: la calidad (juez ciego + comprobaciones
+#: deterministas) no mejora por encima de low en ninguna seccion salvo un
+#: margen pequeno en el analisis de cartera, y high/max tardan 1,5-2,7x mas.
+#: Override por env (solo las secciones que quieras cambiar):
+#: LLM_REASONING_EFFORT_BY_SECTION='{"tesis_profunda":"high"}'.
+LLM_REASONING_EFFORT_DEFAULTS: dict[str, str] = {
+    "chat_consulta": "low",  # dato concreto de un valor (precio, ratio, cifra)
+    "chat_cartera": "high",  # analisis de la cartera completa
+    "chat_general": "low",  # preguntas generales sin datos privados
+    "tesis_profunda": "low",  # narrativa extensa de la tesis
+    "tesis_noticias": "low",  # narrativa de noticias de la tesis
+    "debate": "low",  # debate alcista/bajista y juez
+    "traduccion_titular": "low",  # titulares de noticias al espanol
+    "extraccion": "low",  # KPIs y extracciones estructuradas
+    "segundo_orden": "low",  # hipotesis de segundo orden de una noticia
+    "asts": "low",  # analisis del catalogo satelital de AST
+}
+#: "none" desactiva el razonamiento; "" = no enviar el parametro.
+LLM_REASONING_EFFORT_VALUES = frozenset({"", "none", "low", "high", "max"})
+
+
 class Settings(BaseSettings):
     # extra=ignore a propósito: .env comparte claves de frontend
     # (BETTER_AUTH_*, TWELVE_DATA_*, etc.) que el backend no modela.
@@ -492,18 +515,17 @@ class Settings(BaseSettings):
     # OPENCODE_GO_CHAT_REASONING_EFFORT.
     opencode_go_chat_reasoning_effort: str | None = "high"
 
-    # Effort para las narrativas largas de tesis (request-level, no toca chat
-    # ni otros consumidores). Medido 2026-10-26 en la imagen aislada contra el
-    # endpoint real con deepseek-v4.1-flash: con effort alto/low el
-    # razonamiento oculto consumia TODO max_tokens (finish=length, content
-    # vacio o truncado); con "none" reasoning=0, finish=stop y salida completa
-    # dentro de los topes actuales (798/1600 news, 1996-2299/4000 extensa).
-    # Reversible por env. Cadenas: "none" desactiva thinking en el endpoint.
-    # Env: THESIS_DEEP_NARRATIVE_REASONING_EFFORT.
-    thesis_deep_narrative_reasoning_effort: str | None = "none"
-    # Mismo criterio para la narrativa de noticias (max 1600): medida en la
-    # misma sesion aislada. Env: THESIS_NEWS_NARRATIVE_REASONING_EFFORT.
-    thesis_news_narrative_reasoning_effort: str | None = "none"
+    # Effort de las narrativas de tesis. None (por defecto) = la tabla por
+    # seccion (tesis_profunda / tesis_noticias). Antes era "none" porque con
+    # 4000/1600 max_tokens el razonamiento agotaba el tope; ahora los topes
+    # dejan sitio al razonamiento (16000 / 6000). Un valor explicito sigue
+    # ganando, para no romper despliegues que ya lo fijan.
+    # Env: THESIS_DEEP_NARRATIVE_REASONING_EFFORT / THESIS_NEWS_NARRATIVE_REASONING_EFFORT.
+    thesis_deep_narrative_reasoning_effort: str | None = None
+    thesis_news_narrative_reasoning_effort: str | None = None
+    # Override de la tabla LLM_REASONING_EFFORT_DEFAULTS, JSON por seccion.
+    # Env: LLM_REASONING_EFFORT_BY_SECTION='{"chat_consulta":"high"}'.
+    llm_reasoning_effort_by_section: Annotated[dict[str, str], NoDecode] = Field(default_factory=dict)
 
     # Cascada gratuita (LLM_PROVIDER=cascade): Gemini AI Studio -> OpenRouter :free
     # -> OpenCode, solo los que tengan clave. Env: GEMINI_API_KEY / OPENROUTER_API_KEY.
@@ -643,6 +665,51 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    @field_validator("llm_reasoning_effort_by_section", mode="before")
+    @classmethod
+    def _parse_reasoning_effort_by_section(cls, value):
+        """JSON por seccion; vacio = sin overrides. Falla al arrancar si no es valido."""
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return {}
+            try:
+                value = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    "LLM_REASONING_EFFORT_BY_SECTION debe ser un JSON, "
+                    'p. ej. {"tesis_profunda": "high"}'
+                ) from exc
+        if not isinstance(value, dict):
+            raise ValueError("LLM_REASONING_EFFORT_BY_SECTION debe ser un objeto JSON")
+        cleaned: dict[str, str] = {}
+        for section, effort in value.items():
+            if section not in LLM_REASONING_EFFORT_DEFAULTS:
+                raise ValueError(
+                    f"Seccion de razonamiento desconocida: {section!r}. "
+                    f"Validas: {', '.join(sorted(LLM_REASONING_EFFORT_DEFAULTS))}"
+                )
+            normalized = str(effort or "").strip().lower()
+            if normalized not in LLM_REASONING_EFFORT_VALUES:
+                raise ValueError(
+                    f"Esfuerzo no valido para {section!r}: {effort!r}. "
+                    "Usa low, high, max o none"
+                )
+            cleaned[section] = normalized
+        return cleaned
+
+    def reasoning_effort_for(self, section: str) -> str | None:
+        """Esfuerzo de razonamiento de una seccion: override por env o la tabla.
+
+        Devuelve None cuando no hay que enviar el parametro.
+        """
+        if section not in LLM_REASONING_EFFORT_DEFAULTS:
+            raise KeyError(f"Seccion de razonamiento desconocida: {section}")
+        value = self.llm_reasoning_effort_by_section.get(
+            section, LLM_REASONING_EFFORT_DEFAULTS[section]
+        )
+        return value or None
 
     @field_validator("llm_model_overrides", mode="before")
     @classmethod

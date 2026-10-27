@@ -91,6 +91,13 @@ _SYSTEM = (
 _AGGREGATOR_HOSTS = ("news.google.com", "google.com")
 
 
+def _effort(section: str, explicit: str | None) -> str | None:
+    """Valor explicito del env si existe; si no, la tabla por seccion."""
+    if explicit is not None and explicit.strip():
+        return explicit.strip()
+    return get_settings().reasoning_effort_for(section)
+
+
 def _canonical_url(url: str | None) -> str | None:
     """URL de la fuente; un redirect de Google News no es la fuente: N/D."""
     if not url:
@@ -185,12 +192,10 @@ def build_request(ticker: str, headlines: list[dict]) -> LLMRequest:
         messages=[Message("system", _SYSTEM), Message("user", json.dumps(
             {"ticker": ticker, "noticias": headlines}, ensure_ascii=False,
         ))],
-        task="main_financial_analysis", temperature=0.2, max_tokens=1600,
-        # Medido 2026-10-26 (aislado, endpoint real): con effort alto/low el
-        # razonamiento oculto agotaba los 1600 tokens (finish=length); con
-        # "none" reasoning=0, finish=stop (798/1600). Override por request:
-        # el chat y el resto de consumidores no cambian.
-        reasoning_effort=get_settings().thesis_news_narrative_reasoning_effort,
+        # Con 1600 el razonamiento agotaba el tope (finish=length): 6000 deja
+        # sitio al razonamiento de la tabla por seccion (tesis_noticias).
+        task="main_financial_analysis", temperature=0.2, max_tokens=6000,
+        reasoning_effort=_effort("tesis_noticias", get_settings().thesis_news_narrative_reasoning_effort),
         response_format=ResponseFormat.json_schema(_SCHEMA, name="thesis_news_narrative"),
     )
 

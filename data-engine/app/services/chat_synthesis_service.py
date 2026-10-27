@@ -12,9 +12,11 @@ from typing import Any
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.llm import LLMRequest, Message, ResponseFormat, parse_json_response
 from app.llm.base import LLMProvider
 from app.llm.interactive_deadline import complete_with_deadline
+from app.llm.reasoning_sections import chat_reasoning_effort
 from app.schemas import ChatResponse, SynthesisSection
 from app.services.budget import BudgetController, BudgetExceededError
 from app.services.langfuse_client import LangfuseTracer
@@ -582,7 +584,11 @@ class ChatSynthesisService:
                     ],
                     task="main_financial_analysis",
                     temperature=0.1,
-                    max_tokens=1800,
+                    # El analisis de cartera en high usa hasta ~3,9k tokens con
+                    # el razonamiento (medido 2026-10-27): 1800 lo truncaba.
+                    max_tokens=4000,
+                    # Consulta rapida = low, analisis de cartera = high (tabla por seccion).
+                    reasoning_effort=chat_reasoning_effort(question),
                     response_format=ResponseFormat.json_schema(
                         RESPONSE_SCHEMA,
                         name="source_aware_chat",
@@ -882,6 +888,7 @@ class ChatSynthesisService:
             task="chat",
             temperature=0.3,
             max_tokens=600,
+            reasoning_effort=get_settings().reasoning_effort_for("chat_general"),
         )
         spent = {"cost": 0.0}
 
