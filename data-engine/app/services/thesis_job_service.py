@@ -431,8 +431,9 @@ def _record_preclaim_failure(db: Session, run_id: int, exc: BaseException) -> No
     """Consume un intento cuando el fallo ocurre antes de reclamar el run.
 
     Relee la fila tras el rollback. Si otra entrega ya la reclamo (running con
-    started_at reciente) no escribe nada. Transitorio con intentos restantes ->
-    retrying con attempt+1; en otro caso failed. Condicional por status+attempt
+    started_at reciente) no escribe nada. Cuenta el intento no reclamado como
+    fallido (attempt = el que se iba a reclamar); transitorio con intentos
+    restantes -> retrying, en otro caso failed. Condicional por status+attempt
     leidos: nunca pisa el estado de otra entrega.
     """
     db.rollback()
@@ -448,11 +449,15 @@ def _record_preclaim_failure(db: Session, run_id: int, exc: BaseException) -> No
     if status == "running" and started is not None and datetime.now(UTC) - started < RUNNING_LEASE:
         db.rollback()
         return  # otra entrega es la duena viva
-    consumed = attempt + 1
+    # Numero del intento que ESTA entrega iba a reclamar (misma cuenta que el
+    # reclamo normal): desde retrying/running el reclamo hace attempt+1; desde
+    # queued usa el attempt actual. Se registra como el intento fallido, de modo
+    # que el siguiente reclamo desde retrying suma +1 una sola vez.
+    consumed = attempt + 1 if status in ("retrying", "running") else max(attempt, 1)
     retryable = _is_retryable_error(exc) and consumed < MAX_ATTEMPTS
     values: dict = {
         "status": "retrying" if retryable else "failed",
-        "attempt": consumed if retryable else attempt,
+        "attempt": consumed,
         "error_class": type(exc).__name__,
         "error_message": (
             "Transient failure; delivery will be retried" if retryable else "Thesis generation failed"
