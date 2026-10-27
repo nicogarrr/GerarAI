@@ -181,10 +181,17 @@ def import_report(db: Session, xml: str, account_id: str, revision: int) -> dict
     return view(db)
 
 
-def record_failure(db: Session) -> None:
+def record_failure(db: Session, *, revision: int | None) -> None:
+    """Only the connection revision that started the failed request may change.
+
+    No credentials obtained means no report request was attributed to a revision.
+    Roll back its read transaction without changing a possibly renewed connection.
+    """
     db.rollback()
+    if revision is None:
+        return
     row = connection(db, lock=True)
-    if row and row.enabled:
+    if row and row.enabled and row.revision == revision:
         row.last_attempt_at = datetime.now(UTC)
         row.status = "error"
         row.message = "No se pudo sincronizar. Conservamos los datos anteriores; revisa la conexión y vuelve a intentarlo."
