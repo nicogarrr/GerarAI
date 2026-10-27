@@ -1,245 +1,355 @@
-# GerarAI — Research OS de inversión personal
+# GerarAI
+
+**A self-hosted investment research OS for long-term investors: company research, versioned theses, deterministic valuation, portfolio tracking and a cited AI copilot in one place.**
 
 [![CI](https://github.com/nicogarrr/GerarAI/actions/workflows/ci.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/ci.yml)
 [![Coverage](https://github.com/nicogarrr/GerarAI/actions/workflows/coverage.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/coverage.yml)
 [![CodeQL](https://github.com/nicogarrr/GerarAI/actions/workflows/codeql.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/nicogarrr/GerarAI?include_prereleases&label=release&color=orange)](https://github.com/nicogarrr/GerarAI/releases)
-[![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](package.json)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](data-engine/pyproject.toml)
 
-**GerarAI es tu memoria de inversor a largo plazo.** No es un terminal más ni una fábrica de DCF: es donde vive por qué sigues o posees cada empresa, qué evidencias sostienen tu tesis, qué la contradice y qué ha cambiado con el tiempo.
+> **Status:** v0.9.0 beta (pre-release). The 1.0 checklist is tracked in [docs/RELEASE_1_0.md](docs/RELEASE_1_0.md).
+> The user interface is in Spanish (es-ES); code, APIs and this document are in English.
+> **Not financial advice.** See the [disclaimer](#disclaimer).
 
-> Esto no es asesoramiento financiero. Los datos pueden llegar con retraso o estar incompletos según el proveedor.
+## Contents
 
-**Estado:** v0.9.0 (pre-release). La 1.0 se publicará cuando cierre la auditoría.
+- [What it is](#what-it-is)
+- [Key features](#key-features)
+- [Architecture](#architecture)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [Data sources](#data-sources)
+- [Testing and quality gates](#testing-and-quality-gates)
+- [Deployment](#deployment)
+- [Project structure](#project-structure)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing) · [Security](#security) · [License](#license) · [Disclaimer](#disclaimer)
 
-## Qué hace
+## What it is
 
-- **Workspace por empresa** (`/research/[ticker]`): snapshot coherente, tesis versionada con auditoría, claims con evidencia a favor/en contra, memoria y chat con fuentes.
-- **Tesis con abogado del diablo**: debate bull/bear automático con veredicto persistido en la tesis.
-- **Valoración determinista**: DCF, SOTP, pre-revenue, bancos, aseguradoras, REITs, holdings y materias primas — con traza de cálculo. Anti-look-ahead: la serie histórica de múltiplos con `as_of` pasado solo usa precios hasta esa fecha y cifras SEC cuyo filing (`filed`) es anterior; sin `filed`, cierre del periodo + 120 días. Límite: de cada periodo se guarda solo la última cifra (reexpresada), así que antes de la reexpresión ese periodo sale «sin datos», no con la cifra original.
-- **Señales insider**: compras de directivos desde SEC EDGAR (Form 4, gratis), con detección de cluster-buy y alerta en Telegram.
-- **Alertas en Telegram**: reglas de precio/noticias/earnings + urgencia puntuada por IA; las tesis se aprueban desde el propio Telegram (Publicar / Revisar).
-- **Biblioteca de conocimiento (RAG)**: sube PDFs/MDs, extrae principios, apruébalos y pregúntales con búsqueda semántica (Qdrant + embeddings locales).
-- **Tesis en EPUB**: descarga cada tesis para leerla en tu e-reader/Kindle.
-- **Screener real, portfolio con IBKR, calendario de earnings/dividendos, diario de decisión y fiscalidad.**
+GerarAI is a long-term investor's memory. It is not another market terminal or a DCF factory: it is where the reasons you own or follow each company live, together with the evidence that supports the thesis, the evidence that contradicts it, and how both change over time.
 
-## De dónde vienen los datos (todo verificable)
+Three principles shape the codebase:
 
-| Fuente | Qué aporta | Coste |
-|---|---|---|
-| Yahoo Finance | Índices reales (^GSPC, ^IXIC, BTC-USD, GC=F, SI=F), fallback de quotes | Gratis |
-| Finnhub | Quotes, perfiles, noticias, calendario (caché ~60 s) | Free tier |
-| SEC EDGAR | Filings 10-K/10-Q y Form 4 de insiders | Gratis, sin key |
-| FRED | Macro (IPC, paro, tipos) | Gratis (key gratuita) |
-| Calendario NASDAQ | Earnings y dividendos | Gratis |
-| FMP (opcional, con `FMP_API_KEY`) | Perfiles, dividendos, splits y contraste de cifras SEC | Free tier |
-| OpenCode Go (DeepSeek v4.1 Flash) + Jev | Solo texto de análisis y micro-decisiones; **nunca inventa cifras** | Suscripción Go ya contratada; Jev opcional, factura por uso si se activa |
+- **No invented data.** Every figure comes from a real source and carries a provenance label (`OFICIAL`, `INFERIDO`, `SIN_DATOS`). When a provider is missing or fails, the coverage is shown as unavailable instead of being filled in.
+- **Deterministic numbers, generative prose.** Valuation, signals and tax figures are computed in code with a calculation trace. The LLM writes analysis text and never produces figures.
+- **Zero-cost by default.** Free data sources and free-tier or already-paid LLM access only; paid services are opt-in.
 
-Si FMP no está configurado o el proveedor falla, esa cobertura se marca como no disponible en lugar de inventarse; no hay tickers ni nombres hardcodeados: todo nombre visible viene de una API real.
+The full product rationale is in [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md).
 
-## Cerebro LLM
+## Key features
 
-El primario es **OpenCode Go** (`https://opencode.ai/zen/go/v1`, modelo
-`deepseek-v4.1-flash`, cubierto por la suscripción del dueño). El detalle vive
-en [docs/AI_PROVIDER_STRATEGY.md](docs/AI_PROVIDER_STRATEGY.md):
+### Research and valuation
 
-- `OPENCODE_GO_FALLBACK_MODEL` es opcional y se pasa al primario Go; si el
-  modelo principal falla, se reintenta una vez con él. Debe ser un modelo
-  aprobado (free verificado o el Go).
-- `LLM_MODEL_OVERRIDES` es un JSON de overrides por tarea. En producción cada
-  valor debe ser aprobado; `OPENCODE_GO_ALLOW_UNVERIFIED_MODEL=true` es solo
-  para un piloto auditado.
-- `LLM_PROVIDER=cascade` es opcional: Gemini (con `GEMINI_FREE_PLAN_CONFIRMED=true`),
-  OpenRouter (`:free`) y el Go aprobado, solo miembros con clave.
-- `LLM_PROVIDER=disabled` (o `LLM_ENABLED=false`) no construye proveedor; el
-  chat queda deshabilitado y `/health/ready` devuelve 503.
-- Groq/Gemini/OpenRouter son respaldos gratuitos en modo `auto` (por
-  defecto): cada uno entra solo si tiene clave y las confirmaciones de plan
-  gratuito (`GROQ_FREE_PLAN_CONFIRMED`+`GROQ_ZDR_CONFIRMED`,
-  `GEMINI_FREE_PLAN_CONFIRMED`); sin clave se salta. `*_CHAT_FALLBACK_ENABLED=false`
-  los apaga. Si todo falla, el chat responde en modo determinista marcado
-  como fallback, sin inventar texto.
-  La caché de respuestas Go es por tenant y nunca cachea un fallback.
+- **Company workspace** (`/research/[ticker]`): one coherent snapshot per company with financials, filings, news, ownership and insider activity.
+- **Deterministic valuation engines**: DCF, SOTP, pre-revenue, banks, insurers, REITs, holding companies and commodity producers, each with a calculation trace.
+- **Point-in-time guard**: historical multiples evaluated `as_of` a past date only use prices up to that date and SEC figures whose filing date precedes it, preventing look-ahead bias.
+- **Insider signals**: SEC Form 4 purchases with cluster-buy detection.
 
-## Arranque rápido (< 30 min)
+### Theses
 
-**Opción rápida (Windows) — `arrancar_gerarai.bat`:**
+- **Versioned investment theses** with an audit trail, claims linked to supporting and contradicting evidence, and invalidation rules.
+- **Devil's advocate debate**: an automated bull/bear debate whose verdict is persisted on the thesis.
+- **Scenarios and projections** per thesis, plus EPUB export for e-readers.
+- **Approval workflow**, including approve/review actions from Telegram.
 
-Doble clic (o `arrancar_gerarai.bat /prod` para validar el build de producción).
-El script levanta **solo la infraestructura** con Docker (PostgreSQL, MongoDB,
-Redis, Qdrant, MinIO), libera los puertos 8000/3000 de procesos huérfanos de
-sesiones anteriores, aplica las migraciones de Alembic (se detiene si fallan)
-y arranca backend (uvicorn :8000) y frontend (next :3000) en local, abriendo
-http://localhost:3000 en el navegador.
+### Cerebro (AI copilot)
 
-**Opción A — stack completo con Docker:**
+- A chat assistant grounded in your portfolio, watchlist, filings and knowledge library, with **cited answers** that point back to their sources.
+- Defaults to OpenCode Go (`deepseek-v4.1-flash`, reasoning effort `high`) with optional free-tier fallbacks. If every provider fails, it answers in a clearly labelled deterministic mode rather than generating text. Provider strategy: [docs/AI_PROVIDER_STRATEGY.md](docs/AI_PROVIDER_STRATEGY.md).
+
+### Portfolio
+
+- Positions and transactions with **XIRR** and portfolio intelligence (concentration, risk, stress scenarios).
+- **Interactive Brokers** import via Flex Query, with reconciliation ([docs/PORTFOLIO_IBKR_RECONCILIATION.md](docs/PORTFOLIO_IBKR_RECONCILIATION.md)).
+- Multi-currency positions with FX attribution.
+- **Decision journal** linked to the real executed trade.
+- **Paper trading** ([docs/paper-trading.md](docs/paper-trading.md)).
+
+### DCA entry signals and alerts
+
+- **Tiered DCA engine**: deterministic, look-ahead-free monthly levels from 1X to 4X of the base contribution, plus light and strong trim zones, for every watchlist and portfolio name.
+- Per-ticker hit-rate history and **email alerts** when a level changes.
+- **Rule-based alerts** on price, news and earnings, delivered by email or Telegram ([docs/telegram-outbound-alerts.md](docs/telegram-outbound-alerts.md)).
+
+### Discovery
+
+- **Screener** over stored fundamentals and quotes.
+- **Watchlist** with DCA levels and quick evaluation.
+- Earnings, dividend and macro calendars; market overview and themes.
+
+### Tax (Spain)
+
+- **Draft tax report** for the Spanish IRPF (capital gains and dividends) using official ECB exchange rates on each transaction date, and a **Modelo 720** draft. These are working drafts for review, not filings.
+
+### Knowledge library (RAG)
+
+- Upload PDF and Markdown documents, extract principles, approve them and query them with hybrid semantic search (Qdrant plus local embedding models; no paid embedding API).
+- Optional Obsidian vault and knowledge graph integration.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    U([Browser]) --> FE
+
+    subgraph Vercel
+        FE["Next.js 16 app<br/>App Router · server actions"]
+    end
+
+    FE -- "sessions" --> MDB[(MongoDB<br/>Better Auth)]
+    FE -- "HMAC-signed /api/*" --> API
+
+    subgraph Backend["Backend (Docker Compose)"]
+        API["FastAPI data-engine"]
+        WK["Dramatiq workers<br/>+ scheduler"]
+        PG[(PostgreSQL<br/>canonical store)]
+        RD[(Redis<br/>queues · cache)]
+        QD[(Qdrant<br/>vector index)]
+        MN[(MinIO<br/>document originals)]
+        API --> PG
+        API --> RD
+        API --> QD
+        API --> MN
+        RD --> WK
+        WK --> PG
+    end
+
+    API --> DP["Market and filings data<br/>SEC EDGAR · ESEF · Finnhub · Yahoo · FRED · ECB"]
+    API --> LLM["LLM providers<br/>OpenCode Go (default) · optional free fallbacks"]
+```
+
+- **Frontend** (repository root): Next.js 16, React 19, TypeScript, Tailwind CSS 4, Radix UI / shadcn, Recharts and Lightweight Charts. Authentication uses Better Auth with MongoDB.
+- **Backend** (`data-engine/`): FastAPI, SQLAlchemy 2 and Alembic on Python 3.12, with Dramatiq workers and a scheduler on Redis.
+- **Storage**: PostgreSQL is the source of truth; Qdrant is a rebuildable semantic index; MinIO stores original documents.
+- **Trust boundary**: the frontend calls the research API with HMAC-signed requests (300-second window; the tenant is the authenticated user ID).
+
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Quick start
+
+### Prerequisites
+
+- Docker with Docker Compose v2
+- Node.js 22 and npm, for running the frontend outside Docker
+- Python 3.12 and [uv](https://docs.astral.sh/uv/), for running the backend outside Docker
+
+### Option A: full stack with Docker
 
 ```bash
-cp docker.env.example .env
-# edita .env con tus claves (Finnhub, Telegram, OpenCode Go…)
+git clone https://github.com/nicogarrr/GerarAI.git
+cd GerarAI
+cp docker.env.example .env        # then fill in the keys you need (see Configuration)
 docker compose up --build
 ```
 
-Abre http://localhost:3000. Servicios: PostgreSQL, MongoDB (auth), Qdrant (vectores), MinIO (documentos), Redis.
-
-| Servicio | Puerto host |
-|---|---|
-| Frontend Next.js | 3000 |
-| Backend FastAPI | 8000 |
-| MongoDB (auth) | 27017 |
-| PostgreSQL | 5432 |
-| Redis | 6379 |
-| Qdrant | 6333 (+6334 gRPC) |
-| MinIO API / consola | 9002 / 9003 |
-
-**Opción B — GitHub Codespaces (sin cargar tu portátil):**
-
-El repo incluye `.devcontainer/`: al crear un codespace se levanta la pila completa
-(PostgreSQL, MongoDB, Redis, Qdrant, MinIO, backend FastAPI y frontend Next.js) y
-quedas editando dentro del contenedor con Node 22 y Python 3.
-
-1. En GitHub: **Code -> Codespaces -> Create codespace on main**.
-2. Espera a que termine el arranque y abre el puerto 3000 (se reenvía solo).
-3. La cuenta personal gratuita incluye 120 core-hours/mes (~60 h con la máquina
-   de 2 cores) y 15 GB de almacenamiento; configura el auto-stop a 15-30 min en
-   tus ajustes de Codespaces para no gastar cuota.
-4. En una máquina de 2 cores puedes ahorrar RAM parando lo que no uses:
-   `docker compose stop worker scheduler`.
-
-**Opción C — desarrollo por piezas:**
+In a second terminal, apply migrations and load the public company taxonomy:
 
 ```bash
-# Backend
-cd data-engine
-python -m venv .venv && ./.venv/Scripts/activate  # Windows
-pip install -r requirements.txt
-python -m alembic upgrade head
-python -m uvicorn main:app --host 127.0.0.1 --port 8000
+docker compose exec backend python -m alembic upgrade head
+docker compose exec backend python -m app.seed
+```
 
-# Frontend (otra terminal, desde la raíz)
-npm install
+Open <http://localhost:3000>. The seed installs only the global company taxonomy; it never creates portfolios or user data.
+
+| Service | Host port |
+| --- | --- |
+| Frontend (Next.js) | 3000 |
+| Backend (FastAPI) | 8000 |
+| MongoDB | 27017 |
+| PostgreSQL | 5432 |
+| Redis | 6379 |
+| Qdrant | 6333 (6334 gRPC) |
+| MinIO API / console | 9002 / 9003 |
+
+All ports bind to `127.0.0.1` by default.
+
+### Option B: run frontend and backend locally
+
+Start only the infrastructure with Docker:
+
+```bash
+cp docker.env.example .env
+docker compose up -d mongodb postgres redis qdrant minio
+```
+
+Backend. It reads `.env` from its working directory, so create `data-engine/.env` with the backend variables:
+
+```bash
+cd data-engine
+uv sync --frozen --extra test --extra dev --no-install-project
+source .venv/bin/activate
+python -m alembic upgrade head
+python -m app.seed
+python -m uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+Frontend, from the repository root in another terminal:
+
+```bash
+npm ci
 npm run dev
 ```
 
-**Variables mínimas** (ver `docker.env.example` para la lista completa):
+### Other options
 
-```env
-MONGODB_URI=mongodb://root:***@localhost:27017/cavaai?authSource=admin
-BETTER_AUTH_SECRET=secreto_de_32_caracteres_minimo
-RESEARCH_AUTH_SECRET=otro_secreto_independiente_de_32
-FINNHUB_API_KEY=
-OPENCODE_GO_API_KEY=
-TELEGRAM_ENABLED=true
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
-```
+- **GitHub Codespaces**: the repository ships a `.devcontainer/` that starts the full stack (Node 22, Python 3).
+- **Windows**: `arrancar_gerarai.bat` starts the infrastructure in Docker, applies migrations and runs both servers locally.
 
-Genera secretos con `openssl rand -base64 32`. **Nunca commitees el `.env`** (está en `.gitignore`: solo se versionan los `.example`).
+## Configuration
 
-## Verificación
+All configuration is provided through environment variables. Templates:
+
+- [`docker.env.example`](docker.env.example): local development and Docker Compose.
+- [`.env.production.example`](.env.production.example): production backend.
+
+Never commit a real `.env`; only the `.example` files are versioned. Generate secrets with `openssl rand -base64 32`.
+
+### Frontend variables (Next.js / Vercel)
+
+| Variable | Purpose | Required |
+| --- | --- | --- |
+| `MONGODB_URI` | MongoDB connection used by Better Auth | Yes |
+| `BETTER_AUTH_SECRET` | Session signing secret (32+ characters) | Yes |
+| `BETTER_AUTH_URL` | Public base URL of the app | Yes |
+| `RESEARCH_AUTH_SECRET` | HMAC secret shared with the backend (32+ characters) | Yes |
+| `FMP_BACKEND_URL` | Base URL of the FastAPI data-engine (historical name) | Yes |
+| `NEXT_PUBLIC_SITE_URL` | Canonical site URL for metadata and links | Optional |
+| `ALLOW_PUBLIC_SIGNUP`, `SIGNUP_ALLOWLIST`, `REQUIRE_EMAIL_VERIFICATION` | Sign-up policy (closed by default in production) | Optional |
+| `FINNHUB_API_KEY` | Quotes, profiles and news | Optional |
+| `SMTP_USER`, `SMTP_PASS`, `ACCESS_REQUEST_NOTIFY_EMAIL` | Access-request notification email | Optional |
+
+### Backend variables (`data-engine`)
+
+| Variable | Purpose | Required |
+| --- | --- | --- |
+| `APP_ENV` | `local`, `test` or `production`; production enables strict validation | Yes |
+| `DATABASE_URL` | PostgreSQL connection (SQLite is rejected in production) | Production |
+| `RESEARCH_AUTH_SECRET` | HMAC secret shared with the frontend | Production |
+| `CORS_ORIGINS` | Allowed origins (`*` is rejected) | Production |
+| `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` | Object storage for document originals | Production |
+| `REDIS_URL` | Job queues and cache | Production |
+| `WORKERS_ENABLED` | Enables background workers | Optional |
+| `SEC_USER_AGENT` | Contact string sent to SEC EDGAR, as SEC's fair-access policy requires | Recommended |
+| `QDRANT_URL`, `VECTOR_STORE`, `CAVAAI_ENABLE_VECTOR_INGEST`, `CAVAAI_ENABLE_VECTOR_SEARCH`, `CAVAAI_ENABLE_VECTOR_CHAT` | Vector RAG | Optional |
+| `LLM_ENABLED`, `LLM_PROVIDER` | Enable and select the LLM provider (`disabled` turns it off) | Optional |
+| `OPENCODE_GO_API_KEY`, `OPENCODE_GO_MODEL`, `OPENCODE_GO_REASONING_EFFORT` | Default LLM provider | Optional |
+| `FINNHUB_API_KEY`, `FMP_API_KEY`, `FRED_API_KEY`, `NEWSAPI_KEY`, `MARKETAUX_API_KEY`, `ALPHA_VANTAGE_API_KEY` | Optional data providers | Optional |
+| `IBKR_FLEX_TOKEN`, `IBKR_FLEX_QUERY_ID` | Interactive Brokers Flex import | Optional |
+| `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_LINK_SECRET` | Telegram alerts | Optional |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS`, `SMTP_SSL` | Outbound email for alerts, including DCA signals | Optional |
+
+The complete list, including LLM fallbacks, observability and data-retention settings, is in the example files. LLM-specific variables are documented in [docs/AI_PROVIDER_STRATEGY.md](docs/AI_PROVIDER_STRATEGY.md).
+
+## Data sources
+
+GerarAI uses free or free-tier sources only. Each provider has its own terms; you are responsible for complying with them.
+
+| Source | Used for | Access | Licensing notes |
+| --- | --- | --- | --- |
+| SEC EDGAR | XBRL company facts, 10-K/10-Q/20-F/40-F filings, Form 4 | Free, no key | US public data. Fair-access policy: identify yourself with `SEC_USER_AGENT` and respect rate limits. |
+| ESEF via filings.xbrl.org | Structured financials for European issuers (local snapshot covers IBEX constituents) | Free, no key | Filings remain the issuers' documents; review filings.xbrl.org's terms. |
+| Yahoo Finance | Index levels, quote fallback, complementary fundamentals | Free, no key | **Unofficial** endpoints with no SLA; may change or break. Data is labelled «no oficial» in the app. For personal use only. |
+| Stooq | Historical prices | Free, no key | Personal use; no SLA. |
+| Finnhub | Quotes, profiles, news, calendars | Free tier, key | Subject to Finnhub's free-tier terms and rate limits. |
+| Financial Modeling Prep | Profiles, dividends, splits, cross-checks of SEC figures | Optional free tier, key | Disabled unless `FMP_API_KEY` is set. |
+| FRED | Macro series (CPI, unemployment, rates) | Free key | FRED terms of use; some series carry third-party copyright. |
+| ECB | Official euro reference exchange rates (FX and tax report) | Free, no key | ECB statistical data, free reuse with attribution. |
+| Damodaran Online | Equity risk premium and WACC inputs | Free | Public academic datasets. |
+| Nasdaq calendar | Earnings and dividend dates | Free, no key | Unofficial public endpoint. |
+
+LLM providers only generate analysis text and never supply figures.
+
+## Testing and quality gates
+
+The same gates run locally and in CI ([AGENTS.md](AGENTS.md), [docs/QUALITY_GATES.md](docs/QUALITY_GATES.md)).
+
+Backend, from `data-engine/`:
 
 ```bash
-# Frontend
-./node_modules/.bin/tsc --noEmit
+uv sync --frozen --extra test --extra dev --no-install-project
+ruff check .
+pyright                                   # 0 errors required
+APP_ENV=test pytest -q -p no:warnings
+python scripts/run_valuation_evals.py     # also run_llm_evals.py, run_ingest_evals.py, run_rag_evals.py
+```
+
+Frontend, from the repository root:
+
+```bash
 npm run lint
-npm run build
+npm run typecheck
+npm run test:unit                         # Vitest + Testing Library
+npm run test:e2e                          # Playwright (starts the servers it needs)
+```
 
-# Backend (suite completa; ~10 min en CI con -n 2)
-cd data-engine && ./.venv/Scripts/python.exe -m pytest tests/ -q
+The OpenAPI client must not drift from the backend:
 
-# El cliente OpenAPI no debe derivar (regenerar si tocas rutas)
+```bash
 npm run generate:openapi
 git diff --exit-code -- data-engine/openapi.json lib/research/openapi.generated.ts
 ```
 
-El CI ejecuta 13 jobs: paridad de dependencias, calidad frontend, auth-store,
-lint backend (ruff + pyright), tests backend, evals de calidad (RAG, valoración,
-capas LLM e ingesta), drift OpenAPI, migraciones Postgres, smoke ARM64,
-auditoría supply-chain, e2e de API, e2e de navegador y la puerta final
-`CI gate (single required check)`, más un workflow aparte de cobertura.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) also checks dependency parity, auth-store smoke tests, evals for RAG, valuation, LLM layers and ingestion, Postgres migration round trips with a single Alembic head, supply-chain audits, and API and browser end-to-end tests, all behind one required `CI gate` check. Coverage, CodeQL, Gitleaks and SBOM scanning run as separate workflows. Coverage details: [docs/COVERAGE.md](docs/COVERAGE.md).
 
-### Evals de calidad (FASE C)
+## Deployment
 
-Cuatro suites con dataset congelado y puertas deterministas. Los números, sus
-umbrales y el workflow que los ejecuta están en
-[docs/QUALITY_GATES.md](docs/QUALITY_GATES.md); el detalle de cobertura, en
-[docs/COVERAGE.md](docs/COVERAGE.md).
+The supported production topology is:
 
-```bash
-cd data-engine
+- **Frontend on Vercel** ([`vercel.json`](vercel.json)): Next.js build in the `fra1` region. Only `main` deploys automatically. Recovery runbook: [docs/RUNBOOK_VERCEL_DEPLOY_RECOVERY.md](docs/RUNBOOK_VERCEL_DEPLOY_RECOVERY.md).
+- **Backend on Oracle Cloud** (Always Free, Ampere ARM VM) with [`docker-compose.prod.yml`](docker-compose.prod.yml): Caddy, PostgreSQL, Redis, Qdrant, MinIO, API, worker and scheduler, with health checks and automatic restarts. Setup: [docs/oracle-setup.md](docs/oracle-setup.md).
 
-# RAG (C1): necesita Qdrant vivo. refuse-to-skip: sin Qdrant sale con 1, no con un stub.
-docker compose up -d qdrant
-python scripts/run_rag_evals.py
+Operational notes:
 
-# Motores de valoración (C2), capas LLM (C3) e ingesta (C4): offline y deterministas
-python scripts/run_valuation_evals.py
-python scripts/run_llm_evals.py
-python scripts/run_ingest_evals.py
+- Migrations are always explicit (`alembic upgrade head`).
+- Database ports are never exposed publicly; secrets live only in the deployment environment.
+- Backups and the restore drill: [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md). Key rotation: [docs/ROTACION_CLAVES.md](docs/ROTACION_CLAVES.md).
+- `render.yaml` is experimental and unsupported: it requires external Postgres, Redis, Qdrant and MinIO.
 
-# Cobertura: mide y gatea. Sin pytest-cov instalado esto falla con "unrecognized arguments".
-python -m pip install "pytest-cov>=5.0"
-python scripts/run_coverage_gate.py
+## Project structure
 
-# Suite completa sin servicios externos (el marker `services` está registrado)
-python -m pytest tests -m "not services"
+```text
+.
+├── app/            Next.js App Router pages and API routes
+├── components/     UI components
+├── lib/            Server actions, signed research API client, shared logic
+├── hooks/          React hooks
+├── types/          Shared TypeScript types
+├── data-engine/    FastAPI backend: routes, services, valuation, workers, Alembic, tests, evals
+├── e2e/            Playwright end-to-end specs
+├── qa-e2e/         Read-only QA end-to-end suite
+├── tests/          Frontend unit tests
+├── scripts/        Guards, diagnostics and tooling
+├── docs/           Architecture, runbooks, policies and ADRs
+├── docker/, infra/ Container and infrastructure configuration
+└── public/         Static assets
 ```
 
-Todos aceptan `--json` para volcar el informe. El eval del RAG indexa en
-`rag_eval_v1_documents`, no en el índice del producto.
+## Roadmap
 
-## Arquitectura en 30 segundos
+- **1.0 release**: green CI, a single Alembic head, end-to-end smoke tests and per-deployment environment checklists ([docs/RELEASE_1_0.md](docs/RELEASE_1_0.md)).
+- Broader non-US coverage (ESEF and IFRS filers).
+- Better retrieval quality for Cerebro on the knowledge library and filings.
 
-Next.js (App Router, server actions firmadas HMAC) habla con FastAPI
-(`/api/*`, firma X-CavaAI-*): Postgres como canónico, Qdrant como índice
-semántico reconstruible, MinIO para originales y Redis/Dramatiq para jobs.
-OpenCode Go es el LLM por defecto, con respaldos gratuitos (Groq/Gemini)
-que entran solos cuando hay clave y plan gratuito confirmado, y Jev hace las
-micro-decisiones.
+See [CHANGELOG.md](CHANGELOG.md) for released changes.
 
-Autenticación doble: sesiones Better Auth en MongoDB + firma HMAC con secreto
-de 32 mínimo en la research API (ventana 300 s, tenant = tu userId).
+## Contributing
 
-## Estructura
+Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md): small, single-topic pull requests, green CI and no secrets in commits. Automated agents should also read [AGENTS.md](AGENTS.md).
 
-```
-app/(root)/          páginas: research, screener, watchlist, portfolio,
-                     alerts, knowledge, propicks, metodologia…
-components/          UI (shadcn/Radix + Tailwind oscuro)
-lib/actions/         server actions · lib/research/  cliente firmado
-data-engine/
-  app/api/routes/    51 routers bajo /api
-  app/services/      ingesta, tesis, debate, insider, RAG, alertas…
-  app/valuation/     motores + guardia point-in-time
-  app/llm/           factory de proveedores (OpenCode Go por defecto) + cliente Jev
-  alembic/versions/  migraciones 0001→0080 (lineales, con downgrade)
-  tests/             tests herméticos de pytest (la cifra actual, en el resumen del job «Backend quality» de CI) · evals/  evals financieras
-e2e/                 specs Playwright del flujo inversor
-docs/                PRODUCT_VISION, runbooks, privacidad
-```
+## Security
 
-Ver [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) y la propia app en
-`/metodologia` (fuentes, límites y costes).
+Please do not open public issues for vulnerabilities. Report them privately as described in [SECURITY.md](SECURITY.md).
 
-## Producción
+## License
 
-- **Camino oficial para la 1.0**: frontend en Vercel + backend con
-  `docker-compose.prod.yml` en Oracle Cloud. Es el único despliegue probado de
-  punta a punta (healthchecks, reinicio automático y restore drill en CI).
-- **Oracle Cloud (Always Free)**: `docker-compose.prod.yml` levanta el stack 24/7
-  en una VM Ampere ARM (Caddy + PostgreSQL + Redis + Qdrant + MinIO + backend +
-  worker + scheduler), con healthchecks y reinicio automático; ver
-  `docs/oracle-setup.md` para la cuenta y el `.env.production`.
-- **Autoarranque local (Windows)**: `arrancar_gerarai.bat` para uso personal en el PC.
-- **Render (experimental, no soportado)**: `render.yaml` (raíz del repo) solo
-  describe el backend con `data-engine/Dockerfile.prod`. **No despliega tal
-  cual**: `/health/ready` exige Postgres, Redis, Qdrant y MinIO externos que hay
-  que configurar a mano en el dashboard, el tier free hiberna a los ~15 min y los
-  workers van apagados (`WORKERS_ENABLED=false`).
-- Migraciones siempre explícitas (`alembic upgrade head`); el seed solo instala taxonomía pública, nunca tu cartera.
-- Puertos de BD cerrados al exterior; secretos solo en el dashboard de deploy.
-- Qdrant se reconstruye desde Postgres (`RAGIndex().rebuild_tenant`).
+Copyright © 2025 Nicolás Iglesias García. Licensed under the [GNU Affero General Public License v3.0](LICENSE). If you run a modified version as a network service, the AGPL requires you to make its source available to its users.
 
-## Licencia
+A Spanish version of the previous README is kept in [docs/README.es.md](docs/README.es.md).
 
-Copyright 2025 Nicolás Iglesias García. Publicado bajo la licencia GNU AGPL-3.0; ver [LICENSE](LICENSE).
+## Disclaimer
+
+GerarAI is a personal research tool. Nothing it shows is financial, investment, legal or tax advice. Market data may be delayed, incomplete or wrong depending on the provider, and AI-generated text can contain mistakes. Tax reports are drafts that must be reviewed before filing. Do your own research and consult a qualified professional before making decisions.
