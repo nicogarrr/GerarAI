@@ -2016,6 +2016,9 @@ class KnowledgeDocument(TenantOwnedMixin, Base, TimestampMixin):
     language: Mapped[str] = mapped_column(String(20), default="en")
     status: Mapped[str] = mapped_column(String(40), default="ready", index=True)
     checksum: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    # Empresa a la que se refiere el documento (opcional, normalizado strip +
+    # upper). Lo usa la ficha /research/[ticker] para listar sus lecturas.
+    ticker: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
 
 

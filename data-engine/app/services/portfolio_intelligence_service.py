@@ -23,6 +23,7 @@ from app.services.tax_report_service import (
     cash_amount,
     cash_quantity_is_canonical,
     is_cash_action,
+    withholding_cost,
 )
 
 # Exchange -> listing-market country. Best-effort fallback only: the owning
@@ -624,11 +625,15 @@ class PortfolioIntelligenceService:
                 net, sign = gross - fees, 1
             elif action in {"dividend", "interest"}:
                 net, sign = gross, 1
-            elif action in {"fee", "withholding"}:
-                # IBKR Flex informa retenciones y comisiones con importe
-                # NEGATIVO y la entrada manual en positivo: el coste siempre
-                # es una SALIDA para el inversor, sea cual sea el signo guardado
-                # (con -15 el flujo era -1 * -15 = +15 y la retencion sumaba).
+            elif action == "withholding":
+                # Retencion con signo segun su origen (``withholding_cost``):
+                # IBKR la publica en negativo y su REVERSION en positivo; la
+                # entrada manual, en positivo. Un abs() convertia la reversion
+                # en otra salida (-15, +15, -15 pesaba -45 en vez de -15).
+                net, sign = float(withholding_cost(transaction)), -1
+            elif action == "fee":
+                # IBKR Flex informa comisiones con importe NEGATIVO y la entrada
+                # manual en positivo: el coste siempre es una SALIDA.
                 net, sign = abs(gross), -1
             elif action == "cash_misc":
                 net, sign = gross, -1

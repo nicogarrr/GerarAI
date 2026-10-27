@@ -71,11 +71,16 @@ def _followed_company_ids(db: Session):
     en `followed`: no se puede afirmar que sea de una empresa seguida.
     """
     held = select(Position.company_id).where(*tenant_filters(db, Position))
-    watched = (
-        select(Company.id)
-        .join(WatchItem, WatchItem.symbol == Company.ticker)
-        .where(*tenant_filters(db, WatchItem))
-    )
+    # La watchlist guarda el simbolo tal cual lo escribio el usuario (SAN.MC,
+    # BRK.B, minusculas...). Se resuelve con el mismo `resolve_company` que la
+    # ficha para que un valor con sufijo de mercado cuente como seguido.
+    symbols = set(db.scalars(select(WatchItem.symbol).where(*tenant_filters(db, WatchItem))).all())
+    watched_ids = {
+        company.id
+        for symbol in symbols
+        if symbol and (company := resolve_company(db, symbol)) is not None
+    }
+    watched = select(Company.id).where(Company.id.in_(watched_ids))
     return union(held, watched)
 
 

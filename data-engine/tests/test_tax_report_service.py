@@ -484,3 +484,27 @@ def test_over_sell_makes_realized_total_unreliable_not_exact(db):
     assert summary["over_sell"] == ["OVS"]
     assert summary["total_realized_gain_base"] is None
     assert summary["net_taxable_base"] is None
+
+
+def test_realized_gain_converts_each_leg_at_its_own_fx_rate(db):
+    """IRPF: el valor de adquisición se convierte al tipo de la fecha de
+    compra y el de transmisión al de la fecha de venta. Compra 10 x 100 USD
+    con 1 USD = 0,90 EUR (coste 900 EUR); venta 10 x 100 USD con
+    1 USD = 0,80 EUR (800 EUR). Pérdida en EUR = 800 - 900 = -100,
+    aunque en USD la operación quede a cero."""
+    _eur_portfolio(db)
+    c = _company(db, "FXL")
+    db.add(FXRate(base_currency="EUR", quote_currency="USD",
+                  rate_date=date(2026, 1, 9), rate=Decimal("0.90"), source="test"))
+    db.add(FXRate(base_currency="EUR", quote_currency="USD",
+                  rate_date=date(2026, 6, 1), rate=Decimal("0.80"), source="test"))
+    db.commit()
+    _tx(db, c, date(2026, 1, 10), "buy", 10, 100, currency="USD")
+    _tx(db, c, date(2026, 6, 1), "sell", 10, 100, currency="USD")
+    report = TaxReportService().compute_report(db, 2026)
+    row = next(r for r in report["realized"] if r["ticker"] == "FXL")
+    assert row["gain_native"] == 0.0
+    assert row["gain_base"] == pytest.approx(-100.0)
+    sale = row["sales"][0]
+    assert sale["cost_base"] == pytest.approx(900.0)
+    assert sale["proceeds_base"] == pytest.approx(800.0)

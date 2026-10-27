@@ -8,23 +8,29 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+// @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
+import { PROPICKS_STRATEGIES } from '../lib/utils/proPicksStrategies.ts';
 
 const factsheet = readFileSync('components/proPicks/StrategyFactsheet.tsx', 'utf8');
-const strategies = readFileSync('lib/utils/proPicksStrategies.ts', 'utf8');
 const alerts = readFileSync('components/alerts/AlertsManager.tsx', 'utf8');
 
 describe('pesos de estrategia ProPicks', () => {
   it('la ficha formatea los pesos como ratio (sin fromRatio: false)', () => {
     assert.doesNotMatch(factsheet, /categoryWeights\[key\],\s*\{[^}]*fromRatio:\s*false/);
   });
-  it('los pesos declarados son ratios <= 1', () => {
-    const blocks = [...strategies.matchAll(/categoryWeights:\s*\{([^}]*)\}/g)];
-    assert.ok(blocks.length >= 1);
-    for (const [, body] of blocks) {
-      const nums = [...body.matchAll(/:\s*([0-9.]+)/g)].map((m) => Number(m[1]));
-      if (nums.length === 0) continue;
-      assert.ok(nums.every((n) => n <= 1), `pesos fuera de ratio: ${body}`);
-      assert.ok(Math.abs(nums.reduce((a, b) => a + b, 0) - 1) < 1e-6, `no suman 1: ${body}`);
+  it('los pesos de cada estrategia son ratios en [0, 1] que suman 1', () => {
+    // Se leen los objetos reales, no el texto: un peso calculado o importado
+    // de otro módulo también cuenta.
+    const withWeights = PROPICKS_STRATEGIES.filter((s) => s.categoryWeights);
+    assert.ok(withWeights.length >= 1, 'ninguna estrategia declara categoryWeights');
+    for (const strategy of withWeights) {
+      const weights: number[] = Object.values(strategy.categoryWeights ?? {});
+      assert.ok(weights.length > 0, `${strategy.id}: categoryWeights vacío`);
+      for (const w of weights) {
+        assert.ok(Number.isFinite(w) && w >= 0 && w <= 1, `${strategy.id}: peso fuera de ratio (${w})`);
+      }
+      const total = weights.reduce((a, b) => a + b, 0);
+      assert.ok(Math.abs(total - 1) < 1e-6, `${strategy.id}: los pesos suman ${total}, no 1`);
     }
   });
 });

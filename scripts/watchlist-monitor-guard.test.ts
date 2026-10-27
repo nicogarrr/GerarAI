@@ -20,10 +20,23 @@ test('proximos resultados y chip 52 semanas vienen del monitor, no hardcodeados'
     assert.match(route, /MarketPrice/);
 });
 
-test('el recuento sobre/infravaloradas exige tesis publicada con expected_value', () => {
-    assert.match(route, /status == "published"/);
-    assert.match(route, /expected_value\.isnot\(None\)/);
-    assert.match(page, /Según la tesis publicada de K/);
+test('el recuento sobre/infravaloradas usa el valor justo ÚNICO con su procedencia', () => {
+    const service = readFileSync('data-engine/app/services/fair_value_service.py', 'utf8');
+    // La tesis solo cuenta si está PUBLICADA y tiene expected_value real.
+    assert.match(service, /status == "published"/);
+    assert.match(service, /expected_value\.isnot\(None\)/);
+    // El monitor no calcula su propio valor justo: lee el servicio compartido.
+    assert.match(route, /resolve_fair_values\(db, companies\)/);
+    assert.match(route, /"fair_value_source": reading\["source"\]/);
+    assert.match(page, /Según el valor justo \(\{fairValueSourceNote\}\)/);
+    assert.match(page, /por tesis publicada de K/);
+});
+
+test('inicio y screener leen el mismo valor justo único, con etiqueta', () => {
+    const screener = readFileSync('lib/actions/screener.actions.ts', 'utf8');
+    const home = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
+    assert.match(screener, /\/fair-value`/);
+    assert.match(home, /Fuente: \{op\.fairValueLabel\}/);
 });
 
 test('sin URLs de proveedor construidas a mano en el frontend', () => {

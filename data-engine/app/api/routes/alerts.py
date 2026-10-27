@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -40,6 +40,18 @@ class ManualAlertCreate(BaseModel):
         if _is_non_finite(value):
             raise ValueError("value must be a finite number")
         return value
+
+    @model_validator(mode="after")
+    def _numeric_threshold(self) -> "ManualAlertCreate":
+        # Las alertas de precio y de cambio comparan números: un umbral de texto
+        # («abc», «1,234») se guardaba igual y la regla no podía dispararse nunca,
+        # sin ningún aviso (``_matches`` solo admite == / != sobre texto).
+        from app.services.alert_rule_service import _numeric_threshold
+
+        if self.alert_type in {"price_above", "price_below", "price_change"}:
+            if _numeric_threshold(self.value) is None:
+                raise ValueError("El umbral de una alerta de precio o de cambio debe ser un número")
+        return self
 
 
 def _is_unverified_stub(company: Company) -> bool:

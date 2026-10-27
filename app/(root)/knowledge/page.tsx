@@ -25,6 +25,7 @@ import {
   installKnowledgeDefaults,
   mergeKnowledgePrinciple,
   reviseKnowledgePrinciple,
+  setKnowledgeDocumentTicker,
   uploadKnowledgeDocument,
 } from '@/lib/actions/research-tools.actions';
 import BackendOffline from '@/components/system/BackendOffline';
@@ -328,7 +329,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                 const busy = job?.status === 'queued' || job?.status === 'running';
                 return (
                 <tr className="border-b border-gray-900" key={document.id}>
-                  <th className="py-3 text-left text-sm font-normal" scope="row"><div className="font-medium text-gray-200">{document.title}</div><div className="text-xs text-gray-500">{document.author ?? 'Autor desconocido'}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date)}` : ''}</div></th>
+                  <th className="py-3 text-left text-sm font-normal" scope="row"><div className="font-medium text-gray-200">{document.title}</div><div className="text-xs text-gray-500">{document.author ?? 'Autor desconocido'}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date)}` : ''}</div>{document.ticker ? <Link className="mt-1 inline-block text-xs font-medium text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(document.ticker)}?view=documents`}>{document.ticker}</Link> : null}</th>
                   <td className="py-3 text-gray-400">{document.collection_id ? collectionNames.get(document.collection_id) : 'Sin colección'}</td>
                   <td className="py-3 text-gray-400">{documentTypeLabel(document.document_type)}</td>
                   <td className="py-3 text-gray-500">{parserLabel(document.metadata.parser)}</td>
@@ -371,6 +372,15 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
       {selectedDocument ? (
         <section className="min-w-0 rounded-xl border border-teal-900/50 bg-surface-1 p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-teal-300">Explorador de fragmentos</p><h2 className="text-lg font-semibold text-gray-100">{selectedDocument.title}</h2></div><Button asChild size="sm" variant="ghost"><Link href="/knowledge">Cerrar</Link></Button></div>
+          {/* Conexión 10a: asociar el documento a una empresa lo muestra en su ficha. Vacío = quitar. */}
+          <MutationForm action={setKnowledgeDocumentTicker.bind(null, selectedDocument.id)} className="mb-4 flex flex-wrap items-end gap-2" successMessage="Ticker guardado">
+            <div className="min-w-[12rem] flex-1 sm:flex-none">
+              <label className="mb-1 block text-xs font-medium text-gray-400" htmlFor="kw-doc-ticker">Empresa (ticker)</label>
+              <Input autoCapitalize="characters" className="h-11 w-full uppercase" defaultValue={selectedDocument.ticker ?? ''} id="kw-doc-ticker" maxLength={32} name="ticker" placeholder="Sin empresa" />
+            </div>
+            <Button className="h-11" size="sm" type="submit" variant="outline">Guardar ticker</Button>
+            {selectedDocument.ticker ? <Link className="pb-3 text-xs text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(selectedDocument.ticker)}?view=documents`}>Ver en la ficha de {selectedDocument.ticker}</Link> : null}
+          </MutationForm>
           <div className="grid max-h-[620px] gap-3 overflow-y-auto pr-2">
             {chunks.map((chunk) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={chunk.id}><div className="mb-2 flex justify-between text-xs text-gray-500"><span>Fragmento {formatNumber(Number(chunk.chunk_index) + 1, { maximumFractionDigits: 0 })}</span><span>página {chunk.page_number === null || chunk.page_number === undefined ? NA : formatNumber(chunk.page_number, { maximumFractionDigits: 0 })} · {formatNumber(chunk.token_count, { maximumFractionDigits: 0 })} tokens</span></div><div className="text-sm leading-6 text-gray-300"><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{chunk.content}</ReactMarkdown></div></article>)}
             {!chunks.length ? <p className="text-sm text-gray-500">Este documento no tiene fragmentos.</p> : null}
@@ -399,6 +409,12 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-400" htmlFor="kw-author">Autor</label>
                 <Input className="h-11 w-full" id="kw-author" name="author" placeholder="Autor" />
+              </div>
+              {/* Conexión 10a: el ticker opcional enlaza el documento con la
+                  ficha de la empresa (vista Documentos de /research/[ticker]). */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-400" htmlFor="kw-ticker">Ticker de la empresa (opcional)</label>
+                <Input autoCapitalize="characters" className="h-11 w-full uppercase" id="kw-ticker" maxLength={32} name="ticker" placeholder="p. ej. UBER o SAN.MC" />
               </div>
               {/* F142: tipo como textbox libre con «book» no decía qué vocabulario
                   acepta el backend. Select con los 9 tipos de

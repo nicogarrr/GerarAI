@@ -112,6 +112,21 @@ def _fifo_sort_key(transaction) -> tuple:
     )
 
 
+def _defer_base(lot: dict, take: Decimal, sale: dict) -> None:
+    """Difiere la pérdida bloqueada (wash-sale) también en divisa base.
+
+    La pérdida en base sale de los dos tramos convertidos a su propio tipo;
+    si no se conoce (falta FX), el diferido en base del lote queda
+    desconocido (None) y su futura venta se declara sin importe en base.
+    """
+    if lot["deferred_base"] is None:
+        return
+    if sale["loss_per_share_base"] is None:
+        lot["deferred_base"] = None
+        return
+    lot["deferred_base"] += take * sale["loss_per_share_base"]
+
+
 SELL_ACTIONS = {"sell", "sold"}
 BUY_ACTIONS = {"buy", "bot", "b"}
 
@@ -153,6 +168,38 @@ def cash_amount(transaction) -> Decimal:
         return Decimal(str(price))
     quantity = getattr(transaction, "quantity", None)
     return Decimal(str(quantity)) if quantity is not None else Decimal("0")
+
+
+# Claves que solo escribe el importador Flex de IBKR (``dict(element.attrib)``).
+# El CSV canonico (``source: ibkr_csv``) no entra: su signo lo escribe el usuario.
+_BROKER_PAYLOAD_KEYS = ("type", "trxID", "transactionID", "accountId")
+
+
+def is_broker_signed_cash_row(transaction) -> bool:
+    """True si la fila viene de IBKR, que firma la caja desde la cuenta.
+
+    IBKR publica la retencion como importe NEGATIVO y su reversion como
+    POSITIVO; la entrada manual guarda la retencion en positivo.
+    """
+    payload = getattr(transaction, "raw_payload", None) or {}
+    if not isinstance(payload, dict):
+        return False
+    return any(key in payload for key in _BROKER_PAYLOAD_KEYS)
+
+
+def withholding_cost(transaction) -> Decimal:
+    """Retencion soportada por la fila, con signo: >0 retenido, <0 devuelto.
+
+    Filas de IBKR: coste = -importe, asi una reversion (+15) resta en vez de
+    sumar otra retencion. Resto (entrada manual, historico sin origen): el
+    valor absoluto, como hasta ahora.
+
+    Helper COMPARTIDO con ``portfolio_intelligence_service._xirr``.
+    """
+    amount = cash_amount(transaction)
+    if is_broker_signed_cash_row(transaction):
+        return -amount
+    return abs(amount)
 
 
 def cash_quantity_is_canonical(transaction) -> bool:
@@ -325,7 +372,8 @@ class TaxReportService:
                 if company is None:
                     bucket["unattributed"] = True
                 if "withholding" in action or "tax" in action:
-                    withheld = abs(amount_native)
+                    withheld = withholding_cost(transaction)
+                    withheld_base = withheld * rate if rate is not None else None
                     if ambiguous_cash_row:
                         # Fila ambigua: NO entra en los agregados ni en las
                         # casillas derivadas hasta resolverla (None +
@@ -333,8 +381,8 @@ class TaxReportService:
                         bucket["ambiguous_cash"] = True
                     else:
                         bucket["withholding_native"] += withheld
-                        if amount_base is not None:
-                            bucket["withholding_base"] += abs(amount_base)
+                        if withheld_base is not None:
+                            bucket["withholding_base"] += withheld_base
                         else:
                             bucket["missing_fx"] = True
                     withholding_row = {
@@ -342,7 +390,7 @@ class TaxReportService:
                         "type": "withholding",
                         "raw_action": _raw_action_label(transaction),
                         "amount_native": _money(withheld),
-                        "amount_base": _money(abs(amount_base)) if amount_base is not None else None,
+                        "amount_base": _money(withheld_base) if withheld_base is not None else None,
                     }
                     if ambiguous_cash_row:
                         # Fila ambigua: la cifra derivada de price es un
@@ -486,14 +534,21 @@ class TaxReportService:
                         # rechazan (nunca entran a la base de coste).
                         continue
                     acquisition_cost = transaction.quantity * transaction.price + transaction.fees
+                    unit_native = (
+                        acquisition_cost / transaction.quantity
+                        if transaction.quantity
+                        else Decimal("0")
+                    )
+                    # IRPF: el valor de adquisición se convierte a divisa base
+                    # al tipo de la FECHA DE COMPRA (no al de la venta). Sin
+                    # tipo real el coste en base queda desconocido (None).
+                    buy_rate = resolve_rate(transaction.currency, transaction.trade_date)
                     lot = {
                         "qty": transaction.quantity,
-                        "unit": (
-                            acquisition_cost / transaction.quantity
-                            if transaction.quantity
-                            else Decimal("0")
-                        ),
+                        "unit": unit_native,
+                        "unit_base": unit_native * buy_rate if buy_rate is not None else None,
                         "deferred": Decimal("0"),
+                        "deferred_base": Decimal("0"),
                         "capacity": transaction.quantity,
                         "date": transaction.trade_date,
                     }
@@ -505,6 +560,7 @@ class TaxReportService:
                         if sale["qty_unblocked"] > 0 and lot["capacity"] > 0:
                             take = min(lot["capacity"], sale["qty_unblocked"])
                             lot["deferred"] += take * sale["loss_per_share"]
+                            _defer_base(lot, take, sale)
                             lot["capacity"] -= take
                             sale["blocked_qty"] += take
                             sale["qty_unblocked"] -= take
@@ -522,10 +578,23 @@ class TaxReportService:
                 remaining = transaction.quantity
                 proceeds_native = transaction.quantity * transaction.price - transaction.fees
                 cost_native = Decimal("0")
+                # Coste en base = suma de cada lote a SU tipo de compra.
+                cost_base: Decimal | None = Decimal("0")
                 while remaining > Decimal("0") and lots:
                     lot = lots[0]
                     take = min(lot["qty"], remaining)
                     cost_native += take * lot["unit"]
+                    if cost_base is not None and lot["unit_base"] is not None:
+                        cost_base += take * lot["unit_base"]
+                    else:
+                        cost_base = None
+                    if lot["qty"] > 0 and lot["deferred_base"] is None:
+                        cost_base = None
+                    elif lot["deferred_base"] > 0 and lot["qty"] > 0:
+                        deferred_base_take = lot["deferred_base"] * take / lot["qty"]
+                        if cost_base is not None:
+                            cost_base += deferred_base_take
+                        lot["deferred_base"] -= deferred_base_take
                     if lot["deferred"] > 0 and lot["qty"] > 0:
                         deferred_take = lot["deferred"] * take / lot["qty"]
                         cost_native += deferred_take
@@ -541,6 +610,16 @@ class TaxReportService:
                 over_sell = over_sell_quantity > 0
 
                 gain_native = proceeds_native - cost_native
+                # Valor de transmisión al tipo de la FECHA DE VENTA; la
+                # ganancia en base es la diferencia de ambos tramos ya
+                # convertidos (no la ganancia en divisa x tipo de venta).
+                sell_rate = resolve_rate(transaction.currency, transaction.trade_date)
+                proceeds_base = proceeds_native * sell_rate if sell_rate is not None else None
+                gain_base_raw = (
+                    proceeds_base - cost_base
+                    if proceeds_base is not None and cost_base is not None
+                    else None
+                )
                 # TODA venta válida entra en el historial, con ganancia o con
                 # pérdida: holdings_before_window alimenta la excepción de
                 # compra única del Manual, y omitir las ventas rentables lo
@@ -551,6 +630,13 @@ class TaxReportService:
                         "date": transaction.trade_date,
                         "qty_unblocked": transaction.quantity,
                         "loss_per_share": -gain_native / transaction.quantity,
+                        # Pérdida por acción en base (tramos a su tipo); 0 si
+                        # en base no hay pérdida que diferir.
+                        "loss_per_share_base": (
+                            max(-gain_base_raw, Decimal("0")) / transaction.quantity
+                            if gain_base_raw is not None
+                            else None
+                        ),
                         "blocked_qty": Decimal("0"),
                     }
                     # Backward window (Manual Renta 2025, apdo. E.1): prior-window
@@ -592,6 +678,7 @@ class TaxReportService:
                             continue
                         take = min(lot["capacity"], lot["qty"], to_block, sale["qty_unblocked"])
                         lot["deferred"] += take * sale["loss_per_share"]
+                        _defer_base(lot, take, sale)
                         lot["capacity"] -= take
                         sale["blocked_qty"] += take
                         sale["qty_unblocked"] -= take
@@ -607,6 +694,9 @@ class TaxReportService:
                             "proceeds_native": proceeds_native,
                             "cost_native": cost_native,
                             "gain_native": gain_native,
+                            "proceeds_base": proceeds_base,
+                            "cost_base": cost_base,
+                            "gain_base_raw": gain_base_raw,
                             "sale": sale,
                             "over_sell": over_sell,
                             "over_sell_quantity": over_sell_quantity,
@@ -651,10 +741,16 @@ class TaxReportService:
                     and sale["qty_unblocked"] > 0
                     and sale["date"] + WASH_SALE_WINDOW > last_data_date
                 )
-                rate = resolve_rate(transaction.currency, transaction.trade_date)
-                if rate is not None:
-                    computable_base = computable_native * rate
-                    blocked_base = blocked_native * rate
+                gain_base_raw = entry["gain_base_raw"]
+                if gain_base_raw is not None and (
+                    sale is None or sale["loss_per_share_base"] is not None
+                ):
+                    blocked_base = (
+                        sale["blocked_qty"] * sale["loss_per_share_base"]
+                        if sale is not None
+                        else Decimal("0")
+                    )
+                    computable_base = gain_base_raw + blocked_base
                 else:
                     computable_base = None
                     blocked_base = None
@@ -678,8 +774,8 @@ class TaxReportService:
                         "quantity": float(transaction.quantity),
                         "proceeds_native": _money(entry["proceeds_native"]),
                         "cost_native": _money(entry["cost_native"]),
-                        "proceeds_base": _money(entry["proceeds_native"] * rate) if rate is not None else None,
-                        "cost_base": _money(entry["cost_native"] * rate) if rate is not None else None,
+                        "proceeds_base": _money(entry["proceeds_base"]),
+                        "cost_base": _money(entry["cost_base"]),
                         "gain_native": _money(computable_native),
                         "gain_base": _money(computable_base) if computable_base is not None else None,
                         "raw_gain_native": _money(entry["gain_native"]),

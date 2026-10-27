@@ -15,12 +15,12 @@ from app.models import (
     EarningsDate,
     FinancialFact,
     MarketPrice,
-    ThesisVersion,
     WatchItem,
 )
 from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
+from app.services.fair_value_service import resolve_fair_values
 from app.services.fundamentals_seed_service import enqueue_fundamentals_seed
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
 
@@ -100,7 +100,8 @@ async def watchlist_monitor(
     Solo datos propios o de fuentes publicas con trazabilidad: minimo de 52
     semanas desde ``market_prices`` (ingesta propia), proximo resultado desde
     el conector publico de NASDAQ (misma fuente que /api/calendar/earnings) y
-    comparacion con la ultima tesis PUBLICADA de K (``expected_value``).
+    comparacion con el valor justo UNICO (``fair_value_service``: tesis
+    publicada o motor, con su procedencia en ``fair_value_source``/``_label``).
     Cualquier pieza sin dato va a ``None``; nunca se inventa.
     """
     wanted = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))[:60]
@@ -133,28 +134,15 @@ async def watchlist_monitor(
 
     lows = ranked_prices(MarketPrice.close.asc(), recent=True)
     closes = ranked_prices(MarketPrice.date.desc())
-    ranked_theses = select(
-        ThesisVersion.id,
-        func.row_number().over(partition_by=ThesisVersion.company_id,
-                               order_by=ThesisVersion.version.desc()).label("rank"),
-    ).where(ThesisVersion.company_id.in_(company_ids), ThesisVersion.status == "published",
-            ThesisVersion.expected_value.isnot(None),
-            *tenant_filters(db, ThesisVersion)).subquery()
-    theses = {row.company_id: row for row in db.scalars(
-        select(ThesisVersion).join(ranked_theses, ThesisVersion.id == ranked_theses.c.id)
-        .where(ranked_theses.c.rank == 1)
-    ).all()}
+    # Valor justo ÚNICO (tesis o motor, misma precedencia que inicio y screener).
+    fair_values = resolve_fair_values(db, companies)
     items: dict[str, dict] = {}
     for company in companies:
         ticker = str(company.ticker).upper()
         low_row = lows.get(company.id)
         last_close = closes.get(company.id)
-        thesis = theses.get(company.id)
-        from app.schemas.api import valuation_uses_inferred_inputs
-
-        if thesis is not None and valuation_uses_inferred_inputs(thesis.valuation_basis):
-            thesis = None
-        fair_value = float(thesis.expected_value) if thesis is not None else None
+        reading = fair_values[company.id]
+        fair_value = reading["value"]
         price = float(last_close.close) if last_close is not None else None
         side = None
         if fair_value is not None and price is not None and fair_value > 0:
@@ -166,7 +154,11 @@ async def watchlist_monitor(
             "last_close": price,
             "last_close_date": last_close.date.isoformat() if last_close is not None else None,
             "fair_value": fair_value,
-            "fair_value_thesis_version": int(thesis.version) if thesis is not None else None,
+            "fair_value_thesis_version": reading["thesis_version"],
+            "fair_value_source": reading["source"],
+            "fair_value_label": reading["label"],
+            "fair_value_as_of": reading["as_of"],
+            "fair_value_publishable": reading["publishable"],
             "valuation_side": side,
             "currency": company.currency,
             "next_earnings_date": None,
