@@ -117,7 +117,7 @@ def test_sin_posicion_en_el_ticker_lo_dice(db):
     _company(db, "AAPL", "Apple")
     db.commit()
     resp = _ask(db, "¿Cuánto IRPF pagaría si vendo AAPL?")
-    assert "No tienes ninguna posición guardada en AAPL" in resp.answer
+    assert resp.answer.startswith("No tienes AAPL en cartera, así que no puedo calcular tu IRPF real.")
 
 
 def test_impuestos_de_la_empresa_no_es_tu_irpf(db):
@@ -283,3 +283,134 @@ def test_la_escala_del_ahorro_no_se_presenta_como_vigente_sin_verificar(db):
         assert f"la de {year} no está confirmada" in answer
         assert f"escala del ahorro {year}:" not in answer
     assert "IRPF estimado: 94,10 €" in answer
+
+
+# ------------------------------------------- sin posición e hipotético
+# Revisión de Nico: «¿cuánto IRPF pagaría si vendo AAPL?» sin AAPL en
+# cartera cambiaba a la información de la empresa sin decir que no calculaba
+# el impuesto. Ahora lo dice, ofrece la estimación y, con los lotes, la hace.
+
+_NO_AAPL = (
+    "No tienes AAPL en cartera, así que no puedo calcular tu IRPF real. "
+    "Si me dices cuántas acciones, a qué precio y cuándo las compraste, te hago la estimación."
+)
+
+
+def _aapl_con_cotizacion(db):
+    from app.models.entities import MarketPrice
+
+    comp = _company(db, "AAPL", "Apple Inc.")
+    db.add(MarketPrice(company_id=comp.id, date=date(2026, 10, 23), open=Decimal("230"), high=Decimal("231"),
+                       low=Decimal("229"), close=Decimal("230"), source="yahoo"))
+    db.commit()
+    return comp
+
+
+def test_aapl_sin_posicion_dice_que_no_calcula_y_ofrece_estimacion(db):
+    _uber(db)
+    _aapl_con_cotizacion(db)
+    resp = _ask(db, "¿cuánto IRPF pagaría si vendo AAPL?")
+    assert resp.answer == _NO_AAPL
+    assert resp.llm_trace["path"] == "portfolio_sale_tax"
+    assert resp.llm_trace["no_position"] is True
+    assert resp.llm_trace["provider_calls"] == 0
+    # Nada de la ficha de la empresa: ni cotización ni fuentes ajenas.
+    assert "cotiza" not in resp.answer
+    assert resp.sources == []
+
+
+def test_aapl_fuera_del_maestro_no_cae_en_ticker_desconocido(db):
+    _uber(db)
+    resp = _ask(db, "¿cuánto IRPF pagaría si vendo AAPL?")
+    assert resp.answer == _NO_AAPL
+    assert resp.llm_trace["path"] == "portfolio_sale_tax"
+
+
+def test_aapl_por_su_nombre_sin_posicion(db):
+    _uber(db)
+    _aapl_con_cotizacion(db)
+    resp = _ask(db, "¿Cuánto IRPF pagaría si vendo mis acciones de Apple?")
+    assert resp.answer == _NO_AAPL
+
+
+def test_aapl_con_posicion_calcula_fifo(db):
+    comp = _company(db, "AAPL", "Apple Inc.")
+    comp.currency = "EUR"
+    _tx(db, comp, date(2025, 1, 10), "buy", 10, 100)
+    _tx(db, comp, date(2025, 3, 10), "buy", 10, 200)
+    _eur_position(db, comp, 20, 180, 150)
+    db.commit()
+    resp = _ask(db, "¿cuánto IRPF pagaría si vendo 10 AAPL?")
+    assert resp.llm_trace["path"] == "portfolio_sale_tax"
+    assert resp.llm_trace["method"] == "fifo"
+    assert "No tienes" not in resp.answer
+    assert "ganancia de 800,00 €" in resp.answer
+    assert "IRPF estimado: 152,00 €" in resp.answer
+
+
+def test_hipotetico_con_lotes_da_la_cifra_fifo(db):
+    _uber(db)
+    resp = _ask(
+        db,
+        "¿Cuánto IRPF pagaría si compré 10 acciones de AAPL a 100 € y otras 10 a 200 € y vendo 10 a 180 €?",
+    )
+    assert resp.llm_trace["path"] == "portfolio_sale_tax"
+    assert resp.llm_trace["hypothetical"] is True
+    assert resp.llm_trace["provider_calls"] == 0
+    # El caso de Nico, por FIFO: 1.800 − 1.000 = 800 € (no 300 € a coste medio).
+    assert "Estimación hipotética de AAPL" in resp.answer
+    assert "ganancia de 800,00 €" in resp.answer
+    assert "IRPF estimado: 152,00 €" in resp.answer
+    assert "Método FIFO" in resp.answer
+    assert "en el orden en que me los das" in resp.answer
+
+
+def test_hipotetico_en_dolares_al_tipo_de_cada_fecha(db):
+    _aapl_con_cotizacion(db)
+    db.add(FXRate(base_currency="EUR", quote_currency="USD", rate_date=date(2024, 3, 1),
+                  rate=Decimal("0.90"), source="test"))
+    db.add(FXRate(base_currency="EUR", quote_currency="USD", rate_date=date.today(),
+                  rate=Decimal("0.80"), source="test"))
+    db.commit()
+    resp = _ask(db, "IRPF si vendo AAPL: compré 10 acciones a 150 $ el 1 de marzo de 2024")
+    # Venta a la última cotización (230 $ × 10 × 0,80 = 1.840 €); coste 150 $ × 10 × 0,90 = 1.350 €.
+    assert resp.llm_trace["hypothetical"] is True
+    assert "última cotización guardada" in resp.answer
+    assert "valor 1.840,00 €" in resp.answer
+    assert "coste 1.350,00 €" in resp.answer
+    assert "ganancia de 490,00 €" in resp.answer
+    assert "IRPF estimado: 93,10 €" in resp.answer
+
+
+def test_hipotetico_responde_a_la_oferta_del_turno_anterior(db):
+    from app.schemas import ChatTurn
+
+    _uber(db)
+    history = [
+        ChatTurn(role="user", content="¿cuánto IRPF pagaría si vendo AAPL?"),
+        ChatTurn(role="assistant", content=_NO_AAPL),
+    ]
+    resp = asyncio.run(ChatService(provider=_NoLLM()).answer(
+        db, "10 acciones a 100 € y las vendo a 150 €", "global", None, history=history,
+    ))
+    assert resp.llm_trace["path"] == "portfolio_sale_tax"
+    assert resp.llm_trace["ticker"] == "AAPL"
+    assert "ganancia de 500,00 €" in resp.answer
+    assert "IRPF estimado: 95,00 €" in resp.answer
+
+
+def test_hipotetico_sin_precio_de_venta_lo_pide(db):
+    _uber(db)
+    resp = _ask(db, "IRPF si vendo AAPL que compré: 10 acciones a 100 € el 3 de marzo de 2024")
+    assert resp.llm_trace["hypothetical"] is True
+    assert "IRPF estimado" not in resp.answer
+    assert "¿a qué precio las venderías?" in resp.answer
+
+
+def test_impuestos_que_paga_aapl_siguen_en_la_ficha_de_empresa(db):
+    _uber(db)
+    _aapl_con_cotizacion(db)
+    resp = _ask(db, "¿Cuántos impuestos paga AAPL?")
+    assert resp.llm_trace.get("path") != "portfolio_sale_tax"
+    assert "No tienes AAPL en cartera" not in resp.answer
+    assert "AAPL" in resp.answer
