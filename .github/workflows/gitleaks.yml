@@ -1,0 +1,69 @@
+name: Gitleaks
+
+# Escaneo de secretos con gitleaks sobre los commits NUEVOS de cada PR / push.
+# Complementa (no sustituye) el check de formas de secreto de pr-checks.yml y el
+# secret scanning de GitHub: gitleaks trae ~200 reglas por proveedor y es la
+# misma herramienta que corre en local con pre-commit (.pre-commit-config.yaml).
+#
+# Por que solo el rango de commits y no todo el historial: el historial de
+# nov-dic 2025 contiene claves filtradas (ver docs/seguridad/rotacion-de-claves.md).
+# Escanearlo entero dejaria el check en rojo para siempre sin que ninguna PR
+# pueda arreglarlo; lo que se protege aqui es que no entre ninguna clave nueva.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: gitleaks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITLEAKS_VERSION: "8.30.1"
+  # sha256 de gitleaks_8.30.1_linux_x64.tar.gz (gitleaks_8.30.1_checksums.txt del release).
+  GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+jobs:
+  gitleaks:
+    name: Secretos en commits nuevos
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Instalar gitleaks (binario fijado y verificado)
+        run: |
+          curl -sSfL -o /tmp/gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tgz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+          /tmp/gitleaks version
+      - name: Escanear el rango de commits
+        env:
+          # Datos del evento via env, nunca interpolados dentro del script.
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            range="${PR_BASE}..${PR_HEAD}"
+          elif [ -z "$PUSH_BEFORE" ] || [ "$PUSH_BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            range="-1 ${PUSH_AFTER}"
+          else
+            range="${PUSH_BEFORE}..${PUSH_AFTER}"
+          fi
+          echo "Rango escaneado: ${range}"
+          /tmp/gitleaks git . --config .gitleaks.toml --redact --no-banner \
+            --log-opts="${range}" --exit-code 1
