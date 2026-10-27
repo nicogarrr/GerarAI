@@ -23,9 +23,11 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, MarketPrice
-from app.services.sale_simulation import FifoSale, apply_backward_repurchase, consume_fifo
+from app.services.currencies import price_in_currency
+from app.services.fiscal_fifo import FifoSale, apply_backward_repurchase, consume_fifo
 from app.services.tax_irpf_filing import calculate_savings_tax
 from app.services.tax_report_service import MAX_FX_AGE_DAYS, _rate_not_older_than
+from app.valuation.currency import listing_currency
 
 TAX_CURRENCY = "EUR"
 
@@ -209,12 +211,16 @@ def _sale_quantity(text: str, held: Decimal) -> Decimal:
 
 def latest_quote(db: Session, company: Company) -> tuple[Decimal, date, int] | None:
     row = db.execute(
-        select(MarketPrice.close, MarketPrice.date, MarketPrice.id)
+        select(MarketPrice.close, MarketPrice.date, MarketPrice.id, MarketPrice.quote_currency)
         .where(MarketPrice.company_id == company.id, MarketPrice.source != "seed", MarketPrice.close > 0)
         .order_by(desc(MarketPrice.date))
         .limit(1)
     ).first()
-    return (Decimal(row[0]), row[1], row[2]) if row else None
+    if row is None:
+        return None
+    price = price_in_currency(Decimal(row[0]), quote_currency=row[3],
+                              target_currency=listing_currency(company.ticker, company.currency), company=company)
+    return (price, row[1], row[2]) if price is not None else None
 
 
 def simulate_hypothetical_sale(
@@ -254,7 +260,7 @@ def simulate_hypothetical_sale(
         quote = latest_quote(db, company)
         if quote is not None:
             result.sale_price, result.sale_price_date, result.sale_price_ref = quote
-            result.sale_currency = company.currency or default_ccy
+            result.sale_currency = listing_currency(company.ticker, company.currency)
             result.sale_price_source = "cotización"
     if result.sale_price is None:
         result.missing.append("el precio al que venderías")
