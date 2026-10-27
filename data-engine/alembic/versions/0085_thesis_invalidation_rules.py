@@ -5,10 +5,8 @@ siempre; ``invalidation_rules`` guarda criterios opcionales y evaluables
 (metrica, operador, umbral, descripcion) que el evaluador de alertas comprueba
 para avisar cuando la tesis queda invalidada.
 
-Numeracion: 0083 la usa la rama del motor DCA y 0084 la de la biblioteca con
-ticker (ambas en PR). Si esta se mergea antes que alguna de ellas, ajusta
-``down_revision`` al head que haya en main en ese momento.
-
+Cadena: 0084 de biblioteca ya esta en main; 0083 de DCA sigue aislada.
+No se renombra ninguna revision aplicada.
 Sin backfill: las tesis existentes quedan en NULL (sin criterios medibles).
 """
 import sqlalchemy as sa
@@ -16,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0085_thesis_invalidation_rules"
-down_revision = "0082_financial_facts_filed"
+down_revision = "0084_knowledge_document_ticker"
 branch_labels = None
 depends_on = None
 
