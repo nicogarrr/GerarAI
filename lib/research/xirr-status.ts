@@ -2,6 +2,7 @@
 const XIRR_ND_REASONS: Record<string, string> = {
   incomplete_missing_fx: 'faltan tipos de cambio o valores necesarios para incluir todos los flujos y el valor final',
   incomplete_ambiguous_cash: 'hay flujos de caja ambiguos en el registro',
+  incomplete_missing_cash_balance: 'hay aportaciones registradas pero falta el saldo de caja de la cuenta',
   insufficient_cashflows: 'faltan flujos de caja en el registro de transacciones',
   no_xirr_root: 'no converge con los flujos registrados',
 };
