@@ -13,7 +13,7 @@ from types import SimpleNamespace
 class FakeHTTPError(Exception):
     pass
 
-httpx = SimpleNamespace(Client=object, HTTPError=FakeHTTPError)
+httpx = SimpleNamespace(Client=object, HTTPError=FakeHTTPError, Timeout=lambda *args, **kwargs: (args, kwargs))
 
 module = ast.parse(Path('data-engine/app/api/routes/market.py').read_text())
 functions = [node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == '_fetch_yahoo_candles']
