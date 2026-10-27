@@ -5,8 +5,8 @@ The report follows Spanish IRPF conventions:
 - Realized gains/losses use FIFO lot accounting on sells (required by law for
   homogeneous securities). Each buy lot's unit cost includes acquisition fees;
   a deferred wash-sale loss is added separately to preserve that basis. FX
-  conversion to the portfolio base currency uses the transaction-date rate
-  from the FX ledger.
+  conversion of securities gains uses the sale-date FX rate once. Later
+  currency disposal is separate; purchase-date FX does not change that gain.
 - Dividends are grouped by company and converted at the payment date rate.
 - Withholding is matched from cash transactions whose type contains
   "withholding" / "tax" (IBKR reports gross dividend and withheld tax as
@@ -159,9 +159,10 @@ def _rate_not_older_than(
 def _defer_base(lot: dict, take: Decimal, sale: dict) -> None:
     """Difiere la pérdida bloqueada (wash-sale) también en divisa base.
 
-    La pérdida en base sale de los dos tramos convertidos a su propio tipo;
-    si no se conoce (falta FX), el diferido en base del lote queda
-    desconocido (None) y su futura venta se declara sin importe en base.
+    Conserva trazabilidad del importe de la pérdida al cambio de su venta.
+    El cálculo DGT de una venta posterior usa el diferido nativo y lo convierte
+    al cambio de esa venta posterior, no suma dos tramos FX históricos.
+    deferred_base puede ser None y no sustituye esa base nativa.
     """
     if sale.get("loss_unknown"):
         # Pérdida de una venta descubierta: se calculó con coste cero en el
@@ -442,25 +443,20 @@ def replay_tax_fifo(events, resolve_rate, start, end):
             cost_base = None
 
         gain_native = proceeds_native - cost_native
-        # Valor de transmisión al tipo de la FECHA DE VENTA; la
-        # ganancia en base es la diferencia de ambos tramos ya
-        # convertidos (no la ganancia en divisa x tipo de venta).
+        # Criterio DGT elegido: ganancia en moneda del valor, convertida una
+        # sola vez al cambio de la venta. La posterior transmisión de divisa
+        # es un hecho fiscal separado, no se mezcla con esta venta de acciones.
         sell_rate = resolve_rate(transaction.currency, transaction.trade_date)
         proceeds_base = proceeds_native * sell_rate if sell_rate is not None else None
-        gain_base_raw = (
-            proceeds_base - cost_base
-            if proceeds_base is not None and cost_base is not None
-            else None
-        )
+        cost_base = cost_native * sell_rate if sell_rate is not None else None
+        gain_base_raw = gain_native * sell_rate if sell_rate is not None else None
         # TODA venta válida entra en el historial, con ganancia o con
         # pérdida: holdings_before_window alimenta la excepción de
         # compra única del Manual, y omitir las ventas rentables lo
         # infla (bloquearía pérdidas que AEAT permite computar).
         prior_sells.append((transaction.trade_date, transaction.quantity))
-        # Art. 33.5.f LIRPF: la pérdida que se difiere es la del IRPF,
-        # en EUROS (cada tramo a su tipo, art. 34-35). Una ganancia en
-        # divisa puede ser pérdida en euros (y al revés): se decide con
-        # el resultado en base; solo sin FX se recurre al de divisa.
+        # La pérdida del valor se calcula primero en su moneda y se convierte
+        # al cambio de la venta, sin mezclar el resultado separado de divisa.
         is_loss = (
             gain_base_raw < 0 if gain_base_raw is not None else gain_native < 0
         )
@@ -1081,6 +1077,7 @@ class TaxReportService:
                 b["ticker"] for b in realized if b.get("cost_unknown")
             ),
             "method": FIFO_METHOD,
+            "securities_fx_criterion": "dgt_native_gain_sale_date_v1",
             "incomplete_fx": incomplete_fx,
             "missing_fx": sorted(
                 {b["ticker"] for b in dividends if b["missing_fx"]}
