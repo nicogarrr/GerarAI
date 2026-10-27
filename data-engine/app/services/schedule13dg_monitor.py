@@ -47,6 +47,14 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def _normalize_cik(cik: str | int) -> str:
+    """CIK sin ceros a la izquierda para comparar (EDGAR lo sirve de ambas)."""
+    try:
+        return str(int(str(cik).strip()))
+    except ValueError:
+        return str(cik).strip()
+
+
 def _connector_state(db: Session, tenant_id: int | None) -> ConnectorState:
     state = db.scalar(
         select(ConnectorState).where(
@@ -102,6 +110,7 @@ def scan(
         "filings_seen": 0,
         "filings_new": 0,
         "filings_unparsed": 0,
+        "filings_rejected": 0,
         "errors": [],
         "status": "ok",
     }
@@ -153,6 +162,10 @@ def scan(
                     break
                 budget -= 1
                 filing["issuer_ticker"] = ticker
+                # CIK del emisor SEGUN NUESTRO listado (submissions JSON del
+                # ticker): referencia para verificar el filing y respaldo de
+                # la columna issuer_cik cuando el documento no lo declara.
+                filing["issuer_cik"] = cik
                 try:
                     if fetcher is not None:
                         text = fetcher(filing)
@@ -161,6 +174,20 @@ def scan(
                             filing["document_url"], client=client
                         )
                     parsed = form13dg_connector.parse_schedule13dg(text)
+                    # Veracidad del emisor: si el documento declara un
+                    # issuer_cik distinto del CIK del ticker, el filing no es
+                    # de este emisor: no se persiste ni se publica; se
+                    # registra y se sigue con el siguiente.
+                    parsed_issuer = str(parsed.get("issuer_cik") or "").strip()
+                    if parsed_issuer and _normalize_cik(parsed_issuer) != _normalize_cik(cik):
+                        stats["filings_rejected"] += 1
+                        stats["errors"].append(
+                            f"{accession}: issuer_cik {parsed_issuer} no coincide con "
+                            f"{ticker} (CIK {cik}); filing descartado"
+                        )
+                        if delay_seconds > 0:
+                            sleeper(delay_seconds)
+                        continue
                     persisted = schedule13dg_persistence.persist_filing(
                         db, filing, parsed, raw_text=text, tenant_id=tenant_id
                     )
@@ -181,6 +208,13 @@ def scan(
     except Exception as exc:  # noqa: BLE001 - el actor jamas recibe una excepcion
         stats["status"] = "error"
         stats["errors"].append(f"fatal: {type(exc).__name__}: {exc}")
+        # Si el fallo vino de la sesion (p. ej. un commit roto), hay que hacer
+        # rollback ANTES de tocar nada mas; commitear sobre una sesion
+        # envenenada lanzaria PendingRollbackError y perderia el estado.
+        db.rollback()
+        # Revalidar el estado: el objeto previo pudo quedar deshacerse con el
+        # rollback; se relee (o recrea) desde la base.
+        state = _connector_state(db, tenant_id)
         state.consecutive_errors = (state.consecutive_errors or 0) + 1
         state.last_error = f"{type(exc).__name__}: {exc}"[:1000]
         meta = dict(state.metadata_ or {})

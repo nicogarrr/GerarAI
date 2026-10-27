@@ -1,7 +1,7 @@
 """Institutional ownership endpoints (SEC Form 13F, reviewed managers only,
 y SC 13D/13G de titulares >5% ya ingeridos)."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -80,9 +80,26 @@ def schedule_13dg_sync(
     ticker: str = Query(min_length=1, max_length=20),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Ingesta acotada de SC 13D/13G para UN ticker seguido (submissions JSON + presupuesto)."""
+    """Ingesta acotada de SC 13D/13G para UN ticker SEGUIDO.
+
+    "Seguido" = watchlist o cartera del tenant (misma definicion que el
+    monitor diario); cualquier otro ticker se rechaza con 404 en lugar de
+    gastar peticiones a la SEC en un emisor que el usuario no sigue.
+    """
+    from app.services.insider_monitor import watchlist_tickers
+
+    tenant_id = db.info.get("tenant_id")
+    normalized = ticker.strip().upper()
+    if normalized not in watchlist_tickers(db, tenant_id):
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"{normalized} no esta en la watchlist ni en la cartera; "
+                "la ingesta SC 13D/13G esta acotada a emisores seguidos"
+            ),
+        )
     return schedule13dg_monitor.scan(
         db,
-        tenant_id=db.info.get("tenant_id"),
-        tickers=[ticker],
+        tenant_id=tenant_id,
+        tickers=[normalized],
     )

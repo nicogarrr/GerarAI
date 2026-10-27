@@ -105,3 +105,32 @@ def test_unparsed_document_stays_null_never_invented():
     assert row.snapshot_date is None
     assert row.error
     db.close()
+
+
+def test_flush_error_rolls_back_savepoint_and_session_survives(monkeypatch):
+    """Un flush que viola una constraint real (issuer_cik NULL) queda acotado
+    a su savepoint: la sesion NO queda envenenada y el filing siguiente
+    persiste con normalidad."""
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+
+    db = _db()
+    parsed = form13dg_connector.parse_schedule13dg(REAL_13G_XML)
+    real_init = Schedule13DGFiling.__init__
+
+    def poisoned_init(self, **kwargs):
+        kwargs["issuer_cik"] = None  # viola el NOT NULL real de issuer_cik
+        real_init(self, **kwargs)
+
+    monkeypatch.setattr(Schedule13DGFiling, "__init__", poisoned_init)
+    with pytest.raises(IntegrityError):
+        schedule13dg_persistence.persist_filing(db, FILING, parsed)
+    monkeypatch.undo()
+
+    # La misma sesion sigue operativa sin rollback manual del caller.
+    result = schedule13dg_persistence.persist_filing(db, FILING, parsed)
+    db.commit()
+    assert result["filing_created"] is True
+    assert result["status"] == "parsed"
+    assert db.query(Schedule13DGFiling).count() == 1
+    db.close()

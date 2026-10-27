@@ -293,3 +293,125 @@ def test_recent_form13dg_filings_filters_both_form_families():
     assert first["report_date"] == "2026-09-30"
     assert first["index_url"] == "https://www.sec.gov/Archives/edgar/data/1780312/000201238326003748/"
     assert first["document_url"].endswith("xslSCHEDULE_13G_X02/primary_doc.xml")
+
+
+# ---------------- Auditoria #2585: enteros no negativos ----------------
+
+from app.services.connectors.form13dg import _parse_int  # noqa: E402
+
+
+def test_parse_int_rejects_negative_and_junk():
+    # Acciones/poder de voto jamas negativos: ilegible o negativo = None (N/D).
+    assert _parse_int("-123") is None
+    assert _parse_int("-1,000") is None
+    assert _parse_int("-0") is None
+    assert _parse_int("abc") is None
+    assert _parse_int("12.5") is None
+    assert _parse_int("") is None
+    assert _parse_int(None) is None
+    assert _parse_int("0") == 0
+    assert _parse_int("1,000") == 1000
+    assert _parse_int("16115870") == 16115870
+
+
+def test_parse_xml_negative_shares_become_none():
+    xml = AMENDMENT_XML.replace(
+        "<soleVotingPower>8000000</soleVotingPower>",
+        "<soleVotingPower>-8000000</soleVotingPower>",
+    )
+    parsed = parse_schedule13dg(xml)
+    assert parsed["sole_voting_power"] is None
+    # El resto de campos no negativos se siguen leyendo.
+    assert parsed["aggregate_shares"] == 8000000
+
+
+# ---------------- Auditoria #2585: .htm heredado es documento primario ----------------
+
+# Portada 13G heredada servida como .htm: ES el documento primario, no un
+# render XSL. fetch_filing_document debe aceptarla y el parser SGML/htm debe
+# poder entrar de verdad.
+LEGACY_HTM_URL = "https://www.sec.gov/Archives/edgar/data/1780312/000093247124000884/primary_doc.htm"
+LEGACY_HTM_COVER = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML>
+<HEAD><TITLE>SC 13G</TITLE></HEAD>
+<BODY>
+<P>UNITED STATES SECURITIES AND EXCHANGE COMMISSION</P>
+<P>Washington, D.C. 20549</P>
+<P>SCHEDULE 13G</P>
+<P>CUSIP No. 00217D100</P>
+<P>1 NAME OF REPORTING PERSON</P>
+<P>Example Capital Management LLC</P>
+<P>11 AGGREGATE AMOUNT BENEFICIALLY OWNED BY EACH REPORTING PERSON</P>
+<P>1,000,000</P>
+<P>13 PERCENT OF CLASS REPRESENTED BY AMOUNT IN ROW 11</P>
+<P>6.2%</P>
+<P>Date of Event Which Requires Filing of this Statement</P>
+<P>09/30/2024</P>
+</BODY>
+</HTML>"""
+
+
+def test_fetch_accepts_legacy_htm_primary_document():
+    client = _FakeClient({LEGACY_HTM_URL: LEGACY_HTM_COVER})
+    text = fetch_filing_document(LEGACY_HTM_URL, client=client)
+    assert text == LEGACY_HTM_COVER
+    assert client.requested == [LEGACY_HTM_URL]
+    # Y el parser SGML/htm declarado entra de verdad sobre la portada HTML.
+    parsed = parse_schedule13dg(text)
+    assert parsed["format"] == "legacy-text"
+    assert parsed["parsed_ok"] is True
+    assert parsed["holder_name"] == "Example Capital Management LLC"
+    assert parsed["aggregate_shares"] == 1000000
+    assert parsed["percent_of_class"] == 6.2
+    assert parsed["snapshot_date"] == "2024-09-30"
+
+
+# ---------------- Auditoria #2585: emisor verificable en SGML ----------------
+
+LEGACY_13G_WITH_HEADER = """<SEC-DOCUMENT>0000932471-24-000884.txt : 20241112
+<SEC-HEADER>0000932471-24-000884.hdr.sgml : 20241112
+<ACCEPTANCE-DATETIME>20241112051234
+CONFORMED SUBMISSION TYPE: SC 13G
+PUBLIC DOCUMENT COUNT: 1
+FILED AS OF DATE: 20241112
+
+SUBJECT COMPANY:
+
+	COMPANY DATA:
+		COMPANY CONFORMED NAME:			AST SpaceMobile, Inc.
+		CENTRAL INDEX KEY:			0001780312
+		STANDARD INDUSTRIAL CLASSIFICATION:	COMMUNICATIONS SERVICES [4899]
+
+FILER:
+
+	COMPANY DATA:
+		COMPANY CONFORMED NAME:			Example Capital Management LLC
+		CENTRAL INDEX KEY:			0002012383
+
+</SEC-HEADER>
+<DOCUMENT>
+<TYPE>SC 13G
+<TEXT>
+CUSIP No. 00217D100
+
+1 NAME OF REPORTING PERSON
+Example Capital Management LLC
+
+11 AGGREGATE AMOUNT BENEFICIALLY OWNED BY EACH REPORTING PERSON
+1,000,000
+
+13 PERCENT OF CLASS REPRESENTED BY AMOUNT IN ROW 11
+6.2%
+</TEXT>
+</DOCUMENT>
+</SEC-DOCUMENT>"""
+
+
+def test_parse_legacy_sgml_header_extracts_issuer_cik():
+    parsed = parse_schedule13dg(LEGACY_13G_WITH_HEADER)
+    assert parsed["format"] == "legacy-text"
+    assert parsed["parsed_ok"] is True
+    # El emisor es el SUBJECT COMPANY, no el FILER.
+    assert parsed["issuer_cik"] == "1780312"
+    assert parsed["issuer_name"] == "AST SpaceMobile, Inc."
+    assert parsed["filer_cik"] == "2012383"

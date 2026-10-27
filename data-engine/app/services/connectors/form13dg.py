@@ -196,11 +196,14 @@ def fetch_filing_document(
     if hostname not in {"sec.gov", "www.sec.gov"}:
         raise ValueError("SC 13D/13G document URL must use sec.gov")
     text = _get_text(document_url, client)
-    if not text.lstrip().lower().startswith(("<!doctype", "<html")):
+    if not _RENDERED_XSL_RE.search(urlparse(document_url).path):
+        # Documento primario: puede ser XML (esquema nuevo) o HTML heredado
+        # (un 13D/G antiguo cuyo primario ES un .htm legitimo). No es un
+        # render XSL: se devuelve tal cual y el parse decide el formato.
         return text
+    # URL renderizada (…/xslSCHEDULE_13[DG]_Xnn/fichero): es HTML para
+    # humanos; el documento crudo vive en el directorio del filing.
     raw_url = raw_document_url(document_url)
-    if raw_url == document_url:
-        raise ValueError("SC 13D/13G document is rendered HTML and has no raw variant")
     raw_text = _get_text(raw_url, client)
     if raw_text.lstrip().lower().startswith(("<!doctype", "<html")):
         raise ValueError("SC 13D/13G raw document is rendered HTML too")
@@ -215,7 +218,7 @@ _SGML_TYPE_RE = re.compile(
     r"(?:CONFORMED\s+SUBMISSION\s+TYPE|<TYPE>)\s*:?\s*(SC\s*13[DG](?:/A)?|SCHEDULE\s+13[DG](?:/A)?)",
     re.IGNORECASE,
 )
-_INT_RE = re.compile(r"^-?[\d,]+$")
+_INT_RE = re.compile(r"^[\d,]+$")
 _PERCENT_RE = re.compile(r"^(-?\d+(?:[.,]\d+)?)\s*%?$")
 
 
@@ -241,16 +244,23 @@ def _text_local(elem: ET.Element | None, name: str) -> str | None:
 
 
 def _parse_int(raw: str | None) -> int | None:
-    """Entero SEC con comas de miles; None ante cualquier duda (nunca inventar)."""
+    """Entero SEC con comas de miles; None ante cualquier duda (nunca inventar).
+
+    Acciones y poder de voto son siempre >= 0: un negativo es un error de
+    parseo y queda N/D, igual que un valor ilegible.
+    """
     if raw is None:
         return None
     text = raw.strip()
     if not _INT_RE.match(text):
         return None
     try:
-        return int(text.replace(",", ""))
+        value = int(text.replace(",", ""))
     except ValueError:
         return None
+    if value < 0:
+        return None
+    return value
 
 
 def _parse_percent(raw: str | None) -> float | None:
@@ -414,7 +424,11 @@ def _legacy_value_after(
         if not match:
             continue
         for line in text[match.end() :].splitlines()[0:6]:
-            candidate = line.strip().strip(":")
+            # Las portadas .htm heredadas llevan tags inline (<TD>, </P>...):
+            # se retiran para que el valor real quede visible; en SGML plano
+            # no hay tags y esto no cambia nada.
+            candidate = re.sub(r"<[^>]+>", " ", line)
+            candidate = re.sub(r"\s+", " ", candidate).strip().strip(":")
             if not candidate:
                 continue
             # La linea IRS del bloque 1 no es el nombre del declarante.
@@ -426,10 +440,38 @@ def _legacy_value_after(
     return None
 
 
+_SGML_ISSUER_CIK_RE = re.compile(
+    r"SUBJECT\s+COMPANY.*?CENTRAL\s+INDEX\s+KEY\s*:\s*0*(\d{1,10})",
+    re.IGNORECASE | re.DOTALL,
+)
+_SGML_ISSUER_NAME_RE = re.compile(
+    r"SUBJECT\s+COMPANY.*?COMPANY\s+CONFORMED\s+NAME\s*:\s*([^\n]+)",
+    re.IGNORECASE | re.DOTALL,
+)
+_SGML_FILER_CIK_RE = re.compile(
+    r"FILER:.*?CENTRAL\s+INDEX\s+KEY\s*:\s*0*(\d{1,10})",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
 def _parse_legacy(text: str, form: str | None) -> dict:
     """Portada heredada SGML/htm: extraccion por rotulos fijos, fail-closed."""
     result = _empty_parse(form)
     result["format"] = "legacy-text"
+
+    # La cabecera SGML (<SEC-HEADER>) identifica al emisor (SUBJECT COMPANY)
+    # y al declarante (FILER) con su CIK: es lo que permite verificar que el
+    # filing es del emisor pedido antes de persistirlo.
+    header = text[:8000]
+    issuer_cik = _SGML_ISSUER_CIK_RE.search(header)
+    if issuer_cik:
+        result["issuer_cik"] = issuer_cik.group(1)
+    issuer_name = _SGML_ISSUER_NAME_RE.search(header)
+    if issuer_name:
+        result["issuer_name"] = issuer_name.group(1).strip() or None
+    filer_cik = _SGML_FILER_CIK_RE.search(header)
+    if filer_cik:
+        result["filer_cik"] = filer_cik.group(1)
 
     holder = _legacy_value_after(text, (r"NAME\s+OF\s+REPORTING\s+PERSONS?",))
     if holder and len(holder) <= 300:

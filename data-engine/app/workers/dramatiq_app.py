@@ -3266,6 +3266,7 @@ def scan_schedule13dg_watchlist(
             "filings_seen": stats["filings_seen"],
             "filings_new": stats["filings_new"],
             "filings_unparsed": stats["filings_unparsed"],
+            "filings_rejected": stats.get("filings_rejected", 0),
             "errors": stats["errors"][:20],
         }
     except Exception as exc:

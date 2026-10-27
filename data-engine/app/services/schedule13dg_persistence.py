@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import Schedule13DGFiling
 
-PARSER_VERSION = "1.0"  # 1.0: portada XML schedule13d/13g + portada SGML heredada
+PARSER_VERSION = "1.1"  # 1.0: portada XML + SGML; 1.1: CIK emisor/declarante en SGML y enteros no negativos
 
 
 def persist_filing(
@@ -81,6 +81,10 @@ def persist_filing(
         status="parsed" if parsed_ok else "unparsed",
         error=(parsed.get("error") or None) if not parsed_ok else None,
     )
-    db.add(record)
-    db.flush()
+    # Savepoint por filing: si el flush viola una constraint (p. ej. un
+    # duplicado concurrente), solo se deshace ESTE filing y la sesion queda
+    # operativa para el resto del escaneo, sin rollback manual del caller.
+    with db.begin_nested():
+        db.add(record)
+        db.flush()
     return {"filing_created": True, "filing_id": record.id, "status": record.status}

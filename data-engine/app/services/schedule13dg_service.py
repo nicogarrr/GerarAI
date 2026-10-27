@@ -94,8 +94,11 @@ def filings_for_ticker(
         "limitations": [
             "Solo emisores seguidos (watchlist/cartera) y filings ya ingeridos; "
             "los campos no parseados se muestran N/D, nunca estimados.",
-            "Un Schedule 13G pasivo puede declararse hasta 45 dias despues del "
-            "cierre del trimestre (Rule 13d-1(b)): la fecha de snapshot es la "
-            "declarada en el filing, no la de presentacion.",
+            "Un Schedule 13G de inversor institucional cualificado puede "
+            "declararse hasta 45 dias despues del cierre del trimestre "
+            "natural en que surge la obligacion (17 CFR 240.13d-1(b)(2); "
+            "eCFR: https://www.ecfr.gov/current/title-17/chapter-II/part-240/"
+            "section-240.13d-1): la fecha de snapshot es la declarada en el "
+            "filing, no la de presentacion.",
         ],
     }
