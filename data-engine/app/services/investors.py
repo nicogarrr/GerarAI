@@ -26,6 +26,8 @@ from app.services.manager_holding_ingestion_service import (
     REVIEWED_MANAGERS,
     SOURCE,
     ManagerHoldingIngestionService,
+    public_coverage,
+    verification_status,
 )
 from app.services.provenance import Coverage, SourceKind, provenance
 
@@ -145,7 +147,8 @@ def list_investors(db: Session) -> dict[str, Any]:
         rows = _latest_view(db, manager) if manager else []
         item.update(
             {
-                "coverage": manager.coverage if manager and rows else None,
+                "coverage": public_coverage(manager.coverage) if manager and rows else None,
+                "verification": verification_status(manager.coverage) if manager and rows else None,
                 "official_name": REVIEWED_MANAGERS.get(inv.cik or ""),
                 "report_date": manager.last_report_date.isoformat()
                 if manager and manager.last_report_date
@@ -179,7 +182,8 @@ def investor_detail(db: Session, slug: str) -> dict[str, Any] | None:
     display_names = names_by_cusip(db, [r.cusip for r in rows])
     detail.update(
         {
-            "coverage": manager.coverage if manager and rows else None,
+            "coverage": public_coverage(manager.coverage) if manager and rows else None,
+                "verification": verification_status(manager.coverage) if manager and rows else None,
             "official_name": REVIEWED_MANAGERS.get(inv.cik or ""),
             "report_date": manager.last_report_date.isoformat()
             if manager and manager.last_report_date
@@ -250,7 +254,7 @@ def most_bought(db: Session) -> dict[str, Any]:
             pending += 1
             continue
         compared += 1
-        if manager.coverage == "partial":
+        if public_coverage(manager.coverage) == "partial":
             partial += 1
         periods.add(result["latest_report"])
         for row in result["changes"]:

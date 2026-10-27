@@ -122,6 +122,29 @@ def _verify_totals(
     }
 
 
+# Auditoria A: el estado de verificacion del filing servido se guarda en
+# ``FundManager.coverage`` (String(20), sin migracion) con dos valores mas que
+# el enum ``Coverage``: "mismatch" (los totales no cuadran con el resumen del
+# propio 13F) y "unverified" (resumen ilegible, sin contraste). Hacia fuera
+# ambos son cobertura "partial", asi que toda pantalla que ya mostraba «Datos
+# parciales» sigue haciendolo; el motivo exacto viaja en ``verification``.
+VERIFICATION_COVERAGES = frozenset({"mismatch", "unverified"})
+
+
+def public_coverage(raw: str | None) -> str | None:
+    """Cobertura publica (enum Coverage) a partir del valor guardado."""
+    return Coverage.PARTIAL.value if raw in VERIFICATION_COVERAGES else raw
+
+
+def verification_status(raw: str | None) -> str | None:
+    """verified | mismatch | unverified | partial | unavailable (None sin datos)."""
+    if raw is None:
+        return None
+    if raw in VERIFICATION_COVERAGES:
+        return raw
+    return "verified" if raw == Coverage.OK.value else raw
+
+
 def _latest_accession(rows: list) -> str:
     """Accession vigente de un periodo: gana la enmienda con filing_date mas
     reciente (desempate por accession). Las filas de TODOS los filings quedan
@@ -302,12 +325,15 @@ class ManagerHoldingIngestionService:
         )
         if stored_latest is not None:
             manager.last_report_date = stored_latest
-        manager.coverage = Coverage.PARTIAL.value if errors else Coverage.OK.value
+        stored_coverage = self._stored_coverage(
+            db, manager, stored_latest, verification, errors
+        )
+        manager.coverage = stored_coverage
         manager.synced_at = fetched_at
         db.add(manager)
         db.commit()
 
-        coverage = Coverage.PARTIAL if errors else Coverage.OK
+        coverage = Coverage(public_coverage(stored_coverage))
         return {
             "cik": cik,
             "manager": manager.name,
@@ -324,6 +350,7 @@ class ManagerHoldingIngestionService:
             ],
             "ingested_rows": ingested,
             "verification": verification,
+            "verification_status": verification_status(stored_coverage),
             "skipped_amendments": skipped_amendments,
             "errors": errors,
             "limitations": LIMITATIONS,
@@ -456,6 +483,42 @@ class ManagerHoldingIngestionService:
             "provenance": provenance(SOURCE, SourceKind.INTERNAL, coverage=Coverage.OK),
         }
 
+    @staticmethod
+    def _stored_coverage(
+        db: Session,
+        manager: FundManager,
+        stored_latest: date | None,
+        verification: list[dict],
+        errors: list[dict],
+    ) -> str:
+        """Cobertura a guardar segun la verificacion del filing que se servira.
+
+        El filing servido es la accession vigente del ultimo periodo guardado
+        (la misma regla que ``latest_holdings``). Si sus totales no cuadran o
+        no se pudieron contrastar, se guarda ese motivo exacto; cualquier otro
+        fallo (descarga, otro trimestre, salto de escala) es "partial".
+        """
+        by_accession = {item["accession"]: item["status"] for item in verification}
+        served_status: str | None = None
+        if stored_latest is not None:
+            served_rows = list(
+                db.scalars(
+                    select(ManagerHolding).where(
+                        ManagerHolding.manager_id == manager.id,
+                        ManagerHolding.report_date == stored_latest,
+                    )
+                )
+            )
+            if served_rows:
+                served_status = by_accession.get(_latest_accession(served_rows))
+        if served_status in VERIFICATION_COVERAGES:
+            return str(served_status)
+        if errors:
+            return Coverage.PARTIAL.value
+        if any(item["status"] != "ok" for item in verification):
+            return Coverage.PARTIAL.value
+        return Coverage.OK.value
+
     def latest_holdings(self, db: Session, *, cik: str) -> dict[str, Any]:
         cik = str(cik).strip().zfill(10)
         manager = db.scalar(select(FundManager).where(FundManager.cik == cik))
@@ -485,12 +548,16 @@ class ManagerHoldingIngestionService:
         from app.services.instrument_reference import names_by_cusip
 
         display_names = names_by_cusip(db, [row.cusip for row in rows])
+        verification = verification_status(manager.coverage)
         return {
             "cik": cik,
             "manager": manager.name,
-            "status": "ok",
+            # Auditoria A: "ok" solo con totales contrastados contra el propio
+            # 13F; si no, el motivo exacto (mismatch, unverified, partial).
+            "status": "ok" if verification == "verified" else verification,
+            "verification": verification,
             "report_date": manager.last_report_date.isoformat(),
-            "coverage": manager.coverage,
+            "coverage": public_coverage(manager.coverage),
             "holdings": [
                 {
                     "accession_number": row.accession_number,
@@ -517,6 +584,6 @@ class ManagerHoldingIngestionService:
                 SOURCE,
                 SourceKind.OFFICIAL,
                 fetched_at=manager.synced_at,
-                coverage=Coverage(manager.coverage),
+                coverage=Coverage(public_coverage(manager.coverage)),
             ),
         }

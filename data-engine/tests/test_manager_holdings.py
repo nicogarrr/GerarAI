@@ -134,7 +134,9 @@ def test_sync_ingests_latest_report_and_is_idempotent(db):
 
     manager = db.scalar(select(FundManager).where(FundManager.cik == CIK))
     assert manager.name == REVIEWED_MANAGERS[CIK]
-    assert manager.coverage == "ok"
+    # El resumen de este fixture no trae totales: sin contraste no es "ok".
+    assert manager.coverage == "unverified"
+    assert result["verification_status"] == "unverified"
     rows = db.scalars(select(ManagerHolding)).all()
     assert len(rows) == 4
     accessions = {row.accession_number for row in rows}
@@ -192,7 +194,9 @@ def test_latest_holdings_serves_latest_report(db):
     assert service.latest_holdings(db, cik=CIK)["status"] == "unavailable"
     service.sync_manager(db, cik=CIK)
     result = service.latest_holdings(db, cik=CIK)
-    assert result["status"] == "ok"
+    # Fixture sin totales en el resumen: se sirve, pero sin verificar.
+    assert result["status"] == "unverified"
+    assert result["coverage"] == "partial"
     assert result["report_date"] == "2026-06-30"
     # La enmienda (filing mas reciente) sustituye al base: 2 posiciones, no 4.
     assert len(result["holdings"]) == 2
@@ -287,7 +291,7 @@ def test_latest_holdings_serves_only_the_winning_amendment(db):
     service = ManagerHoldingIngestionService(client=_sec_client_two())
     service.sync_manager(db, cik=CIK)
     result = service.latest_holdings(db, cik=CIK)
-    assert result["status"] == "ok"
+    assert result["status"] == "unverified"  # resumen del fixture sin totales
     keys = [(h["cusip"], h["title_of_class"], h["put_call"]) for h in result["holdings"]]
     assert len(keys) == len(set(keys)), "ninguna posicion puede aparecer dos veces"
     aapl = next(h for h in result["holdings"] if h["cusip"] == "037833100")
@@ -429,7 +433,10 @@ def test_sync_flags_partial_coverage_when_totals_do_not_match(db):
     assert result["verification"][0]["status"] == "mismatch"
     assert {"accession": "0000950123-26-000010", "error": "totals_mismatch"} in result["errors"]
     manager = db.scalar(select(FundManager))
-    assert manager is not None and manager.coverage == "partial"
+    # Auditoria A: se guarda el motivo exacto; hacia fuera sigue siendo "partial".
+    assert manager is not None and manager.coverage == "mismatch"
+    assert result["verification_status"] == "mismatch"
+    assert result["provenance"]["coverage"] == "partial"
 
 
 def test_sync_without_primary_doc_is_unverified_not_ok_claim(db):
@@ -664,7 +671,7 @@ def test_latest_report_failing_keeps_serving_last_stored_period(db):
     out = service.sync_manager(db, cik=CIK)
     assert out["errors"], "el fallo del trimestre reciente se declara"
     result = service.latest_holdings(db, cik=CIK)
-    assert result["status"] == "ok"
+    assert result["status"] == "unverified"  # nunca "ok" con 0 posiciones ni sin contraste
     assert result["report_date"] == "2026-03-31"
     assert result["coverage"] == "partial"
     assert {h["cusip"] for h in result["holdings"]} == {"037833100", "060505104", "594918104"}
@@ -679,3 +686,46 @@ def test_latest_report_failing_does_not_regress_a_newer_stored_period(db):
     result = service.latest_holdings(db, cik=CIK)
     assert result["report_date"] == "2026-06-30"
     assert len(result["holdings"]) == 3
+
+
+
+def test_latest_holdings_reports_mismatch_not_ok_after_totals_mismatch(db):
+    """Auditoria A: con totales que no cuadran se ingerian las filas y
+    ``latest_holdings`` devolvia status="ok". Ahora el estado es exacto."""
+    ManagerHoldingIngestionService(_multi_client(_primary_doc("999", 5))).sync_manager(db, cik=CIK)
+    served = ManagerHoldingIngestionService().latest_holdings(db, cik=CIK)
+    assert served["status"] == "mismatch"
+    assert served["verification"] == "mismatch"
+    assert served["coverage"] == "partial"
+    assert served["provenance"]["coverage"] == "partial"
+    assert len(served["holdings"]) == 2  # las cifras se ven, pero marcadas
+
+
+def test_unreadable_summary_marks_unverified_and_partial_coverage(db):
+    """Sin resumen legible no hay contraste: antes quedaba coverage="ok"."""
+    result = ManagerHoldingIngestionService(_multi_client(None)).sync_manager(db, cik=CIK)
+    assert result["verification_status"] == "unverified"
+    served = ManagerHoldingIngestionService().latest_holdings(db, cik=CIK)
+    assert served["status"] == "unverified"
+    assert served["verification"] == "unverified"
+    assert served["coverage"] == "partial"
+    from app.services.investors import INVESTORS, investor_detail, list_investors
+
+    slug = next(i.slug for i in INVESTORS if i.cik == CIK)
+    detail = investor_detail(db, slug)
+    assert detail is not None
+    assert detail["coverage"] == "partial"
+    assert detail["verification"] == "unverified"
+    listed = next(i for i in list_investors(db)["investors"] if i["slug"] == slug)
+    assert listed["coverage"] == "partial"
+    assert listed["verification"] == "unverified"
+
+
+def test_verified_totals_keep_status_ok(db):
+    total = 200237120 + 3 * 1000 + 40000000
+    result = ManagerHoldingIngestionService(_multi_client(_primary_doc(str(total), 5))).sync_manager(db, cik=CIK)
+    assert result["verification_status"] == "verified"
+    served = ManagerHoldingIngestionService().latest_holdings(db, cik=CIK)
+    assert served["status"] == "ok"
+    assert served["verification"] == "verified"
+    assert served["coverage"] == "ok"
