@@ -89,7 +89,7 @@ def _with_reporting_currency(unit: str, currency: str | None) -> str:
     return unit
 
 
-def _sec_reporting_currency(us_gaap: dict[str, Any]) -> str:
+def _sec_reporting_currency(us_gaap: dict[str, Any]) -> str | None:
     """Divisa de reporte de un filer SEC segun sus propios hechos us-gaap.
 
     Un 10-K reporta en USD, pero un 20-F en US GAAP puede reportar en CNY
@@ -97,7 +97,7 @@ def _sec_reporting_currency(us_gaap: dict[str, Any]) -> str:
     Leer solo la clave ``USD`` dejaba a esos emisores sin hechos (o, peor,
     con la traduccion de conveniencia del ultimo ano). Se cuenta, en los
     conceptos de referencia, cuantas observaciones hay por divisa ISO y gana
-    la que mas tiene (empate -> USD).
+    la que mas tiene. Empate o ausencia de evidencia -> desconocida.
     """
     counts: Counter[str] = Counter()
     for concept in _SEC_CURRENCY_PROBE_CONCEPTS:
@@ -107,14 +107,16 @@ def _sec_reporting_currency(us_gaap: dict[str, Any]) -> str:
             if code is not None and isinstance(entries, list):
                 counts[code] += len(entries)
     if not counts:
-        return "USD"
+        return None
     best = max(counts.values())
     leaders = sorted(code for code, n in counts.items() if n == best)
-    return "USD" if "USD" in leaders else leaders[0]
+    return leaders[0] if len(leaders) == 1 else None
 
 
-def _sec_unit_keys(unit: str, currency: str) -> tuple[str, str]:
+def _sec_unit_keys(unit: str, currency: str | None) -> tuple[str, str] | None:
     """(unidad a guardar, clave de ``units`` en companyfacts) para la divisa."""
+    if currency is None and unit in {"USD", "USD/share"}:
+        return None
     stored = _with_reporting_currency(unit, currency)
     if stored.endswith("/share"):
         return stored, stored.replace("/share", "/shares")
@@ -1249,7 +1251,10 @@ def _fiscal_annual_pairs(us_gaap: dict[str, Any]) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     reporting_currency = _sec_reporting_currency(us_gaap)
     for _metric, concepts, unit in SEC_METRIC_MAP:
-        unit, xbrl_unit_key = _sec_unit_keys(unit, reporting_currency)
+        unit_keys = _sec_unit_keys(unit, reporting_currency)
+        if unit_keys is None:
+            continue
+        unit, xbrl_unit_key = unit_keys
         for concept in concepts:
             entries = us_gaap.get(concept, {}).get("units", {}).get(xbrl_unit_key, [])
             for e in entries:
@@ -1511,7 +1516,10 @@ class FinancialIngestionService:
         annual_by_metric: dict[str, dict[str, dict[str, Any]]] = {}
         restated_fy_keys: list[tuple[str, str]] = []
         for metric, concepts, unit in SEC_METRIC_MAP:
-            unit, xbrl_unit_key = _sec_unit_keys(unit, reporting_currency)
+            unit_keys = _sec_unit_keys(unit, reporting_currency)
+            if unit_keys is None:
+                continue
+            unit, xbrl_unit_key = unit_keys
             metric_concepts = (
                 _revenue_concepts_for(concepts, bank_like)
                 if metric == "revenue"
@@ -1561,7 +1569,10 @@ class FinancialIngestionService:
         )
 
         for metric, concepts, unit in SEC_METRIC_MAP:
-            unit, xbrl_unit_key = _sec_unit_keys(unit, reporting_currency)
+            unit_keys = _sec_unit_keys(unit, reporting_currency)
+            if unit_keys is None:
+                continue
+            unit, xbrl_unit_key = unit_keys
             # --- Trimestres (10-Q): mismas reglas de fusion por `end` ---
             # fp Q1-Q4 + form 10-Q; flujo = 70-110 dias (trimestre real; los
             # acumulados YTD de ~180 dias y los TTM quedan fuera); instantaneos

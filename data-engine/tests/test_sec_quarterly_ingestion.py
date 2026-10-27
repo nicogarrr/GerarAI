@@ -144,6 +144,8 @@ class _FakeSECFilingPeriodFp:
     async def company_facts(self, cik):
         div = "PaymentsOfDividendsCommonStock"
         return {"facts": {"us-gaap": {
+            # Evidencia explicita de divisa de reporte, no fallback por ticker.
+            "Assets": {"units": {"USD": [{"val": 1}]}},
             div: {"units": {"USD": [
                 {"fy": 2017, "fp": "FY", "form": "10-K", "start": "2016-09-25",
                  "end": "2017-09-30", "val": 12769000000, "filed": "2017-11-03"},
@@ -236,3 +238,21 @@ def _anchor_fake(cls, close_month):
 
 _anchor_fake(_FakeSECQuarterly, "12")
 _anchor_fake(_FakeSECFilingPeriodFp, "12")
+
+
+def test_ambiguous_sec_currency_does_not_create_monetary_facts(db, monkeypatch):
+    class AmbiguousSEC(_FakeSECQuarterly):
+        async def company_facts(self, cik):
+            payload = await super().company_facts(cik)
+            gaap = payload["facts"]["us-gaap"]
+            for concept in gaap.values():
+                units = concept.get("units", {})
+                if "USD" in units:
+                    units["EUR"] = [dict(row) for row in units["USD"]]
+            return payload
+
+    monkeypatch.setattr(ingestion, "SECClient", AmbiguousSEC)
+    company = _company(db)
+    asyncio.run(FinancialIngestionService().refresh_from_sec(db=db, company=company))
+    rows = list(db.scalars(select(FinancialFact).where(FinancialFact.company_id == company.id)))
+    assert not any(f.unit in {"USD", "EUR", "USD/share", "EUR/share"} for f in rows)
