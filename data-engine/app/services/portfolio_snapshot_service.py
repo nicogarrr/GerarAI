@@ -221,6 +221,21 @@ class PortfolioSnapshotService:
         }
         db.flush()
 
+        # Auditoria A: con caja neta negativa (margen) el NAV es menor que las
+        # posiciones y base/NAV daba pesos de 133 %. Igual que el panel de
+        # riesgo (portfolio_risk.weight_basis="gross_equity"), con margen el
+        # peso se calcula sobre la exposicion bruta de las posiciones valoradas;
+        # la caja/margen queda aparte con su signo en cash_value_base.
+        gross_positions = sum(
+            (abs(base) for _, _, base in position_values if base is not None),
+            Decimal("0"),
+        )
+        gross_basis = cash_value < 0 and gross_positions > 0
+        weight_denominator = gross_positions if gross_basis else total_value
+        snapshot.metadata_ = {
+            **(snapshot.metadata_ or {}),
+            "weight_basis": "gross_positions" if gross_basis else "total_with_cash",
+        }
         for position, rate, base in position_values:
             db.add(
                 PositionDailySnapshot(
@@ -234,7 +249,7 @@ class PortfolioSnapshotService:
                     fx_rate=rate,
                     market_value_native=position.quantity * position.market_price,
                     market_value_base=base,
-                    weight=(base / total_value if base is not None and total_value else None),
+                    weight=(base / weight_denominator if base is not None and weight_denominator else None),
                     source=source,
                 )
             )

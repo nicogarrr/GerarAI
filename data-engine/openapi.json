@@ -1,127 +1,6 @@
 {
   "components": {
     "schemas": {
-      "DcaRunOut": {
-        "properties": {
-          "alerted": {
-            "title": "Alerted",
-            "type": "integer"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "errors": {
-            "title": "Errors",
-            "type": "integer"
-          },
-          "errors_detail": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "title": "Errors Detail",
-            "type": "array"
-          },
-          "evaluated": {
-            "title": "Evaluated",
-            "type": "integer"
-          },
-          "finished_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Finished At"
-          },
-          "skipped": {
-            "title": "Skipped",
-            "type": "integer"
-          },
-          "skipped_detail": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "title": "Skipped Detail",
-            "type": "array"
-          },
-          "started_at": {
-            "format": "date-time",
-            "title": "Started At",
-            "type": "string"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          },
-          "tracked": {
-            "title": "Tracked",
-            "type": "integer"
-          },
-          "trigger": {
-            "title": "Trigger",
-            "type": "string"
-          }
-        },
-        "required": [
-          "status",
-          "trigger",
-          "started_at",
-          "tracked",
-          "evaluated",
-          "skipped",
-          "errors",
-          "alerted"
-        ],
-        "title": "DcaRunOut",
-        "type": "object"
-      },
-      "IBKRConnectRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "account_id": {
-            "maxLength": 64,
-            "minLength": 3,
-            "title": "Account Id",
-            "type": "string"
-          },
-          "complete_query": {
-            "default": false,
-            "title": "Complete Query",
-            "type": "boolean"
-          },
-          "query_id": {
-            "maxLength": 32,
-            "minLength": 1,
-            "title": "Query Id",
-            "type": "string"
-          },
-          "token": {
-            "title": "Token",
-            "type": "string"
-          }
-        },
-        "required": [
-          "token",
-          "query_id",
-          "account_id"
-        ],
-        "title": "IBKRConnectRequest",
-        "type": "object"
-      },
       "AdHocScreen": {
         "properties": {
           "criteria": {
@@ -585,6 +464,14 @@
       },
       "AssistantRequest": {
         "properties": {
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ChatTurn"
+            },
+            "maxItems": 8,
+            "title": "History",
+            "type": "array"
+          },
           "mode": {
             "enum": [
               "explore",
@@ -3295,6 +3182,94 @@
         "title": "DcaMinLevelOut",
         "type": "object"
       },
+      "DcaRunOut": {
+        "properties": {
+          "alerted": {
+            "title": "Alerted",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "errors_detail": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Errors Detail",
+            "type": "array"
+          },
+          "evaluated": {
+            "title": "Evaluated",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "skipped_detail": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Skipped Detail",
+            "type": "array"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tracked": {
+            "title": "Tracked",
+            "type": "integer"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "trigger",
+          "started_at",
+          "tracked",
+          "evaluated",
+          "skipped",
+          "errors",
+          "alerted"
+        ],
+        "title": "DcaRunOut",
+        "type": "object"
+      },
       "DcaSignalItemOut": {
         "properties": {
           "alerts_on": {
@@ -3416,6 +3391,17 @@
             ],
             "title": "Currency Label"
           },
+          "data_age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Age Days"
+          },
           "data_source": {
             "title": "Data Source",
             "type": "string"
@@ -3520,6 +3506,11 @@
             "format": "date",
             "title": "Signal Date",
             "type": "string"
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
           },
           "status": {
             "title": "Status",
@@ -5752,6 +5743,39 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IBKRConnectRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "maxLength": 64,
+            "minLength": 3,
+            "title": "Account Id",
+            "type": "string"
+          },
+          "complete_query": {
+            "default": false,
+            "title": "Complete Query",
+            "type": "boolean"
+          },
+          "query_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Query Id",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "query_id",
+          "account_id"
+        ],
+        "title": "IBKRConnectRequest",
         "type": "object"
       },
       "IBKRCsvImportRequest": {
@@ -11401,664 +11425,6 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/api/settings/ibkr": {
-      "delete": {
-        "operationId": "disconnect_ibkr_api_settings_ibkr_delete",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "x-cavaai-user",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-User"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-tenant",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Tenant"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-timestamp",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Timestamp"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-signature",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Signature"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-nonce",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Nonce"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-method",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Method"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-path",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Path"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-body-hash",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Body-Hash"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Disconnect Ibkr Api Settings Ibkr Delete",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Disconnect Ibkr",
-        "tags": [
-          "settings"
-        ]
-      },
-      "get": {
-        "operationId": "get_ibkr_connection_api_settings_ibkr_get",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "x-cavaai-user",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-User"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-tenant",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Tenant"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-timestamp",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Timestamp"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-signature",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Signature"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-nonce",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Nonce"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-method",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Method"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-path",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Path"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-body-hash",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Body-Hash"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Ibkr Connection Api Settings Ibkr Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Ibkr Connection",
-        "tags": [
-          "settings"
-        ]
-      },
-      "put": {
-        "operationId": "connect_ibkr_api_settings_ibkr_put",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "x-cavaai-user",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-User"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-tenant",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Tenant"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-timestamp",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Timestamp"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-signature",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Signature"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-nonce",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Nonce"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-method",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Method"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-path",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Path"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-body-hash",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Body-Hash"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/IBKRConnectRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Connect Ibkr Api Settings Ibkr Put",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Connect Ibkr",
-        "tags": [
-          "settings"
-        ]
-      }
-    },
-    "/api/settings/ibkr/sync": {
-      "post": {
-        "operationId": "sync_ibkr_connection_api_settings_ibkr_sync_post",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "x-cavaai-user",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-User"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-tenant",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Tenant"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-timestamp",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Timestamp"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-signature",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Signature"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-nonce",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Nonce"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-method",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Method"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-path",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Path"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-cavaai-body-hash",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Cavaai-Body-Hash"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Sync Ibkr Connection Api Settings Ibkr Sync Post",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Sync Ibkr Connection",
-        "tags": [
-          "settings"
-        ]
-      }
-    },
     "/": {
       "get": {
         "operationId": "root__get",
@@ -38552,7 +37918,7 @@
     },
     "/api/market/movers": {
       "get": {
-        "description": "Gainers/losers/m\u00e1s activas desde market_prices (cierres datados).\n\nSin filas devuelve universo vac\u00edo, nunca KeyError ni 500. El cambio sale de\n`market_change.compute_session_changes`, la misma funci\u00f3n que usan Mercado\ny watchlist. Los rankings solo admiten valores que superan el suelo de\nliquidez documentado arriba; el universo y sus exclusiones se declaran.",
+        "description": "Gainers/losers/m\u00e1s activas desde market_prices (cierres datados).\n\nSin filas devuelve universo vac\u00edo, nunca KeyError ni 500. El cambio sale de\n`market_change.compute_session_changes`, la misma funci\u00f3n que usan Mercado\ny watchlist. Los rankings solo admiten valores que superan el suelo de\nliquidez documentado arriba; el universo y sus exclusiones se declaran.\nEl c\u00e1lculo se cachea `movers_cache.TTL_SECONDS` y se invalida cuando\n`upsert_prices` escribe cierres.",
         "operationId": "market_movers_api_market_movers_get",
         "parameters": [
           {
@@ -57017,6 +56383,664 @@
           }
         },
         "summary": "Settings",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/ibkr": {
+      "delete": {
+        "operationId": "disconnect_ibkr_api_settings_ibkr_delete",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Disconnect Ibkr Api Settings Ibkr Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disconnect Ibkr",
+        "tags": [
+          "settings"
+        ]
+      },
+      "get": {
+        "operationId": "get_ibkr_connection_api_settings_ibkr_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Ibkr Connection Api Settings Ibkr Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ibkr Connection",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "operationId": "connect_ibkr_api_settings_ibkr_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IBKRConnectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Connect Ibkr Api Settings Ibkr Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connect Ibkr",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/ibkr/sync": {
+      "post": {
+        "operationId": "sync_ibkr_connection_api_settings_ibkr_sync_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sync Ibkr Connection Api Settings Ibkr Sync Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sync Ibkr Connection",
         "tags": [
           "settings"
         ]

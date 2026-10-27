@@ -361,6 +361,38 @@ def grounded_numbers_in(texts: list[str]) -> frozenset[str]:
     return frozenset(found)
 
 
+_SECRET_RE = re.compile(r"(?i)\b(?:sk-[a-z0-9_-]{16,}|ghp_[a-z0-9]{20,}|akia[0-9a-z]{12,}|bearer\s+[a-z0-9._-]{20,})")
+_SECTION_LINK_RE = re.compile(r"(?i)https?://|www[.]|<\s*(?:img|a|script|iframe)\b|!?\[[^\]]*\]\([^)]*\)")
+
+
+def _flatten_text(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [t for v in value.values() for t in _flatten_text(v)]
+    if isinstance(value, (list, tuple)):
+        return [t for v in value for t in _flatten_text(v)]
+    return []
+
+
+def _reject_untrusted_output(payload: dict, baseline: Any, question: str) -> None:
+    """Defensa contra inyeccion indirecta: lo que un modelo obediente a un texto
+    plantado en noticias/documentos NO debe llegar al usuario. Rechaza (y asi se
+    cae al baseline determinista) secretos, enlaces/HTML en secciones y cifras
+    de la prosa que no estan en la pregunta ni en el contexto recuperado."""
+    answer = str(payload.get("answer") or "")
+    bodies = [str(s.get("body") or "") for s in payload.get("sections", []) if isinstance(s, dict)]
+    for text in [answer, *bodies]:
+        if _SECRET_RE.search(text):
+            raise ValueError("Secret-like token in model output")
+    if any(_SECTION_LINK_RE.search(body) for body in bodies):
+        raise ValueError("External link or HTML in section body")
+    context = [question or "", *_flatten_text([s.model_dump() for s in baseline.sections]),
+               *_flatten_text(baseline.sources)]
+    if grounded_numbers_in([answer]) - grounded_numbers_in(context):
+        raise ValueError("Ungrounded number in model answer")
+
+
 def _inferred_general_text_valid(
     text: str, *, allow_placeholders: bool = False, quantitative: bool = True,
     allow_named_attribution: bool = False,
@@ -383,6 +415,8 @@ def _inferred_general_text_valid(
     datos que nadie le ha dado.
     """
     if len(text) > 8000 or not text.strip() or re.search(r"https?://|www[.]|\bdoi:", text, re.I):
+        return False
+    if _SECRET_RE.search(text):
         return False
     if re.search(
         r"(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
@@ -678,6 +712,7 @@ class ChatSynthesisService:
                     data["insufficient_data"]
                     if not _prose_answer_valid(data.get("answer")):
                         raise ValueError("Invalid prose answer")
+                    _reject_untrusted_output(data, baseline, question)
 
                 bind = getattr(self.provider, "with_candidate_validator", None)
                 provider = bind(_validate_candidate, _record) if bind else self.provider
@@ -693,6 +728,7 @@ class ChatSynthesisService:
                 payload = parse_json_response(response.text)
                 if not _prose_answer_valid(payload.get("answer")):
                     raise ValueError("Invalid prose answer")
+                _reject_untrusted_output(payload, baseline, question)
                 sections = self._verified_sections(payload, baseline, set(retrieval_ids))
                 declared_confidence = max(0.0, min(1.0, float(payload["confidence"])))
                 declared_insufficient = bool(payload["insufficient_data"])

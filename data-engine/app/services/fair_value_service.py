@@ -20,6 +20,7 @@ Sin ninguno: ``value=None`` y ``source=None``. Nunca se inventa una cifra.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -60,7 +61,8 @@ def _positive(raw: object) -> float | None:
         value = float(raw)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
-    return value if value > 0 else None
+    # inf ("Infinity" en un payload JSON) tampoco es un valor justo.
+    return value if math.isfinite(value) and value > 0 else None
 
 
 def choose(

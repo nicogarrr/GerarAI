@@ -154,3 +154,32 @@ def test_ambiguous_flow_blocks_return_calculation(db):
     snapshot = service.capture(db, as_of=TODAY)
     assert snapshot.daily_return is None
     assert snapshot.metadata_["ambiguous_external_flows"]
+
+
+
+def test_margin_weights_use_gross_positions_not_nav(db):
+    """Auditoria A: posiciones 100, caja -25, NAV 75 -> el peso guardado era
+    1.333 (133 %). Con margen se pesa sobre la exposicion bruta (1.0) y la
+    caja negativa se conserva aparte con su signo."""
+    company = _company(db)
+    portfolio, position = _portfolio_positions(db, company, as_of=TODAY)
+    position.quantity = Decimal("1")
+    db.add(CashBalance(currency="EUR", balance=Decimal("-25"), as_of=TODAY))
+    db.commit()
+
+    snapshot = PortfolioSnapshotService().capture(db, as_of=TODAY)
+    assert snapshot.positions_value_base == Decimal("100")
+    assert snapshot.cash_value_base == Decimal("-25")
+    assert snapshot.total_value_base == Decimal("75")
+    rows = db.scalars(select(PositionDailySnapshot)).all()
+    assert rows[0].weight == pytest.approx(Decimal("1"))
+    assert snapshot.metadata_["weight_basis"] == "gross_positions"
+
+
+def test_positive_cash_keeps_nav_weight_basis(db):
+    company = _company(db)
+    _portfolio_positions(db, company, as_of=TODAY)
+    db.add(CashBalance(currency="EUR", balance=Decimal("500"), as_of=TODAY))
+    db.commit()
+    snapshot = PortfolioSnapshotService().capture(db, as_of=TODAY)
+    assert snapshot.metadata_["weight_basis"] == "total_with_cash"

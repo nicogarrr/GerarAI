@@ -37,13 +37,15 @@ test('la solicitud de acceso también exige aceptar los documentos', () => {
     assert.ok(form.includes('href="/privacidad"'));
 });
 
-test('los documentos legales en borrador no se indexan ni se anuncian en el sitemap', () => {
+test('los documentos legales llevan disclaimer y no se indexan ni se anuncian en el sitemap', () => {
     const privacy = read('app/(public)/privacidad/page.tsx');
     const terms = read('app/(public)/terminos/page.tsx');
     const sitemap = read('app/sitemap.ts');
     for (const page of [privacy, terms]) {
         assert.ok(page.includes('robots: { index: false, follow: false }'));
-        assert.ok(page.includes('Aviso de borrador'));
+        assert.ok(page.includes('informativo y no constituye asesoramiento jurídico'));
+        assert.ok(!page.includes('[PENDIENTE]'));
+        assert.ok(page.includes('role="note"'));
     }
     assert.ok(!sitemap.includes('/privacidad'));
     assert.ok(!sitemap.includes('/terminos'));

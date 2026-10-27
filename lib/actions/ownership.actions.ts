@@ -35,10 +35,14 @@ export type ManagerHoldingRow = {
   filing_url: string;
 };
 
+/** «ok» solo si los totales cuadran con el resumen del propio 13F (Auditoría A). */
+export type ManagerHoldingsStatus = 'ok' | 'mismatch' | 'unverified' | 'partial' | 'unavailable';
+
 export type ManagerHoldings = {
   cik: string;
   manager?: string;
-  status: 'ok' | 'unavailable';
+  status: ManagerHoldingsStatus;
+  verification?: 'verified' | 'mismatch' | 'unverified' | 'partial' | 'unavailable' | null;
   report_date?: string;
   coverage?: string;
   holdings: ManagerHoldingRow[];

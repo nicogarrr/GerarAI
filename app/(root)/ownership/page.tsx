@@ -21,7 +21,7 @@ import { formatMarketCapUsd, formatDate, formatUserDateTime, formatNumber, NA } 
 import SyncButton from './SyncButton';
 import { MostBought } from './_components/MostBought';
 import { Overlap } from './_components/Overlap';
-import { ownershipManagerName } from '@/lib/ownership-display';
+import { holdingsVerificationNote, ownershipManagerName } from '@/lib/ownership-display';
 import { ownershipLimitations } from '@/lib/research/ownership-display';
 
 const CHANGE_LABELS: Record<string, string> = {
@@ -162,7 +162,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
             )}
 
             {view === 'gestor' && activeCik && holdings ? (
-                holdings.status === 'ok' ? (
+                holdings.status !== 'unavailable' ? (
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">
                             <h2 className="font-semibold text-gray-100">
@@ -173,6 +173,9 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                 cobertura {holdings.coverage}
                             </Badge>
                         </div>
+                        {holdingsVerificationNote(holdings.status) ? (
+                            <p className="mt-2 text-sm text-amber-300">{holdingsVerificationNote(holdings.status)}</p>
+                        ) : null}
                         <OverflowScrollRegion label="Posiciones 13F declaradas" className="mt-4">
                             <table className="w-full min-w-[820px] text-left text-sm [&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
                                 <caption className="sr-only">Posiciones declaradas en el último informe 13F del gestor, tal como constan en EDGAR</caption>

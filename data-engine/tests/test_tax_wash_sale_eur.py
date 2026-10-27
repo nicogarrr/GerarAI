@@ -1,28 +1,10 @@
-"""Regla de los 2 meses (art. 33.5.f LIRPF) evaluada sobre la pérdida en EUROS.
+"""DGT: se calcula la ganancia en moneda nativa y se convierte al vender.
 
-La pérdida patrimonial que la ley difiere es la del IRPF, que se calcula en
-euros: valor de adquisición convertido al tipo de la fecha de compra y valor
-de transmisión al tipo de la fecha de venta (art. 34 y 35 LIRPF; Manual Renta
-2025, cap. 11). Una venta con GANANCIA en dólares puede ser una PÉRDIDA en
-euros si el dólar se ha depreciado: esa pérdida en euros también queda
-bloqueada si se recompran valores homogéneos en los 2 meses anteriores o
-posteriores.
-
-Cálculo a mano (tipo = EUR por 1 USD):
-  10/01/2025 compra 10 x 100 $ a 1,00  -> coste 1.000,00 €
-  03/03/2025 venta  10 x 105 $ a 0,90  -> transmisión 945,00 €
-             en dólares: +50 $ (ganancia); en euros: 945 - 1.000 = -55,00 €
-  20/03/2025 recompra 10 x 104 $ a 0,90 (17 días después) -> 936,00 €
-  => la pérdida de 55,00 € NO es computable en la venta de marzo: se difiere
-     al lote recomprado (coste fiscal 936 + 55 = 991,00 €).
-  01/07/2025 venta del lote recomprado 10 x 104 $ a 0,90 -> 936,00 €
-             resultado: 936 - 991 = -55,00 € (computable: sin recompra después)
-  Total computable del ejercicio: 0 + (-55,00) = -55,00 €.
-
-Sin la corrección, la venta de marzo se declaraba como pérdida computable de
--55 € (la regla solo miraba el signo en dólares) y el total del año salía igual
-pero con la pérdida imputada en la venta equivocada; y si la recompra sigue en
-cartera a 31/12, el año declaraba -55 € que la ley no permite computar.
+El movimiento de USD/EUR no crea una pérdida en la venta de acciones con
+beneficio nativo. 10 x (105 - 100) USD a 0,90 = 45 EUR. Por tanto una compra
+posterior no difiere una pérdida inexistente; el lote nuevo conserva 936 EUR
+de coste convertido al vender a 0,90. Sustituye las expectativas previas de
+-55 EUR que mezclaban ambas fechas FX; cualquier venta de divisa es aparte.
 """
 
 from datetime import date
@@ -77,7 +59,7 @@ def _sales(report, ticker="USX"):
     return row, row["sales"]
 
 
-def test_perdida_en_euros_con_ganancia_en_dolares_se_bloquea_si_hay_recompra(db):
+def test_ganancia_nativa_no_crea_perdida_por_fx_ni_bloqueo(db):
     c = _setup(db)
     _tx(db, c, date(2025, 1, 10), "buy", 10, 100)
     _tx(db, c, date(2025, 3, 3), "sell", 10, 105)
@@ -88,13 +70,13 @@ def test_perdida_en_euros_con_ganancia_en_dolares_se_bloquea_si_hay_recompra(db)
     row, sales = _sales(report)
     (march,) = sales
     assert march["gain_native"] == 50.0  # en dólares, ganancia
-    assert march["wash_sale_blocked"] is True
-    assert march["blocked_loss_base"] == 55.0
-    assert march["gain_base"] == 0.0  # pérdida en euros NO computable
-    assert row["gain_base"] == 0.0
+    assert march["wash_sale_blocked"] is False
+    assert march["blocked_loss_base"] == 0.0
+    assert march["gain_base"] == 45.0
+    assert row["gain_base"] == 45.0
 
 
-def test_la_perdida_diferida_en_euros_se_computa_al_vender_el_lote_recomprado(db):
+def test_recompra_no_hereda_perdida_fx_inexistente(db):
     c = _setup(db)
     _tx(db, c, date(2025, 1, 10), "buy", 10, 100)
     _tx(db, c, date(2025, 3, 3), "sell", 10, 105)
@@ -105,10 +87,10 @@ def test_la_perdida_diferida_en_euros_se_computa_al_vender_el_lote_recomprado(db
     report = TaxReportService().compute_report(db, 2025)
     row, sales = _sales(report)
     march, july = sales
-    assert march["gain_base"] == 0.0
-    assert july["cost_base"] == 991.0  # 936 + 55 diferidos
-    assert july["gain_base"] == -55.0
-    assert row["gain_base"] == -55.0
+    assert march["gain_base"] == 45.0
+    assert july["cost_base"] == 936.0
+    assert july["gain_base"] == 0.0
+    assert row["gain_base"] == 45.0
 
 
 def _carry_fx_to(db, day) -> None:

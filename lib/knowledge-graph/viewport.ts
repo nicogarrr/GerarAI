@@ -122,11 +122,9 @@ export function identityViewport(limits: ScaleLimits = {}): Viewport {
  * degenerado (dos dedos que se cruzan) no debe invertir el grafo.
  */
 export function zoomAtPoint(viewport: Viewport, factor: number, anchor: Point, limits: ScaleLimits = {}): Viewport {
+  if (!Number.isFinite(factor) || factor <= 0) return { ...viewport };
   const base = finite(viewport.scale, 1);
-  const next = clampScale(base * finite(factor, 1), limits);
-  // Un factor no positivo devuelve la vista intacta (salvo el recorte de
-  // escala): un pellizco degenerado no debe invertir el grafo.
-  if (!Number.isFinite(factor) || factor <= 0) return { x: viewport.x, y: viewport.y, scale: next };
+  const next = clampScale(base * factor, limits);
   const current = base > EPSILON ? base : 1;
   const ratio = next / current;
   const ax = finite(anchor.x, 0);

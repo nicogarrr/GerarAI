@@ -4,42 +4,6 @@
  */
 
 export interface paths {
-    "/api/settings/ibkr": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Ibkr Connection */
-        get: operations["get_ibkr_connection_api_settings_ibkr_get"];
-        /** Connect Ibkr */
-        put: operations["connect_ibkr_api_settings_ibkr_put"];
-        post?: never;
-        /** Disconnect Ibkr */
-        delete: operations["disconnect_ibkr_api_settings_ibkr_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/ibkr/sync": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Sync Ibkr Connection */
-        post: operations["sync_ibkr_connection_api_settings_ibkr_sync_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/": {
         parameters: {
             query?: never;
@@ -2667,6 +2631,8 @@ export interface paths {
          *     `market_change.compute_session_changes`, la misma función que usan Mercado
          *     y watchlist. Los rankings solo admiten valores que superan el suelo de
          *     liquidez documentado arriba; el universo y sus exclusiones se declaran.
+         *     El cálculo se cachea `movers_cache.TTL_SECONDS` y se invalida cuando
+         *     `upsert_prices` escribe cierres.
          */
         get: operations["market_movers_api_market_movers_get"];
         put?: never;
@@ -4379,6 +4345,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/ibkr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ibkr Connection */
+        get: operations["get_ibkr_connection_api_settings_ibkr_get"];
+        /** Connect Ibkr */
+        put: operations["connect_ibkr_api_settings_ibkr_put"];
+        post?: never;
+        /** Disconnect Ibkr */
+        delete: operations["disconnect_ibkr_api_settings_ibkr_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/ibkr/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sync Ibkr Connection */
+        post: operations["sync_ibkr_connection_api_settings_ibkr_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/llm": {
         parameters: {
             query?: never;
@@ -5604,54 +5606,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** DcaRunOut */
-        DcaRunOut: {
-            /** Alerted */
-            alerted: number;
-            /** Error */
-            error?: string | null;
-            /** Errors */
-            errors: number;
-            /** Errors Detail */
-            errors_detail?: {
-                [key: string]: unknown;
-            }[];
-            /** Evaluated */
-            evaluated: number;
-            /** Finished At */
-            finished_at?: string | null;
-            /** Skipped */
-            skipped: number;
-            /** Skipped Detail */
-            skipped_detail?: {
-                [key: string]: unknown;
-            }[];
-            /**
-             * Started At
-             * Format: date-time
-             */
-            started_at: string;
-            /** Status */
-            status: string;
-            /** Tracked */
-            tracked: number;
-            /** Trigger */
-            trigger: string;
-        };
-        /** IBKRConnectRequest */
-        IBKRConnectRequest: {
-            /** Account Id */
-            account_id: string;
-            /**
-             * Complete Query
-             * @default false
-             */
-            complete_query: boolean;
-            /** Query Id */
-            query_id: string;
-            /** Token */
-            token: string;
-        };
         /** AdHocScreen */
         AdHocScreen: {
             /** Criteria */
@@ -5805,6 +5759,8 @@ export interface components {
         };
         /** AssistantRequest */
         AssistantRequest: {
+            /** History */
+            history?: components["schemas"]["ChatTurn"][];
             /**
              * Mode
              * @enum {string}
@@ -6725,6 +6681,40 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** DcaRunOut */
+        DcaRunOut: {
+            /** Alerted */
+            alerted: number;
+            /** Error */
+            error?: string | null;
+            /** Errors */
+            errors: number;
+            /** Errors Detail */
+            errors_detail?: {
+                [key: string]: unknown;
+            }[];
+            /** Evaluated */
+            evaluated: number;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Skipped */
+            skipped: number;
+            /** Skipped Detail */
+            skipped_detail?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Status */
+            status: string;
+            /** Tracked */
+            tracked: number;
+            /** Trigger */
+            trigger: string;
+        };
         /** DcaSignalItemOut */
         DcaSignalItemOut: {
             /** Alerts On */
@@ -6762,6 +6752,8 @@ export interface components {
             currency?: string | null;
             /** Currency Label */
             currency_label?: string | null;
+            /** Data Age Days */
+            data_age_days?: number | null;
             /** Data Source */
             data_source: string;
             /**
@@ -6800,6 +6792,11 @@ export interface components {
              * Format: date
              */
             signal_date: string;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
             /** Status */
             status: string;
             /** Zone */
@@ -7521,6 +7518,20 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** IBKRConnectRequest */
+        IBKRConnectRequest: {
+            /** Account Id */
+            account_id: string;
+            /**
+             * Complete Query
+             * @default false
+             */
+            complete_query: boolean;
+            /** Query Id */
+            query_id: string;
+            /** Token */
+            token: string;
         };
         /** IBKRCsvImportRequest */
         IBKRCsvImportRequest: {
@@ -9452,170 +9463,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    get_ibkr_connection_api_settings_ibkr_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    connect_ibkr_api_settings_ibkr_put: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IBKRConnectRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    disconnect_ibkr_api_settings_ibkr_delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    sync_ibkr_connection_api_settings_ibkr_sync_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     root__get: {
         parameters: {
             query?: never;
@@ -20348,6 +20195,170 @@ export interface operations {
         };
     };
     settings_api_settings_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ibkr_connection_api_settings_ibkr_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connect_ibkr_api_settings_ibkr_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IBKRConnectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disconnect_ibkr_api_settings_ibkr_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_ibkr_connection_api_settings_ibkr_sync_post: {
         parameters: {
             query?: never;
             header?: {

@@ -29,6 +29,7 @@ disponible» en vez de inventar uno.
 from __future__ import annotations
 
 import importlib
+import math
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -147,7 +148,10 @@ def money_es(value: float, currency: str | None, *, signed: bool = False) -> str
 
 def margin_of_safety(value: float | None, price: float | None) -> float | None:
     """(V − P) / V, estándar de Graham. None sin dato o con V ≤ 0."""
-    if value is None or price is None or value <= 0 or price <= 0:
+    if value is None or price is None:
+        return None
+    # NaN/inf no son cifras: N/D, nunca un margen NaN (mismo criterio que el motor).
+    if not (math.isfinite(value) and math.isfinite(price)) or value <= 0 or price <= 0:
         return None
     return (value - price) / value
 
