@@ -53,8 +53,13 @@ def test_uppercase_es_with_company_cue_still_resolves(db):
 
 @pytest.fixture
 def short_deadline(monkeypatch):
+    # 2 s y no .3: la recuperacion previa a la sintesis (_deterministic_answer)
+    # tarda mas de .3 s en un runner cargado y entonces el plazo vence ANTES
+    # de sintetizar: devuelve el baseline (mismo fallback_reason) y no el
+    # texto «tardó demasiado» que este test comprueba. La sintesis cuelga 30 s,
+    # asi que 2 s sigue disparando el plazo.
     monkeypatch.setattr(interactive_deadline, "get_settings",
-                        lambda: SimpleNamespace(chat_total_timeout_seconds=.3))
+                        lambda: SimpleNamespace(chat_total_timeout_seconds=2.0))
 
 
 @pytest.fixture
@@ -76,7 +81,7 @@ def test_answer_returns_deterministic_on_total_deadline(db, short_deadline, hang
     service = ChatService()
     start = time.monotonic()
     response = asyncio.run(service.answer(db, "qué es el margen operativo", "general", None))
-    assert time.monotonic() - start < 5
+    assert time.monotonic() - start < 10
     _assert_deadline_fallback(response)
 
 
@@ -85,7 +90,7 @@ def test_route_returns_deterministic_on_total_deadline(db, short_deadline, hangi
     payload = ChatRequest(question="qué es el margen operativo", scope="general")
     start = time.monotonic()
     response = asyncio.run(chat(payload, db))
-    assert time.monotonic() - start < 5
+    assert time.monotonic() - start < 10
     _assert_deadline_fallback(response)
 
 
