@@ -7,7 +7,7 @@ fichero RELATIVO al inbox del servidor, que el actor lee tras comprobar disco.
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -134,7 +134,7 @@ def create_source(payload: SourceCreate, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=507, detail=str(exc)) from exc
     source = result.source
     if not result.created:
-        if source.status != "failed":
+        if source.status != "failed" and not _processing_abandoned(source):
             return {**_source(source), "deduplicated": True, "requeued": False}
         # Reintento explicito y seguro: mismos bytes de una fuente fallida.
         source.filename = payload.path
@@ -142,6 +142,22 @@ def create_source(payload: SourceCreate, db: Session = Depends(get_db)) -> dict:
         source.error = None
         db.commit()
     return {**_source(_dispatch(db, source)), "deduplicated": not result.created, "requeued": not result.created}
+
+
+# El actor corta cada entrega a 1 h (time_limit); pasado el doble, un
+# ``processing`` sin actividad es un proceso muerto (SIGKILL/OOM), no trabajo vivo.
+PROCESSING_ABANDONED_AFTER = timedelta(hours=2)
+
+
+def _processing_abandoned(source: KnowledgeRagSource, now: datetime | None = None) -> bool:
+    if source.status != "processing":
+        return False
+    touched = source.updated_at
+    if touched is None:
+        return False
+    if touched.tzinfo is None:
+        touched = touched.replace(tzinfo=UTC)
+    return (now or datetime.now(UTC)) - touched > PROCESSING_ABANDONED_AFTER
 
 
 def _dispatch(db: Session, source: KnowledgeRagSource) -> KnowledgeRagSource:

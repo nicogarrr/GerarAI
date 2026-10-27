@@ -167,6 +167,8 @@ def index_source(
     ``processing``; (B) trabajo pesado SIN sesion abierta, solo con valores
     planos; (C) transaccion corta que guarda padres y marca ``indexed``.
     """
+    from dramatiq.middleware.time_limit import TimeLimitExceeded
+
     source = db.get(KnowledgeRagSource, source_id)
     if source is None:
         raise LookupError(f"knowledge source {source_id} not found")
@@ -254,7 +256,10 @@ def index_source(
         }
         db.rollback()
         return result
-    except Exception as exc:
+    except (Exception, TimeLimitExceeded) as exc:
+        # TimeLimitExceeded es BaseException: sin listarlo la fuente quedaba en
+        # ``processing`` sin error ni salida (ni la API ni el actor la
+        # recuperaban). Se marca failed y se relanza para el reintento.
         mark_failed(db, source_id, f"{type(exc).__name__}: {exc}")
         raise
 
