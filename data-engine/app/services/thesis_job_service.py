@@ -427,6 +427,49 @@ def _is_retryable_error(exc: BaseException) -> bool:
     return isinstance(status, int) and (status == 429 or status >= 500)
 
 
+def _record_preclaim_failure(db: Session, run_id: int, exc: BaseException) -> None:
+    """Consume un intento cuando el fallo ocurre antes de reclamar el run.
+
+    Relee la fila tras el rollback. Si otra entrega ya la reclamo (running con
+    started_at reciente) no escribe nada. Transitorio con intentos restantes ->
+    retrying con attempt+1; en otro caso failed. Condicional por status+attempt
+    leidos: nunca pisa el estado de otra entrega.
+    """
+    db.rollback()
+    row = db.execute(
+        select(WorkflowRun.status, WorkflowRun.attempt, WorkflowRun.started_at)
+        .where(WorkflowRun.id == run_id)
+        .execution_options(include_all_tenants=True)
+    ).one_or_none()
+    if row is None or row.status in TERMINAL_STATUSES:
+        db.rollback()
+        return
+    status, attempt, started = row.status, int(row.attempt or 1), _utc(row.started_at)
+    if status == "running" and started is not None and datetime.now(UTC) - started < RUNNING_LEASE:
+        db.rollback()
+        return  # otra entrega es la duena viva
+    consumed = attempt + 1
+    retryable = _is_retryable_error(exc) and consumed < MAX_ATTEMPTS
+    values: dict = {
+        "status": "retrying" if retryable else "failed",
+        "attempt": consumed if retryable else attempt,
+        "error_class": type(exc).__name__,
+        "error_message": (
+            "Transient failure; delivery will be retried" if retryable else "Thesis generation failed"
+        ),
+        "updated_at": datetime.now(UTC),
+    }
+    if not retryable:
+        values["finished_at"] = datetime.now(UTC)
+    db.execute(
+        update(WorkflowRun)
+        .where(WorkflowRun.id == run_id, WorkflowRun.status == status, WorkflowRun.attempt == attempt)
+        .values(**values)
+        .execution_options(include_all_tenants=True)
+    )
+    db.commit()
+
+
 def _utc(value: datetime | None) -> datetime | None:
     if value is None:
         return None
@@ -652,9 +695,17 @@ def run_thesis_job(run_id: int) -> None:
             from app.llm.tenant_config import tenant_llm_config_scope
             from app.services.tenant_llm_settings_service import load_config_for_tenant
 
-            guard_stack.enter_context(
-                tenant_llm_config_scope(load_config_for_tenant(db, tenant.id))
-            )
+            try:
+                guard_stack.enter_context(
+                    tenant_llm_config_scope(load_config_for_tenant(db, tenant.id))
+                )
+            except (Exception, TimeLimitExceeded) as exc:
+                # Antes del reclamo (commit de abajo) el intento no se habia
+                # consumido: un fallo persistente aqui dejaba el run en
+                # retrying/running con attempt fijo, sin llegar nunca a
+                # MAX_ATTEMPTS. Se registra como fallo del intento.
+                _record_preclaim_failure(db, run_id, exc)
+                raise
         db.commit()
         # Fencing token del intento: si una entrega de recuperacion (lease
         # expirado, reconciler) toma el run MIENTRAS este intento genera,
