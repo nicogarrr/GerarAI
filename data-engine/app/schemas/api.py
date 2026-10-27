@@ -358,6 +358,8 @@ class ThesisOut(BaseModel):
     def _separate_archived_margin(self) -> "ThesisOut":
         from app.valuation.margin_convention import margin_convention_known
 
+        if self.valuation_withheld_reason and self.margin_of_safety_status == "withheld":
+            return self
         if self.archived_margin_of_safety is None:
             self.archived_margin_of_safety = self.margin_of_safety
         self.margin_of_safety_convention = (self.valuation_basis or {}).get("margin_of_safety_convention")

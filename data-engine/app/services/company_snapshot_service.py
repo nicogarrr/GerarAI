@@ -24,6 +24,7 @@ from app.schemas import CompanySnapshotOut
 from app.services.document_visibility import without_archive_duplicates
 from app.services.news_headline_translation import display_translation, original_headline
 from app.services.thesis_change_identity import ChangeItem, group_change_items
+from app.services.thesis_publication_gate import model_withheld_reason, withhold_thesis_payload
 from app.valuation.margin_convention import margin_convention_known
 
 
@@ -434,6 +435,11 @@ class CompanySnapshotService:
                 "created_at": thesis.created_at,
             }
 
+            thesis_summary = withhold_thesis_payload(thesis_summary, thesis, model_withheld_reason(thesis, model))
+
+        if thesis_summary and thesis_summary["margin_of_safety_status"] == "withheld":
+            margin_fields = {key: thesis_summary[key] for key in margin_fields}
+
         model_summary = None
         if model is not None:
             model_summary = {
@@ -474,10 +480,10 @@ class CompanySnapshotService:
                         valuation_model.status if valuation_model else "not_generated"
                     ),
                     "current_price": thesis.current_price if thesis else None,
-                    "bear_value": thesis.bear_value if thesis else None,
-                    "base_value": thesis.base_value if thesis else None,
-                    "bull_value": thesis.bull_value if thesis else None,
-                    "expected_value": thesis.expected_value if thesis else None,
+                    "bear_value": thesis_summary["bear_value"] if thesis_summary else None,
+                    "base_value": thesis_summary["base_value"] if thesis_summary else None,
+                    "bull_value": thesis_summary["bull_value"] if thesis_summary else None,
+                    "expected_value": thesis_summary["expected_value"] if thesis_summary else None,
                     **margin_fields,
                     "updated_at": (
                         valuation_model.updated_at if valuation_model else None
