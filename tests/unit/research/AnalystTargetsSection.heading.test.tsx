@@ -1,6 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { writeFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/research/client', () => ({ researchRequest: vi.fn(async () => ({
   status: 'available', currency: 'USD', consensus: { median: 78, mean: 74.68, low: 42.5, high: 108 },
@@ -18,6 +16,5 @@ describe('analyst target heading inside mobile accordion', () => {
     expect(screen.getByRole('region', { name: 'Precios objetivo de analistas' })).toBeInTheDocument();
     expect(screen.getByTestId('analyst-consensus-note')).toHaveTextContent('Cifra publicada por Yahoo');
     expect(screen.getAllByText('Scotiabank')).toHaveLength(2); // mobile list + desktop table unchanged
-    if (process.env.QA_HTML) writeFileSync(process.env.QA_HTML, renderToStaticMarkup(section));
   });
 });
