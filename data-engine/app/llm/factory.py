@@ -8,7 +8,11 @@ from app.llm.base import LLMProvider
 from app.llm.cascade import CascadeProvider
 from app.llm.model_aliases import VERIFIED_FREE_MODELS
 from app.llm.response_cache import build_response_cache
-from app.llm.tenant_config import TenantLLMConfig, current_tenant_llm_config
+from app.llm.tenant_config import (
+    PROVIDER_CATALOG,
+    TenantLLMConfig,
+    current_tenant_llm_config,
+)
 
 
 def _has_key(value: str | None) -> bool:
@@ -171,6 +175,7 @@ def _tenant_provider(
     except (ValueError, TypeError):
         return DisabledProvider("tenant_llm_settings_invalid")
     provider.billing_scope = "tenant"
+    provider.public_only = PROVIDER_CATALOG[config.provider].requires_custom_url
     return provider
 
 

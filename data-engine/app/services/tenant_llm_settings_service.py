@@ -21,6 +21,11 @@ from app.core.llm_settings_crypto import (
     encryption_available,
     last4,
 )
+from app.llm.egress_guard import (
+    PUBLIC_ONLY_MESSAGE,
+    NonPublicAddressError,
+    public_only_client,
+)
 from app.llm.tenant_config import (
     PROVIDER_CATALOG,
     PROVIDER_CUSTOM,
@@ -326,6 +331,15 @@ def stored_api_key(
         raise ValueError("No se pudo descifrar la clave guardada.") from exc
 
 
+def _probe_client(provider: str) -> httpx.AsyncClient:
+    """Cliente de la prueba: ``custom`` solo conecta a IPs publicas ya resueltas."""
+    if PROVIDER_CATALOG[provider].requires_custom_url:
+        return public_only_client(httpx.Timeout(5.0))
+    return httpx.AsyncClient(
+        timeout=httpx.Timeout(5.0), follow_redirects=False, trust_env=False
+    )
+
+
 async def probe_connection(
     *, provider: str, base_url: str | None, api_key: str, model: str
 ) -> dict:
@@ -339,11 +353,7 @@ async def probe_connection(
         "User-Agent": "gerarai/1.0",
     }
     try:
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(5.0),
-            follow_redirects=False,
-            trust_env=False,
-        ) as client:
+        async with _probe_client(provider) as client:
             response = await client.get(endpoint, headers=headers)
     except httpx.TimeoutException:
         return {
@@ -354,14 +364,19 @@ async def probe_connection(
             "model": model,
             "message": "El proveedor no respondio en 5 segundos.",
         }
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
+        non_public = isinstance(exc.__cause__, NonPublicAddressError)
         return {
             "ok": False,
             "status_code": None,
             "provider": provider,
             "base_url": url,
             "model": model,
-            "message": "No se pudo conectar con el proveedor.",
+            "message": (
+                PUBLIC_ONLY_MESSAGE
+                if non_public
+                else "No se pudo conectar con el proveedor."
+            ),
         }
     ok = 200 <= response.status_code < 300
     return {
