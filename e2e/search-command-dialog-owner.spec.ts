@@ -12,7 +12,7 @@ test.describe('buscador global: una sola instancia de diálogo', () => {
         test(`Ctrl+K abre exactamente 1 diálogo a ${width}px y Escape devuelve el foco`, async ({ page }) => {
             await page.setViewportSize({ width, height: 860 });
             await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
-            await page.locator('button[aria-label="Abrir buscador"]:visible').first().waitFor();
+            await page.locator('[data-testid="search-command-trigger"]:visible').first().waitFor();
             await page.waitForTimeout(500); // registro de instancias tras hidratar
 
             await page.keyboard.press('Control+k');
@@ -25,7 +25,7 @@ test.describe('buscador global: una sola instancia de diálogo', () => {
             await expect(page.locator('[role="dialog"]')).toHaveCount(0);
             const focusBack = await page.evaluate(() =>
                 document.activeElement instanceof HTMLElement
-                && document.activeElement.getAttribute('aria-label') === 'Abrir buscador');
+                && document.activeElement.getAttribute('data-testid') === 'search-command-trigger');
             expect(focusBack).toBe(true);
         });
     }
@@ -40,7 +40,7 @@ test.describe('buscador global: una sola instancia de diálogo', () => {
             return route.continue();
         });
         await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
-        await page.locator('button[aria-label="Abrir buscador"]:visible').first().waitFor();
+        await page.locator('[data-testid="search-command-trigger"]:visible').first().waitFor();
         await page.waitForTimeout(500);
 
         await page.keyboard.press('Control+k');
@@ -70,13 +70,13 @@ test.describe('owner huérfano (objeción auditor)', () => {
     test('desmontar a la dueña (drawer -> resize) no deja diálogo fantasma', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 860 });
         await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
-        await page.locator('button[aria-label="Abrir buscador"]:visible').first().waitFor();
+        await page.locator('[data-testid="search-command-trigger"]:visible').first().waitFor();
         await page.waitForTimeout(500);
 
         // Drawer móvil: su SearchCommand es una instancia más.
         await page.click('button[aria-label="Abrir menú de navegación"]');
         await expect(page.locator('[role="dialog"]')).toHaveCount(1); // el drawer
-        await page.locator('[role="dialog"] button[aria-label="Abrir buscador"]').click();
+        await page.locator('[role="dialog"] [data-testid="search-command-trigger"]').click();
         await expect(page.locator('[role="dialog"]')).toHaveCount(2); // drawer + paleta (dueña: drawer)
 
         // Cruzar el breakpoint desmonta el drawer (y a la dueña) con la paleta abierta.
