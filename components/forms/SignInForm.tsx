@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import InputField from '@/components/forms/InputField';
 import FooterLink from '@/components/forms/FooterLink';
-import AuthPitch from '@/components/forms/AuthPitch';
 import {signInWithEmail, verifyTwoFactorTotp} from "@/lib/actions/auth.actions";
 import {emailFieldValidation} from "@/lib/validation/email";
 import {toast} from "sonner";
@@ -15,11 +14,12 @@ import React, {useState} from "react";
 type Props = {
     /** Solo se muestra el enlace de recuperación si el despliegue puede enviar correo. */
     passwordResetAvailable: boolean;
+    publicSignUpOpen?: boolean;
     /** Ruta interna ya saneada (`safeInternalPath`) a la que volver tras entrar. */
     redirectTo?: string;
 };
 
-const SignInForm = ({ passwordResetAvailable, redirectTo = '/inicio' }: Props) => {
+const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirectTo = '/inicio' }: Props) => {
     const router = useRouter()
     const [twoFactorRequired, setTwoFactorRequired] = useState(false);
     const [pendingCredentials, setPendingCredentials] = useState<{ email: string; password: string } | null>(null);
@@ -132,14 +132,8 @@ const SignInForm = ({ passwordResetAvailable, redirectTo = '/inicio' }: Props) =
 
     return (
         <React.Fragment key="credentials">
-            <h1 className="form-title">Bienvenido de nuevo</h1>
-
-            {/* Contexto de producto: qué es GerarAI y qué se obtiene al entrar.
-                Va entre el H1 y el formulario, sin quitar el formulario.
-                El margen de `.form-title` (mb-12) era para separar el título
-                del formulario; con un bloque en medio sobra, así que el bloque
-                lo sube con un margen negativo. */}
-            <AuthPitch className="-mt-8 border-b border-gray-700/50 pb-8" />
+            <h1 className="form-title !mb-3">Bienvenido de nuevo</h1>
+            <p className="mb-7 text-sm leading-6 text-gray-400">Entra para seguir con tus empresas y tu cartera.</p>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <InputField
@@ -176,7 +170,7 @@ const SignInForm = ({ passwordResetAvailable, redirectTo = '/inicio' }: Props) =
                     {isSubmitting ? 'Iniciando sesión…' : 'Iniciar sesión'}
                 </Button>
 
-                <FooterLink text="¿No tienes cuenta?" linkText="Crear cuenta" href="/sign-up" />
+                <FooterLink text="¿No tienes cuenta?" linkText={publicSignUpOpen ? 'Crear cuenta' : 'Pedir acceso'} href="/sign-up" />
             </form>
         </React.Fragment>
     );

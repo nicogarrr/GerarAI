@@ -1,5 +1,6 @@
 import SignInForm from '@/components/forms/SignInForm';
 import { isPasswordResetEmailConfigured } from '@/lib/auth/email';
+import { isPublicSignUpOpen } from '@/lib/config/product';
 import { safeInternalPath } from '@/lib/auth/safe-redirect';
 
 // `isPasswordResetEmailConfigured` lee SMTP del servidor: el formulario de
@@ -18,6 +19,7 @@ export default async function SignIn({ searchParams }: Props) {
     return (
         <SignInForm
             passwordResetAvailable={isPasswordResetEmailConfigured()}
+            publicSignUpOpen={isPublicSignUpOpen()}
             redirectTo={safeInternalPath(next)}
         />
     );
