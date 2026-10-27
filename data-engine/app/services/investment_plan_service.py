@@ -225,7 +225,9 @@ class InvestmentPlanService:
             expected_basis = "blocked_contract_disabled"
         else:
             # Contrato anterior, seguro aqui: sin divisa registrada o == base.
-            legacy_total = plan.monthly_contribution * Decimal(months_elapsed)
+            legacy_total = plan.monthly_contribution * Decimal(
+                self._due_periods(plan.start_date, today, months_elapsed)
+            )
             expected, expected_partial = legacy_total, legacy_total
             expected_missing_fx, expected_periods = [], []
             expected_basis = "legacy_monthly_as_base"
@@ -291,7 +293,9 @@ class InvestmentPlanService:
         if plan_currency == base_currency:
             # Compat: monthly x meses de CALENDARIO (months_elapsed), igual
             # que siempre; no depende del dia de vencimiento.
-            total = plan.monthly_contribution * Decimal(months_elapsed)
+            total = plan.monthly_contribution * Decimal(
+                self._due_periods(plan.start_date, today, months_elapsed)
+            )
             return total, total, [], periods
         total = Decimal("0")
         missing: list[dict] = []
@@ -546,6 +550,17 @@ class InvestmentPlanService:
                 (plan.monthly_contribution_currency or "").upper() or None
             ),
         }
+
+    def _due_periods(self, start: date, today: date, months_elapsed: int) -> int:
+        """Cuotas ya VENCIDAS: la del mes en curso cuenta solo desde su aniversario.
+
+        months_elapsed son meses de calendario; si el aniversario mensual de
+        start_date (con clamp a fin de mes) aun no ha llegado, esa cuota esta
+        pendiente y no se exige. Misma regla que la via con conversion FX.
+        """
+        if months_elapsed > 0 and self._add_months_clamped(start, months_elapsed) > today:
+            return months_elapsed - 1
+        return months_elapsed
 
     @staticmethod
     def _months_between(start: date, end: date) -> int:
