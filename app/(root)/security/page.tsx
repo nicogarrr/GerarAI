@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/auth/require-user";
+import { redirectToSignIn } from "@/lib/auth/sign-in-redirect";
 import { getTwoFactorStatus } from "@/lib/actions/auth.actions";
 import { isPasswordResetEmailConfigured } from "@/lib/auth/email";
 import TwoFactorSettings from "@/components/security/TwoFactorSettings";
@@ -20,7 +20,7 @@ export default async function SecurityPage() {
     try {
         user = await requireAuthenticatedUser();
     } catch {
-        redirect("/sign-in");
+        return redirectToSignIn();
     }
 
     const status = await getTwoFactorStatus();

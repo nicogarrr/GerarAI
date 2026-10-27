@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { redirect } from 'next/navigation';
 
 import PersonalizedOverview from '@/components/PersonalizedOverview';
 import EarningsDayStrip from '@/components/calendar/EarningsDayStrip';
 import NewsSection from '@/components/NewsSection';
 import { NewsLoadingSkeleton } from '@/components/LoadingState';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { redirectToSignIn } from '@/lib/auth/sign-in-redirect';
 
 // Forzar renderizado dinámico porque requiere datos de usuario
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,7 @@ async function getUserId(): Promise<string> {
     try {
         return (await requireAuthenticatedUser()).id;
     } catch {
-        redirect('/sign-in');
+        return redirectToSignIn();
     }
 }
 

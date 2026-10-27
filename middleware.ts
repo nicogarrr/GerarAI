@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { signInUrlFor } from '@/lib/auth/safe-redirect';
+import { REQUESTED_PATH_HEADER, signInUrlFor } from '@/lib/auth/safe-redirect';
 
 /**
  * Primera línea del gating de sesión.
@@ -31,14 +31,26 @@ export function middleware(request: NextRequest) {
         process.env.NODE_ENV !== 'production' &&
         process.env.APP_ENV === 'test'
     ) {
-        return NextResponse.next();
+        return nextWithRequestedPath(request);
     }
     const hasSessionCookie = SESSION_COOKIES.some((name) => Boolean(request.cookies.get(name)?.value));
     if (!hasSessionCookie) {
         // `?next=` conserva la ruta pedida para volver a ella tras el login.
         return NextResponse.redirect(signInUrlFor(request.url));
     }
-    return NextResponse.next();
+    return nextWithRequestedPath(request);
+}
+
+/**
+ * Deja pasar la petición anotando la ruta pedida en una cabecera interna.
+ * Con cookie pero sesión caducada, quien redirige al login es el layout
+ * (`redirectToSignIn`), y sin esta cabecera no sabría a dónde volver.
+ * Se sobrescribe siempre: lo que mande el cliente en esa cabecera no llega.
+ */
+function nextWithRequestedPath(request: NextRequest) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set(REQUESTED_PATH_HEADER, `${request.nextUrl.pathname}${request.nextUrl.search}`);
+    return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

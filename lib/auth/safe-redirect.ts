@@ -55,3 +55,20 @@ export function signInUrlFor(requestUrl: string): URL {
     }
     return signIn;
 }
+
+/**
+ * Cabecera interna con la ruta pedida (`pathname + search`). La pone el
+ * middleware en la petición; los layouts y páginas de servidor no conocen su
+ * URL, así que sin ella una sesión caducada (cookie presente pero inválida)
+ * mandaba a `/sign-in` a secas y, tras entrar, se caía en /inicio.
+ * El middleware la sobrescribe siempre: un valor enviado por el cliente no
+ * llega, y aun así se sanea con `safeInternalPath`.
+ */
+export const REQUESTED_PATH_HEADER = 'x-gerarai-requested-path';
+
+/** Ruta relativa de `/sign-in`, con `?next=` cuando la ruta pedida es interna y aporta algo. */
+export function signInPathFor(requestedPath: unknown): string {
+    const next = safeInternalPath(requestedPath);
+    if (next === DEFAULT_AFTER_SIGN_IN) return '/sign-in';
+    return `/sign-in?${new URLSearchParams({ next }).toString()}`;
+}
