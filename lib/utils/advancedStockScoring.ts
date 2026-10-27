@@ -20,6 +20,7 @@
 
 import { getSectorAverages } from '@/lib/actions/sectorData.actions';
 import { formatNumber, formatPercent } from '@/lib/format';
+import { netMarginPoints, ratioFromProviderValue, roaPoints, roePoints } from '@/lib/utils/profitabilityPoints';
 
 /**
  * Pesos calibrados del scoring general. ÚNICA fuente de verdad:
@@ -248,22 +249,20 @@ export async function calculateAdvancedStockScore(
     const roa = getMetric('roaTTM', 'roa', 'returnOnAssets');
 
     if (netMargin !== null) {
-        const margin = Math.abs(netMargin) > 1 ? Math.abs(netMargin) / 100 : Math.abs(netMargin);
+        // Conserva el signo: un margen negativo es una pérdida, no rentabilidad.
+        const margin = ratioFromProviderValue(netMargin);
         const sectorMargin = sectorMetrics?.avgNetMargin || 0.15; // Margen promedio del sector real
-        const marginScore = margin > sectorMargin * 1.3 ? 35 : margin > sectorMargin ? 30 : margin > 0.1 ? 25 : margin > 0 ? 15 : 0;
-        categoryScores.profitability += marginScore;
+        categoryScores.profitability += netMarginPoints(netMargin, sectorMargin);
 
         if (margin > sectorMargin * 1.2) {
             strengths.push(`Margen neto superior al sector (${formatPercent(margin, { digits: 1 })} vs ${formatPercent(sectorMargin, { digits: 1 })})`);
         }
     }
     if (roe !== null) {
-        const roeValue = Math.abs(roe) > 1 ? Math.abs(roe) / 100 : Math.abs(roe);
-        categoryScores.profitability += roeValue > 0.2 ? 35 : roeValue > 0.15 ? 30 : roeValue > 0.1 ? 25 : roeValue > 0 ? 20 : 10;
+        categoryScores.profitability += roePoints(roe);
     }
     if (roa !== null) {
-        const roaValue = Math.abs(roa) > 1 ? Math.abs(roa) / 100 : Math.abs(roa);
-        categoryScores.profitability += roaValue > 0.1 ? 30 : roaValue > 0.05 ? 25 : roaValue > 0 ? 20 : 10;
+        categoryScores.profitability += roaPoints(roa);
     }
 
     categoryScores.profitability = Math.min(100, categoryScores.profitability);
