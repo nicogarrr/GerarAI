@@ -3182,6 +3182,94 @@
         "title": "DcaMinLevelOut",
         "type": "object"
       },
+      "DcaRunOut": {
+        "properties": {
+          "alerted": {
+            "title": "Alerted",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "errors_detail": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Errors Detail",
+            "type": "array"
+          },
+          "evaluated": {
+            "title": "Evaluated",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "skipped_detail": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Skipped Detail",
+            "type": "array"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tracked": {
+            "title": "Tracked",
+            "type": "integer"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "trigger",
+          "started_at",
+          "tracked",
+          "evaluated",
+          "skipped",
+          "errors",
+          "alerted"
+        ],
+        "title": "DcaRunOut",
+        "type": "object"
+      },
       "DcaSignalItemOut": {
         "properties": {
           "alerts_on": {
@@ -3202,6 +3290,22 @@
           "effective_min_level": {
             "title": "Effective Min Level",
             "type": "integer"
+          },
+          "evaluation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Reason"
+          },
+          "evaluation_status": {
+            "default": "never_run",
+            "title": "Evaluation Status",
+            "type": "string"
           },
           "in_portfolio": {
             "title": "In Portfolio",
@@ -3467,6 +3571,16 @@
             },
             "title": "Items",
             "type": "array"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DcaRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "signal_months": {
             "anyOf": [

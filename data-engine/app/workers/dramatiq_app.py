@@ -2046,10 +2046,16 @@ def evaluate_dca_signals(
     if lease is None:
         db.close()
         return {"status": "skipped", "actor": "evaluate_dca_signals", "reason": "lease_held"}
+    from app.services import dca_run_log
+
+    run = dca_run_log.start_run(db, "scheduler")
     try:
-        return {"actor": "evaluate_dca_signals", "status": "ok", **evaluate_watchlist(db)}
+        summary = evaluate_watchlist(db)
+        dca_run_log.finish_run(db, run, summary=summary)
+        return {"actor": "evaluate_dca_signals", "status": "ok", **summary}
     except Exception as exc:
         _rollback(db)
+        dca_run_log.finish_run(db, run, error=f"{type(exc).__name__}: {exc}")
         return _handle_actor_error("evaluate_dca_signals", exc, tenant_id=tenant_id)
     finally:
         release_job_lease(

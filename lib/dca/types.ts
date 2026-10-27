@@ -45,6 +45,24 @@ export interface DcaSignalItem {
     effective_min_level: number;
     alerts_on: boolean;
     state: DcaSignalState | null;
+    /** Por qué no hay nivel. Ausente en backends antiguos (se trata como never_run). */
+    evaluation_status?: 'evaluated' | 'never_run' | 'job_failed' | 'skipped' | 'running' | 'pending' | 'unknown';
+    evaluation_reason?: string | null;
+}
+
+export interface DcaRun {
+    status: 'ok' | 'error' | 'running' | 'interrupted';
+    trigger: 'scheduler' | 'manual';
+    started_at: string;
+    finished_at: string | null;
+    tracked: number;
+    evaluated: number;
+    skipped: number;
+    errors: number;
+    alerted: number;
+    error: string | null;
+    skipped_detail?: Array<{ symbol: string; reason?: string; last_price_date?: string }>;
+    errors_detail?: Array<{ symbol: string; error?: string }>;
 }
 
 export interface DcaSignalsResponse {
@@ -58,6 +76,8 @@ export interface DcaSignalsResponse {
     signal_months: number | null;
     zones: DcaZone[];
     items: DcaSignalItem[];
+    /** Última ejecución de la evaluación; null = nunca se ha ejecutado. Ausente en backends antiguos. */
+    last_run?: DcaRun | null;
 }
 
 export interface DcaEvaluateSummary {
