@@ -7,6 +7,7 @@ import { removeFromWatchlist } from '@/lib/actions/watchlist.actions';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
+import { useConfirmWatchlistRemoval } from '@/components/watchlist/WatchlistMembership';
 
 interface WatchlistRemoveButtonProps {
     symbol: string;
@@ -14,6 +15,7 @@ interface WatchlistRemoveButtonProps {
 
 export default function WatchlistRemoveButton({ symbol }: WatchlistRemoveButtonProps) {
     const router = useRouter();
+    const confirmRemoval = useConfirmWatchlistRemoval();
     const [loading, setLoading] = useState(false);
 
     const handleRemove = async () => {
@@ -21,6 +23,7 @@ export default function WatchlistRemoveButton({ symbol }: WatchlistRemoveButtonP
         try {
             const res = await removeFromWatchlist(symbol);
             if (res.success) {
+                confirmRemoval(symbol);
                 toast.success(`${symbol} eliminado de la watchlist`);
                 router.refresh();
             } else {

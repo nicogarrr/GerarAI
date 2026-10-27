@@ -1,0 +1,45 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+const { remove, refresh, success, showError } = vi.hoisted(() => ({ remove: vi.fn(), refresh: vi.fn(), success: vi.fn(), showError: vi.fn() }));
+vi.mock('@/lib/actions/watchlist.actions', () => ({ removeFromWatchlist: remove }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
+vi.mock('sonner', () => ({ toast: { success } }));
+vi.mock('@/lib/toast', () => ({ showErrorToast: showError }));
+import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
+import { WatchlistMembership, WatchlistEntry, WatchlistCount } from '@/components/watchlist/WatchlistMembership';
+function View() {
+    return <WatchlistMembership><WatchlistCount symbols={['AAPL', 'MSFT']} page={1} totalPages={1} /><WatchlistEntry as="article" symbol="AAPL"><span>AAPL card</span><WatchlistRemoveButton symbol="AAPL" /></WatchlistEntry><table><tbody><WatchlistEntry as="tr" symbol="AAPL"><td>AAPL row</td></WatchlistEntry></tbody></table><WatchlistEntry as="article" symbol="MSFT"><span>MSFT card</span></WatchlistEntry></WatchlistMembership>;
+}
+describe('Confirmed watchlist removal while server refresh is pending', () => {
+    beforeEach(() => vi.clearAllMocks());
+    it('hides mobile card and desktop row and updates count immediately after success', async () => {
+        remove.mockResolvedValue({ success: true });
+        render(<View />);
+        fireEvent.click(screen.getByRole('button', { name: 'Quitar AAPL de la watchlist' }));
+        await waitFor(() => expect(success).toHaveBeenCalled());
+        expect(screen.queryByText('AAPL card')).not.toBeInTheDocument();
+        expect(screen.queryByText('AAPL row')).not.toBeInTheDocument();
+        expect(screen.getByText('MSFT card')).toBeInTheDocument();
+        expect(screen.getByText('1 empresa · Página 1 de 1')).toBeInTheDocument();
+        expect(refresh).toHaveBeenCalledOnce();
+    });
+    it('keeps membership and count unchanged on failure', async () => {
+        remove.mockResolvedValue({ success: false, message: 'Error' });
+        render(<View />);
+        fireEvent.click(screen.getByRole('button', { name: 'Quitar AAPL de la watchlist' }));
+        await waitFor(() => expect(showError).toHaveBeenCalled());
+        expect(screen.getByText('AAPL card')).toBeInTheDocument();
+        expect(screen.getByText('2 empresas · Página 1 de 1')).toBeInTheDocument();
+        expect(refresh).not.toHaveBeenCalled();
+    });
+    it('does not remove before the server confirms the DELETE', async () => {
+        let resolve!: (value: { success: boolean }) => void;
+        remove.mockReturnValue(new Promise((done) => { resolve = done; }));
+        render(<View />);
+        fireEvent.click(screen.getByRole('button', { name: 'Quitar AAPL de la watchlist' }));
+        expect(screen.getByText('AAPL card')).toBeInTheDocument();
+        expect(screen.getByRole('button')).toBeDisabled();
+        await act(async () => resolve({ success: true }));
+        expect(screen.queryByText('AAPL card')).not.toBeInTheDocument();
+    });
+});
