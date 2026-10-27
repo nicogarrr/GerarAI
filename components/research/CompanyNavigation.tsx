@@ -24,7 +24,7 @@ export function CompanyNavigation({ ticker, activeView }: { ticker: string; acti
       className={compact
         ? `flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800 px-3 py-2.5 text-sm transition ${activeView === key ? 'bg-teal-950/40 text-teal-200' : 'text-gray-400 hover:text-gray-200'}`
         : `inline-flex min-h-[44px] items-center rounded-lg border px-4 py-2.5 text-sm transition ${activeView === key ? 'border-teal-600 bg-teal-950/40 text-teal-200' : 'border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200'}`}
-      href={moduleHref(ticker, item)} key={key} scroll={!('path' in item)}
+      href={moduleHref(ticker, item)} key={key} scroll={'path' in item}
     >{item.label}{compact ? <span aria-hidden="true">→</span> : null}</Link>;
   };
   return <div className="min-w-0 space-y-3" data-testid="company-navigation">
