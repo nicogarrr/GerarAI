@@ -75,6 +75,9 @@ def resolve_engine_key(company: Company) -> str:
         "KKR": "holding_company",  # gestora: AUM/NAV, no FCF generico
         "CPT": "reit",  # Camden Property Trust: FFO/AFFO
         "BN": "holding_company",  # Brookfield (ya entraba por company_type)
+        # Georgia Capital: entidad de inversion NIIF 10 (NAV = patrimonio).
+        # Un DCF sobre su flujo de explotacion (-5,8 M GEL) no tiene sentido.
+        "CGEO.L": "holding_company",
     }
     if ticker in verified_engines:
         return verified_engines[ticker]
