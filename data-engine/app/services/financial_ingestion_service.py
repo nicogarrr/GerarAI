@@ -22,6 +22,7 @@ from app.services.fact_deletion import (
     drop_shadowed_facts,
     tenant_condition,
 )
+from app.services.price_units import price_in_currency
 from app.services.ttm_fundamentals import (
     NON_ADDITIVE_FLOWS,
     PeriodValue,
@@ -2992,6 +2993,14 @@ class FinancialIngestionService:
             select(MarketPrice).where(MarketPrice.company_id == company.id, MarketPrice.date == quote_date)
         )
         if existing:
+            if existing.quote_currency != (item.get("currency") or None):
+                price = (
+                    price_in_currency(price, quote_currency=item.get("currency"),
+                                      target_currency=existing.quote_currency, company=company)
+                    if existing.quote_currency and item.get("currency") else None
+                )
+                if price is None:
+                    return
             # La fila existente es una barra real: se actualiza solo el close
             # y se preservan OHLC y el adjusted autentico de esa fecha.
             existing.close = price
@@ -3013,6 +3022,7 @@ class FinancialIngestionService:
                 adj_close=None,
                 volume=volume,
                 source="FMP",
+                quote_currency=item.get("currency") or None,
             )
         )
 

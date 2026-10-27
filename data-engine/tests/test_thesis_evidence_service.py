@@ -613,3 +613,22 @@ def test_ingest_market_sin_timestamp_no_escribe_market_cap(db):
             FinancialFact.metric == "market_cap",
         )
     ) == 0
+
+
+@pytest.mark.parametrize("adjusted", [None, Decimal("4200")])
+def test_market_rejected_unitless_spot_does_not_publish_ok(db, adjusted):
+    company = _company(db)
+    company.ticker = "CGEO.L"
+    company.currency = "GBP"
+    friday = datetime(2026, 9, 25, 20, tzinfo=UTC)
+    bar = MarketPrice(company_id=company.id, date=friday.date(), open=4200, high=4300, low=4150,
+                      close=4255, adj_close=adjusted, quote_currency="GBX", source="yfinance")
+    db.add(bar)
+    db.commit()
+    service = ThesisEvidenceService()
+    _stub_market(service, quote={"c": 42.55, "t": int(friday.timestamp())}, profile=None)
+    result = service._ingest_market(db, company)
+    assert result["status"] == "unknown_price_unit"
+    assert "price" not in result
+    assert (bar.open, bar.high, bar.low, bar.close) == (4200, 4300, 4150, 4255)
+    assert bar.quote_currency == "GBX"

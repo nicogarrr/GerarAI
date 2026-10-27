@@ -546,3 +546,137 @@ def test_late_spot_does_not_overwrite_closed_official_bar(db):
     bar = db.scalars(select(MarketPrice).where(MarketPrice.date == date(2026, 9, 21))).one()
     assert bar.close == Decimal("100.40")
     assert bar.source == "yfinance"
+
+
+@pytest.mark.parametrize("unit,close,expected", [
+    ("GBX", "4255", "4255"), ("GBp", "4255", "4255"),
+    ("GBP", "42.55", "4255"), (None, "4255", None),
+    ("USD", "42.55", None),
+])
+def test_refresh_london_price_unit_not_guessed(db, unit, close, expected):
+    from app.models import FXRate
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+
+    day = date(2026, 10, 26)
+    ledger = PortfolioLedgerService()
+    ledger.create_transaction(db, ticker="CGEO.L", action="buy", quantity=Decimal("100"),
+                              price=Decimal("42.55"), currency="GBP", trade_date=day)
+    company = ledger.ensure_company(db, "CGEO.L")
+    db.add(FXRate(base_currency="EUR", quote_currency="GBP", rate=Decimal("1.17"), rate_date=day))
+    db.commit()
+
+    class Prices:
+        async def fetch(self, companies, *, as_of):
+            return {"CGEO.L": PriceObservation("CGEO.L", Decimal(close), day, "test", quote_currency=unit)}, []
+
+    class FX:
+        async def fetch(self, **kwargs):
+            return ECBRates(rate_date=day, rates={"GBP": Decimal("1.17")})
+
+    result = asyncio.run(MarketRefreshService(Prices(), FX()).refresh(db, as_of=day))
+    position = db.scalar(select(Position).where(Position.company_id == company.id))
+    stored = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id))
+    assert stored.close == Decimal(close)  # raw provider value is never rewritten
+    assert stored.quote_currency == unit
+    if expected is None:
+        assert position.market_value_base is None
+        assert position.market_value_native is None
+        # Zero is only a ledger sentinel, never a complete zero-valued snapshot.
+        assert result["stages"][2]["snapshot_pricing_coverage"] < 1
+        assert result["stages"][2]["stale_prices"][0]["status"] == "unknown_price_unit"
+    else:
+        assert position.market_value == Decimal(expected)
+        assert position.market_value_base == Decimal(expected) * Decimal("1.17")
+        assert position.unrealized_pnl == 0
+
+
+def test_reconstruction_converts_explicit_price_unit(db):
+    from app.models import FXRate
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+    from app.services.portfolio_reconstruction_service import PortfolioReconstructionService
+
+    day = date(2026, 10, 26)
+    ledger = PortfolioLedgerService()
+    ledger.create_transaction(db, ticker="CGEO.L", action="buy", quantity=Decimal("100"),
+                              price=Decimal("42.55"), currency="GBP", trade_date=day)
+    company = ledger.ensure_company(db, "CGEO.L")
+    db.add(FXRate(base_currency="EUR", quote_currency="GBP", rate=Decimal("1.17"), rate_date=day))
+    db.add(MarketPrice(company_id=company.id, date=day, close=Decimal("4255"),
+                       quote_currency="GBX", source="test"))
+    db.commit()
+    result = PortfolioReconstructionService().build(db)
+    assert result.series[-1]["value_base"] == pytest.approx(4978.35)
+    assert result.price_check["max_abs_diff_vs_close"] == 0
+
+
+@pytest.mark.parametrize("adjusted", [None, Decimal("4200")])
+def test_refresh_preserves_adjusted_series_unit(db, adjusted):
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+
+    day = date(2026, 10, 26)
+    ledger = PortfolioLedgerService()
+    ledger.create_transaction(db, ticker="CGEO.L", action="buy", quantity=Decimal("100"),
+                              price=Decimal("42.55"), currency="GBP", trade_date=day)
+    company = ledger.ensure_company(db, "CGEO.L")
+    db.add(MarketPrice(company_id=company.id, date=day, close=Decimal("4250"),
+                       adj_close=adjusted, quote_currency="GBX", source="yfinance"))
+    db.commit()
+
+    class Prices:
+        async def fetch(self, companies, *, as_of):
+            return {"CGEO.L": PriceObservation("CGEO.L", Decimal("42.55"), day, "test", quote_currency="GBP")}, []
+
+    asyncio.run(MarketRefreshService(Prices(), _FakeFXProvider()).refresh(db, as_of=day))
+    price = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id))
+    assert price.close == Decimal("4255")
+    assert price.adj_close == adjusted
+    assert price.quote_currency == "GBX"
+
+
+@pytest.mark.parametrize("unit,expected", [("GBP", Decimal("4255")), (None, Decimal("4250"))])
+@pytest.mark.parametrize("adjusted", [None, Decimal("4200")])
+def test_financial_spot_preserves_all_ohlc_unit(db, unit, expected, adjusted):
+    from app.services.financial_ingestion_service import FinancialIngestionService
+
+    day = date(2026, 9, 25)
+    company = Company(ticker="CGEO.L", name="CGEO", currency="GBP", exchange="LSE", company_type="holding", valuation_model="unassigned")
+    db.add(company)
+    db.flush()
+    bar = MarketPrice(company_id=company.id, date=day, open=4200, high=4300, low=4150,
+                      close=4250, adj_close=adjusted, quote_currency="GBX", source="yfinance")
+    db.add(bar)
+    db.commit()
+
+    class FMP:
+        async def quote(self, ticker):
+            return [{"price": 42.55, "timestamp": int(datetime(2026, 9, 25, 20, tzinfo=UTC).timestamp()), "currency": unit}]
+
+    service = FinancialIngestionService.__new__(FinancialIngestionService)
+    asyncio.run(service._add_spot_price(db, company, FMP(), company.ticker))
+    assert (bar.open, bar.high, bar.low) == (4200, 4300, 4150)
+    assert bar.close == expected
+    assert bar.quote_currency == "GBX"
+    assert bar.adj_close == adjusted
+
+
+def test_blank_same_currency_mark_is_not_zero_terminal_xirr(db):
+    from app.models import Transaction
+    from app.services.portfolio_fx_service import PortfolioFXService
+    from app.services.portfolio_intelligence_service import PortfolioIntelligenceService
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+
+    company = Company(ticker="AAPL", name="Apple", currency="EUR", exchange="NASDAQ",
+                      company_type="holding", valuation_model="unassigned")
+    db.add(company)
+    portfolio = PortfolioFXService().ensure_portfolio(db)
+    db.flush()
+    position = Position(company_id=company.id, quantity=1, currency="EUR", market_value_base=None)
+    db.add(position)
+    PortfolioLedgerService()._blank_valuation(position)
+    db.add(Transaction(portfolio_id=portfolio.id, company_id=company.id, trade_date=date(2025, 1, 1),
+                       action="buy", quantity=1, price=100, currency="EUR"))
+    db.commit()
+    value, trace = PortfolioIntelligenceService()._xirr(db, [(position, company)])
+    assert value is None
+    assert trace["status"] == "incomplete_missing_fx"
+    assert trace["missing_fx"][0]["kind"] == "position"
