@@ -9,7 +9,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from decimal import Decimal, DivisionByZero, InvalidOperation
+from decimal import Decimal, DecimalException
 from typing import Any
 
 from sqlalchemy import desc, func, select
@@ -114,7 +114,12 @@ class SafeFormula:
             if not result.is_finite():
                 raise ValueError("El resultado de la fórmula no es finito")
             return result
-        except (DivisionByZero, InvalidOperation, ZeroDivisionError) as exc:
+        # Cualquier señal decimal se normaliza a ValueError: no solo la
+        # division por cero, tambien un Overflow de exponentes anidados (cada
+        # `**` bajo el limite) que supera el Emax del contexto. Los llamadores
+        # (criterios, ranking, metricas personalizadas) solo capturan
+        # ValueError: antes un decimal.Overflow tumbaba la ejecucion entera.
+        except (DecimalException, ZeroDivisionError) as exc:
             raise ValueError("No se puede evaluar la fórmula con estos valores") from exc
 
     def _evaluate(self, node: ast.AST, values: dict[str, Decimal]) -> Decimal:
