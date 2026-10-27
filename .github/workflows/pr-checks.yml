@@ -89,13 +89,13 @@ jobs:
               pull_number: context.issue.number,
               per_page: 100,
             });
-            const exemptRe = /^(data-engine\/evals\/|data-engine\/tests\/fixtures\/)/;
+            const exemptRe = /^(data-engine\/evals\/|data-engine\/tests\/fixtures\/)|(^|\/)package-lock\.json$/;
             let exemptLines = 0;
             for (const f of files) {
               if (exemptRe.test(f.filename)) exemptLines += f.additions + f.deletions;
             }
             const total = additions + deletions - exemptLines;
-            const exemptNote = exemptLines > 0 ? ` (sin contar ${exemptLines} lineas en rutas exentas: evals/ y tests/fixtures/)` : '';
+            const exemptNote = exemptLines > 0 ? ` (sin contar ${exemptLines} lineas en rutas exentas: evals/, tests/fixtures/ y package-lock.json)` : '';
             if (total > failLines) {
               record('fail', 'diff', false, `+${additions}/-${deletions}${exemptNote}: ${total} lineas por encima de ${failLines}`);
               errors.push(
