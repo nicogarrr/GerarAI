@@ -602,7 +602,10 @@ def test_el_contexto_raiz_no_lleva_env_ni_venv(path):
     assert is_excluded(path, read_patterns(DOCKERIGNORE_ROOT)), f"{path} entraria en la imagen"
 
 
-@pytest.mark.parametrize("path", ["node_modules/react/index.js", "node_modules/.package-lock.json"])
+@pytest.mark.parametrize("path", [
+    "node_modules/react/index.js", "node_modules/.package-lock.json",
+    "qa-e2e/node_modules/react/index.js", "nested/app/node_modules/.package-lock.json",
+])
 def test_el_contexto_raiz_no_lleva_node_modules(path):
     assert is_excluded(path, read_patterns(DOCKERIGNORE_ROOT)), f"{path} entraria en la imagen"
 
@@ -713,3 +716,21 @@ def test_una_excepcion_con_paths_solo_cubre_ese_fichero(tmp_path):
     assert cubierto.passed
     otro = _gate(_reports(tmp_path, misconfig=_payload("Dockerfile.dev")), exceptions=entries)
     assert not otro.passed
+
+
+@pytest.mark.parametrize("path", [
+    "node_modules/pkg/index.js", "one/node_modules/pkg/index.js",
+    "one/two/three/node_modules/pkg/index.js",
+])
+def test_recursive_dependency_glob_covers_zero_or_many_directories(path):
+    from scripts.security.dockerignore import parse_patterns
+
+    assert is_excluded(path, parse_patterns("**/node_modules"))
+    assert not is_excluded(path.replace("node_modules", "my_node_modules"), parse_patterns("**/node_modules"))
+
+
+def test_single_star_does_not_cross_directories():
+    from scripts.security.dockerignore import parse_patterns
+
+    assert is_excluded("one/file.js", parse_patterns("*/file.js"))
+    assert not is_excluded("one/two/file.js", parse_patterns("*/file.js"))
