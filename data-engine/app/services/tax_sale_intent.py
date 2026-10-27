@@ -8,22 +8,29 @@ from __future__ import annotations
 
 import re
 
-# Exact verb forms, not arbitrary vend* (vendedor/vendible are not sale events).
-_SALE_EVENT = re.compile(
-    r"(?i)\b(?:vendo|vendes|vendemos|venden|vender|vender[ií]a(?:s|n|mos)?|"
-    r"vendiera(?:s|n|mos)?|vendiese(?:s|n|mos)?|vender[ée]|vender[aá](?:s|n)?|"
-    r"vend[ií]|vendi[oó]|vendimos|vendiste(?:is)?|vendieron|vend[ií]a(?:s|n|mos)?|"
-    r"vendid[oa]s?)\b"
-)
+# Match the same broad repertoire consumed downstream, including vendiendo
+# and venderemos. A conservative clarification is safer than letting a form
+# outside a hand-maintained conjugation list select the first amount.
+_SALE_EVENT = re.compile(r"(?i)\bvend\w*\b")
 _HISTORICAL_SALE = re.compile(
     r"(?i)\b(?:vend[ií]|vendi[oó]|vendimos|vendiste(?:is)?|vendieron|"
     r"vend[ií]a(?:s|n|mos)?|vendid[oa]s?)\b"
     r"|\bventa\s+(?:pasada|anterior|realizada|previa)\b"
 )
+_NEGATED_SALE = re.compile(
+    r"(?i)\b(?:no|nunca|jam[aá]s)\s+(?:(?:he|has|ha|hemos|hab[ií]a|hab[ií]as|"
+    r"estoy|estamos|quiero|quer[ií]a|voy|vamos|a|ya)\s+){0,4}vend\w*\b"
+)
 
 
 def sale_intent_issue(question: str) -> str | None:
     """An explicit clarification, never a substitute sale or a tax figure."""
+    if _NEGATED_SALE.search(question or ""):
+        return (
+            "Hay una venta negada o corregida en el mensaje. Confirma una sola operación "
+            "hipotética con cantidad y precio y qué historial sigue vigente; no he tomado "
+            "los importes de la cláusula negada para calcular el IRPF."
+        )
     if _HISTORICAL_SALE.search(question or ""):
         return (
             "Has incluido una venta pasada. Esta estimación no reconstruye ventas previas escritas "

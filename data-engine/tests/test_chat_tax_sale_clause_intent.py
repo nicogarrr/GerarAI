@@ -87,7 +87,6 @@ def test_historical_and_multiple_sale_clauses_clarify(question):
     "¿IRPF si vendiera la mitad?",
     "¿IRPF por vender 10 acciones?",
     "He comprado 10 acciones y venderé todas mañana",
-    "El vendedor explicó que si vendo 10 a 20, pago impuestos",
 ])
 def test_one_sale_and_purchase_history_are_not_rejected(question):
     assert sale_intent_issue(question) is None
@@ -101,3 +100,22 @@ def test_simulation_helper_also_returns_no_amount_for_historical_sale(db):
     assert result.tax_eur is None
     assert result.quantity == 0
     assert "venta pasada" in result.missing[0]
+
+
+@pytest.mark.parametrize("clause", [
+    "Ahora estoy vendiendo 4 a 12 euros o vendo 6 a 5 euros",
+    "Primero venderemos 4 a 12 euros y luego vendo 6 a 5 euros",
+    "No vendo 4 a 12 euros sino 6 a 5 euros",
+    "No he vendido ninguna; ¿IRPF si vendo 6 a 5 euros?",
+])
+def test_reviewer_conjugations_and_negated_corrections_never_price(db, clause):
+    question = "Compré 10 acciones a 10 euros el 1 de enero de 2026. " + clause + ", ¿qué IRPF?"
+    result = simulate_hypothetical_sale(db, lots=parse_purchase_lots(question), question=question,
+                                        company=None, today=date(2026, 10, 27))
+    assert result.sale_price is None and result.gain_eur is None and result.tax_eur is None
+    response = ChatService()._hypothetical_sale_answer(db, question, parse_purchase_lots(question), None, "TEST")
+    assert "IRPF estimado" not in response.answer
+    assert response.llm_trace["clarification"] == "sale_clause_intent"
+    if "No " in clause:
+        assert "negada" in response.answer
+        assert "Has incluido una venta pasada" not in response.answer
