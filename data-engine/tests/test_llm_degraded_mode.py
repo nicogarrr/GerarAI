@@ -214,7 +214,7 @@ def test_groq_down_falls_through_to_gemini() -> None:
     out = asyncio.run(scenario())
     assert out.provider == "gemini"
     assert out.model == GEMINI_MODEL
-    assert "api.groq.com" in upstreams.calls
+    assert any(host == "api.groq.com" for host in upstreams.calls)
 
 
 def test_all_providers_down_raises_and_chat_declares_degraded_answer() -> None:
