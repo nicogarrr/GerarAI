@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from uuid import uuid4
 
 import pytest
@@ -209,3 +209,32 @@ def test_repeated_real_import_is_idempotent_and_tenant_isolated(monkeypatch):
         assert db.scalars(select(CashBalance)).all() == []
         db.info["tenant_id"] = a
         assert len(db.scalars(select(Position)).all()) == 1
+
+
+@pytest.mark.parametrize("disconnected", [False, True])
+def test_reconnect_cannot_lower_historical_verified_date(disconnected, monkeypatch):
+    init_db()
+    calls = []
+    monkeypatch.setattr(service.IBKRImportService, "import_flex_xml", lambda *a, **kw: calls.append(kw) or {})
+    with SessionLocal() as db:
+        tenant(db)
+        save(db)
+        if disconnected:
+            service.disconnect(db)
+        before = service.view(db)
+        revision = service.connection(db).revision
+        ciphertext = service.connection(db).token_ciphertext
+        with pytest.raises(service.ConnectionError, match="anterior al último verificado"):
+            service.save_connection(db, settings(), token="9999999999999999", query_id="99999", account_id="U123456", complete_query=True, statement_date=date.today() - timedelta(days=1))
+        assert service.view(db) == before
+        assert service.connection(db).revision == revision
+        assert service.connection(db).token_ciphertext == ciphertext
+        # Same-date renewal is still valid; the old report cannot be imported.
+        save(db)
+        _, _, account, revision = service.credentials(db, settings())
+        yesterday = (date.today() - timedelta(days=1)).strftime("%Y%m%d")
+        xml = report().replace(date.today().strftime("%Y%m%d"), yesterday)
+        with pytest.raises(service.ConnectionError, match="anterior al último verificado"):
+            service.import_report(db, xml, account, revision)
+        assert calls == []
+        assert service.view(db)["statement_date"] == date.today()

@@ -109,6 +109,10 @@ def save_connection(db: Session, settings: Settings, *, token: str, query_id: st
     row = connection(db, lock=True)
     if row and row.account_id != account_id:
         raise ConnectionError("Esta cartera ya está vinculada a otra cuenta IBKR. No se pueden mezclar cuentas en esta versión.")
+    # Keep the high-water mark even when credentials were disconnected. A
+    # renewed token/query must never make an older report eligible for import.
+    if row and row.statement_date and statement_date < row.statement_date:
+        raise ConnectionError("El extracto es anterior al último verificado. Conservamos los datos más recientes.")
     # Preserve the existing owner-only legacy source account, never switch it.
     if settings.ibkr_flex_tenant_id == tenant_id and settings.ibkr_flex_account_id and settings.ibkr_flex_account_id.upper() != account_id:
         raise ConnectionError("La cuenta no coincide con la fuente IBKR existente de esta cartera.")
