@@ -425,7 +425,11 @@ def test_4b_financiero_sin_fuentes_rechaza_respuesta_no_etiquetada():
     engine = _memdb()
     provider = CountingJsonProvider(_chat_payload())
     with Session(engine) as db:
-        resp = asyncio.run(ChatService(provider).answer(db, _CHAT_QUESTION, "portfolio", None))
+        # Sin ticker: desde #2372 un ticker que GerarAI no tiene («TST») se
+        # contesta sin LLM («No tengo TST...»), y este test va de la etiqueta.
+        resp = asyncio.run(ChatService(provider).answer(
+            db, "What was the closing price of the stock yesterday?", "portfolio", None
+        ))
     assert provider.calls == 1
     assert resp.model == "fallback"
 

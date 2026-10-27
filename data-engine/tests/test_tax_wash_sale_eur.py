@@ -63,6 +63,7 @@ def _setup(db: Session) -> Company:
 
 
 def _tx(db, company, day, action, qty, price):
+    _carry_fx_to(db, day)
     db.add(Transaction(
         company_id=company.id, trade_date=day, action=action,
         quantity=Decimal(str(qty)), price=Decimal(str(price)),
@@ -108,3 +109,21 @@ def test_la_perdida_diferida_en_euros_se_computa_al_vender_el_lote_recomprado(db
     assert july["cost_base"] == 991.0  # 936 + 55 diferidos
     assert july["gain_base"] == -55.0
     assert row["gain_base"] == -55.0
+
+
+def _carry_fx_to(db, day) -> None:
+    """#2349: el informe solo acepta un tipo de hasta 7 días antes. Estos tests
+    son anteriores y fijaban un único tipo semanas atrás; se replica el último
+    tipo publicado en la fecha de cada operación para conservar su intención
+    (el cálculo con ese tipo), no la antigüedad del dato."""
+    from sqlalchemy import desc as _desc
+    from sqlalchemy import select as _select
+
+    for quote in ("USD",):
+        prior = db.scalar(
+            _select(FXRate).where(FXRate.base_currency == "EUR", FXRate.quote_currency == quote,
+                                  FXRate.rate_date <= day).order_by(_desc(FXRate.rate_date)).limit(1)
+        )
+        if prior is not None and prior.rate_date != day:
+            db.add(FXRate(base_currency="EUR", quote_currency=quote, rate_date=day,
+                          rate=prior.rate, source=prior.source))
