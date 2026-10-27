@@ -70,6 +70,15 @@ def test_populated_company_cites_stored_sourced_rows(db):
         thesis_markdown="# t", executive_summary="e", rating="watch",
         current_price=Decimal("150"), expected_value=Decimal("200"),
     )
+    from app.models import FundamentalModelVersion
+
+    db.add(FundamentalModelVersion(
+        tenant_id=db.info["tenant_id"], company_id=company.id, version=1,
+        engine_version="test", algorithm_version="test", framework_key="dcf",
+        horizon_years=10, status="ok", publishable=True, input_fingerprint="input",
+        forecast_fingerprint="forecast", market_snapshot_fingerprint="market",
+        valuation_snapshot_fingerprint="valuation",
+    ))
     db.add_all([fact, thesis])
     db.commit()
 

@@ -282,6 +282,15 @@ def test_valuation_question_uses_published_thesis_figures_and_flags_newer_draft(
     from app.models import ThesisVersion
 
     tenant, _, company = setup(db)
+    from app.models import FundamentalModelVersion
+
+    db.add(FundamentalModelVersion(
+        tenant_id=tenant.id, company_id=company.id, version=1,
+        engine_version="test", algorithm_version="test", framework_key="dcf",
+        horizon_years=10, status="ok", publishable=True, input_fingerprint="input",
+        forecast_fingerprint="forecast", market_snapshot_fingerprint="market",
+        valuation_snapshot_fingerprint="valuation",
+    ))
     db.add(ThesisVersion(
         tenant_id=tenant.id, company_id=company.id, version=10, status="published",
         thesis_markdown="x", executive_summary="Publicada.", rating="watch",

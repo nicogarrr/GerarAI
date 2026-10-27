@@ -22,6 +22,7 @@ from app.models import (
     ThesisVersion,
 )
 from app.services.text_clip import clip_words
+from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
 from app.valuation.margin_convention import historical_margin_note
 
 
@@ -292,6 +293,9 @@ def _thesis_citations(db: Session, company: Company, tenant_id: int) -> list[dic
                 "as_of": stamp(thesis), "excerpt": excerpt}
 
     def figures(thesis: ThesisVersion) -> str:
+        reason = thesis_withheld_reason(db, thesis)
+        if reason:
+            return archived_thesis_notice(thesis, reason)
         parts = [f"Tesis v{thesis.version} publicada, rating {thesis.rating}."]
         values = [("bajista", thesis.bear_value), ("base", thesis.base_value), ("alcista", thesis.bull_value)]
         shown = [f"{label} {_money(v, company.currency)}" for label, v in values if v is not None]
