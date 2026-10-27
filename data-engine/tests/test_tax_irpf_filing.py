@@ -290,9 +290,10 @@ def test_compute_report_attaches_filing_layer(db):
     assert filing["available"] is True
 
 
-def test_filing_unavailable_when_portfolio_base_is_not_eur(db):
-    # Las casillas del Modelo 100 son importes en EUR: con cartera en USD no
-    # se publican cifras bajo rótulos IRPF.
+def test_irpf_in_eur_even_when_portfolio_base_is_usd(db):
+    # La divisa base es una preferencia de visualizacion: con la cartera en
+    # USD el IRPF se sigue calculando en EUR al tipo BCE de cada operacion, y
+    # las casillas no se bloquean por la divisa base.
     db.add(Portfolio(name="Main", base_currency="USD", is_default=True))
     db.commit()
     c = _company(db, "AAPL", country="US")
@@ -300,10 +301,9 @@ def test_filing_unavailable_when_portfolio_base_is_not_eur(db):
     _tx(db, c, date(2025, 6, 1), "sell", 10, 150, currency="USD")
 
     report = TaxReportService().compute_report(db, 2025)
-    assert report["summary"]["base_currency"] == "USD"
+    assert report["summary"]["base_currency"] == "EUR"
     filing = report["filing"]
-    assert filing["available"] is False
-    assert "EUR" in filing["reason"]
+    assert "divisa base" not in (filing.get("reason") or "")
 
 
 # --- Integración importación IBKR → informe: pagos especiales (fail-closed) --

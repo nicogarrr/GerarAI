@@ -26,9 +26,10 @@ from app.services.company_resolver import resolve_company
 from app.services.connectors.ibkr import IBKRFlexClient
 from app.services.dividend_ingestion_service import DividendIngestionService
 from app.services.dividend_projection_service import DividendProjectionService
+from app.services.fx_attribution import split_unrealized_pnl
 from app.services.ibkr_import_service import IBKRImportError, IBKRImportService, IBKRPnlNotReadyError
 from app.services.market_refresh_service import MarketRefreshService
-from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.portfolio_intelligence_service import PortfolioIntelligenceService
 from app.services.portfolio_ledger_service import (
     PortfolioLedgerService,
@@ -263,14 +264,45 @@ def capture_portfolio_snapshot(
     }
 
 
+def _pnl_effects(position: Position, *, held: bool, has_cost: bool) -> dict:
+    """G/P latente en divisa base partida en efecto precio y efecto divisa."""
+    if held or not has_cost or position.average_cost <= 0:
+        return {"pnl_price_effect_base": None, "pnl_fx_effect_base": None}
+    price_effect, fx_effect = split_unrealized_pnl(
+        unrealized_native=position.unrealized_pnl,
+        unrealized_base=position.unrealized_pnl_base,
+        fx_rate_now=position.fx_rate,
+    )
+    return {"pnl_price_effect_base": price_effect, "pnl_fx_effect_base": fx_effect}
+
+
+def _fx_source(db: Session, base_currency: str) -> dict:
+    """Etiqueta de la fuente FX: de donde salen los tipos y de que fecha."""
+    row = db.execute(
+        select(FXRate.source, FXRate.rate_date)
+        .order_by(desc(FXRate.rate_date), desc(FXRate.id))
+        .limit(1)
+    ).first()
+    return {
+        "source": row.source if row else None,
+        "latest_rate_date": row.rate_date.isoformat() if row else None,
+        "base_currency": base_currency,
+    }
+
+
 @router.get("/configuration")
 def portfolio_configuration(db: Session = Depends(get_db)) -> dict:
     portfolio = PortfolioFXService().portfolio(db)
+    base_currency = portfolio.base_currency if portfolio else "EUR"
     return {
         "id": portfolio.id if portfolio else None,
         "name": portfolio.name if portfolio else "Main",
-        "base_currency": portfolio.base_currency if portfolio else "EUR",
+        "base_currency": base_currency,
         "is_default": portfolio.is_default if portfolio else True,
+        # IRPF y Modelo 720 se declaran en euros al tipo BCE, sea cual sea la
+        # divisa base de la cartera.
+        "tax_currency": TAX_CURRENCY,
+        "fx_source": _fx_source(db, base_currency),
     }
 
 
@@ -502,6 +534,7 @@ def positions(
                 else None
             ),
             "fx_rate": float(position.fx_rate) if position.fx_rate is not None else None,
+            **_pnl_effects(position, held=held, has_cost=has_cost),
             "source": position.source,
             "first_buy_date": fiscal_info["first_buy_date"],
             "holding_days": fiscal_info["holding_days"],
