@@ -49,7 +49,7 @@ def test_empty_company_is_blocked_with_honest_next_steps(db):
     assert response.blocked is True
     assert response.model == "deterministic"
     # Prosa visible natural; el detalle estructurado queda en `sections`.
-    assert "Todavia no tengo hechos financieros fiables almacenados" in response.answer
+    assert "Todavía no tengo hechos financieros fiables almacenados" in response.answer
     assert "HECHO" not in response.answer
     facts_section = next(s for s in response.sections if s.key == "facts")
     assert "No hay hechos financieros fiables almacenados" in facts_section.body
