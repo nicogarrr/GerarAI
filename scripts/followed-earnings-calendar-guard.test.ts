@@ -18,13 +18,20 @@ test('resultados seguidos: estimada solo cuando la fuente lo marca', () => {
   assert.match(list, /Estimada/);
 });
 
-test('resultados seguidos: logos solo via CompanyLogo (FMP, gratis) con fallback de iniciales', () => {
-  // Nico pidio logos de empresa explicitamente: se permiten SOLO las imagenes
-  // publicas y gratuitas de Financial Modeling Prep dentro de CompanyLogo, con
-  // caida a NameAvatar. Otros proveedores de logos siguen prohibidos.
-  const logo = readFileSync('components/calendar/CompanyLogo.tsx', 'utf8');
+test('resultados seguidos: logos solo via CompanyLogo (FMP + web oficial, gratis) con fallback de iniciales', () => {
+  // Nico pidio logos de empresa explicitamente ("consiguelo en todas"): se
+  // permiten las imagenes publicas y gratuitas de Financial Modeling Prep y,
+  // como segunda fuente, el icono de la PROPIA web de la empresa servido por
+  // nuestra ruta /api/logo, con caida a NameAvatar. Proveedores de logos de
+  // terceros siguen prohibidos.
+  const logo =
+    readFileSync('components/calendar/CompanyLogo.tsx', 'utf8') +
+    readFileSync('lib/logos/logo-sources.ts', 'utf8') +
+    readFileSync('lib/logos/site-icon.ts', 'utf8') +
+    readFileSync('app/api/logo/[ticker]/route.ts', 'utf8');
   assert.match(list, /CompanyLogo/);
   assert.match(logo, /financialmodelingprep\.com\/image-stock/);
+  assert.match(logo, /\/api\/logo\//);
   assert.match(logo, /NameAvatar/);
   assert.match(logo, /referrerPolicy="no-referrer"/);
   assert.doesNotMatch(list + page + logo, /logo\.clearbit|img\.logo|logo\.dev|unavatar|google\.com\/s2\/favicons/);
