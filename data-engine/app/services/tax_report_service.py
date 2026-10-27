@@ -112,6 +112,47 @@ def _fifo_sort_key(transaction) -> tuple:
     )
 
 
+#: Antigüedad máxima del tipo de cambio aceptado para una operación. El BCE
+#: no publica en fines de semana ni festivos TARGET (Navidad, Año Nuevo,
+#: Viernes Santo, Lunes de Pascua, 1 de mayo): el hueco más largo entre dos
+#: publicaciones es de 4 días (Viernes Santo → martes de Pascua). 7 días da
+#: margen sin aceptar un tipo de otra semana.
+MAX_FX_AGE_DAYS = 7
+
+
+def _rate_not_older_than(
+    table: dict[tuple[str, str], list[tuple[date, Decimal]]],
+    *,
+    quote_currency: str,
+    base_currency: str,
+    as_of: date,
+    max_age_days: int,
+) -> Decimal | None:
+    """Como ``PortfolioFXService.rate_from_table`` pero sin tipos caducados.
+
+    Devuelve el último tipo publicado en o antes de ``as_of`` solo si tiene
+    como mucho ``max_age_days`` días; si no, ``None`` (importe desconocido).
+    """
+    from bisect import bisect_right
+
+    quote = quote_currency.upper()
+    base = base_currency.upper()
+    if quote == base:
+        return Decimal("1")
+    for key, invert in (((base, quote), False), ((quote, base), True)):
+        series = table.get(key)
+        if not series:
+            continue
+        idx = bisect_right(series, (as_of, Decimal("Infinity"))) - 1
+        if idx < 0:
+            continue
+        rate_date, rate = series[idx]
+        if (as_of - rate_date).days > max_age_days or not rate:
+            continue
+        return Decimal("1") / rate if invert else rate
+    return None
+
+
 def _defer_base(lot: dict, take: Decimal, sale: dict) -> None:
     """Difiere la pérdida bloqueada (wash-sale) también en divisa base.
 
@@ -277,11 +318,17 @@ class TaxReportService:
         )
 
         def resolve_rate(currency: str | None, as_of: date) -> Decimal | None:
-            return PortfolioFXService.rate_from_table(
+            # IRPF: tipo de la FECHA de cada operación. Se acepta el último
+            # publicado hasta MAX_FX_AGE_DAYS antes (fines de semana y
+            # festivos TARGET); uno más viejo NO es el tipo de esa fecha y
+            # deja el importe en base desconocido (None, missing_fx) en vez
+            # de convertir en silencio con un tipo de semanas o meses atrás.
+            return _rate_not_older_than(
                 fx_table,
                 quote_currency=currency or "",
                 base_currency=base_currency,
                 as_of=as_of,
+                max_age_days=MAX_FX_AGE_DAYS,
             )
 
         inconsistent_cash: list[dict] = []
