@@ -310,6 +310,206 @@ def _raw_action_label(transaction) -> str:
     return transaction.action
 
 
+def backward_repurchase_quantity(prior_buys, prior_sells, lots, sale_date, quantity):
+    """AEAT backward window, including the single initial purchase exception."""
+    window_start = sale_date - WASH_SALE_WINDOW
+    buys = [(day, qty) for day, qty in prior_buys if window_start <= day <= sale_date]
+    holdings_before = max(
+        sum((qty for day, qty in prior_buys if day < window_start), Decimal("0"))
+        - sum((qty for day, qty in prior_sells if day < window_start), Decimal("0")),
+        Decimal("0"),
+    )
+    if len(buys) == 1 and holdings_before <= 0:
+        return Decimal("0")
+    eligible = sum((min(lot["qty"], lot["capacity"]) for lot in lots
+                    if window_start <= lot["date"] <= sale_date), Decimal("0"))
+    return min(quantity, eligible, sum((qty for _, qty in buys), Decimal("0")))
+
+
+def replay_tax_fifo(events, resolve_rate, start, end):
+    """Pure annual FIFO/recompra replay, also used by read-only sale estimates.
+
+    Returns remaining lots (including deferred bases) and sales for the window.
+    Does not write transactions or tax snapshots.
+    """
+    lots: deque[dict] = deque()
+    open_loss_sales: list[dict] = []
+    year_sales: list[dict] = []
+    # Chronological buy/sell history for this ticker, used ONLY for
+    # the Manual AEAT 2025 backward proportionality
+    # (min(remanente, comprado previo) + single-purchase exception).
+    prior_buys: list[tuple] = []  # (trade_date, quantity)
+    prior_sells: list[tuple] = []  # (trade_date, quantity)
+    for transaction in events:
+        action = (transaction.action or "").lower()
+        if action in BUY_ACTIONS:
+            if transaction.quantity is None or transaction.quantity <= 0:
+                # Ingesta: lotes de compra sin cantidad positiva se
+                # rechazan (nunca entran a la base de coste).
+                continue
+            acquisition_cost = transaction.quantity * transaction.price + transaction.fees
+            unit_native = (
+                acquisition_cost / transaction.quantity
+                if transaction.quantity
+                else Decimal("0")
+            )
+            # IRPF: el valor de adquisición se convierte a divisa base
+            # al tipo de la FECHA DE COMPRA (no al de la venta). Sin
+            # tipo real el coste en base queda desconocido (None).
+            buy_rate = resolve_rate(transaction.currency, transaction.trade_date)
+            lot = {
+                "qty": transaction.quantity,
+                "unit": unit_native,
+                "unit_base": unit_native * buy_rate if buy_rate is not None else None,
+                "deferred": Decimal("0"),
+                "deferred_base": Decimal("0"),
+                "capacity": transaction.quantity,
+                "date": transaction.trade_date,
+                "currency": transaction.currency or TAX_CURRENCY,
+            }
+            # Forward window: this buy can repurchase earlier loss sales.
+            still_open: list[dict] = []
+            for sale in open_loss_sales:
+                if transaction.trade_date > sale["date"] + WASH_SALE_WINDOW:
+                    continue  # forward window closed
+                if sale["qty_unblocked"] > 0 and lot["capacity"] > 0:
+                    take = min(lot["capacity"], sale["qty_unblocked"])
+                    lot["deferred"] += take * sale["loss_per_share"]
+                    _defer_base(lot, take, sale)
+                    lot["capacity"] -= take
+                    sale["blocked_qty"] += take
+                    sale["qty_unblocked"] -= take
+                still_open.append(sale)
+            open_loss_sales = still_open
+            lots.append(lot)
+            prior_buys.append((transaction.trade_date, transaction.quantity))
+            continue
+        if action not in SELL_ACTIONS:
+            continue
+
+        if transaction.quantity is None or transaction.quantity <= 0:
+            # Ingesta: ventas sin cantidad positiva se rechazan.
+            continue
+        remaining = transaction.quantity
+        proceeds_native = transaction.quantity * transaction.price - transaction.fees
+        cost_native = Decimal("0")
+        # Coste en base = suma de cada lote a SU tipo de compra.
+        cost_base: Decimal | None = Decimal("0")
+        while remaining > Decimal("0") and lots:
+            lot = lots[0]
+            take = min(lot["qty"], remaining)
+            cost_native += take * lot["unit"]
+            if cost_base is not None and lot["unit_base"] is not None:
+                cost_base += take * lot["unit_base"]
+            else:
+                cost_base = None
+            if lot["qty"] > 0 and lot["deferred_base"] is None:
+                cost_base = None
+            elif lot["deferred_base"] > 0 and lot["qty"] > 0:
+                deferred_base_take = lot["deferred_base"] * take / lot["qty"]
+                if cost_base is not None:
+                    cost_base += deferred_base_take
+                lot["deferred_base"] -= deferred_base_take
+            if lot["deferred"] > 0 and lot["qty"] > 0:
+                deferred_take = lot["deferred"] * take / lot["qty"]
+                cost_native += deferred_take
+                lot["deferred"] -= deferred_take
+            lot["qty"] -= take
+            if lot["qty"] == 0:
+                lots.popleft()
+            remaining -= take
+        # Over-sell: se vendió más de lo comprado. El remanente se
+        # valora a coste cero pero se MARCA con warning explícito en
+        # vez de registrar una ganancia silenciosa.
+        over_sell_quantity = remaining if remaining > Decimal("0") else Decimal("0")
+        over_sell = over_sell_quantity > 0
+
+        gain_native = proceeds_native - cost_native
+        # Valor de transmisión al tipo de la FECHA DE VENTA; la
+        # ganancia en base es la diferencia de ambos tramos ya
+        # convertidos (no la ganancia en divisa x tipo de venta).
+        sell_rate = resolve_rate(transaction.currency, transaction.trade_date)
+        proceeds_base = proceeds_native * sell_rate if sell_rate is not None else None
+        gain_base_raw = (
+            proceeds_base - cost_base
+            if proceeds_base is not None and cost_base is not None
+            else None
+        )
+        # TODA venta válida entra en el historial, con ganancia o con
+        # pérdida: holdings_before_window alimenta la excepción de
+        # compra única del Manual, y omitir las ventas rentables lo
+        # infla (bloquearía pérdidas que AEAT permite computar).
+        prior_sells.append((transaction.trade_date, transaction.quantity))
+        # Art. 33.5.f LIRPF: la pérdida que se difiere es la del IRPF,
+        # en EUROS (cada tramo a su tipo, art. 34-35). Una ganancia en
+        # divisa puede ser pérdida en euros (y al revés): se decide con
+        # el resultado en base; solo sin FX se recurre al de divisa.
+        is_loss = (
+            gain_base_raw < 0 if gain_base_raw is not None else gain_native < 0
+        )
+        if is_loss:
+            sale = {
+                "date": transaction.trade_date,
+                "qty_unblocked": transaction.quantity,
+                # Pérdida por acción en divisa; 0 si en divisa hubo
+                # ganancia (la pérdida existe solo en euros).
+                "loss_per_share": max(-gain_native, Decimal("0")) / transaction.quantity,
+                # Pérdida por acción en base (tramos a su tipo); 0 si
+                # en base no hay pérdida que diferir.
+                "loss_per_share_base": (
+                    max(-gain_base_raw, Decimal("0")) / transaction.quantity
+                    if gain_base_raw is not None
+                    else None
+                ),
+                "blocked_qty": Decimal("0"),
+            }
+            # Backward window (Manual Renta 2025, apdo. E.1): prior-window
+            # buys block only for the shares still held, proportionally:
+            #   recompra = min(remanente tras la venta,
+            #                  comprado en los 2 meses previos),
+            # absorbed FIFO onto the oldest surviving in-window lots.
+            # Exception: a single buy op in the prior window with zero
+            # holdings at its start is the initial purchase itself,
+            # not a repurchase → no limitation.
+            window_start = transaction.trade_date - WASH_SALE_WINDOW
+            recompra_prev_qty = backward_repurchase_quantity(
+                prior_buys, prior_sells, lots, transaction.trade_date, sale["qty_unblocked"]
+            )
+            to_block = recompra_prev_qty
+            for lot in lots:
+                if to_block <= 0 or sale["qty_unblocked"] <= 0:
+                    break
+                if lot["date"] < window_start or lot["capacity"] <= 0 or lot["qty"] <= 0:
+                    continue
+                take = min(lot["capacity"], lot["qty"], to_block, sale["qty_unblocked"])
+                lot["deferred"] += take * sale["loss_per_share"]
+                _defer_base(lot, take, sale)
+                lot["capacity"] -= take
+                sale["blocked_qty"] += take
+                sale["qty_unblocked"] -= take
+                to_block -= take
+            open_loss_sales.append(sale)
+        else:
+            sale = None
+
+        if start <= transaction.trade_date <= end:
+            year_sales.append(
+                {
+                    "transaction": transaction,
+                    "proceeds_native": proceeds_native,
+                    "cost_native": cost_native,
+                    "gain_native": gain_native,
+                    "proceeds_base": proceeds_base,
+                    "cost_base": cost_base,
+                    "gain_base_raw": gain_base_raw,
+                    "sale": sale,
+                    "over_sell": over_sell,
+                    "over_sell_quantity": over_sell_quantity,
+                }
+            )
+    return lots, year_sales
+
+
 class TaxReportService:
     """Compute and persist per-fiscal-year tax snapshots."""
 
@@ -569,199 +769,7 @@ class TaxReportService:
 
         realized_by_company = {}
         for ticker, events in events_by_ticker.items():
-            lots: deque[dict] = deque()
-            open_loss_sales: list[dict] = []
-            year_sales: list[dict] = []
-            # Chronological buy/sell history for this ticker, used ONLY for
-            # the Manual AEAT 2025 backward proportionality
-            # (min(remanente, comprado previo) + single-purchase exception).
-            prior_buys: list[tuple] = []  # (trade_date, quantity)
-            prior_sells: list[tuple] = []  # (trade_date, quantity)
-            for transaction in events:
-                action = (transaction.action or "").lower()
-                if action in BUY_ACTIONS:
-                    if transaction.quantity is None or transaction.quantity <= 0:
-                        # Ingesta: lotes de compra sin cantidad positiva se
-                        # rechazan (nunca entran a la base de coste).
-                        continue
-                    acquisition_cost = transaction.quantity * transaction.price + transaction.fees
-                    unit_native = (
-                        acquisition_cost / transaction.quantity
-                        if transaction.quantity
-                        else Decimal("0")
-                    )
-                    # IRPF: el valor de adquisición se convierte a divisa base
-                    # al tipo de la FECHA DE COMPRA (no al de la venta). Sin
-                    # tipo real el coste en base queda desconocido (None).
-                    buy_rate = resolve_rate(transaction.currency, transaction.trade_date)
-                    lot = {
-                        "qty": transaction.quantity,
-                        "unit": unit_native,
-                        "unit_base": unit_native * buy_rate if buy_rate is not None else None,
-                        "deferred": Decimal("0"),
-                        "deferred_base": Decimal("0"),
-                        "capacity": transaction.quantity,
-                        "date": transaction.trade_date,
-                    }
-                    # Forward window: this buy can repurchase earlier loss sales.
-                    still_open: list[dict] = []
-                    for sale in open_loss_sales:
-                        if transaction.trade_date > sale["date"] + WASH_SALE_WINDOW:
-                            continue  # forward window closed
-                        if sale["qty_unblocked"] > 0 and lot["capacity"] > 0:
-                            take = min(lot["capacity"], sale["qty_unblocked"])
-                            lot["deferred"] += take * sale["loss_per_share"]
-                            _defer_base(lot, take, sale)
-                            lot["capacity"] -= take
-                            sale["blocked_qty"] += take
-                            sale["qty_unblocked"] -= take
-                        still_open.append(sale)
-                    open_loss_sales = still_open
-                    lots.append(lot)
-                    prior_buys.append((transaction.trade_date, transaction.quantity))
-                    continue
-                if action not in SELL_ACTIONS:
-                    continue
-
-                if transaction.quantity is None or transaction.quantity <= 0:
-                    # Ingesta: ventas sin cantidad positiva se rechazan.
-                    continue
-                remaining = transaction.quantity
-                proceeds_native = transaction.quantity * transaction.price - transaction.fees
-                cost_native = Decimal("0")
-                # Coste en base = suma de cada lote a SU tipo de compra.
-                cost_base: Decimal | None = Decimal("0")
-                while remaining > Decimal("0") and lots:
-                    lot = lots[0]
-                    take = min(lot["qty"], remaining)
-                    cost_native += take * lot["unit"]
-                    if cost_base is not None and lot["unit_base"] is not None:
-                        cost_base += take * lot["unit_base"]
-                    else:
-                        cost_base = None
-                    if lot["qty"] > 0 and lot["deferred_base"] is None:
-                        cost_base = None
-                    elif lot["deferred_base"] > 0 and lot["qty"] > 0:
-                        deferred_base_take = lot["deferred_base"] * take / lot["qty"]
-                        if cost_base is not None:
-                            cost_base += deferred_base_take
-                        lot["deferred_base"] -= deferred_base_take
-                    if lot["deferred"] > 0 and lot["qty"] > 0:
-                        deferred_take = lot["deferred"] * take / lot["qty"]
-                        cost_native += deferred_take
-                        lot["deferred"] -= deferred_take
-                    lot["qty"] -= take
-                    if lot["qty"] == 0:
-                        lots.popleft()
-                    remaining -= take
-                # Over-sell: se vendió más de lo comprado. El remanente se
-                # valora a coste cero pero se MARCA con warning explícito en
-                # vez de registrar una ganancia silenciosa.
-                over_sell_quantity = remaining if remaining > Decimal("0") else Decimal("0")
-                over_sell = over_sell_quantity > 0
-
-                gain_native = proceeds_native - cost_native
-                # Valor de transmisión al tipo de la FECHA DE VENTA; la
-                # ganancia en base es la diferencia de ambos tramos ya
-                # convertidos (no la ganancia en divisa x tipo de venta).
-                sell_rate = resolve_rate(transaction.currency, transaction.trade_date)
-                proceeds_base = proceeds_native * sell_rate if sell_rate is not None else None
-                gain_base_raw = (
-                    proceeds_base - cost_base
-                    if proceeds_base is not None and cost_base is not None
-                    else None
-                )
-                # TODA venta válida entra en el historial, con ganancia o con
-                # pérdida: holdings_before_window alimenta la excepción de
-                # compra única del Manual, y omitir las ventas rentables lo
-                # infla (bloquearía pérdidas que AEAT permite computar).
-                prior_sells.append((transaction.trade_date, transaction.quantity))
-                # Art. 33.5.f LIRPF: la pérdida que se difiere es la del IRPF,
-                # en EUROS (cada tramo a su tipo, art. 34-35). Una ganancia en
-                # divisa puede ser pérdida en euros (y al revés): se decide con
-                # el resultado en base; solo sin FX se recurre al de divisa.
-                is_loss = (
-                    gain_base_raw < 0 if gain_base_raw is not None else gain_native < 0
-                )
-                if is_loss:
-                    sale = {
-                        "date": transaction.trade_date,
-                        "qty_unblocked": transaction.quantity,
-                        # Pérdida por acción en divisa; 0 si en divisa hubo
-                        # ganancia (la pérdida existe solo en euros).
-                        "loss_per_share": max(-gain_native, Decimal("0")) / transaction.quantity,
-                        # Pérdida por acción en base (tramos a su tipo); 0 si
-                        # en base no hay pérdida que diferir.
-                        "loss_per_share_base": (
-                            max(-gain_base_raw, Decimal("0")) / transaction.quantity
-                            if gain_base_raw is not None
-                            else None
-                        ),
-                        "blocked_qty": Decimal("0"),
-                    }
-                    # Backward window (Manual Renta 2025, apdo. E.1): prior-window
-                    # buys block only for the shares still held, proportionally:
-                    #   recompra = min(remanente tras la venta,
-                    #                  comprado en los 2 meses previos),
-                    # absorbed FIFO onto the oldest surviving in-window lots.
-                    # Exception: a single buy op in the prior window with zero
-                    # holdings at its start is the initial purchase itself,
-                    # not a repurchase → no limitation.
-                    window_start = transaction.trade_date - WASH_SALE_WINDOW
-                    bought_prev = Decimal("0")
-                    buy_ops_prev = 0
-                    for buy_date, buy_qty in prior_buys:
-                        if buy_date >= window_start:
-                            bought_prev += buy_qty
-                            buy_ops_prev += 1
-                    holdings_before_window = Decimal("0")
-                    for buy_date, buy_qty in prior_buys:
-                        if buy_date < window_start:
-                            holdings_before_window += buy_qty
-                    for sell_date, sell_qty in prior_sells:
-                        if sell_date < window_start:
-                            holdings_before_window -= sell_qty
-                    if holdings_before_window < 0:
-                        holdings_before_window = Decimal("0")
-                    remaining_after = sum(lot["qty"] for lot in lots)
-                    if buy_ops_prev == 1 and holdings_before_window <= 0:
-                        recompra_prev_qty = Decimal("0")
-                    else:
-                        recompra_prev_qty = min(
-                            remaining_after, bought_prev, sale["qty_unblocked"]
-                        )
-                    to_block = recompra_prev_qty
-                    for lot in lots:
-                        if to_block <= 0 or sale["qty_unblocked"] <= 0:
-                            break
-                        if lot["date"] < window_start or lot["capacity"] <= 0 or lot["qty"] <= 0:
-                            continue
-                        take = min(lot["capacity"], lot["qty"], to_block, sale["qty_unblocked"])
-                        lot["deferred"] += take * sale["loss_per_share"]
-                        _defer_base(lot, take, sale)
-                        lot["capacity"] -= take
-                        sale["blocked_qty"] += take
-                        sale["qty_unblocked"] -= take
-                        to_block -= take
-                    open_loss_sales.append(sale)
-                else:
-                    sale = None
-
-                if start <= transaction.trade_date <= end:
-                    year_sales.append(
-                        {
-                            "transaction": transaction,
-                            "proceeds_native": proceeds_native,
-                            "cost_native": cost_native,
-                            "gain_native": gain_native,
-                            "proceeds_base": proceeds_base,
-                            "cost_base": cost_base,
-                            "gain_base_raw": gain_base_raw,
-                            "sale": sale,
-                            "over_sell": over_sell,
-                            "over_sell_quantity": over_sell_quantity,
-                        }
-                    )
+            lots, year_sales = replay_tax_fifo(events, resolve_rate, start, end)
 
             # Aggregate the bucket only after the full event loop so that
             # forward-window repurchases (which can postdate the sale) are

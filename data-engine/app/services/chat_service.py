@@ -1951,6 +1951,11 @@ class ChatService:
         name = label or "esas acciones"
         intro = f"Estimación hipotética de {name} con los datos que me das, no con tu cartera."
         sources: list[dict] = []
+        if res.invalid:
+            return ChatResponse(
+                answer=f"{intro} {res.invalid}", sources=[], model="deterministic",
+                prompt_version=_SALE_TAX_PROMPT_VERSION, confidence=0.8, llm_trace=trace,
+            )
         if res.sale_price is None:
             return ChatResponse(
                 answer=f"{intro} Me falta {', '.join(res.missing)}: ¿a qué precio las venderías?",
@@ -2008,9 +2013,22 @@ class ChatService:
             )
         else:
             answer = (
-                f"{head}, pérdida de {_fmt_money_es(float(-res.gain_eur))} €. No pagarías IRPF por esta venta; "
-                "la pérdida compensa otras ganancias si no recompras en los dos meses siguientes."
+                f"{head}, pérdida de {_fmt_money_es(float(-res.gain_eur))} €. No pagarías IRPF por esta venta."
             )
+        if res.gain_eur < 0:
+            if res.fifo is not None and res.fifo.blocking_qty > 0:
+                blocked = -res.gain_eur * res.fifo.blocking_qty / res.quantity
+                trace["wash_sale_blocked_qty"] = float(res.fifo.blocking_qty)
+                answer += (
+                    f" Por compras previas que siguen en cartera, {_fmt_money_es(float(blocked))} € "
+                    "de la pérdida no se pueden compensar ahora: se aplazan hasta vender esas acciones."
+                )
+                if res.fifo.blocking_qty < res.quantity:
+                    answer += f" El resto, {_fmt_money_es(float(-res.gain_eur - blocked))} €, queda sujeto a las posibles recompras posteriores."
+            elif res.undated:
+                answer += " Sin las fechas de todas las compras no puedo confirmar si la pérdida se puede compensar por la regla de los dos meses."
+            else:
+                answer += " La pérdida compensa otras ganancias si no recompras en los dos meses siguientes."
         answer += f" {method} Es una estimación, no asesoría fiscal."
         return ChatResponse(
             answer=answer, sources=sources, model="deterministic",
@@ -2046,17 +2064,22 @@ class ChatService:
         if pos is None:
             return self._no_position_sale_answer(company.ticker)
         held = Decimal(pos.quantity)
-        qty = held
-        match = _SALE_QTY_RE.search(question)
-        if _SALE_HALF_RE.search(question):
-            qty = held / 2
-        elif match:
-            try:
-                asked = Decimal(match.group(1).replace(",", "."))
-            except ArithmeticError:
-                asked = held
-            if 0 < asked < held:
-                qty = asked
+        from app.services.sale_hypothetical import _sale_quantity, parse_sale_price
+
+        qty = _sale_quantity(question, held)
+        issue = None
+        if not 0 < qty <= held:
+            issue = (
+                f"Pides vender {_fmt_number_es(float(qty), 4)} acciones de {company.ticker}, "
+                f"pero tienes {_fmt_number_es(float(held), 4)}. Confirma la cantidad; no he calculado otra venta."
+            )
+        elif re.search(r"(?i)comisi[oó]n|comisiones|gastos|fees?\b", question):
+            issue = "Has indicado comisiones o gastos: confirma el importe de venta y su divisa. No he calculado una cuota ignorándolos."
+        if issue:
+            return ChatResponse(
+                answer=issue, sources=[], model="deterministic", prompt_version=_SALE_TAX_PROMPT_VERSION,
+                confidence=0.8, llm_trace=trace,
+            )
         share = qty / held
         qty_text = _fmt_number_es(float(qty), 4)
         what = (
@@ -2072,6 +2095,28 @@ class ChatService:
         )
         fifo_cost = fifo.cost_eur if fifo is not None else None
         value_base = pos.market_value_base if (pos.base_currency or "EUR") == "EUR" else None
+        explicit_sale = parse_sale_price(question)
+        if explicit_sale is not None:
+            from app.services.portfolio_fx_service import PortfolioFXService
+            from app.services.tax_report_service import MAX_FX_AGE_DAYS, _rate_not_older_than
+
+            price, currency = explicit_sale
+            currency = currency or pos.currency or company.currency or "EUR"
+            fx_table = PortfolioFXService().fx_table(
+                db, currencies={currency}, base_currency="EUR", as_of_max=today,
+            ) if currency != "EUR" else {}
+            rate = _rate_not_older_than(
+                fx_table, quote_currency=currency, base_currency="EUR", as_of=today,
+                max_age_days=MAX_FX_AGE_DAYS,
+            )
+            if rate is None:
+                return ChatResponse(
+                    answer=f"Has indicado un precio de venta en {currency}, pero falta el tipo de cambio de hoy para calcular el IRPF en euros. No he usado el valor guardado de la posición.",
+                    sources=[source], model="deterministic", prompt_version=_SALE_TAX_PROMPT_VERSION,
+                    confidence=0.7, llm_trace=trace,
+                )
+            value_base = price * held * rate
+            trace["sale_price_source"] = "usuario"
         avg_cost = pos.cost_basis_base if (pos.base_currency or "EUR") == "EUR" else None
         trace["method"] = "fifo" if fifo_cost is not None else "average_cost"
         if value_base is None or (fifo_cost is None and avg_cost is None):
@@ -2130,6 +2175,8 @@ class ChatService:
             f"Si vendieras hoy {what} (datos a {_fmt_date_es(pos.as_of.isoformat())}): "
             f"valor {_fmt_money_es(float(value))} €, coste {_fmt_money_es(float(cost))} €"
         )
+        if explicit_sale is not None:
+            head += f" (precio de venta indicado: {_price_display(explicit_sale[0], currency)})"
         scale_label = _savings_scale_label(year)
         if gain > 0:
             tax = calculate_savings_tax(gain, year)

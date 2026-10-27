@@ -35,6 +35,8 @@ from app.services.tax_report_service import (
     WASH_SALE_WINDOW,
     _fifo_sort_key,
     _rate_not_older_than,
+    backward_repurchase_quantity,
+    replay_tax_fifo,
 )
 
 TAX_CURRENCY = "EUR"
@@ -115,43 +117,46 @@ def simulate_fifo_sale(
         base_currency=TAX_CURRENCY,
         as_of_max=sale_date,
     )
-    lots: deque[dict] = deque()
-    for row in legs:
-        if (row.action or "").lower() in BUY_ACTIONS:
-            unit_native = (row.quantity * row.price + (row.fees or Decimal("0"))) / row.quantity
-            rate = _rate_not_older_than(
-                fx_table,
-                quote_currency=row.currency or TAX_CURRENCY,
-                base_currency=TAX_CURRENCY,
-                as_of=row.trade_date,
-                max_age_days=MAX_FX_AGE_DAYS,
-            )
-            lots.append({
-                "qty": Decimal(row.quantity),
-                "unit": unit_native,
-                "unit_eur": unit_native * rate if rate is not None else None,
-                "date": row.trade_date,
-                "currency": row.currency or TAX_CURRENCY,
-            })
-            continue
-        remaining = Decimal(row.quantity)
-        while remaining > 0 and lots:
-            take = min(lots[0]["qty"], remaining)
-            lots[0]["qty"] -= take
-            remaining -= take
-            if lots[0]["qty"] == 0:
-                lots.popleft()
-        if remaining > 0:
-            return None  # vendió más de lo comprado: el libro no cuadra
-    if sum(lot["qty"] for lot in lots) != Decimal(held_quantity) or quantity > held_quantity:
-        return None
+    def resolve_rate(currency, as_of):
+        return _rate_not_older_than(
+            fx_table, quote_currency=currency or TAX_CURRENCY,
+            base_currency=TAX_CURRENCY, as_of=as_of, max_age_days=MAX_FX_AGE_DAYS,
+        )
 
+    lots, history = replay_tax_fifo(legs, resolve_rate, date.min, sale_date)
+    if any(entry["over_sell"] for entry in history):
+        return None
+    if sum((lot["qty"] for lot in lots), Decimal("0")) != Decimal(held_quantity) or not 0 < quantity <= held_quantity:
+        return None
+    # Include deferred losses at their original euro value, not today's FX.
+    for lot in lots:
+        lot["unit_eur"] = (
+            lot["unit_base"] + lot["deferred_base"] / lot["qty"]
+            if lot["unit_base"] is not None and lot["deferred_base"] is not None else None
+        )
+        lot["unit"] += lot["deferred"] / lot["qty"]
     sale = consume_fifo(lots, quantity)
-    window_start = sale_date - WASH_SALE_WINDOW
-    blocking = [lot for lot in lots if lot["qty"] > 0 and lot["date"] >= window_start]
-    sale.blocking_qty = min(quantity, sum((lot["qty"] for lot in blocking), Decimal("0")))
-    sale.blocking_dates = sorted({lot["date"] for lot in blocking})
+    apply_backward_repurchase(
+        sale, lots,
+        [(row.trade_date, row.quantity) for row in legs if row.action.lower() in BUY_ACTIONS],
+        [(row.trade_date, row.quantity) for row in legs if row.action.lower() in SELL_ACTIONS],
+        sale_date,
+    )
     return sale
+
+
+def apply_backward_repurchase(sale, lots, prior_buys, prior_sells, sale_date):
+    """Share annual-report backward proportionality and initial-buy exception."""
+    if any(lot["date"] is None for lot in lots):
+        return  # callers must disclose that undated losses cannot be classified
+    for lot in lots:
+        lot.setdefault("capacity", lot["qty"])
+    sale.blocking_qty = backward_repurchase_quantity(
+        prior_buys, prior_sells, lots, sale_date, sale.quantity,
+    )
+    sale.blocking_dates = sorted({lot["date"] for lot in lots
+                                 if lot["date"] >= sale_date - WASH_SALE_WINDOW
+                                 and lot["qty"] > 0 and lot["capacity"] > 0}) if sale.blocking_qty else []
 
 
 def consume_fifo(lots: deque[dict], quantity: Decimal) -> FifoSale:

@@ -23,7 +23,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, MarketPrice
-from app.services.sale_simulation import FifoSale, consume_fifo
+from app.services.sale_simulation import FifoSale, apply_backward_repurchase, consume_fifo
 from app.services.tax_irpf_filing import calculate_savings_tax
 from app.services.tax_report_service import MAX_FX_AGE_DAYS, _rate_not_older_than
 
@@ -95,6 +95,7 @@ class HypoSale:
     tax_eur: Decimal | None = None
     native_gain: Decimal | None = None
     missing: list[str] = field(default_factory=list)
+    invalid: str | None = None
     undated: bool = False
     approx_dates: bool = False
 
@@ -201,7 +202,7 @@ def _sale_quantity(text: str, held: Decimal) -> Decimal:
     m = _SALE_QTY_RE.search(text)
     if m:
         asked = parse_number(m.group("qty"))
-        if asked is not None and 0 < asked < held:
+        if asked is not None:
             return asked
     return held
 
@@ -237,6 +238,15 @@ def simulate_hypothetical_sale(
         quantity=_sale_quantity(question, held), held=held, sale_price=None,
         sale_currency=default_ccy, sale_price_source="falta",
     )
+    if not 0 < result.quantity <= held:
+        result.invalid = "La cantidad que quieres vender debe ser positiva y no superar las acciones compradas. No he cambiado la cantidad solicitada."
+        return result
+    if any(lot.trade_date is not None and lot.trade_date > today for lot in lots):
+        result.invalid = "Hay una fecha de compra futura respecto a la venta de hoy. Confirma las fechas antes de calcular el IRPF."
+        return result
+    if re.search(r"(?i)comisi[oó]n|comisiones|gastos|fees?\b", question):
+        result.invalid = "Has indicado comisiones o gastos. Necesito separar los de compra y los de venta y su divisa; no los he ignorado ni he calculado una cuota sin ellos."
+        return result
     if sale is not None:
         result.sale_price, result.sale_price_source = sale[0], "usuario"
         result.sale_currency = sale[1] or default_ccy
@@ -278,6 +288,11 @@ def simulate_hypothetical_sale(
             "date": lot.trade_date, "currency": ccy,
         })
     result.fifo = consume_fifo(queue, result.quantity)
+    if not result.undated:
+        apply_backward_repurchase(
+            result.fifo, queue,
+            [(lot.trade_date, lot.quantity) for lot in ordered], [], today,
+        )
     sale_rate = (
         Decimal("1") if result.sale_currency == TAX_CURRENCY
         else _rate_not_older_than(
