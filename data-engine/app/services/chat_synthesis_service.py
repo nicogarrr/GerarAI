@@ -366,8 +366,12 @@ def _inferred_general_text_valid(
     allow_named_attribution: bool = False,
     allowed_investors: frozenset[str] = frozenset(),
     grounded_numbers: frozenset[str] = frozenset(),
+    allow_portfolio_claims: bool = False,
 ) -> bool:
     """Prosa natural: no atribuciones/citas falsas, cifras aproximadas locales.
+
+    ``allow_portfolio_claims``: solo la ruta mixta carta + cartera, que pasa
+    las posiciones guardadas al prompt, puede hablar de la cartera del usuario.
 
     ``grounded_numbers``: cifras que aparecen literalmente en los fragmentos de
     doctrina que se le pasaron (p. ej. "+202%" de una carta de Numantia). Esas
@@ -444,7 +448,7 @@ def _inferred_general_text_valid(
     hits, total = _english_hits(text)
     if hits >= 2 and hits / max(total, 1) >= 0.15:
         return False
-    if _PORTFOLIO_CLAIM_RE.search(text):
+    if _PORTFOLIO_CLAIM_RE.search(text) and not allow_portfolio_claims:
         return False
     if not quantitative:
         return True
@@ -787,8 +791,13 @@ class ChatSynthesisService:
         db: Session | None = None,
         history: list[Any] | None = None,
         page: dict | None = None,
+        portfolio_context: list[dict] | None = None,
     ) -> ChatResponse:
         """Respuesta natural en espanol para preguntas sin ticker.
+
+        ``portfolio_context`` (posiciones guardadas del usuario) solo lo pasa la
+        ruta mixta carta + cartera («¿Qué diría Numantia de mi cartera?»): con
+        él y con doctrina recuperada, la pregunta personal no se abstiene.
 
         El contrato estructurado (HECHO/CALCULO/...) es para respuestas de
         datos. Esta ruta responde con conocimiento natural y, cuando el
@@ -805,6 +814,17 @@ class ChatSynthesisService:
                 llm_trace={"path": "local_educational", "generated": False, "provider_calls": 0},
             )
         scope = _general_scope(question)
+        mixed_portfolio = bool(portfolio_context) and scope == "abstain"
+        if mixed_portfolio and re.search(
+            r"(?i)\b(buy|sell|compra|compro|comprar|vende|vendo|vender|ejecuta)\b", question or ""
+        ):
+            mixed_portfolio = False
+        if mixed_portfolio and not any(
+            source.get("type") == "knowledge_chunk" and source.get("text") for source in baseline.sources
+        ):
+            mixed_portfolio = False
+        if mixed_portfolio:
+            scope = "doctrine_portfolio"
         if scope == "abstain":
             # Cartera privada u ordenes: nunca deducir del generador libre.
             return ChatResponse(
@@ -879,6 +899,20 @@ class ChatSynthesisService:
                 confidence=0.9, llm_trace={"path": "author_source_missing", "provider_calls": 0},
             )
         doctrine_sources = doctrine_sources[:3]
+        if mixed_portfolio and not doctrine_sources:
+            # La doctrina no era del autor pedido: sin carta no hay respuesta mixta.
+            scope = "abstain"
+            return ChatResponse(
+                answer=(
+                    "No tengo fuentes verificadas en esta ruta para responder "
+                    "a esa consulta sobre empresas o inversiones. Los datos actuales "
+                    "necesitan una fuente y fecha; los futuros no son hechos oficiales. "
+                    "Selecciona la empresa o su ticker para consultar sus fuentes."
+                ),
+                sources=[], model="abstain", prompt_version=GENERAL_PROMPT_VERSION, confidence=0.2,
+                llm_trace={"path": "general", "abstain": True, "reason": "financial_scope"},
+            )
+        portfolio_rows = list(portfolio_context or []) if mixed_portfolio else []
         # Autores con fragmento propio en contexto: solo a ellos se puede
         # atribuir una opinion en la respuesta.
         allowed_investors = frozenset(
@@ -921,6 +955,12 @@ class ChatSynthesisService:
                             "reviewed_at_utc": datetime.now(UTC).date().isoformat(),
                             "sources_available": bool(doctrine),
                             "doctrine_context": doctrine or None,
+                            "portfolio_positions": portfolio_rows or None,
+                            "portfolio_note": (
+                                "Posiciones guardadas del usuario (datos de su cartera, verificados). "
+                                "Relaciona lo que dice la doctrina citada con estas posiciones; "
+                                "no atribuyas a la carta nada que su fragmento no diga y no des órdenes."
+                            ) if portfolio_rows else None,
                         },
                         default=str,
                         ensure_ascii=False,
@@ -937,7 +977,10 @@ class ChatSynthesisService:
         # recuperada. Antes "+202% desde su inicio" (literal en la carta) se
         # rechazaba por no llevar "aproximadamente" y el usuario recibia el
         # fallback "no tengo datos" con la carta en el prompt.
-        doctrine_numbers = grounded_numbers_in([str(item.get("text") or "") for item in doctrine or []])
+        doctrine_numbers = grounded_numbers_in(
+            [str(item.get("text") or "") for item in doctrine or []]
+            + [json.dumps(row, default=str, ensure_ascii=False) for row in portfolio_rows]
+        )
 
         def _record(resp: Any) -> None:
             # CADA respuesta consume presupuesto y se registra en DB como en
@@ -971,6 +1014,7 @@ class ChatSynthesisService:
                     allow_named_attribution=bool(doctrine),
                     allowed_investors=allowed_investors,
                     grounded_numbers=doctrine_numbers,
+                    allow_portfolio_claims=bool(portfolio_rows),
                 ):
                     raise ValueError("Ungrounded general output")
 
@@ -996,6 +1040,7 @@ class ChatSynthesisService:
             allow_named_attribution=bool(doctrine),
             allowed_investors=allowed_investors,
             grounded_numbers=doctrine_numbers,
+            allow_portfolio_claims=bool(portfolio_rows),
         ):
             return self._general_fallback(baseline, reason="ungrounded")
         # Fuentes visibles: SOLO la doctrina que la respuesta usa de verdad
