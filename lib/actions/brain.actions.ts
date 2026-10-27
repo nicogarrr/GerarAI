@@ -1,6 +1,7 @@
 'use server';
 
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { trimBrainHistory, type BrainHistoryTurn } from '@/lib/brain/history';
 import type { BrainPageContext } from '@/lib/brain/page-context';
 import { toPortfolioChatCitations } from '@/lib/chat/citations';
 import { jsonBody, researchRequest } from '@/lib/research/client';
@@ -35,16 +36,6 @@ type ResearchChatResponse = {
  * y se resuelve en servidor; la respuesta lo devuelve ya resuelto para la
  * pastilla. Las rutas degradadas hablan castellano.
  */
-export type BrainHistoryTurn = { role: 'user' | 'assistant'; content: string };
-
-/** Últimos turnos que viajan con la pregunta: acotados, solo texto. */
-function trimBrainHistory(history?: BrainHistoryTurn[] | null): BrainHistoryTurn[] {
-    return (history ?? [])
-        .filter((turn) => (turn.role === 'user' || turn.role === 'assistant') && turn.content.trim())
-        .slice(-6)
-        .map((turn) => ({ role: turn.role, content: turn.content.slice(0, 1500) }));
-}
-
 export async function chatWithPortfolio(
     query: string,
     userId: string,

@@ -37,9 +37,9 @@ describe('un fallo de la vista activa no se pinta como vacio', () => {
   });
 });
 
-describe('el chat solo sale cuando es la vista activa', () => {
-  it("chatPromise exige activeView === 'chat' y query.chat", () => {
-    assert.match(PAGE, /const chatPromise = activeView === 'chat' && query\.chat/);
+describe('la ficha no llama al motor de chat desde el servidor', () => {
+  it('la pregunta vive en el Cerebro, no en un POST al renderizar la ficha', () => {
+    assert.doesNotMatch(PAGE, /askResearchCompanyChat|chatPromise/);
   });
 });
 
