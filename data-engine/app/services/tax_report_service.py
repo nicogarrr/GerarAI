@@ -64,6 +64,7 @@ from app.services.tax_irpf_filing import (
     SPECIAL_PAYMENT_TOKENS,
     build_casillas,
     build_double_taxation,
+    build_interest,
     build_loss_compensation,
 )
 
@@ -1011,9 +1012,18 @@ class TaxReportService:
                 }
             except (ValueError, TypeError, ArithmeticError):
                 declared_pending = None
+        interest = build_interest(data.get("misc") or [], fiscal_year)
+        # Saldo neto de rendimientos del capital mobiliario del ahorro: los
+        # dividendos MÁS los intereses cobrados (fija el 25 % de compensación).
+        rcm_net_base: Decimal | None = None
+        if summary.get("total_dividends_base") is not None and not interest["incomplete"]:
+            rcm_net_base = Decimal(str(summary["total_dividends_base"])) + Decimal(
+                str(interest["received"]["amount_base"] or 0)
+            )
         return {
             "available": True,
             "tme_percent_manual": float(tme * 100) if tme is not None else None,
+            "intereses": interest,
             "casillas": build_casillas(
                 data.get("dividends") or [], data.get("realized") or [], fiscal_year
             ),
@@ -1027,8 +1037,7 @@ class TaxReportService:
                 prior_year_nets,
                 None if summary.get("total_realized_gain_base") is None
                 else Decimal(str(summary["total_realized_gain_base"])),
-                None if summary.get("total_dividends_base") is None
-                else Decimal(str(summary["total_dividends_base"])),
+                rcm_net_base,
                 fiscal_year,
                 declared_pending=declared_pending,
             ),

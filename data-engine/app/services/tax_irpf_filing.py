@@ -677,3 +677,90 @@ def build_loss_compensation(
             "mobiliario (dividendos IBKR no los generan en la práctica).",
         ],
     }
+
+
+# --- Intereses (rendimientos del capital mobiliario, base del ahorro) -------
+#
+# Casilla 0027 (Renta 2025): "Intereses de cuentas, depósitos y de activos
+# financieros en general" — incluye los intereses que el bróker abona por el
+# efectivo de la cuenta (art. 25.2 LIRPF; Manual de ayuda Renta 2025, apdo.
+# 7.2.3.1). Para intereses de cuentas y depósitos "en ningún caso podrán
+# computarse gastos deducibles" (mismo apartado): los intereses PAGADOS por
+# el margen (préstamo del bróker) no restan ni de estos intereses ni de los
+# dividendos (art. 26.1.a LIRPF solo admite gastos de administración y
+# depósito de valores). Para una persona física que no ejerce actividad
+# económica, el interés del margen no es deducible en el IRPF.
+CASILLA_INTERESES = "0027"
+
+
+def build_interest(misc_rows: list[dict], fiscal_year: int) -> dict:
+    """Intereses cobrados (casilla 0027) e intereses de margen pagados (no deducibles).
+
+    ``misc_rows`` son las filas ``misc`` del informe (tipo ``interest``,
+    ``fee`` o ``cash_misc``). Una fila ``interest`` con importe positivo es un
+    interés cobrado; con importe negativo, un interés pagado (margen). Si una
+    fila de interés no tiene importe en EUR (falta FX o fila ambigua), el
+    total de la casilla queda en ``None`` y la fila va a revisión manual:
+    nunca se publica un total parcial con pinta de exacto.
+    """
+    received = Decimal("0")
+    paid = Decimal("0")
+    received_rows = 0
+    paid_rows = 0
+    manual_review: list[dict] = []
+    for row in misc_rows:
+        if row.get("type") != "interest":
+            continue
+        native = row.get("amount_native")
+        amount = row.get("amount_base")
+        if amount is None or native is None or row.get("ambiguous"):
+            manual_review.append({
+                "date": row.get("date"),
+                "currency": row.get("currency"),
+                "amount_native": native,
+                "reason": (
+                    "Interés sin importe en EUR (falta el tipo de cambio de su "
+                    "fecha o la fila es ambigua): revisar a mano."
+                ),
+            })
+            continue
+        value = Decimal(str(amount))
+        if value >= 0:
+            received += value
+            received_rows += 1
+        else:
+            paid += -value
+            paid_rows += 1
+    incomplete = bool(manual_review)
+    casilla_ok = fiscal_year in CASILLAS_YEARS
+    return {
+        "basis": "art-25.2-y-26.1.a-lirpf",
+        "received": {
+            "casilla": CASILLA_INTERESES if casilla_ok else None,
+            "amount_base": None if incomplete else _money(received),
+            "rows": received_rows,
+            "status": "SIN_DATOS" if incomplete else "calculada",
+        },
+        "margin_interest_paid": {
+            "amount_base": None if incomplete else _money(paid),
+            "rows": paid_rows,
+            "deductible": False,
+            "reason": (
+                "Los intereses pagados por el margen no son gasto deducible en "
+                "el IRPF de una persona física: para intereses de cuentas no se "
+                "admite ningún gasto y para dividendos solo los de "
+                "administración y depósito (art. 26.1.a LIRPF; Manual de ayuda "
+                "Renta 2025, apdo. 7.2.3.1). No los restes en la declaración."
+            ),
+        },
+        "manual_review": manual_review,
+        "incomplete": incomplete,
+        "notas": [
+            "IBKR (Irlanda) no practica retención española sobre los "
+            "intereses: la casilla de retenciones de este bloque suele ir a "
+            "cero. Contrasta el importe con el informe anual del bróker.",
+            "Los intereses entran en el saldo de rendimientos del capital "
+            "mobiliario del ahorro (0029 + 0027 …), que también fija el "
+            "límite del 25 % para compensar pérdidas patrimoniales.",
+        ],
+    }
