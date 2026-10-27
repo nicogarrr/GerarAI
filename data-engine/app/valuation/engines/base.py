@@ -293,9 +293,13 @@ def margin_of_safety(expected_value: float | None, current_price: float | None) 
     que el veredicto atractivo/caro no cambia de lado. Con V ≤ 0 el cociente
     no tiene lectura y se devuelve None (N/D).
     """
-    if expected_value is None or current_price is None or current_price <= 0:
+    if expected_value is None or current_price is None:
         return None
-    if expected_value <= 0:
+    # NaN/inf (un 0/0 de pandas, un "Infinity" en un JSON) no son cifras: N/D,
+    # nunca un margen NaN que pasa los filtros "> 0" en silencio.
+    if not (math.isfinite(expected_value) and math.isfinite(current_price)):
+        return None
+    if current_price <= 0 or expected_value <= 0:
         return None
     return (expected_value - current_price) / expected_value
 
