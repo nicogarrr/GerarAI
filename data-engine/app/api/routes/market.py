@@ -492,7 +492,7 @@ def market_changes(
     Un ticker sin cierres comparables devuelve change_pct null (la UI muestra
     N/D), nunca un valor de otra fuente."""
     wanted = {t.strip().upper() for t in tickers.split(",") if t.strip()}
-    movers, _, session_day = market_change.compute_session_changes(db)
+    movers, _, session_day = market_change.compute_session_changes(db, tickers=wanted)
     items = {
         m["ticker"].upper(): {
             "price": m["price"],
