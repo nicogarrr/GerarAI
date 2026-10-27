@@ -265,6 +265,23 @@ class PortfolioLedgerService:
                 .order_by(Transaction.trade_date, Transaction.created_at, Transaction.id)
             ).all()
         )
+        if not transactions:
+            snapshot = db.scalar(select(Position).where(
+                Position.company_id == company_id, *tenant_filters(db, Position),
+                Position.source == "screenshot_confirmed",
+            ))
+            if snapshot is not None:
+                # No opening trades were invented for this snapshot. A rebuild
+                # has nothing to replay and must not delete it or fabricate cost.
+                snapshot.base_currency = self.fx.base_currency(db)
+                self.update_market_price(
+                    db, company_id=company_id, position=snapshot,
+                    price=snapshot.market_price, as_of=snapshot.as_of,
+                )
+                snapshot.cost_basis_native = None
+                snapshot.cost_basis_base = None
+                snapshot.realized_pnl_base = None
+                return snapshot
         currencies = {transaction.currency.upper() for transaction in transactions}
         if len(currencies) > 1:
             raise PortfolioMixedCurrencyError(

@@ -32,7 +32,7 @@ Attached synthetic tables use broker names for three light/dark styles. They are
 
 ## Verification
 
-- Python targeted tests: 27 passed (19 feature tests, including actual local OCR on three synthetic tables; 8 ledger regression tests).
+- Python targeted tests: 28 passed (20 feature tests, including actual local OCR on three synthetic tables; 8 ledger regression tests).
 - Focused pyright on new backend files: 0 errors, 0 warnings using the Python 3.12 test environment.
 - Frontend targeted tests: 2 passed (file limits, no save before instrument selection/review/final confirmation).
 - TypeScript: full typecheck passed with NODE_OPTIONS=--max-old-space-size=3072 (default heap hit local memory limit).

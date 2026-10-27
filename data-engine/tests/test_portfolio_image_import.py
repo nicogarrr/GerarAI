@@ -165,3 +165,16 @@ def test_real_local_ocr_synthetic_tables(sample):
     assert [(r["identity"], r["quantity"], r["currency"]) for r in result["rows"]] == [
         ("ASTS", "125.5", "USD"), ("BN", "20", "USD"), ("CGEO.L", "8", "GBP")]
     assert all(r["needs_review"] for r in result["rows"])
+
+
+def test_dated_rebuild_keeps_snapshot_without_inventing_ledger(db, quote):
+    import asyncio
+    from datetime import date
+
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+    result = asyncio.run(review_rows(db, "e" * 64, rows()))
+    confirm_review(db, result["review_id"], True)
+    position = db.scalar(select(Position))
+    rebuilt = PortfolioLedgerService().rebuild_position(db, position.company_id, as_of=date.today())
+    assert rebuilt.id == position.id and rebuilt.quantity == Decimal("12.5")
+    assert rebuilt.source == "screenshot_confirmed" and rebuilt.cost_basis_base is None
