@@ -150,7 +150,10 @@ async def build_package_payloads(fetched_at: str, fetch=None) -> dict[str, dict]
             },
             # The ingestion path replaces prior facts, so a narrower projection
             # must not trigger an automatic destructive history migration.
-            "requires_presentation_review": len(presentations) > 1,
+            # Count configured sources, not just accepted archives: a missing
+            # report or LEI-mismatched package must not turn a partial build
+            # into an apparently safe single-package replacement.
+            "requires_presentation_review": len(sources) > 1,
         }
     return payloads
 

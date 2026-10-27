@@ -18,7 +18,8 @@ Neither chronology nor matching concept/unit/period proves equivalence.
   a merged series. Existing consumers read only `facts`.
 - `selected_presentation`, `presentation_policy`, and `coverage` expose the
   selection, older-only fact-key count, and absence of asserted comparability.
-- Multi-package output sets `requires_presentation_review`. The actual
+- Multiple configured source packages set `requires_presentation_review`,
+  even if a missing-report or LEI-mismatched package was discarded. The actual
   `refresh_from_esef` entry point refuses it BEFORE source creation/deletion
   or commit. This prevents the existing replace-all ingestion operation from
   deleting historical facts or unrelated metrics merely because they are

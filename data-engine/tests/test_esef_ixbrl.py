@@ -182,3 +182,30 @@ def test_package_presentations_keep_represented_and_original_scopes(monkeypatch)
     assert p['coverage']['comparability'] == 'not_asserted_across_presentations'
     assert p['coverage']['older_only_fact_keys_excluded'] == 1
     assert p['requires_presentation_review'] is True
+
+
+def test_partial_package_build_cannot_reenable_history_replacement(monkeypatch):
+    import build_esef_snapshots as builder
+
+    from app.services.esef_package_sources import EsefPackageSource
+
+    lei = '635400TLVVBNXLFHWC59'
+    monkeypatch.setattr(builder, 'REVIEWED_PACKAGES', (
+        EsefPackageSource(lei, '2023-12-31', 'https://fixture/2023.zip'),
+        EsefPackageSource(lei, '2024-12-31', 'https://fixture/2024.zip'),
+    ))
+    valid = DOC.replace('LEITEST00000000000001', lei)
+    for rejected_old in ('missing_report', 'wrong_lei'):
+        async def fetch(url):
+            if '2024' in url:
+                return _zip_with_xhtml(valid)
+            if rejected_old == 'wrong_lei':
+                return _zip_with_xhtml(DOC.replace('LEITEST00000000000001', 'WRONGLEI'))
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w') as zf:
+                zf.writestr('pkg/readme.txt', 'no report')
+            return buf.getvalue()
+
+        p = asyncio.run(builder.build_package_payloads('2026-10-27', fetch=fetch))[lei]
+        assert len(p['presentation_archive']) == 1
+        assert p['requires_presentation_review'] is True
