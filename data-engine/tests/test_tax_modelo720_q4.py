@@ -116,3 +116,17 @@ def test_720_cuentas_por_debajo_con_saldo_medio_conocido(db):
     assert cuentas["average_q4_total_base"] == 18000.0
     assert cuentas["status"] == "por_debajo"
     assert cuentas["exceeds"] is False
+
+
+def test_q4_average_saldo_posterior_al_1_octubre_no_se_aplica_hacia_atras():
+    # Primer dato el 5/10: 1-4/10 serian saldo futuro. Sin observacion
+    # al inicio o anterior la media es N/D.
+    points = [(d, Decimal("70000")) for d in _weekly(date(2025, 10, 5), date(2025, 12, 31))]
+    points.append((date(2025, 12, 31), Decimal("70000")))
+    assert q4_average_native(points, 2025) is None
+
+
+def test_q4_average_observacion_anterior_dentro_del_margen_si_cuenta():
+    points = [(d, Decimal("1000")) for d in _weekly(date(2025, 9, 28), date(2025, 12, 31))]
+    points.append((date(2025, 12, 31), Decimal("1000")))
+    assert q4_average_native(points, 2025) == Decimal("1000")
