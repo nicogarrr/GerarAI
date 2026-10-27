@@ -86,6 +86,17 @@ def _company(db, ticker):
     return company
 
 
+def _publishable_model(db, company):
+    from app.models import FundamentalModelVersion
+
+    db.add(FundamentalModelVersion(
+        company_id=company.id, version=1, engine_version="test", algorithm_version="test",
+        framework_key="dcf", horizon_years=10, status="ok", publishable=True,
+        input_fingerprint="input", forecast_fingerprint="forecast",
+        market_snapshot_fingerprint="market", valuation_snapshot_fingerprint="valuation",
+    ))
+
+
 def _engine_output(db, company, *, status, expected, version=1, when=None):
     model = ValuationModel(company_id=company.id, model_type="dcf", version=version,
                            status=status, calculation_trace={})
@@ -115,6 +126,7 @@ def test_batch_endpoint_and_watchlist_agree(db, monkeypatch):
     with_thesis = _company(db, "WITHTH")
     db.add(ThesisVersion(company_id=with_thesis.id, version=4, status="published",
                          expected_value=150, thesis_markdown="t", executive_summary="s"))
+    _publishable_model(db, with_thesis)
     _engine_output(db, with_thesis, status="final", expected=60.0)
     engine_only = _company(db, "ONLYENG")
     _engine_output(db, engine_only, status="final", expected=70.0)
@@ -155,6 +167,7 @@ def test_single_ticker_computes_engine_live_only_when_thesis_is_not_enough(db, m
     assert (out["value"], out["source"]) == (120.0, "motor")
     assert calls == ["LIVE"]
 
+    _publishable_model(db, company)
     db.add(ThesisVersion(company_id=company.id, version=1, status="published",
                          expected_value=200, thesis_markdown="t", executive_summary="s"))
     db.commit()

@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Company, ThesisVersion, ValuationModel, ValuationOutput
+from app.services.thesis_publication_gate import thesis_withheld_reasons
 
 THESIS_MAX_AGE_DAYS = 180
 PRECEDENCE = ("tesis_vigente", "motor_publicable", "tesis_antigua", "motor_orientativo")
@@ -120,9 +121,7 @@ def _reading(source: str, candidate: Candidate, *, stale: bool, rule: str) -> di
 
 
 def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Candidate]:
-    """Última tesis PUBLICADA por empresa con ``expected_value`` y base trazable."""
-    from app.schemas.api import valuation_uses_inferred_inputs
-
+    """Última tesis publicada con valor y modelo actual publicable (fail-closed)."""
     ids = list(company_ids)
     if not ids:
         return {}
@@ -142,10 +141,11 @@ def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Cand
         .join(ranked, ThesisVersion.id == ranked.c.id)
         .where(ranked.c.rank == 1)
     ).all()
+    reasons = thesis_withheld_reasons(db, list(rows))
     out: dict[int, Candidate] = {}
     for row in rows:
-        if valuation_uses_inferred_inputs(row.valuation_basis):
-            continue  # cifra con inputs inferidos: no es una valoración publicable
+        if reasons[row.id]:
+            continue  # el archivo no es evidencia de una valoración publicable actual
         value = _positive(row.expected_value)
         if value is None:
             continue

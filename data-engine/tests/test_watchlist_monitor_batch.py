@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
 from app.api.routes import watchlist
-from app.models.entities import Base, Company, MarketPrice, ThesisVersion
+from app.models.entities import Base, Company, FundamentalModelVersion, MarketPrice, ThesisVersion
 
 
 def test_monitor_twenty_companies_has_constant_query_count(monkeypatch):
@@ -23,6 +23,12 @@ def test_monitor_twenty_companies_has_constant_query_count(monkeypatch):
                              expected_value=150, thesis_markdown="t", executive_summary="s"))
         db.add(ThesisVersion(company_id=company.id, version=2, status="draft",
                              expected_value=900, thesis_markdown="t", executive_summary="s"))
+        db.add(FundamentalModelVersion(
+            company_id=company.id, version=1, engine_version="test", algorithm_version="test",
+            framework_key="dcf", horizon_years=10, status="ok", publishable=True,
+            input_fingerprint="input", forecast_fingerprint="forecast",
+            market_snapshot_fingerprint="market", valuation_snapshot_fingerprint="valuation",
+        ))
         for days, price in ((400, 1), (20, 80), (1, 100), (0, 110)):
             db.add(MarketPrice(company_id=company.id, date=today-timedelta(days=days), close=price))
     db.commit()
@@ -33,8 +39,8 @@ def test_monitor_twenty_companies_has_constant_query_count(monkeypatch):
     event.listen(engine, "before_cursor_execute", lambda *a: statements.append(a[2]))
     result = asyncio.run(watchlist.watchlist_monitor(
         tickers=','.join(f"BATCH{i}" for i in range(20)), db=db))
-    # +1 consulta (valuation_models) del valor justo único; sigue siendo constante.
-    assert len(statements) == 7
+    # Una query batch adicional verifica publicación del modelo; coste constante.
+    assert len(statements) == 8
     assert len(result["items"]) == 20
     for row in result["items"].values():
         assert row["low_52w"] == 80
@@ -47,7 +53,7 @@ def test_monitor_twenty_companies_has_constant_query_count(monkeypatch):
         assert row["valuation_side"] == "infravalorada"
     statements.clear()
     asyncio.run(watchlist.watchlist_monitor(tickers="BATCH0", db=db))
-    assert len(statements) == 7
+    assert len(statements) == 8
     db.close()
 
 
