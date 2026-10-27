@@ -9,12 +9,17 @@ Telegram con suscripcion "dca_levels").
 
 Reglas de aviso (deduplicacion):
 
-* Solo avisa una SUBIDA de nivel respecto al guardado (1X -> 2X, 3X -> 4X;
-  hacia recorte: 1X -> ligero -> fuerte). Bajar de nivel no avisa.
+* Avisa un CAMBIO real de nivel respecto al guardado, en las dos direcciones,
+  con ``direction`` en el aviso: ``up`` (1X -> 2X, 3X -> 4X; hacia recorte:
+  1X -> ligero -> fuerte) o ``down`` (3X -> 2X, 2X -> 1X, fuerte -> ligero,
+  recorte -> 1X), que se redacta como aviso informativo («baja a 2X»).
+  Una bajada avisa si el nivel de partida llegaba al minimo efectivo.
 * La primera evaluacion de un ticker (sin estado guardado, p. ej. recien
   anadido a la watchlist) solo guarda el nivel, sin aviso.
-* Huella ``dca_level:{simbolo}:{mes}:{nivel}``: el mismo nivel en el mismo mes
-  nunca vuelve a avisar aunque el mes en formacion oscile (3X -> 2X -> 3X).
+* Huella ``dca_level:{simbolo}:{mes}:{nivel}`` (subidas) y
+  ``dca_level:{simbolo}:{mes}:{nivel}:baja`` (bajadas): cada nivel avisa como
+  mucho una vez por mes y direccion aunque el mes en formacion oscile
+  (3X -> 2X -> 3X -> 2X da dos avisos, no cuatro).
 * Escalar (2X -> 3X -> 4X) avisa de nuevo; seguir en el mismo nivel al
   cambiar de mes no.
 * Recortes solo con DCA_ALERT_TRIMS=true. Ajuste por ticker 0 = sin avisos.
@@ -184,6 +189,24 @@ def alert_channels(settings: Any) -> list[str]:
     return list(dict.fromkeys(channels)) or ["in_app"]
 
 
+def alert_direction(level: int, previous_level: int | None) -> str | None:
+    """``up`` si la senal se intensifica, ``down`` si se relaja, None sin cambio.
+
+    Compra: mas X es mas intensa. Recorte: fuerte es mas intenso que ligero.
+    Pasar de compra a recorte es ``up``; volver de recorte a 1X es ``down`` y
+    volver de recorte directamente a 2X+ es entrar en zona de compra (``up``).
+    """
+    if previous_level is None or level == previous_level:
+        return None
+    if level >= 1 and previous_level >= 1:
+        return "up" if level > previous_level else "down"
+    if level < 0 and previous_level < 0:
+        return "up" if level < previous_level else "down"
+    if level < 0:
+        return "up"
+    return "up" if level >= 2 else "down"
+
+
 def should_alert(
     *,
     level: int,
@@ -191,18 +214,23 @@ def should_alert(
     min_level: int,
     trims_enabled: bool,
 ) -> bool:
-    """Regla de aviso por subida de nivel (sin mirar la huella del mes).
+    """Regla de aviso por cambio de nivel en ambas direcciones (sin mirar la huella del mes).
 
     Sin nivel previo (primera evaluacion) no se avisa: se siembra el estado.
     """
-    if previous_level is None or level == previous_level:
+    direction = alert_direction(level, previous_level)
+    if direction is None or previous_level is None:
         return False
     if min_level <= 0:
         return False
-    if level >= 1:
-        return level > previous_level and level >= min_level
-    # Recortes: entrar en recorte o pasar de ligero a fuerte.
-    return bool(trims_enabled) and (previous_level >= 1 or level < previous_level)
+    if level >= 1 and previous_level >= 1:
+        # Subida: el nivel nuevo llega al minimo. Bajada: el de partida llegaba.
+        return (level if direction == "up" else previous_level) >= min_level
+    if level >= 2:
+        # De recorte a zona de compra 2X+.
+        return level >= min_level or bool(trims_enabled)
+    # Entrar, moverse o salir (a 1X) de recorte.
+    return bool(trims_enabled)
 
 
 def _yahoo_symbol_for(item: TrackedSymbol) -> str | None:
@@ -293,11 +321,16 @@ def _dca_payload(
     params: DcaParams,
 ) -> dict[str, Any]:
     zone = ZONES[verdict.level]
+    direction = alert_direction(verdict.level, previous_level)
+    previous_zone = ZONES.get(previous_level) if previous_level is not None else None
     return {
         "symbol": item.symbol,
         "company_name": _company_name(item),
         "level": verdict.level,
         "previous_level": previous_level,
+        "previous_label": previous_zone["label"] if previous_zone else None,
+        "direction": direction,
+        "informational": direction == "down",
         "key": zone["key"],
         "label": zone["label"],
         "zone": zone["zone"],
@@ -328,6 +361,10 @@ def _emit_alert_row(db: Session, dca: dict[str, Any], *, company_id: int | None,
 
     service = ReviewAlertService()
     parts = [ALERT_TYPE, dca["symbol"], dca["period"], str(dca["level"])]
+    down = dca.get("direction") == "down"
+    if down:
+        # Huella propia: una bajada a 2X no queda tapada por la subida a 2X del mismo mes.
+        parts.append("baja")
     fingerprint = service.fingerprint_for(db, parts)
     exists = db.scalar(
         select(ResearchAlert.id).where(ResearchAlert.fingerprint == fingerprint, *tenant_filters(db, ResearchAlert))
@@ -338,7 +375,7 @@ def _emit_alert_row(db: Session, dca: dict[str, Any], *, company_id: int | None,
         db,
         company_id=company_id,
         alert_type=ALERT_TYPE,
-        severity=SEVERITY_BY_LEVEL.get(int(dca["level"]), "low"),
+        severity="low" if down else SEVERITY_BY_LEVEL.get(int(dca["level"]), "low"),
         title=dca_alert_copy.title(dca),
         message=dca_alert_copy.message_text(dca),
         fingerprint_parts=parts,

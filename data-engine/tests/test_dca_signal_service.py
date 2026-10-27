@@ -25,6 +25,7 @@ from app.services.dca_signal_engine import DcaParams
 from app.services.dca_signal_service import (
     FetchedHistory,
     PriceRow,
+    alert_direction,
     build_bars,
     evaluate_watchlist,
     should_alert,
@@ -124,22 +125,54 @@ def _state(db, symbol) -> DcaSignalState:
         (4, None, 2, False, False),
         (-2, None, 2, True, False),
         (1, None, 2, False, False),
-        (3, 3, 2, False, False),
-        (4, 3, 2, False, True),
-        (3, 1, 2, False, True),
-        (2, 3, 2, False, False),  # bajar de nivel no avisa
-        (1, 2, 1, False, False),
-        (4, 1, 0, False, False),
-        (-1, 1, 2, False, False),
-        (-1, 1, 2, True, True),
-        (-2, -1, 2, True, True),
-        (-1, -2, 2, True, False),
+        (3, 3, 2, False, False),  # mismo nivel
         (-2, -2, 2, True, False),
+        (4, 3, 2, False, True),  # subidas
+        (3, 1, 2, False, True),
+        (2, 1, 3, False, False),  # subida por debajo del minimo
+        (2, 3, 2, False, True),  # bajadas: avisan (informativas)
+        (2, 4, 2, False, True),
+        (1, 2, 2, False, True),  # sale de zona de compra
+        (1, 2, 1, False, True),
+        (2, 3, 4, False, False),  # bajada desde un nivel por debajo del minimo
+        (3, 4, 4, False, True),
+        (4, 1, 0, False, False),  # ajuste 0 = sin avisos, en las dos direcciones
+        (1, 3, 0, False, False),
+        (-1, 1, 2, False, False),  # compra -> recorte solo con recortes
+        (-1, 1, 2, True, True),
+        (-2, -1, 2, True, True),  # ligero -> fuerte
+        (-1, -2, 2, True, True),  # fuerte -> ligero: bajada
+        (-1, -2, 2, False, False),
+        (1, -1, 2, True, True),  # recorte -> 1X: bajada
+        (1, -2, 2, True, True),
+        (1, -1, 2, False, False),
+        (2, -1, 2, False, True),  # recorte -> 2X: entra en zona de compra
+        (2, -1, 3, False, False),
+        (2, -1, 3, True, True),
         (-2, 1, 0, True, False),
     ],
 )
 def test_should_alert_rules(level, previous, min_level, trims, expected):
     assert should_alert(level=level, previous_level=previous, min_level=min_level, trims_enabled=trims) is expected
+
+
+@pytest.mark.parametrize(
+    ("level", "previous", "expected"),
+    [
+        (2, None, None),
+        (3, 3, None),
+        (3, 2, "up"),
+        (2, 3, "down"),
+        (1, 2, "down"),
+        (-1, 1, "up"),
+        (-2, -1, "up"),
+        (-1, -2, "down"),
+        (1, -1, "down"),
+        (2, -1, "up"),
+    ],
+)
+def test_alert_direction(level, previous, expected):
+    assert alert_direction(level, previous) == expected
 
 
 def test_first_evaluation_seeds_state_without_alert(db):
@@ -186,14 +219,69 @@ def test_same_level_rerun_and_flicker_do_not_realert(db):
     _run(db, fetcher)
     _run(db, fetcher)  # mismo nivel: nada
     assert len(_alerts(db)) == 1
-    fetcher.set("UBER", series(80.0))  # baja a 2X: bajar no avisa
+    fetcher.set("UBER", series(80.0))  # baja a 2X: aviso informativo
     _run(db, fetcher)
+    _run(db, fetcher)  # sigue en 2X: nada
     fetcher.set("UBER", series(70.0))  # vuelve a 3X en el mismo mes: huella ya existe
     _run(db, fetcher)
+    fetcher.set("UBER", series(80.0))  # y otra vez a 2X: huella de bajada ya existe
+    _run(db, fetcher)
     titles = [a.title for a in _alerts(db)]
-    assert titles == ["UBER entró en 3X DCA"]
+    assert titles == ["UBER entró en 3X DCA", "UBER baja a 2X DCA (desde 3X DCA)"]
     state = _state(db, "UBER")
-    assert state.level == 3 and state.previous_level == 2
+    assert state.level == 2 and state.previous_level == 3
+
+
+def test_drop_alerts_as_informational(db):
+    _watch(db, "UBER")
+    fetcher = FakeFetcher()
+    fetcher.set("UBER", series(70.0))  # 3X: siembra
+    _run(db, fetcher)
+    fetcher.set("UBER", series(80.0))  # baja a 2X
+    summary = _run(db, fetcher)
+    assert [a["level"] for a in summary["alerted"]] == [2]
+    fetcher.set("UBER", series(100.0))  # baja a 1X: sale de zona de compra
+    _run(db, fetcher)
+    alerts = _alerts(db)
+    assert [a.title for a in alerts] == ["UBER baja a 2X DCA (desde 3X DCA)", "UBER baja a 1X DCA (desde 2X DCA)"]
+    assert [a.severity for a in alerts] == ["low", "low"]
+    dca = alerts[0].metadata_["dca"]
+    assert (dca["direction"], dca["informational"], dca["previous_level"]) == ("down", True, 3)
+    assert dca["previous_label"] == "3X DCA"
+    assert alerts[0].message.splitlines()[2] == "Aviso informativo: el nivel baja desde 3X DCA a 2X DCA."
+    uber = _state(db, "UBER")
+    assert (uber.level, uber.last_alerted_level) == (1, 1)
+
+
+def test_rise_after_drop_to_same_level_still_alerts(db):
+    """Una bajada a 2X no gasta la huella de la subida a 2X del mismo mes."""
+    _watch(db, "UBER")
+    fetcher = FakeFetcher()
+    fetcher.set("UBER", series(70.0))  # 3X: siembra
+    _run(db, fetcher)
+    fetcher.set("UBER", series(80.0))  # baja a 2X
+    _run(db, fetcher)
+    fetcher.set("UBER", series(100.0))  # baja a 1X
+    _run(db, fetcher)
+    fetcher.set("UBER", series(80.0))  # sube a 2X
+    _run(db, fetcher)
+    alerts = _alerts(db)
+    assert [a.metadata_["dca"]["direction"] for a in alerts] == ["down", "down", "up"]
+    assert alerts[-1].title == "UBER entró en 2X DCA" and alerts[-1].severity == "medium"
+
+
+def test_drop_email_marks_direction():
+    from app.services.dca_alert_copy import email_content
+
+    dca = {
+        "symbol": "UBER", "label": "2X DCA", "previous_label": "3X DCA", "direction": "down",
+        "zone": "Zona de compra", "status": "confirmed", "color": "#00AA78", "fg": "#FFFFFF",
+    }
+    content = email_content(dca)
+    assert content.subject == "UBER baja a 2X DCA (desde 3X DCA)"
+    assert "Aviso informativo: el nivel baja desde 3X DCA a 2X DCA." in content.html
+    up = email_content({**dca, "direction": "up"})
+    assert up.subject == "UBER entró en 2X DCA" and "Aviso informativo" not in up.html
 
 
 def test_escalation_alerts_again(db):
@@ -265,6 +353,15 @@ def test_trims_only_with_flag(db, monkeypatch):
     alerts = _alerts(db)
     assert len(alerts) == 1 and "RECORTE" in alerts[0].title
     assert alerts[0].severity == "low"
+    # Volver de recorte a 1X tambien avisa (bajada informativa).
+    trim_label = alerts[0].metadata_["dca"]["label"]
+    fetcher.set("NVDA", series(100.0))  # serie plana: 1X
+    _run(db, fetcher)
+    assert _state(db, "NVDA").level == 1
+    alerts = _alerts(db)
+    assert len(alerts) == 2
+    assert alerts[-1].title == f"NVDA baja a 1X DCA (desde {trim_label})"
+    assert alerts[-1].metadata_["dca"]["direction"] == "down"
 
 
 def test_portfolio_and_watchlist_union_with_currency(db):
