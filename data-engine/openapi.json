@@ -52292,10 +52292,16 @@
             "name": "scope",
             "required": false,
             "schema": {
-              "default": "followed",
-              "pattern": "^(followed|all)$",
-              "title": "Scope",
-              "type": "string"
+              "anyOf": [
+                {
+                  "pattern": "^(followed|all)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
             }
           },
           {
@@ -52577,10 +52583,16 @@
             "name": "scope",
             "required": false,
             "schema": {
-              "default": "followed",
-              "pattern": "^(followed|all)$",
-              "title": "Scope",
-              "type": "string"
+              "anyOf": [
+                {
+                  "pattern": "^(followed|all)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
             }
           },
           {

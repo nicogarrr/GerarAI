@@ -18620,7 +18620,7 @@ export interface operations {
         parameters: {
             query?: {
                 ticker?: string | null;
-                scope?: string;
+                scope?: string | null;
                 source_type?: string | null;
                 q?: string | null;
                 include_chunks?: boolean;
@@ -18670,7 +18670,7 @@ export interface operations {
         parameters: {
             query?: {
                 ticker?: string | null;
-                scope?: string;
+                scope?: string | null;
                 source_type?: string | null;
                 q?: string | null;
             };
