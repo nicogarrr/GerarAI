@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 import main
 from app.api.routes import watchlist as watchlist_routes
@@ -150,3 +150,28 @@ def test_list_reports_when_daily_evaluation_is_disabled(client, monkeypatch):
         monkeypatch.delenv("DCA_EVALUATION_ENABLED")
         get_settings.cache_clear()
     assert client.get("/api/watchlist/dca-signals").json()["evaluation_enabled"] is True
+
+
+def test_list_flags_stale_saved_level(client):
+    """Un nivel guardado con el ultimo cierre viejo sale marcado como desactualizado."""
+    client.post("/api/watchlist", json={"symbol": "DCATST"})
+    assert client.post("/api/watchlist/dca-signals/evaluate").status_code == 200
+    fresh = next(i for i in client.get("/api/watchlist/dca-signals").json()["items"] if i["symbol"] == "DCATST")
+    assert fresh["state"]["stale"] is False
+    assert fresh["state"]["data_age_days"] is not None and fresh["state"]["data_age_days"] <= 14
+    with SessionLocal() as db:
+        state = db.scalar(select(DcaSignalState).where(DcaSignalState.symbol == "DCATST"))
+        assert state is not None
+        state.signal_date = date.today() - timedelta(days=40)
+        db.commit()
+    stale = next(i for i in client.get("/api/watchlist/dca-signals").json()["items"] if i["symbol"] == "DCATST")
+    assert stale["state"]["stale"] is True
+    assert stale["state"]["data_age_days"] >= 39
+    assert stale["state"]["level"] == fresh["state"]["level"]  # el nivel se conserva, pero marcado
+
+
+def test_staleness_helper_uses_configured_limit():
+    today = date(2026, 10, 27)
+    assert watchlist_routes._dca_staleness(None, today) == (None, False)
+    assert watchlist_routes._dca_staleness(date(2026, 10, 13), today) == (14, False)
+    assert watchlist_routes._dca_staleness(date(2026, 10, 12), today) == (15, True)

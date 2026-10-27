@@ -377,6 +377,10 @@ class DcaSignalStateOut(BaseModel):
     evaluated_at: datetime
     last_alerted_level: int | None = None
     last_alerted_period: str | None = None
+    # Dias desde el ultimo cierre usado. Si supera DCA_MAX_DATA_AGE_DAYS el
+    # nivel guardado ya no es actual (la evaluacion lo omite por datos viejos).
+    data_age_days: int | None = None
+    stale: bool = False
 
 
 class DcaHitRateCellOut(BaseModel):
@@ -504,11 +508,25 @@ class DcaEvaluateOut(BaseModel):
     params_version: str
 
 
-def _dca_state_payload(state: DcaSignalState) -> dict:
+def _dca_staleness(signal_date: date | None, today: date | None = None) -> tuple[int | None, bool]:
+    """(dias desde el ultimo cierre, desactualizado) con el mismo limite que el job."""
+    from zoneinfo import ZoneInfo
+
+    from app.core.config import get_settings
+
+    if signal_date is None:
+        return None, False
+    today = today or datetime.now(ZoneInfo("America/New_York")).date()
+    age = max((today - signal_date).days, 0)
+    return age, age > int(get_settings().dca_max_data_age_days)
+
+
+def _dca_state_payload(state: DcaSignalState, *, today: date | None = None) -> dict:
     from app.services.dca_alert_copy import currency_label
     from app.services.dca_signal_engine import ZONES
 
     zone = ZONES.get(state.level, ZONES[1])
+    data_age_days, stale = _dca_staleness(state.signal_date, today)
     return {
         "level": state.level,
         "previous_level": state.previous_level,
@@ -530,6 +548,8 @@ def _dca_state_payload(state: DcaSignalState) -> dict:
         "evaluated_at": state.evaluated_at,
         "last_alerted_level": state.last_alerted_level,
         "last_alerted_period": state.last_alerted_period,
+        "data_age_days": data_age_days,
+        "stale": stale,
     }
 
 
