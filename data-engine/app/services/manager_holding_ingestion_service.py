@@ -19,7 +19,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
@@ -290,7 +290,18 @@ class ManagerHoldingIngestionService:
         if scale_jump is not None:
             errors.append({"error": "scale_jump_between_quarters", **scale_jump})
 
-        manager.last_report_date = _date(latest_report)
+        # last_report_date apunta al periodo MAS RECIENTE con filas guardadas.
+        # Si el 13F nuevo no se pudo descargar (503, timeout), apuntar a el
+        # dejaba la ficha en «ok» con 0 posiciones; se sigue sirviendo el
+        # ultimo periodo almacenado y la cobertura queda «partial».
+        db.flush()
+        stored_latest = db.scalar(
+            select(func.max(ManagerHolding.report_date)).where(
+                ManagerHolding.manager_id == manager.id
+            )
+        )
+        if stored_latest is not None:
+            manager.last_report_date = stored_latest
         manager.coverage = Coverage.PARTIAL.value if errors else Coverage.OK.value
         manager.synced_at = fetched_at
         db.add(manager)

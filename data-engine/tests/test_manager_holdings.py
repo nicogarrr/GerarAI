@@ -635,3 +635,47 @@ def test_detect_scale_jump_ignores_normal_moves_and_missing_data() -> None:
     assert detect_scale_jump({"2026-03-31": Decimal("5000"), "2026-06-30": Decimal("9000")}) is None
     assert detect_scale_jump({"2026-03-31": Decimal("0"), "2026-06-30": Decimal("9000")}) is None
     assert detect_scale_jump({"2026-06-30": Decimal("9000")}) is None
+
+
+def _sec_client_latest_down() -> httpx.Client:
+    """El trimestre mas reciente falla (503) y el anterior se descarga bien."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.startswith("https://data.sec.gov/submissions/"):
+            return httpx.Response(200, json=SUBMISSIONS_TWO)
+        if url.endswith("index.json"):
+            return httpx.Response(200, json=INDEX)
+        if url.endswith("form13fInfoTable.xml"):
+            if "000095012326000003" in url:
+                return httpx.Response(200, text=TABLE_ACC3)
+            return httpx.Response(503, text="down")
+        if url.endswith("primary_doc.xml"):
+            return httpx.Response(200, text=RESTATEMENT_DOC)
+        return httpx.Response(404, text="not found")
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_latest_report_failing_keeps_serving_last_stored_period(db):
+    """Si el 13F mas reciente no se pudo descargar, last_report_date no puede
+    apuntar a un periodo sin filas: la ficha salia «ok» con 0 posiciones."""
+    service = ManagerHoldingIngestionService(client=_sec_client_latest_down())
+    out = service.sync_manager(db, cik=CIK)
+    assert out["errors"], "el fallo del trimestre reciente se declara"
+    result = service.latest_holdings(db, cik=CIK)
+    assert result["status"] == "ok"
+    assert result["report_date"] == "2026-03-31"
+    assert result["coverage"] == "partial"
+    assert {h["cusip"] for h in result["holdings"]} == {"037833100", "060505104", "594918104"}
+
+
+def test_latest_report_failing_does_not_regress_a_newer_stored_period(db):
+    """Un re-sync con el trimestre nuevo caido no retrocede a uno anterior
+    si el nuevo ya estaba guardado de una corrida previa."""
+    ManagerHoldingIngestionService(client=_sec_client_two()).sync_manager(db, cik=CIK)
+    service = ManagerHoldingIngestionService(client=_sec_client_latest_down())
+    service.sync_manager(db, cik=CIK)
+    result = service.latest_holdings(db, cik=CIK)
+    assert result["report_date"] == "2026-06-30"
+    assert len(result["holdings"]) == 3
