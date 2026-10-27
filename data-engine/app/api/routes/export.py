@@ -194,6 +194,13 @@ def export_year(
         )
     for row in contributions:
         writer.writerow([_csv_cell(cell) for cell in ["contribution", row["date"], "", row["amount"], row["currency"], row["note"], "", ""]])
+    # Journal export must retain decisions in CSV too, including free text.
+    # Keep the existing eight-column schema: date, company id, decision,
+    # rationale, status, price and entry id. Text uses the same formula guard.
+    for row in journal_rows:
+        writer.writerow(
+            [_csv_cell(cell) for cell in ["journal", row["decision_date"], row["company_id"], row["decision"], row["rationale"], row["status"], row["price"], row["id"]]]
+        )
     output.seek(0)
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode("utf-8-sig")),
