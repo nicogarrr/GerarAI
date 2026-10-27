@@ -41,10 +41,13 @@ void test('el filtro de ticker se normaliza y los enlaces lo conservan', () => {
     assert.equal(sourcesHref('', 3), '/research/sources?page=3');
 });
 
-void test('la acción pasa filtro y página a listado y cuenta del mismo subconjunto', () => {
+void test('la acción pasa filtros y página a listado y cuenta del mismo subconjunto', () => {
     const actions = readFileSync(ACTIONS, 'utf8');
-    assert.match(actions, /getResearchSources\(options: \{ ticker\?: string; page\?: number \}/, 'firma con filtro y página');
-    assert.match(actions, /params\.set\('ticker', options\.ticker\)/, 'el listado recibe el ticker');
+    assert.match(actions, /getResearchSources\(options: ResearchSourcesOptions = \{\}\)/, 'firma con filtros tipados');
+    assert.match(actions, /filters\.set\('ticker', ticker\)/, 'el listado recibe el ticker');
+    assert.match(actions, /filters\.set\('scope', options\.scope\)/, 'el alcance viaja al backend');
+    assert.match(actions, /filters\.set\('source_type', sourceType\)/, 'el tipo de fuente viaja al backend');
+    assert.match(actions, /filters\.set\('q', q\)/, 'la búsqueda viaja al backend');
     assert.match(actions, /params\.set\('page', String\(effectivePage\)\)/, 'el listado recibe la página acotada');
     assert.match(actions, /documents\/count\$\{countQuery\}/, 'la cuenta recibe el mismo filtro');
     assert.match(actions, /sourcesPageInfo\(documentsTotal, requested\)/, 'la página se acota con el total real');

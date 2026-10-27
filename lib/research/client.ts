@@ -16,6 +16,11 @@ export const RESEARCH_TIMEOUTS = {
   // 45s LLM + DB/guard/transport. Still below the 60s page budget.
   CHAT_MS: 55_000,
   GET_FAST_MS: 8_000,
+  // El escaneo insider descarga hasta 20 Form 4 de EDGAR en secuencia: 8s
+  // cortaba la lectura a mitad y la pagina mostraba "motor desconectado".
+  // El backend ya degrada por filing, asi que este es el presupuesto real
+  // para completar el escaneo, no un timeout infinito.
+  INSIDER_SCAN_MS: 30_000,
 } as const;
 
 export type ResearchRequestInit = RequestInit & {
@@ -35,6 +40,10 @@ export function researchTimeoutFor(
   }
   if (path === '/api/chat' && method.toUpperCase() === 'POST') {
     return RESEARCH_TIMEOUTS.CHAT_MS;
+  }
+  // El escaneo live de EDGAR no cabe en el presupuesto "fast" de navegacion.
+  if (method.toUpperCase() === 'GET' && path.startsWith('/api/insider/signals')) {
+    return RESEARCH_TIMEOUTS.INSIDER_SCAN_MS;
   }
   const fastHomeOrPortfolioPath =
     path.startsWith('/api/portfolio/') ||

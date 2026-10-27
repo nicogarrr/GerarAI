@@ -255,6 +255,10 @@ def test_notify_delivers_through_injected_notifier(monkeypatch):
 
 
 def test_insider_signals_endpoint_with_mocked_edgar(monkeypatch):
+    from app.services import insider_persistence
+
+    # La persistencia tiene sus propios tests; aqui el contrato es la lectura.
+    monkeypatch.setattr(insider_persistence, "persist_filing", lambda *a, **k: None)
     monkeypatch.setattr(
         insider_service, "_cik_for_ticker", lambda ticker, client=None: "0001234567"
     )
@@ -281,6 +285,48 @@ def test_insider_signals_endpoint_with_mocked_edgar(monkeypatch):
     assert payload["status"] == "ok"
     kinds = {s["signal"] for s in payload["signals"]}
     assert {"big_buy", "c_suite_buy"} <= kinds
+
+
+def test_insider_signals_endpoint_survives_persistence_integrity_error(monkeypatch):
+    """Un IntegrityError al guardar no convierte el escaneo en 500 ni en
+    'todas las transacciones fallaron': hay lectura parcial con aviso."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.services import insider_persistence
+
+    monkeypatch.setattr(
+        insider_service, "_cik_for_ticker", lambda ticker, client=None: "0001234567"
+    )
+    monkeypatch.setattr(
+        form4_connector,
+        "recent_form4_filings",
+        lambda cik, limit=20, client=None: [
+            {
+                "accession_number": "0001234567-24-000099",
+                "filing_date": "2024-03-12",
+                "document_url": "https://www.sec.gov/Archives/edgar/data/1234567/x.xml",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        form4_connector, "fetch_filing_xml", lambda url, client=None: CEO_BUY_XML
+    )
+
+    def boom(*args, **kwargs):
+        raise IntegrityError("INSERT", {}, Exception("duplicate key"))
+
+    monkeypatch.setattr(insider_persistence, "persist_filing", boom)
+    client = TestClient(main.app, raise_server_exceptions=False)
+    response = client.get("/api/insider/signals?ticker=ACME")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "partial"
+    assert payload["filings_parsed"] == 1
+    assert payload["filings_failed"] == 0
+    assert payload["persist_error_count"] == 1
+    assert payload["warnings"]
+    assert payload["signals"]
 
 
 def test_insider_signals_endpoint_degrades_without_network(monkeypatch):

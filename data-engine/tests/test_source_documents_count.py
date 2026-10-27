@@ -62,10 +62,10 @@ def test_count_is_real_total_beyond_page_and_tenant_scoped():
 
         # Tenant A: 61 documentos reales (la pagina por defecto daria 50)
         db.info["tenant_id"] = tenant_a.id
-        assert documents_count(db=db) == {"total": 61}
-        assert documents_count(ticker="msft", db=db) == {"total": 60}
-        assert documents_count(ticker="AAPL", db=db) == {"total": 1}
+        assert documents_count(scope="all", db=db) == {"total": 61}
+        assert documents_count(ticker="msft", scope="all", db=db) == {"total": 60}
+        assert documents_count(ticker="AAPL", scope="all", db=db) == {"total": 1}
 
         # Tenant B: solo los suyos
         db.info["tenant_id"] = tenant_b.id
-        assert documents_count(db=db) == {"total": 3}
+        assert documents_count(scope="all", db=db) == {"total": 3}

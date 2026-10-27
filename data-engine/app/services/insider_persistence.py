@@ -66,18 +66,24 @@ def persist_filing(
     raw_sha = (
         hashlib.sha256(xml_text.encode()).hexdigest() if xml_text is not None else None
     )
+    # El tenant puede venir del caller o del scope de la sesion. Si se ignora
+    # db.info, el SELECT busca tenant_id IS NULL mientras el INSERT recibe el
+    # tenant del before_flush: el filing existente no se encuentra y el
+    # duplicado choca contra uq_insider_filings_tenant_accession (IntegrityError).
+    effective_tenant_id = tenant_id if tenant_id is not None else db.info.get("tenant_id")
 
     record = db.scalar(
         select(InsiderFiling).where(
-            InsiderFiling.tenant_id.is_(tenant_id) if tenant_id is None
-            else InsiderFiling.tenant_id == tenant_id,
+            InsiderFiling.tenant_id.is_(None)
+            if effective_tenant_id is None
+            else InsiderFiling.tenant_id == effective_tenant_id,
             InsiderFiling.accession_number == accession,
         )
     )
     created_filing = False
     if record is None:
         record = InsiderFiling(
-            tenant_id=tenant_id,
+            tenant_id=effective_tenant_id,
             accession_number=accession,
             form=form,
             is_amendment=form.endswith("/A"),
@@ -113,7 +119,7 @@ def persist_filing(
             continue
         db.add(
             InsiderTransaction(
-                tenant_id=tenant_id,
+                tenant_id=effective_tenant_id,
                 fingerprint=fp,
                 filing_id=record.id,
                 accession_number=accession,

@@ -55,7 +55,13 @@ def insider_signals(
     notify: bool = Query(default=False),
     db: Session = Depends(get_db),
 ) -> dict:
-    result = insider_service.get_signals_for_ticker(ticker, cik=cik, limit=limit, db=db)
+    result = insider_service.get_signals_for_ticker(
+        ticker,
+        cik=cik,
+        limit=limit,
+        db=db,
+        tenant_id=db.info.get("tenant_id"),
+    )
     if notify:
         # Enganche minimo Telegram: detras de INSIDER_ALERTS_ENABLED, nunca rompe.
         result["notification"] = insider_service.maybe_notify_insider_buy(

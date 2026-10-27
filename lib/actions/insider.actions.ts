@@ -11,10 +11,16 @@ export interface InsiderSignalsResult extends Record<string, unknown> {
     cik?: string | null;
     status: string;
     filings_scanned?: number;
+    filings_parsed?: number;
+    filings_failed?: number;
     buy_count?: number;
     signals: InsiderSignal[];
     reason?: string;
     filing_errors?: string[];
+    /** Fallos de escritura: la lectura live sigue en `signals`; no son fallos de parseo. */
+    persist_error_count?: number;
+    persist_errors?: string[];
+    warnings?: string[];
     notification?: Record<string, unknown>;
 }
 

@@ -220,10 +220,17 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                 <>
                     {initialResult.status === 'partial' ? (
                         <p className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-sm text-amber-200">
-                            {initialTicker}: lectura incompleta — {countText(initialResult.filings_parsed)} de{' '}
-                            {countText(initialResult.filings_scanned)} Form 4 leídos (
-                            {countText(initialResult.filings_failed)} con error). Las señales de abajo
-                            cubren solo los filings legibles.
+                            {(initialResult.filings_failed ?? 0) > 0 ? (
+                                <>
+                                    {initialTicker}: lectura incompleta — {countText(initialResult.filings_parsed)} de{' '}
+                                    {countText(initialResult.filings_scanned)} Form 4 leídos (
+                                    {countText(initialResult.filings_failed)} con error). Las señales de abajo
+                                    cubren solo los filings legibles.{' '}
+                                </>
+                            ) : null}
+                            {Array.isArray(initialResult.warnings) && initialResult.warnings.length
+                                ? `${initialTicker}: ${initialResult.warnings.join(' ')}`
+                                : null}
                         </p>
                     ) : null}
                     {persistedSourceCopy(initialTicker, initialResult, countText) ? (

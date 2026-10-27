@@ -1,9 +1,11 @@
 """PR-2: persistencia durable e idempotente de Form 4/4-A."""
 
+from uuid import uuid4
+
 from sqlalchemy import select
 
 from app.core.database import SessionLocal, init_db
-from app.models.entities import InsiderFiling, InsiderTransaction
+from app.models.entities import InsiderFiling, InsiderTransaction, Tenant
 from app.services import insider_persistence
 from app.services.connectors import form4 as form4_connector
 from tests.test_insider_signals import CEO_BUY_XML
@@ -144,13 +146,92 @@ def test_get_signals_persists_best_effort(monkeypatch):
         result = insider_service.get_signals_for_ticker(
             "ACME", fetcher=lambda f: CEO_BUY_XML, db=db
         )
-        # A read whose persistence failed must not claim "ok": the signals were
-        # produced but nothing was stored, and "ok" reads as a clean scan.
-        assert result["status"] == "degraded"
-        assert result["filings_parsed"] == 0
-        assert any("persist" in e for e in result.get("filing_errors", []))
+        # A persistence failure is not a parse failure: the live read worked
+        # and the signals stay available, with an explicit warning.
+        assert result["status"] == "partial"
+        assert result["filings_parsed"] == 1
+        assert result["filings_failed"] == 0
+        assert result["persist_error_count"] == 1
+        assert result["buy_count"] == 1
+        assert any("no se pudieron guardar" in warning for warning in result["warnings"])
+        # The session must be usable after the error (no PendingRollbackError).
+        assert db.scalars(select(InsiderFiling)).all() == []
     finally:
         _cleanup(db)
+        db.close()
+
+
+def test_integrity_error_rolls_back_and_next_filing_is_persisted(monkeypatch):
+    """Un IntegrityError en una fila no invalida la sesion ni las siguientes.
+
+    Antes el fallo de escritura se tragaba sin rollback: la sesion quedaba en
+    PendingRollback y todo lo posterior (incluido el recuento) fallaba.
+    """
+    from app.services import insider_service
+
+    monkeypatch.setattr(insider_service, "_cik_for_ticker", lambda t, client=None: "0001234567")
+    monkeypatch.setattr(
+        form4_connector,
+        "recent_form4_filings",
+        lambda cik, limit=20, client=None: [FILING, AMENDMENT_FILING],
+    )
+
+    db = _db()
+    tenant = None
+    try:
+        _cleanup(db)
+        tenant = Tenant(external_id=f"insider-{uuid4().hex}", name="Insider race")
+        db.add(tenant)
+        db.commit()
+        db.info["tenant_id"] = tenant.id
+
+        original_persist = insider_persistence.persist_filing
+
+        def persist_then_collide(session, filing, parsed, **kwargs):
+            stats = original_persist(session, filing, parsed, **kwargs)
+            if filing["accession_number"] == FILING["accession_number"]:
+                # Simula otra peticion que inserto el mismo accession entre el
+                # SELECT y el flush de persist_filing: choque real de unicidad.
+                session.add(
+                    InsiderFiling(
+                        tenant_id=kwargs.get("tenant_id"),
+                        accession_number=FILING["accession_number"],
+                        form="4",
+                        issuer_cik="0001234567",
+                        parser_version=insider_persistence.PARSER_VERSION,
+                    )
+                )
+                session.flush()
+            return stats
+
+        monkeypatch.setattr(insider_persistence, "persist_filing", persist_then_collide)
+        result = insider_service.get_signals_for_ticker(
+            "ACME",
+            fetcher=lambda f: CEO_BUY_XML,
+            db=db,
+            tenant_id=tenant.id,
+        )
+
+        assert result["status"] == "partial"
+        assert result["filings_scanned"] == 2
+        assert result["filings_parsed"] == 2
+        assert result["filings_failed"] == 0
+        assert result["persist_error_count"] == 1
+        assert result["signals"]
+        # La sesion sigue usable: las dos filas (la segunda tras el rollback).
+        accessions = {
+            row.accession_number for row in db.scalars(select(InsiderFiling)).all()
+        }
+        assert accessions == {
+            FILING["accession_number"],
+            AMENDMENT_FILING["accession_number"],
+        }
+        assert len(db.scalars(select(InsiderTransaction)).all()) == 2
+    finally:
+        _cleanup(db)
+        if tenant is not None:
+            db.query(Tenant).filter(Tenant.id == tenant.id).delete()
+            db.commit()
         db.close()
 
 

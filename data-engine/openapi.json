@@ -52289,6 +52289,51 @@
           },
           {
             "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "followed",
+              "pattern": "^(followed|all)$",
+              "title": "Scope",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
             "name": "include_chunks",
             "required": false,
             "schema": {
@@ -52508,7 +52553,7 @@
     },
     "/api/sources/documents/count": {
       "get": {
-        "description": "Total real de documentos del tenant.\n\nLa lista /documents pagina (50 por defecto): sin este total, la UI\npresentaba el tamano de pagina como si fuera el inventario completo\ny el resto de documentos quedaba inalcanzable (F131).",
+        "description": "Total real de documentos que cumplen los MISMOS filtros que /documents.\n\nLa lista /documents pagina (50 por defecto): sin este total, la UI\npresentaba el tamano de pagina como si fuera el inventario completo\ny el resto de documentos quedaba inalcanzable (F131).",
         "operationId": "documents_count_api_sources_documents_count_get",
         "parameters": [
           {
@@ -52525,6 +52570,51 @@
                 }
               ],
               "title": "Ticker"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "followed",
+              "pattern": "^(followed|all)$",
+              "title": "Scope",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
             }
           },
           {

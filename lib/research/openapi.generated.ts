@@ -4160,7 +4160,7 @@ export interface paths {
         };
         /**
          * Documents Count
-         * @description Total real de documentos del tenant.
+         * @description Total real de documentos que cumplen los MISMOS filtros que /documents.
          *
          *     La lista /documents pagina (50 por defecto): sin este total, la UI
          *     presentaba el tamano de pagina como si fuera el inventario completo
@@ -18620,6 +18620,9 @@ export interface operations {
         parameters: {
             query?: {
                 ticker?: string | null;
+                scope?: string;
+                source_type?: string | null;
+                q?: string | null;
                 include_chunks?: boolean;
                 page?: number;
                 page_size?: number;
@@ -18667,6 +18670,9 @@ export interface operations {
         parameters: {
             query?: {
                 ticker?: string | null;
+                scope?: string;
+                source_type?: string | null;
+                q?: string | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;

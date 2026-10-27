@@ -397,6 +397,7 @@ def get_signals_for_ticker(
         )
         transactions: list[dict] = []
         errors: list[str] = []
+        persist_errors: list[str] = []
         failure_reasons: list[str] = []
         persisted_dates: list[str] = []
         persisted_count = 0
@@ -433,8 +434,23 @@ def get_signals_for_ticker(
                             db, filing, parsed, xml_text=xml_text, tenant_id=tenant_id
                         )
                     except Exception as persist_exc:  # noqa: BLE001
-                        errors.append(
-                            f"{filing.get('accession_number')}: persist {type(persist_exc).__name__}"
+                        # Un fallo de ESCRITURA no es un fallo de lectura. Sin el
+                        # rollback la sesion queda en PendingRollback y ninguna
+                        # fila posterior se guarda; ademas el fallo se contaba
+                        # como parseo y el resultado decia "0 de N leidos"
+                        # aunque todas las senales se hubieran leido.
+                        try:
+                            db.rollback()
+                        except Exception:  # noqa: BLE001 - la lectura sigue
+                            pass
+                        persist_errors.append(
+                            f"{filing.get('accession_number')}: persist "
+                            f"{type(persist_exc).__name__}"
+                        )
+                        logger.warning(
+                            "insider persist %s failed: %s",
+                            filing.get("accession_number"),
+                            redact_secrets(str(persist_exc))[:200],
                         )
                 for line_index, tx in enumerate(parsed.get("transactions", [])):
                     tx.setdefault("ticker", wanted)
@@ -480,7 +496,7 @@ def get_signals_for_ticker(
         # skips a company on a false all-clear.
         if parse_error_count and parsed_ok == 0:
             status = "degraded"
-        elif parse_error_count:
+        elif parse_error_count or persist_errors:
             status = "partial"
         else:
             status = "ok"
@@ -500,7 +516,7 @@ def get_signals_for_ticker(
                 "SEC EDGAR",
                 SourceKind.OFFICIAL,
                 source_url=f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={resolved_cik}&type=4",
-                coverage=Coverage.PARTIAL if errors else Coverage.OK,
+                coverage=Coverage.PARTIAL if errors or persist_errors else Coverage.OK,
                 note=(
                     "Form 4 XML; codigo P = mercado abierto o privado. "
                     f"{parse_error_count} filing(s) con error de red/parse de "
@@ -523,6 +539,18 @@ def get_signals_for_ticker(
             )
             result["provenance"]["note"] = (
                 str(result["provenance"].get("note") or "") + " " + result["source_note"]
+            ).strip()
+        if persist_errors:
+            result["persist_error_count"] = len(persist_errors)
+            result["persist_errors"] = persist_errors
+            result["warnings"] = [
+                f"{len(persist_errors)} de {scanned} filing(s) se leyeron pero no se "
+                "pudieron guardar en el historico; las senales de esta respuesta "
+                "incluyen la lectura en vivo."
+            ]
+            result["provenance"]["note"] = (
+                str(result["provenance"].get("note") or "")
+                + f" {len(persist_errors)} filing(s) sin persistir."
             ).strip()
         if errors:
             result["filing_errors"] = errors

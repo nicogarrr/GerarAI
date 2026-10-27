@@ -86,7 +86,7 @@ def test_file_ingestion_creates_traceable_chunks_and_dedupes():
     assert duplicate.status_code == 200
     assert duplicate.json()["status"] == "duplicate"
 
-    documents = client.get("/api/sources/documents?ticker=MSFT&include_chunks=true")
+    documents = client.get("/api/sources/documents?ticker=MSFT&scope=all&include_chunks=true")
     assert documents.status_code == 200
     uploaded = next(item for item in documents.json() if item["id"] == payload["document_id"])
     assert uploaded["checksum"] == payload["checksum"]
@@ -95,7 +95,7 @@ def test_file_ingestion_creates_traceable_chunks_and_dedupes():
     assert uploaded["chunks"][0]["metadata"]["chunk_sha256"]
     assert len(uploaded["chunks"][0]["text"]) > 120
 
-    limited_documents = client.get("/api/sources/documents?ticker=MSFT&include_chunks=true&chunk_text_limit=120")
+    limited_documents = client.get("/api/sources/documents?ticker=MSFT&scope=all&include_chunks=true&chunk_text_limit=120")
     assert limited_documents.status_code == 200
     limited_uploaded = next(item for item in limited_documents.json() if item["id"] == payload["document_id"])
     assert len(limited_uploaded["chunks"][0]["text"]) <= 120
@@ -149,7 +149,7 @@ def test_xlsx_ingestion_preserves_sheet_lineage():
     assert payload["status"] == "ingested"
     assert payload["parser"] == "openpyxl"
 
-    documents = client.get("/api/sources/documents?ticker=MSFT&include_chunks=true")
+    documents = client.get("/api/sources/documents?ticker=MSFT&scope=all&include_chunks=true")
     uploaded = next(item for item in documents.json() if item["id"] == payload["document_id"])
     assert uploaded["chunks"][0]["metadata"]["block_metadata"][0]["sheet"] == "KPIs"
     assert unique in uploaded["chunks"][0]["text"]

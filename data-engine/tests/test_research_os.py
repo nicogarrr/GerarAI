@@ -225,7 +225,7 @@ def test_memory_api_tracks_claims_evidence_sections_and_sessions():
     assert source.status_code == 200
     source_document_id = source.json()["document_id"]
 
-    documents = client.get("/api/sources/documents?ticker=MSFT&include_chunks=true")
+    documents = client.get("/api/sources/documents?ticker=MSFT&scope=all&include_chunks=true")
     assert documents.status_code == 200
     document_payload = next(
         item for item in documents.json() if item["id"] == source_document_id

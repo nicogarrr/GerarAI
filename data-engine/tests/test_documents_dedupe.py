@@ -164,7 +164,7 @@ def test_global_documents_and_count_collapse_only_archive_groups(db):
     db.commit()
 
     rows = documents(
-        ticker=None, include_chunks=False, page=1, page_size=50,
+        ticker=None, scope="all", include_chunks=False, page=1, page_size=50,
         chunk_limit=1000, chunk_text_limit=1500, db=db,
     )
     urls = [row["source_url"] for row in rows]
@@ -172,7 +172,7 @@ def test_global_documents_and_count_collapse_only_archive_groups(db):
     assert urls.count(FEED_URL) == 2
     assert len(rows) == 4
 
-    total = documents_count(ticker=None, db=db)
+    total = documents_count(ticker=None, scope="all", db=db)
     assert total["total"] == 4
 
 
@@ -196,10 +196,10 @@ def test_http_documents_routes_registered_and_deduped(db):
     main.app.dependency_overrides[get_db] = lambda: db
     try:
         client = TestClient(main.app)
-        listing = client.get("/api/sources/documents?ticker=AAPL")
+        listing = client.get("/api/sources/documents?ticker=AAPL&scope=all")
         assert listing.status_code == 200
         assert len(listing.json()) == 2
-        count = client.get("/api/sources/documents/count?ticker=AAPL")
+        count = client.get("/api/sources/documents/count?ticker=AAPL&scope=all")
         assert count.status_code == 200
         assert count.json()["total"] == 2
     finally:
