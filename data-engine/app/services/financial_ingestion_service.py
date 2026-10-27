@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
 from app.models import Company, Document, FinancialFact, FinancialStatement, MarketPrice
-from app.services.price_units import price_in_currency
 from app.services.connectors import esef as esef_connector
 from app.services.connectors import fred as fred_connector
 from app.services.connectors import sec_edgar as sec_edgar_connector
@@ -23,6 +22,7 @@ from app.services.fact_deletion import (
     drop_shadowed_facts,
     tenant_condition,
 )
+from app.services.price_units import price_in_currency
 from app.services.ttm_fundamentals import (
     NON_ADDITIVE_FLOWS,
     PeriodValue,

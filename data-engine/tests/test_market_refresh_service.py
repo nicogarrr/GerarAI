@@ -609,7 +609,8 @@ def test_reconstruction_converts_explicit_price_unit(db):
     assert result.price_check["max_abs_diff_vs_close"] == 0
 
 
-def test_refresh_preserves_adjusted_series_unit(db):
+@pytest.mark.parametrize("adjusted", [None, Decimal("4200")])
+def test_refresh_preserves_adjusted_series_unit(db, adjusted):
     from app.services.portfolio_ledger_service import PortfolioLedgerService
 
     day = date(2026, 10, 26)
@@ -618,7 +619,7 @@ def test_refresh_preserves_adjusted_series_unit(db):
                               price=Decimal("42.55"), currency="GBP", trade_date=day)
     company = ledger.ensure_company(db, "CGEO.L")
     db.add(MarketPrice(company_id=company.id, date=day, close=Decimal("4250"),
-                       adj_close=Decimal("4200"), quote_currency="GBX", source="yfinance"))
+                       adj_close=adjusted, quote_currency="GBX", source="yfinance"))
     db.commit()
 
     class Prices:
@@ -628,5 +629,31 @@ def test_refresh_preserves_adjusted_series_unit(db):
     asyncio.run(MarketRefreshService(Prices(), _FakeFXProvider()).refresh(db, as_of=day))
     price = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id))
     assert price.close == Decimal("4255")
-    assert price.adj_close == Decimal("4200")
+    assert price.adj_close == adjusted
     assert price.quote_currency == "GBX"
+
+
+@pytest.mark.parametrize("unit,expected", [("GBP", Decimal("4255")), (None, Decimal("4250"))])
+@pytest.mark.parametrize("adjusted", [None, Decimal("4200")])
+def test_financial_spot_preserves_all_ohlc_unit(db, unit, expected, adjusted):
+    from app.services.financial_ingestion_service import FinancialIngestionService
+
+    day = date(2026, 9, 25)
+    company = Company(ticker="CGEO.L", name="CGEO", currency="GBP", exchange="LSE", company_type="holding", valuation_model="unassigned")
+    db.add(company)
+    db.flush()
+    bar = MarketPrice(company_id=company.id, date=day, open=4200, high=4300, low=4150,
+                      close=4250, adj_close=adjusted, quote_currency="GBX", source="yfinance")
+    db.add(bar)
+    db.commit()
+
+    class FMP:
+        async def quote(self, ticker):
+            return [{"price": 42.55, "timestamp": int(datetime(2026, 9, 25, 20, tzinfo=UTC).timestamp()), "currency": unit}]
+
+    service = FinancialIngestionService.__new__(FinancialIngestionService)
+    asyncio.run(service._add_spot_price(db, company, FMP(), company.ticker))
+    assert (bar.open, bar.high, bar.low) == (4200, 4300, 4150)
+    assert bar.close == expected
+    assert bar.quote_currency == "GBX"
+    assert bar.adj_close == adjusted
