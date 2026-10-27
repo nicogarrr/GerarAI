@@ -207,7 +207,7 @@ data-engine/
   app/valuation/     motores + guardia point-in-time
   app/llm/           factory de proveedores (OpenCode Go por defecto) + cliente Jev
   alembic/versions/  migraciones 0001→0080 (lineales, con downgrade)
-  tests/             7.256 tests herméticos (7.246 pasan, 8 skip, 2 xpass; CI 2026-10-26) · evals/  evals financieras
+  tests/             tests herméticos de pytest (la cifra actual, en el resumen del job «Backend quality» de CI) · evals/  evals financieras
 e2e/                 specs Playwright del flujo inversor
 docs/                PRODUCT_VISION, runbooks, privacidad
 ```
