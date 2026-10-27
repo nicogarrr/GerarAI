@@ -178,6 +178,16 @@ class PortfolioLedgerService:
             raise ValueError("Transaction trade_date cannot be in the future")
         company = self.ensure_company(db, ticker)
         portfolio = self.fx.ensure_portfolio(db)
+        if normalized_action in {"buy", "sell"}:
+            snapshot_position = db.scalar(select(Position).where(
+                Position.company_id == company.id, *tenant_filters(db, Position),
+                Position.source == "screenshot_confirmed",
+            ))
+            if snapshot_position is not None:
+                raise ValueError(
+                    "Esta posición procede de una captura sin historial. "
+                    "Importa primero el fichero del bróker para conciliar antes de añadir compras o ventas"
+                )
 
         if normalized_action == "sell":
             # Validate BEFORE writing anything. The oversell was previously

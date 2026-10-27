@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     libffi-dev \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-spa \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps first (better layer caching)

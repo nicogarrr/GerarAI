@@ -22,6 +22,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 import { DcaLevelChip, FairValueLine, useHoldingSignals } from '@/components/portfolio/HoldingSignals';
 import ImportIBKRButton from '@/components/portfolio/ImportIBKRButton';
+import ImportImageButton from '@/components/portfolio/ImportImageButton';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
@@ -173,6 +174,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
         <div className="flex flex-wrap items-center gap-2">
         <AddTransactionButton userId={userId} />
         <ImportIBKRButton userId={userId} />
+        <ImportImageButton />
         <Button
           variant="outline"
           size="sm"
@@ -193,6 +195,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
               <AddTransactionButton userId={userId} />
               <ImportIBKRButton userId={userId} />
+        <ImportImageButton />
             </div>
           </div>
         ) : (

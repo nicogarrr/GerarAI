@@ -1,0 +1,71 @@
+[
+  {
+    "sample": "MyInvestor",
+    "seconds": 0.182,
+    "max_child_rss_kib": 34552,
+    "rows": [
+      [
+        "ASTS",
+        "125.5",
+        "USD"
+      ],
+      [
+        "BN",
+        "20",
+        "USD"
+      ],
+      [
+        "CGEO.L",
+        "8",
+        "GBP"
+      ]
+    ],
+    "exact_fields": 9
+  },
+  {
+    "sample": "Degiro",
+    "seconds": 0.143,
+    "max_child_rss_kib": 34552,
+    "rows": [
+      [
+        "ASTS",
+        "125.5",
+        "USD"
+      ],
+      [
+        "BN",
+        "20",
+        "USD"
+      ],
+      [
+        "CGEO.L",
+        "8",
+        "GBP"
+      ]
+    ],
+    "exact_fields": 9
+  },
+  {
+    "sample": "IBKR",
+    "seconds": 0.138,
+    "max_child_rss_kib": 34552,
+    "rows": [
+      [
+        "ASTS",
+        "125.5",
+        "USD"
+      ],
+      [
+        "BN",
+        "20",
+        "USD"
+      ],
+      [
+        "CGEO.L",
+        "8",
+        "GBP"
+      ]
+    ],
+    "exact_fields": 9
+  }
+]
