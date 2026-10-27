@@ -92,6 +92,9 @@ export type HomeOpportunity = {
     upside: number;
     /** true = el DCF no es publicable: orientacion del motor, no valoracion final. */
     orientation?: boolean;
+    /** Procedencia del valor justo único («Tesis publicada v3», «Motor de valoración»…). */
+    fairValueLabel?: string;
+    fairValueAsOf?: string | null;
 };
 
 export type HomeOpportunityProbe = {
@@ -134,6 +137,8 @@ export async function getHomeOpportunities(params: {
                             // Sin publishable el valor es una orientacion del motor,
                             // nunca una valoracion final: la ficha lo declara.
                             orientation: !reading.publishable,
+                            fairValueLabel: reading.label,
+                            fairValueAsOf: reading.asOf,
                         }
                         : null,
                 };
