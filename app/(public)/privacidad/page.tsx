@@ -8,32 +8,20 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
     title: 'Privacidad',
     description: 'Política de privacidad y tratamiento de datos personales de GerarAI.',
-    // Documento en borrador: no se indexa hasta que el responsable complete y
-    // valide los campos [PENDIENTE].
+    // Texto pendiente de validación jurídica por el titular: no se indexa.
     robots: { index: false, follow: false },
     alternates: { canonical: '/privacidad' },
 };
-
-const pendingClass =
-    'rounded border border-amber-800/60 bg-amber-950/20 px-2 py-0.5 font-mono text-xs text-amber-200';
 
 export default function PrivacyPage() {
     return (
         <main id="content" tabIndex={-1} className="mx-auto w-full max-w-3xl px-4 py-12">
             <h1 className="text-3xl font-bold text-gray-100">Política de privacidad</h1>
-            <p className="mt-2 text-sm text-gray-500">
-                Última revisión editorial: <span className={pendingClass}>[PENDIENTE: fecha]</span>.
-            </p>
+            <p className="mt-2 text-sm text-gray-500">Última revisión editorial: 27 de octubre de 2026.</p>
 
             <div className="mt-6 rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100" role="note">
-                <p className="font-semibold">Aviso de borrador: este texto no es una política legal cerrada.</p>
-                <p className="mt-1">
-                    Los campos marcados como <span className={pendingClass}>[PENDIENTE]</span> debe
-                    completarlos el responsable del tratamiento (identidad, base jurídica,
-                    regiones, encargados y autoridad de control) antes de abrir el servicio a
-                    usuarios externos. Mientras siga siendo borrador, esta página no se indexa
-                    y no debe citarse como política definitiva. Este texto no sustituye una
-                    revisión jurídica.
+                <p>
+                    Este texto es informativo y no constituye asesoramiento jurídico.
                 </p>
             </div>
 
@@ -41,19 +29,13 @@ export default function PrivacyPage() {
                 <section>
                     <h2 className="text-xl font-semibold text-gray-100">1. Responsable del tratamiento</h2>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
-                        <li>Identidad y NIF: <span className={pendingClass}>[PENDIENTE]</span></li>
-                        <li>Domicilio: <span className={pendingClass}>[PENDIENTE]</span></li>
+                        <li>Identidad: Nicolás Iglesias García.</li>
                         <li>
                             Contacto de privacidad:{' '}
-                            {SUPPORT_EMAIL ? (
-                                <a className="text-teal-300 underline" href={`mailto:${SUPPORT_EMAIL}`}>
-                                    {SUPPORT_EMAIL}
-                                </a>
-                            ) : (
-                                <span className={pendingClass}>[PENDIENTE: correo de contacto]</span>
-                            )}
+                            <a className="text-teal-300 underline" href={`mailto:${SUPPORT_EMAIL}`}>
+                                {SUPPORT_EMAIL}
+                            </a>
                         </li>
-                        <li>Delegado de Protección de Datos (si aplica): <span className={pendingClass}>[PENDIENTE]</span></li>
                     </ul>
                 </section>
 
@@ -70,54 +52,67 @@ export default function PrivacyPage() {
                     </p>
                     <p>
                         No pedimos datos de salud, ideología, religión ni datos biométricos. No
-                        vendemos datos personales ni los usamos para entrenar modelos
-                        compartidos.
+                        vendemos datos personales. El tratamiento que hagan los proveedores de IA
+                        depende de sus condiciones y de la configuración elegida.
                     </p>
                 </section>
 
                 <section>
                     <h2 className="text-xl font-semibold text-gray-100">3. Finalidades y base jurídica</h2>
-                    <p>
-                        Tratamos los datos para prestar el servicio que solicitas, proteger la
-                        cuenta, cumplir obligaciones legales y atender incidencias. La base
-                        jurídica concreta para cada finalidad es{' '}
-                        <span className={pendingClass}>[PENDIENTE: ejecución de contrato, consentimiento, interés legítimo u obligación legal]</span>.
-                    </p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                        <li>
+                            Prestar el servicio que solicitas (cuenta, cartera, tesis, watchlist,
+                            alertas, documentos y asistente): ejecución del contrato.
+                        </li>
+                        <li>
+                            Proteger la cuenta, prevenir abusos y operar y mejorar el servicio
+                            (incluida la telemetría técnica del chat): interés legítimo.
+                        </li>
+                        <li>Cumplir obligaciones legales: obligación legal.</li>
+                    </ul>
                 </section>
 
                 <section>
                     <h2 className="text-xl font-semibold text-gray-100">4. Proveedores y subencargados</h2>
-                    <p>
-                        Según la configuración del despliegue, el servicio puede apoyarse en los
-                        siguientes proveedores. El responsable debe confirmar contratos, regiones
-                        y garantías de transferencia antes de publicar esta lista:
-                    </p>
+                    <p>El servicio se apoya en los siguientes proveedores:</p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                         <li>
-                            <strong>OpenCode Go / OpenCode Zen</strong>: proveedor de modelos de
-                            lenguaje cuando el asistente o la generación de tesis estén activados.
+                            <strong>Modelos de lenguaje</strong>: OpenCode (modelos DeepSeek),
+                            Groq, Google (Gemini) y OpenRouter, según la configuración de proveedores.
+                            Intervienen en las funciones con IA y reciben el contexto enviado por
+                            esas funciones, que puede incluir datos de investigación y de cartera.
                         </li>
                         <li>
                             <strong>Proveedores de datos de mercado</strong>: Finnhub, Financial
-                            Modeling Prep, Yahoo Finance, SEC EDGAR, CNMV, FRED, GDELT, CelesTrak y
-                            otras fuentes gratuitas configuradas.
+                            Modeling Prep, Yahoo Finance, SEC EDGAR, CNMV, FRED, GDELT, CelesTrak
+                            y otras fuentes gratuitas configuradas. Estas consultas se hacen por
+                            ticker y no incluyen tus datos personales.
                         </li>
                         <li>
-                            <strong>Hosting y base de datos</strong>: Vercel (frontend), Render o
-                            equivalente (data engine), MongoDB Atlas (autenticación y datos
-                            auxiliares), PostgreSQL gestionado.
+                            <strong>Hosting y bases de datos</strong>: Vercel (frontend, con las
+                            funciones en la región de Fráncfort, fra1), Oracle Cloud (servidor
+                            del motor de datos en la región eu-madrid-1, Madrid, España), MongoDB Atlas (cuentas y datos auxiliares) y
+                            PostgreSQL en el propio servidor.
                         </li>
                         <li>
                             <strong>Almacenamiento y búsqueda</strong>: MinIO o Garage
-                            (documentos), Qdrant (índice vectorial) y Redis (cola/caché).
+                            (documentos), Qdrant (índice vectorial) y Redis (colas y caché),
+                            todos en el propio servidor.
                         </li>
                         <li>
-                            <strong>Correo transaccional</strong>: el proveedor SMTP que configure
-                            el responsable para avisos y restablecimiento de contraseña.
+                            <strong>Copias de seguridad</strong>: Cloudflare R2, cuando está
+                            configurado.
+                        </li>
+                        <li>
+                            <strong>Correo saliente</strong>: SMTP para avisos y
+                            restablecimiento de contraseña, mediante el servidor SMTP configurado.
                         </li>
                     </ul>
                     <p className="mt-2">
-                        Regiones y transferencias internacionales: <span className={pendingClass}>[PENDIENTE]</span>.
+                        Regiones y transferencias internacionales: el frontend se ejecuta en la
+                        región de Fráncfort (fra1) de Vercel. Los proveedores de modelos de
+                        lenguaje y el resto de servicios externos pueden tratar datos fuera de
+                        la Unión Europea conforme a sus condiciones.
                     </p>
                 </section>
 
@@ -126,8 +121,10 @@ export default function PrivacyPage() {
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                         <li>
                             Documentos financieros: por defecto 2.555 días (7 años),
-                            configurable con <code>FINANCIAL_DOCUMENT_RETENTION_DAYS</code>. Al
-                            caducar se borran el original, los fragmentos y los vectores, y se
+                            configurable con <code>FINANCIAL_DOCUMENT_RETENTION_DAYS</code>. La purga
+                            requiere activar la tarea de conservación y desactivar el modo de simulación.
+                            Por defecto está apagada y en simulación; esos plazos no garantizan un borrado automático.
+                            Cuando se ejecuta la purga, se borran el original, los fragmentos y los vectores, y se
                             conserva una referencia tombstone sin contenido para que las
                             decisiones históricas sigan siendo auditables.
                         </li>
@@ -136,11 +133,16 @@ export default function PrivacyPage() {
                             configurable con <code>CHAT_TELEMETRY_RETENTION_DAYS</code>.
                         </li>
                         <li>
-                            Solicitudes de acceso: por defecto 365 días, expiradas por TTL en
-                            MongoDB; configurable con <code>ACCESS_REQUEST_RETENTION_DAYS</code>.
+                            Solicitudes de acceso: por defecto 365 días, configurable con{' '}
+                            <code>ACCESS_REQUEST_RETENTION_DAYS</code>; el borrado automático
+                            por TTL en MongoDB solo se activa si el operador lo habilita
+                            expresamente.
                         </li>
                         <li>
-                            Copias de seguridad: <span className={pendingClass}>[PENDIENTE: plazo y procedimiento de expiración]</span>.
+                            Copias de seguridad: el script local permite configurar cuántas conservar
+                            (8 por defecto); no es una garantía de ejecución. Además,
+                            cuando está configurada, una copia en Cloudflare R2 cuya caducidad
+                            fija la regla de expiración del bucket.
                         </li>
                     </ul>
                 </section>
@@ -160,8 +162,17 @@ export default function PrivacyPage() {
                         documentos originales, vectores y sesiones; es irreversible.
                     </p>
                     <p>
-                        También puedes reclamar ante la autoridad de control competente:{' '}
-                        <span className={pendingClass}>[PENDIENTE: AEPD u otra autoridad según jurisdicción]</span>.
+                        También puedes reclamar ante la Agencia Española de Protección de Datos
+                        (AEPD,{' '}
+                        <a
+                            className="text-teal-300 underline"
+                            href="https://www.aepd.es"
+                            rel="noreferrer"
+                            target="_blank"
+                        >
+                            www.aepd.es
+                        </a>
+                        ).
                     </p>
                 </section>
 
@@ -178,11 +189,11 @@ export default function PrivacyPage() {
                         consultarlo en{' '}
                         <a
                             className="text-teal-300 underline"
-                            href="https://github.com/nicogarrr/GerarAI"
+                            href="https://github.com/nicogarrr/gerarai"
                             rel="noreferrer"
                             target="_blank"
                         >
-                            github.com/nicogarrr/GerarAI
+                            github.com/nicogarrr/gerarai
                         </a>
                         . El código fuente correspondiente a la versión desplegada debe estar
                         disponible para los usuarios del servicio.
@@ -194,7 +205,7 @@ export default function PrivacyPage() {
                     <p>
                         Podemos actualizar esta política para reflejar cambios legales o
                         técnicos. La fecha de la última revisión y los cambios relevantes se
-                        publicarán en esta página. <span className={pendingClass}>[PENDIENTE: procedimiento de notificación]</span>.
+                        publicarán en esta página.
                     </p>
                 </section>
             </article>

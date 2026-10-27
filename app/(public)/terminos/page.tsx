@@ -8,46 +8,30 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
     title: 'Términos de uso',
     description: 'Condiciones de uso del servicio GerarAI.',
-    // Documento en borrador: no se indexa hasta que el titular complete y
-    // valide los campos [PENDIENTE].
+    // Texto pendiente de validación jurídica por el titular: no se indexa.
     robots: { index: false, follow: false },
     alternates: { canonical: '/terminos' },
 };
-
-const pendingClass =
-    'rounded border border-amber-800/60 bg-amber-950/20 px-2 py-0.5 font-mono text-xs text-amber-200';
 
 export default function TermsPage() {
     return (
         <main id="content" tabIndex={-1} className="mx-auto w-full max-w-3xl px-4 py-12">
             <h1 className="text-3xl font-bold text-gray-100">Términos de uso</h1>
-            <p className="mt-2 text-sm text-gray-500">
-                Última revisión editorial: <span className={pendingClass}>[PENDIENTE: fecha]</span>.
-            </p>
+            <p className="mt-2 text-sm text-gray-500">Última revisión editorial: 27 de octubre de 2026.</p>
 
             <div className="mt-6 rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100" role="note">
-                <p className="font-semibold">Aviso de borrador.</p>
-                <p className="mt-1">
-                    Los campos <span className={pendingClass}>[PENDIENTE]</span> los debe
-                    completar el titular del servicio antes de abrirlo a usuarios externos.
-                    Mientras siga siendo borrador, esta página no se indexa y no debe citarse
-                    como términos definitivos. Este documento no es asesoramiento jurídico.
-                </p>
+                <p>Este documento es informativo y no constituye asesoramiento jurídico.</p>
             </div>
 
             <article className="mt-8 space-y-6 text-sm leading-7 text-gray-300">
                 <section>
                     <h2 className="text-xl font-semibold text-gray-100">1. Titular del servicio</h2>
                     <p>
-                        Nombre legal, NIF y domicilio:{' '}
-                        <span className={pendingClass}>[PENDIENTE]</span>. Contacto:{' '}
-                        {SUPPORT_EMAIL ? (
-                            <a className="text-teal-300 underline" href={`mailto:${SUPPORT_EMAIL}`}>
-                                {SUPPORT_EMAIL}
-                            </a>
-                        ) : (
-                            <span className={pendingClass}>[PENDIENTE: correo de contacto]</span>
-                        )}
+                        GerarAI es un proyecto personal de Nicolás Iglesias García (España).
+                        Contacto:{' '}
+                        <a className="text-teal-300 underline" href={`mailto:${SUPPORT_EMAIL}`}>
+                            {SUPPORT_EMAIL}
+                        </a>
                         .
                     </p>
                 </section>
@@ -95,9 +79,9 @@ export default function TermsPage() {
                     <h2 className="text-xl font-semibold text-gray-100">5. Datos y proveedores externos</h2>
                     <p>
                         El servicio combina datos de proveedores públicos y privados (SEC EDGAR,
-                        CNMV, Finnhub, FMP, Yahoo Finance, FRED, GDELT, CelesTrak, SEC, entre
-                        otros) y puede enviar extractos mínimos a un proveedor de modelos de
-                        lenguaje cuando actives las funciones correspondientes. Consulta la{' '}
+                        CNMV, Finnhub, FMP, Yahoo Finance, FRED, GDELT y CelesTrak, entre otros)
+                        y puede enviar contexto de investigación y, según la función, datos de cartera a un proveedor de modelos de lenguaje
+                        cuando actives las funciones correspondientes. Consulta la{' '}
                         <Link className="text-teal-300 underline" href="/privacidad">política de privacidad</Link>{' '}
                         para el detalle y los subencargados.
                     </p>
@@ -109,7 +93,7 @@ export default function TermsPage() {
                         El código de GerarAI se distribuye bajo AGPL-3.0 (
                         <a
                             className="text-teal-300 underline"
-                            href="https://github.com/nicogarrr/GerarAI"
+                            href="https://github.com/nicogarrr/gerarai"
                             rel="noreferrer"
                             target="_blank"
                         >
@@ -128,8 +112,7 @@ export default function TermsPage() {
                         interrupciones por mantenimiento, límites de proveedores gratuitos o
                         causas de fuerza mayor. En la medida permitida por la ley, el titular no
                         responde de daños indirectos, lucro cesante o decisiones de inversión
-                        basadas en la información mostrada. Los límites concretos de
-                        responsabilidad son <span className={pendingClass}>[PENDIENTE]</span>.
+                        basadas en la información mostrada.
                     </p>
                 </section>
 
@@ -148,18 +131,16 @@ export default function TermsPage() {
                 <section>
                     <h2 className="text-xl font-semibold text-gray-100">9. Ley aplicable y jurisdicción</h2>
                     <p>
-                        Ley aplicable y tribunales competentes:{' '}
-                        <span className={pendingClass}>[PENDIENTE]</span>. Si eres consumidor,
-                        conservas los derechos imperativos de tu lugar de residencia.
+                        Estos términos se rigen por la ley española. Si eres consumidor,
+                        conservas los derechos imperativos y el fuero de tu lugar de residencia.
                     </p>
                 </section>
 
                 <section>
                     <h2 className="text-xl font-semibold text-gray-100">10. Cambios</h2>
                     <p>
-                        Podemos actualizar estos términos. Publicaremos la fecha de revisión y,
-                        cuando el cambio sea material, avisaremos por el canal que corresponda:{' '}
-                        <span className={pendingClass}>[PENDIENTE: procedimiento]</span>.
+                        Podemos actualizar estos términos. Publicaremos la fecha de la última
+                        revisión en esta página.
                     </p>
                 </section>
             </article>
