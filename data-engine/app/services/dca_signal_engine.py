@@ -323,6 +323,8 @@ def hit_rates(
     params: DcaParams = DEFAULT_PARAMS,
     today: date | None = None,
     horizons: Sequence[int] = HIT_RATE_HORIZONS,
+    start: str | None = None,
+    end: str | None = None,
 ) -> dict:
     """"¿Cuántas veces estaba más arriba?" por nivel de compra (histórico).
 
@@ -334,6 +336,8 @@ def hit_rates(
     están ajustadas). Histórico e hipotético; no predice resultados.
     """
     series = [v for v in evaluate_series(bars, params=params, today=today) if v.status == "confirmed"]
+    # ``start``/``end`` (YYYY-MM) acotan los meses CON SENAL; el resultado a N
+    # meses puede caer despues de ``end`` si ese mes ya esta cerrado.
     index = {v.period: i for i, v in enumerate(series)}
     closes = [v.close for v in series]
     periods = [v.period for v in series]
@@ -345,7 +349,11 @@ def hit_rates(
 
     rows = []
     for key, label, levels in HIT_RATE_GROUPS:
-        members = [i for i, v in enumerate(series) if v.level in levels]
+        members = [
+            i
+            for i, v in enumerate(series)
+            if v.level in levels and (start is None or v.period >= start) and (end is None or v.period <= end)
+        ]
         cells = []
         for h in horizons:
             rets = []
@@ -364,10 +372,11 @@ def hit_rates(
                 }
             )
         rows.append({"key": key, "label": label, "levels": list(levels), "signal_months": len(members), "cells": cells})
+    in_range = [p for p in periods if (start is None or p >= start) and (end is None or p <= end)]
     return {
-        "months_completed": len(series),
-        "first_period": periods[0] if periods else None,
-        "last_period": periods[-1] if periods else None,
+        "months_completed": len(in_range),
+        "first_period": in_range[0] if in_range else None,
+        "last_period": in_range[-1] if in_range else None,
         "horizons": list(horizons),
         "params_version": params.version,
         "rows": rows,

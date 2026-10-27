@@ -2446,6 +2446,338 @@
         "title": "CustomMetricCreate",
         "type": "object"
       },
+      "DcaBacktestLevelOut": {
+        "properties": {
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
+          "months": {
+            "title": "Months",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "level",
+          "label",
+          "color",
+          "months"
+        ],
+        "title": "DcaBacktestLevelOut",
+        "type": "object"
+      },
+      "DcaBacktestOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "base_amount": {
+            "default": 100.0,
+            "title": "Base Amount",
+            "type": "number"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "currency_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Label"
+          },
+          "data_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Source"
+          },
+          "disclaimer": {
+            "default": "Hist\u00f3rico, hipot\u00e9tico. No es asesoramiento.",
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "final_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Price"
+          },
+          "first_buy": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Buy"
+          },
+          "first_signal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Signal"
+          },
+          "hit_rates": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DcaHitRatesOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_buy": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Buy"
+          },
+          "last_signal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Signal"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/DcaBacktestLevelOut"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "months": {
+            "default": 0,
+            "title": "Months",
+            "type": "integer"
+          },
+          "params_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params Version"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/DcaBacktestPlanOut"
+            },
+            "title": "Plans",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "valued_at_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valued At Period"
+          }
+        },
+        "required": [
+          "symbol",
+          "available"
+        ],
+        "title": "DcaBacktestOut",
+        "type": "object"
+      },
+      "DcaBacktestPlanOut": {
+        "properties": {
+          "avg_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cost"
+          },
+          "buys": {
+            "title": "Buys",
+            "type": "integer"
+          },
+          "cash_left": {
+            "title": "Cash Left",
+            "type": "number"
+          },
+          "deployed": {
+            "title": "Deployed",
+            "type": "number"
+          },
+          "final_value": {
+            "title": "Final Value",
+            "type": "number"
+          },
+          "invested": {
+            "title": "Invested",
+            "type": "number"
+          },
+          "irr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Irr"
+          },
+          "irr_vs_plain": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Irr Vs Plain"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "max_drawdown": {
+            "title": "Max Drawdown",
+            "type": "number"
+          },
+          "multiple": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multiple"
+          },
+          "shares": {
+            "title": "Shares",
+            "type": "number"
+          },
+          "shares_per_money_vs_plain": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Per Money Vs Plain"
+          },
+          "value_vs_plain": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Vs Plain"
+          },
+          "worst_unrealized": {
+            "title": "Worst Unrealized",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "invested",
+          "deployed",
+          "cash_left",
+          "shares",
+          "final_value",
+          "max_drawdown",
+          "worst_unrealized",
+          "buys"
+        ],
+        "title": "DcaBacktestPlanOut",
+        "type": "object"
+      },
       "DcaEvaluateOut": {
         "properties": {
           "alerted": {
@@ -61560,6 +61892,229 @@
           }
         },
         "summary": "Evaluate Dca Signals Now",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/watchlist/dca-signals/{symbol}/backtest": {
+      "get": {
+        "description": "Backtest DCA plano vs DCA por niveles (F\u00f3rmula Nico v1) para cualquier ticker.\n\nSin look-ahead: veredicto con datos hasta el cierre de cada mes y compra al\nprimer cierre del mes siguiente. Usa la misma serie que la se\u00f1al diaria\n(Yahoo, cierre ajustado si existe y sin la barra del d\u00eda en curso).",
+        "operationId": "dca_backtest_api_watchlist_dca_signals__symbol__backtest_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Primer mes con se\u00f1al (YYYY-MM)",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Primer mes con se\u00f1al (YYYY-MM)",
+              "title": "Start"
+            }
+          },
+          {
+            "description": "\u00daltimo mes con se\u00f1al (YYYY-MM)",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\u00daltimo mes con se\u00f1al (YYYY-MM)",
+              "title": "End"
+            }
+          },
+          {
+            "description": "Aportaci\u00f3n base mensual",
+            "in": "query",
+            "name": "base",
+            "required": false,
+            "schema": {
+              "default": 100.0,
+              "description": "Aportaci\u00f3n base mensual",
+              "exclusiveMinimum": 0,
+              "maximum": 1000000,
+              "title": "Base",
+              "type": "number"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DcaBacktestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dca Backtest",
         "tags": [
           "watchlist"
         ]
