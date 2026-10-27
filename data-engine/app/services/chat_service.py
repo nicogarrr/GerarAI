@@ -1304,6 +1304,15 @@ class ChatService:
         )
         if unvalued:
             lines.append(f"- Sin valor en moneda base (no entran en los porcentajes): {', '.join(sorted(unvalued))}.")
+        # Reglas del panel de riesgo y TWR/caída máxima del histórico de snapshots:
+        # el Cerebro ya no se queda solo en la concentración.
+        from app.services.brain_context_tools import portfolio_risk_lines
+
+        try:
+            risk_lines, risk_sources = portfolio_risk_lines(db, tenant_id)
+        except Exception:  # noqa: BLE001 - el panel nunca rompe la respuesta de concentración
+            risk_lines, risk_sources = [], []
+        lines.extend(f"- {line}" if not line.startswith("- ") else line for line in risk_lines)
         as_of = min(pos.as_of for pos, _ in rows)
         answer = (
             "Cifras calculadas de tus posiciones guardadas "
@@ -1315,6 +1324,7 @@ class ChatService:
             self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))
             for pos, comp, _ in top
         ]
+        sources.extend(risk_sources)
         return ChatResponse(
             answer=answer,
             sources=sources,
