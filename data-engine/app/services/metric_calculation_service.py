@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.units import is_from_percent, to_fraction
 from app.models import CalculatedMetric, Company, FinancialFact
 from app.services.moat_profile import NONCOMPARABLE_PROFILES, PROFILE_LABELS, financial_quality_profile
+from app.services.owner_earnings import WORKING_CAPITAL_SIGN_CONVENTION, owner_earnings
 
 MetricFormula = tuple[str, str, tuple[str, ...], str]
 
@@ -135,10 +136,13 @@ METRIC_DEFINITIONS: dict[str, MetricFormula] = {
         ("net_income", "total_assets"),
         "decimal",
     ),
+    # Beneficio del propietario (Buffett, carta de Berkshire Hathaway de
+    # 1986). Definicion unica en app/services/owner_earnings.py: el ΔCC va en
+    # signo de flujo de caja y se SUMA; sin ΔCC no hay numero (V1 lo omitia).
     "owner_earnings": (
-        "OWNER_EARNINGS_V1",
-        "net_income + depreciation_amortization - maintenance_capex, where maintenance_capex = min(abs(capital_expenditure), depreciation_amortization); maintenance capex is not separately reported - declared conservative estimate (Buffet owner earnings)",
-        ("net_income", "depreciation_amortization", "capital_expenditure"),
+        "OWNER_EARNINGS_V2",
+        "net_income + depreciation_amortization + change_in_working_capital - maintenance_capex, where change_in_working_capital is in cash-flow sign (negative = working capital absorbed cash) and maintenance_capex = min(abs(capital_expenditure), depreciation_amortization); maintenance capex is not separately reported - declared conservative estimate (Buffett owner earnings, Berkshire Hathaway 1986 letter)",
+        ("net_income", "depreciation_amortization", "capital_expenditure", "change_in_working_capital"),
         "USD",
     ),
     "cfroi_approx": (
@@ -148,9 +152,9 @@ METRIC_DEFINITIONS: dict[str, MetricFormula] = {
         "decimal",
     ),
     "owner_earnings_5y": (
-        "OWNER_EARNINGS_5Y_V1",
-        "mean of annual (net_income + depreciation_amortization - min(abs(capital_expenditure), depreciation_amortization)) over up to 5 most recent fiscal years, minimum 3; maintenance capex is a declared conservative estimate (Buffett owner earnings)",
-        ("net_income", "depreciation_amortization", "capital_expenditure"),
+        "OWNER_EARNINGS_5Y_V2",
+        "mean of annual (net_income + depreciation_amortization + change_in_working_capital - min(abs(capital_expenditure), depreciation_amortization)) over up to 5 most recent fiscal years, minimum 3; change_in_working_capital in cash-flow sign; maintenance capex is a declared conservative estimate (Buffett owner earnings, Berkshire Hathaway 1986 letter)",
+        ("net_income", "depreciation_amortization", "capital_expenditure", "change_in_working_capital"),
         "USD",
     ),
     "capex_to_da_5y": (
@@ -588,21 +592,23 @@ class MetricCalculationService:
     ) -> tuple[Decimal | None, Decimal | None, dict, dict[str, FinancialFact]]:
         value = lambda key: Decimal(facts[key].value)
         if metric == "owner_earnings":
-            net_income = value("net_income")
-            depreciation = value("depreciation_amortization")
-            capex_abs = abs(value("capital_expenditure"))
-            maintenance_capex = min(capex_abs, depreciation)
+            oe = owner_earnings(
+                net_income=value("net_income"),
+                depreciation_amortization=value("depreciation_amortization"),
+                change_in_working_capital=value("change_in_working_capital"),
+                capital_expenditure=value("capital_expenditure"),
+            )
+            assert oe is not None and oe.estimated_growth_capex is not None
             trace = {
                 "method": "owner_earnings",
-                "maintenance_capex": str(_quantize(maintenance_capex)),
-                "maintenance_capex_rule": (
-                    "min(abs(capital_expenditure), depreciation_amortization); "
-                    "maintenance capex is not separately reported - declared "
-                    "conservative estimate"
-                ),
-                "estimated_growth_capex": str(_quantize(capex_abs - maintenance_capex)),
+                "source": "Buffett, Berkshire Hathaway shareholder letter 1986",
+                "maintenance_capex": str(_quantize(oe.maintenance_capex)),
+                "maintenance_capex_rule": oe.maintenance_capex_rule,
+                "estimated_growth_capex": str(_quantize(oe.estimated_growth_capex)),
+                "change_in_working_capital": str(_quantize(value("change_in_working_capital"))),
+                "working_capital_sign": WORKING_CAPITAL_SIGN_CONVENTION,
             }
-            return net_income + depreciation - maintenance_capex, Decimal("1"), trace, {}
+            return oe.value, Decimal("1"), trace, {}
         if metric == "cfroi_approx":
             tax_rate, tax_trace, tax_facts = self._tax_rate_for_period(
                 db,
@@ -1488,8 +1494,16 @@ class MetricCalculationService:
             da = Decimal(facts_by_year["depreciation_amortization"][year].value)
             capex = abs(Decimal(facts_by_year["capital_expenditure"][year].value))
             if metric == "owner_earnings_5y":
-                ni = Decimal(facts_by_year["net_income"][year].value)
-                yearly[year] = ni + da - min(capex, da)
+                oe = owner_earnings(
+                    net_income=Decimal(facts_by_year["net_income"][year].value),
+                    depreciation_amortization=da,
+                    change_in_working_capital=Decimal(
+                        facts_by_year["change_in_working_capital"][year].value
+                    ),
+                    capital_expenditure=capex,
+                )
+                assert oe is not None
+                yearly[year] = oe.value
             else:  # capex_to_da_5y
                 if da == 0:
                     skipped_zero_da.append(year)
