@@ -11,17 +11,16 @@ type AnalystTargets = components['schemas']['AnalystTargets'];
  * cabecera la hora de obtención. Sin datos o con fallo se dice, nunca se
  * rellena. Nunca rechaza: un fallo de la fuente no rompe la ficha.
  */
-export async function AnalystTargetsSection({ symbol, currency }: { symbol: string; currency?: string | null }) {
+export async function AnalystTargetsSection({ symbol }: { symbol: string; currency?: string | null }) {
     let data: AnalystTargets | null = null;
     try {
         data = await researchRequest<AnalystTargets>(`/api/companies/${encodeURIComponent(symbol)}/analyst-targets`, { timeoutMs: 14000 });
     } catch {
         data = null;
     }
-    // La divisa la declara Yahoo para el listado consultado; sin
-    // declaración, la de la ficha (master); sin ambas, número pelado
-    // (nunca se asume dólar).
-    const cur = data?.currency ?? currency ?? null;
+    // Only this response can declare the unit of its target prices. The
+    // company master may use a different scale (e.g. GBP versus GBX).
+    const cur = data?.currency?.trim() || null;
     const fmtTarget = (value: number | null | undefined) =>
         value === null || value === undefined
             ? 'N/D'
@@ -37,6 +36,7 @@ export async function AnalystTargetsSection({ symbol, currency }: { symbol: stri
                 <p className="mt-2 text-sm text-gray-400" role="status">{data.note ?? 'Sin precios objetivo por analista para este valor.'}</p>
             ) : (
                 <>
+                    {!cur ? <p className="mt-2 text-xs text-gray-400">Divisa no declarada por Yahoo: importes sin unidad verificada y recorrido N/D.</p> : null}
                     {data.consensus ? (
                         <div className="mt-1 text-sm text-gray-300">
                             <p>
@@ -62,7 +62,7 @@ export async function AnalystTargetsSection({ symbol, currency }: { symbol: stri
                                 </div>
                                 <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-3 text-xs text-gray-400">
                                     <span>{analystRatingEs(row.rating) ?? 'N/D'} · {formatMarketDate(row.date)}</span>
-                                    <span className="tabular-nums">Anterior {fmtTarget(row.prior_target)} · Recorrido {row.upside_percent === null || row.upside_percent === undefined ? 'N/D' : formatPercent(row.upside_percent, { fromRatio: false, signDisplay: 'always' })}</span>
+                                    <span className="tabular-nums">Anterior {fmtTarget(row.prior_target)} · Recorrido {!cur || row.upside_percent === null || row.upside_percent === undefined ? 'N/D' : formatPercent(row.upside_percent, { fromRatio: false, signDisplay: 'always' })}</span>
                                 </div>
                             </li>
                         ))}
@@ -87,7 +87,7 @@ export async function AnalystTargetsSection({ symbol, currency }: { symbol: stri
                                         <td className="py-1.5 pr-3 text-gray-300">{analystRatingEs(row.rating) ?? 'N/D'}</td>
                                         <td className="py-1.5 pr-3 text-right tabular-nums text-gray-100">{fmtTarget(row.price_target)}</td>
                                         <td className="py-1.5 pr-3 text-right tabular-nums text-gray-400">{fmtTarget(row.prior_target)}</td>
-                                        <td className="py-1.5 pr-3 text-right tabular-nums text-gray-300">{row.upside_percent === null || row.upside_percent === undefined ? 'N/D' : formatPercent(row.upside_percent, { fromRatio: false, signDisplay: 'always' })}</td>
+                                        <td className="py-1.5 pr-3 text-right tabular-nums text-gray-300">{!cur || row.upside_percent === null || row.upside_percent === undefined ? 'N/D' : formatPercent(row.upside_percent, { fromRatio: false, signDisplay: 'always' })}</td>
                                         <td className="py-1.5 text-gray-400">{formatMarketDate(row.date)}</td>
                                     </tr>
                                 ))}
@@ -100,7 +100,7 @@ export async function AnalystTargetsSection({ symbol, currency }: { symbol: stri
                         Fuente: {data.source}
                         {data.source_url ? <> · <a className="text-teal-300 underline underline-offset-4 hover:text-teal-200" href={data.source_url} rel="noreferrer noopener" target="_blank">ver en Yahoo Finance</a></> : null}
                         {' '}· obtenido el {formatUserDateTime(data.fetched_at * 1000)}
-                        {data.reference_price ? ` · recorrido frente a ${fmtTarget(data.reference_price)} (${data.reference_price_source ?? 'precio de referencia'})` : ' · sin precio de referencia: recorrido N/D'}
+                        {cur && data.reference_price ? ` · recorrido frente a ${fmtTarget(data.reference_price)} (${data.reference_price_source ?? 'precio de referencia'})` : ' · sin precio de referencia con unidad verificada: recorrido N/D'}
                         . Terceros, no verificado por GerarAI.
                     </p>
                 </>
