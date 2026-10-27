@@ -56,6 +56,7 @@ export default function AddTransactionButton({ userId }: Props) {
     currency: 'USD',
     quantity: '',
     price: '',
+    fees: '',
     date: todayLocal(),
     notes: '',
   });
@@ -71,6 +72,7 @@ export default function AddTransactionButton({ userId }: Props) {
       type: formData.type,
       quantity: formData.quantity,
       price: formData.price,
+      fees: formData.fees,
       date: formData.date,
     });
     setFieldErrors(errors);
@@ -87,6 +89,7 @@ export default function AddTransactionButton({ userId }: Props) {
         new Date(formData.date),
         formData.notes || undefined,
         formData.currency,
+        parseLocalizedNumber(formData.fees) ?? 0,
       );
       setOpen(false);
       setFormData({
@@ -96,6 +99,7 @@ export default function AddTransactionButton({ userId }: Props) {
         currency: 'USD',
         quantity: '',
         price: '',
+        fees: '',
         date: todayLocal(),
         notes: '',
       });
@@ -234,6 +238,23 @@ export default function AddTransactionButton({ userId }: Props) {
                 <p role="alert" className="text-sm text-red-400">{fieldErrors.price}</p>
               )}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="fees" className="text-gray-300">Comisiones ({formData.currency}) (opcional)</Label>
+            <Input
+              id="fees"
+              type="number"
+              step="any"
+              min="0"
+              placeholder="0,00"
+              value={formData.fees}
+              onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
+              className="bg-gray-800 border-gray-700 text-gray-100"
+            />
+            {fieldErrors.fees && (
+              <p role="alert" className="text-sm text-red-400">{fieldErrors.fees}</p>
+            )}
           </div>
 
           <div className="space-y-2">

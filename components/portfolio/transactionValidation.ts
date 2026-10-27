@@ -15,6 +15,8 @@ export interface TransactionFormValues {
   quantity: string;
   price: string;
   date: string;
+  /** Comisión opcional (vacío = sin comisión). */
+  fees?: string;
 }
 
 export interface TransactionFormErrors {
@@ -22,6 +24,7 @@ export interface TransactionFormErrors {
   quantity?: string;
   price?: string;
   date?: string;
+  fees?: string;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -41,6 +44,13 @@ export function validateTransactionForm(values: TransactionFormValues, now: Date
   const price = parseLocalizedNumber(values.price);
   if (price === null || price < 0) {
     errors.price = 'Introduce un precio válido (0 o mayor).';
+  }
+
+  if (values.fees !== undefined && values.fees.trim() !== '') {
+    const fees = parseLocalizedNumber(values.fees);
+    if (fees === null || fees < 0) {
+      errors.fees = 'Introduce una comisión válida (0 o mayor) o déjala vacía.';
+    }
   }
 
   if (!DATE_RE.test(values.date)) {

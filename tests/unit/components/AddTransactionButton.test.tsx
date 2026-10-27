@@ -108,6 +108,46 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
+    it('la comisión tecleada se envía y una negativa se rechaza antes del backend', async () => {
+        searchStocksWithStatus.mockResolvedValue({
+            status: 'ok',
+            stocks: [{ symbol: 'SAN.MC', name: 'Banco Santander SA', exchange: 'BME', type: 'Common Stock', isInWatchlist: false }],
+        });
+        const dialog = openDialog();
+        await pickTicker(dialog, 'santander', 'SAN.MC');
+        fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '10' } });
+        fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '4' } });
+        fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2026-01-15' } });
+        const form = within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!;
+
+        fireEvent.change(within(dialog).getByLabelText(/^Comisiones/), { target: { value: '-1' } });
+        fireEvent.submit(form);
+        await flush();
+        expect(addTransaction).not.toHaveBeenCalled();
+        expect(within(dialog).getByRole('alert')).toHaveTextContent('comisión válida');
+
+        fireEvent.change(within(dialog).getByLabelText(/^Comisiones/), { target: { value: '1.25' } });
+        fireEvent.submit(form);
+        await flush();
+        expect(addTransaction).toHaveBeenCalledTimes(1);
+        expect(addTransaction.mock.calls[0][8]).toBe(1.25);
+    });
+
+    it('sin comisión se envía 0 (campo opcional)', async () => {
+        searchStocksWithStatus.mockResolvedValue({
+            status: 'ok',
+            stocks: [{ symbol: 'SAN.MC', name: 'Banco Santander SA', exchange: 'BME', type: 'Common Stock', isInWatchlist: false }],
+        });
+        const dialog = openDialog();
+        await pickTicker(dialog, 'santander', 'SAN.MC');
+        fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '10' } });
+        fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '4' } });
+        fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2026-01-15' } });
+        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!);
+        await flush();
+        expect(addTransaction.mock.calls[0][8]).toBe(0);
+    });
+
     it('una fecha futura se rechaza antes de llegar al backend', async () => {
         searchStocksWithStatus.mockResolvedValue({
             status: 'ok',
