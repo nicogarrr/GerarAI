@@ -46,7 +46,7 @@ export interface DcaSignalItem {
     alerts_on: boolean;
     state: DcaSignalState | null;
     /** Por qué no hay nivel. Ausente en backends antiguos (se trata como never_run). */
-    evaluation_status?: 'evaluated' | 'never_run' | 'job_failed' | 'skipped';
+    evaluation_status?: 'evaluated' | 'never_run' | 'job_failed' | 'skipped' | 'running' | 'pending' | 'unknown';
     evaluation_reason?: string | null;
 }
 

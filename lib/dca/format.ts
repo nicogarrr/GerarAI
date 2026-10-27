@@ -80,9 +80,26 @@ export function dcaMissingBadge(item: DcaSignalItem | undefined): { text: string
             tone: 'warn',
         };
     }
+    if (status === 'running') {
+        return { text: 'En curso', title: 'Hay una evaluación en curso; el nivel aparecerá al terminar.', tone: 'neutral' };
+    }
+    if (status === 'pending') {
+        return {
+            text: 'Pendiente',
+            title: 'Hay una ejecución registrada, pero este ticker no figuraba en ella (por ejemplo, añadido después). Se evaluará en la siguiente.',
+            tone: 'neutral',
+        };
+    }
+    if (status === 'unknown') {
+        return {
+            text: 'Estado desconocido',
+            title: 'El detalle guardado de la última ejecución está truncado y no permite saber qué pasó con este ticker.',
+            tone: 'warn',
+        };
+    }
     return {
         text: 'Sin evaluar',
-        title: 'Todavía no hay veredicto: no consta ninguna evaluación ejecutada. Se evalúa tras el cierre (L-V) o con «Evaluar ahora».',
+        title: 'No consta ninguna evaluación ejecutada. Se evalúa tras el cierre (L-V) o con «Evaluar ahora».',
         tone: 'neutral',
     };
 }

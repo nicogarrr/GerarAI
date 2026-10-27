@@ -156,7 +156,7 @@ class DcaEvaluationRun(TenantOwnedMixin, Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     trigger: Mapped[str] = mapped_column(String(16))  # scheduler | manual
     status: Mapped[str] = mapped_column(String(16))  # running | ok | error
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     tracked: Mapped[int] = mapped_column(Integer, default=0)
     evaluated: Mapped[int] = mapped_column(Integer, default=0)

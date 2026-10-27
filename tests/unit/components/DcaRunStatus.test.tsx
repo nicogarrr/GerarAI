@@ -73,6 +73,16 @@ describe('dcaMissingBadge', () => {
     });
 });
 
+describe('dcaMissingBadge con ejecución registrada', () => {
+    it('nunca dice "Sin evaluar" si consta una ejecución: pendiente, desconocido o en curso', () => {
+        expect(dcaMissingBadge(item({ evaluation_status: 'pending' })).text).toBe('Pendiente');
+        const unknown = dcaMissingBadge(item({ evaluation_status: 'unknown', evaluation_reason: 'detalle truncado' }));
+        expect(unknown).toMatchObject({ text: 'Estado desconocido', tone: 'warn' });
+        expect(unknown.title).toContain('truncado');
+        expect(dcaMissingBadge(item({ evaluation_status: 'running' })).text).toBe('En curso');
+    });
+});
+
 describe('dcaRunSummary', () => {
     it('nunca ejecutado', () => {
         expect(dcaRunSummary(null)).toMatchObject({ tone: 'neutral' });

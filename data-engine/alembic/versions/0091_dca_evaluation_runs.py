@@ -21,16 +21,7 @@ _TABLE = "dca_evaluation_runs"
 def upgrade() -> None:
     inspector = sa.inspect(op.get_bind())
     if inspector.has_table(_TABLE):
-        from app.models.entities import DcaEvaluationRun
-
-        columns = {c["name"]: c for c in inspector.get_columns(_TABLE)}
-        expected = DcaEvaluationRun.__table__.columns
-        if set(columns) != set(expected.keys()):
-            raise RuntimeError("dca_evaluation_runs schema mismatch")
-        for name, column in columns.items():
-            target = expected[name]
-            if column["nullable"] != target.nullable or column["type"]._type_affinity != target.type._type_affinity:
-                raise RuntimeError("dca_evaluation_runs schema mismatch")
+        _adopt(inspector)
         return
     op.create_table(
         _TABLE,
@@ -53,6 +44,42 @@ def upgrade() -> None:
     )
     op.create_index("ix_dca_evaluation_runs_tenant_id", _TABLE, ["tenant_id"])
     op.create_index("ix_dca_evaluation_runs_started_at", _TABLE, ["started_at"])
+
+
+def _adopt(inspector) -> None:
+    """Adopta una tabla creada antes por ``create_all`` solo si es identica.
+
+    Se valida el esquema completo: columnas, nullability, tipo, longitud de los
+    strings, clave primaria y FK de ``tenant_id``. Los indices que falten se
+    crean (operacion segura y aditiva); todo lo demas que difiera FALLA sin
+    tocar nada.
+    """
+    from app.models.entities import DcaEvaluationRun
+
+    columns = {c["name"]: c for c in inspector.get_columns(_TABLE)}
+    expected = DcaEvaluationRun.__table__.columns
+    if set(columns) != set(expected.keys()):
+        raise RuntimeError("dca_evaluation_runs schema mismatch: columnas")
+    for name, column in columns.items():
+        target = expected[name]
+        if column["nullable"] != target.nullable or column["type"]._type_affinity != target.type._type_affinity:
+            raise RuntimeError(f"dca_evaluation_runs schema mismatch: {name}")
+        if isinstance(target.type, sa.String) and getattr(column["type"], "length", None) != target.type.length:
+            raise RuntimeError(f"dca_evaluation_runs schema mismatch: longitud de {name}")
+    if inspector.get_pk_constraint(_TABLE).get("constrained_columns") != ["id"]:
+        raise RuntimeError("dca_evaluation_runs schema mismatch: clave primaria")
+    fks = [
+        fk for fk in inspector.get_foreign_keys(_TABLE)
+        if fk["constrained_columns"] == ["tenant_id"] and fk["referred_table"] == "tenants"
+        and fk["referred_columns"] == ["id"]
+    ]
+    if not fks:
+        raise RuntimeError("dca_evaluation_runs schema mismatch: falta FK tenant_id -> tenants.id")
+    present = {tuple(ix["column_names"]) for ix in inspector.get_indexes(_TABLE)}
+    if ("tenant_id",) not in present:
+        op.create_index("ix_dca_evaluation_runs_tenant_id", _TABLE, ["tenant_id"])
+    if ("started_at",) not in present:
+        op.create_index("ix_dca_evaluation_runs_started_at", _TABLE, ["started_at"])
 
 
 def downgrade() -> None:

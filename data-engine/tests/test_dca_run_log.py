@@ -104,7 +104,7 @@ def test_stale_running_row_is_reported_as_interrupted():
     assert payload["status"] == "interrupted"
     assert dca_run_log.item_evaluation("X", False, payload)["status"] == "job_failed"
     fresh = {**payload, "status": "running"}
-    assert dca_run_log.item_evaluation("X", False, fresh) == {"status": "never_run", "reason": "running"}
+    assert dca_run_log.item_evaluation("X", False, fresh) == {"status": "running", "reason": None}
 
 
 def test_recording_failure_never_breaks_the_evaluation():
@@ -171,3 +171,95 @@ def test_migration_0091_creates_adopts_and_rejects_drift(monkeypatch):
         conn.exec_driver_sql("ALTER TABLE dca_evaluation_runs ADD COLUMN unexpected INTEGER")
         with pytest.raises(RuntimeError, match="schema mismatch"):
             module.upgrade()
+
+
+def _runs_payload(n, limit, monkeypatch):
+    monkeypatch.setattr(dca_run_log, "_DETAIL_LIMIT", limit)
+    with SessionLocal() as db:
+        row = dca_run_log.start_run(db, "scheduler")
+        dca_run_log.finish_run(
+            db, row,
+            summary={
+                "tracked": n, "evaluated": 0, "alerted": [], "errors": [],
+                "skipped": [{"symbol": f"S{i}", "reason": "sin_datos"} for i in range(n)],
+            },
+        )
+        return dca_run_log.run_payload(dca_run_log.latest_run(db))
+
+
+def test_truncated_detail_never_reports_never_run(monkeypatch):
+    """Con mas omitidos que el limite guardado, el ticker fuera de la lista es 'unknown'."""
+    payload = _runs_payload(5, 3, monkeypatch)
+    assert payload["skipped"] == 5 and len(payload["skipped_detail"]) == 3
+    assert dca_run_log.item_evaluation("S0", False, payload)["status"] == "skipped"
+    out = dca_run_log.item_evaluation("S4", False, payload)
+    assert out["status"] == "unknown" and "truncado" in out["reason"]
+    assert dca_run_log.item_evaluation("S4", False, payload)["status"] != "never_run"
+
+
+def test_complete_detail_unlisted_symbol_is_pending_not_never_run(monkeypatch):
+    payload = _runs_payload(2, 500, monkeypatch)
+    out = dca_run_log.item_evaluation("ADDED_LATER", False, payload)
+    assert out["status"] == "pending"
+    assert dca_run_log.item_evaluation("ADDED_LATER", False, None)["status"] == "never_run"
+
+
+def test_detail_keeps_every_symbol_up_to_the_limit(monkeypatch):
+    payload = _runs_payload(51, 500, monkeypatch)
+    assert len(payload["skipped_detail"]) == 51
+    assert dca_run_log.item_evaluation("S50", False, payload)["status"] == "skipped"
+
+
+def _migration_module():
+    path = Path(__file__).parents[1] / "alembic/versions/0091_dca_evaluation_runs.py"
+    spec = importlib.util.spec_from_file_location("dca_runs_migration_full", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _fresh_adoptable(conn, module, monkeypatch):
+    conn.exec_driver_sql("CREATE TABLE tenants (id INTEGER PRIMARY KEY)")
+    monkeypatch.setattr(module, "op", Operations(MigrationContext.configure(conn)))
+    module.upgrade()
+
+
+def _recreate(conn, ddl):
+    conn.exec_driver_sql("DROP TABLE dca_evaluation_runs")
+    conn.exec_driver_sql(ddl)
+
+
+_GOOD_COLS = (
+    "id INTEGER NOT NULL, tenant_id INTEGER, trigger VARCHAR(16) NOT NULL, status VARCHAR(16) NOT NULL, "
+    "started_at DATETIME NOT NULL, finished_at DATETIME, tracked INTEGER NOT NULL, evaluated INTEGER NOT NULL, "
+    "skipped_count INTEGER NOT NULL, errors_count INTEGER NOT NULL, alerted_count INTEGER NOT NULL, "
+    "detail JSON NOT NULL, error VARCHAR(300), params_version VARCHAR(40), created_at DATETIME NOT NULL, "
+    "updated_at DATETIME NOT NULL"
+)
+_FK = ", FOREIGN KEY(tenant_id) REFERENCES tenants (id)"
+
+
+def test_migration_adoption_validates_full_schema(monkeypatch):
+    module = _migration_module()
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as conn:
+        _fresh_adoptable(conn, module, monkeypatch)
+        # Falta FK: se rechaza.
+        _recreate(conn, f"CREATE TABLE dca_evaluation_runs ({_GOOD_COLS}, PRIMARY KEY (id))")
+        with pytest.raises(RuntimeError, match="FK"):
+            module.upgrade()
+        # status VARCHAR(1): se rechaza.
+        bad = _GOOD_COLS.replace("status VARCHAR(16)", "status VARCHAR(1)")
+        _recreate(conn, f"CREATE TABLE dca_evaluation_runs ({bad}, PRIMARY KEY (id){_FK})")
+        with pytest.raises(RuntimeError, match="longitud de status"):
+            module.upgrade()
+        # Sin clave primaria: se rechaza.
+        _recreate(conn, f"CREATE TABLE dca_evaluation_runs ({_GOOD_COLS}{_FK})")
+        with pytest.raises(RuntimeError, match="clave primaria"):
+            module.upgrade()
+        # Esquema bueno sin indices: se repara creando los indices.
+        _recreate(conn, f"CREATE TABLE dca_evaluation_runs ({_GOOD_COLS}, PRIMARY KEY (id){_FK})")
+        assert inspect(conn).get_indexes("dca_evaluation_runs") == []
+        module.upgrade()
+        cols = {tuple(ix["column_names"]) for ix in inspect(conn).get_indexes("dca_evaluation_runs")}
+        assert cols == {("tenant_id",), ("started_at",)}

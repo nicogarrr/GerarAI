@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # ya no esta corriendo, la mato un reinicio o el limite de tiempo.
 STALE_RUNNING_AFTER = timedelta(minutes=40)
 KEEP_RUNS = 60
-_DETAIL_LIMIT = 50
+_DETAIL_LIMIT = 500
 
 
 def _trim(items: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
@@ -71,7 +71,12 @@ def finish_run(
         row.errors_count = len(summary.get("errors", []))
         row.alerted_count = len(summary.get("alerted", []))
         row.params_version = summary.get("params_version")
-        row.detail = {"skipped": _trim(summary.get("skipped")), "errors": _trim(summary.get("errors"))}
+        row.detail = {
+            "skipped": _trim(summary.get("skipped")),
+            "errors": _trim(summary.get("errors")),
+            # El detalle por simbolo esta acotado: si no cabe, se declara.
+            "truncated": len(summary.get("skipped", [])) > _DETAIL_LIMIT or len(summary.get("errors", [])) > _DETAIL_LIMIT,
+        }
         db.commit()
         _prune(db)
     except Exception:  # noqa: BLE001
@@ -138,7 +143,9 @@ def run_payload(row: DcaEvaluationRun | None, now: datetime | None = None) -> di
 
 def item_evaluation(symbol: str, has_state: bool, run: dict[str, Any] | None) -> dict[str, str | None]:
     """Por que un ticker no tiene nivel: ``evaluated`` | ``never_run`` |
-    ``job_failed`` | ``skipped`` (con motivo)."""
+    ``job_failed`` | ``skipped`` (con motivo) | ``running`` | ``pending`` (hubo
+    ejecucion y este ticker no figura) | ``unknown`` (detalle truncado).
+    ``never_run`` solo si no consta NINGUNA ejecucion."""
     if has_state:
         return {"status": "evaluated", "reason": None}
     if run is None:
@@ -152,5 +159,12 @@ def item_evaluation(symbol: str, has_state: bool, run: dict[str, Any] | None) ->
         if entry.get("symbol") == symbol:
             return {"status": "skipped", "reason": entry.get("reason")}
     if run["status"] == "running":
-        return {"status": "never_run", "reason": "running"}
-    return {"status": "never_run", "reason": None}
+        return {"status": "running", "reason": None}
+    listed_all = run.get("skipped", 0) <= len(run.get("skipped_detail", [])) and run.get("errors", 0) <= len(
+        run.get("errors_detail", [])
+    )
+    if not listed_all:
+        # El detalle guardado no cubre todos los omitidos/errores: no se puede
+        # afirmar ni "nunca ejecutado" ni "no estaba en la ejecucion".
+        return {"status": "unknown", "reason": "detalle de la ultima ejecucion truncado"}
+    return {"status": "pending", "reason": "no figuraba en la ultima ejecucion"}
