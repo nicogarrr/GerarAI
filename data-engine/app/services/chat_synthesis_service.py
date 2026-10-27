@@ -416,6 +416,8 @@ def _inferred_general_text_valid(
     """
     if len(text) > 8000 or not text.strip() or re.search(r"https?://|www[.]|\bdoi:", text, re.I):
         return False
+    if _SECRET_RE.search(text):
+        return False
     if re.search(
         r"(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
         r"(?:com|org|net|io|ai|es|gov|edu|co|uk|de|fr|app|dev|info|biz|eu)\b(?:/[^\s]*)?",
