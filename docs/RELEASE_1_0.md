@@ -3,8 +3,19 @@
 Documento vivo para sacar la **1.0.0**. Marca cada casilla al cumplirla. La PR del
 bump de versión (#2340) está en *draft* y **no se mergea hasta el OK de Nico**.
 
-Estado al escribirlo: 27-oct-2026, `main` en verde (último run completo del
-workflow CI, `a6abdead`), cabeza Alembic `0082`.
+Estado al escribirlo: 27-oct-2026, cabeza Alembic `0082`.
+
+**Recuento a 27-oct-2026 18:50 (CET), `main` = `239e68de`** (incluye #2476):
+
+| # | Bloqueante | Estado | Evidencia |
+|---|---|---|---|
+| 1 | Divisas | En `main`. Sin comprobar en producción (no desplegado) | #2331, #2325, #2365, #2339, #2431, #2437, #2419, #2376 |
+| 2 | Rotar claves | **No hecho. Solo Nico.** No se ha comprobado si las antiguas siguen activas | `docs/ROTACION_CLAVES.md` (#2332) |
+| 3 | Cola de PRs y `main` en verde | Cola en `main`. **Verde sin demostrar**: ningún run de CI de `main` de la tarde ha terminado en success (4 failure, 8 cancelled). Fallos reales en el run `f203dcf3`: guards `scripts/*.test.ts` (7, ya corregidos en una PR aparte) y otros jobs aún sin reproducir en local | run 40544205846 |
+| 4 | Trimestres y TTM | En `main` | #2342, #2350, #2448 |
+| 5 | gitleaks | En `main` (solo commits nuevos; el historial sigue con claves) | #2269 |
+
+Las casillas de abajo no se marcan sin un run en verde del commit de `main` que se vaya a etiquetar.
 
 ## 0. Lo que falta para la 1.0 (bloqueantes)
 
