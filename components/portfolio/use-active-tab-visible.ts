@@ -11,8 +11,10 @@ export function useActiveTabVisible(activeTab: string) {
         if (!viewport || !selected) return;
         const outer = viewport.getBoundingClientRect();
         const inner = selected.getBoundingClientRect();
-        const offset = inner.left < outer.left ? inner.left - outer.left
-            : inner.right > outer.right ? inner.right - outer.right : 0;
+        const left = outer.left + viewport.clientLeft;
+        const right = left + viewport.clientWidth;
+        const offset = inner.left < left ? Math.floor(inner.left - left)
+            : inner.right > right ? Math.ceil(inner.right - right) : 0;
         if (offset) viewport.scrollLeft += offset;
     }, [activeTab]);
     return ref;

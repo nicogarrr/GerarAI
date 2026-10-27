@@ -9,6 +9,7 @@ function Fixture({ active }: { active: string }) {
 }
 
 it('reveals a selected tab to the right on direct URL entry and to the left on URL changes', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(358);
     let rect = { left: 480, right: 610 };
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
         return (this.getAttribute('role') === 'tab' ? rect : { left: 16, right: 374 }) as DOMRect;
@@ -22,6 +23,7 @@ it('reveals a selected tab to the right on direct URL entry and to the left on U
 });
 
 it('does not move an already visible tab or steal focus', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(358);
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ left: 16, right: 374 } as DOMRect);
     const { getByTestId } = render(<Fixture active="resumen" />);
     expect(getByTestId('viewport').scrollLeft).toBe(0);
