@@ -460,7 +460,7 @@ class MarketRefreshService:
                 # An existing row is a real bar from the OHLCV path: update
                 # only the close, never the session's open/high/low.
                 close = observation.price
-                if market.quote_currency != observation.quote_currency and market.adj_close is not None:
+                if market.quote_currency != observation.quote_currency:
                     # Preserve adjusted history in its stored unit. Unknown
                     # legacy units cannot be reconciled from price magnitude.
                     close = (
@@ -474,8 +474,7 @@ class MarketRefreshService:
                         continue
                 market.close = close
                 market.source = observation.source
-                if market.adj_close is None:
-                    market.quote_currency = observation.quote_currency
+                # OHL and adjusted values keep their original unit.
                 # El volumen solo se toca cuando el proveedor trae uno nuevo:
                 # un None intradia nunca pisa el volumen real de la barra.
                 if observation.volume is not None:

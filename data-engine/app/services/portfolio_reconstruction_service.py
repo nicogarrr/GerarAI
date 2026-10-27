@@ -94,11 +94,11 @@ class PortfolioReconstructionService:
         )
         # Posiciones sin operaciones en el libro: cantidad constante en la ventana.
         ids: set[int] = {p.company_id for p in held_positions}
-        currency: dict[int, str] = {p.company_id: (p.currency or "USD").upper() for p in held_positions}
+        currency: dict[int, str] = {p.company_id: (p.currency or "USD") for p in held_positions}
         for t in transactions:
             if t.company_id is not None:
                 ids.add(t.company_id)
-                currency[t.company_id] = (t.currency or "USD").upper()
+                currency[t.company_id] = (t.currency or "USD")
         company_ids = sorted(ids)
         companies_by_id = {company.id: company for _, company in (rows or [])}
         missing = [cid for cid in company_ids if cid not in companies_by_id]

@@ -67,6 +67,7 @@ from app.services.tax_irpf_filing import (
     build_interest,
     build_loss_compensation,
 )
+from app.valuation.currency import normalize_currency
 
 FIFO_METHOD = "fifo"
 AVERAGE_METHOD = "average"
@@ -136,10 +137,11 @@ def _rate_not_older_than(
     """
     from bisect import bisect_right
 
-    quote = quote_currency.upper()
-    base = base_currency.upper()
+    quote, quote_divisor = normalize_currency(quote_currency)
+    base, base_divisor = normalize_currency(base_currency)
+    factor = Decimal(base_divisor) / Decimal(quote_divisor)
     if quote == base:
-        return Decimal("1")
+        return factor
     for key, invert in (((base, quote), False), ((quote, base), True)):
         series = table.get(key)
         if not series:
@@ -150,7 +152,7 @@ def _rate_not_older_than(
         rate_date, rate = series[idx]
         if (as_of - rate_date).days > max_age_days or not rate:
             continue
-        return Decimal("1") / rate if invert else rate
+        return factor / rate if invert else rate * factor
     return None
 
 

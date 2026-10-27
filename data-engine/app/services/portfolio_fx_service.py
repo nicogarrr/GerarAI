@@ -7,10 +7,17 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import FXRate, Portfolio
+from app.valuation.currency import normalize_currency
 
 # Divisa de la declaracion (IRPF, Modelo 720): euros al tipo BCE de cada fecha,
 # sea cual sea la divisa base de la cartera.
 TAX_CURRENCY = "EUR"
+
+
+def currency_key(raw: str) -> str:
+    """Injective monetary-unit key: GBP and GBp must never collide."""
+    major, divisor = normalize_currency(raw)
+    return major if divisor == 1 else f"{major}/{divisor}"
 
 
 class PortfolioFXService:
@@ -74,8 +81,14 @@ class PortfolioFXService:
         rate_date desc y created_at desc. Devuelve la tasa efectiva y su
         procedencia: rate_date y source de la fila usada y direction
         ("same", "direct" o "inverse"; en inversa rate = 1 / fila.rate)."""
-        quote = quote_currency.upper()
-        base = base_currency.upper()
+        quote, quote_divisor = normalize_currency(quote_currency)
+        base, base_divisor = normalize_currency(base_currency)
+        factor = Decimal(base_divisor) / Decimal(quote_divisor)
+        if quote_divisor != 1 or base_divisor != 1:
+            found = self.rate_with_provenance(
+                db, quote_currency=quote or "", base_currency=base or "", as_of=as_of
+            )
+            return {**found, "rate": found["rate"] * factor} if found else None
         if quote == base:
             return {
                 "rate": Decimal("1"),
@@ -133,8 +146,8 @@ class PortfolioFXService:
         fecha ascendente; combínese con :meth:`rate_from_table` para
         replicar :meth:`rate` sin N+1 y sin filtrar futuro (lookahead).
         """
-        base = base_currency.upper()
-        codes = {str(code).upper() for code in currencies if code}
+        base, _ = normalize_currency(base_currency)
+        codes = {normalize_currency(str(code))[0] for code in currencies if code}
         codes.add(base)
         rows = list(
             db.scalars(
@@ -167,20 +180,21 @@ class PortfolioFXService:
         """Equivalente puro en memoria de :meth:`rate` sobre ``fx_table``."""
         from bisect import bisect_right
 
-        quote = quote_currency.upper()
-        base = base_currency.upper()
+        quote, quote_divisor = normalize_currency(quote_currency)
+        base, base_divisor = normalize_currency(base_currency)
+        factor = Decimal(base_divisor) / Decimal(quote_divisor)
         if quote == base:
-            return Decimal("1")
+            return factor
         series = table.get((base, quote))
         if series:
             idx = bisect_right(series, (as_of, Decimal("Infinity"))) - 1
             if idx >= 0:
-                return series[idx][1]
+                return series[idx][1] * factor
         inverse = table.get((quote, base))
         if inverse:
             idx = bisect_right(inverse, (as_of, Decimal("Infinity"))) - 1
             if idx >= 0 and inverse[idx][1]:
-                return Decimal("1") / inverse[idx][1]
+                return factor / inverse[idx][1]
         return None
 
     def rates_for(
@@ -197,41 +211,22 @@ class PortfolioFXService:
         rate_date <= as_of) y elige en Python la más reciente por par,
         replicando la semántica de :meth:`rate`.
         """
-        base = base_currency.upper()
-        quotes = {str(code).upper() for code in quote_currencies if code}
-        result: dict[str, Decimal | None] = {}
-        pending = set(quotes)
-        for code in quotes:
-            if code == base:
-                result[code] = Decimal("1")
-                pending.discard(code)
-        if not pending:
-            return result
-        pairs = set(pending) | {base}
-        rows = list(
-            db.scalars(
-                select(FXRate)
-                .where(
-                    FXRate.base_currency.in_(pairs),
-                    FXRate.quote_currency.in_(pairs),
-                    FXRate.rate_date <= as_of,
-                )
-                .order_by(desc(FXRate.rate_date), desc(FXRate.created_at))
-            ).all()
+        quotes = {str(code) for code in quote_currencies if code}
+        base_major, base_divisor = normalize_currency(base_currency)
+        if all(normalize_currency(code)[0] == base_major for code in quotes):
+            return {
+                currency_key(code): Decimal(base_divisor) / Decimal(normalize_currency(code)[1])
+                for code in quotes
+            }
+        table = self.fx_table(
+            db, currencies=quotes, base_currency=base_currency, as_of_max=as_of
         )
-        latest: dict[tuple[str, str], Decimal] = {}
-        for row in rows:
-            key = (row.base_currency.upper(), row.quote_currency.upper())
-            if key not in latest and row.rate is not None:
-                latest[key] = row.rate
-        for code in pending:
-            direct = latest.get((base, code))
-            if direct is not None:
-                result[code] = direct
-                continue
-            inverse = latest.get((code, base))
-            result[code] = Decimal("1") / inverse if inverse else None
-        return result
+        return {
+            currency_key(code): self.rate_from_table(
+                table, quote_currency=code, base_currency=base_currency, as_of=as_of
+            )
+            for code in quotes
+        }
 
     def upsert_rate(
         self,

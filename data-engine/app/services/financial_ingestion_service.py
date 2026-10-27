@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
 from app.models import Company, Document, FinancialFact, FinancialStatement, MarketPrice
+from app.services.price_units import price_in_currency
 from app.services.connectors import esef as esef_connector
 from app.services.connectors import fred as fred_connector
 from app.services.connectors import sec_edgar as sec_edgar_connector
@@ -1984,6 +1985,14 @@ class FinancialIngestionService:
         snapshot = esef_connector.read_esef_snapshot(ticker)
         if snapshot is None:
             raise RuntimeError(f"Sin snapshot ESEF local para {ticker}: por ahora solo hay cobertura de emisores IBEX revisados")
+        # Multi-package snapshots now preserve incompatible presentations in
+        # an archive instead of silently blending them. Their current facts
+        # may be narrower; reject BEFORE source creation/deletion/commit.
+        if snapshot.get("requires_presentation_review"):
+            raise RuntimeError(
+                "esef_presentation_review_required: snapshot preserves separate "
+                "filing presentations; automatic history replacement is blocked"
+            )
         from app.services.esef_issuer_mapping import (
             reviewed_isins_for_ticker,
             reviewed_names_for_ticker,
@@ -2984,16 +2993,20 @@ class FinancialIngestionService:
             select(MarketPrice).where(MarketPrice.company_id == company.id, MarketPrice.date == quote_date)
         )
         if existing:
-            if existing.adj_close is not None and existing.quote_currency != (item.get("currency") or None):
-                # Do not mix an adjusted series with a close of unknown/different unit.
-                return
+            if existing.quote_currency != (item.get("currency") or None):
+                price = (
+                    price_in_currency(price, quote_currency=item.get("currency"),
+                                      target_currency=existing.quote_currency, company=company)
+                    if existing.quote_currency and item.get("currency") else None
+                )
+                if price is None:
+                    return
             # La fila existente es una barra real: se actualiza solo el close
             # y se preservan OHLC y el adjusted autentico de esa fecha.
             existing.close = price
             if volume is not None:
                 existing.volume = volume
             existing.source = "FMP"
-            existing.quote_currency = item.get("currency") or None
             return
         # Una quote spot no es una barra ajustada: adj_close queda NULL en vez
         # de copiar close, que afirmaria un ajuste nunca realizado y

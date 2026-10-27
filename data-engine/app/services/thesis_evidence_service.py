@@ -577,7 +577,7 @@ class ThesisEvidenceService:
                         MarketPrice.company_id == company.id, MarketPrice.date == quote_date
                     )
                 )
-                if existing and existing.adj_close is not None and existing.quote_currency is not None:
+                if existing and existing.quote_currency is not None:
                     result.update({"status": "unknown_price_unit", "detail": "Quote sin unidad verificable para esta barra ajustada."})
                 elif existing:
                     # Barra real ya persistida: se actualiza solo el close y se
@@ -604,7 +604,8 @@ class ThesisEvidenceService:
                             quote_currency=None,
                         )
                     )
-                result.update({"status": "ok", "price": float(price), "price_as_of": quote_date.isoformat()})
+                if result["status"] != "unknown_price_unit":
+                    result.update({"status": "ok", "price": float(price), "price_as_of": quote_date.isoformat()})
         else:
             result["detail"] = result.get("detail") or "Quote sin precio util (c<=0 o vacio)."
         try:

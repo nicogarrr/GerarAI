@@ -14,6 +14,9 @@ del emisor (tabla reviewed de esef_package_sources) para paises que el indice
 no cubre (Irlanda no tiene filings en filings.xbrl.org): se descarga el zip
 ESMA publicado por el emisor y se parsea el iXBRL con esef_ixbrl, con la
 misma salida normalizada y sha256 real del paquete como procedencia.
+En este carril no se fusionan presentaciones de distintos paquetes: `facts`
+es la ultima presentacion, con originales separados en presentation_archive.
+Los snapshots multipaquete requieren revision antes de reemplazar historia.
 
 Uso:
     python scripts/build_esef_snapshots.py --out data/esef_snapshots \
@@ -88,7 +91,7 @@ async def build_package_payloads(fetched_at: str, fetch=None) -> dict[str, dict]
         issuer = resolve_issuer_by_lei(lei)
         if issuer is None:
             continue  # tabla de paquetes sin emisor reviewed: no se construye
-        normalized_docs = []
+        presentations = []
         periods = []
         latest_sha = latest_name = ""
         for src_pkg in sorted(sources, key=lambda s: s.period_end):
@@ -107,13 +110,25 @@ async def build_package_payloads(fetched_at: str, fetch=None) -> dict[str, dict]
                 print(f"LEI del documento {parsed['entity_lei']} != {lei}: "
                       f"paquete descartado ({src_pkg.url})")
                 continue
-            normalized_docs.append(parsed["facts"])
+            presentations.append({
+                "filing_period_end": src_pkg.period_end,
+                "source_url": src_pkg.url,
+                "sha256": sha,
+                "report_path": name,
+                "facts": parsed["facts"],
+            })
             periods.append(src_pkg.period_end)
             # orden ascendente por period_end: el ultimo procesado es el mas reciente
             latest_sha, latest_name = sha, name
-        if not normalized_docs:
+        if not presentations:
             continue
-        facts = merge_facts(normalized_docs)
+        # Chronology does not establish accounting-scope comparability. Keep
+        # original presentations intact; never fill gaps in the latest report
+        # with facts from another perimeter (e.g. discontinued operations).
+        latest = presentations[-1]
+        facts = latest["facts"]
+        selected_keys = _fact_keys(facts)
+        excluded = set().union(*(_fact_keys(p["facts"]) for p in presentations)) - selected_keys
         payloads[lei] = {
             "lei": lei,
             "ticker": issuer.ticker,
@@ -125,9 +140,34 @@ async def build_package_payloads(fetched_at: str, fetch=None) -> dict[str, dict]
             "fetched_at": fetched_at,
             "package_urls": {s.period_end: s.url for s in sources},
             "facts": facts,
+            "presentation_policy": "single_latest_package_no_cross_filing_fallback",
+            "selected_presentation": {k: v for k, v in latest.items() if k != "facts"},
+            "presentation_archive": presentations,
+            "coverage": {
+                "selected_fact_keys": len(selected_keys),
+                "older_only_fact_keys_excluded": len(excluded),
+                "comparability": "not_asserted_across_presentations",
+            },
+            # The ingestion path replaces prior facts, so a narrower projection
+            # must not trigger an automatic destructive history migration.
+            # Count configured sources, not just accepted archives: a missing
+            # report or LEI-mismatched package must not turn a partial build
+            # into an apparently safe single-package replacement.
+            "requires_presentation_review": len(sources) > 1,
         }
     return payloads
 
+
+
+def _fact_keys(facts: dict) -> set[tuple]:
+    """Coverage identities only, not a claim of accounting comparability."""
+    return {
+        (concept, unit, e.get("start"), e.get("end") or e.get("instant"),
+         tuple(e.get("dims") or ()))
+        for concept, units in facts.items()
+        for unit, entries in units.items()
+        for e in entries
+    }
 
 
 def latest_filing_per_lei(filings: list[EsefFiling]) -> dict[str, EsefFiling]:
