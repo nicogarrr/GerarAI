@@ -217,14 +217,19 @@ Ver [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) y la propia app en
 
 ## Producción
 
-- Frontend en Vercel; backend con autoarranque local, `docker-compose.prod.yml` (Oracle) o `render.yaml` (Render).
+- **Camino oficial para la 1.0**: frontend en Vercel + backend con
+  `docker-compose.prod.yml` en Oracle Cloud. Es el único despliegue probado de
+  punta a punta (healthchecks, reinicio automático y restore drill en CI).
 - **Oracle Cloud (Always Free)**: `docker-compose.prod.yml` levanta el stack 24/7
   en una VM Ampere ARM (Caddy + PostgreSQL + Redis + Qdrant + MinIO + backend +
   worker + scheduler), con healthchecks y reinicio automático; ver
   `docs/oracle-setup.md` para la cuenta y el `.env.production`.
-- **Render (free)**: `render.yaml` (raíz del repo) despliega solo el backend con
-  `data-engine/Dockerfile.prod` y healthcheck `/health/ready`; en el tier free
-  hiberna a los ~15 min, así que los workers no corren 24/7.
+- **Autoarranque local (Windows)**: `arrancar_gerarai.bat` para uso personal en el PC.
+- **Render (experimental, no soportado)**: `render.yaml` (raíz del repo) solo
+  describe el backend con `data-engine/Dockerfile.prod`. **No despliega tal
+  cual**: `/health/ready` exige Postgres, Redis, Qdrant y MinIO externos que hay
+  que configurar a mano en el dashboard, el tier free hiberna a los ~15 min y los
+  workers van apagados (`WORKERS_ENABLED=false`).
 - Migraciones siempre explícitas (`alembic upgrade head`); el seed solo instala taxonomía pública, nunca tu cartera.
 - Puertos de BD cerrados al exterior; secretos solo en el dashboard de deploy.
 - Qdrant se reconstruye desde Postgres (`RAGIndex().rebuild_tenant`).
