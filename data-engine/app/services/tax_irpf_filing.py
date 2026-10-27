@@ -48,6 +48,14 @@ from decimal import ROUND_HALF_UP, Decimal
 #  - 2025+:     19 / 21 / 23 / 27 / 30 (Ley 7/2024 sube el tramo >300.000 al 30%)
 # Cada banda es (desde, hasta, tipo); el tramo superior usa hasta=None.
 
+_BRACKETS_2007 = ((0, None, Decimal("0.18")),)
+_BRACKETS_2010 = ((0, 6_000, Decimal("0.19")), (6_000, None, Decimal("0.21")))
+_BRACKETS_2012 = ((0, 6_000, Decimal("0.21")), (6_000, 24_000, Decimal("0.25")),
+                  (24_000, None, Decimal("0.27")))
+_BRACKETS_2015 = ((0, 6_000, Decimal("0.195")), (6_000, 50_000, Decimal("0.215")),
+                  (50_000, None, Decimal("0.235")))
+_BRACKETS_2016 = ((0, 6_000, Decimal("0.19")), (6_000, 50_000, Decimal("0.21")),
+                  (50_000, None, Decimal("0.23")))
 _BRACKETS_2021 = ((0, 6_000, Decimal("0.19")), (6_000, 50_000, Decimal("0.21")),
                   (50_000, 200_000, Decimal("0.23")), (200_000, None, Decimal("0.26")))
 _BRACKETS_2023 = ((0, 6_000, Decimal("0.19")), (6_000, 50_000, Decimal("0.21")),
@@ -115,12 +123,31 @@ SPECIAL_PAYMENT_TOKENS = (
 
 
 def savings_bands(year: int) -> tuple:
-    """Escala del ahorro vigente en ``year`` (tuplas desde/hasta/tipo)."""
+    """Escala del ahorro vigente en ``year`` (tuplas desde/hasta/tipo).
+
+    Tipo total (estatal + autonomico). Fuentes:
+    - 2021-2022: Ley 11/2020 (BOE-A-2020-17339), tramo del 26 % desde 200.000.
+    - 2016-2020: Ley 26/2014 (BOE-A-2014-12327), arts. 66 y 76 LIRPF: 19/21/23.
+    - 2015: RDL 9/2015 (BOE-A-2015-7765), escala de 2015: 19,5/21,5/23,5.
+    - 2012-2014: RDL 20/2011 (BOE-A-2011-20638), gravamen complementario: 21/25/27.
+    - 2010-2011: Ley 26/2009 (PGE 2010): 19/21.
+    - 2007-2009: Ley 35/2006: tipo unico del 18 %.
+    """
     if year >= 2025:
         return _BRACKETS_2025
     if year >= 2023:
         return _BRACKETS_2023
-    return _BRACKETS_2021
+    if year >= 2021:
+        return _BRACKETS_2021
+    if year >= 2016:
+        return _BRACKETS_2016
+    if year == 2015:
+        return _BRACKETS_2015
+    if year >= 2012:
+        return _BRACKETS_2012
+    if year >= 2010:
+        return _BRACKETS_2010
+    return _BRACKETS_2007
 
 
 def calculate_savings_tax(income: Decimal, year: int) -> Decimal:
