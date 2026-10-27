@@ -171,17 +171,8 @@ def backfill_ecb_rates_sync(
     async def _adapter(codes: list[str], s: date, e: date) -> str:
         return fetcher(codes, s, e)
 
-    import asyncio
+    from app.services.async_bridge import run_from_any_context
 
-    coro = backfill_ecb_rates(db, currencies=currencies, start=start, end=end, fetcher=_adapter)
-    # El adaptador no hace I/O asincrono: el bucle solo existe para reutilizar
-    # la unica implementacion de la escritura. Un hilo con su propio bucle evita
-    # chocar con el bucle de FastAPI si el llamante ya esta dentro de uno.
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    import concurrent.futures
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(asyncio.run, coro).result()
+    return run_from_any_context(
+        backfill_ecb_rates(db, currencies=currencies, start=start, end=end, fetcher=_adapter)
+    )
