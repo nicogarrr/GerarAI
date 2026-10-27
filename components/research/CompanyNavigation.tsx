@@ -48,7 +48,7 @@ export function CompanyNavigation({ ticker, activeView }: { ticker: string; acti
           return keys.length ? <div key={group.label}>
             <p className="mb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{group.label}</p>
             {keys.map((key) => key === 'changes'
-              ? <div key={key}>{link(key, true)}<Link className="flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-200" href={`/research/${encodeURIComponent(ticker)}?view=changes#diario-decisiones`} scroll={false}>Diario de decisiones <span aria-hidden="true">→</span></Link></div>
+              ? <div key={key}>{link(key, true)}<Link data-testid="decision-journal-entry" className="flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-200" href={`/research/${encodeURIComponent(ticker)}?view=changes#diario-decisiones`} scroll={false}>Diario de decisiones <span aria-hidden="true">→</span></Link></div>
               : link(key, true))}
           </div> : null;
         })}

@@ -16,7 +16,8 @@ describe('CompanyNavigation', () => {
       other.unmount();
     }
     for (const item of MODULES) expect(hrefs).toContain(moduleHref('ASTS', item));
-    expect(screen.getByText('Diario de decisiones')).toHaveAttribute('href', '/research/ASTS?view=changes#diario-decisiones');
+    expect(screen.getByTestId('decision-journal-entry')).toHaveAttribute('href', '/research/ASTS?view=changes#diario-decisiones');
+    expect(screen.getByTestId('decision-journal-entry').closest('details')).toBe(screen.getByText('Análisis avanzado').closest('details'));
     expect(screen.getByText('Análisis avanzado').closest('details')).not.toHaveAttribute('open');
   });
   it('opens advanced navigation for an active specialist module', () => {
