@@ -417,13 +417,24 @@ export function DecisionAndRealityPanel({
                 </div>
               ) : trades.length > 0 ? (
                 <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-2 flex flex-wrap items-center gap-2" successMessage="Decisión enlazada a la operación">
+                  {ambiguousCandidateIds(entry.metadata) ? (
+                    <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-ambiguous-link" role="status">
+                      Hay varias operaciones posibles para esta decisión y no se ha enlazado ninguna sola. Elige cuál la ejecutó, o deja la decisión sin operación.
+                    </p>
+                  ) : null}
                   <select aria-label="Enlazar a una operación" className={`${selectClass} h-8 text-xs`} defaultValue="" name="transaction_id" required>
                     <option disabled value="">Enlazar a una operación…</option>
-                    {trades.map((trade) => (
+                    {tradesForEntry(trades, entry.metadata).map((trade) => (
                       <option key={trade.id} value={trade.id}>{describeTrade(trade)}</option>
                     ))}
                   </select>
                   <Button size="sm" type="submit" variant="outline">Enlazar</Button>
+                </MutationForm>
+              ) : null}
+              {!entry.transaction && ambiguousCandidateIds(entry.metadata) ? (
+                <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage="Decisión marcada sin operación">
+                  <input name="transaction_id" type="hidden" value="" />
+                  <button className="text-gray-500 underline hover:text-gray-300" type="submit">No enlazar (sin operación)</button>
                 </MutationForm>
               ) : null}
             </div>
@@ -509,4 +520,21 @@ function AssumptionSources({ fuentes }: { fuentes?: Array<{ fact_id: number; tit
       ))}
     </>
   );
+}
+
+
+/** Candidatas que dejó la importación cuando NO pudo enlazar sola (varias posibles). */
+function ambiguousCandidateIds(metadata: Record<string, unknown> | undefined): number[] | null {
+  const link = metadata?.auto_link as { status?: unknown; candidate_transaction_ids?: unknown } | undefined;
+  if (!link || link.status !== 'ambiguous' || !Array.isArray(link.candidate_transaction_ids)) return null;
+  const ids = link.candidate_transaction_ids.filter((id): id is number => typeof id === 'number');
+  return ids.length > 0 ? ids : null;
+}
+
+/** Con ambigüedad, el selector ofrece SOLO las candidatas (si siguen existiendo); si no, todas. */
+function tradesForEntry(trades: JournalTrade[], metadata: Record<string, unknown> | undefined): JournalTrade[] {
+  const ids = ambiguousCandidateIds(metadata);
+  if (!ids) return trades;
+  const subset = trades.filter((trade) => ids.includes(trade.id));
+  return subset.length > 0 ? subset : trades;
 }

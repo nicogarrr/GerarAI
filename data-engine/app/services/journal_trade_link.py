@@ -34,9 +34,15 @@ TRADE_ACTIONS = ("buy", "sell")
 # Decision del diario -> accion de la operacion que la ejecutaria. «hold»,
 # «watch» y «avoid» no tienen operacion: nunca se enlazan.
 DECISION_TRADE_ACTION = {"buy": "buy", "sell": "sell", "trim": "sell"}
-# Ventana (dias) entre la fecha de la decision y la de la operacion para
-# considerar una correspondencia. Conservadora: fuera de ella no se enlaza.
+# Ventana (dias) DESPUES de la fecha de la decision en la que una operacion se
+# considera candidata. HIPOTESIS de producto sin confirmar: la operacion debe
+# ser del mismo dia o posterior (la decision precede a la ejecucion; una compra
+# anterior pudo responder a otro razonamiento) y a <= 3 dias.
 AUTO_LINK_WINDOW_DAYS = 3
+# Veto por precio: si la entrada guarda un precio y esta en la misma divisa que
+# la operacion, una diferencia relativa mayor que esta no es candidata. El
+# diario NO guarda cantidad, cuenta ni hora: no se infieren.
+AUTO_LINK_MAX_PRICE_GAP = Decimal("0.25")
 THESIS_MAX_AGE_DAYS = 180
 _ACTION_LABELS = {"buy": "Compra", "sell": "Venta"}
 
@@ -227,6 +233,19 @@ def journal_trades(db: Session, company: Company, *, limit: int = 100) -> list[d
     return [{**trade_summary(t), "linked_entry_ids": sorted(linked.get(t.id, []))} for t in trades]
 
 
+def _price_compatible(
+    entry: DecisionJournalEntry, trade: Transaction, company_currency: str | None
+) -> bool:
+    """False solo si hay dos precios comparables (misma divisa) y difieren demasiado."""
+    decision_price = _positive(entry.price)
+    trade_price = _positive(trade.price)
+    if decision_price is None or trade_price is None:
+        return True
+    if not company_currency or str(trade.currency or "").upper() != company_currency.upper():
+        return True
+    return abs(trade_price / decision_price - 1) <= float(AUTO_LINK_MAX_PRICE_GAP)
+
+
 def auto_link_journal_trades(
     db: Session, company_ids: set[int] | None = None
 ) -> dict[str, int]:
@@ -235,7 +254,9 @@ def auto_link_journal_trades(
     Una decision sin operacion (``transaction_id`` nulo) de compra/venta/reduccion
     se enlaza a una compra/venta de la misma empresa cuando:
     - la accion coincide (buy->buy, sell/trim->sell),
-    - la fecha de la operacion esta a <= ``AUTO_LINK_WINDOW_DAYS`` de la decision,
+    - la operacion es del mismo dia que la decision o hasta ``AUTO_LINK_WINDOW_DAYS``
+      despues (una operacion anterior pudo responder a otro razonamiento),
+    - el precio, si ambos existen y estan en la misma divisa, no difiere > 25 %,
     - la operacion no esta ya enlazada a otra entrada,
     - y la relacion es uno a uno: esa entrada tiene UNA sola candidata y esa
       operacion tiene UNA sola entrada candidata.
@@ -247,22 +268,41 @@ def auto_link_journal_trades(
     (``metadata.auto_link.status == "user_unlinked"``) no se vuelve a enlazar.
     Idempotente.
     """
-    summary = {"linked": 0, "ambiguous": 0}
+    summary = {"linked": 0, "ambiguous": 0, "unlinked": 0}
     query = select(DecisionJournalEntry).where(
-        DecisionJournalEntry.transaction_id.is_(None),
         DecisionJournalEntry.decision.in_(list(DECISION_TRADE_ACTION)),
     )
     if company_ids is not None:
         if not company_ids:
             return summary
         query = query.where(DecisionJournalEntry.company_id.in_(company_ids))
+    all_entries = list(db.scalars(query).all())
+
+    def _meta(entry: DecisionJournalEntry) -> dict[str, Any]:
+        return dict(entry.metadata_ or {})
+
+    def _is_auto(entry: DecisionJournalEntry) -> bool:
+        link = _meta(entry).get("auto_link") or {}
+        return (
+            entry.transaction_id is not None
+            and link.get("status") == "linked"
+            and link.get("transaction_id") == entry.transaction_id
+        )
+
+    # Entradas a evaluar: las pendientes y las enlazadas AUTOMATICAMENTE (que se
+    # reevaluan ante cada operacion nueva). Los enlaces manuales/confirmados no se tocan.
     entries = [
         entry
-        for entry in db.scalars(query).all()
-        if (entry.metadata_ or {}).get("auto_link", {}).get("status") != "user_unlinked"
+        for entry in all_entries
+        if _is_auto(entry)
+        or (
+            entry.transaction_id is None
+            and (_meta(entry).get("auto_link") or {}).get("status") != "user_unlinked"
+        )
     ]
     if not entries:
         return summary
+    auto_ids = {entry.id for entry in entries if _is_auto(entry)}
     company_set = {entry.company_id for entry in entries}
     trades = list(
         db.scalars(
@@ -272,15 +312,25 @@ def auto_link_journal_trades(
             )
         ).all()
     )
+    # Operaciones ya ligadas por el usuario (o por otra entrada no automatica).
     already_linked = {
+        entry.transaction_id
+        for entry in all_entries
+        if entry.transaction_id is not None and entry.id not in auto_ids
+    } | {
         tid
         for tid in db.scalars(
             select(DecisionJournalEntry.transaction_id).where(
-                DecisionJournalEntry.transaction_id.is_not(None)
+                DecisionJournalEntry.transaction_id.is_not(None),
+                DecisionJournalEntry.decision.notin_(list(DECISION_TRADE_ACTION)),
             )
         ).all()
     }
     window = AUTO_LINK_WINDOW_DAYS
+    company_currency = {
+        company.id: company.currency
+        for company in db.scalars(select(Company).where(Company.id.in_(company_set))).all()
+    }
     candidates: dict[int, list[Transaction]] = {}
     for entry in entries:
         wanted = DECISION_TRADE_ACTION[entry.decision]
@@ -294,7 +344,8 @@ def auto_link_journal_trades(
                 if trade.company_id == entry.company_id
                 and str(trade.action).lower() == wanted
                 and trade.id not in already_linked
-                and abs((trade.trade_date - decided).days) <= window
+                and 0 <= (trade.trade_date - decided).days <= window
+                and _price_compatible(entry, trade, company_currency.get(entry.company_id))
             ]
         )
     entries_by_trade: dict[int, int] = {}
@@ -304,8 +355,27 @@ def auto_link_journal_trades(
     now = datetime.now(UTC).isoformat()
     for entry in entries:
         found = candidates[entry.id]
-        meta = dict(entry.metadata_ or {})
-        if len(found) == 1 and entries_by_trade[found[0].id] == 1:
+        meta = _meta(entry)
+        unique = len(found) == 1 and entries_by_trade[found[0].id] == 1
+        ambiguous = len(found) > 1 or (bool(found) and entries_by_trade[found[0].id] > 1)
+        if _is_auto(entry):
+            if unique and found[0].id == entry.transaction_id:
+                continue  # sigue siendo inequivoca: sin cambios
+            # Ya no es inequivoca (nueva ejecucion, otra decision...): se deshace
+            # el enlace AUTOMATICO y se pide eleccion. Nunca toca enlaces manuales.
+            entry.transaction_id = None
+            summary["unlinked"] += 1
+            if found:
+                meta["auto_link"] = {
+                    "status": "ambiguous",
+                    "candidate_transaction_ids": sorted(trade.id for trade in found),
+                    "at": now,
+                }
+                summary["ambiguous"] += 1
+            else:
+                meta.pop("auto_link", None)
+            entry.metadata_ = meta
+        elif unique:
             trade = found[0]
             entry.transaction_id = trade.id
             meta["auto_link"] = {
@@ -316,15 +386,11 @@ def auto_link_journal_trades(
             }
             entry.metadata_ = meta
             summary["linked"] += 1
-        elif len(found) > 1 or (found and entries_by_trade[found[0].id] > 1):
+        elif ambiguous:
             ids = sorted(trade.id for trade in found)
             previous = meta.get("auto_link") or {}
             if previous.get("status") != "ambiguous" or previous.get("candidate_transaction_ids") != ids:
-                meta["auto_link"] = {
-                    "status": "ambiguous",
-                    "candidate_transaction_ids": ids,
-                    "at": now,
-                }
+                meta["auto_link"] = {"status": "ambiguous", "candidate_transaction_ids": ids, "at": now}
                 entry.metadata_ = meta
             summary["ambiguous"] += 1
     return summary
