@@ -59,7 +59,7 @@ from app.models import (
     Tenant,
     Transaction,
 )
-from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.tax_irpf_filing import (
     SPECIAL_PAYMENT_TOKENS,
     build_casillas,
@@ -275,10 +275,11 @@ class TaxReportService:
         self.settings = get_settings()
 
     def compute_report(self, db: Session, fiscal_year: int, include_filing: bool = True, tme: Decimal | None = None) -> dict:
-        # SOLO lectura: sin portfolio persistido se usa la divisa por defecto;
-        # crearlo aqui convertia cualquier GET del informe en una escritura.
-        portfolio = self.fx.portfolio(db)
-        base_currency = (portfolio.base_currency if portfolio else "EUR") or "EUR"
+        # IRPF y Modelo 720 se declaran SIEMPRE en euros al tipo del BCE de la
+        # fecha de cada operacion, sea cual sea la divisa base de la cartera
+        # (EUR, USD...). La divisa base es una preferencia de visualizacion;
+        # la fiscal la fija la AEAT.
+        base_currency = TAX_CURRENCY
 
         start = date(fiscal_year, 1, 1)
         end = date(fiscal_year, 12, 31)

@@ -75,6 +75,9 @@ export type PortfolioHolding = {
     /** G/P y coste en divisa nativa tal como los expone la API (null si no hay dato). */
     nativeGain: number | null;
     nativeCost: number | null;
+    /** G/P en base partida: efecto precio y efecto divisa (suman la G/P). */
+    priceEffect?: number | null;
+    fxEffect?: number | null;
     /** El valor en divisa base no está disponible (independiente del coste). */
     valueMissing: boolean;
     firstBuyDate: string | null;
@@ -149,6 +152,8 @@ type ResearchPortfolioPosition = {
     unrealized_pnl_base: number | null;
     realized_pnl_base: number | null;
     fx_rate: number | null;
+    pnl_price_effect_base?: number | null;
+    pnl_fx_effect_base?: number | null;
     first_buy_date: string | null;
     holding_days: number | null;
     fiscal_bucket: 'corto_plazo' | 'largo_plazo' | null;
@@ -262,6 +267,8 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
             fxMissing: held || position.market_value_base === null || position.cost_basis_base === null,
             nativeGain: position.unrealized_pnl_native ?? null,
             nativeCost: position.cost_basis_native ?? null,
+            priceEffect: position.pnl_price_effect_base ?? null,
+            fxEffect: position.pnl_fx_effect_base ?? null,
             valueMissing: position.market_value_base === null,
             firstBuyDate: position.first_buy_date ?? null,
             holdingDays: position.holding_days ?? null,
