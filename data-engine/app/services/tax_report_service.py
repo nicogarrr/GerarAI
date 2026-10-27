@@ -159,9 +159,10 @@ def _rate_not_older_than(
 def _defer_base(lot: dict, take: Decimal, sale: dict) -> None:
     """Difiere la pérdida bloqueada (wash-sale) también en divisa base.
 
-    La pérdida en base sale de los dos tramos convertidos a su propio tipo;
-    si no se conoce (falta FX), el diferido en base del lote queda
-    desconocido (None) y su futura venta se declara sin importe en base.
+    Conserva trazabilidad del importe de la pérdida al cambio de su venta.
+    El cálculo DGT de una venta posterior usa el diferido nativo y lo convierte
+    al cambio de esa venta posterior, no suma dos tramos FX históricos.
+    deferred_base puede ser None y no sustituye esa base nativa.
     """
     if lot["deferred_base"] is None:
         return
