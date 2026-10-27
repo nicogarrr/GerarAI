@@ -13,6 +13,7 @@ from decimal import Decimal, DecimalException
 from typing import Any
 
 from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
@@ -28,6 +29,9 @@ from app.services.review_alert_service import ReviewAlertService
 from app.services.screener_context_metrics import context_metrics_with_data, context_observations
 
 logger = logging.getLogger(__name__)
+
+DUPLICATE_SCREEN_NAME = "Ya existe un filtro con ese nombre"
+SCREEN_NAME_MAX = 240
 
 KEY_RE = re.compile(r"^[a-z][a-z0-9_]{1,159}$")
 COMPARATORS = {
@@ -217,12 +221,13 @@ class ScreenerService:
         if not criteria:
             raise ValueError("El filtro necesita al menos un criterio")
         normalized = [self._criterion(item) for item in criteria]
+        clean_name = self.claim_screen_name(db, name)
         if ranking_formula:
             SafeFormula(ranking_formula)
         if ranking_direction not in {"asc", "desc"}:
             raise ValueError("ranking_direction must be asc or desc")
         screen = SavedScreen(
-            name=name.strip(),
+            name=clean_name,
             description=description.strip(),
             criteria=normalized,
             ranking_formula=ranking_formula.strip() if ranking_formula else None,
@@ -232,9 +237,42 @@ class ScreenerService:
             metadata_={"criteria_version": 1, "formula_engine": "safe_ast_v1"},
         )
         db.add(screen)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            # Carrera con otra petición que guardó el mismo nombre a la vez.
+            db.rollback()
+            raise ValueError(DUPLICATE_SCREEN_NAME) from exc
         db.refresh(screen)
         return screen
+
+    def claim_screen_name(
+        self, db: Session, name: str, *, exclude_id: int | None = None
+    ) -> str:
+        """Valida y reserva ``name`` para un filtro activo del tenant.
+
+        ``uq_saved_screen_tenant_name`` cubre también los filtros archivados
+        (el borrado es lógico para conservar historial y alertas). Un filtro
+        archivado libera su nombre: se renombra con un sufijo «[archivado #id]».
+        Un filtro activo con el mismo nombre es un conflicto (ValueError).
+        """
+        clean = name.strip()
+        if not clean:
+            raise ValueError("El nombre no puede estar vacío")
+        holders = db.scalars(
+            select(SavedScreen).where(
+                SavedScreen.name == clean, *tenant_filters(db, SavedScreen)
+            )
+        ).all()
+        for holder in holders:
+            if holder.id == exclude_id:
+                continue
+            if holder.active:
+                raise ValueError(DUPLICATE_SCREEN_NAME)
+            suffix = f" [archivado #{holder.id}]"
+            holder.name = clean[: SCREEN_NAME_MAX - len(suffix)] + suffix
+        db.flush()
+        return clean
 
     def metric_coverage(self, db: Session) -> list[str]:
         """Metric names at least one company has data for.
