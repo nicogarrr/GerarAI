@@ -65,3 +65,18 @@ describe('Diario: resolución visible cuando hay varias operaciones posibles', (
         expect(screen.queryByRole('button', { name: /No enlazar/ })).not.toBeInTheDocument();
     });
 });
+
+describe('Diario: enlace automático visible', () => {
+    it('muestra el distintivo y permite corregir cuando está enlazada automáticamente', () => {
+        render(
+            <DecisionAndRealityPanel
+                ticker="UBER"
+                decisions={[{ ...base, transaction_id: 11, transaction: trade(11), metadata: { auto_link: { status: 'linked' } } } as never]}
+                reviews={[]}
+                trades={[trade(11)]}
+            />,
+        );
+        expect(screen.getByTestId('journal-auto-link-badge')).toHaveTextContent('Enlace detectado automáticamente');
+        expect(screen.getByRole('button', { name: 'Corregir / desenlazar' })).toBeTruthy();
+    });
+});

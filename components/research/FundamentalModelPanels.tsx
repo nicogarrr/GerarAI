@@ -409,10 +409,16 @@ export function DecisionAndRealityPanel({
               {entry.transaction ? (
                 <div className="mt-2 rounded border border-teal-900/50 bg-teal-950/10 p-2 text-xs leading-5 text-gray-300">
                   <p><span className="text-teal-300">Operación:</span> {describeTrade(entry.transaction)}</p>
+                  {isAutoLinked(entry.metadata) ? (
+                    <p className="text-amber-200" data-testid="journal-auto-link-badge">
+                      <Badge variant="outline">Enlace detectado automáticamente</Badge>{' '}
+                      Coincide en empresa, sentido y fecha (hasta 3 días después), sin otra candidata. No confirma cantidad ni cuenta: corrígelo si no es esa operación.
+                    </p>
+                  ) : null}
                   <p className="text-gray-400" title="Margen = valor justo / precio de ejecución − 1">{describeFairValue(entry.fair_value_on_day)}</p>
                   <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage="Operación desenlazada">
                     <input name="transaction_id" type="hidden" value="" />
-                    <button className="text-gray-500 underline hover:text-gray-300" type="submit">Desenlazar</button>
+                    <button className="text-gray-500 underline hover:text-gray-300" type="submit">{isAutoLinked(entry.metadata) ? 'Corregir / desenlazar' : 'Desenlazar'}</button>
                   </MutationForm>
                 </div>
               ) : trades.length > 0 ? (
@@ -537,4 +543,9 @@ function tradesForEntry(trades: JournalTrade[], metadata: Record<string, unknown
   if (!ids) return trades;
   const subset = trades.filter((trade) => ids.includes(trade.id));
   return subset.length > 0 ? subset : trades;
+}
+
+function isAutoLinked(metadata: Record<string, unknown> | undefined): boolean {
+  const link = metadata?.auto_link as { status?: unknown } | undefined;
+  return link?.status === 'linked';
 }
