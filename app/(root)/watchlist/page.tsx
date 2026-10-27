@@ -348,8 +348,9 @@ export default async function WatchlistPage({
                         <Eye className="mb-4 h-12 w-12 text-gray-500 sm:h-16 sm:w-16" aria-hidden="true" />
                         <h2 className="mb-2 text-lg font-semibold text-gray-300 sm:text-xl">Tu Watchlist está vacía</h2>
                         <p className="mb-6 max-w-md text-sm text-gray-500 sm:text-base">
-                            Busca la empresa en la búsqueda universal (o con Ctrl+K desde cualquier pantalla) y
-                            pulsa &ldquo;Añadir a Watchlist&rdquo; para monitorizarla aquí.
+                            Pulsa &ldquo;Añadir empresa&rdquo; y búscala por nombre o símbolo para seguirla aquí.
+                            {/* El atajo de teclado solo tiene sentido con teclado físico: en móvil se oculta. */}
+                            <span className="hidden md:inline"> También puedes abrir la búsqueda con Ctrl+K desde cualquier pantalla.</span>
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-3">
                             <WatchlistAddButton followedSymbols={[]} />
