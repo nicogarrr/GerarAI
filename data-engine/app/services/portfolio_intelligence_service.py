@@ -172,12 +172,21 @@ class PortfolioIntelligenceService:
             for position, company in rows
             if position.id in base_values
         }
-        price_series: dict[int, list[MarketPrice]] = {company.id: [] for _, company in rows}
+        price_series: dict[int, list[Any]] = {company.id: [] for _, company in rows}
         if rows:
             # Lote: 1 query para todas las series (anti N+1 por posición).
+            # Solo las columnas que se usan (filas ligeras con .date, .close,
+            # .adj_close y .source): ~25.000 entidades ORM completas costaban
+            # mas que todo el calculo.
             all_prices = list(
-                db.scalars(
-                    select(MarketPrice)
+                db.execute(
+                    select(
+                        MarketPrice.company_id,
+                        MarketPrice.date,
+                        MarketPrice.close,
+                        MarketPrice.adj_close,
+                        MarketPrice.source,
+                    )
                     .where(
                         MarketPrice.company_id.in_([company.id for _, company in rows]),
                         MarketPrice.date >= cutoff,
@@ -714,13 +723,33 @@ class PortfolioIntelligenceService:
     ) -> tuple[dict[str, dict[str, float | None]], dict[str, dict[str, int]]]:
         result: dict[str, dict[str, float | None]] = {}
         observations: dict[str, dict[str, int]] = {}
+        # La matriz es simetrica (corr(a, b) == corr(b, a) bit a bit: mismos
+        # productos y mismas sumas en el mismo orden), asi que cada par se
+        # calcula una vez. La media de cada serie sobre unas fechas dadas se
+        # reutiliza entre pares: statistics.mean es exacta pero cara, y antes
+        # se recalculaba 2 veces por par (684 medias con 19 posiciones).
+        means: dict[tuple[int, tuple[date, ...]], float] = {}
+
+        def _cached_mean(company_id: int, series: dict[date, float], dates: tuple[date, ...]) -> float:
+            key = (company_id, dates)
+            if key not in means:
+                means[key] = mean([series[day] for day in dates])
+            return means[key]
+
+        computed: dict[tuple[int, int], tuple[float | None, int]] = {}
         for _, left_company in rows:
             result[left_company.ticker] = {}
             observations[left_company.ticker] = {}
             for _, right_company in rows:
+                mirrored = computed.get((right_company.id, left_company.id))
+                if mirrored is not None:
+                    correlation, count = mirrored
+                    observations[left_company.ticker][right_company.ticker] = count
+                    result[left_company.ticker][right_company.ticker] = correlation
+                    continue
                 left = returns.get(left_company.id, {})
                 right = returns.get(right_company.id, {})
-                dates = sorted(left.keys() & right.keys())
+                dates = tuple(sorted(left.keys() & right.keys()))
                 observations[left_company.ticker][right_company.ticker] = len(dates)
                 if left_company.id == right_company.id and dates:
                     correlation: float | None = 1.0
@@ -729,13 +758,15 @@ class PortfolioIntelligenceService:
                     correlation = None
                 else:
                     xs, ys = [left[day] for day in dates], [right[day] for day in dates]
-                    x_mean, y_mean = mean(xs), mean(ys)
+                    x_mean = _cached_mean(left_company.id, left, dates)
+                    y_mean = _cached_mean(right_company.id, right, dates)
                     numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys))
                     denominator = math.sqrt(
                         sum((x - x_mean) ** 2 for x in xs)
                         * sum((y - y_mean) ** 2 for y in ys)
                     )
                     correlation = numerator / denominator if denominator else None
+                computed[(left_company.id, right_company.id)] = (correlation, len(dates))
                 result[left_company.ticker][right_company.ticker] = correlation
         return result, observations
 
@@ -753,9 +784,13 @@ class PortfolioIntelligenceService:
         portfolio = [portfolio_returns[day] for day in dates]
         market = [benchmark_returns[day] for day in dates]
         market_mean = mean(market)
+        # La media de la cartera se calcula UNA vez: dentro del generador se
+        # recalculaba por cada observacion (O(n^2); ~1.250 medias exactas de
+        # ~1.250 valores con 5 años de historia).
+        portfolio_mean = mean(portfolio)
         variance = sum((value - market_mean) ** 2 for value in market)
         covariance = sum(
-            (left - mean(portfolio)) * (right - market_mean)
+            (left - portfolio_mean) * (right - market_mean)
             for left, right in zip(portfolio, market)
         )
         return (
