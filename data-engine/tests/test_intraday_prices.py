@@ -122,10 +122,16 @@ def test_fetch_intraday_yahoo_parses_last_close(monkeypatch):
             assert kwargs["interval"] == "15m"
             return frame
 
+        @staticmethod
+        def Ticker(symbol):
+            class Ticker:
+                fast_info = {"currency": "EUR" if symbol == "TEF.MC" else "USD"}
+            return Ticker()
+
     monkeypatch.setitem(__import__("sys").modules, "yfinance", _FakeYF)
     latest = fetch_intraday_yahoo(["ASTS", "TEF.MC"])
-    assert latest["ASTS"] == (Decimal("61.82"), date(2026, 9, 25))
-    assert latest["TEF.MC"] == (Decimal("4.22"), date(2026, 9, 25))
+    assert latest["ASTS"] == (Decimal("61.82"), date(2026, 9, 25), "USD")
+    assert latest["TEF.MC"] == (Decimal("4.22"), date(2026, 9, 25), "EUR")
 
 
 def test_refresh_with_companies_filter_only_fetches_positions_universe(db):
