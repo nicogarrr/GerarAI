@@ -1048,8 +1048,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           <dl className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
             <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
             {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100">{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</dd></div> : null}
-            {per.note ? <p className="basis-full text-xs text-gray-500">{per.note}</p> : null}
           </dl>
+          {per.note ? <p className="mt-1 text-xs text-gray-500">{per.note}</p> : null}
           </Panel>
           {snapshot.model_summary ? <Panel collapsible="mobile" title="Modelo fundamental a largo plazo">
             {snapshot.model_summary ? (

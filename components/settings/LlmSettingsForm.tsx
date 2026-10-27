@@ -287,7 +287,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
 
             <p className="text-xs text-gray-500">
                 Los proveedores de pago los paga el usuario; GerarAI no asume ese coste.
-                Consulta la <a className="text-teal-300 hover:underline" href="/privacidad">política de privacidad</a>.
+                Consulta la <a className="text-teal-300 underline underline-offset-4 hover:text-teal-200" href="/privacidad">política de privacidad</a>.
             </p>
 
             {testResult ? (
