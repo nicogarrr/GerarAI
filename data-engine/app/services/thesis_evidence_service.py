@@ -241,7 +241,9 @@ class ThesisEvidenceService:
         if cik:
             bundle["sources"]["cik"] = {"status": "ok", "source": "SEC EDGAR", "cik": cik}
 
-        bundle["sources"]["fundamentals"] = self._ingest_fundamentals(db, company, cik)
+        bundle["sources"]["fundamentals"] = self._ingest_fundamentals_with_fallback(
+            db, company, cik
+        )
         bundle["sources"]["market"] = self._ingest_market(db, company)
         bundle["sources"]["filings"] = self._ingest_filings(db, company, cik)
         bundle["sources"]["news"] = self._collect_news(db, company)
@@ -282,7 +284,16 @@ class ThesisEvidenceService:
         signals = ownership_signals(db, company.ticker)
         return {"insider": signals["insider"], "holders": signals["holders"]}
 
-    # -- 1. fundamentales SEC -------------------------------------------------
+    # -- 1. fundamentales: SEC y, si no aporta, fuentes alternativas ----------
+    def _ingest_fundamentals_with_fallback(
+        self, db: Session, company: Company, cik: str | None
+    ) -> dict[str, Any]:
+        """SEC primero; sin CIK o sin us-gaap, el orden de fundamentals_fallback
+        (oficial guardado > Yahoo revisado, no oficial)."""
+        from app.services.fundamentals_fallback import ingest_with_fallback
+
+        return ingest_with_fallback(db, company, self._ingest_fundamentals(db, company, cik))
+
     def _ingest_fundamentals(
         self, db: Session, company: Company, cik: str | None
     ) -> dict[str, Any]:

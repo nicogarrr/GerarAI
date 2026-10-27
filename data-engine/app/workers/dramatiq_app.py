@@ -1997,6 +1997,48 @@ def sync_official_closes(
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=1_800_000)
+def evaluate_dca_signals(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Senales DCA (1X-4X + recortes) de watchlist + cartera y avisos por cambio de nivel.
+
+    La evaluacion (guardar el nivel de cada ticker para las insignias de la
+    watchlist) depende solo de DCA_EVALUATION_ENABLED. Los avisos los filtra el
+    servicio con DCA_ALERTS_ENABLED: con los avisos apagados se sigue evaluando
+    y guardando el nivel, pero no sale ningun aviso ni correo.
+    """
+    from app.core.config import get_settings
+    from app.services.dca_signal_service import evaluate_watchlist
+
+    if not get_settings().dca_evaluation_enabled:
+        return {"status": "skipped", "actor": "evaluate_dca_signals", "reason": "disabled"}
+    db = _session(tenant_id, user_id)
+    try:
+        lease = acquire_job_lease(
+            f"evaluate_dca_signals:{tenant_id}",
+            ttl_seconds=1800,
+            redis_url=_lease_redis_url(),
+        )
+    except Exception:
+        db.close()
+        raise
+    if lease is None:
+        db.close()
+        return {"status": "skipped", "actor": "evaluate_dca_signals", "reason": "lease_held"}
+    try:
+        return {"actor": "evaluate_dca_signals", "status": "ok", **evaluate_watchlist(db)}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("evaluate_dca_signals", exc, tenant_id=tenant_id)
+    finally:
+        release_job_lease(
+            f"evaluate_dca_signals:{tenant_id}", lease, redis_url=_lease_redis_url()
+        )
+        db.close()
+
+
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=600_000)
 def refresh_earnings_calendar(
     tenant_id: int | None = None,

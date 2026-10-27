@@ -688,6 +688,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/decision-journal/trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Decision Journal Trades
+         * @description Compras y ventas del ticker que se pueden enlazar a una entrada del diario.
+         */
+        get: operations["decision_journal_trades_api_companies__ticker__decision_journal_trades_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{ticker}/decision-journal/{entry_id}/transaction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Link Decision Journal Trade */
+        put: operations["link_decision_journal_trade_api_companies__ticker__decision_journal__entry_id__transaction_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/decision-lessons": {
         parameters: {
             query?: never;
@@ -5079,6 +5116,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/watchlist/dca-signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Dca Signals
+         * @description Nivel DCA actual de cada ticker de watchlist + cartera y su minimo de aviso.
+         */
+        get: operations["list_dca_signals_api_watchlist_dca_signals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/dca-signals/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evaluate Dca Signals Now
+         * @description Evalua ahora watchlist + cartera (una vez por minuto como maximo).
+         */
+        post: operations["evaluate_dca_signals_now_api_watchlist_dca_signals_evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/dca-signals/{symbol}/backtest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dca Backtest
+         * @description Backtest DCA plano vs DCA por niveles (Fórmula Nico v1) para cualquier ticker.
+         *
+         *     Sin look-ahead: veredicto con datos hasta el cierre de cada mes y compra al
+         *     primer cierre del mes siguiente. Usa la misma serie que la señal diaria
+         *     (Yahoo, cierre ajustado si existe y sin la barra del día en curso).
+         */
+        get: operations["dca_backtest_api_watchlist_dca_signals__symbol__backtest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/dca-signals/{symbol}/hit-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dca Hit Rates
+         * @description "¿Cuántas veces estaba más arriba?" por nivel (3/6/12/24/36 meses).
+         *
+         *     Sale de la ultima evaluacion guardada (misma serie y parametros que el
+         *     veredicto); sin evaluacion previa se declara no disponible, no se inventa.
+         */
+        get: operations["dca_hit_rates_api_watchlist_dca_signals__symbol__hit_rates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist/metrics/{symbol}": {
         parameters: {
             query?: never;
@@ -5142,6 +5266,26 @@ export interface paths {
         post?: never;
         /** Delete Watch Item */
         delete: operations["delete_watch_item_api_watchlist__symbol__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/{symbol}/dca-alert-min-level": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Dca Alert Min Level
+         * @description Ajusta el nivel minimo de aviso DCA de un ticker (null = global, 0 = apagado).
+         */
+        put: operations["set_dca_alert_min_level_api_watchlist__symbol__dca_alert_min_level_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6169,6 +6313,302 @@ export interface components {
              */
             unit: string;
         };
+        /** DcaBacktestLevelOut */
+        DcaBacktestLevelOut: {
+            /** Color */
+            color: string;
+            /** Label */
+            label: string;
+            /** Level */
+            level: number;
+            /** Months */
+            months: number;
+        };
+        /** DcaBacktestOut */
+        DcaBacktestOut: {
+            /** Available */
+            available: boolean;
+            /**
+             * Base Amount
+             * @default 100
+             */
+            base_amount: number;
+            /** Currency */
+            currency?: string | null;
+            /** Currency Label */
+            currency_label?: string | null;
+            /** Data Source */
+            data_source?: string | null;
+            /**
+             * Disclaimer
+             * @default Histórico, hipotético. No es asesoramiento.
+             */
+            disclaimer: string;
+            /** Final Price */
+            final_price?: number | null;
+            /** First Buy */
+            first_buy?: string | null;
+            /** First Signal */
+            first_signal?: string | null;
+            hit_rates?: components["schemas"]["DcaHitRatesOut"] | null;
+            /** Last Buy */
+            last_buy?: string | null;
+            /** Last Signal */
+            last_signal?: string | null;
+            /** Levels */
+            levels?: components["schemas"]["DcaBacktestLevelOut"][];
+            /**
+             * Months
+             * @default 0
+             */
+            months: number;
+            /** Params Version */
+            params_version?: string | null;
+            /** Plans */
+            plans?: components["schemas"]["DcaBacktestPlanOut"][];
+            /** Reason */
+            reason?: string | null;
+            /** Symbol */
+            symbol: string;
+            /** Valued At Period */
+            valued_at_period?: string | null;
+        };
+        /** DcaBacktestPlanOut */
+        DcaBacktestPlanOut: {
+            /** Avg Cost */
+            avg_cost?: number | null;
+            /** Buys */
+            buys: number;
+            /** Cash Left */
+            cash_left: number;
+            /** Deployed */
+            deployed: number;
+            /** Final Value */
+            final_value: number;
+            /** Invested */
+            invested: number;
+            /** Irr */
+            irr?: number | null;
+            /** Irr Vs Plain */
+            irr_vs_plain?: number | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Max Drawdown */
+            max_drawdown: number;
+            /** Multiple */
+            multiple?: number | null;
+            /** Shares */
+            shares: number;
+            /** Shares Per Money Vs Plain */
+            shares_per_money_vs_plain?: number | null;
+            /** Value Vs Plain */
+            value_vs_plain?: number | null;
+            /** Worst Unrealized */
+            worst_unrealized: number;
+        };
+        /** DcaEvaluateOut */
+        DcaEvaluateOut: {
+            /** Alerted */
+            alerted: {
+                [key: string]: unknown;
+            }[];
+            /** Alerts Enabled */
+            alerts_enabled: boolean;
+            /** Errors */
+            errors: {
+                [key: string]: unknown;
+            }[];
+            /** Evaluated */
+            evaluated: number;
+            /** Params Version */
+            params_version: string;
+            /** Skipped */
+            skipped: {
+                [key: string]: unknown;
+            }[];
+            /** Tracked */
+            tracked: number;
+        };
+        /** DcaHitRateCellOut */
+        DcaHitRateCellOut: {
+            /** Avg Return */
+            avg_return?: number | null;
+            /** Horizon Months */
+            horizon_months: number;
+            /** Months */
+            months: number;
+            /** Pct Higher */
+            pct_higher?: number | null;
+        };
+        /** DcaHitRateRowOut */
+        DcaHitRateRowOut: {
+            /** Cells */
+            cells: components["schemas"]["DcaHitRateCellOut"][];
+            /** Color */
+            color?: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Levels */
+            levels: number[];
+            /** Signal Months */
+            signal_months: number;
+        };
+        /** DcaHitRatesOut */
+        DcaHitRatesOut: {
+            /** Available */
+            available: boolean;
+            /**
+             * Disclaimer
+             * @default Histórico, hipotético. No es asesoramiento.
+             */
+            disclaimer: string;
+            /** Evaluated At */
+            evaluated_at?: string | null;
+            /** First Period */
+            first_period?: string | null;
+            /** Horizons */
+            horizons?: number[];
+            /** Last Period */
+            last_period?: string | null;
+            /**
+             * Months Completed
+             * @default 0
+             */
+            months_completed: number;
+            /** Params Version */
+            params_version?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Rows */
+            rows?: components["schemas"]["DcaHitRateRowOut"][];
+            /** Symbol */
+            symbol: string;
+        };
+        /** DcaMinLevelIn */
+        DcaMinLevelIn: {
+            /** Min Level */
+            min_level?: number | null;
+        };
+        /** DcaMinLevelOut */
+        DcaMinLevelOut: {
+            /** Effective Min Level */
+            effective_min_level: number;
+            /** Min Level Override */
+            min_level_override: number | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** DcaSignalItemOut */
+        DcaSignalItemOut: {
+            /** Alerts On */
+            alerts_on: boolean;
+            /** Company Name */
+            company_name?: string | null;
+            /** Effective Min Level */
+            effective_min_level: number;
+            /** In Portfolio */
+            in_portfolio: boolean;
+            /** In Watchlist */
+            in_watchlist: boolean;
+            /** Min Level Override */
+            min_level_override?: number | null;
+            /** Sources */
+            sources: string[];
+            state?: components["schemas"]["DcaSignalStateOut"] | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** DcaSignalStateOut */
+        DcaSignalStateOut: {
+            /** Close */
+            close: number;
+            /** Color */
+            color: string;
+            /** Currency */
+            currency?: string | null;
+            /** Currency Label */
+            currency_label?: string | null;
+            /** Data Source */
+            data_source: string;
+            /**
+             * Evaluated At
+             * Format: date-time
+             */
+            evaluated_at: string;
+            /** Fg */
+            fg: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Last Alerted Level */
+            last_alerted_level?: number | null;
+            /** Last Alerted Period */
+            last_alerted_period?: string | null;
+            /** Level */
+            level: number;
+            /** Level Prices */
+            level_prices?: {
+                [key: string]: number | null;
+            };
+            /** Metrics */
+            metrics?: {
+                [key: string]: number | string | null;
+            };
+            /** Params Version */
+            params_version: string;
+            /** Period */
+            period: string;
+            /** Previous Level */
+            previous_level?: number | null;
+            /**
+             * Signal Date
+             * Format: date
+             */
+            signal_date: string;
+            /** Status */
+            status: string;
+            /** Zone */
+            zone: string;
+        };
+        /** DcaSignalsOut */
+        DcaSignalsOut: {
+            /** Alerts Enabled */
+            alerts_enabled: boolean;
+            /** Channels */
+            channels: string[];
+            /** Email Configured */
+            email_configured: boolean;
+            /** Global Min Level */
+            global_min_level: number;
+            /** Items */
+            items: components["schemas"]["DcaSignalItemOut"][];
+            /** Signal Months */
+            signal_months?: number | null;
+            /** Trims Enabled */
+            trims_enabled: boolean;
+            /** Zones */
+            zones: components["schemas"]["DcaZoneOut"][];
+        };
+        /** DcaZoneOut */
+        DcaZoneOut: {
+            /** Color */
+            color: string;
+            /** Fg */
+            fg: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Level */
+            level: number;
+            /** Zone */
+            zone: string;
+        };
         /** DecisionJournalCreate */
         DecisionJournalCreate: {
             /**
@@ -6178,8 +6618,18 @@ export interface components {
             decision: "buy" | "hold" | "trim" | "sell" | "watch" | "avoid";
             /** Rationale */
             rationale: string;
+            /** Transaction Id */
+            transaction_id?: number | null;
             /** What Must Be True */
             what_must_be_true?: string[];
+        };
+        /**
+         * DecisionJournalTradeLink
+         * @description Enlaza una entrada del diario a una operacion; null la desenlaza.
+         */
+        DecisionJournalTradeLink: {
+            /** Transaction Id */
+            transaction_id?: number | null;
         };
         /** DecisionLessonAction */
         DecisionLessonAction: {
@@ -8175,7 +8625,7 @@ export interface components {
              * Event Type
              * @enum {string}
              */
-            event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest";
+            event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels";
         };
         /** ThesisApproveRequest */
         ThesisApproveRequest: {
@@ -9169,7 +9619,7 @@ export interface operations {
                 "x-cavaai-body-hash"?: string | null;
             };
             path: {
-                event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest";
+                event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels";
             };
             cookie?: never;
         };
@@ -10253,6 +10703,95 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decision_journal_trades_api_companies__ticker__decision_journal_trades_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_decision_journal_trade_api_companies__ticker__decision_journal__entry_id__transaction_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionJournalTradeLink"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -21188,6 +21727,169 @@ export interface operations {
             };
         };
     };
+    list_dca_signals_api_watchlist_dca_signals_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaSignalsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluate_dca_signals_now_api_watchlist_dca_signals_evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaEvaluateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dca_backtest_api_watchlist_dca_signals__symbol__backtest_get: {
+        parameters: {
+            query?: {
+                /** @description Primer mes con señal (YYYY-MM) */
+                start?: string | null;
+                /** @description Último mes con señal (YYYY-MM) */
+                end?: string | null;
+                /** @description Aportación base mensual */
+                base?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaBacktestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dca_hit_rates_api_watchlist_dca_signals__symbol__hit_rates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaHitRatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     watchlist_metrics_api_watchlist_metrics__symbol__get: {
         parameters: {
             query?: never;
@@ -21299,6 +22001,50 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_dca_alert_min_level_api_watchlist__symbol__dca_alert_min_level_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DcaMinLevelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaMinLevelOut"];
+                };
             };
             /** @description Validation Error */
             422: {

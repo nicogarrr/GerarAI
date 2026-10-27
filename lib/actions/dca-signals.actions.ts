@@ -1,0 +1,99 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { researchRequest, jsonBody } from '@/lib/research/client';
+import { classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
+import type { DcaBacktest, DcaEvaluateSummary, DcaHitRates, DcaSignalsResponse } from '@/lib/dca/types';
+
+/** Señales DCA (watchlist + cartera) del backend research. `unavailable`
+    distingue un fallo del servicio de una lista realmente vacía. */
+export async function getDcaSignals(): Promise<{ data: DcaSignalsResponse | null; unavailable: boolean }> {
+    try {
+        await requireAuthenticatedUser();
+        const data = await researchRequest<DcaSignalsResponse>('/api/watchlist/dca-signals');
+        if (!data || !Array.isArray(data.items)) return { data: null, unavailable: true };
+        return { data, unavailable: false };
+    } catch (error) {
+        console.error('getDcaSignals error:', error);
+        return { data: null, unavailable: true };
+    }
+}
+
+export interface DcaMutationResult {
+    success: boolean;
+    code?: ErrorCause;
+    message?: string;
+}
+
+/** Nivel mínimo de aviso por ticker: null = global, 0 = sin avisos, 1-4. */
+export async function setDcaAlertMinLevel(symbol: string, minLevel: number | null): Promise<DcaMutationResult> {
+    try {
+        await requireAuthenticatedUser();
+        await researchRequest(`/api/watchlist/${encodeURIComponent(symbol)}/dca-alert-min-level`, {
+            method: 'PUT',
+            body: jsonBody({ min_level: minLevel }),
+        });
+        revalidatePath('/watchlist');
+        return { success: true };
+    } catch (error) {
+        console.error('setDcaAlertMinLevel error:', error);
+        return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error) };
+    }
+}
+
+/** Evaluación manual (el backend la limita a una por minuto). */
+export async function evaluateDcaSignalsNow(): Promise<DcaMutationResult & { summary?: DcaEvaluateSummary }> {
+    try {
+        await requireAuthenticatedUser();
+        const summary = await researchRequest<DcaEvaluateSummary>('/api/watchlist/dca-signals/evaluate', {
+            method: 'POST',
+        });
+        revalidatePath('/watchlist');
+        return { success: true, summary };
+    } catch (error) {
+        console.error('evaluateDcaSignalsNow error:', error);
+        return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error) };
+    }
+}
+
+/** «¿Cuántas veces estaba más arriba?» de un ticker seguido (histórico de la
+    última evaluación). null = servicio caído o ticker sin señal evaluada. */
+export async function getDcaHitRates(symbol: string): Promise<DcaHitRates | null> {
+    try {
+        await requireAuthenticatedUser();
+        return await researchRequest<DcaHitRates>(`/api/watchlist/dca-signals/${encodeURIComponent(symbol)}/hit-rates`);
+    } catch (error) {
+        console.error('getDcaHitRates error:', error);
+        return null;
+    }
+}
+
+/** Backtest DCA plano vs DCA por niveles (Fórmula Nico v1) de cualquier ticker.
+    Sin look-ahead: el backend usa solo datos hasta el cierre de cada mes. */
+export async function getDcaBacktest(input: {
+    symbol: string;
+    start?: string;
+    end?: string;
+    base?: number;
+}): Promise<{ data: DcaBacktest | null; error: string | null }> {
+    const symbol = input.symbol.trim().toUpperCase();
+    if (!/^[A-Z0-9.\-=^]{1,24}$/.test(symbol)) {
+        return { data: null, error: 'Ticker no válido' };
+    }
+    const params = new URLSearchParams();
+    if (input.start) params.set('start', input.start);
+    if (input.end) params.set('end', input.end);
+    if (input.base && Number.isFinite(input.base) && input.base > 0) params.set('base', String(input.base));
+    try {
+        await requireAuthenticatedUser();
+        const query = params.toString();
+        const data = await researchRequest<DcaBacktest>(
+            `/api/watchlist/dca-signals/${encodeURIComponent(symbol)}/backtest${query ? `?${query}` : ''}`,
+        );
+        return { data, error: null };
+    } catch (error) {
+        console.error('getDcaBacktest error:', error);
+        return { data: null, error: getFriendlyErrorMessage(error) };
+    }
+}

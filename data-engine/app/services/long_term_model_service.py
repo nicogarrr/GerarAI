@@ -304,6 +304,61 @@ def _driver_gap_reason(key: str, *, formula_input: bool) -> str:
         "se publica en el texto del informe anual"
     )
 
+@dataclass(frozen=True)
+class _SharesOutstandingProxy:
+    """Acciones en circulacion al cierre usadas como recuento de acciones de un
+    ejercicio en el que el emisor no etiqueta la media ponderada diluida.
+
+    Caso real: KKR dejo de presentar WeightedAverageNumberOfDilutedSharesOutstanding
+    (y el BPA diluido) en us-gaap tras su conversion de 2018; solo publica
+    CommonStockSharesOutstanding. Sin esto la tesis decia «faltan acciones
+    diluidas» con el recuento en el 10-K. Es un hecho reportado de otra
+    magnitud (saldo al cierre, sin dilucion potencial), asi que se marca como
+    derivado con su formula y nunca sustituye a una media diluida reportada.
+    """
+
+    fact: FinancialFact
+    derivation: str = (
+        "derivado: acciones en circulación al cierre (CommonStockSharesOutstanding); "
+        "el emisor no etiqueta la media ponderada diluida de ese ejercicio"
+    )
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.fact, name)
+
+
+# Drivers obligatorios que no son un concepto us-gaap pero SI se obtienen por
+# una identidad contable a partir de hechos reportados del MISMO ejercicio.
+# clave -> (formula legible, metricas de entrada, signo de cada entrada).
+DERIVED_DRIVERS: dict[str, tuple[str, tuple[str, ...], tuple[int, ...]]] = {
+    "net_operating_income": (
+        "lease_income − property_operating_expense − real_estate_tax_expense",
+        ("lease_income", "property_operating_expense", "real_estate_tax_expense"),
+        (1, -1, -1),
+    ),
+}
+
+
+def _with_shares_outstanding_proxies(
+    diluted: list[Any], outstanding: list[FinancialFact]
+) -> list[Any]:
+    """Completa los ejercicios sin media diluida con el saldo al cierre."""
+    covered = {
+        int(fact.fiscal_year)
+        for fact in diluted
+        if fact.fiscal_year is not None and _is_annual(fact)
+    }
+    proxies = [
+        _SharesOutstandingProxy(fact=fact)
+        for fact in outstanding
+        if fact.fiscal_year is not None
+        and _is_annual(fact)
+        and int(fact.fiscal_year) not in covered
+        and fact.value is not None
+        and fact.value > 0
+    ]
+    return list(diluted) + proxies
+
 
 def _has_unexplained_share_jump(series: list[dict[str, Any]]) -> bool:
     """Salto entre anos consecutivos incompatible con emision/recompra
@@ -389,10 +444,15 @@ class LongTermModelService:
                 "cash_and_equivalents",
                 "income_tax_expense",
                 "income_before_tax",
+                "shares_outstanding",
             }
+            | {metric for _f, inputs, _s in DERIVED_DRIVERS.values() for metric in inputs}
         }
         fact_cache["shares_diluted"] = _adjust_share_facts(
-            fact_cache["shares_diluted"], _split_events(db, company.id)
+            _with_shares_outstanding_proxies(
+                fact_cache["shares_diluted"], fact_cache["shares_outstanding"]
+            ),
+            _split_events(db, company.id),
         )
         revenue_history = self._annual_by_year(fact_cache["revenue"])
         years = sorted(revenue_history)
@@ -786,6 +846,25 @@ class LongTermModelService:
             # row happened to be ingested last.
             annual = self._annual_by_year(facts)
             fact = annual[max(annual)] if annual else (facts[-1] if facts else None)
+            if fact is None and key in DERIVED_DRIVERS:
+                derived = self._derived_driver(key, fact_cache)
+                if derived is not None:
+                    drivers.append(
+                        {
+                            "key": key,
+                            "driver_type": "revenue_driver" if key in revenue_keys else "kpi",
+                            "required": key in required_keys,
+                            **derived,
+                            **driver_metadata(
+                                key,
+                                raw_unit=derived["unit"],
+                                company_currency=company.currency,
+                                period=derived["trace"]["period"],
+                                source_type="derived",
+                            ),
+                        }
+                    )
+                    continue
             drivers.append(
                 {
                     "key": key,
@@ -811,6 +890,45 @@ class LongTermModelService:
                 }
             )
         return drivers
+
+    def _derived_driver(
+        self, key: str, fact_cache: dict[str, list[FinancialFact]]
+    ) -> dict[str, Any] | None:
+        """Driver por identidad contable con hechos reportados del mismo
+        ejercicio (el ultimo en que estan TODAS las entradas, en la misma
+        unidad). Sin todas las entradas no hay dato: nunca se completa."""
+        formula, inputs, signs = DERIVED_DRIVERS[key]
+        by_year = [self._annual_by_year(fact_cache.get(metric) or []) for metric in inputs]
+        common = set(by_year[0]).intersection(*by_year[1:]) if by_year else set()
+        for year in sorted(common, reverse=True):
+            facts = [annual[year] for annual in by_year]
+            units = {fact.unit for fact in facts}
+            values = [_float(fact.value) for fact in facts]
+            if len(units) != 1 or any(value is None for value in values):
+                continue
+            value = sum(sign * float(v) for sign, v in zip(signs, values) if v is not None)
+            return {
+                "status": "derived",
+                "value": value,
+                "unit": facts[0].unit,
+                "confidence": min(_float(fact.confidence) or 0.0 for fact in facts),
+                "source_fact_ids": _unique_ids(*facts),
+                "derivation": {
+                    "label": "derivado",
+                    "formula": formula,
+                    "fiscal_year": year,
+                    "inputs": {
+                        metric: {"fact_id": fact.id, "value": _float(fact.value)}
+                        for metric, fact in zip(inputs, facts)
+                    },
+                },
+                "trace": {
+                    "period": facts[0].period,
+                    "fiscal_year": year,
+                    "source_type": "derived",
+                },
+            }
+        return None
 
     @staticmethod
     def _market_revenue_ceiling(market_opportunity: dict[str, Any]) -> float | None:
@@ -916,7 +1034,16 @@ class LongTermModelService:
                         continue
                 metrics[metric] = _fact_line(fact)
                 split_factor = getattr(fact, "split_factor", None) if fact is not None else None
-                if metric == "shares_diluted" and split_factor is not None and split_factor != 1:
+                derivation = getattr(fact, "derivation", None) if fact is not None else None
+                if metric == "shares_diluted" and fact is not None and derivation:
+                    metrics[metric] = _calculated_line(
+                        float(fact.value),
+                        unit="shares",
+                        source_fact_ids=[fact.id],
+                        calculation="shares_outstanding al cierre del ejercicio",
+                        basis=derivation,
+                    )
+                elif metric == "shares_diluted" and split_factor is not None and split_factor != 1:
                     metrics[metric] = _calculated_line(
                         float(fact.value),
                         unit="shares",

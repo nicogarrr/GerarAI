@@ -371,6 +371,35 @@ class Settings(BaseSettings):
     # Senales insider (Form 4 EDGAR): alerta Telegram 'insider buy' apagada
     # por defecto. Env: INSIDER_ALERTS_ENABLED.
     insider_alerts_enabled: bool = False
+    # Correo saliente por SMTP (canal "email" de las alertas). Vacio = sin SMTP:
+    # el canal email cae al webhook ALERT_EMAIL_WEBHOOK_URL si existe y si no
+    # queda "not_configured". Con Gmail hace falta una contrasena de aplicacion
+    # (no la de la cuenta). La contrasena nunca se registra en logs.
+    # Env: SMTP_HOST / SMTP_PORT / SMTP_USERNAME / SMTP_PASSWORD / SMTP_FROM /
+    # SMTP_STARTTLS / SMTP_SSL / SMTP_TIMEOUT_SECONDS / ALERT_EMAIL_TO.
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str | None = None
+    smtp_password: str | None = Field(default=None, repr=False)
+    smtp_from: str | None = None
+    smtp_starttls: bool = True
+    smtp_ssl: bool = False
+    smtp_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
+    # Destinatarios separados por comas.
+    alert_email_to: str | None = None
+    # DCA_EVALUATION_ENABLED: la evaluacion diaria de senales DCA (guarda el
+    # nivel 1X-4X de watchlist + cartera). Es independiente de los avisos: con
+    # DCA_ALERTS_ENABLED=false se sigue evaluando y solo se callan los avisos.
+    dca_evaluation_enabled: bool = True
+    # Senales DCA por niveles (1X-4X + recortes) sobre watchlist + cartera.
+    # DCA_ALERT_MIN_LEVEL: nivel minimo de compra que avisa (1-4) salvo ajuste
+    # por ticker. DCA_ALERT_TRIMS: avisar tambien de las zonas de recorte.
+    # DCA_ALERT_CHANNELS: canales base; Telegram se anade solo si el tenant
+    # tiene suscripcion "dca_levels" con chat vinculado.
+    dca_alerts_enabled: bool = True
+    dca_alert_min_level: int = Field(default=2, ge=1, le=4)
+    dca_alert_trims: bool = False
+    dca_alert_channels: str = "in_app,email"
     # Langfuse Cloud EU shadow tracing (stage 3): SOLO observabilidad.
     # Apagado por defecto; nunca es fuente de verdad de negocio (eso es
     # Postgres). Sin payloads: solo metadatos de la allowlist. Muestreo del
@@ -485,13 +514,15 @@ class Settings(BaseSettings):
     # usar los datos para mejorar el servicio: no enviar nada que no deba salir.
     groq_api_key: str | None = Field(default=None, repr=False)
     # Respaldos del chat y de los trabajos en segundo plano (Groq, luego
-    # Gemini) cuando falla el primario OpenCode Go. Tres estados (hallazgo M1
-    # de la revision: el plan B estaba apagado y habia que encenderlo a mano):
-    #   None ("auto", por defecto) -> activo SOLO si estan la clave y las
-    #     confirmaciones de plan gratuito (y ZDR en Groq) y el primario es
-    #     OpenCode Go. Sin clave el respaldo se salta; nunca se inventa texto.
-    #   True  -> forzado: falla el arranque del proveedor si falta algo.
-    #   False -> apagado aunque haya clave.
+    # Gemini) cuando falla el primario OpenCode Go. Decision del dueno
+    # (2026-10-27): TODO el LLM va por su OpenCode Go con DeepSeek V4.1 Flash;
+    # ningun respaldo a otro proveedor entra sin pedirlo explicitamente.
+    #   None ("auto", por defecto) -> APAGADO, aunque haya clave y
+    #     confirmaciones (antes se encendia solo y Groq respondia el chat
+    #     sin que se viera).
+    #   True  -> encendido de forma explicita; falla el arranque del
+    #     proveedor si falta la clave o una confirmacion de plan gratuito.
+    #   False -> apagado.
     # Usa siempre `groq_chat_fallback_active` / `gemini_chat_fallback_active`.
     groq_chat_fallback_enabled: bool | None = None
     groq_free_plan_confirmed: bool = False
@@ -508,6 +539,10 @@ class Settings(BaseSettings):
     openrouter_api_key: str | None = Field(default=None, repr=False)
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "google/gemma-4-31b-it:free"
+    # OpenRouter :free como ultimo respaldo del chat: solo si se pide de forma
+    # explicita (antes bastaba con tener OPENROUTER_API_KEY y Groq activo).
+    # Env: OPENROUTER_CHAT_FALLBACK_ENABLED.
+    openrouter_chat_fallback_enabled: bool = False
     # Por miembro de la cascada: poco margen para que el siguiente tenga tiempo.
     llm_cascade_member_timeout_seconds: float = Field(default=20.0, gt=0)
     llm_cascade_member_total_timeout_seconds: float = Field(default=25.0, gt=0)
@@ -598,7 +633,9 @@ class Settings(BaseSettings):
         return not self.is_production
 
     @field_validator(
-        "ibkr_flex_tenant_id", "ibkr_flex_account_id", "ibkr_flex_complete_query_id", mode="before"
+        "ibkr_flex_tenant_id", "ibkr_flex_account_id", "ibkr_flex_complete_query_id",
+        "smtp_host", "smtp_username", "smtp_password", "smtp_from", "alert_email_to",
+        mode="before",
     )
     @classmethod
     def _blank_flex_tenant_is_none(cls, value):
@@ -659,6 +696,7 @@ class Settings(BaseSettings):
         for field_name, value in (
             ("TELEGRAM_BOT_TOKEN", self.telegram_bot_token),
             ("TELEGRAM_LINK_SECRET", self.telegram_link_secret),
+            ("SMTP_PASSWORD", self.smtp_password),
         ):
             if value:
                 _assert_not_placeholder(value, label=field_name)
@@ -677,32 +715,19 @@ class Settings(BaseSettings):
             return None
         return value
 
-    def _primary_is_opencode_go(self) -> bool:
-        requested = (self.llm_provider or "").strip().lower()
-        return requested in {"auto", "opencode", "opencode_go", "opencode-go"}
-
     @property
     def groq_chat_fallback_active(self) -> bool:
-        """Groq entra como respaldo: forzado, o auto con clave + plan gratis + ZDR."""
-        if self.groq_chat_fallback_enabled is not None:
-            return self.groq_chat_fallback_enabled
-        return bool(
-            self._primary_is_opencode_go()
-            and (self.groq_api_key or "").strip()
-            and self.groq_free_plan_confirmed
-            and self.groq_zdr_confirmed
-        )
+        """Groq entra como respaldo SOLO con GROQ_CHAT_FALLBACK_ENABLED=true.
+
+        "auto" (sin valor) ya no lo enciende aunque haya clave: el dueno exige
+        que todo vaya por OpenCode Go salvo decision explicita y visible.
+        """
+        return self.groq_chat_fallback_enabled is True
 
     @property
     def gemini_chat_fallback_active(self) -> bool:
-        """Gemini entra como respaldo: forzado, o auto con clave + plan gratis confirmado."""
-        if self.gemini_chat_fallback_enabled is not None:
-            return self.gemini_chat_fallback_enabled
-        return bool(
-            self._primary_is_opencode_go()
-            and (self.gemini_api_key or "").strip()
-            and self.gemini_free_plan_confirmed
-        )
+        """Gemini entra como respaldo SOLO con GEMINI_CHAT_FALLBACK_ENABLED=true."""
+        return self.gemini_chat_fallback_enabled is True
 
     @model_validator(mode="after")
     def validate_production_llm_model(self) -> Self:

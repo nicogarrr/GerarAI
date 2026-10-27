@@ -37,10 +37,54 @@ SOURCE_TYPE = "YAHOO_FUNDAMENTALS"
 # Mapa revisado a mano: ticker de la Company -> simbolo Yahoo, divisa declarada
 # y nombres aceptados para la prueba de identidad.
 REVIEWED_MAP: dict[str, dict[str, Any]] = {
-    "KRKNF": {"symbol": "PNG.V", "currency": "CAD", "names": ["Kraken Robotics"]},
+    "KRKNF": {
+        "symbol": "PNG.V",
+        "currency": "CAD",
+        "names": ["Kraken Robotics"],
+        # Cotejo a mano (2026-10-27) contra las notas de resultados del emisor:
+        # FY2025 ingresos 102,2 M CAD, beneficio neto 2.860 k, activos 313,7 M,
+        # caja 120,5 M; FY2024 91,3 M / 20.089 k / 162,6 M / 58,5 M. Yahoo
+        # devuelve exactamente esas cifras.
+        "verified_against": [
+            "https://www.krakenrobotics.com/news-releases/kraken-robotics-reports-2025-financial-results/",
+            "https://www.theglobeandmail.com/investing/markets/stocks/KRKNF/pressreleases/32080072/kraken-robotics-reports-2024-financial-results/",
+        ],
+    },
     # BN: Brookfield Corporation (40-F con cobertura oficial parcial; reporta
     # en USD: BN y BN.TO declaran los mismos fundamentales en USD).
     "BN": {"symbol": "BN", "currency": "USD", "names": ["Brookfield"]},
+    # CGEO.L: Georgia Capital PLC (LSE). Sin SEC y sin XBRL utilizable: el
+    # informe anual que deposita en el NSM de la FCA va marcado "Untagged"
+    # (xhtml de pdf2htmlEX, 0 hechos iXBRL), filings.xbrl.org no lo indexa y
+    # Companies House solo tiene PDF. Reporta en GEL (cotiza en GBp). Es una
+    # entidad de inversion (NIIF 10): el patrimonio ES el NAV. Cotejo a mano
+    # (2026-10-27) contra el Annual Report 2025 depositado en el NSM: NAV
+    # 5.194.527 k GEL, activos 5.198.380, caja 13.495, beneficio 1.892.642,
+    # BPA diluido 54,0296, acciones diluidas medias 35.029.723, flujo de
+    # explotacion -5.838; FY2024 3.609.013 / 3.611.317 / 3.521 / 362.274.
+    # La "Total Revenue" de Yahoo (1.900.030 k en FY2025) NO aparece en el
+    # informe: ingresos, margen bruto y resultado de explotacion quedan fuera.
+    "CGEO.L": {
+        "symbol": "CGEO.L",
+        "currency": "GEL",
+        "names": ["Georgia Capital"],
+        "metrics": (
+            "net_income",
+            "income_before_tax",
+            "eps_diluted",
+            "shares_diluted",
+            "total_assets",
+            "total_liabilities",
+            "total_equity",
+            "cash_and_equivalents",
+            "operating_cash_flow",
+            "free_cash_flow",
+        ),
+        "verified_against": [
+            "https://data.fca.org.uk/artefacts/NSM/DirectUpload/NI-000143657/NI-000143657_213800Q65T5GNBOW7H65-2025-12-31.xhtml",
+            "https://data.fca.org.uk/artefacts/NSM/Portal/NI-000115718/NI-000115718_213800Q65T5GNBOW7H65-2024-12-31.xhtml",
+        ],
+    },
 }
 
 # metric -> (statement, [filas Yahoo por orden de preferencia], es_por_accion)
@@ -111,9 +155,22 @@ def _fetch_yahoo(symbol: str) -> dict[str, Any]:
     }
 
 
+def _metric_rows(entry: dict[str, Any]) -> list[tuple[str, str, list[str], bool | str]]:
+    """Filas del mapa que aplican al emisor: una lista blanca revisada
+    (``metrics``) deja fuera lo que Yahoo sintetiza y el informe no publica."""
+    allowed = entry.get("metrics")
+    if not allowed:
+        return YAHOO_METRIC_MAP
+    return [row for row in YAHOO_METRIC_MAP if row[0] in allowed]
+
+
 def refresh_from_yahoo(
-    db: Session, company: Company, *, fetcher: Any = _fetch_yahoo
+    db: Session, company: Company, *, fetcher: Any = _fetch_yahoo, commit: bool = True
 ) -> dict[str, Any]:
+    """Ingesta Yahoo del mapa revisado.
+
+    ``commit=False`` solo hace flush: la generacion de tesis corre dentro de
+    un SAVEPOINT y un commit intermedio lo romperia."""
     ticker = company.ticker.upper()
     entry = REVIEWED_MAP.get(ticker)
     if entry is None:
@@ -134,8 +191,12 @@ def refresh_from_yahoo(
 
     data = fetcher(entry["symbol"])
     yname = data.get("name")
+    # Una ficha recien creada lleva el ticker como nombre (ensure_company_stub
+    # sin enriquecer): no aporta identidad, asi que manda la prueba contra los
+    # nombres REVISADOS del mapa. Un nombre real distinto sigue bloqueando.
+    placeholder_name = (company.name or "").strip().upper() in {"", ticker}
     if not (
-        _name_identity_ok(company.name, yname)
+        (placeholder_name or _name_identity_ok(company.name, yname))
         and any(_name_identity_ok(n, yname) for n in entry["names"])
     ):
         raise RuntimeError(
@@ -150,6 +211,7 @@ def refresh_from_yahoo(
         )
 
     symbol = entry["symbol"]
+    retrieved_at = datetime.now(UTC).isoformat()
     title = f"Yahoo Finance fundamentals (fuente no oficial) - {symbol}"
     tenant_id = db.info.get("tenant_id")
     document = db.scalar(
@@ -182,7 +244,8 @@ def refresh_from_yahoo(
     # Cobertura de Yahoo por metrica, antes de escribir nada.
     coverage: dict[str, list[str]] = {}
     periods_by_metric: dict[str, dict[str, Decimal]] = {}
-    for metric, statement, labels, _per_share in YAHOO_METRIC_MAP:
+    rows = _metric_rows(entry)
+    for metric, statement, labels, _per_share in rows:
         by_period = _row_by_period(data.get(statement), labels)
         if by_period:
             coverage[metric] = sorted(by_period, reverse=True)
@@ -202,7 +265,7 @@ def refresh_from_yahoo(
 
     imported = 0
     skipped_official = 0
-    for metric, statement, labels, per_share in YAHOO_METRIC_MAP:
+    for metric, statement, labels, per_share in rows:
         by_period = periods_by_metric.get(metric, {})
         for period_date, val in sorted(by_period.items(), reverse=True)[:10]:
             if (metric, int(period_date[:4])) in official_pairs:
@@ -233,11 +296,15 @@ def refresh_from_yahoo(
         "currency": currency,
         "yahoo_name": data.get("name"),
         "metrics_covered": sorted(coverage),
-        "last_refreshed_at": datetime.now(UTC).isoformat(),
+        "last_refreshed_at": retrieved_at,
+        "verified_against": list(entry.get("verified_against") or []),
     }
     drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
     sync_company_fact_chunks(db, company)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return {
         "status": "ingested",
         "ticker": ticker,
@@ -249,4 +316,7 @@ def refresh_from_yahoo(
         "facts_imported": imported,
         "facts_skipped_official": skipped_official,
         "metrics_covered": sorted(coverage),
+        "retrieved_at": retrieved_at,
+        "source_url": document.source_url,
+        "verified_against": list(entry.get("verified_against") or []),
     }

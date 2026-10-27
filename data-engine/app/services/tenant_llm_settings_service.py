@@ -158,6 +158,24 @@ def _validated(
     return provider, model, base_url, fallback_model, reasoning_effort
 
 
+class StoredKeyEndpointMismatch(ValueError):
+    """La clave guardada pertenece a otro proveedor o URL."""
+
+
+def _key_endpoint(provider: str | None, base_url: str | None) -> tuple[str, str] | None:
+    """(proveedor, URL efectiva) a la que se envia la clave; None si no es valido."""
+    try:
+        normalized = normalize_provider(provider or "")
+        return normalized, validate_base_url(normalized, base_url)
+    except (KeyError, ValueError):
+        return None
+
+
+def _same_key_endpoint(row: TenantLLMSettings, provider: str, base_url: str | None) -> bool:
+    stored = _key_endpoint(row.provider, row.base_url)
+    return stored is not None and stored == _key_endpoint(provider, base_url)
+
+
 def save_tenant_settings(
     db: Session,
     update: TenantLLMUpdate,
@@ -169,6 +187,20 @@ def save_tenant_settings(
         raise ValueError("Se requiere el contexto del tenant.")
     provider, model, base_url, fallback_model, reasoning_effort = _validated(update)
     row = read_tenant_row(db, tenant_id)
+    new_key = update.api_key is not None and bool(update.api_key.strip())
+    if (
+        row is not None
+        and row.api_key_ciphertext
+        and not new_key
+        and not update.clear_api_key
+        and not _same_key_endpoint(row, provider, base_url)
+    ):
+        # La clave guardada solo vale para el proveedor/URL con que se guardo:
+        # conservarla al cambiar de destino la enviaria a otro host.
+        raise ValueError(
+            "Has cambiado de proveedor o de URL: introduce la API key para el nuevo "
+            "destino (la clave guardada no se envia a otro sitio)."
+        )
     if row is None:
         row = TenantLLMSettings(tenant_id=tenant_id)
         db.add(row)
@@ -263,11 +295,24 @@ def settings_view(db: Session, settings: Settings | None = None) -> dict:
 
 
 def stored_api_key(
-    db: Session, settings: Settings | None = None
+    db: Session,
+    settings: Settings | None = None,
+    *,
+    provider: str | None = None,
+    base_url: str | None = None,
 ) -> str | None:
+    """Clave guardada del tenant, descifrada.
+
+    Con ``provider`` solo se devuelve si el destino (proveedor + URL efectiva)
+    coincide con el guardado; si no, ``StoredKeyEndpointMismatch``.
+    """
     row = read_tenant_row(db)
     if row is None or not row.api_key_ciphertext:
         return None
+    if provider is not None and not _same_key_endpoint(row, provider, base_url):
+        raise StoredKeyEndpointMismatch(
+            "La clave guardada es de otro proveedor o URL; introduce la API key para probar este."
+        )
     try:
         return decrypt_api_key(row.api_key_ciphertext, settings)
     except LLMSettingsCryptoError as exc:

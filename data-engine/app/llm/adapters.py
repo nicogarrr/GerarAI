@@ -36,6 +36,10 @@ if TYPE_CHECKING:  # pragma: no cover - solo para el type checker
 
 logger = logging.getLogger(__name__)
 
+#: Longitud maxima de cada campo del registro `llm.call` (un modelo legitimo
+#: no pasa de unas decenas de caracteres; un cuerpo devuelto entero no cabe).
+_LOG_FIELD_MAX_CHARS = 120
+
 #: `finish_reason` que significa "respuesta completa y utilizable". Cualquier
 #: otra cosa (truncado, filtro de contenido, error) marca la respuesta como
 #: degradada y la cache de respuestas se niega a guardarla.
@@ -375,25 +379,43 @@ class OpenAICompatibleProvider(LLMProvider):
         host = urlsplit(self._base_url).hostname or "?"
         fallback_from = (extra_metadata or {}).get("fallback_from")
         level = logging.WARNING if status == "failed" else logging.INFO
+        safe = self._redact_for_log
         logger.log(
             level,
             "llm.call provider=%s model=%s requested_model=%s reasoning_effort=%s "
             "task=%s status=%s duration_ms=%d host=%s key_scope=%s fallback_from=%s "
             "output_tokens=%s reasoning_tokens=%s error=%s",
-            self.name,
-            response.model if response is not None else model,
-            model,
-            self.effective_reasoning_effort(request, model) or "none_sent",
-            request.task or "-",
+            safe(self.name),
+            safe(response.model if response is not None else model),
+            safe(model),
+            safe(self.effective_reasoning_effort(request, model) or "none_sent"),
+            safe(request.task or "-"),
             status,
             duration_ms,
-            host,
-            getattr(self, "billing_scope", "platform"),
-            fallback_from or "-",
+            safe(host),
+            safe(getattr(self, "billing_scope", "platform")),
+            safe(fallback_from or "-"),
             response.usage.output_tokens if response is not None else "-",
             response.usage.reasoning_tokens if response is not None else "-",
-            error or "-",
+            safe(error or "-"),
         )
+
+    def _redact_for_log(self, value: object) -> str:
+        """Texto apto para el registro `llm.call` y las trazas.
+
+        Todos los campos de texto pasan por aqui, no solo el error: el modelo
+        lo devuelve el proveedor (`body["model"]`) y el modelo pedido o la
+        tarea pueden venir de Ajustes, asi que cualquiera de ellos podria
+        contener una clave. Se redactan la key y las cabeceras conocidas, los
+        patrones habituales (`sk-…`, `Bearer …`, `api_key=…`), y se quitan
+        espacios y saltos de linea para que un valor no pueda inyectar
+        campos falsos (`status=ok`) en la linea.
+        """
+        known = [str(self._api_key or "")]
+        known.extend(str(v) for v in self._extra_headers.values())
+        text = redact_secrets(str(value), known)
+        text = "_".join(text.split())
+        return text[:_LOG_FIELD_MAX_CHARS] if text else "-"
 
     def _build_payload(self, request: LLMRequest, model: str) -> dict[str, Any]:
         """Sobre OpenAI-compatible. Unico lugar que decide que se envia."""
@@ -502,11 +524,11 @@ class OpenAICompatibleProvider(LLMProvider):
             )
             _tracing.trace_generation(
                 name=f"llm.{request.task or 'complete'}",
-                model=model,
+                model=self._redact_for_log(model),
                 metadata={
                     "provider": self.name,
                     "task": request.task,
-                    "route": model,
+                    "route": self._redact_for_log(model),
                     "duration_ms": int((_time.monotonic() - _started) * 1000),
                     **dict(request.metadata or {}),
                     **dict(extra_metadata or {}),
@@ -527,11 +549,11 @@ class OpenAICompatibleProvider(LLMProvider):
         )
         _tracing.trace_generation(
             name=f"llm.{request.task or 'complete'}",
-            model=response.model,
+            model=self._redact_for_log(response.model),
             metadata={
                 "provider": self.name,
                 "task": request.task,
-                "route": model,
+                "route": self._redact_for_log(model),
                 "duration_ms": int((_time.monotonic() - _started) * 1000),
                 **dict(request.metadata or {}),
                 **dict(extra_metadata or {}),

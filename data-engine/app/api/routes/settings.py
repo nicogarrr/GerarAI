@@ -19,6 +19,7 @@ from app.services.budget import BudgetController
 from app.services.jev_availability import credit_status
 from app.services.llm_router import route_table
 from app.services.tenant_llm_settings_service import (
+    StoredKeyEndpointMismatch,
     TenantLLMUpdate,
     probe_connection,
     save_tenant_settings,
@@ -166,7 +167,17 @@ async def test_llm_settings(
     key = (payload.api_key or "").strip()
     if not key:
         try:
-            key = stored_api_key(db, app_settings) or ""
+            key = (
+                stored_api_key(
+                    db,
+                    app_settings,
+                    provider=payload.provider,
+                    base_url=payload.base_url,
+                )
+                or ""
+            )
+        except StoredKeyEndpointMismatch as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(
                 status_code=422,

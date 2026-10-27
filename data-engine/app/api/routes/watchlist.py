@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -7,7 +7,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import Company, EarningsDate, FinancialFact, MarketPrice, WatchItem
+from app.core.tenancy import tenant_filters
+from app.models import (
+    Company,
+    DcaAlertOverride,
+    DcaSignalState,
+    EarningsDate,
+    FinancialFact,
+    MarketPrice,
+    WatchItem,
+)
 from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
@@ -309,3 +318,380 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
 
     return {"market_cap": market_cap, "per": per,
             "currency": company.currency, "sources": sources}
+
+
+# --- Senales DCA por niveles (watchlist + cartera) -------------------------
+
+_DCA_EVALUATE_COOLDOWN_SECONDS = 60
+_dca_last_manual_run: dict[object, float] = {}
+
+
+class DcaZoneOut(BaseModel):
+    level: int
+    key: str
+    label: str
+    zone: str
+    color: str
+    fg: str
+
+
+class DcaSignalStateOut(BaseModel):
+    level: int
+    previous_level: int | None = None
+    key: str
+    label: str
+    zone: str
+    color: str
+    fg: str
+    status: str
+    period: str
+    signal_date: date
+    close: float
+    currency: str | None = None
+    currency_label: str | None = None
+    metrics: dict[str, float | str | int | None] = Field(default_factory=dict)
+    level_prices: dict[str, float | None] = Field(default_factory=dict)
+    params_version: str
+    data_source: str
+    evaluated_at: datetime
+    last_alerted_level: int | None = None
+    last_alerted_period: str | None = None
+
+
+class DcaHitRateCellOut(BaseModel):
+    horizon_months: int
+    months: int
+    pct_higher: float | None = None
+    avg_return: float | None = None
+
+
+class DcaHitRateRowOut(BaseModel):
+    key: str
+    label: str
+    levels: list[int]
+    signal_months: int
+    color: str | None = None
+    cells: list[DcaHitRateCellOut]
+
+
+class DcaHitRatesOut(BaseModel):
+    symbol: str
+    available: bool
+    reason: str | None = None
+    months_completed: int = 0
+    first_period: str | None = None
+    last_period: str | None = None
+    horizons: list[int] = Field(default_factory=list)
+    params_version: str | None = None
+    evaluated_at: datetime | None = None
+    rows: list[DcaHitRateRowOut] = Field(default_factory=list)
+    disclaimer: str = "Histórico, hipotético. No es asesoramiento."
+
+
+class DcaBacktestPlanOut(BaseModel):
+    key: str
+    label: str
+    invested: float
+    deployed: float
+    cash_left: float
+    shares: float
+    avg_cost: float | None = None
+    final_value: float
+    multiple: float | None = None
+    irr: float | None = None
+    max_drawdown: float
+    worst_unrealized: float
+    buys: int
+    irr_vs_plain: float | None = None
+    value_vs_plain: float | None = None
+    shares_per_money_vs_plain: float | None = None
+
+
+class DcaBacktestLevelOut(BaseModel):
+    level: int
+    label: str
+    color: str
+    months: int
+
+
+class DcaBacktestOut(BaseModel):
+    symbol: str
+    available: bool
+    reason: str | None = None
+    params_version: str | None = None
+    currency: str | None = None
+    currency_label: str | None = None
+    data_source: str | None = None
+    first_signal: str | None = None
+    last_signal: str | None = None
+    first_buy: date | None = None
+    last_buy: date | None = None
+    valued_at_period: str | None = None
+    final_price: float | None = None
+    months: int = 0
+    base_amount: float = 100.0
+    plans: list[DcaBacktestPlanOut] = Field(default_factory=list)
+    levels: list[DcaBacktestLevelOut] = Field(default_factory=list)
+    hit_rates: DcaHitRatesOut | None = None
+    disclaimer: str = "Histórico, hipotético. No es asesoramiento."
+
+
+class DcaSignalItemOut(BaseModel):
+    symbol: str
+    company_name: str | None = None
+    sources: list[str]
+    in_watchlist: bool
+    in_portfolio: bool
+    min_level_override: int | None = None
+    effective_min_level: int
+    alerts_on: bool
+    state: DcaSignalStateOut | None = None
+
+
+class DcaSignalsOut(BaseModel):
+    alerts_enabled: bool
+    global_min_level: int
+    trims_enabled: bool
+    channels: list[str]
+    email_configured: bool
+    signal_months: int | None = None
+    zones: list[DcaZoneOut]
+    items: list[DcaSignalItemOut]
+
+
+class DcaMinLevelIn(BaseModel):
+    # null = usar el global; 0 = avisos apagados para este ticker; 1-4 = minimo.
+    min_level: int | None = Field(default=None, ge=0, le=4)
+
+
+class DcaMinLevelOut(BaseModel):
+    symbol: str
+    min_level_override: int | None
+    effective_min_level: int
+
+
+class DcaEvaluateOut(BaseModel):
+    tracked: int
+    evaluated: int
+    alerted: list[dict]
+    skipped: list[dict]
+    errors: list[dict]
+    alerts_enabled: bool
+    params_version: str
+
+
+def _dca_state_payload(state: DcaSignalState) -> dict:
+    from app.services.dca_alert_copy import currency_label
+    from app.services.dca_signal_engine import ZONES
+
+    zone = ZONES.get(state.level, ZONES[1])
+    return {
+        "level": state.level,
+        "previous_level": state.previous_level,
+        "key": zone["key"],
+        "label": zone["label"],
+        "zone": zone["zone"],
+        "color": zone["color"],
+        "fg": zone["fg"],
+        "status": state.status,
+        "period": state.period,
+        "signal_date": state.signal_date,
+        "close": float(state.close),
+        "currency": state.currency,
+        "currency_label": currency_label(state.currency),
+        "metrics": state.metrics or {},
+        "level_prices": state.level_prices or {},
+        "params_version": state.params_version,
+        "data_source": state.data_source,
+        "evaluated_at": state.evaluated_at,
+        "last_alerted_level": state.last_alerted_level,
+        "last_alerted_period": state.last_alerted_period,
+    }
+
+
+@router.get("/dca-signals", response_model=DcaSignalsOut)
+def list_dca_signals(db: Session = Depends(get_db)) -> dict:
+    """Nivel DCA actual de cada ticker de watchlist + cartera y su minimo de aviso."""
+    from app.core.config import get_settings
+    from app.services import dca_signal_service as dca
+    from app.services.dca_signal_engine import DEFAULT_PARAMS, ZONES
+    from app.services.email_delivery import smtp_configured
+
+    settings = get_settings()
+    tracked = dca.tracked_symbols(db)
+    per_ticker = dca.overrides(db)
+    states = {
+        row.symbol.upper(): row
+        for row in db.scalars(select(DcaSignalState).where(*tenant_filters(db, DcaSignalState)))
+    }
+    items = []
+    for symbol, item in tracked.items():
+        override = per_ticker.get(symbol)
+        effective = dca.effective_min_level(override, settings)
+        state = states.get(symbol)
+        items.append({
+            "symbol": symbol,
+            "company_name": item.company.name if item.company is not None else None,
+            "sources": item.sources,
+            "in_watchlist": "watchlist" in item.sources,
+            "in_portfolio": "portfolio" in item.sources,
+            "min_level_override": override,
+            "effective_min_level": effective,
+            "alerts_on": bool(settings.dca_alerts_enabled) and effective > 0,
+            "state": _dca_state_payload(state) if state is not None else None,
+        })
+    return {
+        "alerts_enabled": bool(settings.dca_alerts_enabled),
+        "global_min_level": int(settings.dca_alert_min_level),
+        "trims_enabled": bool(settings.dca_alert_trims),
+        "channels": dca.alert_channels(settings),
+        "email_configured": smtp_configured(settings),
+        "signal_months": getattr(DEFAULT_PARAMS, "sma_months", None),
+        "zones": [{"level": level, **zone} for level, zone in ZONES.items()],
+        "items": items,
+    }
+
+
+@router.put("/{symbol}/dca-alert-min-level", response_model=DcaMinLevelOut)
+def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = Depends(get_db)) -> dict:
+    """Ajusta el nivel minimo de aviso DCA de un ticker (null = global, 0 = apagado)."""
+    from app.core.config import get_settings
+    from app.services import dca_signal_service as dca
+
+    key = symbol.strip().upper()
+    if key not in dca.tracked_symbols(db):
+        raise HTTPException(status_code=404, detail="El ticker no está en tu watchlist ni en tu cartera")
+    row = db.scalar(
+        select(DcaAlertOverride).where(DcaAlertOverride.symbol == key, *tenant_filters(db, DcaAlertOverride))
+    )
+    if payload.min_level is None:
+        if row is not None:
+            db.delete(row)
+    elif row is None:
+        db.add(DcaAlertOverride(tenant_id=db.info.get("tenant_id"), symbol=key, min_level=payload.min_level))
+    else:
+        row.min_level = payload.min_level
+    db.commit()
+    return {
+        "symbol": key,
+        "min_level_override": payload.min_level,
+        "effective_min_level": dca.effective_min_level(payload.min_level, get_settings()),
+    }
+
+
+@router.post("/dca-signals/evaluate", response_model=DcaEvaluateOut)
+async def evaluate_dca_signals_now(db: Session = Depends(get_db)) -> dict:
+    """Evalua ahora watchlist + cartera (una vez por minuto como maximo)."""
+    import time
+
+    from fastapi.concurrency import run_in_threadpool
+
+    from app.services.dca_signal_service import evaluate_watchlist
+
+    tenant = db.info.get("tenant_id") or "legacy"
+    now = time.monotonic()
+    last = _dca_last_manual_run.get(tenant)
+    if last is not None and now - last < _DCA_EVALUATE_COOLDOWN_SECONDS:
+        wait = int(_DCA_EVALUATE_COOLDOWN_SECONDS - (now - last)) + 1
+        raise HTTPException(
+            status_code=429,
+            detail=f"Ya se evaluó hace un momento; vuelve a intentarlo en {wait} s",
+            headers={"Retry-After": str(wait)},
+        )
+    _dca_last_manual_run[tenant] = now
+    return await run_in_threadpool(evaluate_watchlist, db)
+
+
+@router.get("/dca-signals/{symbol}/hit-rates", response_model=DcaHitRatesOut)
+def dca_hit_rates(symbol: str, db: Session = Depends(get_db)) -> dict:
+    """"¿Cuántas veces estaba más arriba?" por nivel (3/6/12/24/36 meses).
+
+    Sale de la ultima evaluacion guardada (misma serie y parametros que el
+    veredicto); sin evaluacion previa se declara no disponible, no se inventa.
+    """
+    from app.services.dca_signal_engine import ZONES
+
+    key = symbol.strip().upper()
+    state = db.scalar(
+        select(DcaSignalState).where(DcaSignalState.symbol == key, *tenant_filters(db, DcaSignalState))
+    )
+    if state is None:
+        raise HTTPException(status_code=404, detail="Ticker sin señal DCA evaluada (añádelo a watchlist o cartera)")
+    data = state.hit_rates or {}
+    if not data.get("rows"):
+        return {"symbol": key, "available": False, "reason": "Aún sin histórico calculado: se rellena en la próxima evaluación"}
+    colors = {zone["key"]: zone["color"] for zone in ZONES.values()}
+    rows = [{**row, "color": colors.get(row.get("key"), "#94A3B8")} for row in data["rows"]]
+    return {
+        "symbol": key,
+        "available": True,
+        "months_completed": data.get("months_completed", 0),
+        "first_period": data.get("first_period"),
+        "last_period": data.get("last_period"),
+        "horizons": data.get("horizons", []),
+        "params_version": data.get("params_version"),
+        "evaluated_at": state.evaluated_at,
+        "rows": rows,
+    }
+
+
+_PERIOD_RE = r"^\d{4}-(0[1-9]|1[0-2])$"
+
+
+@router.get("/dca-signals/{symbol}/backtest", response_model=DcaBacktestOut)
+def dca_backtest(
+    symbol: str,
+    start: str | None = Query(None, pattern=_PERIOD_RE, description="Primer mes con señal (YYYY-MM)"),
+    end: str | None = Query(None, pattern=_PERIOD_RE, description="Último mes con señal (YYYY-MM)"),
+    base: float = Query(100.0, gt=0, le=1_000_000, description="Aportación base mensual"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Backtest DCA plano vs DCA por niveles (Fórmula Nico v1) para cualquier ticker.
+
+    Sin look-ahead: veredicto con datos hasta el cierre de cada mes y compra al
+    primer cierre del mes siguiente. Usa la misma serie que la señal diaria
+    (Yahoo, cierre ajustado si existe y sin la barra del día en curso).
+    """
+    from app.services import dca_signal_service as svc
+    from app.services.dca_alert_copy import currency_label
+    from app.services.dca_backtest import backtest_dca
+    from app.services.dca_signal_engine import ZONES
+
+    key = symbol.strip().upper()
+    if not key or len(key) > 24:
+        raise HTTPException(status_code=422, detail="Ticker inválido")
+    if start and end and start > end:
+        raise HTTPException(status_code=422, detail="El inicio va después del final")
+    company = db.scalar(select(Company).where(Company.ticker == key))
+    yahoo = key
+    if company is not None:
+        from app.services.propicks_price_service import yahoo_symbol
+
+        yahoo = yahoo_symbol(company) or key
+    try:
+        fetched = svc.fetch_yahoo_history(yahoo)
+    except Exception as exc:  # proveedor caido o ticker desconocido: se dice, no se inventa
+        raise HTTPException(status_code=502, detail=f"No se pudo descargar el histórico de {key}") from exc
+    rows = svc.settled_rows(fetched.rows, datetime.now(UTC))
+    bars, _factor = svc.build_bars(rows)
+    if not bars:
+        return {"symbol": key, "available": False, "reason": "Sin histórico de precios para este ticker"}
+    result = backtest_dca(bars, start=start, end=end, base_amount=base, today=date.today())
+    currency = fetched.currency or (company.currency if company is not None else None)
+    out: dict = {
+        "symbol": key,
+        "currency": currency,
+        "currency_label": currency_label(currency),
+        "data_source": "yfinance",
+        **result,
+    }
+    hits = result.get("hit_rates")
+    if hits:
+        colors = {zone["key"]: zone["color"] for zone in ZONES.values()}
+        out["hit_rates"] = {
+            "symbol": key,
+            "available": bool(hits.get("rows")),
+            **hits,
+            "rows": [{**row, "color": colors.get(row.get("key"), "#94A3B8")} for row in hits.get("rows", [])],
+        }
+    return out
