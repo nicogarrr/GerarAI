@@ -304,9 +304,13 @@ async def fetch_public_url_async(
     *,
     max_bytes: int = DEFAULT_MAX_BYTES,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    headers: dict[str, str] | None = None,
 ) -> tuple[bytes, str | None, str]:
     target = await _resolve_public_url_async(url)
-    headers = {"User-Agent": USER_AGENT, "Accept": "*/*"}
+    request_headers = {"User-Agent": USER_AGENT, "Accept": "*/*"}
+    if headers:
+        request_headers.update(headers)
+    headers = request_headers
     async with httpx.AsyncClient(
         timeout=timeout,
         follow_redirects=False,
