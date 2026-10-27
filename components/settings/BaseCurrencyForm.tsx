@@ -73,11 +73,14 @@ export default function BaseCurrencyForm({ initial }: { initial: PortfolioCurren
                     {saving ? 'Guardando…' : 'Guardar'}
                 </Button>
             </div>
-            <p className="text-xs text-gray-400">
+            <details className="text-xs text-gray-400">
+                <summary className="min-h-11 cursor-pointer py-3 text-teal-300">Cómo se aplica la divisa</summary>
+                <p className="pb-2 leading-relaxed">
                 La cartera y sus totales se muestran en esta divisa, y la G/P se separa en efecto precio y efecto divisa.
                 Cada valor se sigue mostrando en la divisa en que cotiza. Las operaciones se guardan en su divisa original
                 y se convierten al leerlas, así que cambiar la base no reescribe nada. IRPF y Modelo 720 van siempre en EUR al tipo del BCE.
-            </p>
+                </p>
+            </details>
             <p className="text-xs text-gray-500">
                 Tipos de cambio: {fx?.source ?? 'BCE'}
                 {fx?.latest_rate_date ? `, último del ${formatDate(fx.latest_rate_date)}` : ', sin tipos descargados todavía'}.

@@ -109,8 +109,12 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                 </label>
             </div>
             {initial.partidas.length ? (
-                <fieldset className="space-y-2">
-                    <legend className="text-sm font-medium text-gray-200">Custodia por partida</legend>
+                <details className="rounded-lg border border-gray-800 p-3">
+                    <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-gray-200">
+                        Custodia por partida ({initial.partidas.length})
+                    </summary>
+                    <fieldset className="mt-3 space-y-2">
+                    <legend className="sr-only">Custodia por partida</legend>
                     <div className="space-y-3">
                         {initial.partidas.map((key) => {
                             const entity = entities[key] ?? EMPTY_ENTITY;
@@ -167,7 +171,8 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                             );
                         })}
                     </div>
-                </fieldset>
+                    </fieldset>
+                </details>
             ) : null}
             <Button disabled={busy} type="submit">{busy ? 'Guardando…' : 'Guardar'}</Button>
         </form>
