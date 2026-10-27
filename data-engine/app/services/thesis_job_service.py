@@ -123,7 +123,18 @@ def enqueue_generation(
     # lock se libera con el commit/rollback de la sesion.
     _lock_generation(db, tenant_id, ticker, force)
     active = latest_generation(db, ticker, active_only=True, force=force)
-    existing = _find_by_key(db, key, tenant_id) or active
+    keyed = _find_by_key(db, key, tenant_id)
+    existing = keyed or active
+    # Un request_id antiguo ya fallido NO se reactiva si otra peticion del
+    # mismo tenant+ticker+force esta activa: se reutiliza esa (una sola
+    # generacion activa). El replay de un run exitoso se conserva.
+    if (
+        keyed is not None
+        and keyed.status in ("failed", "dispatch_failed")
+        and active is not None
+        and active.id != keyed.id
+    ):
+        existing = active
     # Idempotencia: un run que ya termino bien se devuelve tal cual (replay),
     # pero uno FALLIDO no es un resultado reutilizable - el front dice
     # "puedes reintentar", asi que reintentar debe re-despachar de verdad.
@@ -422,6 +433,15 @@ def _is_retryable_error(exc: BaseException) -> bool:
         ),
     ):
         return True
+    from app.llm.errors import ProviderHTTPError, ProviderTransportError
+
+    # Errores propios de la cadena LLM (mismo criterio que el worker normal):
+    # llevan status_code directo, no response, y el transporte no hereda de
+    # ConnectionError/TimeoutError.
+    if isinstance(exc, ProviderTransportError):
+        return True
+    if isinstance(exc, ProviderHTTPError):
+        return exc.status_code == 429 or exc.status_code >= 500
     response = getattr(exc, "response", None)
     status = getattr(response, "status_code", None)
     return isinstance(status, int) and (status == 429 or status >= 500)
@@ -577,6 +597,7 @@ def run_thesis_job(run_id: int) -> None:
             return
 
         now = datetime.now(UTC)
+        lease_recovered = False
         if run.status == "running":
             started = _utc(run.started_at)
             if started is not None and now - started < RUNNING_LEASE:
@@ -594,10 +615,16 @@ def run_thesis_job(run_id: int) -> None:
                 run.finished_at = now
                 db.commit()
                 return
-            run.status = "retrying"
+            # Recuperacion y reclamo bajo el MISMO FOR UPDATE: no se confirma
+            # un estado intermedio ("retrying") porque el commit liberaba el
+            # lock y otra entrega podia reclamar y terminar el mismo attempt
+            # mientras esta seguia con un objeto ORM obsoleto. El reclamo
+            # (attempt+1, running, started_at nuevo) se confirma una sola vez
+            # mas abajo; las entregas concurrentes esperan el lock y ven un
+            # lease vigente.
+            lease_recovered = True
             run.error_class = "RecoverableRunningState"
             run.error_message = "A previous worker lease expired; retrying"
-            db.commit()
 
         settings = get_settings()
         payload = run.input_payload or {}
@@ -629,7 +656,7 @@ def run_thesis_job(run_id: int) -> None:
             db.commit()
             raise ValueError(run.error_message)
 
-        if run.status == "retrying":
+        if run.status == "retrying" or lease_recovered:
             run.attempt = max(int(run.attempt or 1) + 1, 2)
         else:
             run.attempt = max(int(run.attempt or 1), 1)

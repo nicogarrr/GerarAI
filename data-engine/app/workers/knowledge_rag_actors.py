@@ -15,13 +15,14 @@ from typing import Any
 
 import dramatiq
 
+from app.services.knowledge_rag.runtime import INGEST_TIME_LIMIT_MS
 from app.workers.dramatiq_app import _handle_actor_error, _session
 from app.workers.dramatiq_app import broker as _broker  # noqa: F401
 
 KNOWLEDGE_QUEUE_NAME = "knowledge"
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, queue_name=KNOWLEDGE_QUEUE_NAME, time_limit=3_600_000)
+@dramatiq.actor(max_retries=1, min_backoff=60_000, queue_name=KNOWLEDGE_QUEUE_NAME, time_limit=INGEST_TIME_LIMIT_MS)
 def ingest_knowledge_source(
     source_id: int,
     *,
