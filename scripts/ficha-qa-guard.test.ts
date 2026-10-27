@@ -56,7 +56,7 @@ describe('QA ficha: cabecera de panel sin solape en movil (6)', () => {
 
 describe('QA ficha: barra de modulos sin scrollbar en desktop (10)', () => {
     it('el nav de modulos envuelve en todos los tamanos', () => {
-        const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        assert.ok(page.includes('mb-7 flex flex-wrap gap-2'), 'modulos envuelven (movil y desktop)');
+        const nav = readFileSync('components/research/CompanyNavigation.tsx', 'utf8');
+        assert.ok(nav.includes('aria-label={`Módulos de ${primary.label}`} className="flex flex-wrap gap-2"'), 'modulos envuelven (movil y desktop)');
     });
 });
