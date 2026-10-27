@@ -50,8 +50,25 @@ def percent_es(value: float | None, decimals: int = 1) -> str | None:
     return f"{number_es(float(value) * 100, decimals)} %"
 
 
+def is_drop(dca: dict[str, Any]) -> bool:
+    """Aviso de bajada de nivel (informativo, no una senal nueva)."""
+    return dca.get("direction") == "down"
+
+
 def title(dca: dict[str, Any]) -> str:
+    if is_drop(dca):
+        previous = dca.get("previous_label")
+        suffix = f" (desde {previous})" if previous else ""
+        return f"{dca['symbol']} baja a {dca['label']}{suffix}"
     return f"{dca['symbol']} entró en {dca['label']}"
+
+
+def drop_note(dca: dict[str, Any]) -> str | None:
+    if not is_drop(dca):
+        return None
+    previous = dca.get("previous_label")
+    origin = f" desde {previous}" if previous else ""
+    return f"Aviso informativo: el nivel baja{origin} a {dca['label']}."
 
 
 def signal_metric(dca: dict[str, Any]) -> tuple[str, str] | None:
@@ -101,6 +118,9 @@ def message_text(dca: dict[str, Any]) -> str:
     if dca.get("company_name"):
         lines.append(str(dca["company_name"]))
     lines.append("")
+    note = drop_note(dca)
+    if note:
+        lines += [note, ""]
     lines += [f"{label}: {value}" for label, value in detail_rows(dca)]
     if dca.get("status") == "forming":
         lines += ["", "El mes aún no ha cerrado: el veredicto puede cambiar hasta el último cierre del mes."]
@@ -134,7 +154,8 @@ def email_content(dca: dict[str, Any]) -> EmailContent:
         + (f"<p style=\"margin:0 0 16px;color:#555\">{escape(str(company))}</p>" if company else "")
         + f"<span style=\"display:inline-block;padding:6px 14px;border-radius:999px;background:{escape(color)};"
         f"color:{escape(fg)};font-weight:700;border:1px solid #d0d0d0\">{escape(str(dca['label']))}</span>"
-        f"<table style=\"margin-top:16px;border-collapse:collapse\">{rows_html}</table>"
+        + (f"<p style=\"margin:12px 0 0;color:#555\">{escape(drop_note(dca) or '')}</p>" if is_drop(dca) else "")
+        + f"<table style=\"margin-top:16px;border-collapse:collapse\">{rows_html}</table>"
         + forming_note
         + f"<p style=\"font-size:11px;color:#777;margin:20px 0 0\">{escape(DISCLAIMER)} "
         "Señal generada por GerarAI con la fórmula DCA propia a partir de cierres diarios asentados.</p>"
