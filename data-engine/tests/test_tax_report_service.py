@@ -628,3 +628,86 @@ def test_legacy_persisted_oversell_is_sanitized_on_get_and_export_without_write(
     assert exported["tax"]["realized"][0]["sales"][0]["gain_native"] is None
     db.expire(stored)
     assert stored.realized == original
+
+
+
+def test_over_sell_bucket_cost_is_nd_not_partial_zero(db):
+    """Auditoría A: vender 5 a 120 sin compras dejaba el coste del ticker en
+    0,00 (agregado) aunque la venta y la ganancia ya salían N/D. El coste del
+    bloque mezcla una base desconocida: N/D; transmisión y cantidad reales."""
+    _eur_portfolio(db)
+    ovs = _company(db, "OVS")
+    _tx(db, ovs, date(2026, 3, 10), "sell", 5, 120)
+    report = TaxReportService().compute_report(db, 2026, include_filing=False)
+    (bucket,) = report["realized"]
+    assert bucket["over_sell"] is True
+    assert bucket["cost_native"] is None
+    assert bucket["gain_native"] is None and bucket["gain_base"] is None
+    assert bucket["proceeds_native"] == 600.0
+    assert bucket["sales"][0]["quantity"] == 5.0
+
+
+def test_over_sell_bucket_cost_is_nd_even_with_partial_lots(db):
+    _eur_portfolio(db)
+    ovs = _company(db, "OVS")
+    _tx(db, ovs, date(2026, 1, 5), "buy", 5, 100)
+    _tx(db, ovs, date(2026, 6, 1), "sell", 10, 120)
+    report = TaxReportService().compute_report(db, 2026, include_filing=False)
+    (bucket,) = report["realized"]
+    assert bucket["cost_native"] is None
+    assert bucket["proceeds_native"] == 1200.0
+
+
+def test_legacy_persisted_oversell_summary_totals_are_nd_on_read_and_export(db, monkeypatch):
+    """Informe guardado antes del arreglo con plusvalía total y base imponible
+    calculadas con coste cero: al leer (GET y exportación anual) salen N/D y
+    el coste del ticker también; el JSON guardado no se reescribe."""
+    import asyncio
+    import json
+    from copy import deepcopy
+
+    from app.api.routes.export import export_year
+    from app.models import TaxReport
+
+    realized = [{"ticker": "OVS", "currency": "EUR", "over_sell": True, "proceeds_native": 600.0,
+                 "cost_native": 0.0, "gain_native": 600.0, "gain_base": 600.0,
+                 "sales": [{"date": "2026-03-10", "quantity": 5, "proceeds_base": 600.0, "proceeds_native": 600.0,
+                            "cost_base": 0.0, "cost_native": 0.0, "gain_base": 600.0, "gain_native": 600.0,
+                            "raw_gain_native": 600.0, "over_sell": True}]}]
+    summary = {"fiscal_year": 2026, "base_currency": "EUR", "total_realized_gain_base": 600.0,
+               "net_taxable_base": 600.0, "total_dividends_base": 0.0}
+    stored = TaxReport(fiscal_year=2026, summary=deepcopy(summary), dividends=[],
+                       realized=deepcopy(realized), misc=[])
+    db.add(stored)
+    db.commit()
+    seen = {}
+
+    def fake_filing(self, db, fiscal_year, data, tme=None):
+        seen["summary"] = data["summary"]
+        return {}
+
+    monkeypatch.setattr(TaxReportService, "_build_filing", fake_filing)
+    read = TaxReportService().get_report(db, 2026)
+    assert read["summary"]["total_realized_gain_base"] is None
+    assert read["summary"]["net_taxable_base"] is None
+    assert read["summary"]["over_sell"] == ["OVS"]
+    assert read["summary"]["total_dividends_base"] == 0.0
+    # La capa IRPF (compensación de pérdidas) recibe el total ya anulado.
+    assert seen["summary"]["total_realized_gain_base"] is None
+    assert read["realized"][0]["cost_native"] is None
+    assert read["realized"][0]["proceeds_native"] == 600.0
+    assert stored.summary == summary
+    assert stored.realized == realized
+
+    response = export_year(2026, format="json", db=db)
+
+    async def collect():
+        chunks = [chunk async for chunk in response.body_iterator]
+        return b"".join(chunk if isinstance(chunk, bytes) else chunk.encode() for chunk in chunks)
+
+    exported = json.loads(asyncio.run(collect()))
+    assert exported["tax"]["summary"]["total_realized_gain_base"] is None
+    assert exported["tax"]["summary"]["net_taxable_base"] is None
+    assert exported["tax"]["realized"][0]["cost_native"] is None
+    db.expire(stored)
+    assert stored.summary == summary

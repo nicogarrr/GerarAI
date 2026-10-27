@@ -523,8 +523,39 @@ def sanitize_realized_over_sells(realized: list[dict]) -> list[dict]:
                 for key in ("cost_native", "cost_base", "gain_native", "gain_base", "raw_gain_native"):
                     sale[key] = None
         if affected:
+            bucket["cost_native"] = None
             bucket["gain_native"] = None
             bucket["gain_base"] = None
+    return result
+
+
+def sanitize_summary_over_sells(summary: dict | None, realized: list[dict]) -> dict:
+    """Copia de lectura del resumen de un informe persistido antiguo.
+
+    Un informe guardado antes de anular las ventas descubiertas puede llevar
+    la plusvalia total y la base imponible con el coste inventado (cero).
+    Si algun bloque tiene over_sell, ambos totales salen None al leer (misma
+    regla que ``compute_report``); el JSON persistido no se reescribe.
+    """
+    result = dict(summary or {})
+    if any(
+        bucket.get("over_sell")
+        or any(sale.get("over_sell") for sale in bucket.get("sales", []))
+        for bucket in realized or []
+    ):
+        result["total_realized_gain_base"] = None
+        result["net_taxable_base"] = None
+        flagged = set(result.get("over_sell") or [])
+        flagged.update(
+            bucket["ticker"]
+            for bucket in realized
+            if bucket.get("ticker")
+            and (
+                bucket.get("over_sell")
+                or any(sale.get("over_sell") for sale in bucket.get("sales", []))
+            )
+        )
+        result["over_sell"] = sorted(flagged)
     return result
 
 
@@ -916,10 +947,11 @@ class TaxReportService:
                     "ticker": bucket["ticker"],
                     "currency": bucket["currency"],
                     "proceeds_native": _money(bucket["proceeds_native"]),
-                    "cost_native": _money(bucket["cost_native"]),
-                    # Con alguna venta descubierta, el resultado del ticker
-                    # mezcla una base desconocida: N/D, nunca la suma parcial
-                    # (la transmision y el coste registrado si son observados).
+                    # Con alguna venta descubierta, el coste y el resultado
+                    # del ticker mezclan una base desconocida (el exceso se
+                    # valoro a coste cero): N/D, nunca la suma parcial. La
+                    # transmision si es un dato observado y se conserva.
+                    "cost_native": None if bucket["over_sell"] else _money(bucket["cost_native"]),
                     "gain_native": None if bucket["over_sell"] else _money(bucket["gain_native"]),
                     "gain_base": (
                         None
@@ -1160,7 +1192,7 @@ class TaxReportService:
         )
         if report is not None:
             data = {
-                "summary": report.summary,
+                "summary": sanitize_summary_over_sells(report.summary, report.realized),
                 "dividends": report.dividends,
                 "realized": sanitize_realized_over_sells(report.realized),
                 "misc": report.misc,
