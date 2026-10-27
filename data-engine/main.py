@@ -98,6 +98,14 @@ async def lifespan(_: FastAPI):
     if settings.app_env.lower() == "production":
         _start_embedder_warmup(settings)
 
+    if settings.app_env.lower() != "test":
+        # FastAPI construye cada ruta perezosamente en la primera peticion que
+        # la recorre (cientos de ms tras cada arranque). Se adelanta en un hilo
+        # de fondo; en tests no, porque cada TestClient arrancaria otro hilo.
+        from app.core.route_warmup import start_route_warmup
+
+        start_route_warmup(app)
+
     yield
 
     if scheduler is not None:

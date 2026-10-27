@@ -339,3 +339,37 @@ async def test_a_finished_provider_call_is_not_cancelled_by_the_fix():
     provider = Fake(delay=0)
     result = await complete_with_deadline(provider, chat_request(), source="test")
     assert result is not None and not provider.cancelled
+
+
+@run_async
+async def test_deadline_expiry_detected_inside_is_still_timeout(monkeypatch):
+    # Carrera vista en CI de main (c78fcec3): si el plazo vence y lo detecta
+    # antes el código interno (remaining_seconds/complete_with_deadline) que el
+    # wait_for externo, salía ProviderTransportError en vez de TimeoutError y
+    # answer() no aplicaba su fallback rotulado. Se fuerza ese orden bloqueando
+    # el loop hasta pasado el plazo: el resultado debe ser siempre TimeoutError.
+    monkeypatch.setattr(interactive_deadline, "get_settings",
+                        lambda: SimpleNamespace(chat_total_timeout_seconds=.05))
+
+    @bounded_chat
+    async def ask():
+        time.sleep(.1)  # bloqueante a propósito: el timer externo no llega a correr
+        return interactive_deadline.remaining_seconds()
+
+    with pytest.raises(TimeoutError):
+        await ask()
+
+
+@run_async
+async def test_provider_transport_timeout_from_a_real_provider_is_not_rewritten(monkeypatch):
+    # Solo el vencimiento del plazo total se normaliza: un fallo de transporte
+    # de un proveedor concreto conserva su tipo.
+    monkeypatch.setattr(interactive_deadline, "get_settings",
+                        lambda: SimpleNamespace(chat_total_timeout_seconds=5))
+
+    @bounded_chat
+    async def ask():
+        raise ProviderTransportError("groq", "timeout", 2)
+
+    with pytest.raises(ProviderTransportError):
+        await ask()

@@ -49,6 +49,8 @@ const envSchema = z.object({
   // Auth pública (P0: signup cerrado en prod por defecto)
   ALLOW_PUBLIC_SIGNUP: z.enum(['true', 'false']).optional(),
   REQUIRE_EMAIL_VERIFICATION: z.enum(['true', 'false']).optional(),
+  // Emails (separados por comas) que pueden registrarse aunque el alta esté cerrada.
+  SIGNUP_ALLOWLIST: z.string().optional(),
   E2E_AUTH_SECRET: z.string().optional(),
   APP_ENV: z.enum(['local', 'test', 'production']).optional(),
   NEXT_PUBLIC_SUPPORT_EMAIL: z.string().email().optional(),

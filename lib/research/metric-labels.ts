@@ -9,6 +9,11 @@
  */
 export const METRIC_LABELS: Record<string, string> = {
     market_cap: 'Capitalización bursátil',
+    // Screener conectado (screener_context_metrics.py).
+    margen_seguridad: 'Margen de seguridad (motor de valoración)',
+    tiene_tesis: 'Tiene tesis (1 = sí, 0 = no)',
+    tesis_publicada: 'Tesis publicada (1 = sí, 0 = no)',
+    nivel_dca: 'Nivel DCA (4 = 4X … 1 = 1X; −1/−2 = recorte)',
     roce: 'Rentabilidad del capital empleado (ROCE)',
     incremental_roic: 'ROIC incremental',
     stock_based_compensation: 'Remuneración en acciones',
@@ -43,6 +48,7 @@ export const METRIC_LABELS: Record<string, string> = {
     depreciation_and_amortization: 'Depreciación y amortización',
     maintenance_capex: 'Capex de mantenimiento',
     normalized_working_capital: 'Capital circulante normalizado',
+    change_in_working_capital: 'Variación del capital circulante (flujo de caja)',
     free_cash_flow: 'Flujo de caja libre',
     dividends_paid: 'Dividendos pagados',
     common_stock_repurchased: 'Recompra de acciones propias',

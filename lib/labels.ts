@@ -405,6 +405,7 @@ const VALORES_BACKEND: Record<string, string> = {
   insufficient_data: 'datos insuficientes',
   primary_official: 'oficial primaria',
   wacc_policy: 'política de WACC',
+  damodaran: 'Damodaran (NYU Stern)',
   model_policy: 'política del modelo',
   calculated_metric: 'métrica calculada',
   financial_facts: 'datos financieros',

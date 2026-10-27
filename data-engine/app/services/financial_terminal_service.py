@@ -49,7 +49,7 @@ METRIC_DEFINITIONS_TEXT = {
     "stock_based_compensation": "Stock-based compensation expense.",
     "working_capital": "Operating current assets less operating current liabilities.",
     "capital_expenditure": "Cash investment in property, plant and equipment.",
-    "owner_earnings": "Net income plus D&A less maintenance capex and normalized working-capital needs.",
+    "owner_earnings": "Buffett owner earnings (Berkshire Hathaway 1986 letter): net income + D&A + change in working capital (cash-flow sign: negative when working capital absorbs cash) - maintenance capex (estimated as min(|capex|, D&A) when not reported).",
 }
 
 

@@ -62,6 +62,20 @@ function NativePnlLine({ holding, gainKnown, format }: { holding: PortfolioHoldi
   );
 }
 
+function FxEffectLine({ holding, format }: { holding: PortfolioHolding; format: (value: number, currency: string) => string }) {
+  // Solo con divisa nativa distinta de la base y con el reparto calculado.
+  if (holding.nativeCurrency === holding.baseCurrency) return null;
+  if (holding.priceEffect == null || holding.fxEffect == null) return null;
+  return (
+    <span
+      className="block text-right text-xs text-gray-400"
+      title={`Efecto precio: lo que se movió la acción en ${holding.nativeCurrency}, al tipo de hoy. Efecto divisa: lo que se movió el ${holding.nativeCurrency} frente al ${holding.baseCurrency} desde cada compra.`}
+    >
+      Precio {format(holding.priceEffect, holding.baseCurrency)} · Divisa {format(holding.fxEffect, holding.baseCurrency)}
+    </span>
+  );
+}
+
 export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency }: Props) {
   const router = useRouter();
   const [currentHoldings, setCurrentHoldings] = useState<PortfolioHolding[]>(holdings);
@@ -231,6 +245,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         </dd>
                       </div>
                       <NativePnlLine holding={holding} gainKnown={gainKnown} format={format} />
+                      {gainKnown ? <FxEffectLine holding={holding} format={format} /> : null}
                       {/* Dato decisional fiscal reubicado (SERIE 1, auditoría): accesible por fila, nulo honesto. */}
                       <div className="flex items-center justify-between gap-2">
                         <dt className="text-gray-500">Fiscal</dt>
@@ -344,6 +359,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                             {gainKnown ? formatPercent(holding.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' }, NA) : NA}
                           </Badge>
                           <NativePnlLine holding={holding} gainKnown={gainKnown} format={format} />
+                      {gainKnown ? <FxEffectLine holding={holding} format={format} /> : null}
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-sm">

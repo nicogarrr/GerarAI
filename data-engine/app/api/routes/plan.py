@@ -166,6 +166,14 @@ def delete_contribution(contribution_id: int, db: Session = Depends(get_db)) -> 
         raise HTTPException(status_code=404, detail="Contribution not found")
 
 
+@router.get("/contribution-split")
+def contribution_split(db: Session = Depends(get_db)) -> dict:
+    """Reparto de la aportacion de este mes ponderado por nivel DCA."""
+    from app.services.plan_contribution_split import build_contribution_split
+
+    return build_contribution_split(db)
+
+
 @router.get("/drift")
 def drift_analysis(db: Session = Depends(get_db)) -> dict:
     return InvestmentPlanService().drift_analysis(db)

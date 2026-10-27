@@ -111,6 +111,18 @@ TERMS_ES: dict[str, str] = {
     "no_revenue_reported": "ingresos reportados",
     "revenue_history_two_periods": "histórico de ingresos de dos períodos",
     "unknown": "desconocido",
+    # Motores, marcos y riesgos que llegaban en inglés al memo (prueba real
+    # ASTS/BABA, 2026-10-27). Las claves compuestas con «+» se traducen por
+    # partes en `term_es`.
+    "dilution": "dilución",
+    "sotp": "suma de partes (SOTP)",
+    "buyback_adjusted_dcf": "DCF ajustado por recompras",
+    "holding_company": "holding",
+    "china_adr_holding": "holding china cotizada como ADR",
+    "space_network": "red espacial",
+    "spectrum": "espectro",
+    "execution": "ejecución",
+    "funding": "financiación",
     # Marco advertising_platform (Meta y ads/social): drivers y KPIs reales
     # que la empresa desglosa en resultados, en español para memo y UI.
     "advertising_platform": "Plataforma publicitaria / de atención",
@@ -136,6 +148,12 @@ def term_es(key: object) -> str:
     el motor que las emite): se prueba la clave tal cual, en minusculas y
     normalizada a snake_case para que una sola entrada cubra ambas formas."""
     text = str(key)
+    if "+" in text and text not in TERMS_ES:
+        # Combinaciones de motores ("sotp+buyback adjusted dcf"): cada parte
+        # con su etiqueta, en vez de dejar la cadena entera en inglés.
+        parts = [part.strip() for part in text.split("+") if part.strip()]
+        if len(parts) > 1:
+            return " + ".join(term_es(part) for part in parts)
     return (
         TERMS_ES.get(text)
         or TERMS_ES.get(text.lower())

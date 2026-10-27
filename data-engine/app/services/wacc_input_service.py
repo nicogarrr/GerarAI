@@ -1,5 +1,6 @@
 import asyncio
-from datetime import UTC, datetime
+import os
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import select
@@ -8,6 +9,14 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.tenancy import tenant_filters
 from app.models import Company, Document, FinancialFact
+from app.services.connectors.damodaran import (
+    DAMODARAN_ERP_COLUMN,
+    DAMODARAN_ERP_PAGE,
+    DAMODARAN_ERP_URL,
+    ImpliedErp,
+    implied_erp_series,
+    latest_implied_erp,
+)
 from app.services.connectors.fred import FREDClient
 
 # Sufijos Yahoo por bolsa (free tier): solo mercados confirmados en prod.
@@ -120,6 +129,9 @@ class WaccInputService:
                     )
                 )
 
+        # ERP implicito del mes vigente (Damodaran, gratuito y citado). Sin
+        # dato se mantiene el valor fijo de settings y se declara la fuente.
+        implied_erp = await self._damodaran_implied_erp(as_of)
         country = self._company_country(company)
         crp_table_value = _DAMODARAN_CRP_BY_COUNTRY.get(country or "")
         crp_source = "damodaran_ctryprem" if crp_table_value is not None else "settings_default"
@@ -130,6 +142,9 @@ class WaccInputService:
             "country": country
             or getattr(settings, "wacc_default_country", "US"),
             "country_risk_premium_source": crp_source,
+            "equity_risk_premium_source": "damodaran_implied_erp"
+            if implied_erp is not None
+            else "settings_default",
         }
         if crp_table_value is not None:
             policy_metadata["country_risk_premium_reference"] = {
@@ -144,19 +159,49 @@ class WaccInputService:
             metadata=policy_metadata,
         )
         sources.append(policy_document.id)
+        if implied_erp is not None:
+            erp_document = self._source_document(
+                db,
+                company,
+                source_type="damodaran",
+                title=f"Damodaran (NYU Stern) ERP implícito {implied_erp.month.isoformat()}",
+                metadata={
+                    "source": "Aswath Damodaran, Implied Equity Risk Premiums (NYU Stern)",
+                    "source_url": DAMODARAN_ERP_URL,
+                    "page": DAMODARAN_ERP_PAGE,
+                    "month": implied_erp.month.isoformat(),
+                    "column": DAMODARAN_ERP_COLUMN,
+                    # Referencia: la columna T12m (no se usa en el WACC).
+                    "erp_t12m_reference": str(implied_erp.erp_t12m)
+                    if implied_erp.erp_t12m is not None
+                    else None,
+                    "tbond_rate": str(implied_erp.tbond) if implied_erp.tbond is not None else None,
+                    "date": as_of,
+                },
+            )
+            sources.append(erp_document.id)
+            facts.append(
+                self._upsert_fact(
+                    db,
+                    company,
+                    metric="equity_risk_premium",
+                    value=implied_erp.erp,
+                    period=as_of,
+                    source=erp_document,
+                    source_type="wacc_policy",
+                    confidence=Decimal("0.80"),
+                )
+            )
+        policy_premiums: list[tuple[str, Decimal]] = []
+        if implied_erp is None:
+            policy_premiums.append(
+                (
+                    "equity_risk_premium",
+                    Decimal(str(getattr(settings, "wacc_equity_risk_premium", 0.0433))),
+                )
+            )
         for metric, value in [
-            (
-                "equity_risk_premium",
-                Decimal(
-                    str(
-                        getattr(
-                            settings,
-                            "wacc_equity_risk_premium",
-                            0.0433,
-                        )
-                    )
-                ),
-            ),
+            *policy_premiums,
             (
                 "country_risk_premium",
                 crp_table_value
@@ -244,6 +289,20 @@ class WaccInputService:
                 is None
             ],
         }
+
+    async def _damodaran_implied_erp(self, as_of: str) -> ImpliedErp | None:
+        """ERP implicito de Damodaran del ultimo mes publicado (``None`` si no hay).
+
+        ``WACC_DAMODARAN_ERP=0`` lo apaga sin desplegar (vuelve el valor fijo
+        de settings). Nunca lanza: un fallo de red o de formato es ``None``.
+        """
+        if os.getenv("WACC_DAMODARAN_ERP", "1").strip() == "0":
+            return None
+        try:
+            rows = await implied_erp_series()
+            return latest_implied_erp(rows, date.fromisoformat(as_of))
+        except Exception:  # noqa: BLE001 - mejor esfuerzo: el WACC sigue con settings
+            return None
 
     def _source_document(
         self,

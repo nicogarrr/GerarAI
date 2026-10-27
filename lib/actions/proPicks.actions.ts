@@ -61,12 +61,12 @@ export interface ProPick {
   sector?: string;
   exchange?: string;
   vsSector?: {
-    value: number;
-    growth: number;
-    profitability: number;
-    cashFlow: number;
-    momentum: number;
-    debtLiquidity: number;
+    value: number | null;
+    growth: number | null;
+    profitability: number | null;
+    cashFlow: number | null;
+    momentum: number | null;
+    debtLiquidity: number | null;
   };
   upsidePotential?: number;
   isStrongBuy?: boolean;
@@ -292,7 +292,7 @@ function buildConfidence(
 
   let confidence = score >= 80 ? 82 : score >= 70 ? 72 : score >= 60 ? 60 : 45;
   if (upsidePotential > 15) confidence += 6;
-  const strongVsSector = Object.values(advanced.sectorComparison?.vsSector ?? {}).filter((d) => d > 5).length;
+  const strongVsSector = Object.values(advanced.sectorComparison?.vsSector ?? {}).filter((d) => d !== null && d > 5).length;
   if (strongVsSector >= 2) confidence += 4;
   const bestCategory = (Object.entries(advanced.categoryScores) as Array<[keyof AdvancedScoreData['categoryScores'], number]>)
     .sort((a, b) => b[1] - a[1])[0];
@@ -312,9 +312,10 @@ function buildConfidence(
     });
   }
   const deltas = advanced.sectorComparison?.vsSector;
-  if (deltas && bestCategory && deltas[bestCategory[0]] > 5) {
+  const bestDelta = bestCategory ? deltas?.[bestCategory[0]] : null;
+  if (bestCategory && bestDelta != null && bestDelta > 5) {
     const [key, catScore] = bestCategory;
-    const delta = Math.round(deltas[key]);
+    const delta = Math.round(bestDelta);
     candidates.push({
       metric: `cat_${key}`,
       value: catScore,

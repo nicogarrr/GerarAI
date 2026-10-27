@@ -3,8 +3,11 @@
  * marco blanco horneado (HIMS/UNH/UBER y BN/AMZN medidos el 2026-10-20).
  *
  * Contrato:
- * - analyzeLogoPixels detecta el placeholder invisible de FMP (HTTP 200 con
- *   PNG vacío) como blank -> CompanyLogo cae a las iniciales (NameAvatar).
+ * - analyzeLogoPixels detecta un placeholder invisible (HTTP 200 con PNG
+ *   vacío) como blank -> CompanyLogo pasa a la siguiente fuente y, al final,
+ *   a las iniciales (NameAvatar).
+ * - Un logo BLANCO sobre transparente (UBER, UNH, HIMS, V en FMP; medido el
+ *   2026-10-27) NO es blank: se mide por alfa y se pinta sobre fondo oscuro.
  * - El margen blanco horneado se recorta a la caja de contenido (bbox).
  * - El contenedor se rellena con el color de la esquina del logo, no con un
  *   marco blanco; logo transparente -> fondo blanco legible.
@@ -41,12 +44,32 @@ const HUECO: [number, number, number, number] = [0, 0, 0, 0];
 const TINTA: [number, number, number, number] = [20, 40, 90, 255];
 
 describe('analyzeLogoPixels: placeholder y marco del proveedor', () => {
-  it('placeholder de FMP: todo blanco o todo transparente es blank (HIMS/UNH/UBER)', () => {
+  it('placeholder: todo blanco o todo transparente es blank', () => {
     assert.equal(analyzeLogoPixels(8, 8, pixels(8, 8, () => BLANCO)).blank, true);
     assert.equal(analyzeLogoPixels(8, 8, pixels(8, 8, () => HUECO)).blank, true);
     // Niebla: <2% de contenido también es placeholder (niebla de compresión).
     const niebla = pixels(32, 32, (x, y) => (x === 3 && y === 3 ? TINTA : HUECO));
     assert.equal(analyzeLogoPixels(32, 32, niebla).blank, true);
+  });
+
+  it('glifo BLANCO sobre transparente (UBER/UNH/HIMS/V) es logo real y pide fondo oscuro', () => {
+    // Reproduce el PNG de FMP de UBER: 16% del lienzo en blanco puro opaco,
+    // resto transparente. Antes salía blank (0% «contenido») -> iniciales.
+    const uber = analyzeLogoPixels(20, 20, pixels(20, 20, (x, y) => (x >= 4 && x < 16 && y >= 8 && y < 12 ? BLANCO : HUECO)));
+    assert.equal(uber.blank, false);
+    assert.equal(uber.onDark, true);
+    assert.equal(uber.background, null);
+    assert.deepEqual(uber.bbox, { x: 2, y: 6, w: 16, h: 8 });
+    // Niebla blanca (<2%) sobre transparente sigue siendo placeholder.
+    const niebla = pixels(32, 32, (x, y) => (x === 3 && y === 3 ? BLANCO : HUECO));
+    assert.equal(analyzeLogoPixels(32, 32, niebla).blank, true);
+  });
+
+  it('logo blanco con detalle de color sobre transparente: mayoría clara -> fondo oscuro', () => {
+    // Banda blanca centrada con un detalle de color; esquinas transparentes.
+    const a = analyzeLogoPixels(10, 10, pixels(10, 10, (x, y) => (y >= 3 && y < 8 ? (x === 5 ? TINTA : BLANCO) : HUECO)));
+    assert.equal(a.blank, false);
+    assert.equal(a.onDark, true);
   });
 
   it('logo que llena el lienzo: bbox completo y color de esquina', () => {
@@ -70,14 +93,23 @@ describe('analyzeLogoPixels: placeholder y marco del proveedor', () => {
     const a = analyzeLogoPixels(10, 10, pixels(10, 10, (x, y) => (x >= 2 && x < 8 && y >= 2 && y < 8 ? TINTA : HUECO)));
     assert.equal(a.blank, false);
     assert.equal(a.background, null);
+    assert.equal(a.onDark, false, 'glifo oscuro: fondo blanco, no oscuro');
+  });
+
+  it('logo opaco con fondo blanco nunca pide fondo oscuro (sin transparencia)', () => {
+    const a = analyzeLogoPixels(20, 20, pixels(20, 20, (x, y) => (x >= 8 && x < 12 && y >= 8 && y < 12 ? TINTA : BLANCO)));
+    assert.equal(a.onDark, false);
   });
 });
 
 describe('CompanyLogo: la caja blanca vacía no puede volver', () => {
-  it('mide píxeles con CORS y cae a iniciales si el logo está en blanco', () => {
+  it('mide píxeles con CORS y pasa a la siguiente fuente si el logo está en blanco', () => {
     assert.ok(vista.includes('analyzeLogoPixels'), 'el análisis de píxeles decide');
     assert.ok(vista.includes('crossOrigin="anonymous"'), 'sin CORS el canvas se contamina');
-    assert.ok(vista.includes("setFailedFor(ticker)"), 'placeholder -> fallback');
+    assert.match(vista, /if \(analysis\.blank\) \{\s*next\(\);/, 'placeholder -> siguiente fuente');
+    assert.match(vista, /onError=\{next\}/, '404 -> siguiente fuente');
+    assert.ok(vista.includes('logoSources(ticker)'), 'cadena de fuentes, no una sola URL');
+    assert.ok(vista.includes('DARK_LOGO_BACKGROUND'), 'glifo claro -> fondo oscuro');
     assert.match(vista, /<NameAvatar name=\{name \|\| ticker\}/, 'iniciales como red honesta');
   });
 

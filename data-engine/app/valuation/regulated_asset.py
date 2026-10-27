@@ -51,12 +51,18 @@ The dividend cross-check
 
 The same equity value has to be reachable from the dividend, because that is
 how the value is actually distributed: ``V = D1 / (ke - g)`` with
-``D1 = B * allowed_roe * payout * (1 + g)``. Setting (E) equal to that gives
+``D1 = B * allowed_roe * payout`` (``B`` is the OPENING book: year-1 earnings
+are ``allowed_roe * B``, the same base the residual income ``(allowed_roe -
+ke) * B`` of (E) is measured on; Penman, *Financial Statement Analysis and
+Security Valuation*, residual income ``RI_t = E_t - ke * B_{t-1}``; CFA
+Level II, Residual Income Valuation). Clean surplus with ``B`` growing at
+``g`` gives ``D1 = E1 - g * B = B * (allowed_roe - g)``. Setting (E) equal to
+the dividend leg gives
 
-    payout = (allowed_roe - g) / (allowed_roe * (1 + g))               (P)
+    payout = (allowed_roe - g) / allowed_roe = 1 - g / allowed_roe     (P)
 
-which at ``g = 0`` is ``payout = 1`` and, to first order, is the familiar
-sustainable-growth condition ``g = (1 - payout) * allowed_roe``. ``P`` is
+which at ``g = 0`` is ``payout = 1`` and is exactly the sustainable-growth
+condition ``g = (1 - payout) * allowed_roe``. ``P`` is
 *not* an assumption to be satisfied: it is a diagnostic. A utility paying 70%
 with a 2% allowed-ROE growth assumption is mis-modelled by exactly the
 difference, and ``reconcile_regulated_asset_model`` returns that difference
@@ -303,9 +309,10 @@ def reconcile_regulated_asset_model(
     """Excess-return leg vs dividend leg of the same equity value.
 
     ``(E)`` says ``V = B * (1 + (allowed_roe - ke)/(ke - g))``; Gordon on the
-    distributed dividend says ``V = B * allowed_roe * payout * (1 + g) /
-    (ke - g)``. They are the same number **iff**
-    ``payout = (allowed_roe - g) / (allowed_roe * (1 + g))``. The residual is
+    distributed dividend says ``V = B * allowed_roe * payout / (ke - g)``
+    (``D1`` is year-1 earnings on the opening book times the payout: no extra
+    ``(1 + g)``). They are the same number **iff**
+    ``payout = (allowed_roe - g) / allowed_roe``. The residual is
     returned explicitly, together with that reconciling payout, so a reader
     can tell a modelled utility from a mis-modelled one.
     """
@@ -317,17 +324,17 @@ def reconcile_regulated_asset_model(
         cost_of_equity=cost_of_equity,
         growth=growth,
     )
-    dividend_next = book_equity * allowed_roe * payout_ratio * (1 + growth)
+    dividend_next = book_equity * allowed_roe * payout_ratio
     dividend_value = dividend_next / (cost_of_equity - growth)
     residual = excess["equity_value"] - dividend_value
     reconciling_payout = (
-        (allowed_roe - growth) / (allowed_roe * (1 + growth)) if allowed_roe > 0 else None
+        (allowed_roe - growth) / allowed_roe if allowed_roe > 0 else None
     )
     return {
         "excess_return_leg": excess,
         "dividend_next_year": dividend_next,
         "dividend_leg_value": dividend_value,
-        "dividend_leg_formula": "V = book_equity * allowed_roe * payout * (1 + g) / (ke - g)",
+        "dividend_leg_formula": "V = book_equity * allowed_roe * payout / (ke - g)",
         "residual": residual,
         "residual_pct_of_excess_leg": (
             residual / excess["equity_value"] if excess["equity_value"] else None
@@ -340,7 +347,7 @@ def reconcile_regulated_asset_model(
             "ok" if abs(residual) <= 1e-9 * max(1.0, abs(excess["equity_value"])) else "divergent"
         ),
         "note": (
-            "payout = (allowed_roe - g) / (allowed_roe * (1 + g)) is the only "
+            "payout = (allowed_roe - g) / allowed_roe is the only "
             "payout at which the regulatory promise and the distributed "
             "dividend are the same claim on the same cash. A utility that "
             "pays less is funding the rate base with retained earnings, and "

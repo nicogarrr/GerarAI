@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { NameAvatar } from '@/components/ui/name-avatar';
 import { analyzeLogoPixels } from '@/lib/logo-analysis';
+import { DARK_LOGO_BACKGROUND, logoSources } from '@/lib/logos/logo-sources';
 
 type Props = {
     ticker: string;
@@ -11,39 +12,48 @@ type Props = {
     className?: string;
 };
 
-type LogoArt = { src: string; background: string | null; forTicker: string };
+type LogoArt = { src: string; background: string | null; forKey: string };
 
 /**
- * Logo real de empresa: imagen pública y gratuita de Financial Modeling Prep
- * (sin clave, por ticker). Verdad medida sobre el universo (2026-10-20):
+ * Logo real de empresa con cadena de fuentes (lib/logos/logo-sources.ts):
+ * FMP image-stock por ticker -> icono oficial de la web de la empresa vía
+ * nuestra ruta cacheada /api/logo -> iniciales. Verdad medida (2026-10-27):
  *
- * - FMP devuelve HTTP 200 con un PNG VACÍO para tickers sin logo (HIMS, UNH,
- *   UBER): `onload` dispara igual y la caja blanca parecía logo cargado. Al
- *   cargar se miden los píxeles en un canvas (FMP manda CORS *) y si el
- *   contenido visible es <2% se declara fallo y se ven las iniciales.
+ * - UBER, UNH, HIMS y V NO estaban vacíos: FMP los sirve como glifo BLANCO
+ *   sobre transparente. El análisis anterior contaba el blanco como «nada» y
+ *   caía a las iniciales. Ahora el análisis mide por alfa y, si el glifo es
+ *   claro, se pinta sobre fondo oscuro para que se lea.
+ * - Placeholder real (PNG vacío) o 404 (AENA sin sufijo) -> siguiente fuente.
  * - Muchos PNG llevan el margen blanco horneado (BN, AMZN…): se recorta a
  *   la caja de contenido para que el logo llene el contenedor.
  * - Un logo rectangular (CGEO.L) rellena la caja con el color de su propia
- *   esquina, no con un marco blanco; un logo con transparencia (AAPL) sigue
- *   sobre fondo blanco para que el glifo oscuro se lea.
+ *   esquina, no con un marco blanco; un logo oscuro con transparencia (AAPL)
+ *   sigue sobre fondo blanco para que el glifo se lea.
  *
  * Sin canvas (navegador raro o CORS retirado) se degrada a mostrar la imagen
- * tal cual, como antes. Nunca un hueco vacío ni el logo de otra empresa.
+ * tal cual. Nunca un hueco vacío ni el logo de otra empresa.
  */
 export function CompanyLogo({ ticker, name, className }: Props) {
+    const sources = logoSources(ticker);
     const [art, setArt] = useState<LogoArt | null>(null);
-    const [failedFor, setFailedFor] = useState<string | null>(null);
+    // Índice de la fuente en curso; la clave ata cada estado a su ticker.
+    const [attempt, setAttempt] = useState<{ ticker: string; index: number }>({ ticker, index: 0 });
     const [plainFor, setPlainFor] = useState<string | null>(null);
     const img = useRef<HTMLImageElement>(null);
 
-    const ready = art?.forTicker === ticker ? art : null;
-    const failed = failedFor === ticker;
-    const plain = plainFor === ticker;
+    const index = attempt.ticker === ticker ? attempt.index : 0;
+    const src = sources[index] ?? null;
+    const key = `${ticker}#${index}`;
+    const ready = art?.forKey === key ? art : null;
+    const failed = src === null;
+    const plain = plainFor === key;
     const loading = !ready && !failed && !plain;
+
+    const next = () => setAttempt({ ticker, index: index + 1 });
 
     const inspect = (el: HTMLImageElement) => {
         if (el.naturalWidth === 0) {
-            setFailedFor(ticker);
+            next();
             return;
         }
         try {
@@ -55,17 +65,17 @@ export function CompanyLogo({ ticker, name, className }: Props) {
             canvas.height = h;
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (!ctx) {
-                setPlainFor(ticker);
+                setPlainFor(key);
                 return;
             }
             ctx.drawImage(el, 0, 0, w, h);
             const analysis = analyzeLogoPixels(w, h, ctx.getImageData(0, 0, w, h).data);
             if (analysis.blank) {
-                setFailedFor(ticker);
+                next();
                 return;
             }
             const { x, y, w: cw, h: ch } = analysis.bbox;
-            const src =
+            const cropped =
                 cw >= w && ch >= h
                     ? el.src
                     : (() => {
@@ -75,10 +85,11 @@ export function CompanyLogo({ ticker, name, className }: Props) {
                           crop.getContext('2d')?.drawImage(canvas, x, y, cw, ch, 0, 0, cw, ch);
                           return crop.toDataURL('image/png');
                       })();
-            setArt({ src, background: analysis.background, forTicker: ticker });
+            const background = analysis.background ?? (analysis.onDark ? DARK_LOGO_BACKGROUND : null);
+            setArt({ src: cropped, background, forKey: key });
         } catch {
             // Canvas contaminado o no disponible: la imagen se muestra tal cual.
-            setPlainFor(ticker);
+            setPlainFor(key);
         }
     };
 
@@ -87,7 +98,7 @@ export function CompanyLogo({ ticker, name, className }: Props) {
         if (!el || !el.complete || !loading) return;
         inspect(el);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ticker, loading]);
+    }, [key, loading]);
 
     if (failed) {
         return <NameAvatar name={name || ticker} className={className} />;
@@ -101,15 +112,18 @@ export function CompanyLogo({ ticker, name, className }: Props) {
             style={ready?.background ? { background: ready.background } : undefined}
         >
             {loading ? <NameAvatar name={name || ticker} className="absolute inset-0 size-full" /> : null}
-            {/* eslint-disable-next-line @next/next/no-img-element -- proveedor externo de logos con análisis de píxeles y fallback controlado; next/image exigiría fijar el dominio en config */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- fuentes de logo con análisis de píxeles y fallback controlado; next/image exigiría fijar el dominio en config */}
             <img
+                key={key}
                 ref={img}
-                src={`https://financialmodelingprep.com/image-stock/${encodeURIComponent(ticker)}.png`}
+                src={ready ? ready.src : src}
                 alt=""
                 crossOrigin="anonymous"
                 referrerPolicy="no-referrer"
-                onLoad={(e) => inspect(e.currentTarget)}
-                onError={() => setFailedFor(ticker)}
+                onLoad={(e) => {
+                    if (!ready) inspect(e.currentTarget);
+                }}
+                onError={next}
                 className={
                     ready
                         ? 'absolute inset-0 size-full object-contain'
