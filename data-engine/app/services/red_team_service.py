@@ -310,6 +310,14 @@ class RedTeamService:
                     materiality_score=10 - min(5, score // 20),
                     impact_direction="negative",
                     metadata={"red_team_run_id": run.id},
+                    # Prueba real realqa-16: añadir 12 empresas a la watchlist
+                    # generaba 12 tesis automáticas y, con ellas, 12 avisos
+                    # «La valoración no se puede publicar todavía…» que nadie
+                    # había configurado. El red team es una revisión interna de
+                    # la tesis: queda en la bandeja de revisión y en la ficha,
+                    # pero no dispara un aviso. Los avisos son las reglas que el
+                    # usuario crea.
+                    emit=False,
                 )
         if commit:
             db.commit()
