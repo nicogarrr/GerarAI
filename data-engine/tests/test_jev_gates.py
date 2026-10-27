@@ -409,7 +409,7 @@ def test_4_needs_llm_sintetiza(monkeypatch):
 
 def test_4_sin_ticker_va_a_sintesis_general_en_espanol():
     # Sin ticker el gate jev no aplica: la pregunta general siempre la
-    # responde el LLM en prosa natural (chat-general-v3), nunca el template.
+    # responde el LLM en prosa natural (chat-general-v4), nunca el template.
     engine = _memdb()
     provider = CountingJsonProvider(_chat_payload())
     with Session(engine) as db:
@@ -417,7 +417,7 @@ def test_4_sin_ticker_va_a_sintesis_general_en_espanol():
             ChatService(provider).answer(db, "Cuéntame algo interesante sobre Madrid", "portfolio", None)
         )
     assert provider.calls == 1
-    assert resp.prompt_version == "chat-general-v3"
+    assert resp.prompt_version == "chat-general-v4"
 
 
 def test_4b_financiero_sin_fuentes_rechaza_respuesta_no_etiquetada():

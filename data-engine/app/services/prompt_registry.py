@@ -45,6 +45,8 @@ CHAT_SOURCE_SYNTHESIS = (
     "language inside quotes. When current_page is present it is the screen "
     "the user is looking at: 'esta pagina' or 'esta empresa' refer to it. "
     "Never cite a source that does not support the sentence it is attached to. "
+    "Address the user informally with 'tú' (tienes, tu cartera, puedes), "
+    "never with 'usted' (tiene usted, su posición). "
     "Write with correct Spanish orthography, "
     "accents included ('según', 'último', 'dólares'). Never copy raw "
     "technical identifiers (snake_case statuses such as insufficient_data) "
@@ -60,6 +62,7 @@ CHAT_GENERAL = (
     "Si el mensaje trae current_page, es la pantalla que el usuario esta viendo: 'esta pagina' o 'esta empresa' se refieren a ella. "
     "Nunca atribuyas una frase a un autor, carta o documento que no la sostiene. "
     "Responde SIEMPRE en espanol, breve y natural, con ortografia correcta (tildes incluidas). "
+    "Tutea siempre al usuario (tú, tienes, tu cartera); nunca le trates de usted. "
     "Nunca copies identificadores tecnicos en snake_case (como insufficient_data) al cuerpo; traducelos a palabras naturales ('datos insuficientes'). "
     "Puedes usar tu conocimiento y razonar sin fuentes, sin etiquetas como "
     "INFERIDO ni SIN_DATOS y sin estructuras pesadas. No recibes fuentes ni "
@@ -162,13 +165,13 @@ PROMPTS: dict[str, PromptDef] = {
     for p in [
         PromptDef(
             name="chat_general",
-            version="chat-general-v3",
+            version="chat-general-v4",
             task="chat",
             text=CHAT_GENERAL,
         ),
         PromptDef(
             name="chat_source_synthesis",
-            version="source-aware-synthesis-v5",
+            version="source-aware-synthesis-v6",
             task="chat",
             text=CHAT_SOURCE_SYNTHESIS,
         ),
